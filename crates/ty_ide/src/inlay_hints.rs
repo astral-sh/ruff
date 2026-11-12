@@ -585,12 +585,13 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
-                let details =
-                    if self.settings.call_argument_names && !call.arguments.args.is_empty() {
-                        inlay_hint_call_argument_details(self.db, &self.model, call)
-                    } else {
-                        None
-                    };
+                let details = if self.settings.call_argument_names
+                    && call.arguments.args().next().is_some()
+                {
+                    inlay_hint_call_argument_details(self.db, &self.model, call)
+                } else {
+                    None
+                };
 
                 self.visit_expr(&call.func);
 
@@ -609,7 +610,7 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             // `f(x=value(), *items())` would evaluate `items()` first and could
                             // pass `x` twice.
                             let is_last_positional =
-                                positional_index + 1 == call.arguments.args.len();
+                                positional_index + 1 == call.arguments.args().count();
                             // For `def f(ｉｆ): ...`, `name` is already normalized to the
                             // reserved word `if`. Inserting `if=` would be a syntax error.
                             // Repeating an existing keyword, as in `f(x=1, x=2)`, would be too.

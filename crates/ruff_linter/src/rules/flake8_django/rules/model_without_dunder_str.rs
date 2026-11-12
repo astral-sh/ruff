@@ -81,7 +81,7 @@ fn has_dunder_method(class_def: &ast::StmtClassDef, semantic: &SemanticModel) ->
 
 /// Returns `true` if the class is a non-abstract Django model.
 fn is_non_abstract_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    if class_def.bases().is_empty() || is_model_abstract(class_def) {
+    if class_def.bases().next().is_none() || is_model_abstract(class_def) {
         false
     } else {
         helpers::is_model(class_def, semantic)

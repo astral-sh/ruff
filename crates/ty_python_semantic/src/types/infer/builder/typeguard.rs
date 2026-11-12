@@ -80,8 +80,8 @@ pub(super) fn bind_type_guard_return_type<'db>(
             // Preserve positional behavior when there isn't a unique callable binding whose
             // parameter mapping we can use.
             None => arguments
-                .args
-                .get(narrowed_argument_index())
+                .args()
+                .nth(narrowed_argument_index())
                 .map(ast::ArgOrKeyword::from),
         }?;
         if argument.is_variadic() {

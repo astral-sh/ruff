@@ -1,5 +1,5 @@
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
+use ruff_python_ast::{self as ast, Decorator, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -163,8 +163,8 @@ fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str
             node_index: _,
         }) => {
             if !checker.settings().flake8_pytest_style.mark_parentheses
-                && arguments.args.is_empty()
-                && arguments.keywords.is_empty()
+                && arguments.args().next().is_none()
+                && arguments.keywords().next().is_none()
             {
                 let fix = Fix::applicable_edit(
                     Edit::range_deletion(arguments.range()),
@@ -212,11 +212,8 @@ fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &
         // @pytest.mark.usefixtures
         Expr::Attribute(..) => {}
         // @pytest.mark.usefixtures(...)
-        Expr::Call(ast::ExprCall {
-            arguments: Arguments { args, keywords, .. },
-            ..
-        }) => {
-            if !args.is_empty() || !keywords.is_empty() {
+        Expr::Call(ast::ExprCall { arguments, .. }) => {
+            if !arguments.is_empty() {
                 return;
             }
         }

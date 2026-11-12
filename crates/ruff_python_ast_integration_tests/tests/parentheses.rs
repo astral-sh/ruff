@@ -146,8 +146,8 @@ fn test_call_arguments_not_counted() {
 
     let arg = call
         .arguments
-        .args
-        .first()
+        .args()
+        .next()
         .expect("call should have an argument");
     let result = parenthesized_range(arg.into(), (&call.arguments).into(), tokens);
     // The parentheses belong to the call, not the argument
@@ -172,8 +172,8 @@ fn test_call_with_parenthesized_argument() {
 
     let arg = call
         .arguments
-        .args
-        .first()
+        .args()
+        .next()
         .expect("call should have an argument");
     let result = parenthesized_range(arg.into(), (&call.arguments).into(), tokens);
 
@@ -186,7 +186,7 @@ fn multiply_parenthesized_argument() {
     let source = "f(((a + 1)))";
     let parsed = parse_expression(source).expect("valid expression");
     let call = parsed.expr().as_call_expr().expect("call expression");
-    let argument = call.arguments.args.first().expect("call argument");
+    let argument = call.arguments.args().next().expect("call argument");
 
     let range = parenthesized_range(argument.into(), (&call.arguments).into(), parsed.tokens())
         .expect("parenthesized argument");

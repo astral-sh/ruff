@@ -891,8 +891,7 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
 
     if call
         .arguments
-        .keywords
-        .iter()
+        .keywords()
         .any(|keyword| keyword.arg.is_none())
     {
         return Some(ModelConfig::unknown());
@@ -987,11 +986,7 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
     let Some(arguments) = class_node.arguments.as_ref() else {
         return ModelConfig::default();
     };
-    if arguments
-        .keywords
-        .iter()
-        .any(|keyword| keyword.arg.is_none())
-    {
+    if arguments.keywords().any(|keyword| keyword.arg.is_none()) {
         return ModelConfig::unknown();
     }
     // Keep this list of recognized options in sync with `own_model_config` and
@@ -1156,7 +1151,7 @@ fn raw_input_validator_targets<'db>(
             continue;
         }
 
-        fields.extend(call.arguments.args.iter().filter_map(|field| {
+        fields.extend(call.arguments.args().filter_map(|field| {
             let name = decorators
                 .expression_type(field)?
                 .as_string_literal()?

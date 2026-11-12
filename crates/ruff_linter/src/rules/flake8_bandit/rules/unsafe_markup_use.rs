@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_python_ast::{Expr, ExprCall};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -141,7 +142,7 @@ fn is_unsafe_call(call: &ExprCall, semantic: &SemanticModel, settings: &LinterSe
     // unlikely that someone will actually use a keyword argument here
     // TODO: Eventually we may want to allow dynamic values, as long as they
     //       have a __html__ attribute, since that is part of the API
-    matches!(&*call.arguments.args, [first] if !first.is_string_literal_expr() && !first.is_bytes_literal_expr() && !is_whitelisted_call(first, semantic, settings))
+    matches!(call.arguments.args().collect_array(), Some([first]) if !first.is_string_literal_expr() && !first.is_bytes_literal_expr() && !is_whitelisted_call(first, semantic, settings))
 }
 
 fn is_whitelisted_call(expr: &Expr, semantic: &SemanticModel, settings: &LinterSettings) -> bool {

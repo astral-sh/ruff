@@ -4,7 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, Arguments, DecoratorList, Expr, ExprContext, Identifier, Keyword, Stmt, Suite,
+    self as ast, Arguments, DecoratorList, Expr, ExprContext, Identifier, Stmt, Suite,
 };
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -81,20 +81,23 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     targets: &[Expr],
     value: &Expr,
 ) {
-    let Some((typename, args, keywords, base_class)) =
+    let Some((typename, arguments, base_class)) =
         match_named_tuple_assign(targets, value, checker.semantic())
     else {
         return;
     };
 
-    let fields = match (args, keywords) {
+    let fields = match arguments.items.as_slice() {
         // Ex) `NamedTuple("MyType")`
-        ([_typename], []) => Suite::from([Stmt::Pass(ast::StmtPass {
+        [ast::Argument::Positional(_)] => Suite::from([Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })]),
         // Ex) `NamedTuple("MyType", [("a", int), ("b", str)])`
-        ([_typename, fields], []) => {
+        [
+            ast::Argument::Positional(_),
+            ast::Argument::Positional(fields),
+        ] => {
             if let Some(fields) = create_fields_from_fields_arg(fields) {
                 fields
             } else {
@@ -103,8 +106,8 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             }
         }
         // Ex) `NamedTuple("MyType", a=int, b=str)`
-        ([_typename], keywords) => {
-            if let Some(fields) = create_fields_from_keywords(keywords) {
+        _ if arguments.args().count() == 1 => {
+            if let Some(fields) = create_fields_from_keywords(arguments) {
                 fields
             } else {
                 debug!("Skipping `NamedTuple` \"{typename}\": unable to parse keywords");
@@ -137,18 +140,18 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     }
 }
 
-/// Return the typename, args, keywords, and base class.
+/// Return the typename, arguments, and base class.
 fn match_named_tuple_assign<'a>(
     targets: &'a [Expr],
     value: &'a Expr,
     semantic: &SemanticModel,
-) -> Option<(&'a str, &'a [Expr], &'a [Keyword], &'a Expr)> {
+) -> Option<(&'a str, &'a Arguments, &'a Expr)> {
     let [Expr::Name(ast::ExprName { id: typename, .. })] = targets else {
         return None;
     };
     let Expr::Call(ast::ExprCall {
         func,
-        arguments: Arguments { args, keywords, .. },
+        arguments,
         range_start: _,
         node_index: _,
     }) = value
@@ -158,7 +161,7 @@ fn match_named_tuple_assign<'a>(
     if !semantic.match_typing_expr(func, "NamedTuple") {
         return None;
     }
-    Some((typename, args, keywords, func))
+    Some((typename, arguments, func))
 }
 
 /// Generate a [`Stmt::AnnAssign`] representing the provided field definition.
@@ -219,9 +222,9 @@ fn create_fields_from_fields_arg(fields: &Expr) -> Option<Suite> {
 }
 
 /// Create a list of field assignments from the `NamedTuple` keyword arguments.
-fn create_fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
-    keywords
-        .iter()
+fn create_fields_from_keywords(arguments: &Arguments) -> Option<Suite> {
+    arguments
+        .keywords()
         .map(|keyword| {
             keyword
                 .arg
@@ -237,8 +240,7 @@ fn create_class_def_stmt(typename: &str, body: Suite, base_class: &Expr) -> Stmt
     ast::StmtClassDef {
         name: Identifier::new(typename.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
-            args: [base_class.clone()].into(),
-            keywords: std::iter::empty().collect(),
+            items: [ast::Argument::Positional(base_class.clone())].into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),

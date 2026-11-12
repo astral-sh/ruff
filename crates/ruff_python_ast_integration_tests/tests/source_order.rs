@@ -7,6 +7,12 @@ use ruff_python_ast::{AnyNodeRef, BoolOp, CmpOp, Operator, Singleton, UnaryOp};
 use ruff_python_parser::{Mode, ParseOptions, parse, parse_unchecked};
 
 #[test]
+fn interleaved_call_arguments() {
+    let trace = trace_source_order_visitation("f(before, key=value, *after, **rest)");
+    assert_snapshot!(trace);
+}
+
+#[test]
 fn function_arguments() {
     let source = r"def a(b, c,/, d, e = 20, *args, named=5, other=20, **kwargs): pass";
 

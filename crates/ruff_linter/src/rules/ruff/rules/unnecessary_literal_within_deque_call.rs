@@ -124,7 +124,7 @@ pub(crate) fn unnecessary_literal_within_deque_call(
     // Return without a fix in the presence of a starred argument because we can't accurately
     // generate the fix. If all of the arguments are unpacked (e.g. `deque(*([], 10))`), we will
     // have already returned after the first `find_argument_value` call.
-    if deque.arguments.args.iter().any(Expr::is_starred_expr) {
+    if deque.arguments.args().any(Expr::is_starred_expr) {
         return;
     }
 

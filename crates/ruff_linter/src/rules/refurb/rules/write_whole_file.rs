@@ -174,14 +174,14 @@ fn match_write_call(expr: &Expr) -> Option<(&Expr, &Expr)> {
 
     if method_name != "write"
         || !attr.value.is_name_expr()
-        || call.arguments.args.len() != 1
-        || !call.arguments.keywords.is_empty()
+        || call.arguments.args().count() != 1
+        || call.arguments.keywords().next().is_some()
     {
         return None;
     }
 
     // `write` only takes in a single positional argument.
-    Some((&*attr.value, call.arguments.args.first()?))
+    Some((&*attr.value, call.arguments.args().next()?))
 }
 
 fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, locator: &Locator) -> String {

@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Number;
 use ruff_python_ast::token::parenthesized_range;
@@ -138,7 +139,7 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
     }
 
     // Check if the call to `sorted()` has a single argument.
-    let [list_expr] = arguments.args.as_ref() else {
+    let Some([list_expr]) = arguments.args().collect_array() else {
         return;
     };
 
@@ -146,7 +147,7 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
     let mut key_keyword_expr = None;
 
     // Check if the call to `sorted()` has the `reverse` and `key` keywords.
-    for keyword in &*arguments.keywords {
+    for keyword in arguments.keywords() {
         // If the call contains `**kwargs`, return.
         let Some(arg) = keyword.arg.as_ref() else {
             return;

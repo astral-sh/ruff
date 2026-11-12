@@ -186,7 +186,7 @@ fn forwards_arguments(parameters: &ast::Parameters, arguments: &ast::Arguments) 
                 Expr::Starred(arg) => (&mut starred, arg.value.as_ref()),
                 _ => return false,
             },
-            ArgOrKeyword::Keyword(arg) => (&mut keyword, &arg.value),
+            ArgOrKeyword::Keyword(arg) => (&mut keyword, arg.value.as_ref()),
         };
         let Some(name) = value.as_name_expr() else {
             return false;

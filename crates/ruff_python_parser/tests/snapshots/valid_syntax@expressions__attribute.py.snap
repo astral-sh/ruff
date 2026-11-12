@@ -67,8 +67,7 @@ Module(
                             arguments: Arguments {
                                 range: 21..23,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -97,8 +96,7 @@ Module(
                                     arguments: Arguments {
                                         range: 29..31,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -143,8 +141,7 @@ Module(
                                                     arguments: Arguments {
                                                         range: 42..44,
                                                         node_index: NodeIndex(None),
-                                                        args: [],
-                                                        keywords: [],
+                                                        items: [],
                                                     },
                                                 },
                                             ),
@@ -159,8 +156,7 @@ Module(
                                     arguments: Arguments {
                                         range: 49..51,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -247,8 +243,7 @@ Module(
                                     arguments: Arguments {
                                         range: 83..85,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),

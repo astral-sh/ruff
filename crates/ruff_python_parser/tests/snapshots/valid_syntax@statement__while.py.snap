@@ -173,30 +173,31 @@ Module(
                                         arguments: Arguments {
                                             range: 95..111,
                                             node_index: NodeIndex(None),
-                                            args: [
-                                                StringLiteral(
-                                                    ExprStringLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 96..110,
-                                                        value: StringLiteralValue {
-                                                            inner: Single(
-                                                                StringLiteral {
-                                                                    range: 96..110,
-                                                                    node_index: NodeIndex(None),
-                                                                    value: "Hello World!",
-                                                                    flags: StringLiteralFlags {
-                                                                        quote_style: Single,
-                                                                        prefix: Empty,
-                                                                        triple_quoted: false,
-                                                                        unclosed: false,
+                                            items: [
+                                                Positional(
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 96..110,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 96..110,
+                                                                        node_index: NodeIndex(None),
+                                                                        value: "Hello World!",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Single,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                            unclosed: false,
+                                                                        },
                                                                     },
-                                                                },
-                                                            ),
+                                                                ),
+                                                            },
                                                         },
-                                                    },
+                                                    ),
                                                 ),
                                             ],
-                                            keywords: [],
                                         },
                                     },
                                 ),
@@ -223,30 +224,31 @@ Module(
                                         arguments: Arguments {
                                             range: 128..144,
                                             node_index: NodeIndex(None),
-                                            args: [
-                                                StringLiteral(
-                                                    ExprStringLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 129..143,
-                                                        value: StringLiteralValue {
-                                                            inner: Single(
-                                                                StringLiteral {
-                                                                    range: 129..143,
-                                                                    node_index: NodeIndex(None),
-                                                                    value: "Olá, Mundo!",
-                                                                    flags: StringLiteralFlags {
-                                                                        quote_style: Single,
-                                                                        prefix: Empty,
-                                                                        triple_quoted: false,
-                                                                        unclosed: false,
+                                            items: [
+                                                Positional(
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 129..143,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 129..143,
+                                                                        node_index: NodeIndex(None),
+                                                                        value: "Olá, Mundo!",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Single,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                            unclosed: false,
+                                                                        },
                                                                     },
-                                                                },
-                                                            ),
+                                                                ),
+                                                            },
                                                         },
-                                                    },
+                                                    ),
                                                 ),
                                             ],
-                                            keywords: [],
                                         },
                                     },
                                 ),

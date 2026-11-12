@@ -70,15 +70,12 @@ impl Violation for UnnecessaryLiteralWithinTupleCall {
 
 /// C409
 pub(crate) fn unnecessary_literal_within_tuple_call(checker: &Checker, call: &ast::ExprCall) {
-    if !call.arguments.keywords.is_empty() {
+    if call.arguments.keywords().next().is_some() {
         return;
     }
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function(
-        "tuple",
-        &call.func,
-        &call.arguments.args,
-        &call.arguments.keywords,
-    ) else {
+    let Some(argument) =
+        helpers::exactly_one_argument_with_matching_function("tuple", &call.func, &call.arguments)
+    else {
         return;
     };
     let argument_kind = match argument {

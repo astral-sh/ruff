@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     Expr, ExprCall, ExprName, ExprSlice, ExprSubscript, ExprUnaryOp, Int, StmtAssign, UnaryOp,
@@ -116,7 +117,7 @@ fn peel_lists(expr: &Expr) -> &Expr {
         return expr;
     };
 
-    if !arguments.keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return expr;
     }
 
@@ -124,7 +125,7 @@ fn peel_lists(expr: &Expr) -> &Expr {
         return expr;
     }
 
-    let [arg] = arguments.args.as_ref() else {
+    let Some([arg]) = arguments.args().collect_array() else {
         return expr;
     };
 
@@ -142,13 +143,11 @@ fn extract_name_from_reversed<'a>(
         func, arguments, ..
     } = expr.as_call_expr()?;
 
-    if !arguments.keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return None;
     }
 
-    let [arg] = arguments.args.as_ref() else {
-        return None;
-    };
+    let [arg] = arguments.args().collect_array()?;
 
     if !semantic.match_builtin_expr(func, "reversed") {
         return None;

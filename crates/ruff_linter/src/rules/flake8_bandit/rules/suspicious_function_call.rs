@@ -2,6 +2,7 @@
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use itertools::Either;
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
 use ruff_python_semantic::SemanticModel;
@@ -1163,7 +1164,7 @@ fn suspicious_function(
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
             if let Some(arguments) = arguments {
-                if let [single] = &*arguments.args {
+                if let Some([single]) = arguments.args().collect_array() {
                     if single.is_string_literal_expr() {
                         return;
                     }
@@ -1176,11 +1177,8 @@ fn suspicious_function(
         ["urllib", "request", "Request"] | ["six", "moves", "urllib", "request", "Request"] => {
             if let Some(arguments) = arguments {
                 // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
-                if arguments.args.iter().all(|arg| !arg.is_starred_expr())
-                    && arguments
-                        .keywords
-                        .iter()
-                        .all(|keyword| keyword.arg.is_some())
+                if arguments.args().all(|arg| !arg.is_starred_expr())
+                    && arguments.keywords().all(|keyword| keyword.arg.is_some())
                 {
                     if let Some(url_expr) = arguments.find_argument_value("url", 0)
                         && expression_starts_with_http_prefix(url_expr, checker.semantic())
@@ -1202,11 +1200,8 @@ fn suspicious_function(
             "urlopen" | "urlretrieve",
         ] => {
             if let Some(arguments) = arguments {
-                if arguments.args.iter().all(|arg| !arg.is_starred_expr())
-                    && arguments
-                        .keywords
-                        .iter()
-                        .all(|keyword| keyword.arg.is_some())
+                if arguments.args().all(|arg| !arg.is_starred_expr())
+                    && arguments.keywords().all(|keyword| keyword.arg.is_some())
                 {
                     match arguments.find_argument_value("url", 0) {
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.

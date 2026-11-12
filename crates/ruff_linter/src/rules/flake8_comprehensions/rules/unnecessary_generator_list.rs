@@ -69,12 +69,9 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorList {
 
 /// C400 (`list(generator)`)
 pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function(
-        "list",
-        &call.func,
-        &call.arguments.args,
-        &call.arguments.keywords,
-    ) else {
+    let Some(argument) =
+        helpers::exactly_one_argument_with_matching_function("list", &call.func, &call.arguments)
+    else {
         return;
     };
 

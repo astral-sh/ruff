@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Argument;
 use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -88,15 +89,12 @@ pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &E
 /// `split` are a positional prefix of the top-level functions', so any explicit argument shape
 /// reduces; unpacked (`*`/`**`) arguments have an unknown shape and never reduce.
 fn reducible_re_method(attr: &str, arguments: &Arguments) -> Option<&'static str> {
-    if arguments.args.iter().any(Expr::is_starred_expr)
-        || arguments
-            .keywords
-            .iter()
-            .any(|keyword| keyword.arg.is_none())
+    if arguments.args().any(Expr::is_starred_expr)
+        || arguments.keywords().any(|keyword| keyword.arg.is_none())
     {
         return None;
     }
-    let only_string_argument = arguments.args.len() == 1 && arguments.keywords.is_empty();
+    let only_string_argument = matches!(arguments.items.as_slice(), [Argument::Positional(_)]);
     Some(match attr {
         "search" if only_string_argument => "search",
         "match" if only_string_argument => "match",

@@ -1214,18 +1214,15 @@ impl<'a> Generator<'a> {
             }) => {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
-                if let (
-                    [
-                        Expr::Generator(ast::ExprGenerator {
-                            elt,
-                            generators,
-                            range: _,
-                            node_index: _,
-                            parenthesized: _,
-                        }),
-                    ],
-                    [],
-                ) = (arguments.args.as_ref(), arguments.keywords.as_ref())
+                if let [
+                    ast::Argument::Positional(Expr::Generator(ast::ExprGenerator {
+                        elt,
+                        generators,
+                        range: _,
+                        node_index: _,
+                        parenthesized: _,
+                    })),
+                ] = arguments.items.as_slice()
                 {
                     // Ensure that a single generator doesn't get double-parenthesized.
                     self.unparse_expr(elt, precedence::COMMA);

@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::QualifiedName;
@@ -63,38 +64,37 @@ impl Violation for StarmapZip {
 pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
     let semantic = checker.semantic();
 
-    if !call.arguments.keywords.is_empty() {
+    if call.arguments.keywords().next().is_some() {
         return;
     }
 
-    let [_map_func, Expr::Call(iterable_call)] = &*call.arguments.args else {
+    let Some([_map_func, Expr::Call(iterable_call)]) = call.arguments.args().collect_array() else {
         return;
     };
 
-    let keywords = &iterable_call.arguments.keywords;
+    let mut keywords = iterable_call.arguments.keywords();
 
     match checker.target_version().cmp(&PythonVersion::PY314) {
         // Keyword arguments not supported for `map` before Python 3.14
         std::cmp::Ordering::Less => {
-            if !keywords.is_empty() {
+            if keywords.next().is_some() {
                 return;
             }
         }
         // Only supported keyword argument is `strict` starting in 3.14
         std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
-            if keywords.len() > 1 {
-                return;
-            }
-            if keywords.len() == 1 && iterable_call.arguments.find_keyword("strict").is_none() {
+            if let Some(keyword) = keywords.next()
+                && (keyword.arg.as_deref() != Some("strict") || keywords.next().is_some())
+            {
                 return;
             }
         }
     }
 
-    let positionals = &iterable_call.arguments.args;
+    let mut positionals = iterable_call.arguments.args().peekable();
 
     // `zip(*a)` where `a` is empty is valid, but `map(_, *a)` isn't.
-    if !positionals.is_empty() && positionals.iter().all(Expr::is_starred_expr) {
+    if positionals.peek().is_some() && positionals.all(Expr::is_starred_expr) {
         return;
     }
 

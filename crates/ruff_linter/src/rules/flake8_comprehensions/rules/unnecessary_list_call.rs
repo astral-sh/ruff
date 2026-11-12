@@ -1,4 +1,4 @@
-use ruff_python_ast::{Arguments, Expr, ExprCall};
+use ruff_python_ast::{Expr, ExprCall};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -55,22 +55,16 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
         node_index: _,
     } = call;
 
-    if !arguments.keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return;
     }
 
-    if arguments.args.len() > 1 {
+    if arguments.args().nth(1).is_some() {
         return;
     }
 
-    let Arguments {
-        range: _,
-        node_index: _,
-        args,
-        keywords: _,
-    } = arguments;
-
-    let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
+    let Some(argument) = helpers::first_argument_with_matching_function("list", func, arguments)
+    else {
         return;
     };
     if !argument.is_list_comp_expr() {

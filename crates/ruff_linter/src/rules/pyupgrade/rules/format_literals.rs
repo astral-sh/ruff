@@ -91,20 +91,19 @@ pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: 
         Arguments::Preserve
     } else {
         // Ex) `"{1} {0}".format(foo=1, bar=2)`
-        if !call.arguments.keywords.is_empty() {
+        if call.arguments.keywords().next().is_some() {
             return;
         }
 
         // Ex) `"{1} {0}".format(foo)`
-        if call.arguments.args.len() < summary.indices.len() {
+        if call.arguments.args().count() < summary.indices.len() {
             return;
         }
 
         // Ex) `"{1} {0}".format(*foo)`
         if call
             .arguments
-            .args
-            .iter()
+            .args()
             .take(summary.indices.len())
             .any(Expr::is_starred_expr)
         {
