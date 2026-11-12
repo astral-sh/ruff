@@ -5,11 +5,29 @@ use insta::assert_snapshot;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, BoolOp, CmpOp, Operator, Singleton, UnaryOp};
 use ruff_python_parser::{Mode, ParseOptions, parse, parse_unchecked};
+use ruff_text_size::Ranged;
 
 #[test]
 fn interleaved_call_arguments() {
     let trace = trace_source_order_visitation("f(before, key=value, *after, **rest)");
     assert_snapshot!(trace);
+}
+
+#[test]
+fn find_call_argument_in_source_order() {
+    let source = "f(first, *rest, named=keyword, *more)";
+    let parsed = ruff_python_parser::parse_expression(source).unwrap();
+    let call = parsed.expr().as_call_expr().unwrap();
+    let arguments = &call.arguments;
+    let value = |name, position| {
+        arguments
+            .find_argument_value(name, position)
+            .map(|arg| &source[arg.range()])
+    };
+
+    assert_eq!(value("named", 0), Some("keyword"));
+    assert_eq!(value("other", 0), Some("first"));
+    assert_eq!(value("other", 1), None);
 }
 
 #[test]
