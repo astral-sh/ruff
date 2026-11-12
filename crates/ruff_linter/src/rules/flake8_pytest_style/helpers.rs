@@ -38,11 +38,10 @@ pub(crate) fn is_pytest_fixture(decorator: &Decorator, checker: &Checker) -> boo
 }
 
 pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(map_callable(&decorator.expression))
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["pytest", "yield_fixture"])
-        })
+    semantic.matches_qualified_name(
+        map_callable(&decorator.expression),
+        &["pytest", "yield_fixture"],
+    )
 }
 
 /// Returns `true` if the decorator is `@pytest.hookimpl(wrapper=True)` or
@@ -58,9 +57,7 @@ pub(crate) fn is_pytest_hookimpl_wrapper(decorator: &Decorator, semantic: &Seman
     };
 
     // Check if it's pytest.hookimpl
-    let is_hookimpl = semantic
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|name| matches!(name.segments(), ["pytest", "hookimpl"]));
+    let is_hookimpl = semantic.matches_qualified_name(&call.func, &["pytest", "hookimpl"]);
 
     if !is_hookimpl {
         return false;

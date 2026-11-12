@@ -185,9 +185,7 @@ fn is_p_wait(call: &ast::ExprCall, semantic: &SemanticModel) -> bool {
         let Some(value) = find_assigned_value(id, semantic) else {
             return false;
         };
-        if let Some(qualified_name) = semantic.resolve_qualified_name(value) {
-            return matches!(qualified_name.segments(), ["os", "P_WAIT"]);
-        }
+        return semantic.matches_qualified_name(value, &["os", "P_WAIT"]);
     }
     false
 }

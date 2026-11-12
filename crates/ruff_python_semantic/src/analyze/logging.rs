@@ -90,8 +90,7 @@ pub fn exc_info<'a>(arguments: &'a Arguments, semantic: &SemanticModel) -> Optio
     if exc_info
         .value
         .as_call_expr()
-        .and_then(|call| semantic.resolve_qualified_name(&call.func))
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "exc_info"]))
+        .is_some_and(|call| semantic.matches_qualified_name(&call.func, &["sys", "exc_info"]))
     {
         return Some(exc_info);
     }

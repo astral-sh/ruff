@@ -67,8 +67,7 @@ pub(crate) fn direct_logger_instantiation(checker: &Checker, call: &ast::ExprCal
 
     if checker
         .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["logging", "Logger"]))
+        .matches_qualified_name(call.func.as_ref(), &["logging", "Logger"])
     {
         let mut diagnostic =
             checker.report_diagnostic(DirectLoggerInstantiation, call.func.range());

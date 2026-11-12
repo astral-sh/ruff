@@ -76,11 +76,7 @@ pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ExprCall
     let semantic = checker.semantic();
     let (func, arguments) = (&call.func, &call.arguments);
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
-        return;
-    };
-
-    if !matches!(qualified_name.segments(), ["itertools", "batched"]) {
+    if !semantic.matches_qualified_name(func, &["itertools", "batched"]) {
         return;
     }
 
