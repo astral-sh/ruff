@@ -52,7 +52,7 @@ use crate::codes::Category;
 /// - [Python documentation: Exception groups](https://docs.python.org/3/builtins/exceptions.html#exception-groups)
 /// - [pytest documentation: `pytest.RaisesGroup`](https://docs.pytest.org/en/stable/reference/reference.html#pytest.RaisesGroup)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Pedantic)]
+#[violation_metadata(preview_since = "0.17.5", category = Category::Pedantic)]
 pub(crate) struct PytestRaisesExceptionGroup {
     nested: bool,
 }

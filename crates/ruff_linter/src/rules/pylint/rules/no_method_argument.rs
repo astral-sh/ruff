@@ -45,7 +45,7 @@ use crate::codes::Category;
 /// ## References
 /// - [Python documentation: Instance methods](https://docs.python.org/3/reference/datamodel.html#instance-methods)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
+#[violation_metadata(preview_since = "0.17.5", category = Category::Suspicious)]
 pub(crate) struct NoMethodArgument {
     method_name: String,
 }

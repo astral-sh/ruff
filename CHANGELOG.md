@@ -1,5 +1,77 @@
 # Changelog
 
+## 0.17.5
+
+Released on 2026-11-12.
+
+### Preview features
+
+- Redirect renamed rules ([#30081](https://github.com/astral-sh/ruff/pull/30081))
+- \[`flake8-async`\] Implement `pytest-raises-exception-group` (`ASYNC401`) ([#28772](https://github.com/astral-sh/ruff/pull/28772))
+- \[`flake8-logging-format`\] Mark `G004` fix as unsafe ([#30087](https://github.com/astral-sh/ruff/pull/30087))
+- \[`pylint`\] Implement `no-method-argument` (`PLE0211`) ([#29748](https://github.com/astral-sh/ruff/pull/29748))
+- \[`refurb`\] Do not offer fix when `write` is nested in an expression (`FURB103`) ([#29789](https://github.com/astral-sh/ruff/pull/29789))
+- \[`ruff`\] Add `renamed-rule` (`RUF202`) ([#30079](https://github.com/astral-sh/ruff/pull/30079))
+- \[`ruff`\] Expand `redirected-noqa` to other suppression comments (`RUF101`) ([#30078](https://github.com/astral-sh/ruff/pull/30078))
+
+### Bug fixes
+
+- Avoid crashing when Ruff logs to a closed stderr pipe ([#30209](https://github.com/astral-sh/ruff/pull/30209))
+- Fix fixes that add or remove a keyword argument with a parenthesized value ([#30189](https://github.com/astral-sh/ruff/pull/30189))
+- \[`flake8-import-conventions`\] Avoid shadowing names when fixing import aliases (`ICN001`) ([#30035](https://github.com/astral-sh/ruff/pull/30035))
+- [flake8-bugbear] Fix B010 autofix for parenthesized setattr calls ([#30168](https://github.com/astral-sh/ruff/pull/30168))
+- [flake8-pyi] Fix PYI034 autofix for parenthesized self annotations ([#30173](https://github.com/astral-sh/ruff/pull/30173))
+- [pyupgrade] Fix UP031 duplicating closing parentheses around the format string ([#30172](https://github.com/astral-sh/ruff/pull/30172))
+
+### Rule changes
+
+- \[`flake8-bugbear`\] Ignore frozen dataclass instantiations (`B008`) ([#29231](https://github.com/astral-sh/ruff/pull/29231))
+
+### Performance
+
+- Apply per-file ignores as rule sets ([#30375](https://github.com/astral-sh/ruff/pull/30375))
+- Avoid allocating for single-target assignments in PLW0127 ([#30211](https://github.com/astral-sh/ruff/pull/30211))
+- Inline public `Cursor` methods across crates ([#30368](https://github.com/astral-sh/ruff/pull/30368))
+- Make `ComparableExpr` comparison lazy ([#30259](https://github.com/astral-sh/ruff/pull/30259))
+- Match docstring section headings against the whole line ([#30354](https://github.com/astral-sh/ruff/pull/30354))
+- Precompute the rule set for qualified call checks ([#30115](https://github.com/astral-sh/ruff/pull/30115))
+- Recognize typing calls by their resolved member name ([#30133](https://github.com/astral-sh/ruff/pull/30133))
+- Reuse the binding returned by scope insertion ([#30132](https://github.com/astral-sh/ruff/pull/30132))
+- Select lint passes with precomputed rule sets ([#30358](https://github.com/astral-sh/ruff/pull/30358))
+- Share resolved call names with pytest lint rules ([#30135](https://github.com/astral-sh/ruff/pull/30135))
+- Short-circuit typing member checks before resolving qualified names ([#30369](https://github.com/astral-sh/ruff/pull/30369))
+- Skip display-width calculation for lines that fit the length limit ([#30351](https://github.com/astral-sh/ruff/pull/30351))
+- Skip dummy-name checks for unique assignment targets in PLW0128 ([#30352](https://github.com/astral-sh/ruff/pull/30352))
+- Skip the CST parse when deleting a single named import ([#30347](https://github.com/astral-sh/ruff/pull/30347))
+- Speed up streaming notebook reads ([#30379](https://github.com/astral-sh/ruff/pull/30379))
+- [B017] Skip a redundant positional argument lookup ([#30328](https://github.com/astral-sh/ruff/pull/30328))
+- [W605] Read string flags once per literal part ([#30329](https://github.com/astral-sh/ruff/pull/30329))
+- [ty] Check unused stub parameters in the surrounding inference ([#30251](https://github.com/astral-sh/ruff/pull/30251))
+- [ty] Share predicate evaluations within an inference region ([#30235](https://github.com/astral-sh/ruff/pull/30235))
+- [ty] Share use-def layouts for stub function parameters ([#30248](https://github.com/astral-sh/ruff/pull/30248))
+- [ty] Stop after the first incompatible target overload ([#30147](https://github.com/astral-sh/ruff/pull/30147))
+- optimizing `TID251` to use hash map look up for banned apis ([#29446](https://github.com/astral-sh/ruff/pull/29446))
+
+### Other changes
+
+- Fix FreeBSD source builds with libc 0.2.190 ([#30176](https://github.com/astral-sh/ruff/pull/30176))
+
+### Contributors
+
+- [@rajveer3x](https://github.com/rajveer3x)
+- [@tjkuson](https://github.com/tjkuson)
+- [@hugehoo](https://github.com/hugehoo)
+- [@hector2394](https://github.com/hector2394)
+- [@ansh-rohilla](https://github.com/ansh-rohilla)
+- [@mati-caliz](https://github.com/mati-caliz)
+- [@yxshee](https://github.com/yxshee)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@GeorgiaPreda](https://github.com/GeorgiaPreda)
+- [@G26karthik](https://github.com/G26karthik)
+- [@ntBre](https://github.com/ntBre)
+- [@s-cork](https://github.com/s-cork)
+
 ## 0.17.4
 
 Released on 2026-11-05.
