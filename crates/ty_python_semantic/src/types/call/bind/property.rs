@@ -9,7 +9,7 @@ use itertools::Itertools;
 
 impl<'db> Bindings<'db> {
     /// Retains the accessors and nominal class when the property initializer is inherited.
-    pub(super) fn evaluate_property_calls(
+    pub(crate) fn evaluate_property_calls(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
