@@ -1266,6 +1266,16 @@
             }
           ]
         },
+        "mismatched-dynamic-type-name": {
+          "title": "detects mismatched names in dynamically created classes",
+          "description": "## What it does\n\nChecks calls to three-argument `type()` or `types.new_class()` that are assigned directly to a\nsingle variable. If ty can infer the class name from the argument, it reports a mismatch with the\nvariable name.\n\n## Why is this bad?\n\nThe name argument sets the class's `__name__`, which appears in tracebacks and representations. A\ntypo can make it difficult to connect that runtime name to the class definition.\n\n## Default level\n\nThis rule is disabled by default because class factories often choose runtime names independently of\nthe local variables that hold their results.\n\n## Examples\n\n```python\nfrom types import new_class\n\nPoint = type(\"Vector\", (), {})  # error: [mismatched-dynamic-type-name]\nRecord = new_class(name=\"Entry\")  # error: [mismatched-dynamic-type-name]\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "mismatched-enum-name": {
           "title": "detects mismatched names in enum classes",
           "description": "## What it does\n\nChecks that the name passed to a functional enum constructor, such as `Enum`, `IntEnum`, or `Flag`,\nmatches the variable it is assigned to. This rule also warns if ty cannot determine the value of the\nname argument.\n\n## Why is this bad?\n\nThe name argument becomes the enum class's `__name__`. A member's representation can therefore refer\nto a different class name than the one used in the source.\n\n## Default level\n\nThis rule is disabled by default because a functional enum can intentionally have a runtime name\nthat differs from its variable name.\n\n## Examples\n\n```python\nfrom enum import Enum\n\nColor = Enum(\"Colour\", \"RED BLUE\")  # error: [mismatched-enum-name]\n```",

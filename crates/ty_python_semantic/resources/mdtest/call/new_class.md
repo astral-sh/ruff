@@ -35,6 +35,27 @@ reveal_type(types.new_class(name="Bar"))  # revealed: <class 'Bar'>
 reveal_type(types.new_class(name="Baz", bases=(Base,)))  # revealed: <class 'Baz'>
 ```
 
+## Mismatched class names
+
+```toml
+[rules]
+mismatched-dynamic-type-name = "warn"
+```
+
+ty recognizes an imported alias for `types.new_class` whether the name argument is positional or
+passed by keyword.
+
+```py
+from types import new_class as make_class
+
+Point = make_class("Vector")  # error: [mismatched-dynamic-type-name]
+Record: type = make_class(name="Entry")  # error: [mismatched-dynamic-type-name]
+
+def factory(name: str):
+    cls = make_class(name)  # ok
+    return cls
+```
+
 ## Assignability to base type
 
 The inferred type should be assignable to `type[Base]` when the class inherits from `Base`.
