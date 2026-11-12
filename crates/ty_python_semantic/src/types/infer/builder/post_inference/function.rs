@@ -354,13 +354,16 @@ fn check_legacy_positional_only_convention<'db>(
 
     // If the function has any PEP-570 positional-only parameters,
     // assume that `__`-prefixed parameters are not meant to be positional-only
-    if !ast_parameters.posonlyargs.is_empty() {
+    if ast_parameters
+        .roles()
+        .any(|role| role == ast::ParameterRole::PositionalOnly)
+    {
         return;
     }
     let parsed_parameters = signature.parameters();
     let mut previous_non_positional_only: Option<&ast::ParameterWithDefault> = None;
 
-    for (param_node, param) in std::iter::zip(ast_parameters, parsed_parameters) {
+    for (param_node, param) in std::iter::zip(ast_parameters.iter(), parsed_parameters) {
         let ast::AnyParameterRef::NonVariadic(param_node) = param_node else {
             continue;
         };

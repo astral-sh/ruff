@@ -1,5 +1,7 @@
 use std::fmt;
 
+use itertools::Itertools;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::visitor::Visitor;
@@ -239,7 +241,7 @@ fn lambda_has_expected_arity(lambda: &ExprLambda) -> bool {
         return false;
     }
 
-    let [parameter] = &*parameters.args else {
+    let Some((parameter,)) = parameters.args().collect_tuple() else {
         return false;
     };
 

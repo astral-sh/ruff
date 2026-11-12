@@ -25,27 +25,25 @@ Module(
                     parameters: Parameters {
                         range: 7..10,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 8..9,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 8..9,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("x"),
+                                    parameter: Parameter {
                                         range: 8..9,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("x"),
+                                            range: 8..9,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [
@@ -146,57 +144,59 @@ Module(
                     parameters: Parameters {
                         range: 37..46,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 38..39,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 38..39,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("x"),
+                                    parameter: Parameter {
                                         range: 38..39,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("x"),
+                                            range: 38..39,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                            ParameterWithDefault {
-                                range: 41..42,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                            ),
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 41..42,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("y"),
+                                    parameter: Parameter {
                                         range: 41..42,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("y"),
+                                            range: 41..42,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                            ParameterWithDefault {
-                                range: 44..45,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                            ),
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 44..45,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("z"),
+                                    parameter: Parameter {
                                         range: 44..45,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("z"),
+                                            range: 44..45,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [

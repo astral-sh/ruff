@@ -1398,31 +1398,41 @@ impl<'a> Generator<'a> {
 
     fn unparse_parameters(&mut self, parameters: &Parameters) {
         let mut first = true;
-        for (i, parameter_with_default) in parameters
-            .posonlyargs
+        let slash_after = parameters
+            .items
             .iter()
-            .chain(&parameters.args)
-            .enumerate()
-        {
+            .rposition(|item| matches!(item, ast::ParameterItem::PositionalOnly(_)));
+        let mut seen_star = false;
+
+        for (index, item) in parameters.items.iter().enumerate() {
             self.p_delim(&mut first, ", ");
-            self.unparse_parameter_with_default(parameter_with_default);
-            self.p_if(i + 1 == parameters.posonlyargs.len(), ", /");
-        }
-        if parameters.vararg.is_some() || !parameters.kwonlyargs.is_empty() {
-            self.p_delim(&mut first, ", ");
-            self.p("*");
-        }
-        if let Some(vararg) = &parameters.vararg {
-            self.unparse_parameter(vararg);
-        }
-        for kwarg in &parameters.kwonlyargs {
-            self.p_delim(&mut first, ", ");
-            self.unparse_parameter_with_default(kwarg);
-        }
-        if let Some(kwarg) = &parameters.kwarg {
-            self.p_delim(&mut first, ", ");
-            self.p("**");
-            self.unparse_parameter(kwarg);
+            match item {
+                ast::ParameterItem::PositionalOnly(p) => {
+                    self.unparse_parameter_with_default(p);
+                    if slash_after == Some(index) {
+                        self.p(", /");
+                    }
+                }
+                ast::ParameterItem::PositionalOrKeyword(p) => {
+                    self.unparse_parameter_with_default(p);
+                }
+                ast::ParameterItem::Vararg(p) => {
+                    self.p("*");
+                    self.unparse_parameter(p);
+                    seen_star = true;
+                }
+                ast::ParameterItem::KeywordOnly(p) => {
+                    if !seen_star {
+                        self.p("*, ");
+                        seen_star = true;
+                    }
+                    self.unparse_parameter_with_default(p);
+                }
+                ast::ParameterItem::Kwarg(p) => {
+                    self.p("**");
+                    self.unparse_parameter(p);
+                }
+            }
         }
     }
 
@@ -1651,6 +1661,20 @@ mod tests {
         let mut generator = Generator::new(&indentation, line_ending);
         generator.unparse_suite(module.suite());
         generator.generate()
+    }
+
+    #[test]
+    fn recovered_parameters_have_one_positional_separator() {
+        let parsed = ruff_python_parser::parse_unchecked(
+            "def f(a, **kw, b, /): pass",
+            ParseOptions::from(Mode::Module),
+        )
+        .try_into_module()
+        .unwrap();
+        let indentation = Indentation::default();
+        let mut generator = Generator::new(&indentation, LineEnding::default());
+        generator.unparse_suite(parsed.suite());
+        assert_eq!(generator.generate(), "def f(a, **kw, b, /):\n    pass");
     }
 
     /// Like [`round_trip`] but configure the [`Generator`] with the requested

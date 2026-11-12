@@ -3305,320 +3305,256 @@ impl Ranged for AnyParameterRef<'_> {
     }
 }
 
-/// An alternative type of AST `arguments`. This is ruff_python_parser-friendly and human-friendly definition of function arguments.
-/// This form also has advantage to implement pre-order traverse.
-///
-/// `defaults` and `kw_defaults` fields are removed and the default values are placed under each [`ParameterWithDefault`] typed argument.
-/// `vararg` and `kwarg` are still typed as `arg` because they never can have a default value.
-///
-/// The original Python-style AST type orders `kwonlyargs` fields by default existence; [Parameters] has location-ordered `kwonlyargs` fields.
-///
-/// NOTE: This type differs from the original Python AST. See: [arguments](https://docs.python.org/3/library/ast.html#ast.arguments).
+/// A parameter's role in a signature, ordered by argument binding order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ParameterRole {
+    PositionalOnly,
+    PositionalOrKeyword,
+    Vararg,
+    KeywordOnly,
+    Kwarg,
+}
 
+/// One parameter in a function or lambda signature, in its written position.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub enum ParameterItem {
+    PositionalOnly(ParameterWithDefault),
+    PositionalOrKeyword(ParameterWithDefault),
+    Vararg(Parameter),
+    KeywordOnly(ParameterWithDefault),
+    Kwarg(Parameter),
+}
+
+impl ParameterItem {
+    fn role(&self) -> ParameterRole {
+        match self {
+            Self::PositionalOnly(_) => ParameterRole::PositionalOnly,
+            Self::PositionalOrKeyword(_) => ParameterRole::PositionalOrKeyword,
+            Self::Vararg(_) => ParameterRole::Vararg,
+            Self::KeywordOnly(_) => ParameterRole::KeywordOnly,
+            Self::Kwarg(_) => ParameterRole::Kwarg,
+        }
+    }
+
+    pub fn as_ref(&self) -> AnyParameterRef<'_> {
+        match self {
+            Self::PositionalOnly(p) | Self::PositionalOrKeyword(p) | Self::KeywordOnly(p) => {
+                AnyParameterRef::NonVariadic(p)
+            }
+            Self::Vararg(p) | Self::Kwarg(p) => AnyParameterRef::Variadic(p),
+        }
+    }
+}
+
+/// Parameters of a function or lambda, in source order. The item kind records which
+/// side of a `/` or `*` separator the parameter belongs to.
 #[derive(Clone, Debug, PartialEq, Default)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Parameters {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub posonlyargs: ThinVec<ParameterWithDefault>,
-    pub args: ThinVec<ParameterWithDefault>,
-    pub vararg: Option<Box<Parameter>>,
-    pub kwonlyargs: ThinVec<ParameterWithDefault>,
-    pub kwarg: Option<Box<Parameter>>,
+    pub items: ThinVec<ParameterItem>,
 }
 
 impl Parameters {
-    /// Returns an iterator over all non-variadic parameters included in this [`Parameters`] node.
-    ///
-    /// The variadic parameters (`.vararg` and `.kwarg`) can never have default values;
-    /// non-variadic parameters sometimes will.
-    pub fn iter_non_variadic_params(&self) -> impl Iterator<Item = &ParameterWithDefault> {
-        self.posonlyargs
-            .iter()
-            .chain(&self.args)
-            .chain(&self.kwonlyargs)
+    fn is_in_binding_order(&self) -> bool {
+        self.items.iter().is_sorted_by(|left, right| {
+            let a = left.role();
+            let b = right.role();
+            a < b || (a == b && !matches!(left, ParameterItem::Vararg(_) | ParameterItem::Kwarg(_)))
+        })
     }
 
-    /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
+    /// Iterates the parameter roles in source order.
+    pub fn roles(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = ParameterRole> + ExactSizeIterator + FusedIterator + Clone
+    {
+        self.items.iter().map(ParameterItem::role)
+    }
+
+    pub fn posonlyargs(&self) -> impl DoubleEndedIterator<Item = &ParameterWithDefault> + Clone {
+        self.items.iter().filter_map(|item| match item {
+            ParameterItem::PositionalOnly(p) => Some(p),
+            _ => None,
+        })
+    }
+
+    pub fn args(&self) -> impl DoubleEndedIterator<Item = &ParameterWithDefault> + Clone {
+        self.items.iter().filter_map(|item| match item {
+            ParameterItem::PositionalOrKeyword(p) => Some(p),
+            _ => None,
+        })
+    }
+
+    pub fn kwonlyargs(&self) -> impl DoubleEndedIterator<Item = &ParameterWithDefault> + Clone {
+        self.items.iter().filter_map(|item| match item {
+            ParameterItem::KeywordOnly(p) => Some(p),
+            _ => None,
+        })
+    }
+
+    pub fn vararg(&self) -> Option<&Parameter> {
+        self.items.iter().find_map(|item| match item {
+            ParameterItem::Vararg(p) => Some(p),
+            _ => None,
+        })
+    }
+
+    pub fn kwarg(&self) -> Option<&Parameter> {
+        self.items.iter().rev().find_map(|item| match item {
+            ParameterItem::Kwarg(p) => Some(p),
+            _ => None,
+        })
+    }
+
+    /// Positional-only and positional-or-keyword parameters, in argument-binding order.
+    pub fn iter_positional_params(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &ParameterWithDefault> + Clone {
+        self.items.iter().filter_map(|item| match item {
+            ParameterItem::PositionalOnly(p) | ParameterItem::PositionalOrKeyword(p) => Some(p),
+            _ => None,
+        })
+    }
+
+    /// Positional-or-keyword and keyword-only parameters, in source order.
+    pub fn iter_keyword_params(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &ParameterWithDefault> + Clone {
+        self.items.iter().filter_map(|item| match item {
+            ParameterItem::PositionalOrKeyword(p) | ParameterItem::KeywordOnly(p) => Some(p),
+            _ => None,
+        })
+    }
+
+    /// Parameters which can have defaults, including keyword-only parameters.
+    pub fn iter_non_variadic_params(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &ParameterWithDefault> {
+        self.items.iter().filter_map(|item| match item.as_ref() {
+            AnyParameterRef::NonVariadic(p) => Some(p),
+            AnyParameterRef::Variadic(_) => None,
+        })
+    }
+
+    /// Visits parameters that can have defaults and returns `*args` and `**kwargs`.
+    /// Callers that process variadic parameters last can do so in the same pass.
+    pub fn split_variadic<'a>(
+        &'a self,
+        mut non_variadic: impl FnMut(&'a ParameterWithDefault),
+    ) -> (Option<&'a Parameter>, Option<&'a Parameter>) {
+        let mut vararg = None;
+        let mut kwarg = None;
+        for item in &self.items {
+            match item {
+                ParameterItem::PositionalOnly(p)
+                | ParameterItem::PositionalOrKeyword(p)
+                | ParameterItem::KeywordOnly(p) => non_variadic(p),
+                ParameterItem::Vararg(p) => {
+                    vararg.get_or_insert(p);
+                }
+                ParameterItem::Kwarg(p) => kwarg = Some(p),
+            }
+        }
+        (vararg, kwarg)
+    }
+
     pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
         self.iter_non_variadic_params()
-            .find(|arg| arg.parameter.name.as_str() == name)
+            .find(|p| p.parameter.name.as_str() == name)
     }
 
-    /// Returns the index of the parameter with the given name
     pub fn index(&self, name: &str) -> Option<usize> {
         self.iter_non_variadic_params()
-            .position(|arg| arg.parameter.name.as_str() == name)
+            .position(|p| p.parameter.name.as_str() == name)
     }
 
-    /// Returns an iterator over all parameters included in this [`Parameters`] node.
-    pub fn iter(&self) -> ParametersIterator<'_> {
-        ParametersIterator::new(self)
+    /// Iterates parameters in source order, including in recovered syntax.
+    pub fn iter_source_order(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = AnyParameterRef<'_>> + ExactSizeIterator + FusedIterator + Clone
+    {
+        self.items.iter().map(ParameterItem::as_ref)
     }
 
-    /// Returns the total number of parameters included in this [`Parameters`] node.
-    pub fn len(&self) -> usize {
-        let Parameters {
-            range: _,
-            node_index: _,
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-        } = self;
-        // Safety: a Python function can have an arbitrary number of parameters,
-        // so theoretically this could be a number that wouldn't fit into a usize,
-        // which would lead to a panic. A Python function with that many parameters
-        // is extremely unlikely outside of generated code, however, and it's even
-        // more unlikely that we'd find a function with that many parameters in a
-        // source-code file <=4GB large (Ruff's maximum).
-        posonlyargs
-            .len()
-            .checked_add(args.len())
-            .and_then(|length| length.checked_add(usize::from(vararg.is_some())))
-            .and_then(|length| length.checked_add(kwonlyargs.len()))
-            .and_then(|length| length.checked_add(usize::from(kwarg.is_some())))
-            .expect("Failed to fit the number of parameters into a usize")
-    }
-
-    /// Returns `true` if a parameter with the given name is included in this [`Parameters`].
-    pub fn includes(&self, name: &str) -> bool {
-        self.iter().any(|param| param.name() == name)
-    }
-
-    /// Returns `true` if the [`Parameters`] is empty.
-    pub fn is_empty(&self) -> bool {
-        self.posonlyargs.is_empty()
-            && self.args.is_empty()
-            && self.kwonlyargs.is_empty()
-            && self.vararg.is_none()
-            && self.kwarg.is_none()
-    }
-
-    /// Returns an iterator over all parameters in source order.
-    ///
-    /// This differs from [`Parameters::iter`] which returns parameters
-    /// in type-based order (positional-only, regular, variadic, keyword-only,
-    /// keyword). For well-formed Python the two orderings are identical, but
-    /// error recovery can produce ASTs where variadic parameters appear before
-    /// non-variadic ones (e.g. `def foo(**kwargs, a):`).
-    pub fn iter_source_order(&self) -> ParametersSourceOrderIterator<'_> {
-        let mut variadics = [self.vararg.as_deref(), self.kwarg.as_deref()];
-        variadics.sort_by_key(|param| param.map_or(TextSize::new(u32::MAX), Ranged::start));
-
-        ParametersSourceOrderIterator {
-            next_non_variadic_peeked: None,
-            posonlyargs: self.posonlyargs.iter(),
-            args: self.args.iter(),
-            kwonlyargs: self.kwonlyargs.iter(),
-            variadics,
-            next_variadic: 0,
+    /// Iterates parameter roles and nodes in argument-binding order, including in recovered syntax.
+    pub fn items_in_binding_order(&self) -> impl DoubleEndedIterator<Item = &ParameterItem> {
+        let items = self.items.iter();
+        if self.is_in_binding_order() {
+            return itertools::Either::Left(items);
         }
-    }
-}
-
-pub struct ParametersIterator<'a> {
-    posonlyargs: Iter<'a, ParameterWithDefault>,
-    args: Iter<'a, ParameterWithDefault>,
-    vararg: Option<&'a Parameter>,
-    kwonlyargs: Iter<'a, ParameterWithDefault>,
-    kwarg: Option<&'a Parameter>,
-}
-
-impl<'a> ParametersIterator<'a> {
-    fn new(parameters: &'a Parameters) -> Self {
-        let Parameters {
-            range: _,
-            node_index: _,
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-        } = parameters;
-        Self {
-            posonlyargs: posonlyargs.iter(),
-            args: args.iter(),
-            vararg: vararg.as_deref(),
-            kwonlyargs: kwonlyargs.iter(),
-            kwarg: kwarg.as_deref(),
-        }
-    }
-}
-
-impl<'a> Iterator for ParametersIterator<'a> {
-    type Item = AnyParameterRef<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let ParametersIterator {
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-        } = self;
-
-        if let Some(param) = posonlyargs.next() {
-            return Some(AnyParameterRef::NonVariadic(param));
-        }
-        if let Some(param) = args.next() {
-            return Some(AnyParameterRef::NonVariadic(param));
-        }
-        if let Some(param) = vararg.take() {
-            return Some(AnyParameterRef::Variadic(param));
-        }
-        if let Some(param) = kwonlyargs.next() {
-            return Some(AnyParameterRef::NonVariadic(param));
-        }
-        kwarg.take().map(AnyParameterRef::Variadic)
+        itertools::Either::Right(
+            items
+                .clone()
+                .filter(|p| matches!(p, ParameterItem::PositionalOnly(_)))
+                .chain(
+                    items
+                        .clone()
+                        .filter(|p| matches!(p, ParameterItem::PositionalOrKeyword(_))),
+                )
+                .chain(
+                    items
+                        .clone()
+                        .find(|p| matches!(p, ParameterItem::Vararg(_))),
+                )
+                .chain(
+                    items
+                        .clone()
+                        .filter(|p| matches!(p, ParameterItem::KeywordOnly(_))),
+                )
+                .chain(
+                    items
+                        .clone()
+                        .rfind(|p| matches!(p, ParameterItem::Kwarg(_))),
+                ),
+        )
     }
 
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let ParametersIterator {
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-        } = self;
-
-        let posonlyargs_len = posonlyargs.len();
-        let args_len = args.len();
-        let vararg_len = usize::from(vararg.is_some());
-        let kwonlyargs_len = kwonlyargs.len();
-        let kwarg_len = usize::from(kwarg.is_some());
-
-        let lower = posonlyargs_len
-            .saturating_add(args_len)
-            .saturating_add(vararg_len)
-            .saturating_add(kwonlyargs_len)
-            .saturating_add(kwarg_len);
-
-        let upper = posonlyargs_len
-            .checked_add(args_len)
-            .and_then(|length| length.checked_add(vararg_len))
-            .and_then(|length| length.checked_add(kwonlyargs_len))
-            .and_then(|length| length.checked_add(kwarg_len));
-
-        (lower, upper)
-    }
-
-    fn last(mut self) -> Option<Self::Item> {
-        self.next_back()
-    }
-}
-
-impl DoubleEndedIterator for ParametersIterator<'_> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let ParametersIterator {
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-        } = self;
-
-        if let Some(param) = kwarg.take() {
-            return Some(AnyParameterRef::Variadic(param));
-        }
-        if let Some(param) = kwonlyargs.next_back() {
-            return Some(AnyParameterRef::NonVariadic(param));
-        }
-        if let Some(param) = vararg.take() {
-            return Some(AnyParameterRef::Variadic(param));
-        }
-        if let Some(param) = args.next_back() {
-            return Some(AnyParameterRef::NonVariadic(param));
-        }
-        posonlyargs.next_back().map(AnyParameterRef::NonVariadic)
-    }
-}
-
-impl FusedIterator for ParametersIterator<'_> {}
-
-/// We rely on the same invariants outlined in the comment above `Parameters::len()`
-/// in order to implement `ExactSizeIterator` here
-impl ExactSizeIterator for ParametersIterator<'_> {}
-
-impl<'a> IntoIterator for &'a Parameters {
-    type IntoIter = ParametersIterator<'a>;
-    type Item = AnyParameterRef<'a>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a Box<Parameters> {
-    type IntoIter = ParametersIterator<'a>;
-    type Item = AnyParameterRef<'a>;
-    fn into_iter(self) -> Self::IntoIter {
-        (&**self).into_iter()
-    }
-}
-
-/// The iterator returned by [`Parameters::iter_source_order`].
-pub struct ParametersSourceOrderIterator<'a> {
-    next_non_variadic_peeked: Option<&'a ParameterWithDefault>,
-    posonlyargs: Iter<'a, ParameterWithDefault>,
-    args: Iter<'a, ParameterWithDefault>,
-    kwonlyargs: Iter<'a, ParameterWithDefault>,
-    variadics: [Option<&'a Parameter>; 2],
-    next_variadic: usize,
-}
-
-impl<'a> ParametersSourceOrderIterator<'a> {
-    /// Returns the next variadic parameter that appears before `before`, if any.
-    fn next_variadic_before(&mut self, before: TextSize) -> Option<&'a Parameter> {
-        let param = self.variadics.get(self.next_variadic).copied().flatten()?;
-        if param.start() < before {
-            self.next_variadic += 1;
-            Some(param)
+    /// Returns the first parameter in argument-binding order.
+    pub fn first(&self) -> Option<AnyParameterRef<'_>> {
+        let first = self.items.first()?;
+        if matches!(
+            first,
+            ParameterItem::PositionalOnly(_) | ParameterItem::PositionalOrKeyword(_)
+        ) || self.is_in_binding_order()
+        {
+            Some(first.as_ref())
         } else {
-            None
+            self.iter_grouped().next()
         }
     }
 
-    fn next_non_variadic(&mut self) -> Option<&'a ParameterWithDefault> {
-        self.next_non_variadic_peeked
-            .take()
-            .or_else(|| self.posonlyargs.next())
-            .or_else(|| self.args.next())
-            .or_else(|| self.kwonlyargs.next())
+    /// Iterates parameters in argument-binding order.
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = AnyParameterRef<'_>> {
+        if self.is_in_binding_order() {
+            itertools::Either::Left(self.iter_source_order())
+        } else {
+            itertools::Either::Right(self.iter_grouped())
+        }
     }
 
-    fn peek_next_non_variadic(&mut self) -> Option<&'a ParameterWithDefault> {
-        let next = self.next_non_variadic()?;
-        self.next_non_variadic_peeked = Some(next);
-        Some(next)
+    fn iter_grouped(&self) -> impl DoubleEndedIterator<Item = AnyParameterRef<'_>> {
+        self.iter_positional_params()
+            .map(AnyParameterRef::NonVariadic)
+            .chain(std::iter::once_with(|| self.vararg().map(AnyParameterRef::Variadic)).flatten())
+            .chain(self.kwonlyargs().map(AnyParameterRef::NonVariadic))
+            .chain(std::iter::once_with(|| self.kwarg().map(AnyParameterRef::Variadic)).flatten())
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn includes(&self, name: &str) -> bool {
+        self.items.iter().any(|item| item.as_ref().name() == name)
     }
 }
-
-impl<'a> Iterator for ParametersSourceOrderIterator<'a> {
-    type Item = AnyParameterRef<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // If there's a variadic parameter that comes before the next
-        // non-variadic parameter, emit it first.
-        let next_non_variadic_start = self
-            .peek_next_non_variadic()
-            .map_or(TextSize::new(u32::MAX), Ranged::start);
-
-        if let Some(variadic) = self.next_variadic_before(next_non_variadic_start) {
-            return Some(AnyParameterRef::Variadic(variadic));
-        }
-
-        if let Some(non_variadic) = self.next_non_variadic() {
-            return Some(AnyParameterRef::NonVariadic(non_variadic));
-        }
-
-        // Drain remaining variadics.
-        self.next_variadic_before(TextSize::new(u32::MAX))
-            .map(AnyParameterRef::Variadic)
-    }
-}
-
-impl FusedIterator for ParametersSourceOrderIterator<'_> {}
 
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
 /// Used by `Arguments` original type.
@@ -3918,8 +3854,6 @@ pub type DecoratorList = ThinVec<Decorator>;
 
 pub type Patterns = ThinVec<Pattern>;
 
-pub type ParameterWithDefaults = ThinVec<ParameterWithDefault>;
-
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
 /// [IPython Syntax]: https://github.com/ipython/ipython/blob/635815e8f1ded5b764d66cacc80bbe25e9e2587f/IPython/core/inputtransformer2.py#L335-L343
@@ -4188,7 +4122,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<StmtTry>(), 64);
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 64);
-        assert_eq!(std::mem::size_of::<Parameters>(), 56);
+        assert_eq!(std::mem::size_of::<Parameters>(), 24);
         assert_eq!(std::mem::size_of::<Arguments>(), 32);
         assert_eq!(std::mem::size_of::<Expr>(), 56);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);

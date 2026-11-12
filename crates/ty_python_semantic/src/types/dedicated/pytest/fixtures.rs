@@ -42,6 +42,8 @@
 //!   available by that definition, including those reached through imports. Each exposure records the
 //!   fixture's public name, canonical declaration, and local and source bindings.
 
+use std::cell::LazyCell;
+
 use std::cmp::Ordering;
 
 use itertools::Either;
@@ -543,12 +545,17 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
 
         let signature = self.function_type.last_definition_signature(db);
         let parameters = signature.parameters();
+        let has_explicit_positional_only = LazyCell::new(|| {
+            self.function
+                .parameters
+                .roles()
+                .any(|role| role == ast::ParameterRole::PositionalOnly)
+        });
         let is_source_keyword_parameter = |parameter: &SignatureParameter<'db>| {
             parameter.keyword_name().is_some()
                 // ty applies PEP 484's legacy positional-only convention to leading `__name`
                 // parameters, but Python and pytest still inspect them as positional-or-keyword.
-                || (self.function.parameters.posonlyargs.is_empty()
-                    && parameter.is_positional_only())
+                || (parameter.is_positional_only() && !*has_explicit_positional_only)
         };
         let skips_receiver = self.function_type.has_implicit_receiver(db)
             && parameters

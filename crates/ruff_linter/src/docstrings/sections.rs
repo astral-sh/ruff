@@ -579,9 +579,7 @@ fn is_docstring_section(
 /// Returns whether or not `definition` is a function definition and contains a parameter with the
 /// same name as `section_name`.
 fn has_parameter(definition: &Definition, section_name: &str) -> bool {
-    definition.as_function_def().is_some_and(|func| {
-        func.parameters
-            .iter()
-            .any(|param| param.name() == section_name)
-    })
+    definition
+        .as_function_def()
+        .is_some_and(|func| func.parameters.includes(section_name))
 }

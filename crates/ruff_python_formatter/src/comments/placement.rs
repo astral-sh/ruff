@@ -832,7 +832,14 @@ fn handle_parameters_separator_comment<'a>(
     parameters: &Parameters,
     source: &str,
 ) -> CommentPlacement<'a> {
-    let (slash, star) = find_parameter_separators(source, parameters);
+    let preceding_end = comment
+        .preceding_node()
+        .map_or(parameters.start(), |node| node.end());
+    let following_start = comment
+        .following_node()
+        .map_or(parameters.end(), |node| node.start());
+    let (slash, star) =
+        find_parameter_separators(source, TextRange::new(preceding_end, following_start));
     let placement = assign_argument_separator_comment_placement(
         slash.as_ref(),
         star.as_ref(),

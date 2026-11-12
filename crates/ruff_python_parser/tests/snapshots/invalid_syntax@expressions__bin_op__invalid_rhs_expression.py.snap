@@ -35,27 +35,25 @@ Module(
                                         Parameters {
                                             range: 11..12,
                                             node_index: NodeIndex(None),
-                                            posonlyargs: [],
-                                            args: [
-                                                ParameterWithDefault {
-                                                    range: 11..12,
-                                                    node_index: NodeIndex(None),
-                                                    parameter: Parameter {
+                                            items: [
+                                                PositionalOrKeyword(
+                                                    ParameterWithDefault {
                                                         range: 11..12,
                                                         node_index: NodeIndex(None),
-                                                        name: Identifier {
-                                                            id: Name("y"),
+                                                        parameter: Parameter {
                                                             range: 11..12,
                                                             node_index: NodeIndex(None),
+                                                            name: Identifier {
+                                                                id: Name("y"),
+                                                                range: 11..12,
+                                                                node_index: NodeIndex(None),
+                                                            },
+                                                            annotation: None,
                                                         },
-                                                        annotation: None,
+                                                        default: None,
                                                     },
-                                                    default: None,
-                                                },
+                                                ),
                                             ],
-                                            vararg: None,
-                                            kwonlyargs: [],
-                                            kwarg: None,
                                         },
                                     ),
                                     body: Name(

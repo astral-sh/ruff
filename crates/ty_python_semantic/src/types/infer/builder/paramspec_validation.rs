@@ -23,13 +23,15 @@ pub(super) fn validate_paramspec_components<'db>(
     context: &'db InferContext<'db, '_>,
     index: &SemanticIndex<'db>,
     parameters: &ast::Parameters,
+    vararg_parameter: Option<&ast::Parameter>,
+    kwarg_parameter: Option<&ast::Parameter>,
     infer_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
     let env = context.program_environment();
 
     // Extract ParamSpec info from *args annotation
-    let args_paramspec = parameters.vararg.as_deref().and_then(|vararg| {
+    let args_paramspec = vararg_parameter.and_then(|vararg| {
         let annotation = vararg.annotation()?;
         let ty = infer_type(annotation);
         if let Type::TypeVar(typevar) = ty
@@ -43,7 +45,7 @@ pub(super) fn validate_paramspec_components<'db>(
     });
 
     // Extract ParamSpec info from **kwargs annotation
-    let kwargs_paramspec = parameters.kwarg.as_deref().and_then(|kwarg| {
+    let kwargs_paramspec = kwarg_parameter.and_then(|kwarg| {
         let annotation = kwarg.annotation()?;
         let ty = infer_type(annotation);
         if let Type::TypeVar(typevar) = ty
@@ -56,8 +58,8 @@ pub(super) fn validate_paramspec_components<'db>(
         }
     });
 
-    let vararg_name = parameters.vararg.as_deref().map(|v| v.name.as_str());
-    let kwarg_name = parameters.kwarg.as_deref().map(|k| k.name.as_str());
+    let vararg_name = vararg_parameter.map(|v| v.name.as_str());
+    let kwarg_name = kwarg_parameter.map(|k| k.name.as_str());
 
     match (args_paramspec, kwargs_paramspec) {
         // Both *args: P.args and **kwargs: P.kwargs present
@@ -117,13 +119,11 @@ pub(super) fn validate_paramspec_components<'db>(
                 }
 
                 // Same ParamSpec - check no keyword-only params between them
-                if !parameters.kwonlyargs.is_empty() {
+                if let Some(first_keyword) = parameters.kwonlyargs().next() {
                     let name = args_tv.name(db);
                     let vararg = vararg_name.unwrap_or("args");
                     let kwarg = kwarg_name.unwrap_or("kwargs");
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_PARAMSPEC, &parameters.kwonlyargs[0])
-                    {
+                    if let Some(builder) = context.report_lint(&INVALID_PARAMSPEC, first_keyword) {
                         builder.into_diagnostic(format_args!(
                             "No parameters may appear between \
                                  `*{vararg}: {name}.args` and `**{kwarg}: {name}.kwargs`",
@@ -139,7 +139,7 @@ pub(super) fn validate_paramspec_components<'db>(
             let vararg = vararg_name.unwrap_or("args");
             let kwarg = kwarg_name.unwrap_or("kwargs");
             // Report on the kwarg annotation if it exists, otherwise on *args
-            let range = if let Some(kwarg_param) = parameters.kwarg.as_deref() {
+            let range = if let Some(kwarg_param) = kwarg_parameter {
                 kwarg_param
                     .annotation()
                     .map(Ranged::range)
@@ -160,7 +160,7 @@ pub(super) fn validate_paramspec_components<'db>(
             let vararg = vararg_name.unwrap_or("args");
             let kwarg = kwarg_name.unwrap_or("kwargs");
             // Report on the vararg annotation if it exists, otherwise on **kwargs
-            let range = if let Some(vararg_param) = parameters.vararg.as_deref() {
+            let range = if let Some(vararg_param) = vararg_parameter {
                 vararg_param
                     .annotation()
                     .map(Ranged::range)

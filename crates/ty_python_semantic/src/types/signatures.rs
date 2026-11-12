@@ -5542,116 +5542,72 @@ impl<'db> Parameters<'db> {
         has_implicitly_positional_first_parameter: bool,
         annotation: &impl Fn(&ast::Expr) -> (Type<'db>, TypeExpressionFlags),
     ) -> Self {
-        let ast::Parameters {
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-            range: _,
-            node_index: _,
-        } = parameters;
-
         let default_type = |param: &ast::ParameterWithDefault| {
             param.default().map(|_| {
                 ParameterDefault::Deferred(index.expect_single_definition(&param.parameter))
             })
         };
 
-        let pos_only_param = |param: &ast::ParameterWithDefault| {
-            Parameter::from_node_and_kind(
-                db,
-                index,
-                annotation,
-                &param.parameter,
-                ParameterKind::PositionalOnly {
-                    name: Some(param.parameter.name.id.clone()),
-                    default_type: default_type(param),
-                },
-            )
-        };
-
-        let mut positional_only: Vec<Parameter> = posonlyargs.iter().map(pos_only_param).collect();
-
-        let mut pos_or_keyword_iter = args.iter();
-
-        // If there are no PEP-570 positional-only parameters, check for the legacy PEP-484 convention
-        // for denoting positional-only parameters (parameters that start with `__` and do not end with `__`)
-        if positional_only.is_empty() {
-            let pos_or_keyword_iter = pos_or_keyword_iter.by_ref();
-
-            if has_implicitly_positional_first_parameter {
-                positional_only.extend(pos_or_keyword_iter.next().map(pos_only_param));
-            }
-
-            positional_only.extend(
-                pos_or_keyword_iter
-                    .peeking_take_while(|param| param.uses_pep_484_positional_only_convention())
-                    .map(pos_only_param),
-            );
-        }
-
-        let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                index,
-                annotation,
-                &arg.parameter,
-                ParameterKind::PositionalOrKeyword {
-                    name: arg.parameter.name.id.clone(),
-                    default_type: default_type(arg),
-                },
-            )
-        });
-
-        let variadic = vararg.as_ref().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                index,
-                annotation,
-                arg,
-                ParameterKind::Variadic {
-                    name: arg.name.id.clone(),
-                },
-            )
-        });
-
-        let keyword_only = kwonlyargs.iter().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                index,
-                annotation,
-                &arg.parameter,
-                ParameterKind::KeywordOnly {
-                    name: arg.parameter.name.id.clone(),
-                    default_type: default_type(arg),
-                },
-            )
-        });
-
-        let keywords = kwarg.as_ref().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                index,
-                annotation,
-                arg,
-                ParameterKind::KeywordVariadic {
-                    name: arg.name.id.clone(),
-                },
-            )
-        });
-
-        Self::from_annotation(
-            db,
-            positional_only
-                .into_iter()
-                .chain(positional_or_keyword)
-                .chain(variadic)
-                .chain(keyword_only)
-                .chain(keywords)
-                .enumerate()
-                .map(|(index, parameter)| parameter.with_source_parameter_index(Some(index))),
-        )
+        // Without a slash, a leading run of `__name` parameters follows the PEP 484
+        // positional-only convention. A method receiver can start that run.
+        let mut legacy_positional_prefix = true;
+        let parameters = parameters
+            .items_in_binding_order()
+            .enumerate()
+            .map(|(i, item)| {
+                let (node, kind) = match item {
+                    ast::ParameterItem::PositionalOnly(p) => {
+                        legacy_positional_prefix = false;
+                        (
+                            &p.parameter,
+                            ParameterKind::PositionalOnly {
+                                name: Some(p.parameter.name.id.clone()),
+                                default_type: default_type(p),
+                            },
+                        )
+                    }
+                    ast::ParameterItem::PositionalOrKeyword(p) => {
+                        let kind = if legacy_positional_prefix
+                            && ((i == 0 && has_implicitly_positional_first_parameter)
+                                || p.uses_pep_484_positional_only_convention())
+                        {
+                            ParameterKind::PositionalOnly {
+                                name: Some(p.parameter.name.id.clone()),
+                                default_type: default_type(p),
+                            }
+                        } else {
+                            legacy_positional_prefix = false;
+                            ParameterKind::PositionalOrKeyword {
+                                name: p.parameter.name.id.clone(),
+                                default_type: default_type(p),
+                            }
+                        };
+                        (&p.parameter, kind)
+                    }
+                    ast::ParameterItem::KeywordOnly(p) => (
+                        &p.parameter,
+                        ParameterKind::KeywordOnly {
+                            name: p.parameter.name.id.clone(),
+                            default_type: default_type(p),
+                        },
+                    ),
+                    ast::ParameterItem::Vararg(p) => (
+                        p,
+                        ParameterKind::Variadic {
+                            name: p.name.id.clone(),
+                        },
+                    ),
+                    ast::ParameterItem::Kwarg(p) => (
+                        p,
+                        ParameterKind::KeywordVariadic {
+                            name: p.name.id.clone(),
+                        },
+                    ),
+                };
+                Parameter::from_node_and_kind(db, index, annotation, node, kind)
+                    .with_source_parameter_index(Some(i))
+            });
+        Self::from_annotation(db, parameters)
     }
 
     fn apply_type_mapping_impl<'a>(

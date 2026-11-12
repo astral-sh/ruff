@@ -1,9 +1,11 @@
 use std::fmt::{Display, Formatter};
 
+use itertools::Itertools;
 use ruff_python_ast::{
     Expr, ExprBinOp, ExprSubscript, ExprTuple, Operator, ParameterWithDefault, Parameters, Stmt,
     StmtClassDef, StmtFunctionDef,
 };
+use ruff_python_ast::{ParameterItem, ParameterRole};
 use smallvec::SmallVec;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -153,57 +155,58 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         return;
     };
 
-    let non_self_positional_args: SmallVec<[&ParameterWithDefault; 3]> = parameters
-        .posonlyargs
-        .iter()
-        .chain(&parameters.args)
-        .skip(1)
-        .collect();
-
     if is_overload(decorator_list, semantic) {
         check_positional_args_for_overloaded_method(
             checker,
-            &non_self_positional_args,
+            parameters,
             func_kind,
             parent_class_def,
-            parameters.range(),
         );
         return;
     }
 
-    // If there are less than three positional arguments, at least one of them must be a star-arg,
-    // and it must be annotated with `object`.
+    let mut skip_receiver = true;
+    let mut non_self_positional_args: SmallVec<[&ParameterWithDefault; 3]> = SmallVec::new();
+    let mut vararg = None;
+    let mut required_keyword_ranges = Vec::new();
+    for item in &parameters.items {
+        match item {
+            ParameterItem::PositionalOnly(p) | ParameterItem::PositionalOrKeyword(p) => {
+                if std::mem::take(&mut skip_receiver) {
+                    continue;
+                }
+                if non_self_positional_args.len() < 3 {
+                    non_self_positional_args.push(p);
+                } else if p.default.is_none() {
+                    checker.report_diagnostic(
+                        BadExitAnnotation {
+                            func_kind,
+                            error_kind: ErrorKind::ArgsAfterFirstFourMustHaveDefault,
+                        },
+                        p.range(),
+                    );
+                }
+            }
+            ParameterItem::KeywordOnly(p) if p.default.is_none() => {
+                required_keyword_ranges.push(p.range());
+            }
+            ParameterItem::Vararg(p) => {
+                vararg.get_or_insert(p);
+            }
+            ParameterItem::KeywordOnly(_) | ParameterItem::Kwarg(_) => {}
+        }
+    }
+
     if non_self_positional_args.len() < 3 {
-        check_short_args_list(checker, parameters, func_kind);
+        check_short_args_list(checker, vararg, parameters.range(), func_kind);
     }
-
-    // Every positional argument (beyond the first four) must have a default.
-    for parameter in non_self_positional_args
-        .iter()
-        .skip(3)
-        .filter(|parameter| parameter.default.is_none())
-    {
-        checker.report_diagnostic(
-            BadExitAnnotation {
-                func_kind,
-                error_kind: ErrorKind::ArgsAfterFirstFourMustHaveDefault,
-            },
-            parameter.range(),
-        );
-    }
-
-    // ...as should all keyword-only arguments.
-    for parameter in parameters
-        .kwonlyargs
-        .iter()
-        .filter(|arg| arg.default.is_none())
-    {
+    for range in required_keyword_ranges {
         checker.report_diagnostic(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::AllKwargsMustHaveDefault,
             },
-            parameter.range(),
+            range,
         );
     }
 
@@ -212,8 +215,13 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
 
 /// Determine whether a "short" argument list (i.e., an argument list with less than four elements)
 /// contains a star-args argument annotated with `object`. If not, report an error.
-fn check_short_args_list(checker: &Checker, parameters: &Parameters, func_kind: FuncKind) {
-    if let Some(varargs) = &parameters.vararg {
+fn check_short_args_list(
+    checker: &Checker,
+    vararg: Option<&ruff_python_ast::Parameter>,
+    parameters_range: TextRange,
+    func_kind: FuncKind,
+) {
+    if let Some(varargs) = vararg {
         if let Some(annotation) = varargs.annotation().filter(|ann| {
             !checker.match_maybe_stringized_annotation(ann, |expr| {
                 is_object_or_unused(expr, checker.semantic())
@@ -243,7 +251,7 @@ fn check_short_args_list(checker: &Checker, parameters: &Parameters, func_kind: 
                 func_kind,
                 error_kind: ErrorKind::MissingArgs,
             },
-            parameters.range(),
+            parameters_range,
         );
     }
 }
@@ -302,10 +310,9 @@ fn check_positional_args_for_non_overloaded_method(
 /// overload are annotated correctly.
 fn check_positional_args_for_overloaded_method(
     checker: &Checker,
-    non_self_positional_args: &[&ParameterWithDefault],
+    parameters: &Parameters,
     kind: FuncKind,
     parent_class_def: &StmtClassDef,
-    parameters_range: TextRange,
 ) {
     fn parameter_annotation_loosely_matches_predicate(
         parameter: &ParameterWithDefault,
@@ -353,28 +360,15 @@ fn check_positional_args_for_overloaded_method(
             return;
         }
 
-        // If any overloads have any variadic arguments, don't do any checking
-        let Parameters {
-            range: _,
-            node_index: _,
-            posonlyargs,
-            args,
-            vararg: None,
-            kwonlyargs,
-            kwarg: None,
-        } = &**parameters
-        else {
-            return;
-        };
-
-        // If any overloads have any keyword-only arguments, don't do any checking
-        if !kwonlyargs.is_empty() {
-            return;
-        }
-
-        // If the number of non-keyword-only arguments is not exactly equal to 4
-        // for any overloads, don't do any checking
-        if posonlyargs.len() + args.len() != 4 {
+        // Each overload must have exactly four positional parameters, including self.
+        if parameters.len() != 4
+            || !parameters.roles().all(|role| {
+                matches!(
+                    role,
+                    ParameterRole::PositionalOnly | ParameterRole::PositionalOrKeyword
+                )
+            })
+        {
             return;
         }
     }
@@ -403,6 +397,13 @@ fn check_positional_args_for_overloaded_method(
     // - If not: emit a diagnostic.
 
     // Start by checking the first possibility:
+    let Some(non_self_positional_args) = parameters
+        .iter_positional_params()
+        .skip(1)
+        .collect_array::<3>()
+    else {
+        return;
+    };
     if non_self_positional_args.iter().all(|parameter| {
         parameter_annotation_loosely_matches_predicate(
             parameter,
@@ -436,7 +437,7 @@ fn check_positional_args_for_overloaded_method(
             func_kind: kind,
             error_kind: ErrorKind::UnrecognizedExitOverload,
         },
-        parameters_range,
+        parameters.range(),
     );
 }
 

@@ -1059,7 +1059,7 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
         if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) =
             binding.statement(semantic)
         {
-            if let Some(kwarg_parameter) = parameters.kwarg.as_deref() {
+            if let Some(kwarg_parameter) = parameters.kwarg() {
                 if kwarg_parameter.name.range() == binding.range() {
                     return true;
                 }
@@ -1112,7 +1112,7 @@ pub fn is_tuple(binding: &Binding, semantic: &SemanticModel) -> bool {
         if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) =
             binding.statement(semantic)
         {
-            if let Some(arg_parameter) = parameters.vararg.as_deref() {
+            if let Some(arg_parameter) = parameters.vararg() {
                 if arg_parameter.name.range() == binding.range() {
                     return true;
                 }

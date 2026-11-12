@@ -1377,10 +1377,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 // The default values of the parameters needs to be evaluated in the enclosing
                 // scope.
-                for parameter in parameters {
-                    if let Some(expr) = parameter.default() {
-                        self.visit_expr(expr);
-                    }
+                for default in parameters
+                    .iter_non_variadic_params()
+                    .filter_map(ast::ParameterWithDefault::default)
+                {
+                    self.visit_expr(default);
                 }
 
                 // Here we add the implicit scope surrounding a method which allows code in the
@@ -1408,7 +1409,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_type_params(type_params);
                 }
 
-                for parameter in parameters {
+                for parameter in parameters.iter() {
                     if let Some(expr) = parameter.annotation() {
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);

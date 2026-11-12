@@ -25,60 +25,60 @@ Module(
                     parameters: Parameters {
                         range: 7..43,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 13..23,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 13..23,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("first"),
-                                        range: 13..18,
+                                    parameter: Parameter {
+                                        range: 13..23,
                                         node_index: NodeIndex(None),
-                                    },
-                                    annotation: Some(
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 20..23,
-                                                id: Name("int"),
-                                                ctx: Load,
-                                            },
+                                        name: Identifier {
+                                            id: Name("first"),
+                                            range: 13..18,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 20..23,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
                                         ),
-                                    ),
+                                    },
+                                    default: None,
                                 },
-                                default: None,
-                            },
-                            ParameterWithDefault {
-                                range: 29..40,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                            ),
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 29..40,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("second"),
-                                        range: 29..35,
+                                    parameter: Parameter {
+                                        range: 29..40,
                                         node_index: NodeIndex(None),
-                                    },
-                                    annotation: Some(
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 37..40,
-                                                id: Name("int"),
-                                                ctx: Load,
-                                            },
+                                        name: Identifier {
+                                            id: Name("second"),
+                                            range: 29..35,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 37..40,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
                                         ),
-                                    ),
+                                    },
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: Some(
                         Name(

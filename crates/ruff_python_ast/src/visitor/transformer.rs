@@ -664,36 +664,24 @@ pub fn walk_arguments<V: Transformer + ?Sized>(visitor: &V, arguments: &mut Argu
 
 pub fn walk_parameters<V: Transformer + ?Sized>(visitor: &V, parameters: &mut Parameters) {
     // Defaults are evaluated before annotations.
-    for arg in &mut parameters.posonlyargs {
-        if let Some(default) = &mut arg.default {
-            visitor.visit_expr(default);
-        }
-    }
-    for arg in &mut parameters.args {
-        if let Some(default) = &mut arg.default {
-            visitor.visit_expr(default);
-        }
-    }
-    for arg in &mut parameters.kwonlyargs {
-        if let Some(default) = &mut arg.default {
+    for item in &mut parameters.items {
+        if let ast::ParameterItem::PositionalOnly(p)
+        | ast::ParameterItem::PositionalOrKeyword(p)
+        | ast::ParameterItem::KeywordOnly(p) = item
+            && let Some(default) = &mut p.default
+        {
             visitor.visit_expr(default);
         }
     }
 
-    for arg in &mut parameters.posonlyargs {
-        visitor.visit_parameter(&mut arg.parameter);
-    }
-    for arg in &mut parameters.args {
-        visitor.visit_parameter(&mut arg.parameter);
-    }
-    if let Some(arg) = &mut parameters.vararg {
-        visitor.visit_parameter(arg);
-    }
-    for arg in &mut parameters.kwonlyargs {
-        visitor.visit_parameter(&mut arg.parameter);
-    }
-    if let Some(arg) = &mut parameters.kwarg {
-        visitor.visit_parameter(arg);
+    for item in &mut parameters.items {
+        let parameter = match item {
+            ast::ParameterItem::PositionalOnly(p)
+            | ast::ParameterItem::PositionalOrKeyword(p)
+            | ast::ParameterItem::KeywordOnly(p) => &mut p.parameter,
+            ast::ParameterItem::Vararg(p) | ast::ParameterItem::Kwarg(p) => p,
+        };
+        visitor.visit_parameter(parameter);
     }
 }
 
