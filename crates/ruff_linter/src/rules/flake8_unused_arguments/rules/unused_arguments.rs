@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{Parameter, Parameters, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
 
@@ -376,7 +377,7 @@ pub(crate) fn is_not_implemented_stub_with_variable(
         return false;
     }
 
-    let [argument] = &*arguments.args else {
+    let Some([argument]) = arguments.args().collect_array() else {
         return false;
     };
 

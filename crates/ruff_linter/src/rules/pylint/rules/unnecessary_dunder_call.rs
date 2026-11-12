@@ -133,7 +133,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // If the call has keywords, abort.
-    if !call.arguments.keywords.is_empty() {
+    if call.arguments.keywords().next().is_some() {
         return;
     }
 
@@ -143,8 +143,9 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
     let mut title: Option<String> = None;
 
     if let Some(dunder) = DunderReplacement::from_method(attr) {
-        match (&*call.arguments.args, dunder) {
-            ([], DunderReplacement::Builtin(replacement, message)) => {
+        let mut args = call.arguments.args();
+        match (args.next(), args.next(), dunder) {
+            (None, _, DunderReplacement::Builtin(replacement, message)) => {
                 if !checker.semantic().has_builtin_binding(replacement) {
                     return;
                 }
@@ -158,7 +159,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
                 ));
                 title = Some(message.to_string());
             }
-            ([arg], DunderReplacement::Operator(replacement, message, precedence)) => {
+            (Some(arg), None, DunderReplacement::Operator(replacement, message, precedence)) => {
                 let value_slice = checker.locator().slice(value.as_ref());
                 let arg_slice = checker.locator().slice(arg);
 
@@ -178,7 +179,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
 
                 title = Some(message.to_string());
             }
-            ([arg], DunderReplacement::ROperator(replacement, message, precedence)) => {
+            (Some(arg), None, DunderReplacement::ROperator(replacement, message, precedence)) => {
                 let value_slice = checker.locator().slice(value.as_ref());
                 let arg_slice = checker.locator().slice(arg);
 
@@ -197,7 +198,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
                 }
                 title = Some(message.to_string());
             }
-            (_, DunderReplacement::MessageOnly(message)) => {
+            (_, _, DunderReplacement::MessageOnly(message)) => {
                 title = Some(message.to_string());
             }
             _ => {}

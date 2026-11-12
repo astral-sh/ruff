@@ -4,11 +4,11 @@ pub mod source_order;
 pub mod transformer;
 
 use crate::{
-    self as ast, Alias, AnyParameterRef, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension,
-    Decorator, DictItem, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringPartRef,
-    InterpolatedStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
-    PatternArguments, PatternKeyword, Stmt, StringLiteral, TString, TypeParam, TypeParamParamSpec,
-    TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
+    self as ast, Alias, AnyParameterRef, Argument, Arguments, BoolOp, BytesLiteral, CmpOp,
+    Comprehension, Decorator, DictItem, ElifElseClause, ExceptHandler, Expr, ExprContext, FString,
+    FStringPartRef, InterpolatedStringElement, Keyword, MatchCase, Operator, Parameter, Parameters,
+    Pattern, PatternArguments, PatternKeyword, Stmt, StringLiteral, TString, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -658,13 +658,22 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
 }
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
-    // Note that there might be keywords before the last arg, e.g. in
-    // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
-    // `keywords`. See also [Arguments::arguments_source_order`].
-    for arg in &*arguments.args {
+    // In `f(first(), key=second(), *third())`, Python evaluates `first` and
+    // `third` before `second`. Only the suffix after the first keyword can
+    // still contain positional arguments that must move ahead of it.
+    let mut items = arguments.items.iter();
+    let first_keyword = loop {
+        match items.next() {
+            Some(Argument::Positional(arg)) => visitor.visit_expr(arg),
+            Some(Argument::Keyword(keyword)) => break keyword,
+            None => return,
+        }
+    };
+    for arg in items.clone().filter_map(Argument::as_positional) {
         visitor.visit_expr(arg);
     }
-    for keyword in &*arguments.keywords {
+    visitor.visit_keyword(first_keyword);
+    for keyword in items.filter_map(Argument::as_keyword) {
         visitor.visit_keyword(keyword);
     }
 }

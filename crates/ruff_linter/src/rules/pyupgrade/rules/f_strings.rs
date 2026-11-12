@@ -74,7 +74,7 @@ impl<'a> FormatSummaryValues<'a> {
         let mut extracted_args: Vec<&Expr> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
 
-        for arg in &*call.arguments.args {
+        for arg in call.arguments.args() {
             if matches!(arg, Expr::Starred(..))
                 || contains_quotes(locator.slice(arg))
                 || locator.contains_line_break(arg.range())
@@ -83,7 +83,7 @@ impl<'a> FormatSummaryValues<'a> {
             }
             extracted_args.push(arg);
         }
-        for keyword in &*call.arguments.keywords {
+        for keyword in call.arguments.keywords() {
             let Keyword {
                 arg,
                 value,
@@ -91,7 +91,9 @@ impl<'a> FormatSummaryValues<'a> {
                 node_index: _,
             } = keyword;
             let key = arg.as_ref()?;
-            if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
+            if contains_quotes(locator.slice(value.as_ref()))
+                || locator.contains_line_break(value.range())
+            {
                 return None;
             }
             extracted_kwargs.insert(key, value);

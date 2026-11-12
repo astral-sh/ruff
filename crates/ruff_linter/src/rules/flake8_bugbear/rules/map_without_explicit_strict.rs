@@ -69,10 +69,10 @@ pub(crate) fn map_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
         && call.arguments.find_keyword("strict").is_none()
         && (
             // at least 2 iterables (+ 1 function), or a starred argument.
-            call.arguments.args.len() >= 3
-                || call.arguments.args.iter().any(ast::Expr::is_starred_expr)
+            call.arguments.args().nth(2).is_some()
+                || call.arguments.args().any(ast::Expr::is_starred_expr)
         )
-        && !any_infinite_iterables(call.arguments.args.iter().skip(1), semantic)
+        && !any_infinite_iterables(call.arguments.args().skip(1), semantic)
     {
         checker
             .report_diagnostic(MapWithoutExplicitStrict, call.range())

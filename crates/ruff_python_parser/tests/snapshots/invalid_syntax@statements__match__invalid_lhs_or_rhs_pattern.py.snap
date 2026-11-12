@@ -49,8 +49,7 @@ Module(
                                                     arguments: Arguments {
                                                         range: 39..41,
                                                         node_index: NodeIndex(None),
-                                                        args: [],
-                                                        keywords: [],
+                                                        items: [],
                                                     },
                                                 },
                                             ),
@@ -482,17 +481,18 @@ Module(
                                                     arguments: Arguments {
                                                         range: 305..313,
                                                         node_index: NodeIndex(None),
-                                                        args: [
-                                                            Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 306..312,
-                                                                    id: Name(""),
-                                                                    ctx: Invalid,
-                                                                },
+                                                        items: [
+                                                            Positional(
+                                                                Name(
+                                                                    ExprName {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 306..312,
+                                                                        id: Name(""),
+                                                                        ctx: Invalid,
+                                                                    },
+                                                                ),
                                                             ),
                                                         ],
-                                                        keywords: [],
                                                     },
                                                 },
                                             ),
@@ -573,8 +573,7 @@ Module(
                                                     arguments: Arguments {
                                                         range: 377..379,
                                                         node_index: NodeIndex(None),
-                                                        args: [],
-                                                        keywords: [],
+                                                        items: [],
                                                     },
                                                 },
                                             ),
@@ -945,17 +944,18 @@ Module(
                                                     arguments: Arguments {
                                                         range: 603..611,
                                                         node_index: NodeIndex(None),
-                                                        args: [
-                                                            Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 604..610,
-                                                                    id: Name(""),
-                                                                    ctx: Invalid,
-                                                                },
+                                                        items: [
+                                                            Positional(
+                                                                Name(
+                                                                    ExprName {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 604..610,
+                                                                        id: Name(""),
+                                                                        ctx: Invalid,
+                                                                    },
+                                                                ),
                                                             ),
                                                         ],
-                                                        keywords: [],
                                                     },
                                                 },
                                             ),
@@ -1015,8 +1015,7 @@ Module(
                                                     arguments: Arguments {
                                                         range: 670..672,
                                                         node_index: NodeIndex(None),
-                                                        args: [],
-                                                        keywords: [],
+                                                        items: [],
                                                     },
                                                 },
                                             ),
@@ -1036,8 +1035,7 @@ Module(
                                                     arguments: Arguments {
                                                         range: 678..680,
                                                         node_index: NodeIndex(None),
-                                                        args: [],
-                                                        keywords: [],
+                                                        items: [],
                                                     },
                                                 },
                                             ),

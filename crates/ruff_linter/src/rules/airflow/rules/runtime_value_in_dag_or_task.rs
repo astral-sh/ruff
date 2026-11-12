@@ -69,7 +69,7 @@ pub(crate) fn airflow_3_dag_dynamic_value(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    for keyword in &call.arguments.keywords {
+    for keyword in call.arguments.keywords() {
         if let Some((expr, name)) = find_runtime_varying_call(&keyword.value, checker.semantic()) {
             checker.report_diagnostic(
                 Airflow3DagDynamicValue {
@@ -135,14 +135,12 @@ fn find_runtime_varying_call<'a>(
             find_runtime_varying_call(func, semantic)
                 .or_else(|| {
                     arguments
-                        .args
-                        .iter()
+                        .args()
                         .find_map(|arg| find_runtime_varying_call(arg, semantic))
                 })
                 .or_else(|| {
                     arguments
-                        .keywords
-                        .iter()
+                        .keywords()
                         .find_map(|kw| find_runtime_varying_call(&kw.value, semantic))
                 })
         }

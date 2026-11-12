@@ -252,8 +252,7 @@ Module(
                                 arguments: Arguments {
                                     range: 110..112,
                                     node_index: NodeIndex(None),
-                                    args: [],
-                                    keywords: [],
+                                    items: [],
                                 },
                             },
                         ),
@@ -292,8 +291,7 @@ Module(
                                 arguments: Arguments {
                                     range: 130..132,
                                     node_index: NodeIndex(None),
-                                    args: [],
-                                    keywords: [],
+                                    items: [],
                                 },
                             },
                         ),

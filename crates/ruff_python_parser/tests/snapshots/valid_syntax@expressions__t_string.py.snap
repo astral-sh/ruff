@@ -1759,8 +1759,7 @@ Module(
                                                                                 arguments: Arguments {
                                                                                     range: 565..567,
                                                                                     node_index: NodeIndex(None),
-                                                                                    args: [],
-                                                                                    keywords: [],
+                                                                                    items: [],
                                                                                 },
                                                                             },
                                                                         ),

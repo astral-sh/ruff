@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -116,12 +116,12 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
     }
 }
 
-fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) -> bool {
-    keywords.iter().any(|keyword| {
+fn is_abc_class(arguments: &Arguments, semantic: &SemanticModel) -> bool {
+    arguments.keywords().any(|keyword| {
         keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
             && semantic.matches_qualified_name(&keyword.value, &["abc", "ABCMeta"])
-    }) || bases
-        .iter()
+    }) || arguments
+        .args()
         .any(|base| semantic.matches_qualified_name(base, &["abc", "ABC"]))
 }
 
@@ -151,14 +151,14 @@ pub(crate) fn abstract_base_class(
     arguments: Option<&Arguments>,
     body: &[Stmt],
 ) {
-    let Some(Arguments { args, keywords, .. }) = arguments else {
+    let Some(arguments) = arguments else {
         return;
     };
 
-    if args.len() + keywords.len() != 1 {
+    if arguments.len() != 1 {
         return;
     }
-    if !is_abc_class(args, keywords, checker.semantic()) {
+    if !is_abc_class(arguments, checker.semantic()) {
         return;
     }
 

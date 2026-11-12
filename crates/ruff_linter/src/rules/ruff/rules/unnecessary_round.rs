@@ -155,11 +155,11 @@ pub(super) fn rounded_and_ndigits<'a>(
     }
 
     // *args
-    if arguments.args.iter().any(Expr::is_starred_expr) {
+    if arguments.args().any(Expr::is_starred_expr) {
         return None;
     }
     // **kwargs
-    if arguments.keywords.iter().any(|kw| kw.arg.is_none()) {
+    if arguments.keywords().any(|kw| kw.arg.is_none()) {
         return None;
     }
 

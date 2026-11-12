@@ -1,4 +1,3 @@
-use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
@@ -208,7 +207,7 @@ fn try_fix_legacy_call(
                         PytestContextType::from_expr_name(&inner_call.func, semantic)
                             == Some(PytestContextType::Raises)
                     })?;
-                let match_arg = call.arguments.args.first();
+                let match_arg = call.arguments.args().next();
                 generate_with_statement(context_type, inner_raises_call, match_arg, None, None)
             } else {
                 None
@@ -254,14 +253,13 @@ fn generate_with_statement(
         .arguments
         .find_argument_value(func_arg_name, func_arg_position)?;
 
-    let (func_args, func_keywords): (Vec<_>, Vec<_>) = legacy_call
+    let func_args = legacy_call
         .arguments
-        .iter_source_order()
+        .items
+        .iter()
         .skip(if expected.is_some() { 2 } else { 1 })
-        .partition_map(|arg_or_keyword| match arg_or_keyword {
-            ast::ArgOrKeyword::Arg(expr) => Either::Left(expr.clone()),
-            ast::ArgOrKeyword::Keyword(keyword) => Either::Right(keyword.clone()),
-        });
+        .cloned()
+        .collect();
 
     let context_call = ast::ExprCall {
         node_index: AtomicNodeIndex::NONE,
@@ -270,18 +268,19 @@ fn generate_with_statement(
         arguments: ast::Arguments {
             node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
-            args: expected.cloned().as_slice().into(),
-            keywords: match_arg
-                .map(|expr| ast::Keyword {
-                    node_index: AtomicNodeIndex::NONE,
-                    // Take range from the original expression so that the keyword
-                    // argument is generated after positional arguments
-                    range: expr.range(),
-                    arg: Some(ast::Identifier::new("match", TextRange::default())),
-                    value: expr.clone(),
-                })
-                .as_slice()
-                .into(),
+            items: expected
+                .cloned()
+                .into_iter()
+                .map(ast::Argument::Positional)
+                .chain(match_arg.map(|expr| {
+                    ast::Argument::Keyword(ast::Keyword {
+                        node_index: AtomicNodeIndex::NONE,
+                        range: expr.range(),
+                        arg: Some(ast::Identifier::new("match", TextRange::default())),
+                        value: Box::new(expr.clone()),
+                    })
+                }))
+                .collect(),
         },
     };
 
@@ -292,8 +291,7 @@ fn generate_with_statement(
         arguments: ast::Arguments {
             node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
-            args: func_args.into(),
-            keywords: func_keywords.into(),
+            items: func_args,
         },
     };
 

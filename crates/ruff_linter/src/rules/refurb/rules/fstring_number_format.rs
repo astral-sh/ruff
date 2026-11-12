@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall, Number, PythonVersion, UnaryOp};
 use ruff_source_file::find_newline;
@@ -103,11 +104,11 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
         return;
     };
 
-    if !arguments.keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return;
     }
 
-    let [arg] = &*arguments.args else {
+    let Some([arg]) = arguments.args().collect_array() else {
         return;
     };
 

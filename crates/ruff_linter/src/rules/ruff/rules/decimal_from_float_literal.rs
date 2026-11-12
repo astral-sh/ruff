@@ -55,7 +55,7 @@ pub(crate) fn decimal_from_float_literal_syntax(
     call: &ast::ExprCall,
     qualified_name: &QualifiedName,
 ) {
-    let Some(arg) = call.arguments.args.first() else {
+    let Some(arg) = call.arguments.args().next() else {
         return;
     };
 

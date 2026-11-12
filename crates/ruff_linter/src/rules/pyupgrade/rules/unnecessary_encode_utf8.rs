@@ -104,15 +104,15 @@ enum EncodingArg<'a> {
 /// Return the encoding argument to an `encode` call, if it can be determined to be a
 /// UTF-8-equivalent encoding.
 fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg<'_>> {
-    match (&*arguments.args, &*arguments.keywords) {
+    match arguments.items.as_slice() {
         // Ex `"".encode()`
-        ([], []) => return Some(EncodingArg::Empty),
+        [] => return Some(EncodingArg::Empty),
         // Ex `"".encode(encoding)`
-        ([arg], []) if is_utf8_encoding_arg(arg) => {
+        [ast::Argument::Positional(arg)] if is_utf8_encoding_arg(arg) => {
             return Some(EncodingArg::Positional(arg));
         }
         // Ex `"".encode(kwarg=kwarg)`
-        ([], [keyword])
+        [ast::Argument::Keyword(keyword)]
             if keyword.arg.as_ref().is_some_and(|arg| arg == "encoding")
                 && is_utf8_encoding_arg(&keyword.value) =>
         {

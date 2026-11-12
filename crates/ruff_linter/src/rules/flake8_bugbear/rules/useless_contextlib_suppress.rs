@@ -57,7 +57,7 @@ pub(crate) fn useless_contextlib_suppress(
     call: &ExprCall,
     qualified_name: &QualifiedName,
 ) {
-    if call.arguments.args.is_empty()
+    if call.arguments.args().next().is_none()
         && matches!(qualified_name.segments(), ["contextlib", "suppress"])
     {
         checker.report_diagnostic(UselessContextlibSuppress, call.range());

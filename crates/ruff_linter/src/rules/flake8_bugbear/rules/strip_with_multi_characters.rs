@@ -78,7 +78,7 @@ pub(crate) fn strip_with_multi_characters(
     checker: &Checker,
     expr: &Expr,
     func: &Expr,
-    args: &[Expr],
+    arguments: &ast::Arguments,
 ) {
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
         return;
@@ -87,7 +87,9 @@ pub(crate) fn strip_with_multi_characters(
         return;
     };
 
-    let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] = args else {
+    let Some([Expr::StringLiteral(ast::ExprStringLiteral { value, .. })]) =
+        arguments.args().collect_array()
+    else {
         return;
     };
 

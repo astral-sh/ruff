@@ -2070,7 +2070,7 @@ impl KnownFunction {
                     call_expression,
                     self,
                     *second_argument,
-                    call_expression.arguments.args.get(1),
+                    call_expression.arguments.args().nth(1),
                 );
 
                 if self == KnownFunction::IsInstance {

@@ -104,19 +104,13 @@ impl std::fmt::Display for Nan {
 /// Returns `true` if the expression is a call to `float("NaN")`.
 fn is_nan_float(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     }) = expr
     else {
         return false;
     };
 
-    if !keywords.is_empty() {
-        return false;
-    }
-
-    let [expr] = &**args else {
+    let [ast::Argument::Positional(expr)] = arguments.items.as_slice() else {
         return false;
     };
     if as_nan_float_string_literal(expr).is_none() {

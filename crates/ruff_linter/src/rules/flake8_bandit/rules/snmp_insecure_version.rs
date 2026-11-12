@@ -55,7 +55,7 @@ pub(crate) fn snmp_insecure_version(
     ) {
         if let Some(keyword) = call.arguments.find_keyword("mpModel") {
             if matches!(
-                keyword.value,
+                keyword.value.as_ref(),
                 Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(Int::ZERO | Int::ONE),
                     ..

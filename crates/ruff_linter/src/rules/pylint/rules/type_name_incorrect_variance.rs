@@ -87,11 +87,11 @@ pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
 
     let covariant = arguments
         .find_keyword("covariant")
-        .map(|keyword| &keyword.value);
+        .map(|keyword| keyword.value.as_ref());
 
     let contravariant = arguments
         .find_keyword("contravariant")
-        .map(|keyword| &keyword.value);
+        .map(|keyword| keyword.value.as_ref());
 
     if !mismatch(param_name, covariant, contravariant) {
         return;

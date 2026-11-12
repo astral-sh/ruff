@@ -302,7 +302,7 @@ pub(super) fn report_inconsistent_dynamic_generic_bases<'db>(
         context,
         dynamic_class.header_range(db),
         explicit_bases,
-        base_nodes,
+        |index| base_nodes.and_then(|nodes| nodes.get(index)),
     );
 }
 

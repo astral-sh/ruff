@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
@@ -147,7 +148,7 @@ fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
 
     let ast::ExprCall {
         func: attr,
-        arguments: ast::Arguments { args, keywords, .. },
+        arguments,
         ..
     } = expr.as_call_expr()?;
 
@@ -161,11 +162,9 @@ fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
         return None;
     };
 
-    let [arg] = &**args else {
-        return None;
-    };
+    let [arg] = arguments.args().collect_array()?;
 
-    if func_name != "remove" || !keywords.is_empty() {
+    if func_name != "remove" || arguments.keywords().next().is_some() {
         return None;
     }
 
@@ -188,8 +187,7 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: [element.clone()].into(),
-            keywords: std::iter::empty().collect(),
+            items: [ast::Argument::Positional(element.clone())].into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },

@@ -946,8 +946,7 @@ Module(
                                     arguments: Arguments {
                                         range: 1129..1131,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -994,8 +993,7 @@ Module(
                                     arguments: Arguments {
                                         range: 1147..1149,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -1042,8 +1040,7 @@ Module(
                                     arguments: Arguments {
                                         range: 1166..1168,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -1286,18 +1283,19 @@ Module(
                                                     arguments: Arguments {
                                                         range: 1261..1265,
                                                         node_index: NodeIndex(None),
-                                                        args: [
-                                                            NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 1262..1264,
-                                                                    value: Int(
-                                                                        10,
-                                                                    ),
-                                                                },
+                                                        items: [
+                                                            Positional(
+                                                                NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 1262..1264,
+                                                                        value: Int(
+                                                                            10,
+                                                                        ),
+                                                                    },
+                                                                ),
                                                             ),
                                                         ],
-                                                        keywords: [],
                                                     },
                                                 },
                                             ),
@@ -1401,18 +1399,19 @@ Module(
                                                     arguments: Arguments {
                                                         range: 1308..1312,
                                                         node_index: NodeIndex(None),
-                                                        args: [
-                                                            NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 1309..1311,
-                                                                    value: Int(
-                                                                        10,
-                                                                    ),
-                                                                },
+                                                        items: [
+                                                            Positional(
+                                                                NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 1309..1311,
+                                                                        value: Int(
+                                                                            10,
+                                                                        ),
+                                                                    },
+                                                                ),
                                                             ),
                                                         ],
-                                                        keywords: [],
                                                     },
                                                 },
                                             ),
@@ -1503,18 +1502,19 @@ Module(
                                                     arguments: Arguments {
                                                         range: 1349..1353,
                                                         node_index: NodeIndex(None),
-                                                        args: [
-                                                            NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 1350..1352,
-                                                                    value: Int(
-                                                                        10,
-                                                                    ),
-                                                                },
+                                                        items: [
+                                                            Positional(
+                                                                NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 1350..1352,
+                                                                        value: Int(
+                                                                            10,
+                                                                        ),
+                                                                    },
+                                                                ),
                                                             ),
                                                         ],
-                                                        keywords: [],
                                                     },
                                                 },
                                             ),
@@ -2108,8 +2108,7 @@ Module(
                                     arguments: Arguments {
                                         range: 1821..1823,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -2183,8 +2182,7 @@ Module(
                                     arguments: Arguments {
                                         range: 1878..1880,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -2240,8 +2238,7 @@ Module(
                                     arguments: Arguments {
                                         range: 1923..1925,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -2288,8 +2285,7 @@ Module(
                                     arguments: Arguments {
                                         range: 1963..1965,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -2345,8 +2341,7 @@ Module(
                                     arguments: Arguments {
                                         range: 2007..2009,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -2703,30 +2698,31 @@ Module(
                                     arguments: Arguments {
                                         range: 2180..2188,
                                         node_index: NodeIndex(None),
-                                        args: [
-                                            StringLiteral(
-                                                ExprStringLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 2181..2187,
-                                                    value: StringLiteralValue {
-                                                        inner: Single(
-                                                            StringLiteral {
-                                                                range: 2181..2187,
-                                                                node_index: NodeIndex(None),
-                                                                value: "a.py",
-                                                                flags: StringLiteralFlags {
-                                                                    quote_style: Single,
-                                                                    prefix: Empty,
-                                                                    triple_quoted: false,
-                                                                    unclosed: false,
+                                        items: [
+                                            Positional(
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 2181..2187,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 2181..2187,
+                                                                    node_index: NodeIndex(None),
+                                                                    value: "a.py",
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Single,
+                                                                        prefix: Empty,
+                                                                        triple_quoted: false,
+                                                                        unclosed: false,
+                                                                    },
                                                                 },
-                                                            },
-                                                        ),
+                                                            ),
+                                                        },
                                                     },
-                                                },
+                                                ),
                                             ),
                                         ],
-                                        keywords: [],
                                     },
                                 },
                             ),
@@ -2750,30 +2746,31 @@ Module(
                                     arguments: Arguments {
                                         range: 2196..2204,
                                         node_index: NodeIndex(None),
-                                        args: [
-                                            StringLiteral(
-                                                ExprStringLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 2197..2203,
-                                                    value: StringLiteralValue {
-                                                        inner: Single(
-                                                            StringLiteral {
-                                                                range: 2197..2203,
-                                                                node_index: NodeIndex(None),
-                                                                value: "b.py",
-                                                                flags: StringLiteralFlags {
-                                                                    quote_style: Single,
-                                                                    prefix: Empty,
-                                                                    triple_quoted: false,
-                                                                    unclosed: false,
+                                        items: [
+                                            Positional(
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 2197..2203,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 2197..2203,
+                                                                    node_index: NodeIndex(None),
+                                                                    value: "b.py",
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Single,
+                                                                        prefix: Empty,
+                                                                        triple_quoted: false,
+                                                                        unclosed: false,
+                                                                    },
                                                                 },
-                                                            },
-                                                        ),
+                                                            ),
+                                                        },
                                                     },
-                                                },
+                                                ),
                                             ),
                                         ],
-                                        keywords: [],
                                     },
                                 },
                             ),
@@ -4412,18 +4409,19 @@ Module(
                                                     arguments: Arguments {
                                                         range: 3532..3536,
                                                         node_index: NodeIndex(None),
-                                                        args: [
-                                                            NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 3533..3535,
-                                                                    value: Int(
-                                                                        10,
-                                                                    ),
-                                                                },
+                                                        items: [
+                                                            Positional(
+                                                                NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 3533..3535,
+                                                                        value: Int(
+                                                                            10,
+                                                                        ),
+                                                                    },
+                                                                ),
                                                             ),
                                                         ],
-                                                        keywords: [],
                                                     },
                                                 },
                                             ),
@@ -4501,18 +4499,19 @@ Module(
                                                     arguments: Arguments {
                                                         range: 3571..3575,
                                                         node_index: NodeIndex(None),
-                                                        args: [
-                                                            NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 3572..3574,
-                                                                    value: Int(
-                                                                        10,
-                                                                    ),
-                                                                },
+                                                        items: [
+                                                            Positional(
+                                                                NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 3572..3574,
+                                                                        value: Int(
+                                                                            10,
+                                                                        ),
+                                                                    },
+                                                                ),
                                                             ),
                                                         ],
-                                                        keywords: [],
                                                     },
                                                 },
                                             ),
@@ -4590,18 +4589,19 @@ Module(
                                                     arguments: Arguments {
                                                         range: 3604..3608,
                                                         node_index: NodeIndex(None),
-                                                        args: [
-                                                            NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 3605..3607,
-                                                                    value: Int(
-                                                                        10,
-                                                                    ),
-                                                                },
+                                                        items: [
+                                                            Positional(
+                                                                NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 3605..3607,
+                                                                        value: Int(
+                                                                            10,
+                                                                        ),
+                                                                    },
+                                                                ),
                                                             ),
                                                         ],
-                                                        keywords: [],
                                                     },
                                                 },
                                             ),
