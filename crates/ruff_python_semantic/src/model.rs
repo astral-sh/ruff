@@ -282,21 +282,15 @@ impl<'a> SemanticModel<'a> {
         qualified_name: &QualifiedName,
         target: &str,
     ) -> bool {
-        if matches!(
-            qualified_name.segments(),
-            ["typing" | "_typeshed" | "typing_extensions", member] if *member == target
-        ) {
-            return true;
-        }
-
-        if self.typing_modules.iter().any(|module| {
-            let module = QualifiedName::user_defined(module);
-            qualified_name == &module.append_member(target)
-        }) {
-            return true;
-        }
-
-        false
+        let Some((member, module)) = qualified_name.segments().split_last() else {
+            return false;
+        };
+        *member == target
+            && (matches!(module, ["typing" | "_typeshed" | "typing_extensions"])
+                || self
+                    .typing_modules
+                    .iter()
+                    .any(|configured| configured.split('.').eq(module.iter().copied())))
     }
 
     /// Return an iterator over the set of `typing` modules allowed in the semantic model.
