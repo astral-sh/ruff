@@ -8231,6 +8231,24 @@ td["<CURSOR>"]
     }
 
     #[test]
+    fn string_literal_completions_typed_dict_get() {
+        let builder = completion_test_builder(
+            r#"
+from typing import TypedDict
+
+class Record(TypedDict):
+    count: int
+    name: str
+
+def use(record: Record):
+    record.get("<CURSOR>name")
+"#,
+        );
+
+        builder.build().contains("count").contains("name");
+    }
+
+    #[test]
     fn string_literal_completions_recursive_typed_dict_alias_keys() {
         let builder = completion_test_builder(
             r#"
