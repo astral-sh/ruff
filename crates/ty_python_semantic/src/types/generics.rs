@@ -2847,6 +2847,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         match outcome {
                             PathBoundSolution::BudgetExceeded { fallback } => fallback
                                 .map_or(PathBoundSolution::Unsolved, PathBoundSolution::Solved),
+                            // A sibling's budget fallback cannot validate a dependent preference.
+                            PathBoundSolution::Deferred { combined, .. } => {
+                                PathBoundSolution::Solved(combined)
+                            }
                             outcome => outcome,
                         }
                     },

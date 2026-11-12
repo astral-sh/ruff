@@ -117,9 +117,21 @@ impl<'db> Resolver<'_, 'db> {
                 // Some type forms preserve captured variables when specialized. For example, an
                 // alias changes its explicit arguments but can retain a free variable in its body.
                 // Verify closure on the actual result without performing further substitutions.
-                Dependencies::check(db, self.env, self.inferable, mapped, |_| false)
+                mapped
+                    .is_independent_of_typevars(db, self.env, self.inferable)
                     .then_some(mapped)
             })
+    }
+}
+
+impl<'db> Type<'db> {
+    pub(super) fn is_independent_of_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevars: TypeVarSet<'db>,
+    ) -> bool {
+        Dependencies::check(db, env, typevars, self, |_| false)
     }
 }
 
@@ -504,12 +516,9 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         for name in ["value", "growing"] {
             let tree = global_symbol(db, file, name).place.expect_type();
-            let resolved = resolve_solution(
-                db,
-                &env,
-                TypeVarSet::from_typevars(db, [t]),
-                &[binding(t, tree)],
-            );
+            let inferable = TypeVarSet::from_typevars(db, [t]);
+            assert!(tree.is_independent_of_typevars(db, &env, inferable));
+            let resolved = resolve_solution(db, &env, inferable, &[binding(t, tree)]);
             assert_eq!(resolved.as_ref(), [SolutionType::Resolved(tree)]);
 
             // A closed recursive alias does not prevent resolving an independent tuple element.

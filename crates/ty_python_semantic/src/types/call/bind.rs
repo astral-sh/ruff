@@ -7034,7 +7034,7 @@ impl<'db> CallInference<'_, 'db> {
                     self.inferable_typevars,
                 );
 
-                let solutions = path_bounds.solve_with(|variance, path_bound| {
+                let solutions = path_bounds.solve_with(db, self.env, |variance, path_bound| {
                     let outcome = CandidateSolutions::preliminary_solve(
                         db,
                         self.env,

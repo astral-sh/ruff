@@ -105,8 +105,9 @@ use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
+use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::generics::Specialization;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarSet};
 use crate::types::visitor::{
     NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases, walk_non_atomic_type,
@@ -3258,6 +3259,12 @@ impl<'db> CandidateTypeVarSolver<'db> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum PathBoundSolution<'db> {
     Solved(Type<'db>),
+    /// Prefer the argument-derived candidate if substituting the other bindings on this path
+    /// produces a specialization that still satisfies every bound.
+    Deferred {
+        combined: Type<'db>,
+        inferred: Type<'db>,
+    },
     /// The path provides no type to infer for this variable.
     Unsolved,
     /// The path's lower and upper bounds cannot be satisfied together
@@ -3270,10 +3277,14 @@ pub(crate) enum PathBoundSolution<'db> {
 }
 
 impl<'db> PathBoundSolution<'db> {
-    /// Transforms a selected type without losing whether it is only a budget-exhaustion fallback.
-    pub(crate) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+    /// Transforms the selected type and any preference that still needs validation.
+    pub(crate) fn map(self, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
         match self {
             Self::Solved(ty) => Self::Solved(f(ty)),
+            Self::Deferred { combined, inferred } => Self::Deferred {
+                combined: f(combined),
+                inferred: f(inferred),
+            },
             Self::BudgetExceeded { fallback } => Self::BudgetExceeded {
                 fallback: fallback.map(f),
             },
@@ -3285,7 +3296,7 @@ impl<'db> PathBoundSolution<'db> {
     /// Match the outcome directly when completeness or the reason no type was selected matters.
     pub(crate) fn as_type(self) -> Option<Type<'db>> {
         match self {
-            Self::Solved(ty) => Some(ty),
+            Self::Solved(ty) | Self::Deferred { combined: ty, .. } => Some(ty),
             Self::Unsolved | Self::Unsatisfiable => None,
             Self::BudgetExceeded { fallback } => fallback,
         }
@@ -3440,6 +3451,21 @@ impl<'db> CandidateTypeVarSolution<'db> {
             .iter_clauses(EvidenceSource::All)
             .map(move |bound| (candidate, specialize(bound)));
         lower.into_iter().chain(uppers)
+    }
+
+    fn accepts_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        arguments: Specialization<'db>,
+    ) -> bool {
+        self.candidate_relations(db, env, ty, Some(arguments))
+            .all(|(lower, upper)| {
+                !lower.has_provisional_marker(db, env)
+                    && !upper.has_provisional_marker(db, env)
+                    && lower.is_assignable_to(db, env, upper)
+            })
     }
 
     /// Checks whether a given candidate solution satisfies this path.
@@ -3679,6 +3705,152 @@ pub(crate) struct CandidateSolution<'db> {
 }
 
 impl<'db> CandidateSolution<'db> {
+    /// Tries the argument-derived choices together so each dependent type uses the other
+    /// bindings selected on the same path.
+    fn prefer_inferred(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bindings: &mut [TypeVarSolution<'db>],
+        deferred: &[(usize, Type<'db>)],
+    ) {
+        let Some(first) = self.typevars.first() else {
+            return;
+        };
+        // A specialization has one slot per variable identity. A path can distinguish
+        // specialized instances of the same variable.
+        let mut identities = FxHashSet::default();
+        if self
+            .typevars
+            .iter()
+            .any(|bounds| !identities.insert(bounds.bound_typevar.identity(db)))
+        {
+            return;
+        }
+        let inferable = first.inferable;
+        let resolve = |deferred: &[_]| {
+            Self::resolve_inferred_bindings(db, env, inferable, bindings, deferred)
+        };
+        let Some((proposed, fixed)) = resolve(deferred) else {
+            return;
+        };
+        let proposed = if self.accepts_partial_specialization(db, env, proposed, fixed, bindings) {
+            proposed
+        } else {
+            // One argument-derived choice can violate its own bounds while another satisfies
+            // its bounds. Restore the rejected choices together, then resolve their dependents
+            // again against those original selections.
+            let incompatible: FxHashSet<_> = self
+                .incompatible_typevars(db, env, proposed)
+                .filter(|variable| proposed.get(db, *variable).is_some())
+                .collect();
+            let remaining: Vec<_> = deferred
+                .iter()
+                .copied()
+                .filter(|&(index, _)| !incompatible.contains(&bindings[index].bound_typevar))
+                .collect();
+            if remaining.is_empty() || remaining.len() == deferred.len() {
+                return;
+            }
+            let Some((revised, fixed)) = resolve(&remaining) else {
+                return;
+            };
+            if !self.accepts_partial_specialization(db, env, revised, fixed, bindings) {
+                return;
+            }
+            revised
+        };
+        for binding in bindings {
+            if binding.bound_typevar.is_inferable(db, inferable)
+                && let Some(ty) = proposed.get(db, binding.bound_typevar)
+            {
+                binding.solution = ty;
+            }
+        }
+    }
+
+    fn resolve_inferred_bindings(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        bindings: &[TypeVarSolution<'db>],
+        deferred: &[(usize, Type<'db>)],
+    ) -> Option<(Specialization<'db>, TypeVarSet<'db>)> {
+        let mut proposed = bindings.to_vec();
+        for &(index, inferred) in deferred {
+            proposed[index].solution = inferred;
+        }
+        for binding in &mut proposed {
+            if !binding.bound_typevar.is_inferable(db, inferable) {
+                // A path can retain the reverse bound of a caller's variable. That variable
+                // has its original meaning in the specialization we are checking.
+                binding.solution = Type::TypeVar(binding.bound_typevar);
+            }
+        }
+        let resolved = resolve_solution(db, env, inferable, &proposed);
+        if !deferred.iter().any(|&(index, _)| {
+            matches!(resolved[index], SolutionType::Resolved(ty) if ty != bindings[index].solution)
+        }) {
+            return None;
+        }
+        let mut variables = Vec::new();
+        let mut types = Vec::new();
+        for (resolved, binding) in resolved.into_iter().zip(bindings.iter()) {
+            let ty = match resolved {
+                SolutionType::Resolved(ty) => ty,
+                SolutionType::Unresolved(_)
+                    if binding
+                        .solution
+                        .is_independent_of_typevars(db, env, inferable) =>
+                {
+                    binding.solution
+                }
+                SolutionType::Unresolved(_) => continue,
+            };
+            if ty.is_union()
+                && binding.bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
+            {
+                return None;
+            }
+            variables.push(binding.bound_typevar);
+            types.push(ty);
+        }
+        let fixed = TypeVarSet::from_typevars(
+            db,
+            variables
+                .iter()
+                .copied()
+                .filter(|var| var.is_inferable(db, inferable)),
+        );
+        let context = GenericContext::from_typevar_instances(db, env, variables);
+        Some((context.specialize(db, types), fixed))
+    }
+
+    /// An unresolved group keeps its selections if its choices and bounds are independent
+    /// of every inferable variable fixed by this specialization.
+    fn accepts_partial_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        proposed: Specialization<'db>,
+        fixed: TypeVarSet<'db>,
+        bindings: &[TypeVarSolution<'db>],
+    ) -> bool {
+        let independent = |ty: Type<'db>| ty.is_independent_of_typevars(db, env, fixed);
+        bindings.iter().all(|binding| {
+            proposed.get(db, binding.bound_typevar).is_some() || independent(binding.solution)
+        }) && self.typevars.iter().all(|bounds| {
+            if let Some(ty) = proposed.get(db, bounds.bound_typevar) {
+                bounds.accepts_specialization(db, env, ty, proposed)
+            } else {
+                iter::once(bounds.effective_lower(db, env, EvidenceSource::All))
+                    .chain(bounds.upper.iter_clauses(EvidenceSource::All))
+                    .chain(bounds.selected_declared_constraint)
+                    .all(independent)
+            }
+        })
+    }
+
     /// Variables whose bounds fail with all sibling arguments fixed to this specialization.
     fn incompatible_typevars(
         &self,
@@ -3688,15 +3860,9 @@ impl<'db> CandidateSolution<'db> {
     ) -> impl Iterator<Item = BoundTypeVarInstance<'db>> {
         self.typevars.iter().filter_map(move |bounds| {
             let variable = bounds.bound_typevar;
-            let fits = arguments.get(db, variable).is_some_and(|ty| {
-                bounds
-                    .candidate_relations(db, env, ty, Some(arguments))
-                    .all(|(lower, upper)| {
-                        !lower.has_provisional_marker(db, env)
-                            && !upper.has_provisional_marker(db, env)
-                            && lower.is_assignable_to(db, env, upper)
-                    })
-            });
+            let fits = arguments
+                .get(db, variable)
+                .is_some_and(|ty| bounds.accepts_specialization(db, env, ty, arguments));
             (!fits).then_some(variable)
         })
     }
@@ -4036,7 +4202,7 @@ impl<'db> CandidateSolutions<'db> {
         env: &ProgramEnvironment<'db>,
         builder: &ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
-        self.solve_with(|_variance, path_bound| {
+        self.solve_with(db, env, |_variance, path_bound| {
             CandidateSolutions::default_solve(db, env, builder, path_bound)
         })
     }
@@ -4047,14 +4213,16 @@ impl<'db> CandidateSolutions<'db> {
         env: &ProgramEnvironment<'db>,
         builder: &ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
-        self.solve_with(|_variance, path_bound| {
-            match Self::preliminary_solve(db, env, builder, path_bound) {
+        self.solve_with(
+            db,
+            env,
+            |_variance, path_bound| match Self::preliminary_solve(db, env, builder, path_bound) {
                 PathBoundSolution::Solved(ty) if ty.is_provisional_marker() => {
                     PathBoundSolution::Unsolved
                 }
                 solution => solution,
-            }
-        })
+            },
+        )
     }
 
     /// Widen the inferred arguments for the next pass only when one viable path permits
@@ -4132,15 +4300,19 @@ impl<'db> CandidateSolutions<'db> {
     /// the path's available bindings, but marks the resulting path family as incomplete.
     pub(crate) fn solve_with(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
     ) -> Solutions<'db> {
-        let Ok(solutions) = self.try_solve_with(choose, |_| Ok::<(), Infallible>(()));
+        let Ok(solutions) = self.try_solve_with(db, env, choose, |_| Ok::<(), Infallible>(()));
         solutions
     }
 
     /// Checks each retained solution before collecting it or solving the next path.
     fn try_solve_with<E>(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         mut choose: impl FnMut(
             TypeVarVariance,
             &CandidateTypeVarSolution<'db>,
@@ -4161,7 +4333,8 @@ impl<'db> CandidateSolutions<'db> {
         let mut valid_exceeded_budget = false;
         let mut invalid_exceeded_budget = false;
         for path in paths {
-            let Some((solution, path_exceeded_budget)) = Self::solve_path_with(path, &mut choose)
+            let Some((solution, path_exceeded_budget)) =
+                Self::solve_path_with(db, env, path, &mut choose)
             else {
                 continue;
             };
@@ -4190,6 +4363,8 @@ impl<'db> CandidateSolutions<'db> {
     /// Solves one complete path, retaining whether any of its bindings used a fallback.
     /// A later unsatisfiable bound rejects the path even if an earlier bound exhausted its budget.
     fn solve_path_with(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         candidate: &CandidateSolution<'db>,
         choose: &mut impl FnMut(
             TypeVarVariance,
@@ -4197,10 +4372,20 @@ impl<'db> CandidateSolutions<'db> {
         ) -> PathBoundSolution<'db>,
     ) -> Option<(Solution<'db>, bool)> {
         let mut solved_typevars = Vec::with_capacity(candidate.typevars.len());
+        let mut deferred = Vec::new();
         let mut exceeded_budget = false;
         for path_bound in &candidate.typevars {
             let ty = match choose(path_bound.variance(), path_bound) {
                 PathBoundSolution::Solved(ty) => Some(ty),
+                PathBoundSolution::Deferred { combined, inferred } => {
+                    if path_bound
+                        .bound_typevar
+                        .is_inferable(db, path_bound.inferable)
+                    {
+                        deferred.push((solved_typevars.len(), inferred));
+                    }
+                    Some(combined)
+                }
                 PathBoundSolution::Unsolved => None,
                 PathBoundSolution::Unsatisfiable => return None,
                 PathBoundSolution::BudgetExceeded { fallback } => {
@@ -4214,6 +4399,12 @@ impl<'db> CandidateSolutions<'db> {
                     solution: ty,
                 });
             }
+        }
+        if !deferred.is_empty()
+            && !exceeded_budget
+            && matches!(candidate.validity, SolutionValidity::Valid)
+        {
+            candidate.prefer_inferred(db, env, &mut solved_typevars, &deferred);
         }
         let solution = Solution {
             solved_typevars,
@@ -4233,63 +4424,71 @@ impl<'db> CandidateSolutions<'db> {
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &CandidateTypeVarSolution<'db>,
     ) -> PathBoundSolution<'db> {
-        let default_solution =
+        let combined_solution =
             Self::solve_from_evidence(db, env, builder, path_bound, EvidenceSource::All);
-        let PathBoundSolution::Solved(restricted) = default_solution else {
-            return default_solution;
+        let PathBoundSolution::Solved(combined) = combined_solution else {
+            return combined_solution;
         };
 
         // A single parameter list must satisfy all of its lower bounds. A union of captured
         // parameter lists represents neither that common signature nor alternative runtime calls.
         // TODO: Construct a common behavioral supertype where possible.
         if path_bound.bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
-            && restricted.is_union()
+            && combined.is_union()
         {
             return PathBoundSolution::Unsatisfiable;
         }
 
         if !path_bound.has_declared_evidence {
-            return default_solution;
+            return combined_solution;
         }
 
         let inferred =
-            match Self::solve_from_evidence(db, env, builder, path_bound, EvidenceSource::Inferred)
-            {
-                PathBoundSolution::Solved(inferred) => Some(inferred),
-                PathBoundSolution::Unsolved => None,
-                PathBoundSolution::Unsatisfiable | PathBoundSolution::BudgetExceeded { .. } => {
-                    return default_solution;
-                }
-            }
+            Self::solve_from_evidence(db, env, builder, path_bound, EvidenceSource::Inferred);
+        if matches!(
+            inferred,
+            PathBoundSolution::Unsatisfiable | PathBoundSolution::BudgetExceeded { .. }
+        ) {
+            return combined_solution;
+        }
+        let inferred = inferred
+            .as_type()
             .filter(|candidate| !candidate.has_provisional_marker(db, env));
 
-        let declared = match path_bound.declared_candidate(db, env) {
-            PathBoundSolution::Solved(declared) => Some(declared),
-            PathBoundSolution::Unsolved | PathBoundSolution::Unsatisfiable => None,
-            PathBoundSolution::BudgetExceeded { .. } => return default_solution,
+        let declared = path_bound.declared_candidate(db, env);
+        if matches!(declared, PathBoundSolution::BudgetExceeded { .. }) {
+            return combined_solution;
         }
-        .filter(|candidate| !candidate.has_provisional_marker(db, env));
+        let declared = declared
+            .as_type()
+            .filter(|candidate| !candidate.has_provisional_marker(db, env));
 
-        // Prefer the declared candidate when it is mutually assignable with the inferred
-        // candidate. Otherwise, prefer the inferred candidate.
-        let candidates = match (inferred, declared) {
-            (Some(inferred), Some(declared))
-                if inferred.is_assignable_to(db, env, declared)
-                    && declared.is_assignable_to(db, env, inferred) =>
-            {
-                [Some(declared), Some(inferred)]
-            }
-            (Some(inferred), _) => [Some(inferred), None],
-            (None, declared) => [declared, None],
-        };
-
-        for candidate in candidates.into_iter().flatten() {
-            if path_bound.accepts_candidate(db, env, builder, candidate) {
-                return PathBoundSolution::Solved(candidate);
-            }
+        // Prefer the declared candidate when the arguments leave the variable unsolved or the
+        // inferred and declared candidates are mutually assignable.
+        if let Some(declared) = declared
+            && inferred.is_none_or(|inferred| {
+                inferred.is_assignable_to(db, env, declared)
+                    && declared.is_assignable_to(db, env, inferred)
+            })
+            && path_bound.accepts_candidate(db, env, builder, declared)
+        {
+            return PathBoundSolution::Solved(declared);
         }
 
-        default_solution
+        // An argument such as an identity callback can imply only `K ≤ V`. Choosing `V` for
+        // `K` and `K` for `V` independently loses any concrete bounds from the expected type.
+        if let Some(inferred) = inferred
+            && inferred != combined
+        {
+            if !inferred.is_independent_of_typevars(db, env, path_bound.inferable) {
+                return PathBoundSolution::Deferred { combined, inferred };
+            }
+            if path_bound.accepts_candidate(db, env, builder, inferred) {
+                return PathBoundSolution::Solved(inferred);
+            }
+        }
+
+        combined_solution
     }
 
     /// Selects a preliminary solution to use as type context during generic call inference.
@@ -5911,18 +6110,94 @@ mod tests {
     }
 
     #[test]
+    fn unresolved_bounds_restrict_partial_specializations() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let k = create_typevar(db, "K");
+        let u = create_typevar(db, "U");
+        let inferable = TypeVarSet::from_typevars(db, [k, u]);
+        let list = |ty| KnownClass::List.to_specialized_instance(db, &env, &[ty]);
+        // list[K] ≤ U ≤ list[int] cannot hold for K = str, even when U has no selected type.
+        let bounds = CandidateTypeVarSolution {
+            upper: UpperBound::from_clause(list(known_instance(db, KnownClass::Int))),
+            ..CandidateTypeVarSolution::from_equivalence(u, list(Type::TypeVar(k)), inferable)
+        };
+        let path = CandidateSolution {
+            typevars: Box::new([bounds]),
+            validity: SolutionValidity::Valid,
+        };
+        let context = GenericContext::from_typevar_instances(db, &env, [k]);
+        let proposed = context.repeat_specialization(db, known_instance(db, KnownClass::Str));
+        assert!(!path.accepts_partial_specialization(
+            db,
+            &env,
+            proposed,
+            context.inferable_typevars(db),
+            &[]
+        ));
+    }
+
+    #[test]
+    fn distinct_instances_of_one_variable_retain_their_selections() -> Result<(), ProjectionError> {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let specialized_t = t.map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::object()))
+        });
+        let u = create_typevar(db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let set = create_constraint(db, &builder, t, KnownClass::Int)
+            .and(db, &builder, || {
+                create_constraint(db, &builder, specialized_t, KnownClass::Int)
+            })
+            .and(db, &builder, || {
+                create_constraint(db, &builder, u, KnownClass::Str)
+            });
+        let paths = bounded_path_bounds(db, set, TypeVarSet::from_typevars(db, [t, u]), 10, 100)?;
+        assert_matches!(&paths, CandidateSolutions::Constrained(paths) if paths.len() == 1 && paths[0].typevars.len() == 3);
+        let selected = paths.solve_with(db, &env, |_, bound| {
+            if bound.bound_typevar == u {
+                PathBoundSolution::Deferred {
+                    combined: known_instance(db, KnownClass::Str),
+                    inferred: Type::TypeVar(t),
+                }
+            } else {
+                CandidateSolutions::default_solve(db, &env, &builder, bound)
+            }
+        });
+        assert_eq!(selected, paths.solve(db, &env, &builder));
+        Ok(())
+    }
+
+    #[test]
     fn promoting_solutions_preserves_completeness() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
         let literal = Type::int_literal(1);
         let int = known_instance(db, KnownClass::Int);
+        let inferred = Type::TypeVar(create_typevar(db, "T"));
+        let deferred = PathBoundSolution::Deferred {
+            combined: int,
+            inferred,
+        };
 
         for (solution, expected) in [
             (
                 PathBoundSolution::Solved(literal),
                 PathBoundSolution::Solved(int),
             ),
+            (
+                PathBoundSolution::Deferred {
+                    combined: literal,
+                    inferred,
+                },
+                deferred,
+            ),
+            (deferred, deferred),
             (
                 PathBoundSolution::BudgetExceeded {
                     fallback: Some(literal),
