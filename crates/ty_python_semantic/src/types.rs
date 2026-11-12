@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use bitflags::bitflags;
-use call::{CallDunderError, CallError, CallErrorKind};
+use call::{CallDunderError, CallError, CallErrorKind, OperatorResult};
 use context::InferContext;
 pub use context::ProgramEnvironment;
 use ruff_db::Instant;
@@ -1203,6 +1203,20 @@ fn map_member_lookup_type<'db>(
             error.kind(db),
         )),
     }
+}
+
+/// Callers pass each union alternative as `element`. If a receiver is provided, this function
+/// intersects it with `element` before looking up the member.
+fn lookup_member_on_union_element<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    element: Type<'db>,
+    name: &str,
+    policy: MemberLookupPolicy,
+    receiver: Option<Type<'db>>,
+) -> MemberLookupResult<'db> {
+    let receiver = receiver.map(|ty| IntersectionType::from_two_elements(db, env, ty, element));
+    element.member_lookup_with_policy_and_receiver(db, env, name, policy, receiver)
 }
 
 fn distribute_member_lookup_over_bound_or_constraints<'db>(
@@ -5324,6 +5338,27 @@ impl<'db> Type<'db> {
         try_call_dunder_get_inner(db, env.program(db), self, instance, owner)
     }
 
+    /// Reads a value stored on a class, binding its descriptor to the given instance or class.
+    /// A descriptor that rejects this access cannot satisfy a read requirement.
+    fn class_variable_read_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let (member, _, error) = Self::try_call_dunder_get_on_attribute(
+            db,
+            env,
+            Place::bound(self).into(),
+            instance,
+            owner,
+        );
+        member
+            .ignore_possibly_undefined()
+            .filter(|_| error.is_none())
+    }
+
     /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
     /// and `owner` as arguments. This method exists as a separate step as we need to handle unions
     /// and intersections explicitly.
@@ -5881,6 +5916,20 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Variance accounts for aliases without expanding recursive specializations and ignores
+    /// parameters used only in bivariant positions, such as unused type alias arguments.
+    fn depends_on_type_parameters(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> bool {
+        generic_context.variables(db).any(|typevar| {
+            self.variance_of(db, env, typevar.identity(db)).evaluate(db)
+                != TypeVarVariance::Bivariant
+        })
+    }
+
     /// Whether class access exposes an instance attribute whose type depends on the class's
     /// type parameters. Specializing a class does not give it separate attribute storage:
     /// `Box[int].value` and `Box[str].value` both refer to `Box.value` at runtime.
@@ -5952,12 +6001,7 @@ impl<'db> Type<'db> {
             // Descriptors define their own class-access behavior, but do not exempt other
             // alternatives in a union from the restriction on generic instance storage.
             ty.class_member(db, env, "__get__").is_undefined()
-                // Variance accounts for aliases without expanding recursive specializations,
-                // and ignores alias arguments that do not affect the resulting type.
-                && generic_context.variables(db).any(|typevar| {
-                    ty.variance_of(db, env, typevar.identity(db)).evaluate(db)
-                        != TypeVarVariance::Bivariant
-                })
+                && ty.depends_on_type_parameters(db, env, generic_context)
         })
     }
 
@@ -6182,11 +6226,8 @@ impl<'db> Type<'db> {
                         // the original receiver (`T`). Here, we distribute lookup over the union
                         // and intersect each member with that receiver to obtain `T & E1`
                         // and `T & E2`, respectively.
-                        let receiver = receiver.map(|receiver| {
-                            IntersectionType::from_two_elements(db, env, receiver, *elem)
-                        });
-                        let result = elem.member_lookup_with_policy_and_receiver(
-                            db, env, name_str, policy, receiver,
+                        let result = lookup_member_on_union_element(
+                            db, env, *elem, name_str, policy, receiver,
                         );
                         error = error.or_else(|| result.err().map(|error| error.kind(db)));
                         let member = result.unwrap_or_else(|error| error.fallback_member(db));
@@ -8366,6 +8407,48 @@ impl<'db> Type<'db> {
             )
     }
 
+    /// Call a unary operator's dunder, retaining the original receiver when evaluating a bound.
+    fn try_call_unary_dunder(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        receiver: Option<Type<'db>>,
+    ) -> Result<OperatorResult<'db>, CallDunderError<'db>> {
+        let mut arguments = CallArguments::none();
+        let tcx = TypeContext::default();
+        let bindings = match (self, receiver) {
+            (Type::Union(union), Some(receiver)) => {
+                union.try_call_dunder(db, env, &mut arguments, tcx, |element| {
+                    lookup_member_on_union_element(
+                        db,
+                        env,
+                        element,
+                        name,
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        Some(receiver),
+                    )
+                })
+            }
+            (Type::Intersection(intersection), _) => {
+                let bindings = intersection.try_call_dunder_with_policy(
+                    db,
+                    env,
+                    receiver.unwrap_or(self),
+                    name,
+                    &mut arguments,
+                    tcx,
+                    MemberLookupPolicy::default(),
+                )?;
+                return Ok(bindings.operator_result(db, env));
+            }
+            _ => receiver
+                .unwrap_or(self)
+                .try_call_dunder(db, env, name, arguments, tcx),
+        }?;
+        Ok(OperatorResult::from_bindings(db, env, &bindings))
+    }
+
     /// Look up a dunder method on the meta-type of `self` and call it.
     ///
     /// Returns an `Err` if the dunder method can't be called,
@@ -8406,26 +8489,23 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         if let Type::Intersection(intersection) = self {
             return intersection
-                .try_call_dunder_with_policy(db, env, name, argument_types, tcx, policy)
+                .try_call_dunder_with_policy(db, env, self, name, argument_types, tcx, policy)
                 .map(|bindings| bindings.into_bindings(self));
-        }
-
-        if let Type::Union(union) = self {
-            return union.try_call_dunder_with_policy(db, env, name, argument_types, tcx, policy);
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies.
+        let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
+        if let Type::Union(union) = self {
+            return union.try_call_dunder(db, env, argument_types, tcx, |element| {
+                element.member_lookup_with_policy_and_receiver(db, env, name, policy, None)
+            });
+        }
+
         Self::try_call_dunder_member_impl(
             db,
             env,
-            self.member_lookup_with_policy_and_receiver(
-                db,
-                env,
-                name,
-                policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                None,
-            ),
+            self.member_lookup_with_policy_and_receiver(db, env, name, policy, None),
             argument_types,
             tcx,
         )
@@ -11091,6 +11171,35 @@ enum DunderBindings<'db> {
 }
 
 impl<'db> DunderBindings<'db> {
+    fn operator_result(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> OperatorResult<'db> {
+        let components = match self {
+            Self::Single(bindings) => return OperatorResult::from_bindings(db, env, bindings),
+            Self::Intersection(components) => components,
+        };
+        let mut deprecated_functions = Vec::new();
+        // One non-deprecated component can supply the implementation for the whole intersection.
+        for component in components {
+            let start = deprecated_functions.len();
+            deprecated_functions.extend(
+                component
+                    .deprecated_functions(db)
+                    .map(|(_, function)| function),
+            );
+            if deprecated_functions.len() == start {
+                deprecated_functions.clear();
+                break;
+            }
+        }
+        OperatorResult {
+            return_type: self.return_type(db, env),
+            deprecated_functions: deprecated_functions.into_boxed_slice(),
+        }
+    }
+
     fn into_bindings(self, receiver: Type<'db>) -> Bindings<'db> {
         match self {
             Self::Single(bindings) => *bindings,
@@ -11144,10 +11253,12 @@ impl<'db> IntersectionType<'db> {
     //
     // TODO: we might be able to remove this after fixing
     // https://github.com/astral-sh/ty/issues/2428.
+    #[expect(clippy::too_many_arguments)]
     fn try_call_dunder_with_policy(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
         name: &str,
         argument_types: &mut CallArguments<'_, 'db>,
         tcx: TypeContext<'db>,
@@ -11163,7 +11274,6 @@ impl<'db> IntersectionType<'db> {
         // An inherited `object` method on an otherwise undefined component is only a fallback
         // for the whole intersection: `object.__eq__` must not restrict another component's
         // custom comparison result to `bool`.
-        let receiver = Type::Intersection(self);
         let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
         let component_policy = policy | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK;
         let lookup = |element: Type<'db>, policy| {
@@ -11222,14 +11332,13 @@ impl<'db> UnionType<'db> {
     // This alternative to aggregating the dunder lookups with
     // `UnionType.map_with_boundness_and_qualifiers` preserves the information
     // necessary to emit more precise diagnostics for "possibly unbound" errors.
-    fn try_call_dunder_with_policy(
+    fn try_call_dunder(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        name: &str,
         argument_types: &mut CallArguments<'_, 'db>,
         tcx: TypeContext<'db>,
-        policy: MemberLookupPolicy,
+        lookup: impl Fn(Type<'db>) -> MemberLookupResult<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         let elements = self.elements(db);
         let mut builder = UnionBuilder::new(db, env);
@@ -11239,13 +11348,9 @@ impl<'db> UnionType<'db> {
         let mut provenance = Provenance::Unknown;
 
         for element in elements {
-            match element
-                .member_lookup_with_policy(
-                    db,
-                    env,
-                    name,
-                    policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
+            match lookup(*element)
+                .unwrap_or_else(|error| error.fallback_member(db))
+                .member(db)
                 .place
             {
                 Place::Defined(DefinedPlace {
@@ -12003,28 +12108,22 @@ impl TypeQualifiers {
 /// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the
 /// qualifier `ClassVar`.
 #[derive(Clone, Debug, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct TypeAndQualifiers<'db> {
-    inner: Type<'db>,
+pub(crate) struct TypeAndQualifiers<'db, T = Type<'db>> {
+    inner: T,
     origin: TypeOrigin,
     qualifiers: TypeQualifiers,
     provenance: Provenance<'db>,
 }
 
-impl<'db> TypeAndQualifiers<'db> {
-    pub(crate) fn new(inner: Type<'db>, origin: TypeOrigin, qualifiers: TypeQualifiers) -> Self {
+/// A bare qualifier such as `Final` can declare a name without specifying its type.
+pub(crate) type DeclaredType<'db> = TypeAndQualifiers<'db, Option<Type<'db>>>;
+
+impl<'db, T: Copy> TypeAndQualifiers<'db, T> {
+    pub(crate) fn new(inner: T, origin: TypeOrigin, qualifiers: TypeQualifiers) -> Self {
         Self {
             inner,
             origin,
             qualifiers,
-            provenance: Provenance::Unknown,
-        }
-    }
-
-    fn declared(inner: Type<'db>) -> Self {
-        Self {
-            inner,
-            origin: TypeOrigin::Declared,
-            qualifiers: TypeQualifiers::empty(),
             provenance: Provenance::Unknown,
         }
     }
@@ -12038,8 +12137,7 @@ impl<'db> TypeAndQualifiers<'db> {
         self.provenance
     }
 
-    /// Forget about type qualifiers and only return the inner type.
-    pub(crate) fn inner_type(&self) -> Type<'db> {
+    pub(crate) fn inner_type(&self) -> T {
         self.inner
     }
 
@@ -12057,14 +12155,31 @@ impl<'db> TypeAndQualifiers<'db> {
     pub(crate) fn qualifiers(&self) -> TypeQualifiers {
         self.qualifiers
     }
+}
 
-    fn map_type(&self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> TypeAndQualifiers<'db> {
-        TypeAndQualifiers {
-            inner: f(self.inner),
-            origin: self.origin,
-            qualifiers: self.qualifiers,
-            provenance: self.provenance,
-        }
+impl<'db> TypeAndQualifiers<'db> {
+    fn map_type(mut self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        self.inner = f(self.inner);
+        self
+    }
+}
+
+impl<'db> DeclaredType<'db> {
+    fn from_type(ty: Type<'db>) -> Self {
+        Self::new(Some(ty), TypeOrigin::Declared, TypeQualifiers::empty())
+    }
+
+    fn inner_type_or_unknown(self) -> Type<'db> {
+        self.inner.unwrap_or_else(Type::unknown)
+    }
+
+    fn is_bare_final(self) -> bool {
+        self.inner.is_none() && self.qualifiers.contains(TypeQualifiers::FINAL)
+    }
+
+    fn map_type(mut self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        self.inner = self.inner.map(f);
+        self
     }
 }
 

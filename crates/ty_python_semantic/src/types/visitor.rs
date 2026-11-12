@@ -69,6 +69,10 @@ pub(crate) trait TypeVisitor<'db> {
         walk_callable_type(db, callable, self);
     }
 
+    fn visit_signature(&self, db: &'db dyn Db, signature: &super::Signature<'db>) {
+        super::walk_signature(db, signature, self);
+    }
+
     fn visit_property_instance_type(&self, db: &'db dyn Db, property: PropertyInstanceType<'db>) {
         walk_property_instance_type(db, property, self);
     }
@@ -172,7 +176,7 @@ pub(crate) trait TypeVisitor<'db> {
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::SalsaValue)]
 pub(super) enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),

@@ -598,38 +598,17 @@ impl<'db> GenericContext<'db> {
         binding_context: Definition<'db>,
         type_param_node: &ast::TypeParam,
     ) -> Option<BoundTypeVarInstance<'db>> {
-        match type_param_node {
-            ast::TypeParam::TypeVar(node) => {
-                let definition = index.expect_single_definition(node);
-                let declared = inferred_declaration(db, definition).declared()?;
-                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declared.inner_type()
-                else {
-                    return None;
-                };
-                Some(typevar.with_binding_context(db, binding_context))
-            }
-            ast::TypeParam::ParamSpec(node) => {
-                let definition = index.expect_single_definition(node);
-                let declared = inferred_declaration(db, definition).declared()?;
-                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declared.inner_type()
-                else {
-                    return None;
-                };
-                Some(typevar.with_binding_context(db, binding_context))
-            }
-            ast::TypeParam::TypeVarTuple(node) => {
-                let definition = index.expect_single_definition(node);
-                let declared = inferred_declaration(db, definition).declared()?;
-                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declared.inner_type()
-                else {
-                    return None;
-                };
-                Some(typevar.with_binding_context(db, binding_context))
-            }
-        }
+        let definition = match type_param_node {
+            ast::TypeParam::TypeVar(node) => index.expect_single_definition(node),
+            ast::TypeParam::ParamSpec(node) => index.expect_single_definition(node),
+            ast::TypeParam::TypeVarTuple(node) => index.expect_single_definition(node),
+        };
+        let declared = inferred_declaration(db, definition).declared()?;
+        let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = declared.inner_type()?
+        else {
+            return None;
+        };
+        Some(typevar.with_binding_context(db, binding_context))
     }
 
     /// Creates a generic context from the legacy `TypeVar`s that appear in a function parameter
@@ -2414,32 +2393,19 @@ impl<'db> ApplySpecialization<'_, 'db> {
         }
     }
 
-    /// Convert this specialization mapping to a concrete specialization over its own generic
-    /// context, preserving skipped type variables in partial specializations as identity mappings.
+    /// Convert this specialization mapping to a concrete specialization over its own generic context.
     pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             ApplySpecialization::Specialization { specialization, .. }
             | ApplySpecialization::TypeAlias(specialization) => Some(specialization),
             ApplySpecialization::Partial {
-                generic_context,
-                types,
-                skip,
+                generic_context, ..
             } => Some(
                 generic_context.specialize(
                     db,
                     generic_context
                         .variables(db)
-                        .enumerate()
-                        .map(|(index, bound_typevar)| {
-                            if skip.is_some_and(|skip| skip == index) {
-                                Type::TypeVar(bound_typevar)
-                            } else {
-                                types
-                                    .get(index)
-                                    .copied()
-                                    .unwrap_or(Type::TypeVar(bound_typevar))
-                            }
-                        })
+                        .map(|variable| self.get(db, variable).unwrap_or(Type::TypeVar(variable)))
                         .collect::<Vec<_>>(),
                 ),
             ),

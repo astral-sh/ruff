@@ -935,7 +935,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
         let declared_type = inferred_declaration(db, definition)
             .declared()?
-            .inner_type();
+            .inner_type()?;
         (declared_type == inferred_type).then_some(annotation)
     }
 

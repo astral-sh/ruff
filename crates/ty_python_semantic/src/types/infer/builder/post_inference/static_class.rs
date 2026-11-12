@@ -10,6 +10,7 @@ use crate::attribute_assignments;
 use crate::{
     TypeQualifiers,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
+    reachability::binding_reachability,
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, DisplaySettings,
         KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, SpecialFormType,
@@ -24,10 +25,10 @@ use crate::{
         definition_expression_type,
         diagnostic::{
             ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
-            DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
-            INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS,
+            DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
+            INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS, INVALID_DATACLASS_FIELD_ORDER,
             INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
-            INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
+            INVALID_PROTOCOL, INVALID_TYPE_FORM, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
             report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
             report_duplicate_bases, report_inconsistent_generic_bases,
@@ -44,7 +45,8 @@ use crate::{
         function::KnownFunction,
         generics::enclosing_generic_contexts,
         infer::builder::post_inference::typed_dict::validate_typed_dict_class,
-        infer_definition_types,
+        infer_definition_types, inferred_declaration,
+        member::class_member_with_symbol,
         mro::StaticMroErrorKind,
         overrides,
         special_form::TypeQualifier,
@@ -1095,7 +1097,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
 
                 let report = |range: TextRange| {
-                    let Some(builder) = context.report_lint(&DATACLASS_FIELD_ORDER, range) else {
+                    let Some(builder) = context.report_lint(&INVALID_DATACLASS_FIELD_ORDER, range)
+                    else {
                         return false;
                     };
                     builder.into_diagnostic(format_args!(
@@ -1138,6 +1141,9 @@ pub(crate) fn check_static_class_definitions<'db>(
     // (16) Check for Final-qualified declarations without a value.
     check_class_final_without_value(context, class, index);
 
+    // (17) Check inferred ClassVar types against the class's type parameters.
+    check_inferred_classvars(context, class, index);
+
     if let Some(protocol) = class.into_protocol_class(db) {
         protocol.validate_members(context);
         protocol.validate_type_parameter_variance(context);
@@ -1150,6 +1156,81 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     class.validate_members(context);
+}
+
+/// All specializations share one class namespace. Check the stored type after the whole class
+/// body is known because a bare `ClassVar` can be declared separately or inherited.
+fn check_inferred_classvars<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    index: &SemanticIndex<'db>,
+) {
+    let db = context.db();
+    if !context.is_lint_enabled(&INVALID_TYPE_FORM) {
+        return;
+    }
+    let Some(generic_context) = class.generic_context(db) else {
+        return;
+    };
+    let env = context.program_environment();
+    let body_scope = class.body_scope(db);
+    let scope_id = body_scope.file_scope_id(db);
+    let table = index.place_table(scope_id);
+    let use_def = index.use_def_map(scope_id);
+    for (symbol_id, bindings) in use_def.all_end_of_scope_symbol_bindings() {
+        let symbol = table.symbol(symbol_id);
+        if !symbol.is_local() || !symbol.is_bound() {
+            continue;
+        }
+        let member = class_member_with_symbol(db, body_scope, Some(symbol_id)).inner;
+        let Place::Defined(stored) = member.place else {
+            continue;
+        };
+        if !member.is_class_var() || stored.origin.is_declared() {
+            continue;
+        }
+        let ty = stored.public_type(db, env);
+        if !ty.depends_on_type_parameters(db, env, generic_context) {
+            continue;
+        }
+
+        for binding in bindings {
+            let Some(definition) = binding.binding.definition() else {
+                continue;
+            };
+            if !definition.kind(db).is_user_visible()
+                || binding_reachability(db, use_def, &binding).is_always_false()
+                || !binding_type(db, definition).depends_on_type_parameters(
+                    db,
+                    env,
+                    generic_context,
+                )
+            {
+                continue;
+            }
+            // Another branch can supply an explicit ClassVar type, which is checked at its
+            // annotation. Report only assignments that contribute an inferred type here.
+            let is_inferred = if let Some(own) = inferred_declaration(db, definition).declared() {
+                own.inner_type().is_none()
+            } else {
+                let prior =
+                    place_from_declarations(db, env, use_def.declarations_at_binding(definition));
+                prior.first_declaration.is_none() || prior.has_qualifier_only_declaration
+            };
+            if is_inferred
+                && let Some(builder) = context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    definition.focus_range(db, context.module()),
+                )
+            {
+                builder.into_diagnostic(format_args!(
+                    "Inferred `ClassVar` type `{}` depends on a type parameter of `{}`",
+                    ty.display(db, env),
+                    class.name(db)
+                ));
+            }
+        }
+    }
 }
 
 /// Returns whether the same default-before-required field pair already violates an ancestor's

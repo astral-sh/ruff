@@ -221,12 +221,9 @@ fn is_valid_argument_type(
         // Fraction.from_decimal accepts int, bool, Decimal
         (MethodName::FromDecimal, Constructor::Fraction) => {
             // First check if it's a Decimal constructor call
-            let is_decimal_call = arg_expr
-                .as_call_expr()
-                .and_then(|call| semantic.resolve_qualified_name(&call.func))
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["decimal", "Decimal"])
-                });
+            let is_decimal_call = arg_expr.as_call_expr().is_some_and(|call| {
+                semantic.matches_qualified_name(&call.func, &["decimal", "Decimal"])
+            });
 
             if is_decimal_call {
                 return true;

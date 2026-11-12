@@ -1,5 +1,6 @@
+use std::collections::BTreeMap;
+use std::io::{BufWriter, Write as _};
 use std::path::Path;
-use std::{collections::BTreeMap, ops::Deref};
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
@@ -7,7 +8,7 @@ use ruff_source_file::LineColumn;
 
 use crate::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, Severity,
-    render::{FileResolver, Renderer},
+    render::{FileResolver, FmtAdapter, Renderer},
 };
 
 /// Print diagnostics as a JUnit-style XML report.
@@ -103,8 +104,9 @@ impl Renderer for JunitRenderer<'_> {
             }
         }
 
-        let adapter = FmtAdapter { fmt: f };
-        report.serialize(adapter).map_err(|_| std::fmt::Error)
+        let mut writer = BufWriter::new(FmtAdapter { fmt: f });
+        report.serialize(&mut writer).map_err(|_| std::fmt::Error)?;
+        writer.flush().map_err(|_| std::fmt::Error)
     }
 }
 
@@ -118,20 +120,9 @@ const fn severity_name(severity: Severity) -> &'static str {
     }
 }
 
-// TODO(brent) this and `group_diagnostics_by_filename` are also used by the `grouped` output
-// format. I think they'd make more sense in that file, but I started here first. I'll move them to
-// that module when adding the `grouped` output format.
 struct DiagnosticWithLocation<'a> {
     diagnostic: &'a Diagnostic,
     start_location: Option<LineColumn>,
-}
-
-impl Deref for DiagnosticWithLocation<'_> {
-    type Target = Diagnostic;
-
-    fn deref(&self) -> &Self::Target {
-        self.diagnostic
-    }
 }
 
 fn group_diagnostics_by_filename<'a>(
@@ -166,33 +157,6 @@ fn group_diagnostics_by_filename<'a>(
             });
     }
     grouped_diagnostics
-}
-
-struct FmtAdapter<'a> {
-    fmt: &'a mut dyn std::fmt::Write,
-}
-
-impl std::io::Write for FmtAdapter<'_> {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.fmt
-            .write_str(std::str::from_utf8(buf).map_err(|_| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Invalid UTF-8 in JUnit report",
-                )
-            })?)
-            .map_err(std::io::Error::other)?;
-
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> std::io::Result<()> {
-        self.fmt.write_fmt(args).map_err(std::io::Error::other)
-    }
 }
 
 #[cfg(test)]

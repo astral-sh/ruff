@@ -105,3 +105,13 @@ PLW0128 Redeclared variable `FIRST` in assignment
 8 |
 9 | FIRST, SECOND, _, _, _ignored = (1, 2, 3, 4, 5)  # OK
   |
+
+PLW0128 Redeclared variable `FIRST` in assignment
+  --> redeclared_assigned_name.py:11:18
+   |
+ 9 | FIRST, SECOND, _, _, _ignored = (1, 2, 3, 4, 5)  # OK
+10 |
+11 | FIRST = SECOND = FIRST = 1  # PLW0128
+   |                  ^^^^^
+12 | _ = _ = 1  # OK
+   |

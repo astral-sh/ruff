@@ -249,7 +249,7 @@ reveal_type(f)  # revealed: Unknown
 ```py
 non_callable = 1
 
-# error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+# error: [not-callable] "Object of type `Literal[1]` is not callable"
 @non_callable
 def f(x): ...
 
@@ -434,7 +434,7 @@ reveal_type(Foo)  # revealed: int
 Using `None` as a decorator is an error:
 
 ```py
-# error: [call-non-callable]
+# error: [not-callable]
 @None
 class Bar: ...
 

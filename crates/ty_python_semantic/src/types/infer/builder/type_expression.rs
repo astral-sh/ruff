@@ -18,7 +18,6 @@ use crate::types::diagnostic::{
     report_invalid_concatenate_last_arg, report_missing_type_arguments,
     report_unsupported_binary_operation,
 };
-use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::legacy_type_alias::non_alias_assignment;
 use crate::types::infer::{
     CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, TypeExpressionFlags,
@@ -551,7 +550,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ast::Operator::BitOr => {
                         let left = self.infer_type_expression(&binary.left);
                         let right = self.infer_type_expression(&binary.right);
-                        UnionType::from_elements_leave_aliases(db, env, [left, right])
+                        UnionType::from_two_elements_leave_aliases(db, env, left, right)
                     }
                     ast::Operator::BitAnd => {
                         if let Some(builder) =
@@ -1327,10 +1326,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             None
         };
         InferredUnionOperand {
-            annotation: UnionType::from_elements_leave_aliases(
+            annotation: UnionType::from_two_elements_leave_aliases(
                 db,
                 env,
-                [left.annotation, right.annotation],
+                left.annotation,
+                right.annotation,
             ),
             runtime_value,
         }
@@ -2573,9 +2573,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::Annotated => self
                 .parse_subscription_of_annotated_special_form(
                     subscript,
-                    AnnotatedExprContext::TypeExpression,
+                    Self::infer_type_expression,
                 )
-                .map_or(Type::unknown(), |inferred| inferred.inner_type()),
+                .unwrap_or_else(Type::unknown),
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
                 Ok(ty) => ty,
                 Err(nodes) => {
@@ -2594,7 +2594,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
-                UnionType::from_elements_leave_aliases(db, env, [param_type, Type::none(db, env)])
+                UnionType::from_two_elements_leave_aliases(db, env, param_type, Type::none(db, env))
             }
             SpecialFormType::Union => {
                 // TODO: Support the union of a `TypeVarTuple`'s elements. Until then, reject

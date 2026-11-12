@@ -68,8 +68,7 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
+        .matches_qualified_name(&call.func, &["subprocess", "run"])
     {
         // Find `stdout` and `stderr` kwargs.
         let Some(stdout) = call.arguments.find_keyword("stdout") else {
@@ -82,16 +81,10 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
         // Verify that they're both set to `subprocess.PIPE`.
         if !checker
             .semantic()
-            .resolve_qualified_name(&stdout.value)
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["subprocess", "PIPE"])
-            })
+            .matches_qualified_name(&stdout.value, &["subprocess", "PIPE"])
             || !checker
                 .semantic()
-                .resolve_qualified_name(&stderr.value)
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["subprocess", "PIPE"])
-                })
+                .matches_qualified_name(&stderr.value, &["subprocess", "PIPE"])
         {
             return;
         }

@@ -23,9 +23,9 @@ class C:
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
 reveal_type(C.c)  # revealed: int
-reveal_type(C.d)  # revealed: Unknown | Literal[1]
+reveal_type(C.d)  # revealed: int
 reveal_type(C.e)  # revealed: int
-reveal_type(C.f)  # revealed: Unknown | Literal[1]
+reveal_type(C.f)  # revealed: int
 
 c = C()
 
@@ -43,6 +43,112 @@ c.e = 2
 c.f = 3
 ```
 
+With no type argument, the initializer determines which values can be assigned through the class.
+
+```py
+C.d = 2  # ok
+C.d = "two"  # error: [invalid-assignment]
+```
+
+A `None` initializer widens as it does for other mutable class attributes. With no initializer, the
+type is unknown.
+
+```py
+class Defaults:
+    placeholder: ClassVar = None
+    uninitialized: ClassVar
+
+reveal_type(Defaults.placeholder)  # revealed: None | Unknown
+reveal_type(Defaults.uninitialized)  # revealed: Unknown
+```
+
+## Inferring the type from a generic call
+
+A bare `ClassVar` lets a generic call infer its return type from the receiver. The inferred type is
+also visible outside the class body.
+
+```py
+from typing import ClassVar
+from ty_extensions._internal import Unknown
+
+class C:
+    header: ClassVar = bytes.fromhex("fd")
+    reveal_type(header)  # revealed: bytes
+
+    other: ClassVar[Unknown]
+    other = b""
+
+reveal_type(C.header)  # revealed: bytes
+reveal_type(C.other)  # revealed: Unknown
+```
+
+Inside the subclass, both assignments narrow the variable to `bytes`. An inherited
+`ClassVar[Unknown]` still exposes its declared type outside the class body.
+
+```py
+class Child(C):
+    header = bytes.fromhex("ab")
+    reveal_type(header)  # revealed: bytes
+
+    other = "data".encode()
+    reveal_type(other)  # revealed: bytes
+
+reveal_type(Child.header)  # revealed: bytes
+reveal_type(Child.other)  # revealed: Unknown
+```
+
+A subclass can replace the default with another value of the inferred type. An incompatible
+assignment is rejected, including through an intermediate subclass.
+
+```py
+class TextHeader(Child):
+    header = "header"  # error: [invalid-assignment]
+
+reveal_type(TextHeader.header)  # revealed: bytes
+TextHeader().header = b"new header"  # error: [invalid-attribute-access]
+```
+
+## Overriding a mutable class variable
+
+The inferred public type also constrains subclass annotations. For a mutable class variable, an
+override must support the reads and writes allowed by the base class.
+
+```py
+from typing import ClassVar
+
+class Base:
+    count: ClassVar = 0
+    items: ClassVar = [1]
+
+class Compatible(Base):
+    count = 1  # ok
+    items = []
+    reveal_type(items)  # revealed: list[int]
+
+class Redeclared(Compatible):
+    count: ClassVar[int] = 2  # ok
+
+class Incompatible(Base):
+    count: ClassVar = "one"  # error: [incompatible-attribute-override]
+
+class Narrower(Base):
+    count: ClassVar[bool] = True  # error: [incompatible-mutable-override]
+```
+
+Without an initializer the base supplies only the qualifier. A subclass can supply the first value.
+
+```py
+class Uninitialized:
+    items: ClassVar
+
+class Initialized(Uninitialized):
+    items = [1]
+
+class Grandchild(Initialized):
+    items = []
+    reveal_type(items)  # revealed: list[int]
+```
+
 ## From stubs
 
 This is a regression test for a bug where we did not properly keep track of type qualifiers when
@@ -55,6 +161,8 @@ from typing import ClassVar
 
 class C:
     a: ClassVar[int]
+    untyped: ClassVar
+    placeholder: ClassVar = ...
 ```
 
 `main.py`:
@@ -64,6 +172,18 @@ from module import C
 
 c = C()
 c.a = 2  # error: [invalid-attribute-access]
+reveal_type(C.a)  # revealed: int
+reveal_type(C.untyped)  # revealed: Unknown
+reveal_type(C.placeholder)  # revealed: Unknown
+C.untyped = 2  # ok
+c.untyped = 2  # error: [invalid-attribute-access]
+
+class Child(C):
+    untyped = 1
+    placeholder = "ready"
+
+reveal_type(Child.untyped)  # revealed: int
+reveal_type(Child.placeholder)  # revealed: str
 ```
 
 ## Conflicting type qualifiers
@@ -89,6 +209,32 @@ c = C()
 
 # error: [invalid-attribute-access]
 c.a = 2
+```
+
+## Conditional type argument
+
+A bare `ClassVar` can appear on one branch and an explicit type on another. A read through the class
+includes the value inferred on the bare branch and the type declared on the other.
+
+```py
+from typing import ClassVar
+
+def flag() -> bool:
+    return True
+
+class C:
+    if flag():
+        x: ClassVar = "a"
+    else:
+        x: ClassVar[int] = 0
+
+reveal_type(C.x)  # revealed: Literal["a"] | int
+C.x = 3.14  # error: [invalid-assignment]
+
+class Child(C):
+    x = "a"  # ok
+
+reveal_type(Child.x)  # revealed: Literal["a"] | int
 ```
 
 ## Too many arguments

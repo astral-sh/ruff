@@ -72,7 +72,7 @@ use crate::package::PackageRoot;
 use crate::preview::{
     is_incorrect_dict_iterator_comprehension_enabled, is_undefined_export_in_dunder_init_enabled,
 };
-use crate::registry::Rule;
+use crate::registry::{LintSource, Rule};
 use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction,
@@ -3618,10 +3618,8 @@ impl<'a> LintContext<'a> {
     /// Create a new collector for `path` with an empty collection of `Diagnostic`s.
     pub(crate) fn new(path: &'a Path, contents: &'a str, settings: &'a LinterSettings) -> Self {
         // Ignore diagnostics based on per-file-ignores.
-        let mut rules = settings.rules.clone();
-        for ignore in crate::fs::ignores_from_path(path, &settings.per_file_ignores) {
-            rules.disable(ignore);
-        }
+        let ignored = crate::fs::ignores_from_path(path, &settings.per_file_ignores);
+        let rules = settings.rules.clone().without(&ignored);
 
         Self {
             diagnostics: RefCell::default(),
@@ -3732,8 +3730,8 @@ impl<'a> LintContext<'a> {
     }
 
     #[inline]
-    pub(crate) fn iter_enabled_rules(&self) -> impl Iterator<Item = Rule> + '_ {
-        self.rules.iter_enabled()
+    pub(crate) fn has_rules_for(&self, source: LintSource) -> bool {
+        self.rules.any_enabled_in(source.rule_set())
     }
 
     #[inline]

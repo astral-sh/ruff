@@ -86,6 +86,7 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::convert::Infallible;
@@ -103,17 +104,12 @@ use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
-use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::type_alias::TypeAliasType;
-use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarInstance, TypeVarSet,
-};
-use crate::types::variance::VarianceInferable;
+use crate::types::generics::Specialization;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarSet};
 use crate::types::visitor::{
-    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
-    walk_non_atomic_type, walk_type_with_recursion_guard,
+    NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases, walk_non_atomic_type,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
@@ -1295,7 +1291,7 @@ impl<'db> ConstraintSetStorage<'db> {
         id
     }
 
-    /// Interns all of the typevars mentioned in a type in a stable order.
+    /// Interns the free type variables in a constraint bound in a stable order.
     fn intern_mentioned_typevars_in_type(
         &mut self,
         db: &'db dyn Db,
@@ -1303,78 +1299,11 @@ impl<'db> ConstraintSetStorage<'db> {
         ty: Type<'db>,
         support: &mut Support,
     ) {
-        struct InternMentionedTypevars<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
-            storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
-            support: RefCell<&'a mut Support>,
-            recursion_guard: TypeCollector<'db>,
+        let (typevars, skipped_lazy) = ty.free_typevars(db, env);
+        *support |= &Support::from_typevar_set(db, self, typevars);
+        if skipped_lazy {
+            support.mark_incomplete();
         }
-
-        impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn notify_skipped_lazy_type_attributes(&self) {
-                self.support.borrow_mut().mark_incomplete();
-            }
-
-            fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
-                // Declaration bounds, constraints, and defaults are not occurrences in the
-                // constraint itself and must not contribute to its support.
-            }
-
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                for ty in alias.specialization(db).types(db) {
-                    self.visit_type(db, *ty);
-                }
-            }
-
-            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-                self.notify_skipped_lazy_type_attributes();
-                let Some(specialization) = alias.specialization(db) else {
-                    return;
-                };
-                let parameters = specialization.generic_context(db).variables(db);
-                let origin = alias.unspecialized(db);
-                for (parameter, &argument) in parameters.zip(specialization.types(db)) {
-                    // With `type Constant[T] = int`, the value of T has no effect on the bound.
-                    let variance = origin.variance_of(db, self.env, parameter.identity(db));
-                    if variance.evaluate(db) != TypeVarVariance::Bivariant {
-                        self.visit_type(db, argument);
-                    }
-                }
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                if let Type::TypeVar(bound_typevar) = ty {
-                    let mut storage = self.storage.borrow_mut();
-                    let typevar = storage.intern_typevar(db, bound_typevar);
-                    let mut support = self.support.borrow_mut();
-                    support.insert(typevar);
-                    // Walking `Callable[P, R]` visits P.args and P.kwargs separately. The bound
-                    // also depends on P itself, so solving or quantifying P must update it.
-                    if bound_typevar.paramspec_attr(db).is_some() {
-                        support.insert(
-                            storage.intern_typevar(db, bound_typevar.without_paramspec_attr(db)),
-                        );
-                    }
-                }
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        InternMentionedTypevars {
-            env,
-            storage: RefCell::new(self),
-            support: RefCell::new(support),
-            recursion_guard: TypeCollector::default(),
-        }
-        .visit_type(db, ty);
     }
 
     /// Interns all of the typevars mentioned in a constraint in a stable order.
@@ -3493,6 +3422,26 @@ impl<'db> CandidateTypeVarSolution<'db> {
         PathBoundSolution::Solved(candidate)
     }
 
+    /// The assignability relations that place a candidate between its lower and upper bounds.
+    fn candidate_relations(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidate: Type<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> impl Iterator<Item = (Type<'db>, Type<'db>)> {
+        let specialize =
+            move |bound: Type<'db>| bound.apply_optional_specialization(db, specialization);
+        let lower = (!self.bound_typevar.is_paramspec(db))
+            .then(|| self.effective_lower(db, env, EvidenceSource::All))
+            .map(|bound| (specialize(bound), candidate));
+        let uppers = self
+            .upper
+            .iter_clauses(EvidenceSource::All)
+            .map(move |bound| (candidate, specialize(bound)));
+        lower.into_iter().chain(uppers)
+    }
+
     /// Checks whether a given candidate solution satisfies this path.
     pub(super) fn accepts_candidate(
         &self,
@@ -3502,20 +3451,10 @@ impl<'db> CandidateTypeVarSolution<'db> {
         candidate: Type<'db>,
     ) -> bool {
         let inferable = self.inferable;
-        let lower = self.effective_lower(db, env, EvidenceSource::All);
-        let when_lower = if self.bound_typevar.is_paramspec(db) {
-            ConstraintSet::always(builder)
-        } else {
-            lower.when_assignable_to(db, env, candidate, builder, inferable)
-        };
-
-        !when_lower
-            .and(db, builder, || {
-                self.upper
-                    .iter_clauses(EvidenceSource::All)
-                    .when_all(db, builder, |upper| {
-                        candidate.when_assignable_to(db, env, upper, builder, inferable)
-                    })
+        !self
+            .candidate_relations(db, env, candidate, None)
+            .when_all(db, builder, |(lower, upper)| {
+                lower.when_assignable_to(db, env, upper, builder, inferable)
             })
             .is_never_satisfied(db, env, inferable)
     }
@@ -3737,6 +3676,30 @@ pub(crate) enum CandidateSolutions<'db> {
 pub(crate) struct CandidateSolution<'db> {
     typevars: Box<[CandidateTypeVarSolution<'db>]>,
     validity: SolutionValidity<'db>,
+}
+
+impl<'db> CandidateSolution<'db> {
+    /// Variables whose bounds fail with all sibling arguments fixed to this specialization.
+    fn incompatible_typevars(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: Specialization<'db>,
+    ) -> impl Iterator<Item = BoundTypeVarInstance<'db>> {
+        self.typevars.iter().filter_map(move |bounds| {
+            let variable = bounds.bound_typevar;
+            let fits = arguments.get(db, variable).is_some_and(|ty| {
+                bounds
+                    .candidate_relations(db, env, ty, Some(arguments))
+                    .all(|(lower, upper)| {
+                        !lower.has_provisional_marker(db, env)
+                            && !upper.has_provisional_marker(db, env)
+                            && lower.is_assignable_to(db, env, upper)
+                    })
+            });
+            (!fits).then_some(variable)
+        })
+    }
 }
 
 /// Whether or not to report diagnostics when the constraint solver encounters unsatisfied bounds.
@@ -4092,6 +4055,75 @@ impl<'db> CandidateSolutions<'db> {
                 solution => solution,
             }
         })
+    }
+
+    /// Widen the inferred arguments for the next pass only when one viable path permits
+    /// all the chosen promotions. If one path requires `T` to stay narrow and another
+    /// requires `U` to stay narrow, both can still permit widening a third variable.
+    pub(super) fn promote_for_argument_context(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        original: Specialization<'db>,
+        widest: Specialization<'db>,
+    ) -> Specialization<'db> {
+        let paths = match self {
+            Self::Unconstrained => return widest,
+            Self::Unsatisfiable => return original,
+            Self::Constrained(paths) => paths,
+        };
+        let context = original.generic_context(db);
+        if original == widest
+            || paths.len().saturating_mul(context.len(db)) > SolutionBudget::default().type_terms
+        {
+            return original;
+        }
+
+        let accepts = |path: &CandidateSolution<'db>, arguments| {
+            path.incompatible_typevars(db, env, arguments)
+                .next()
+                .is_none()
+        };
+        let viable = paths
+            .iter()
+            .filter(|path| matches!(path.validity, SolutionValidity::Valid));
+        let mut combined = Cow::Borrowed(original.types(db));
+        let mut common = Cow::Borrowed(widest.types(db));
+        'paths: for path in viable.clone() {
+            // Start with all promotions so related variables (e.g. `T = U`) can widen together.
+            let mut selected = Cow::Borrowed(widest.types(db));
+            for variable in path.incompatible_typevars(db, env, widest) {
+                let Some(index) = context.variable_index(db, variable.identity(db)) else {
+                    continue 'paths;
+                };
+                selected.to_mut()[index] = original.types(db)[index];
+            }
+            let Cow::Owned(types) = selected else {
+                return widest;
+            };
+            let selected = context.specialize(db, types);
+            // Restoring one variable can invalidate a dependent variable's promotion.
+            if selected == original || !accepts(path, selected) {
+                continue;
+            }
+            for (index, &ty) in selected.types(db).iter().enumerate() {
+                if ty == original.types(db)[index] {
+                    common.to_mut()[index] = ty;
+                } else {
+                    combined.to_mut()[index] = ty;
+                }
+            }
+        }
+
+        // If the proposals conflict, try just the promotions they share. Dropping a promotion
+        // can invalidate a dependent bound, so this combination also needs a complete path.
+        for types in [combined, common] {
+            let candidate = context.specialize(db, types);
+            if candidate == original || viable.clone().any(|path| accepts(path, candidate)) {
+                return candidate;
+            }
+        }
+        original
     }
 
     /// Solves each path by applying a per-typevar solver function, collecting retained solutions.
@@ -5185,9 +5217,10 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
-    use crate::types::generics::ApplySpecialization;
+    use crate::types::generics::{ApplySpecialization, GenericContext};
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+        TypeVarInstance,
     };
     use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
     use ruff_db::files::system_path_to_file;
@@ -5293,6 +5326,37 @@ mod tests {
             solved_typevars,
             validity: SolutionValidity::Valid,
         }
+    }
+
+    #[test]
+    fn shared_promotion_respects_dependent_bounds() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let vars = ["A", "B", "C"].map(|name| create_typevar(db, name));
+        let context = GenericContext::from_typevar_instances(db, &env, vars);
+        let [a, b, c] = vars.map(Type::TypeVar);
+        let literal = Type::string_literal(db, "x");
+        let object = Type::object();
+        let tuple = |types| Type::heterogeneous_tuple(db, &env, types);
+
+        // The left arm permits widening C with B, and the right permits widening C with A.
+        // Widening C alone would violate its upper bound on both arms.
+        let left = tuple([literal, object, b]);
+        let right = tuple([object, literal, a]);
+        let target = UnionType::from_two_elements(db, &env, left, right);
+        let bounds = tuple([a, b, c]).assignable_solutions_for_argument_context(
+            db,
+            &env,
+            target,
+            context.inferable_typevars(db),
+        );
+        let original = context.repeat_specialization(db, literal);
+        let widest = context.repeat_specialization(db, known_instance(db, KnownClass::Str));
+        assert_eq!(
+            bounds.promote_for_argument_context(db, &env, original, widest),
+            original
+        );
     }
 
     #[test]

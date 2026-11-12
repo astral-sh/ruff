@@ -2,9 +2,8 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::place::TypeOrigin;
 use crate::types::{
-    CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Type, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypingModule, UnionType,
+    CallArguments, DataclassParams, DeclaredType, KnownClass, KnownInstanceType, SpecialFormType,
+    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypeQualifiers, TypingModule, UnionType,
     class::StaticClassHeader,
     function::{KnownFunction, OverloadLiteral},
     infer::{
@@ -447,8 +446,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.add_declaration_with_binding(
             class_node.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(TypeAndQualifiers::new(
-                inferred_ty,
+            &DeclaredAndInferredType::FromDeclaration(DeclaredType::new(
+                Some(inferred_ty),
                 TypeOrigin::Inferred,
                 qualifiers,
             )),

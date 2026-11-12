@@ -397,10 +397,10 @@ error[not-subscriptable]: Cannot specialize non-generic type alias `AliasB`
 type A = int
 type B[T] = T
 
-# error: [call-non-callable] "Object of type `TypeAliasType` is not callable"
+# error: [not-callable] "Object of type `TypeAliasType` is not callable"
 reveal_type(A())  # revealed: Unknown
 
-# error: [call-non-callable] "Object of type `GenericAlias` is not callable"
+# error: [not-callable] "Object of type `GenericAlias` is not callable"
 reveal_type(B[int]())  # revealed: Unknown
 ```
 

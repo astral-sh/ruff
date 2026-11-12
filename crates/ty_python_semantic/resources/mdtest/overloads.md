@@ -1683,7 +1683,7 @@ class CheckClassMethod:
     # error: [inconsistent-overload-decorator]
     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
-            # error: [call-non-callable]
+            # error: [not-callable]
             return cls(x)
         return None
 

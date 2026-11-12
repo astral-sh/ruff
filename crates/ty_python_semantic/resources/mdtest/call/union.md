@@ -40,7 +40,7 @@ def _(flag: bool):
     else:
         def f() -> int:
             return 1
-    x = f()  # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+    x = f()  # error: [not-callable] "Object of type `Literal[1]` is not callable"
     reveal_type(x)  # revealed: Unknown | int
 ```
 
@@ -57,8 +57,8 @@ def _(flag: bool, flag2: bool):
     else:
         def f() -> int:
             return 1
-    # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
-    # error: [call-non-callable] "Object of type `Literal["foo"]` is not callable"
+    # error: [not-callable] "Object of type `Literal[1]` is not callable"
+    # error: [not-callable] "Object of type `Literal["foo"]` is not callable"
     # revealed: Unknown | int
     reveal_type(f())
 ```
@@ -74,7 +74,7 @@ def _(flag: bool):
     else:
         f = "foo"
 
-    x = f()  # error: [call-non-callable] "Object of type `Literal[1, "foo"]` is not callable"
+    x = f()  # error: [not-callable] "Object of type `Literal[1, "foo"]` is not callable"
     reveal_type(x)  # revealed: Unknown
 ```
 
@@ -211,7 +211,7 @@ def _(flag: bool):
     else:
         f = "This is a string literal"
 
-    # error: [call-non-callable] "Object of type `Literal["This is a string literal"]` is not callable"
+    # error: [not-callable] "Object of type `Literal["This is a string literal"]` is not callable"
     x = f(3)
     reveal_type(x)  # revealed: Any
 ```
@@ -250,7 +250,7 @@ def _(flag: bool):
         f = C()
 
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
-    # error: [call-non-callable] "Object of type `C` is not callable"
+    # error: [not-callable] "Object of type `C` is not callable"
     x = f(3)
     reveal_type(x)  # revealed: Any
 ```

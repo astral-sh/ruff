@@ -588,7 +588,7 @@ python-version = "3.12"
 ```py
 from typing_extensions import Protocol
 
-# error: [call-non-callable]
+# error: [not-callable]
 reveal_type(Protocol())  # revealed: Unknown
 
 class MyProtocol(Protocol):
@@ -2433,6 +2433,203 @@ as something that must be supported by type checkers:
 > To distinguish between protocol class variables and protocol instance variables, the special
 > `ClassVar` annotation should be used.
 
+## Inferring the type of a `ClassVar` protocol member
+
+With a bare `ClassVar`, the initializer determines the type that implementations must support for
+both reads and writes.
+
+```py
+from typing import ClassVar, Protocol
+
+class HasCount(Protocol):
+    count: ClassVar = 0
+
+def get_count(value: HasCount) -> int:
+    reveal_type(type(value).count)  # revealed: int
+    return value.count
+
+class Counter:
+    count: ClassVar = 1
+
+class TextCounter:
+    count: ClassVar = "one"
+
+class Flag:
+    count: ClassVar[bool] = True
+
+get_count(Counter())  # ok
+get_count(TextCounter())  # error: [invalid-argument-type]
+get_count(Flag())  # error: [invalid-argument-type]
+```
+
+The type stays unknown until a protocol supplies a default, including in a subclass.
+
+```py
+class NoDefault(Protocol):
+    count: ClassVar
+
+class WithDefault(NoDefault, Protocol):
+    count = 0
+
+def check_defaults(first: NoDefault, second: WithDefault) -> None:
+    reveal_type(type(first).count)  # revealed: Unknown
+    reveal_type(type(second).count)  # revealed: int
+```
+
+If only one branch gives an explicit type, the interface also includes the value inferred on the
+other branch.
+
+```py
+from random import random
+
+class Conditional(Protocol):
+    if random() < 0.5:
+        count: ClassVar = "one"
+    else:
+        count: ClassVar[int] = 0
+
+def check_conditional(value: Conditional) -> None:
+    reveal_type(type(value).count)  # revealed: Literal["one"] | int
+```
+
+## Descriptors stored in `ClassVar` protocol members
+
+A descriptor can return different types through an instance and through the class. Assigning through
+the class replaces the descriptor. These operations are the same whether the protocol infers the
+descriptor's type or declares it explicitly.
+
+```py
+from typing import ClassVar, Protocol, overload
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+class Field:
+    @overload
+    def __get__(self, instance: None, owner: type) -> str: ...
+    @overload
+    def __get__(self, instance: object, owner: type) -> bool: ...
+    def __get__(self, instance: object, owner: type) -> str | bool:
+        return "field" if instance is None else True
+
+class Inferred(Protocol):
+    field: ClassVar = Field()
+
+class Explicit(Protocol):
+    field: ClassVar[Field]
+
+class Implementation:
+    field: ClassVar = Field()
+
+def check_inferred(value: Inferred) -> None:
+    reveal_type(value.field)  # revealed: bool
+    reveal_type(type(value).field)  # revealed: str
+    type(value).field = Field()  # ok
+    type(value).field = "field"  # error: [invalid-assignment]
+
+def check_explicit(value: Explicit) -> None:
+    reveal_type(value.field)  # revealed: bool
+    reveal_type(type(value).field)  # revealed: str
+    check_inferred(value)  # ok
+
+check_inferred(Implementation())  # ok
+check_explicit(Implementation())  # ok
+static_assert(not is_disjoint_from(Implementation, Inferred))
+```
+
+Class writes rule out an implementation that accepts only `NarrowField`, even though its read types
+match.
+
+```py
+class NarrowField(Field): ...
+
+class NarrowImplementation:
+    field: ClassVar = NarrowField()
+
+check_inferred(NarrowImplementation())  # error: [invalid-argument-type]
+```
+
+A descriptor whose getter accepts only `None` supports a class read. It can satisfy a protocol with
+the same descriptor. A protocol whose getter accepts any instance also requires an instance read.
+
+```py
+class ClassOnlyField:
+    def __get__(self, instance: None, owner: type) -> bool:
+        return True
+
+class ClassOnly(Protocol):
+    field: ClassVar = ClassOnlyField()
+
+class ClassOnlyImplementation:
+    field: ClassVar = ClassOnlyField()
+
+class ReadableField(ClassOnlyField):
+    def __get__(self, instance: object, owner: type) -> bool:
+        return True
+
+class Readable(Protocol):
+    field: ClassVar = ReadableField()
+
+def read(value: Readable) -> None: ...
+def check_class_only(value: ClassOnly) -> None:
+    reveal_type(type(value).field)  # revealed: bool
+    read(value)  # error: [invalid-argument-type]
+
+check_class_only(ClassOnlyImplementation())  # ok
+read(ClassOnlyImplementation())  # error: [invalid-argument-type]
+```
+
+A function stored in a `ClassVar` binds to the instance as a method. It can also be replaced through
+the class.
+
+```py
+def answer(instance: object) -> int:
+    return 42
+
+class HasFunction(Protocol):
+    get_answer: ClassVar = answer
+
+class ImplementationWithFunction:
+    get_answer: ClassVar = answer
+
+def replace(value: HasFunction) -> None:
+    reveal_type(value.get_answer())  # revealed: int
+    type(value).get_answer = answer  # ok
+
+replace(ImplementationWithFunction())  # ok
+```
+
+## Conditional `Final` protocol members
+
+When only one branch gives a `Final` an explicit type, a structural implementation can supply either
+that type or the value inferred on the other branch.
+
+```py
+from random import random
+from typing import Final, Protocol
+
+class HasValue(Protocol):
+    if random() < 0.5:
+        value: Final = "one"
+    else:
+        value: Final[int] = 0
+
+def check(value: HasValue) -> None:
+    reveal_type(value.value)  # revealed: Literal["one"] | int
+
+class One:
+    value: Final = "one"
+
+class Two:
+    value: Final = 2
+
+class Other:
+    value: Final = "other"
+
+check(One())  # ok
+check(Two())  # ok
+check(Other())  # error: [invalid-argument-type]
+```
+
 ## Nested class members
 
 ### Read-only nested classes
@@ -2723,6 +2920,16 @@ static_assert(is_subtype_of(MutableClassVarX, HasFinalClassVarX))
 static_assert(is_assignable_to(MutableClassVarX, HasFinalClassVarX))
 static_assert(is_subtype_of(FinalClassVarImplementation, HasFinalClassVarX))
 static_assert(is_assignable_to(FinalClassVarImplementation, HasFinalClassVarX))
+```
+
+A bare `Final` retains the literal type of its default. Here, the protocol requires a read to return
+zero.
+
+```py
+class HasFinalZero(Protocol):
+    x: Final = 0
+
+static_assert(not is_assignable_to(XReadProperty, HasFinalZero))
 ```
 
 A read/write property on a protocol, where the getter returns the same type that the setter takes,

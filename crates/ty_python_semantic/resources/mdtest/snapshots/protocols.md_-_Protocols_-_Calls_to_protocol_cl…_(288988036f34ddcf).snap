@@ -15,7 +15,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 ```
  1 | from typing_extensions import Protocol
  2 | 
- 3 | # error: [call-non-callable]
+ 3 | # error: [not-callable]
  4 | reveal_type(Protocol())  # revealed: Unknown
  5 | 
  6 | class MyProtocol(Protocol):
@@ -43,7 +43,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 # Diagnostics
 
 ```
-error[call-non-callable]: Object of type `<special-form 'typing.Protocol'>` is not callable
+error[not-callable]: Object of type `<special-form 'typing.Protocol'>` is not callable
  --> src/mdtest_snippet.py:4:13
   |
 4 | reveal_type(Protocol())  # revealed: Unknown

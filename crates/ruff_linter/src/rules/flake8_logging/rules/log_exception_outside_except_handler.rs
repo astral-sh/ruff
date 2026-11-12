@@ -112,11 +112,7 @@ pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &Exp
         }
 
         func @ Expr::Name(_) => {
-            let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
-                return;
-            };
-
-            if !matches!(qualified_name.segments(), ["logging", "exception"]) {
+            if !semantic.matches_qualified_name(func, &["logging", "exception"]) {
                 return;
             }
 

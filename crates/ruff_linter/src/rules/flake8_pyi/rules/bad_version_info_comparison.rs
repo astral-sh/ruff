@@ -126,8 +126,7 @@ pub(crate) fn bad_version_info_comparison(checker: &Checker, test: &Expr, has_el
 
     if !checker
         .semantic()
-        .resolve_qualified_name(left)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "version_info"]))
+        .matches_qualified_name(left, &["sys", "version_info"])
     {
         return;
     }

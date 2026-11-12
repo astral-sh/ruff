@@ -55,8 +55,7 @@ pub(crate) fn name_or_attribute(checker: &Checker, expr: &Expr) {
 
     if checker
         .semantic()
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["six", "PY3"]))
+        .matches_qualified_name(expr, &["six", "PY3"])
     {
         checker.report_diagnostic(SixPY3, expr.range());
     }

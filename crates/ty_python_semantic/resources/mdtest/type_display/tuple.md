@@ -12,7 +12,7 @@ def f(n: int):
     c = (b, b, b, b)
     d = (c, c, c, c)
 
-    d()  # error: [call-non-callable] "tuple[...]"
+    d()  # error: [not-callable] "tuple[...]"
     with d:  # error: [invalid-context-manager] "tuple[...]"
         pass
 ```

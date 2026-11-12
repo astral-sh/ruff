@@ -686,7 +686,8 @@ impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
 /// The signature of one of the overloads of a callable.
 #[derive(Clone, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
 pub struct Signature<'db> {
-    /// The generic context for this overload, if it is generic.
+    /// The type variables bound by this signature, if it is generic. Variables captured from an
+    /// enclosing scope are excluded.
     pub(crate) generic_context: Option<GenericContext<'db>>,
 
     /// The original definition associated with this function, if available.
@@ -995,15 +996,17 @@ impl<'db> Signature<'db> {
             .is_some_and(|extras| extras.is_paramspec_value)
     }
 
-    /// Return a signature for a dynamic callable
-    pub(crate) fn dynamic(signature_type: Type<'db>) -> Self {
-        Signature {
-            generic_context: None,
-            definition: None,
-            extras: None,
-            parameters: Parameters::gradual_form(),
-            return_ty: signature_type,
-        }
+    /// A dynamically callable value accepts arbitrary arguments and supplies no expected
+    /// type for their expressions.
+    pub(crate) fn dynamic(return_ty: Type<'db>) -> Self {
+        let parameters = Parameters::new(
+            [
+                Parameter::variadic(Name::new_static("args")),
+                Parameter::keyword_variadic(Name::new_static("kwargs")),
+            ],
+            ParametersKind::Gradual,
+        );
+        Self::new(parameters, return_ty)
     }
 
     /// Return a typed signature from a function definition.

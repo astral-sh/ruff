@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::OnceLock;
 use thiserror::Error;
@@ -80,30 +80,33 @@ pub struct Notebook {
 }
 
 impl Notebook {
-    /// Read the Jupyter Notebook from the given [`Path`].
-    pub fn from_path(path: &Path) -> Result<Self, NotebookError> {
-        Self::from_reader(BufReader::new(File::open(path)?))
-    }
-
     /// Read the Jupyter Notebook from its JSON string.
     pub fn from_source_code(source_code: &str) -> Result<Self, NotebookError> {
-        Self::from_reader(Cursor::new(source_code))
+        Self::from_json(
+            serde_json::from_str(source_code),
+            source_code.ends_with('\n'),
+        )
     }
 
-    /// Read a Jupyter Notebook from a [`Read`] implementer.
+    /// Read the Jupyter Notebook from the given [`Path`].
     ///
     /// See also the black implementation
     /// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
-    fn from_reader<R>(mut reader: R) -> Result<Self, NotebookError>
-    where
-        R: Read + Seek,
-    {
+    pub fn from_path(path: &Path) -> Result<Self, NotebookError> {
+        let mut reader = BufReader::new(File::open(path)?);
         let trailing_newline = reader.seek(SeekFrom::End(-1)).is_ok_and(|_| {
             let mut buf = [0; 1];
             reader.read_exact(&mut buf).is_ok_and(|()| buf[0] == b'\n')
         });
         reader.rewind()?;
-        let raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
+        Self::from_json(serde_json::from_reader(reader), trailing_newline)
+    }
+
+    fn from_json(
+        raw: serde_json::Result<RawNotebook>,
+        trailing_newline: bool,
+    ) -> Result<Self, NotebookError> {
+        let raw_notebook = match raw {
             Ok(notebook) => notebook,
             Err(err) => {
                 // Translate the error into a diagnostic
