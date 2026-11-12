@@ -45,8 +45,10 @@ reveal_type(f(*("a", "b")))  # revealed: Unknown
 
 ## Type checking
 
-The second step is to perform type checking. This is done for all the overloads that passed the
-arity check.
+The second step checks argument types against the overloads that passed the arity check. If a
+literal argument rules out an overload, ty can check the other candidates first. If any of them
+matches, ty skips type checking the deferred overloads. If none matches, ty checks them too so it
+can use their errors to choose the closest overload for diagnostics.
 
 ### Single match
 
@@ -115,10 +117,10 @@ More examples of this diagnostic can be found in the
 
 ### Overloads distinguished by a string literal
 
-A literal-valued variable can select an overload by keyword. If its other argument is incompatible,
-the call still reports the overload error.
+A literal-valued variable can select an overload by keyword.
 
 ```py
+from functools import partial
 from typing import Literal, overload
 
 @overload
@@ -130,27 +132,32 @@ def select(key: str, value: int | str) -> int | str:
 
 def use(key: Literal["text"]):
     reveal_type(select(key=key, value="hello"))  # revealed: str
-    select(key, 1)  # error: [no-matching-overload]
 ```
 
-### Overloads distinguished by a boolean literal
-
-A literal flag selects the return type. A plain `bool` can select either overload.
+Binding the literal with `functools.partial` selects the same overload for later calls.
 
 ```py
-from typing import Literal, overload
+select_text = partial(select, "text")
+reveal_type(select_text)  # revealed: partial[(value: str) -> str]
+select_text(1)  # error: [invalid-argument-type]
+```
+
+### Type context when no overload matches
+
+Both overloads reject the value, but only the first also rejects the key. The second overload
+therefore supplies the type of the lambda parameter.
+
+```py
+from typing import Callable, Literal, overload
 
 @overload
-def read(binary: Literal[True]) -> bytes: ...
+def visit(value: int, callback: Callable[[int], object], *, key: Literal["number"]) -> None: ...
 @overload
-def read(binary: Literal[False]) -> str: ...
-def read(binary: bool) -> bytes | str:
-    return b"" if binary else ""
+def visit(value: str, callback: Callable[[str], object], *, key: Literal["text"]) -> None: ...
+def visit(value, callback, *, key): ...
 
-def use(binary: bool):
-    reveal_type(read(True))  # revealed: bytes
-    reveal_type(read(False))  # revealed: str
-    reveal_type(read(binary))  # revealed: bytes | str
+# error: [no-matching-overload]
+visit(b"bad", lambda x: reveal_type(x), key="text")  # revealed: str
 ```
 
 ### Multiple matches

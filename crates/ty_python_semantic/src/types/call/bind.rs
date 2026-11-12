@@ -1362,18 +1362,18 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    /// Verify that the type of each argument is assignable to type of the parameter that it was
-    /// matched to.
+    /// Verify that each argument type is assignable to its matched parameter type.
     ///
-    /// You must provide an `call_arguments` that was created from the same `arguments` that you
-    /// provided to [`match_parameters`][Self::match_parameters].
+    /// `call_arguments` must come from the same arguments passed to [`Self::match_parameters`].
     ///
     /// The type context of the call expression is also used to infer the specialization of generic
     /// calls.
     ///
-    /// We update the bindings to include the return type of the call, the bound types for all
-    /// parameters, and any errors resulting from binding the call, all for each union element and
-    /// overload (if any).
+    /// For each overload we type-check, the binding records its return type, bound parameter
+    /// types, and errors. If another overload matches, an overload ruled out by a disjoint literal
+    /// can remain in [`CallableBinding::overloads`] with no bound parameter types and only
+    /// [`BindingError::UnmatchedOverload`]. Call [`Self::check_types_impl`] with
+    /// [`CheckTypesMode::SignatureDetails`] for inferred types from every arity-compatible overload.
     pub(crate) fn check_types(
         mut self,
         db: &'db dyn Db,
@@ -9215,7 +9215,10 @@ impl<'db> Binding<'db> {
                     return false;
                 };
                 let parameter = &self.signature.parameters()[matched.index];
-                if !parameter.is_positional() || matched.expected_type.is_some() {
+                if parameter.is_variadic()
+                    || parameter.is_keyword_variadic()
+                    || matched.expected_type.is_some()
+                {
                     return false;
                 }
                 let declared = parameter.annotated_type();
