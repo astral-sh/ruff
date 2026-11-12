@@ -756,12 +756,8 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         }
 
         // `bool(expr)` can delegate to narrowing `expr` itself, e.g. `bool(x is not None)`
-        if let Some(first_arg) = expr_call.arguments.args().next() {
-            if expr_call.arguments.args().count() == 1
-                && expr_call.arguments.keywords().next().is_none()
-            {
-                places.extend(self.expression_node(first_arg));
-            }
+        if let Some(arg) = expr_call.arguments.as_single_positional() {
+            places.extend(self.expression_node(arg));
         }
 
         places

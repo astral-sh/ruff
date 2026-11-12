@@ -172,16 +172,12 @@ fn match_write_call(expr: &Expr) -> Option<(&Expr, &Expr)> {
     let attr = call.func.as_attribute_expr()?;
     let method_name = &attr.attr;
 
-    if method_name != "write"
-        || !attr.value.is_name_expr()
-        || call.arguments.args().count() != 1
-        || call.arguments.keywords().next().is_some()
-    {
+    if method_name != "write" || !attr.value.is_name_expr() {
         return None;
     }
 
     // `write` only takes in a single positional argument.
-    Some((&*attr.value, call.arguments.args().next()?))
+    Some((&*attr.value, call.arguments.as_single_positional()?))
 }
 
 fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, locator: &Locator) -> String {
