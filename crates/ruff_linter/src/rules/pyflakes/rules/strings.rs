@@ -619,25 +619,20 @@ pub(crate) fn percent_format_extra_named_arguments(
     let Expr::Dict(dict) = &right else {
         return;
     };
-    // If any of the keys are spread, abort.
-    if dict.iter_keys().any(|key| key.is_none()) {
-        return;
+    let mut missing = Vec::new();
+    for (index, key) in dict.iter_keys().enumerate() {
+        let Some(key) = key else {
+            // An unpacked mapping can supply any key.
+            return;
+        };
+        let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = key else {
+            continue;
+        };
+        let name = value.to_str();
+        if !summary.keywords.contains(name) {
+            missing.push((index, name));
+        }
     }
-
-    let missing: Vec<(usize, &str)> = dict
-        .iter_keys()
-        .enumerate()
-        .filter_map(|(index, key)| match key {
-            Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
-                if summary.keywords.contains(value.to_str()) {
-                    None
-                } else {
-                    Some((index, value.to_str()))
-                }
-            }
-            _ => None,
-        })
-        .collect();
 
     if missing.is_empty() {
         return;
@@ -687,20 +682,13 @@ pub(crate) fn percent_format_missing_arguments(
         return;
     };
 
-    if dict.iter_keys().any(|key| key.is_none()) {
-        return; // contains **x splat
-    }
-
     let mut keywords = FxHashSet::default();
-    for key in dict.iter_keys().flatten() {
-        match key {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                keywords.insert(value.to_str());
-            }
-            _ => {
-                return; // Dynamic keys present
-            }
-        }
+    for key in dict.iter_keys() {
+        let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = key else {
+            // A dynamic key or an unpacked mapping can supply any missing argument.
+            return;
+        };
+        keywords.insert(value.to_str());
     }
 
     let missing: Vec<&String> = summary
