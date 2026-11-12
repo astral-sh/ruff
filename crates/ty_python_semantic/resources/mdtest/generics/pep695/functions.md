@@ -6131,6 +6131,79 @@ def check(setter: ConstrainedSetter) -> None:
     writable: HasValue = setter  # error: [invalid-assignment]
 ```
 
+## Unknown type argument in the return context
+
+A bare `Sequence` annotation leaves the call's element type to inference. The annotated variable
+takes the declared type because the two sequence types are mutually assignable.
+
+```py
+from collections.abc import Sequence
+
+def singleton[T](value: T) -> Sequence[T]:
+    return [value]
+
+# error: [missing-type-argument]
+items: Sequence = reveal_type(singleton(1))  # revealed: Sequence[Literal[1]]
+reveal_type(items)  # revealed: Sequence[Unknown]
+```
+
+A bare `list` in the return context also preserves a bounded type variable from the caller. The call
+takes and returns a list of that same element type.
+
+```py
+def identity[T: int](items: list[T]) -> list[T]:
+    return items
+
+def forward[U: int](items: list[U]):
+    # error: [missing-type-argument]
+    result: list = reveal_type(identity(items))  # revealed: list[U@forward]
+```
+
+Both tuple elements constrain the same type variable. Only the `list[Any]` supplies a preference for
+its element type, so swapping the two annotations gives the same call result.
+
+```py
+from typing import Any
+
+def duplicate[T: int](items: list[T]) -> tuple[list[T], list[T]]:
+    return items, items
+
+def forward_both[U: int](items: list[U]):
+    # error: [missing-type-argument]
+    # revealed: tuple[list[Any], list[Any]]
+    first: tuple[list, list[Any]] = reveal_type(duplicate(items))
+    reveal_type(first)  # revealed: tuple[list[Unknown], list[Any]]
+
+    # error: [missing-type-argument]
+    # revealed: tuple[list[Any], list[Any]]
+    second: tuple[list[Any], list] = reveal_type(duplicate(items))
+    reveal_type(second)  # revealed: tuple[list[Any], list[Unknown]]
+
+    # The covariant `Sequence` annotations supply only upper bounds for the element type.
+    # error: [missing-type-argument]
+    # revealed: tuple[list[Any], list[Any]]
+    views: tuple[Sequence, Sequence[Any]] = reveal_type(duplicate(items))
+```
+
+For a callable, the parameter and return positions can supply different bounds. An `Unknown`
+parameter leaves the return annotation to guide inference. A return type of `str` therefore rejects
+a captured value whose type is bounded by `int`.
+
+```py
+from collections.abc import Callable
+from ty_extensions import Intersection
+from ty_extensions._internal import Unknown
+
+def constant[T](value: T) -> Callable[[T], T]:
+    return lambda _: value
+
+def callbacks[U: int](value: U, dynamic: Any):
+    invalid: Callable[[Unknown], str] = constant(value)  # error: [invalid-argument-type]
+
+    # revealed: (int & Unknown, /) -> int & Unknown
+    partial: Callable[[Unknown], Intersection[int, Unknown]] = reveal_type(constant(dynamic))
+```
+
 ## Return-context preferences across alternatives
 
 When forwarding a generic call, an upper-only bound from one return-context alternative must not

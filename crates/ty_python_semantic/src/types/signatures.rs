@@ -995,15 +995,9 @@ impl<'db> Signature<'db> {
             .is_some_and(|extras| extras.is_paramspec_value)
     }
 
-    /// Return a signature for a dynamic callable
-    pub(crate) fn dynamic(signature_type: Type<'db>) -> Self {
-        Signature {
-            generic_context: None,
-            definition: None,
-            extras: None,
-            parameters: Parameters::gradual_form(),
-            return_ty: signature_type,
-        }
+    /// A dynamically callable value accepts arbitrary arguments without providing their types.
+    pub(crate) fn dynamic(return_ty: Type<'db>) -> Self {
+        Self::new(Parameters::unknown(), return_ty)
     }
 
     /// Return a typed signature from a function definition.
@@ -1102,7 +1096,7 @@ impl<'db> Signature<'db> {
 
     /// Returns the signature which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown() -> Self {
-        Self::new(Parameters::unknown(), Type::unknown())
+        Self::dynamic(Type::unknown())
     }
 
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
