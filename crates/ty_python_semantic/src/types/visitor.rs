@@ -46,11 +46,11 @@ pub(crate) trait TypeVisitor<'db> {
     /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
     fn should_visit_lazy_type_attributes(&self) -> bool;
 
-    /// Should the visitor visit the member signatures of protocols?
+    /// Should the visitor visit the values of type aliases, and unfold recursive types?
     ///
-    /// Protocol members are lazily-inferred type attributes, so this defaults to
+    /// Type alias values are lazily-inferred type attributes, so this defaults to
     /// [`TypeVisitor::should_visit_lazy_type_attributes`].
-    fn should_visit_protocol_members(&self) -> bool {
+    fn should_visit_type_alias_values(&self) -> bool {
         self.should_visit_lazy_type_attributes()
     }
 
@@ -148,7 +148,7 @@ pub(crate) trait TypeVisitor<'db> {
     /// Visit an alias used as a value, such as `Box[T]` in `values = [Box[T]]`.
     /// Its specialization arguments are available without evaluating its lazy `__value__`.
     fn visit_type_alias_object(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-        if self.should_visit_lazy_type_attributes() {
+        if self.should_visit_type_alias_values() {
             self.visit_type_alias_type(db, alias);
         } else {
             self.notify_skipped_lazy_type_attributes();
@@ -168,7 +168,7 @@ pub(crate) trait TypeVisitor<'db> {
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        if self.should_visit_lazy_type_attributes() {
+        if self.should_visit_type_alias_values() {
             self.visit_type(
                 db,
                 recursive.unfold(db, self.program_environment()).into_type(),
@@ -971,22 +971,22 @@ pub(super) fn contains_growing_type<'db>(
 enum TypeSearchMode {
     SkipLazyAttributes,
     IncludeLazyAttributes,
-    /// Visit all lazy attributes except the member signatures of protocols.
-    IncludeLazyAttributesExceptProtocolMembers,
+    /// Visit the values of type aliases, but no other lazy attributes.
+    IncludeTypeAliasValues,
     /// Visit alias arguments without evaluating alias bodies or other lazy attributes.
     IncludeAliasArguments,
 }
 
 impl TypeSearchMode {
     const fn should_visit_lazy_type_attributes(self) -> bool {
-        matches!(
-            self,
-            Self::IncludeLazyAttributes | Self::IncludeLazyAttributesExceptProtocolMembers
-        )
+        matches!(self, Self::IncludeLazyAttributes)
     }
 
-    const fn should_visit_protocol_members(self) -> bool {
-        matches!(self, Self::IncludeLazyAttributes)
+    const fn should_visit_type_alias_values(self) -> bool {
+        matches!(
+            self,
+            Self::IncludeLazyAttributes | Self::IncludeTypeAliasValues
+        )
     }
 
     const fn should_visit_alias_arguments(self) -> bool {
@@ -1026,8 +1026,8 @@ where
             self.mode.should_visit_lazy_type_attributes()
         }
 
-        fn should_visit_protocol_members(&self) -> bool {
-            self.mode.should_visit_protocol_members()
+        fn should_visit_type_alias_values(&self) -> bool {
+            self.mode.should_visit_type_alias_values()
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -1096,23 +1096,18 @@ pub(super) fn any_over_type<'db>(
 
 /// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.
 ///
-/// This visits lazy type attributes, such as the values of type aliases, except for the member
-/// signatures of protocols. It answers whether a type is written in terms of a type that matches,
-/// so `Iterable[bytes]` does not match `Any` just because a method of `Iterable`'s interface
-/// mentions `Any`, but `Iterable[Any]` does.
-pub(crate) fn any_over_type_except_protocol_members<'db>(
+/// Of the lazily-inferred type attributes, this only visits the values of type aliases. It answers
+/// whether a type is written in terms of a type that matches, looking through aliases, so a value
+/// of a type alias `Json = dict[str, Any]` matches `Any`, but `Iterable[bytes]` does not match `Any`
+/// just because a method of `Iterable`'s interface mentions `Any`, and neither does
+/// `slice[int, int, None]` just because `slice`'s type parameters default to `Any`.
+pub(crate) fn any_over_type_through_aliases<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(
-        db,
-        env,
-        ty,
-        TypeSearchMode::IncludeLazyAttributesExceptProtocolMembers,
-        query,
-    )
+    any_over_type_impl(db, env, ty, TypeSearchMode::IncludeTypeAliasValues, query)
 }
 
 /// Searches through the arguments of [`Type::TypeAlias`] without evaluating alias bodies or other

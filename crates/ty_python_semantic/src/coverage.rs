@@ -18,7 +18,7 @@ use ruff_python_ast::{self as ast};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::types::visitor::any_over_type_except_protocol_members;
+use crate::types::visitor::any_over_type_through_aliases;
 use crate::types::{KnownClass, ProgramEnvironment, Type};
 use crate::{Db, HasType, SemanticModel};
 
@@ -77,39 +77,49 @@ struct CoverageVisitor<'db> {
 }
 
 impl<'db> CoverageVisitor<'db> {
+    /// Returns the line on which the node at `range` starts.
+    fn line_mut(&mut self, range: TextRange) -> Option<&mut Line> {
+        let line_number = self.line_index.line_index(range.start()).to_zero_indexed();
+        self.lines.get_mut(line_number)
+    }
+
     /// Records the type of the node at `range` on the line where the node starts.
     ///
     /// Nodes without a type, such as expressions in unreachable code, are not recorded.
     fn record(&mut self, ty: Option<Type<'db>>, range: TextRange) {
-        let Some(ty) = ty else {
-            return;
-        };
+        if let Some(ty) = ty {
+            let coverage = classify(self.model.db(), &self.env, ty);
+            self.record_coverage(coverage, ty, range);
+        }
+    }
 
-        let db = self.model.db();
-        let coverage = classify(db, &self.env, ty);
-        let line_number = self.line_index.line_index(range.start()).to_zero_indexed();
-        let Some(line) = self.lines.get_mut(line_number) else {
+    /// Records `coverage` for the node at `range`, whose type is `ty`.
+    fn record_coverage(&mut self, coverage: LineCoverage, ty: Type<'db>, range: TextRange) {
+        let note = (coverage > LineCoverage::Precise).then(|| self.note(ty, range));
+        let Some(line) = self.line_mut(range) else {
             return;
         };
 
         line.coverage = line.coverage.max(coverage);
+        line.notes.extend(note);
+    }
 
-        if coverage > LineCoverage::Precise {
-            // Show only the first line of a multi-line node, and shorten long nodes.
-            let text = self.source.as_str()[range]
-                .lines()
-                .next()
-                .unwrap_or_default();
-            let mut note = String::from("`");
-            if text.chars().count() > 40 {
-                note.extend(text.chars().take(39));
-                note.push('…');
-            } else {
-                note.push_str(text);
-            }
-            let _ = write!(note, "`: {}", ty.display(db, &self.env));
-            line.notes.push(note);
+    /// Describes the node at `range` and its type for the line's hover text.
+    fn note(&self, ty: Type<'db>, range: TextRange) -> String {
+        // Show only the first line of a multi-line node, and shorten long nodes.
+        let text = self.source.as_str()[range]
+            .lines()
+            .next()
+            .unwrap_or_default();
+        let mut note = String::from("`");
+        if text.chars().count() > 40 {
+            note.extend(text.chars().take(39));
+            note.push('…');
+        } else {
+            note.push_str(text);
         }
+        let _ = write!(note, "`: {}", ty.display(self.model.db(), &self.env));
+        note
     }
 }
 
@@ -138,7 +148,7 @@ fn classify<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) 
         return classify(db, env, *result).min(LineCoverage::Imprecise);
     }
 
-    if any_over_type_except_protocol_members(db, env, ty, |ty| ty.is_dynamic()) {
+    if any_over_type_through_aliases(db, env, ty, |ty| ty.is_dynamic()) {
         LineCoverage::Imprecise
     } else {
         LineCoverage::Precise
@@ -156,6 +166,19 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
             ast::Stmt::ClassDef(class) => {
                 self.record(class.inferred_type(&self.model), class.name.range());
             }
+            // These statements have no expressions, but like mypy we count their lines as precise
+            // rather than empty.
+            ast::Stmt::Pass(_) | ast::Stmt::Break(_) | ast::Stmt::Continue(_) => {
+                if let Some(line) = self.line_mut(stmt.range()) {
+                    line.coverage = line.coverage.max(LineCoverage::Precise);
+                }
+            }
+            // The value of a `type` statement is a type expression, which we classify through the
+            // alias's name rather than expression by expression (see `visit_annotation`).
+            ast::Stmt::TypeAlias(type_alias) => {
+                self.visit_expr(&type_alias.name);
+                return;
+            }
             _ => {}
         }
 
@@ -167,13 +190,31 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
         source_order::walk_expr(self, expr);
     }
 
+    /// Records the type that an annotation declares, without visiting the expressions inside it.
+    ///
+    /// Like mypy, we classify `def f(x: list[Any])` by the declared type `list[Any]`, which is
+    /// imprecise. Visiting the annotation's sub-expressions would classify the `Any` inside it as
+    /// dynamic, even though no value on the line has a dynamic type.
+    fn visit_annotation(&mut self, expr: &ast::Expr) {
+        self.record(expr.inferred_type(&self.model), expr.range());
+    }
+
     fn visit_parameter(&mut self, parameter: &ast::Parameter) {
         self.record(parameter.inferred_type(&self.model), parameter.name.range());
         source_order::walk_parameter(self, parameter);
     }
 
+    /// Like mypy, we classify an import by whether it resolves, not by the type of what it imports.
+    /// For example, importing a type alias `Json = dict[str, Any]` is precise.
     fn visit_alias(&mut self, alias: &ast::Alias) {
-        self.record(alias.inferred_type(&self.model), alias.range());
+        if let Some(ty) = alias.inferred_type(&self.model) {
+            let coverage = if ty.is_dynamic() {
+                LineCoverage::Dynamic
+            } else {
+                LineCoverage::Precise
+            };
+            self.record_coverage(coverage, ty, alias.range());
+        }
         source_order::walk_alias(self, alias);
     }
 }
@@ -191,7 +232,15 @@ mod tests {
 
     /// Renders each source line prefixed with a marker for its classification.
     fn annotated(source: &str) -> String {
+        annotated_with_modules(&[], source)
+    }
+
+    /// Like [`annotated`], with other modules that `source` can import.
+    fn annotated_with_modules(modules: &[(&str, &str)], source: &str) -> String {
         let mut db = setup_db();
+        for (path, module_source) in modules {
+            db.write_file(path, dedent(module_source).as_ref()).unwrap();
+        }
         let source = dedent(source);
         db.write_file("test.py", source.as_ref()).unwrap();
         let file = system_path_to_file(&db, "test.py").unwrap();
@@ -251,13 +300,48 @@ mod tests {
         P | def chunks() -> Iterable[bytes]:
         P |     return [b""]
           | 
-        D | type Json = dict[str, Any]  # `Json`: TypeAliasType, `dict[str, Any]`: dict[str, Any], `str, Any`: tuple[str, Any], `Any`: Any
+        I | type Json = dict[str, Any]  # `Json`: TypeAliasType
           | 
         I | def parse() -> Json:  # `Json`: Json
         I |     return {}  # `{}`: dict[str, Any]
           | 
         I | data = parse()  # `data`: Json, `parse()`: Json
         "#);
+    }
+
+    #[test]
+    fn annotations_and_imports() {
+        insta::assert_snapshot!(annotated_with_modules(
+            &[("/src/aliases.py", "from typing import Any\n\nJson = dict[str, Any]\n")],
+            r#"
+            from typing import Any
+            from aliases import Json
+            from does_not_exist import Missing
+
+            def send(message: dict[str, Any]) -> None:
+                pass
+
+            def load(raw: str) -> Json:
+                return {}
+
+            def first(values: list[int]) -> list[int]:
+                return values[1:]
+            "#
+        ), @"
+          | 
+        P | from typing import Any
+        P | from aliases import Json
+        D | from does_not_exist import Missing  # `Missing`: Unknown
+          | 
+        I | def send(message: dict[str, Any]) -> None:  # `message`: dict[str, Any], `dict[str, Any]`: dict[str, Any]
+        P |     pass
+          | 
+        I | def load(raw: str) -> Json:  # `Json`: dict[str, Any]
+        I |     return {}  # `{}`: dict[str, Any]
+          | 
+        P | def first(values: list[int]) -> list[int]:
+        P |     return values[1:]
+        ");
     }
 
     #[test]
@@ -296,7 +380,7 @@ mod tests {
         D | def unannotated(y):  # `y`: Unknown
         D |     return y  # `y`: Unknown
           | 
-        D | def explicit_any(z: Any) -> list[Any]:  # `z`: Any, `Any`: Any, `list[Any]`: list[Any], `Any`: Any
+        D | def explicit_any(z: Any) -> list[Any]:  # `z`: Any, `Any`: Any, `list[Any]`: list[Any]
         D |     return [z]  # `[z]`: list[Any], `z`: Any
           | 
         P | a = annotated(1)
