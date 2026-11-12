@@ -443,24 +443,99 @@ type ComparableComprehensionSlice<'a> =
     ComparableSlice<'a, ast::Comprehension, ComparableComprehension<'a>>;
 type ComparableExprSlice<'a> = ComparableSlice<'a, Expr, ComparableExpr<'a>>;
 
-#[derive(Debug, Default, PartialEq, Eq, Hash)]
-struct ComparableArguments<'a> {
-    args: ComparableExprSlice<'a>,
-    keywords: ComparableSlice<'a, ast::Keyword, ComparableKeyword<'a>>,
+#[derive(Default)]
+struct ComparableArguments<'a>(Option<&'a ast::Arguments>);
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum ComparableArgument<'a> {
+    Positional(ComparableExpr<'a>),
+    Keyword(ComparableKeyword<'a>),
+}
+
+impl<'a> From<ast::ArgOrKeyword<'a>> for ComparableArgument<'a> {
+    fn from(argument: ast::ArgOrKeyword<'a>) -> Self {
+        match argument {
+            ast::ArgOrKeyword::Arg(expr) => Self::Positional(expr.into()),
+            ast::ArgOrKeyword::Keyword(keyword) => Self::Keyword(keyword.into()),
+        }
+    }
+}
+
+fn grouped_arguments<'a>(
+    items: impl Iterator<Item = ast::ArgOrKeyword<'a>> + Clone,
+) -> impl Iterator<Item = ComparableArgument<'a>> {
+    items
+        .clone()
+        .filter(|item| matches!(item, ast::ArgOrKeyword::Arg(_)))
+        .chain(items.filter(|item| matches!(item, ast::ArgOrKeyword::Keyword(_))))
+        .map(ComparableArgument::from)
+}
+
+impl fmt::Debug for ComparableArguments<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut list = f.debug_list();
+        if let Some(arguments) = self.0 {
+            arguments.for_each_in_evaluation_order(|arg| {
+                list.entry(&ComparableArgument::from(arg));
+            });
+        }
+        list.finish()
+    }
+}
+
+impl PartialEq for ComparableArguments<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        let (left_args, right_args) = match (self.0, other.0) {
+            (Some(left), Some(right)) => (left, right),
+            (Some(args), None) | (None, Some(args)) => return args.is_empty(),
+            (None, None) => return true,
+        };
+        if left_args.len() != right_args.len() {
+            return false;
+        }
+        for (index, (left, right)) in left_args
+            .iter_source_order()
+            .zip(right_args.iter_source_order())
+            .enumerate()
+        {
+            let equal = match (left, right) {
+                (ast::ArgOrKeyword::Arg(left), ast::ArgOrKeyword::Arg(right)) => {
+                    ComparableExpr::from(left) == ComparableExpr::from(right)
+                }
+                (ast::ArgOrKeyword::Keyword(left), ast::ArgOrKeyword::Keyword(right)) => {
+                    ComparableKeyword::from(left) == ComparableKeyword::from(right)
+                }
+                // f(key=x, *ys) and f(*ys, key=x) evaluate their arguments in the same order.
+                _ => {
+                    return grouped_arguments(left_args.iter_source_order().skip(index)).eq(
+                        grouped_arguments(right_args.iter_source_order().skip(index)),
+                    );
+                }
+            };
+            if !equal {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Eq for ComparableArguments<'_> {}
+
+impl Hash for ComparableArguments<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let Some(arguments) = self.0 else {
+            0usize.hash(state);
+            return;
+        };
+        arguments.len().hash(state);
+        arguments.for_each_in_evaluation_order(|arg| ComparableArgument::from(arg).hash(state));
+    }
 }
 
 impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
     fn from(arguments: &'a ast::Arguments) -> Self {
-        let ast::Arguments {
-            args,
-            keywords,
-            range: _,
-            node_index: _,
-        } = arguments;
-        Self {
-            args: ComparableSlice::new(args),
-            keywords: ComparableSlice::new(keywords),
-        }
+        Self(Some(arguments))
     }
 }
 
@@ -580,7 +655,7 @@ impl<'a> From<&'a ast::Keyword> for ComparableKeyword<'a> {
         } = keyword;
         Self {
             arg: arg.as_ref().map(ast::Identifier::as_str),
-            value: value.into(),
+            value: value.as_ref().into(),
         }
     }
 }

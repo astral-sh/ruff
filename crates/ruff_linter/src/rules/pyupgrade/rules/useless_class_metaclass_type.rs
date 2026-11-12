@@ -55,7 +55,7 @@ pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtCl
         return;
     };
 
-    for keyword in &arguments.keywords {
+    for keyword in arguments.keywords() {
         if let (Some("metaclass"), expr) = (keyword.arg.as_deref(), &keyword.value) {
             if checker.semantic().match_builtin_expr(expr, "type") {
                 let mut diagnostic = checker.report_diagnostic(

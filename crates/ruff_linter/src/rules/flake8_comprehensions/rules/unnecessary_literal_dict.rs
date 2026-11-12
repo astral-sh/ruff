@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -56,11 +56,10 @@ pub(crate) fn unnecessary_literal_dict(
     checker: &Checker,
     expr: &Expr,
     func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    arguments: &ast::Arguments,
 ) {
     let Some(argument) =
-        helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords)
+        helpers::exactly_one_argument_with_matching_function("dict", func, arguments)
     else {
         return;
     };

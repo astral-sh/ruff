@@ -6,8 +6,93 @@ use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal
 use ruff_python_ast::{
     AnyNodeRef, BoolOp, CmpOp, DictItem, Operator, PySourceType, Singleton, UnaryOp,
 };
-use ruff_python_parser::{Mode, ParseOptions, parse, parse_unchecked, parse_unchecked_source};
+use ruff_python_parser::{
+    Mode, ParseOptions, parse, parse_expression, parse_unchecked, parse_unchecked_source,
+};
 use ruff_text_size::Ranged;
+
+#[test]
+fn interleaved_call_arguments() {
+    let trace = trace_source_order_visitation("f(before, key=value, *after, **rest)");
+    assert_snapshot!(trace);
+}
+
+#[test]
+fn find_multiple_keywords_in_source_order() {
+    let source = "f(pos, sep=first, *items, **mapping, last=end, sep=duplicate)";
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Expression));
+    let call = parsed
+        .syntax()
+        .as_expression()
+        .unwrap()
+        .body
+        .as_call_expr()
+        .unwrap();
+    let arguments = &call.arguments;
+    let requests = ["last", "positional", "sep", "missing", "sep"];
+    let expected = std::array::from_fn(|i| arguments.find_argument_value(requests[i], i));
+    assert_eq!(arguments.find_argument_values(requests), expected);
+    let values = arguments
+        .find_keywords(["last", "sep", "missing", "sep"])
+        .map(|keyword| keyword.map(|kw| &source[kw.value.range()]));
+    assert_eq!(values, [Some("end"), Some("first"), None, Some("first")]);
+    assert!(arguments.find_keywords([]).is_empty());
+}
+
+#[test]
+fn find_call_argument_in_source_order() {
+    let source = "f(first, *rest, named=keyword, *more)";
+    let parsed = parse_expression(source).unwrap();
+    let call = parsed.expr().as_call_expr().unwrap();
+    let arguments = &call.arguments;
+    let value = |name, position| {
+        arguments
+            .find_argument_value(name, position)
+            .map(|arg| &source[arg.range()])
+    };
+
+    assert_eq!(value("named", 0), Some("keyword"));
+    assert_eq!(value("other", 0), Some("first"));
+    assert_eq!(value("other", 1), None);
+}
+
+#[test]
+fn fixed_positional_call_shape() {
+    for (source, two_positionals) in [
+        ("f(a, b)", true),
+        ("f(a, *items)", true),
+        ("f(a, key=b)", false),
+        ("f(key=b, *items)", false),
+        ("f(a, **kwargs)", false),
+        ("f(a, b, c)", false),
+    ] {
+        let parsed = parse_expression(source).unwrap();
+        let call = parsed.expr().as_call_expr().unwrap();
+        let arguments = &call.arguments;
+        assert_eq!(
+            arguments.as_positional_array::<2>().is_some(),
+            two_positionals,
+            "{source}"
+        );
+    }
+
+    let parsed = parse_expression("f()").unwrap();
+    let call = parsed.expr().as_call_expr().unwrap();
+    let arguments = &call.arguments;
+    assert!(matches!(arguments.as_positional_array::<0>(), Some([])));
+}
+
+#[test]
+fn unpacked_call_keywords() {
+    let parsed = parse_expression("f(key=value, *args, **kwargs)").unwrap();
+    let call = parsed.expr().as_call_expr().unwrap();
+    let arguments = &call.arguments;
+    let flags: Vec<_> = arguments
+        .keywords()
+        .map(ruff_python_ast::Keyword::is_variadic)
+        .collect();
+    assert_eq!(flags, [false, true]);
+}
 
 #[test]
 fn function_arguments() {

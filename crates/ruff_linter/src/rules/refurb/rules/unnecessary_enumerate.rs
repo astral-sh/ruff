@@ -105,7 +105,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
     };
 
     // Get the first argument, which is the sequence to iterate over.
-    let Some(Expr::Name(sequence)) = arguments.args.first() else {
+    let Some(Expr::Name(sequence)) = arguments.args().next() else {
         return;
     };
 
@@ -248,8 +248,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             .into(),
         ),
         arguments: Arguments {
-            args: [var.into()].into(),
-            keywords: std::iter::empty().collect(),
+            items: [ast::Argument::Positional(var.into())].into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -268,8 +267,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             .into(),
         ),
         arguments: Arguments {
-            args: [len.into()].into(),
-            keywords: std::iter::empty().collect(),
+            items: [ast::Argument::Positional(len.into())].into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },

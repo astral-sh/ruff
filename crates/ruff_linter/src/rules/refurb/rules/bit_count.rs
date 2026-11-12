@@ -80,10 +80,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    if !call.arguments.keywords.is_empty() {
-        return;
-    }
-    let [arg] = &*call.arguments.args else {
+    let Some(arg) = call.arguments.as_single_positional() else {
         return;
     };
 
@@ -106,10 +103,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    if !arguments.keywords.is_empty() {
-        return;
-    }
-    let [arg] = &*arguments.args else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

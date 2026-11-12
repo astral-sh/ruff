@@ -151,7 +151,7 @@ pub(crate) fn branch_python_operator_as_short_circuit(checker: &Checker, call: &
         return;
     };
 
-    let Expr::Name(name_expr) = &keyword.value else {
+    let Expr::Name(name_expr) = keyword.value.as_ref() else {
         return;
     };
 

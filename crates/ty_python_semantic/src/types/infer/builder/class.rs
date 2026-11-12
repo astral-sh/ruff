@@ -153,7 +153,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let has_explicit_bases = class_node
             .arguments
             .as_deref()
-            .is_some_and(|arguments| !arguments.args.is_empty());
+            .is_some_and(|arguments| arguments.args().next().is_some());
         let has_explicit_metaclass = class_node
             .arguments
             .as_deref()
@@ -456,7 +456,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if self.in_stub()
                 || class_node
                     .bases()
-                    .iter()
                     .any(|expr| any_over_expr(expr, &ast::Expr::is_string_literal_expr))
                 || class_node
                     .arguments

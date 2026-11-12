@@ -157,10 +157,9 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
 
-    let (Some(path_expr), Some(second_expr)) = (
-        call.arguments.find_argument_value(path_arg, 0),
-        call.arguments.find_argument_value(second_arg, 1),
-    ) else {
+    let [Some(path_expr), Some(second_expr)] =
+        call.arguments.find_argument_values([path_arg, second_arg])
+    else {
         return;
     };
 
@@ -200,13 +199,12 @@ pub(crate) fn has_unknown_keywords_or_starred_expr(
     arguments: &Arguments,
     allowed: &[&str],
 ) -> bool {
-    if arguments.args.iter().any(Expr::is_starred_expr) {
-        return true;
-    }
-
-    arguments.keywords.iter().any(|kw| match &kw.arg {
-        Some(arg) => !allowed.contains(&arg.as_str()),
-        None => true,
+    arguments.iter_source_order().any(|arg| match arg {
+        ast::ArgOrKeyword::Arg(arg) => arg.is_starred_expr(),
+        ast::ArgOrKeyword::Keyword(kw) => kw
+            .arg
+            .as_ref()
+            .is_none_or(|name| !allowed.contains(&name.as_str())),
     })
 }
 

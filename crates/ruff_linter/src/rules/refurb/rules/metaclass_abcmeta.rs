@@ -74,7 +74,11 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
     };
 
     // Identify the `metaclass` keyword.
-    let Some((position, keyword)) = class_def.keywords().iter().find_position(|&keyword| {
+    let mut keywords = arguments.keywords().peekable();
+    let Some(&first_keyword) = keywords.peek() else {
+        return;
+    };
+    let Some((position, keyword)) = keywords.find_position(|&keyword| {
         keyword
             .arg
             .as_ref()
@@ -92,7 +96,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let applicability = if !class_def.bases().is_empty() {
+    let applicability = if class_def.bases().next().is_some() {
         // The class has base arguments (not just a `metaclass` keyword).
         // Applying the fix may change semantics, so it is considered unsafe.
         Applicability::Unsafe
@@ -138,7 +142,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
                 Fix::applicable_edits(
                     delete_metaclass_keyword,
                     [
-                        Edit::insertion(format!("{binding}, "), class_def.keywords()[0].start()),
+                        Edit::insertion(format!("{binding}, "), first_keyword.start()),
                         import_edit,
                     ],
                     applicability,

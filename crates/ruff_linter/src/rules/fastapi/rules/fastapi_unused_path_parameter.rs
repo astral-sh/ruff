@@ -126,7 +126,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         return;
     };
 
-    let Some(path_arg) = route_decorator.arguments.args.first() else {
+    let Some(path_arg) = route_decorator.arguments.args().next() else {
         return;
     };
     let diagnostic_range = path_arg.range();
@@ -388,7 +388,6 @@ impl<'a> Dependency<'a> {
 
         let parameter_names = if class_def
             .bases()
-            .iter()
             .any(|expr| is_pydantic_base_model(expr, semantic))
         {
             class_def
@@ -474,7 +473,7 @@ fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Op
         .map(|alias| &alias.value)?;
 
     // Ensure that it's a literal string.
-    let Expr::StringLiteral(alias) = alias else {
+    let Expr::StringLiteral(alias) = alias.as_ref() else {
         return None;
     };
 

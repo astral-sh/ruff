@@ -5,9 +5,7 @@ use ruff_python_ast::ExprCall;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_fix_os_path_abspath_enabled;
-use crate::rules::flake8_use_pathlib::helpers::{
-    check_os_pathlib_single_arg_calls, has_unknown_keywords_or_starred_expr,
-};
+use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -76,10 +74,6 @@ impl Violation for OsPathAbspath {
 /// PTH100
 pub(crate) fn os_path_abspath(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     if segments != ["os", "path", "abspath"] {
-        return;
-    }
-
-    if has_unknown_keywords_or_starred_expr(&call.arguments, &["path"]) {
         return;
     }
 

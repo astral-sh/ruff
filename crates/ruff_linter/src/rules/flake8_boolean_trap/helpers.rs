@@ -149,7 +149,7 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> boo
     // If the function appears to be a setter (e.g., `set_visible` or `setVisible`), then the
     // boolean trap is allowed. We want to avoid raising a violation for cases in which the argument
     // is positional-only and third-party, and this tends to be the case for setters.
-    if call.arguments.args.len() == 1 {
+    if call.arguments.args().count() == 1 {
         // Ex) `foo.set(True)`
         if func_name == "set" {
             return true;

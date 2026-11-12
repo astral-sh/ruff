@@ -31,6 +31,10 @@ def test_error_kwargs():
     pytest.raises(func=func, expected_exception=ZeroDivisionError)
 
 
+def test_error_mixed_argument_order(args):
+    pytest.raises(ZeroDivisionError, func, b=0, *args)
+
+
 def test_error_multi_statement():
     excinfo = pytest.raises(ValueError, int, "hello")
     assert excinfo.match("^invalid literal")

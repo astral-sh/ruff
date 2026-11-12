@@ -158,11 +158,7 @@ fn match_read_call(expr: &Expr) -> Option<&Expr> {
     let attr = call.func.as_attribute_expr()?;
     let method_name = &attr.attr;
 
-    if method_name != "read"
-        || !attr.value.is_name_expr()
-        || !call.arguments.args.is_empty()
-        || !call.arguments.keywords.is_empty()
-    {
+    if method_name != "read" || !attr.value.is_name_expr() || !call.arguments.is_empty() {
         return None;
     }
 
@@ -179,8 +175,13 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
     let call = ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
-            args: [].into(),
-            keywords: open.keywords.iter().copied().cloned().collect(),
+            items: open
+                .keywords
+                .iter()
+                .copied()
+                .cloned()
+                .map(ast::Argument::Keyword)
+                .collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },

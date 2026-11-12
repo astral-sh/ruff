@@ -32,8 +32,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: [].into(),
-            keywords: std::iter::empty().collect(),
+            items: [].into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -260,26 +259,15 @@ fn find_file_open<'a>(
 ) -> Option<FileOpen<'a>> {
     // We want to match `open(...) as var`.
     let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     } = item.context_expr.as_call_expr()?;
-
-    // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="w")`,
-    // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
-    // arguments, like `buffering`.
-    if args.iter().any(Expr::is_starred_expr)
-        || keywords.iter().any(|keyword| keyword.arg.is_none())
-    {
-        return None;
-    }
 
     if !semantic.match_builtin_expr(func, "open") {
         return None;
     }
 
     // Match positional arguments, get filename and mode.
-    let (filename, pos_mode) = match_open_args(args)?;
+    let (filename, pos_mode) = match_open_args(arguments)?;
 
     // `open` accepts a file descriptor, but `Path` does not, so a `pathlib` replacement
     // would fail at runtime. `PTH123` skips these for the same reason.
@@ -288,7 +276,7 @@ fn find_file_open<'a>(
     }
 
     // Match keyword arguments, get keyword arguments to forward and possibly mode.
-    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
+    let (keywords, kw_mode) = match_open_keywords(arguments, read_mode, python_version)?;
 
     let mode = kw_mode.unwrap_or(pos_mode);
 
@@ -311,28 +299,24 @@ fn find_path_open<'a>(
     python_version: PythonVersion,
 ) -> Option<FileOpen<'a>> {
     let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     } = item.context_expr.as_call_expr()?;
-    if args.iter().any(Expr::is_starred_expr)
-        || keywords.iter().any(|keyword| keyword.arg.is_none())
-    {
-        return None;
-    }
 
     if !is_open_call_from_pathlib(func, semantic) {
         return None;
     }
 
     let attr = func.as_attribute_expr()?;
-    let mode = if args.is_empty() {
-        OpenMode::ReadText
-    } else {
-        match_open_mode(args.first()?)?
+    let mut positional = arguments.args();
+    let mode = match positional.next() {
+        Some(mode) => match_open_mode(mode)?,
+        None => OpenMode::ReadText,
     };
+    if positional.any(Expr::is_starred_expr) {
+        return None;
+    }
 
-    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
+    let (keywords, kw_mode) = match_open_keywords(arguments, read_mode, python_version)?;
     let mode = kw_mode.unwrap_or(mode);
 
     resolve_file_open(
@@ -349,25 +333,30 @@ fn find_path_open<'a>(
 }
 
 /// Match positional arguments. Return expression for the file name and open mode.
-fn match_open_args(args: &[Expr]) -> Option<(&Expr, OpenMode)> {
-    match args {
-        [filename] => Some((filename, OpenMode::ReadText)),
-        [filename, mode_literal] => match_open_mode(mode_literal).map(|mode| (filename, mode)),
-        // The third positional argument is `buffering` and the pathlib methods don't support it.
-        _ => None,
+fn match_open_args(arguments: &ast::Arguments) -> Option<(&Expr, OpenMode)> {
+    let mut args = arguments.args();
+    let filename = args.next()?;
+    if filename.is_starred_expr() {
+        return None;
     }
+    let mode = match args.next() {
+        Some(mode) => match_open_mode(mode)?,
+        None => OpenMode::ReadText,
+    };
+    // The third positional argument is `buffering` and the pathlib methods don't support it.
+    args.next().is_none().then_some((filename, mode))
 }
 
 /// Match keyword arguments. Return keyword arguments to forward and mode.
 fn match_open_keywords(
-    keywords: &[ast::Keyword],
+    arguments: &ast::Arguments,
     read_mode: bool,
     target_version: PythonVersion,
 ) -> Option<(Vec<&ast::Keyword>, Option<OpenMode>)> {
     let mut result: Vec<&ast::Keyword> = vec![];
     let mut mode: Option<OpenMode> = None;
 
-    for keyword in keywords {
+    for keyword in arguments.keywords() {
         match keyword.arg.as_ref()?.as_str() {
             "encoding" | "errors" => result.push(keyword),
             "newline" => {

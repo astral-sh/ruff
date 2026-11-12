@@ -719,8 +719,7 @@ impl<'db> TypeVarInstance<'db> {
                     db,
                     call_expr
                         .arguments
-                        .args
-                        .iter()
+                        .args()
                         .skip(1)
                         .map(|arg| definition_expression_type(db, definition, arg))
                         .collect::<Box<_>>(),

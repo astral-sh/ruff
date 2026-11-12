@@ -57,14 +57,8 @@ impl Violation for UnnecessaryLiteralWithinDictCall {
 
 /// C418
 pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: &ast::ExprCall) {
-    if !call.arguments.keywords.is_empty() {
-        return;
-    }
-    if call.arguments.args.len() > 1 {
-        return;
-    }
     let Some(argument) =
-        helpers::first_argument_with_matching_function("dict", &call.func, &call.arguments.args)
+        helpers::exactly_one_argument_with_matching_function("dict", &call.func, &call.arguments)
     else {
         return;
     };

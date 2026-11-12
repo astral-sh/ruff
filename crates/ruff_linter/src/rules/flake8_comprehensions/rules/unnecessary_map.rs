@@ -98,10 +98,6 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
     let (func, arguments) = (&call.func, &call.arguments);
 
-    if !arguments.keywords.is_empty() {
-        return;
-    }
-
     let Some(object_type) = ObjectType::from(func, semantic) else {
         return;
     };
@@ -128,7 +124,10 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         }
 
         ObjectType::List | ObjectType::Set | ObjectType::Dict => {
-            let [Expr::Call(inner_call)] = arguments.args.as_ref() else {
+            let Some(inner_call) = arguments
+                .as_single_positional()
+                .and_then(Expr::as_call_expr)
+            else {
                 return;
             };
 
@@ -202,18 +201,19 @@ fn is_list_set_or_dict(func: &Expr, semantic: &SemanticModel) -> bool {
 fn map_lambda_and_iterables<'a>(
     call: &'a ast::ExprCall,
     semantic: &'a SemanticModel,
-) -> Option<(&'a ExprLambda, &'a [Expr])> {
+) -> Option<(&'a ExprLambda, impl Iterator<Item = &'a Expr>)> {
     if !semantic.match_builtin_expr(&call.func, "map") {
         return None;
     }
 
     let arguments = &call.arguments;
 
-    if !arguments.keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return None;
     }
 
-    let Some((Expr::Lambda(lambda), iterables)) = arguments.args.split_first() else {
+    let mut iterables = arguments.args();
+    let Some(Expr::Lambda(lambda)) = iterables.next() else {
         return None;
     };
 

@@ -7,7 +7,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -561,16 +561,6 @@ impl Violation for StringDotFormatMixingAutomatic {
     }
 }
 
-fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
-    keywords
-        .iter()
-        .any(|keyword| matches!(keyword, Keyword { arg: None, .. }))
-}
-
-fn has_star_args(args: &[Expr]) -> bool {
-    args.iter().any(Expr::is_starred_expr)
-}
-
 /// F502
 pub(crate) fn percent_format_expected_mapping(
     checker: &Checker,
@@ -794,42 +784,32 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
-    keywords: &[Keyword],
 ) {
-    // If there are any **kwargs, abort.
-    if has_star_star_kwargs(keywords) {
-        return;
+    let mut missing = Vec::new();
+    for (index, keyword) in call.arguments.keywords().enumerate() {
+        let Some(name) = &keyword.arg else {
+            // An unpacking may supply any of the format fields.
+            return;
+        };
+        if !summary.keywords.contains(name.id()) {
+            missing.push((index, name.id(), keyword.value.as_ref()));
+        }
     }
-
-    let keyword_names = keywords
-        .iter()
-        .filter_map(|Keyword { arg, value, .. }| Some((arg.as_ref()?, value)));
-
-    let mut side_effects = false;
-    let missing: Vec<(usize, &Name)> = keyword_names
-        .enumerate()
-        .filter_map(|(index, (keyword, value))| {
-            if summary.keywords.contains(keyword.id()) {
-                None
-            } else {
-                side_effects |=
-                    contains_effect(value, |id| checker.semantic().has_builtin_binding(id));
-                Some((index, &keyword.id))
-            }
-        })
-        .collect();
 
     if missing.is_empty() {
         return;
     }
 
-    let names: Vec<Name> = missing.iter().map(|(_, name)| (*name).clone()).collect();
+    let names: Vec<Name> = missing.iter().map(|(_, name, _)| (*name).clone()).collect();
     let mut diagnostic = checker.report_diagnostic(
         StringDotFormatExtraNamedArguments { missing: names },
         call.range(),
     );
-    let indexes: Vec<usize> = missing.into_iter().map(|(index, _)| index).collect();
     diagnostic.try_set_fix(|| {
+        let side_effects = missing.iter().any(|(_, _, value)| {
+            contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
+        });
+        let indexes: Vec<usize> = missing.into_iter().map(|(index, _, _)| index).collect();
         let edit = remove_unused_keyword_arguments_from_format_call(
             &indexes,
             call,
@@ -854,45 +834,27 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
-    args: &[Expr],
 ) {
     // We can only fix if the positional arguments we're removing don't require re-indexing
     // the format string itself. For example, we can't fix `"{1}{2}".format(0, 1, 2)"`, since
     // this requires changing the format string to `"{0}{1}"`. But we can fix
     // `"{0}{1}".format(0, 1, 2)`, since this only requires modifying the call arguments.
-    fn is_contiguous_from_end<T>(indexes: &[usize], target: &[T]) -> bool {
-        if indexes.is_empty() {
-            return true;
-        }
-
-        let mut expected_index = target.len() - 1;
-        for &index in indexes.iter().rev() {
-            if index != expected_index {
-                return false;
-            }
-
-            if expected_index == 0 {
-                break;
-            }
-
-            expected_index -= 1;
-        }
-
-        true
-    }
-
+    let mut missing = Vec::new();
     let mut side_effects = false;
-    let missing: Vec<usize> = args
-        .iter()
-        .enumerate()
-        .filter(|(i, arg)| {
-            !(arg.is_starred_expr() || summary.autos.contains(i) || summary.indices.contains(i))
-        })
-        .map(|(i, arg)| {
+    let mut can_fix = true;
+    for (index, arg) in call.arguments.args().enumerate() {
+        if arg.is_starred_expr()
+            || summary.autos.contains(&index)
+            || summary.indices.contains(&index)
+        {
+            if !missing.is_empty() {
+                can_fix = false;
+            }
+        } else {
             side_effects |= contains_effect(arg, |id| checker.semantic().has_builtin_binding(id));
-            i
-        })
-        .collect();
+            missing.push(index);
+        }
+    }
 
     if missing.is_empty() {
         return;
@@ -908,7 +870,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         call.range(),
     );
 
-    if is_contiguous_from_end(&missing, args) {
+    if can_fix {
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_positional_arguments_from_format_call(
                 &missing,
@@ -934,26 +896,24 @@ pub(crate) fn string_dot_format_missing_argument(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
-    args: &[Expr],
-    keywords: &[Keyword],
 ) {
-    if has_star_args(args) || has_star_star_kwargs(keywords) {
-        return;
+    let mut positional_count = 0;
+    let mut keywords = FxHashSet::default();
+    for argument in call.arguments.iter_source_order() {
+        match argument {
+            ast::ArgOrKeyword::Arg(arg) if !arg.is_starred_expr() => positional_count += 1,
+            ast::ArgOrKeyword::Keyword(keyword) if let Some(name) = &keyword.arg => {
+                keywords.insert(name.id());
+            }
+            _ => return,
+        }
     }
-
-    let keywords: FxHashSet<_> = keywords
-        .iter()
-        .filter_map(|k| {
-            let Keyword { arg, .. } = &k;
-            arg.as_ref().map(ruff_python_ast::Identifier::id)
-        })
-        .collect();
 
     let missing: Vec<String> = summary
         .autos
         .iter()
         .chain(&summary.indices)
-        .filter(|&&i| i >= args.len())
+        .filter(|&&i| i >= positional_count)
         .map(ToString::to_string)
         .chain(
             summary

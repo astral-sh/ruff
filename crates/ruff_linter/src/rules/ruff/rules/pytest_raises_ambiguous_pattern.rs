@@ -97,7 +97,7 @@ pub(crate) fn pytest_raises_ambiguous_pattern(
         return;
     };
 
-    let ast::Expr::StringLiteral(string) = value else {
+    let ast::Expr::StringLiteral(string) = value.as_ref() else {
         return;
     };
 

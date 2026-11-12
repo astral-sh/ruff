@@ -145,7 +145,7 @@ fn enumerate_items<'a>(
     }
 
     // Get the first argument of the enumerate call.
-    let Some(Expr::Name(sequence)) = arguments.args.first() else {
+    let Some(Expr::Name(sequence)) = arguments.args().next() else {
         return None;
     };
 

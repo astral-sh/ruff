@@ -18,7 +18,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        if !arguments.args.is_empty() {
+        if arguments.args().next().is_some() {
             return None;
         }
 
@@ -47,8 +47,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     speculative_builder.infer_expression(expr, tcx)
                 })
                 .into_iter()
-                .flatten()
-                .all(|keyword_ty| {
+                .all(|(_, keyword_ty)| {
                     keyword_ty.is_assignable_to(db, env, Type::TypedDict(typed_dict))
                         || extract_unpacked_typed_dict_keys_from_value_type(db, env, keyword_ty)
                             .is_some()
@@ -69,11 +68,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        if arguments
-            .keywords
-            .iter()
-            .any(|keyword| keyword.arg.is_none())
-        {
+        if arguments.keywords().any(|keyword| keyword.arg.is_none()) {
             return None;
         }
 
@@ -81,13 +76,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // reuse dict-literal inference. We key the synthetic name off the value node because
         // `infer_collection_literal` operates on expressions rather than keywords.
         let items = arguments
-            .keywords
-            .iter()
-            .map(|keyword| [Some(&keyword.value), Some(&keyword.value)])
+            .keywords()
+            .map(|keyword| [Some(keyword.value.as_ref()), Some(keyword.value.as_ref())])
             .collect_vec();
         let keyword_names = arguments
-            .keywords
-            .iter()
+            .keywords()
             .filter_map(|keyword| {
                 Some((
                     keyword.value.node_index().load(),

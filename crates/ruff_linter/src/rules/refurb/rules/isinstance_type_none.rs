@@ -55,11 +55,11 @@ pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
     let (func, arguments) = (&call.func, &call.arguments);
 
-    if !arguments.keywords.is_empty() {
-        return;
-    }
-
-    let [expr, types] = arguments.args.as_ref() else {
+    let [
+        ruff_python_ast::Argument::Positional(expr),
+        ruff_python_ast::Argument::Positional(types),
+    ] = arguments.items.as_slice()
+    else {
         return;
     };
 
@@ -95,11 +95,9 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
                     return false;
                 }
 
-                if !arguments.keywords.is_empty() {
-                    return false;
-                }
-
-                matches!(arguments.args.as_ref(), [Expr::NoneLiteral(_)])
+                arguments
+                    .as_single_positional()
+                    .is_some_and(Expr::is_none_literal_expr)
             }
 
             // Ex) `(type(None),)`

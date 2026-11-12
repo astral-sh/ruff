@@ -32,7 +32,7 @@ fn logging_f_string(
 
     // If there are existing positional arguments after the message, bail out.
     // This could indicate a mistake or complex usage we shouldn't try to fix.
-    if arguments.args.len() > msg_pos + 1 {
+    if arguments.args().nth(msg_pos + 1).is_some() {
         return;
     }
 
@@ -181,7 +181,7 @@ fn check_msg(checker: &Checker, msg: &Expr, arguments: &Arguments, msg_pos: usiz
 
 /// Check contents of the `extra` argument to logging calls.
 fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
-    match &extra.value {
+    match extra.value.as_ref() {
         Expr::Dict(dict) => {
             for invalid_key in dict.iter_keys().filter_map(|key| {
                 let string_key = key?.as_string_literal_expr()?;
@@ -198,11 +198,9 @@ fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
             }
         }
         Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { keywords, .. },
-            ..
+            func, arguments, ..
         }) if checker.semantic().match_builtin_expr(func, "dict") => {
-            for keyword in keywords {
+            for keyword in arguments.keywords() {
                 if let Some(attr) = &keyword.arg {
                     if is_reserved_attr(attr) {
                         checker.report_diagnostic(

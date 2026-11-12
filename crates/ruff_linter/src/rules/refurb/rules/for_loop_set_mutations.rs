@@ -76,9 +76,6 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
     let Expr::Attribute(expr_attr) = expr_call.func.as_ref() else {
         return;
     };
-    if !expr_call.arguments.keywords.is_empty() {
-        return;
-    }
 
     let (method_name, batch_method_name) = match expr_attr.attr.as_str() {
         "add" => ("add", "update"),
@@ -88,6 +85,9 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
         }
     };
 
+    let Some(arg) = expr_call.arguments.as_single_positional() else {
+        return;
+    };
     let Expr::Name(set) = expr_attr.value.as_ref() else {
         return;
     };
@@ -99,9 +99,6 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
     {
         return;
     }
-    let [arg] = expr_call.arguments.args.as_ref() else {
-        return;
-    };
 
     let locator = checker.locator();
     let content = match (for_stmt.target.as_ref(), arg) {

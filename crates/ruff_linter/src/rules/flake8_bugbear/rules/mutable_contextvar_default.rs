@@ -78,7 +78,7 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
     let Some(default) = call
         .arguments
         .find_keyword("default")
-        .map(|keyword| &keyword.value)
+        .map(|keyword| keyword.value.as_ref())
     else {
         return;
     };

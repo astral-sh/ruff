@@ -75,11 +75,7 @@ pub(crate) fn path_constructor_current_directory(
         return;
     }
 
-    if !arguments.keywords.is_empty() {
-        return;
-    }
-
-    let [Expr::StringLiteral(arg)] = &*arguments.args else {
+    let Some(Expr::StringLiteral(arg)) = arguments.as_single_positional() else {
         return;
     };
 

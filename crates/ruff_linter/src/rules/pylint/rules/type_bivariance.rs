@@ -90,14 +90,14 @@ pub(crate) fn type_bivariance(checker: &Checker, value: &Expr) {
 
     let Some(covariant) = arguments
         .find_keyword("covariant")
-        .map(|keyword| &keyword.value)
+        .map(|keyword| keyword.value.as_ref())
     else {
         return;
     };
 
     let Some(contravariant) = arguments
         .find_keyword("contravariant")
-        .map(|keyword| &keyword.value)
+        .map(|keyword| keyword.value.as_ref())
     else {
         return;
     };

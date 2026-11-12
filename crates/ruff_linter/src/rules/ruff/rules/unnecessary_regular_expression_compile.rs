@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -88,24 +88,25 @@ pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &E
 /// `split` are a positional prefix of the top-level functions', so any explicit argument shape
 /// reduces; unpacked (`*`/`**`) arguments have an unknown shape and never reduce.
 fn reducible_re_method(attr: &str, arguments: &Arguments) -> Option<&'static str> {
-    if arguments.args.iter().any(Expr::is_starred_expr)
-        || arguments
-            .keywords
-            .iter()
-            .any(|keyword| keyword.arg.is_none())
-    {
-        return None;
-    }
-    let only_string_argument = arguments.args.len() == 1 && arguments.keywords.is_empty();
+    let only_string_argument = || {
+        arguments
+            .as_single_positional()
+            .is_some_and(|expr| !expr.is_starred_expr())
+    };
+    let only_explicit_arguments = || {
+        !arguments
+            .iter_source_order()
+            .any(ast::ArgOrKeyword::is_variadic)
+    };
     Some(match attr {
-        "search" if only_string_argument => "search",
-        "match" if only_string_argument => "match",
-        "fullmatch" if only_string_argument => "fullmatch",
-        "findall" if only_string_argument => "findall",
-        "finditer" if only_string_argument => "finditer",
-        "sub" => "sub",
-        "subn" => "subn",
-        "split" => "split",
+        "search" if only_string_argument() => "search",
+        "match" if only_string_argument() => "match",
+        "fullmatch" if only_string_argument() => "fullmatch",
+        "findall" if only_string_argument() => "findall",
+        "finditer" if only_string_argument() => "finditer",
+        "sub" if only_explicit_arguments() => "sub",
+        "subn" if only_explicit_arguments() => "subn",
+        "split" if only_explicit_arguments() => "split",
         _ => return None,
     })
 }

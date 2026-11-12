@@ -100,12 +100,8 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             }
             Conversion::Str | Conversion::Repr | Conversion::Ascii => {
                 // Can't be a conversion otherwise.
-                if !call.arguments.keywords.is_empty() {
-                    continue;
-                }
-
                 // Can't be a conversion otherwise.
-                let [arg] = call.arguments.args.as_ref() else {
+                let Some(arg) = call.arguments.as_single_positional() else {
                     continue;
                 };
                 arg

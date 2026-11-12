@@ -4113,12 +4113,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         ) -> Option<&'a ast::Expr> {
             match expr.expression_value() {
                 ast::Expr::Call(ast::ExprCall {
-                    func,
-                    arguments: ast::Arguments { args, keywords, .. },
-                    ..
+                    func, arguments, ..
                 }) => {
-                    if keywords.is_empty()
-                        && let [single_argument] = &**args
+                    if let [ast::Argument::Positional(single_argument)] = arguments.items.as_slice()
                         && let Type::ClassLiteral(called_class) = inference.expression_type(func)
                         && called_class.is_known(db, KnownClass::Type)
                     {
@@ -4209,12 +4206,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     else {
                         return;
                     };
-                    if function_type.known(db) != Some(KnownFunction::Len)
-                        || !call.arguments.keywords.is_empty()
-                    {
+                    if function_type.known(db) != Some(KnownFunction::Len) {
                         return;
                     }
-                    let [arg] = &*call.arguments.args else {
+                    let Some(arg) = call.arguments.as_single_positional() else {
                         return;
                     };
                     let Some(length) = length_type.resolve_type_alias(db).as_int_like_literal()
@@ -4605,11 +4600,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             // `__bool__` and `__len__` are consistent (literals, tuples). Non-narrowable parts
             // (str, list, etc.) are kept unchanged.
             Type::FunctionLiteral(function_type)
-                if expr_call.arguments.args.len() == 1
-                    && expr_call.arguments.keywords.is_empty()
+                if let Some(arg) = expr_call.arguments.as_single_positional()
                     && function_type.known(db) == Some(KnownFunction::Len) =>
             {
-                let arg = &expr_call.arguments.args[0];
                 let arg_ty = inference.expression_type(arg);
 
                 // Narrow only the parts of the type that are safe to narrow based on len().
@@ -4626,11 +4619,15 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     None
                 }
             }
-            Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let [first_arg, second_arg] = &*expr_call.arguments.args else {
+            Type::FunctionLiteral(function_type) => {
+                let [
+                    ast::Argument::Positional(first_expr),
+                    ast::Argument::Positional(second_arg),
+                ] = expr_call.arguments.items.as_slice()
+                else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let first_arg = PlaceExpr::try_from_expr(first_expr)?;
                 let function = function_type.known(db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -4688,8 +4685,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         };
                         let mut constraints =
                             NarrowingConstraints::from_iter([(place, constraint)]);
-                        let argument = &expr_call.arguments.args[0];
-                        if let ast::Expr::Subscript(subscript) = argument.expression_value()
+                        if let ast::Expr::Subscript(subscript) = first_expr.expression_value()
                             && let Some((tuple_place, tuple_constraint)) = self
                                 .narrow_tuple_subscript_by_type(
                                     inference,
@@ -4710,15 +4706,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
             Type::ClassLiteral(class_type)
-                if expr_call.arguments.args.len() == 1
-                    && expr_call.arguments.keywords.is_empty()
+                if let Some(arg) = expr_call.arguments.as_single_positional()
                     && class_type.is_known(db, KnownClass::Bool) =>
             {
-                self.evaluate_expression_node_predicate(
-                    &expr_call.arguments.args[0],
-                    expression,
-                    is_positive,
-                )
+                self.evaluate_expression_node_predicate(arg, expression, is_positive)
             }
             _ => None,
         }
@@ -4770,12 +4761,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     NarrowingConstraint::intersection(constraint_type)
                 };
                 let mut constraints = NarrowingConstraints::from_iter([(place, constraint)]);
-                for argument in expr_call.arguments.args.iter().chain(
+                for argument in expr_call.arguments.args().chain(
                     expr_call
                         .arguments
-                        .keywords
-                        .iter()
-                        .map(|keyword| &keyword.value),
+                        .keywords()
+                        .map(|keyword| keyword.value.as_ref()),
                 ) {
                     if let ast::Expr::Subscript(subscript) = argument.expression_value()
                         && let Some(argument_place) = PlaceExpr::try_from_expr(argument)

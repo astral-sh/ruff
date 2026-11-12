@@ -74,11 +74,7 @@ pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    if !call.arguments.keywords.is_empty() {
-        return;
-    }
-
-    let [arg] = call.arguments.args.as_ref() else {
+    let Some(arg) = call.arguments.as_single_positional() else {
         return;
     };
 

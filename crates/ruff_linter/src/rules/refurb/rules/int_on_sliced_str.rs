@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Argument;
 use ruff_python_ast::{Expr, ExprCall, Identifier};
 use ruff_text_size::Ranged;
 
@@ -74,14 +75,14 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ExprCall) {
     }
 
     // There must be exactly two arguments (e.g., `int(num[2:], 16)`).
-    let (expression, base) = match (
-        call.arguments.args.as_ref(),
-        call.arguments.keywords.as_ref(),
-    ) {
-        ([expression], [base]) if base.arg.as_ref().map(Identifier::as_str) == Some("base") => {
-            (expression, &base.value)
+    let (expression, base) = match call.arguments.items.as_slice() {
+        [Argument::Positional(expression), Argument::Keyword(base)]
+        | [Argument::Keyword(base), Argument::Positional(expression)]
+            if base.arg.as_ref().map(Identifier::as_str) == Some("base") =>
+        {
+            (expression, base.value.as_ref())
         }
-        ([expression, base], []) => (expression, base),
+        [Argument::Positional(expression), Argument::Positional(base)] => (expression, base),
         _ => {
             return;
         }

@@ -1,5 +1,6 @@
 use crate::codes::Category;
 use crate::fix::edits::fresh_binding_name;
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::{SemanticModel, analyze::typing::is_mutable_expr};
@@ -82,7 +83,7 @@ pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // Check that the value parameter is a mutable object.
-    let [keys, value] = &*call.arguments.args else {
+    let Some([keys, value]) = call.arguments.args().collect_array() else {
         return;
     };
     if !is_mutable_expr(value, semantic) {

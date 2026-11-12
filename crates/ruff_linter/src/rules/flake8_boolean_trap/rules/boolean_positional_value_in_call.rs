@@ -60,8 +60,7 @@ pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: &ast::Ex
     }
     for arg in call
         .arguments
-        .args
-        .iter()
+        .args()
         .filter(|arg| arg.is_boolean_literal_expr())
     {
         checker.report_diagnostic(BooleanPositionalValueInCall, arg.range());

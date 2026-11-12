@@ -29,28 +29,29 @@ Module(
                             arguments: Arguments {
                                 range: 4..15,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 5..14,
-                                        node_index: NodeIndex(None),
-                                        arg: Some(
-                                            Identifier {
-                                                id: Name(""),
-                                                range: 5..10,
-                                                node_index: NodeIndex(None),
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 13..14,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                    },
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 5..14,
+                                            node_index: NodeIndex(None),
+                                            arg: Some(
+                                                Identifier {
+                                                    id: Name(""),
+                                                    range: 5..10,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 13..14,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ],
                             },
                         },
@@ -76,28 +77,29 @@ Module(
                             arguments: Arguments {
                                 range: 20..32,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 21..31,
-                                        node_index: NodeIndex(None),
-                                        arg: Some(
-                                            Identifier {
-                                                id: Name(""),
-                                                range: 21..27,
-                                                node_index: NodeIndex(None),
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 30..31,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                    },
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 21..31,
+                                            node_index: NodeIndex(None),
+                                            arg: Some(
+                                                Identifier {
+                                                    id: Name(""),
+                                                    range: 21..27,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 30..31,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ],
                             },
                         },
@@ -123,25 +125,26 @@ Module(
                             arguments: Arguments {
                                 range: 38..47,
                                 node_index: NodeIndex(None),
-                                args: [
-                                    Yield(
-                                        ExprYield {
-                                            node_index: NodeIndex(None),
-                                            range: 39..46,
-                                            value: Some(
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 45..46,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
+                                items: [
+                                    Positional(
+                                        Yield(
+                                            ExprYield {
+                                                node_index: NodeIndex(None),
+                                                range: 39..46,
+                                                value: Some(
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 45..46,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
                                                 ),
-                                            ),
-                                        },
+                                            },
+                                        ),
                                     ),
                                 ],
-                                keywords: [],
                             },
                         },
                     ),
@@ -166,23 +169,24 @@ Module(
                             arguments: Arguments {
                                 range: 52..66,
                                 node_index: NodeIndex(None),
-                                args: [
-                                    YieldFrom(
-                                        ExprYieldFrom {
-                                            node_index: NodeIndex(None),
-                                            range: 53..65,
-                                            value: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 64..65,
-                                                    id: Name("x"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
+                                items: [
+                                    Positional(
+                                        YieldFrom(
+                                            ExprYieldFrom {
+                                                node_index: NodeIndex(None),
+                                                range: 53..65,
+                                                value: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 64..65,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            },
+                                        ),
                                     ),
                                 ],
-                                keywords: [],
                             },
                         },
                     ),

@@ -199,8 +199,7 @@ impl<'a> DependencyCall<'a> {
         let default_argument = call.arguments.find_argument("default", 0)?;
         let keyword_arguments = call
             .arguments
-            .keywords
-            .iter()
+            .keywords()
             .filter(|kwarg| kwarg.arg.as_ref().is_some_and(|name| name != "default"))
             .collect();
 

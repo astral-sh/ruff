@@ -1,7 +1,8 @@
+use itertools::Itertools;
 use std::{fmt, iter};
 
 use regex::Regex;
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt, WithItem};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Stmt, WithItem};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
@@ -263,9 +264,7 @@ fn assignment_is_cast_expr(value: &Expr, target: &Expr, semantic: &SemanticModel
     }
 
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
+        func, arguments, ..
     }) = value
     else {
         return false;
@@ -273,10 +272,8 @@ fn assignment_is_cast_expr(value: &Expr, target: &Expr, semantic: &SemanticModel
     let Expr::Name(ast::ExprName { id: target_id, .. }) = target else {
         return false;
     };
-    if args.len() != 2 {
-        return false;
-    }
-    let Expr::Name(ast::ExprName { id: arg_id, .. }) = &args[1] else {
+    let Some([_, Expr::Name(ast::ExprName { id: arg_id, .. })]) = arguments.args().collect_array()
+    else {
         return false;
     };
     if arg_id != target_id {

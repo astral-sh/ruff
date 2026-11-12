@@ -1,10 +1,9 @@
 use itertools::Itertools;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign, StmtRef};
+use ruff_python_ast::{Expr, ExprCall, ExprName, StmtAnnAssign, StmtAssign, StmtRef};
 use ruff_python_edits::unwrapped_call_argument;
 use ruff_text_size::Ranged;
 
@@ -146,24 +145,32 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         return;
     };
 
-    let [Expr::StringLiteral(name), value] = arguments.args.as_ref() else {
+    if !(2..=3).contains(&arguments.len()) {
+        return;
+    }
+    let mut positional = arguments.args();
+    let (Some(name), Some(value)) = (positional.next(), positional.next()) else {
         return;
     };
-
+    let Some(name) = name.as_string_literal_expr() else {
+        return;
+    };
     if &name.value != target_name.id.as_str() {
         return;
     }
 
-    let type_params = match arguments.keywords.as_ref() {
-        [] => &[],
-        [
-            Keyword {
-                arg: Some(name),
-                value: Expr::Tuple(type_params),
-                ..
-            },
-        ] if name.as_str() == "type_params" => type_params.elts.as_slice(),
-        _ => return,
+    let type_params = if arguments.len() == 2 {
+        &[][..]
+    } else if let Some(keyword) = arguments.keywords().next()
+        && keyword
+            .arg
+            .as_ref()
+            .is_some_and(|name| name == "type_params")
+        && let Some(tuple) = keyword.value.as_tuple_expr()
+    {
+        tuple.elts.as_slice()
+    } else {
+        return;
     };
 
     if !checker

@@ -56,7 +56,7 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
         return;
     };
 
-    for base in &*arguments.args {
+    for base in arguments.args() {
         if !checker.semantic().match_builtin_expr(base, "object") {
             continue;
         }

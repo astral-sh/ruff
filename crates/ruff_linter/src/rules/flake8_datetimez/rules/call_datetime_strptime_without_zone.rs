@@ -109,7 +109,7 @@ pub(crate) fn call_datetime_strptime_without_zone(
     }
 
     // Does the `strptime` call contain a format string with a timezone specifier?
-    if let Some(expr) = call.arguments.args.get(1) {
+    if let Some(expr) = call.arguments.args().nth(1) {
         match expr {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
                 if value.to_str().contains("%z") =>
@@ -164,10 +164,9 @@ fn find_antipattern(
     }
     match arguments.find_keyword("tzinfo") {
         // Ex) `datetime.strptime(...).replace(tzinfo=None)`
-        Some(ast::Keyword {
-            value: Expr::NoneLiteral(_),
-            ..
-        }) => Some(DatetimeModuleAntipattern::NonePassedToTzArgument),
+        Some(keyword) if keyword.value.is_none_literal_expr() => {
+            Some(DatetimeModuleAntipattern::NonePassedToTzArgument)
+        }
         // Ex) `datetime.strptime(...).replace(tzinfo=...)`
         Some(_) => None,
         // Ex) `datetime.strptime(...).replace(...)` with no `tzinfo` argument

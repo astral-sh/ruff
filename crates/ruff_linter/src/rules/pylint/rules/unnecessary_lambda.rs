@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr, ExprLambda, Parameter, ParameterWithDefault, visitor};
+use ruff_python_ast::{self as ast, ArgOrKeyword, Expr, ExprLambda, ParameterItem, visitor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -94,112 +94,12 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         }
     }
 
-    // If at least one of the lambda parameters has a default value, abort. We can't know if the
-    // defaults provided by the lambda are the same as the defaults provided by the inner
-    // function.
-    if parameters.as_ref().is_some_and(|parameters| {
-        parameters
-            .args()
-            .any(|ParameterWithDefault { default, .. }| default.is_some())
-    }) {
+    let forwards = match parameters.as_deref() {
+        None => arguments.is_empty(),
+        Some(parameters) => forwards_arguments(parameters, arguments),
+    };
+    if !forwards {
         return;
-    }
-
-    match parameters.as_ref() {
-        None => {
-            if !arguments.is_empty() {
-                return;
-            }
-        }
-        Some(parameters) => {
-            // Collect all starred arguments (e.g., `lambda *args: func(*args)`).
-            let call_varargs: Vec<&Expr> = arguments
-                .args
-                .iter()
-                .filter_map(|arg| {
-                    if let Expr::Starred(ast::ExprStarred { value, .. }) = arg {
-                        Some(value.as_ref())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-
-            // Collect all keyword arguments (e.g., `lambda x, y: func(x=x, y=y)`).
-            let call_kwargs: Vec<&Expr> = arguments
-                .keywords
-                .iter()
-                .map(|kw| &kw.value)
-                .collect::<Vec<_>>();
-
-            // Collect all positional arguments (e.g., `lambda x, y: func(x, y)`).
-            let call_posargs: Vec<&Expr> = arguments
-                .args
-                .iter()
-                .filter(|arg| !arg.is_starred_expr())
-                .collect::<Vec<_>>();
-
-            // Ex) `lambda **kwargs: func(**kwargs)`
-            match parameters.kwarg() {
-                None => {
-                    if !call_kwargs.is_empty() {
-                        return;
-                    }
-                }
-                Some(kwarg) => {
-                    let [call_kwarg] = &call_kwargs[..] else {
-                        return;
-                    };
-
-                    let Expr::Name(ast::ExprName { id, .. }) = call_kwarg else {
-                        return;
-                    };
-
-                    if id.as_str() != kwarg.name.as_str() {
-                        return;
-                    }
-                }
-            }
-
-            // Ex) `lambda *args: func(*args)`
-            match parameters.vararg() {
-                None => {
-                    if !call_varargs.is_empty() {
-                        return;
-                    }
-                }
-                Some(vararg) => {
-                    let [call_vararg] = &call_varargs[..] else {
-                        return;
-                    };
-
-                    let Expr::Name(ast::ExprName { id, .. }) = call_vararg else {
-                        return;
-                    };
-
-                    if id.as_str() != vararg.name.as_str() {
-                        return;
-                    }
-                }
-            }
-
-            // Ex) `lambda x, y: func(x, y)`
-            let lambda_posargs: Vec<&Parameter> = parameters
-                .args()
-                .map(|ParameterWithDefault { parameter, .. }| parameter)
-                .collect::<Vec<_>>();
-            if call_posargs.len() != lambda_posargs.len() {
-                return;
-            }
-            for (param, arg) in lambda_posargs.iter().zip(call_posargs) {
-                let Expr::Name(ast::ExprName { id, .. }) = arg else {
-                    return;
-                };
-                if id.as_str() != param.name.as_str() {
-                    return;
-                }
-            }
-        }
     }
 
     // The lambda is necessary if it uses one of its parameters _as_ the function call.
@@ -247,6 +147,57 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         },
         lambda.range(),
     )));
+}
+
+/// Check whether the call forwards the lambda's positional-or-keyword and variadic parameters.
+fn forwards_arguments(parameters: &ast::Parameters, arguments: &ast::Arguments) -> bool {
+    let mut vararg = None;
+    let mut kwarg = None;
+    let mut positional = parameters.items.iter().filter_map(|item| match item {
+        ParameterItem::PositionalOrKeyword(parameter) => Some(parameter),
+        ParameterItem::Vararg(parameter) => {
+            // Parameter lookup selects the first `*` parameter on parser recovery.
+            vararg.get_or_insert(parameter);
+            None
+        }
+        ParameterItem::Kwarg(parameter) => {
+            // It selects the last `**` parameter.
+            kwarg = Some(parameter);
+            None
+        }
+        ParameterItem::PositionalOnly(_) | ParameterItem::KeywordOnly(_) => None,
+    });
+    let mut starred = None;
+    let mut keyword = None;
+    for argument in arguments.iter_source_order() {
+        let (slot, value) = match argument {
+            ArgOrKeyword::Arg(arg) => match arg {
+                Expr::Name(name) => {
+                    let Some(parameter) = positional.next() else {
+                        return false;
+                    };
+                    if parameter.default.is_some()
+                        || parameter.parameter.name.as_str() != name.id.as_str()
+                    {
+                        return false;
+                    }
+                    continue;
+                }
+                Expr::Starred(arg) => (&mut starred, arg.value.as_ref()),
+                _ => return false,
+            },
+            ArgOrKeyword::Keyword(arg) => (&mut keyword, arg.value.as_ref()),
+        };
+        let Some(name) = value.as_name_expr() else {
+            return false;
+        };
+        if slot.replace(name.id.as_str()).is_some() {
+            return false;
+        }
+    }
+    positional.next().is_none()
+        && vararg.map(|param| param.name.as_str()) == starred
+        && kwarg.map(|param| param.name.as_str()) == keyword
 }
 
 /// Identify all `Expr::Name` nodes in an AST.

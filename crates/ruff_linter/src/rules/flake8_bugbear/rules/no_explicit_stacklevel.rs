@@ -86,14 +86,8 @@ pub(crate) fn no_explicit_stacklevel(
         || is_skip_file_prefixes_param_set(&call.arguments)
         || call
             .arguments
-            .args
-            .iter()
-            .any(ruff_python_ast::Expr::is_starred_expr)
-        || call
-            .arguments
-            .keywords
-            .iter()
-            .any(|keyword| keyword.arg.is_none())
+            .iter_source_order()
+            .any(ast::ArgOrKeyword::is_variadic)
     {
         return;
     }
@@ -109,7 +103,7 @@ pub(crate) fn no_explicit_stacklevel(
 fn is_skip_file_prefixes_param_set(arguments: &ast::Arguments) -> bool {
     arguments
         .find_keyword("skip_file_prefixes")
-        .is_some_and(|keyword| match &keyword.value {
+        .is_some_and(|keyword| match keyword.value.as_ref() {
             Expr::Tuple(tuple) => !tuple.elts.is_empty(),
             _ => true,
         })

@@ -7,7 +7,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
+use ruff_python_ast::{self as ast, Expr, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -74,27 +74,22 @@ impl<'a> FormatSummaryValues<'a> {
         let mut extracted_args: Vec<&Expr> = Vec::new();
         let mut extracted_kwargs: FxHashMap<&str, &Expr> = FxHashMap::default();
 
-        for arg in &*call.arguments.args {
-            if matches!(arg, Expr::Starred(..))
-                || contains_quotes(locator.slice(arg))
-                || locator.contains_line_break(arg.range())
-            {
-                return None;
-            }
-            extracted_args.push(arg);
-        }
-        for keyword in &*call.arguments.keywords {
-            let Keyword {
-                arg,
-                value,
-                range: _,
-                node_index: _,
-            } = keyword;
-            let key = arg.as_ref()?;
+        for item in call.arguments.iter_source_order() {
+            let (name, value) = match item {
+                ast::ArgOrKeyword::Arg(arg) if arg.is_starred_expr() => return None,
+                ast::ArgOrKeyword::Arg(arg) => (None, arg),
+                ast::ArgOrKeyword::Keyword(keyword) => {
+                    (Some(keyword.arg.as_ref()?.as_str()), keyword.value.as_ref())
+                }
+            };
             if contains_quotes(locator.slice(value)) || locator.contains_line_break(value.range()) {
                 return None;
             }
-            extracted_kwargs.insert(key, value);
+            if let Some(name) = name {
+                extracted_kwargs.insert(name, value);
+            } else {
+                extracted_args.push(value);
+            }
         }
 
         if extracted_args.is_empty() && extracted_kwargs.is_empty() {

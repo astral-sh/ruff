@@ -333,40 +333,57 @@ impl<'db> FieldMetadata<'db> {
         call_type: Type<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
-        if let Some(default) = call.arguments.find_argument_value("default", 0) {
+        let arguments = &call.arguments;
+        let [
+            default,
+            default_factory,
+            init,
+            validation_alias,
+            alias,
+            strict,
+            frozen,
+        ] = arguments.find_keywords([
+            "default",
+            "default_factory",
+            "init",
+            "validation_alias",
+            "alias",
+            "strict",
+            "frozen",
+        ]);
+        if let Some(default) = default
+            .map(|kw| kw.value.as_ref())
+            .or_else(|| arguments.find_positional(0))
+        {
             let default_type = field_expression_type(db, definition, default);
             if !default_type.is_instance_of(db, KnownClass::EllipsisType) {
                 self.default_ty =
                     Some(default_type.apply_optional_specialization(db, specialization));
             }
-        } else if call.arguments.find_keyword("default_factory").is_some() {
+        } else if default_factory.is_some() {
             self.default_ty = Some(call_type.apply_optional_specialization(db, specialization));
         }
 
-        if let Some(init) = call.arguments.find_keyword("init") {
+        if let Some(init) = init {
             let init = field_expression_type(db, definition, &init.value);
             let env = ProgramEnvironment::from_scope(definition.scope);
             self.init &= !init.bool(db, &env).is_always_false();
         }
 
-        if let Some(alias) = call
-            .arguments
-            .find_keyword("validation_alias")
-            .or_else(|| call.arguments.find_keyword("alias"))
-        {
+        if let Some(alias) = validation_alias.or(alias) {
             self.alias = field_expression_type(db, definition, &alias.value)
                 .as_string_literal()
                 .map(|literal| Box::from(literal.value(db)));
         }
 
-        if let Some(strict) = call.arguments.find_keyword("strict") {
+        if let Some(strict) = strict {
             let strict = field_expression_type(db, definition, &strict.value);
             if !strict.is_none(db) {
                 self.merge_strict(ConfigBoolean::from_type(strict));
             }
         }
 
-        if let Some(frozen) = call.arguments.find_keyword("frozen") {
+        if let Some(frozen) = frozen {
             let frozen = field_expression_type(db, definition, &frozen.value);
             self.frozen = if frozen.is_none(db) {
                 ConfigBoolean::Disabled
@@ -833,55 +850,7 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
         return Some(ModelConfig::unknown());
     }
 
-    if call
-        .arguments
-        .keywords
-        .iter()
-        .any(|keyword| keyword.arg.is_none())
-    {
-        return Some(ModelConfig::unknown());
-    }
-
-    // Keep this list of recognized options in sync with `model_config_from_dict` and
-    // `class_keyword_config`.
-    let extra = call.arguments.find_keyword("extra").map(|extra| {
-        let extra = definition_expression_type(db, definition, &extra.value)
-            .as_string_literal()
-            .map(|literal| literal.value(db));
-        ExtraBehavior::from_value(extra)
-    });
-    let strict = config_boolean(db, definition, call.arguments.find_keyword("strict"));
-    let from_attributes = config_boolean(
-        db,
-        definition,
-        call.arguments.find_keyword("from_attributes"),
-    );
-    let frozen = config_boolean(db, definition, call.arguments.find_keyword("frozen"));
-    let validate_by_alias = config_boolean(
-        db,
-        definition,
-        call.arguments.find_keyword("validate_by_alias"),
-    );
-    let validate_by_name = config_boolean(
-        db,
-        definition,
-        call.arguments.find_keyword("validate_by_name"),
-    );
-    let populate_by_name = config_boolean(
-        db,
-        definition,
-        call.arguments.find_keyword("populate_by_name"),
-    );
-
-    Some(ModelConfig {
-        extra,
-        strict,
-        from_attributes,
-        frozen,
-        validate_by_alias,
-        validate_by_name,
-        populate_by_name,
-    })
+    Some(model_config_from_keywords(db, definition, &call.arguments))
 }
 
 fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDict) -> ModelConfig {
@@ -899,8 +868,7 @@ fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDi
         };
         let value = definition_expression_type(db, definition, &item.value);
 
-        // Keep this match in sync with the options recognized for `ConfigDict` calls in
-        // `own_model_config` and for class keywords in `class_keyword_config`.
+        // Keep this match in sync with the options in `model_config_from_keywords`.
         match key.value.to_str() {
             "extra" => {
                 config.extra = Some(ExtraBehavior::from_value(
@@ -931,39 +899,55 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
     let Some(arguments) = class_node.arguments.as_ref() else {
         return ModelConfig::default();
     };
-    if arguments
-        .keywords
-        .iter()
-        .any(|keyword| keyword.arg.is_none())
-    {
-        return ModelConfig::unknown();
+    model_config_from_keywords(db, definition, arguments)
+}
+
+fn model_config_from_keywords(
+    db: &dyn Db,
+    definition: Definition<'_>,
+    arguments: &Arguments,
+) -> ModelConfig {
+    let [
+        mut extra,
+        mut strict,
+        mut from_attributes,
+        mut frozen,
+        mut validate_by_alias,
+        mut validate_by_name,
+        mut populate_by_name,
+    ] = [None; 7];
+    for keyword in arguments.keywords() {
+        let Some(name) = keyword.arg.as_ref() else {
+            // A mapping unpacking can override any option, including one seen earlier.
+            return ModelConfig::unknown();
+        };
+        let slot = match name.as_str() {
+            "extra" => &mut extra,
+            "strict" => &mut strict,
+            "from_attributes" => &mut from_attributes,
+            "frozen" => &mut frozen,
+            "validate_by_alias" => &mut validate_by_alias,
+            "validate_by_name" => &mut validate_by_name,
+            "populate_by_name" => &mut populate_by_name,
+            _ => continue,
+        };
+        // On a recovered duplicate, use the first explicit keyword, like argument lookup.
+        slot.get_or_insert(keyword);
     }
-    // Keep this list of recognized options in sync with `own_model_config` and
-    // `model_config_from_dict`.
-    let extra = arguments.find_keyword("extra").map(|extra| {
+    let extra = extra.map(|extra| {
         let extra = definition_expression_type(db, definition, &extra.value)
             .as_string_literal()
             .map(|literal| literal.value(db));
         ExtraBehavior::from_value(extra)
     });
-    let strict = config_boolean(db, definition, arguments.find_keyword("strict"));
-    let from_attributes = config_boolean(db, definition, arguments.find_keyword("from_attributes"));
-    let frozen = config_boolean(db, definition, arguments.find_keyword("frozen"));
-    let validate_by_alias =
-        config_boolean(db, definition, arguments.find_keyword("validate_by_alias"));
-    let validate_by_name =
-        config_boolean(db, definition, arguments.find_keyword("validate_by_name"));
-    let populate_by_name =
-        config_boolean(db, definition, arguments.find_keyword("populate_by_name"));
-
     ModelConfig {
         extra,
-        strict,
-        from_attributes,
-        frozen,
-        validate_by_alias,
-        validate_by_name,
-        populate_by_name,
+        strict: config_boolean(db, definition, strict),
+        from_attributes: config_boolean(db, definition, from_attributes),
+        frozen: config_boolean(db, definition, frozen),
+        validate_by_alias: config_boolean(db, definition, validate_by_alias),
+        validate_by_name: config_boolean(db, definition, validate_by_name),
+        populate_by_name: config_boolean(db, definition, populate_by_name),
     }
 }
 
@@ -1077,7 +1061,7 @@ fn function_has_before_or_plain_field_validator<'db>(
             return false;
         }
 
-        call.arguments.args.iter().any(|field| {
+        call.arguments.args().any(|field| {
             decorators
                 .expression_type(field)
                 .and_then(Type::as_string_literal)

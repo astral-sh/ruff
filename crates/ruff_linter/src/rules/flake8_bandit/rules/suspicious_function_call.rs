@@ -2,6 +2,7 @@
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use itertools::Either;
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
 use ruff_python_semantic::SemanticModel;
@@ -1021,6 +1022,29 @@ fn suspicious_function(
     arguments: Option<&Arguments>,
     range: TextRange,
 ) {
+    /// Return the explicit URL only when no argument unpacking can affect the call.
+    fn url_without_unpacking(arguments: &Arguments) -> Option<&Expr> {
+        let mut positional = None;
+        let mut named = None;
+        for item in arguments.iter_source_order() {
+            match item {
+                ast::ArgOrKeyword::Arg(arg) => {
+                    if arg.is_starred_expr() {
+                        return None;
+                    }
+                    positional.get_or_insert(arg);
+                }
+                ast::ArgOrKeyword::Keyword(keyword) => {
+                    let name = keyword.arg.as_ref()?;
+                    if named.is_none() && name.as_str() == "url" {
+                        named = Some(keyword.value.as_ref());
+                    }
+                }
+            }
+        }
+        named.or(positional)
+    }
+
     /// Returns `true` if the iterator starts with the given prefix.
     fn has_prefix(mut chars: impl Iterator<Item = char>, prefix: &str) -> bool {
         for expected in prefix.chars() {
@@ -1165,7 +1189,7 @@ fn suspicious_function(
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
             if let Some(arguments) = arguments {
-                if let [single] = &*arguments.args {
+                if let Some([single]) = arguments.args().collect_array() {
                     if single.is_string_literal_expr() {
                         return;
                     }
@@ -1176,20 +1200,10 @@ fn suspicious_function(
 
         // URLOpen (`Request`)
         ["urllib", "request", "Request"] | ["six", "moves", "urllib", "request", "Request"] => {
-            if let Some(arguments) = arguments {
-                // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
-                if arguments.args.iter().all(|arg| !arg.is_starred_expr())
-                    && arguments
-                        .keywords
-                        .iter()
-                        .all(|keyword| keyword.arg.is_some())
-                {
-                    if let Some(url_expr) = arguments.find_argument_value("url", 0)
-                        && expression_starts_with_http_prefix(url_expr, checker.semantic())
-                    {
-                        return;
-                    }
-                }
+            if let Some(url) = arguments.and_then(url_without_unpacking)
+                && expression_starts_with_http_prefix(url, checker.semantic())
+            {
+                return;
             }
             checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range)
         }
@@ -1203,41 +1217,28 @@ fn suspicious_function(
             "request",
             "urlopen" | "urlretrieve",
         ] => {
-            if let Some(arguments) = arguments {
-                if arguments.args.iter().all(|arg| !arg.is_starred_expr())
-                    && arguments
-                        .keywords
-                        .iter()
-                        .all(|keyword| keyword.arg.is_some())
+            match arguments.and_then(url_without_unpacking) {
+                // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
+                Some(Expr::Call(ExprCall {
+                    func, arguments, ..
+                })) if checker
+                    .semantic()
+                    .resolve_qualified_name(func.as_ref())
+                    .is_some_and(|name| name.segments() == ["urllib", "request", "Request"]) =>
                 {
-                    match arguments.find_argument_value("url", 0) {
-                        // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
-                        Some(Expr::Call(ExprCall {
-                            func, arguments, ..
-                        })) if checker
-                            .semantic()
-                            .resolve_qualified_name(func.as_ref())
-                            .is_some_and(|name| {
-                                name.segments() == ["urllib", "request", "Request"]
-                            }) =>
-                        {
-                            if let Some(url_expr) = arguments.find_argument_value("url", 0)
-                                && expression_starts_with_http_prefix(url_expr, checker.semantic())
-                            {
-                                return;
-                            }
-                        }
-
-                        // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
-                        Some(expr)
-                            if expression_starts_with_http_prefix(expr, checker.semantic()) =>
-                        {
-                            return;
-                        }
-
-                        _ => {}
+                    if let Some(url_expr) = arguments.find_argument_value("url", 0)
+                        && expression_starts_with_http_prefix(url_expr, checker.semantic())
+                    {
+                        return;
                     }
                 }
+
+                // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
+                Some(expr) if expression_starts_with_http_prefix(expr, checker.semantic()) => {
+                    return;
+                }
+
+                _ => {}
             }
             checker.report_diagnostic_if_enabled(SuspiciousURLOpenUsage, range)
         }

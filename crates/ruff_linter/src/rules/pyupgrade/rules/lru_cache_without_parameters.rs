@@ -68,8 +68,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[
         };
 
         // Look for, e.g., `import functools; @functools.lru_cache()`.
-        if arguments.args.is_empty()
-            && arguments.keywords.is_empty()
+        if arguments.is_empty()
             && checker
                 .semantic()
                 .resolve_qualified_name(func)

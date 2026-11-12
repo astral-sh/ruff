@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::add_argument;
-use crate::rules::flake8_bugbear::helpers::any_infinite_iterables;
+use crate::rules::flake8_bugbear::helpers::{any_infinite_iterables, needs_strict_argument};
 use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
@@ -60,10 +60,8 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
 
     // any call to `zip()` with at least 2 iterables, or a starred argument.
     if semantic.match_builtin_expr(&call.func, "zip")
-        && call.arguments.find_keyword("strict").is_none()
-        && (call.arguments.args.len() >= 2
-            || call.arguments.args.iter().any(ast::Expr::is_starred_expr))
-        && !any_infinite_iterables(call.arguments.args.iter(), semantic)
+        && needs_strict_argument(&call.arguments, 2)
+        && !any_infinite_iterables(call.arguments.args(), semantic)
     {
         checker
             .report_diagnostic(ZipWithoutExplicitStrict, call.range())

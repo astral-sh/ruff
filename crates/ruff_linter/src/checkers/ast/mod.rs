@@ -1504,10 +1504,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 if let Some(arguments) = arguments {
                     self.semantic.flags |= SemanticModelFlags::CLASS_BASE;
-                    for base in &*arguments.args {
+                    for base in arguments.args() {
                         self.visit_expr(base);
                     }
-                    for keyword in &*arguments.keywords {
+                    for keyword in arguments.keywords() {
                         if keyword.arg.as_ref().is_some_and(|arg| arg == "extra_items")
                             && self.is_typed_dict(class_def)
                         {
@@ -1995,7 +1995,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         });
                 match callable {
                     Some(typing::Callable::Bool) => {
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args();
                         if let Some(arg) = args.next() {
                             self.visit_boolean_test(arg);
                         }
@@ -2021,14 +2021,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::TypeForm) => {
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args();
                         if let Some(arg) = args.next() {
                             self.visit_type_definition(arg);
                         }
                         for arg in args {
                             self.visit_non_type_definition(arg);
                         }
-                        for keyword in &*arguments.keywords {
+                        for keyword in arguments.keywords() {
                             self.visit_non_type_definition(&keyword.value);
                         }
                     }
@@ -2050,14 +2050,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::TypeVar) => {
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
                         for arg in args {
                             self.visit_type_definition(arg);
                         }
-                        for keyword in &*arguments.keywords {
+                        for keyword in arguments.keywords() {
                             let Keyword {
                                 arg,
                                 value,
@@ -2096,7 +2096,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                     Some(typing::Callable::NamedTuple) => {
                         // Ex) NamedTuple("a", [("a", int)])
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
@@ -2125,9 +2125,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
 
-                        for keyword in &*arguments.keywords {
+                        for keyword in arguments.keywords() {
                             let Keyword { arg, value, .. } = keyword;
-                            match (arg.as_ref(), value) {
+                            match (arg.as_ref(), value.as_ref()) {
                                 // Ex) NamedTuple("a", **{"a": int})
                                 (None, Expr::Dict(dict)) => {
                                     for ast::DictItem { key, value, .. } in dict {
@@ -2152,11 +2152,25 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                     Some(typing::Callable::TypedDict) => {
                         // Ex) TypedDict("a", {"a": int})
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args();
+                        // Before Python 3.13, field names could be passed as keyword arguments when
+                        // the field mapping is omitted or `None`:
+                        //
+                        // ```pycon
+                        // >>> from typing import TypedDict
+                        // >>> TypedDict("a", closed=int).__required_keys__
+                        // frozenset({'closed'})
+                        // >>> TypedDict("a", None, closed=int).__required_keys__
+                        // frozenset({'closed'})
+                        // ```
+                        let mut legacy_fields = false;
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
+                            legacy_fields = self.target_version() < PythonVersion::PY313;
                         }
-                        for arg in args {
+                        for (index, arg) in args.enumerate() {
+                            legacy_fields =
+                                legacy_fields && index == 0 && arg.is_none_literal_expr();
                             if let Expr::Dict(ast::ExprDict {
                                 items,
                                 range: _,
@@ -2174,20 +2188,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
 
-                        // Before Python 3.13, field names could be passed as keyword arguments when
-                        // the field mapping is omitted or `None`:
-                        //
-                        // ```pycon
-                        // >>> from typing import TypedDict
-                        // >>> TypedDict("a", closed=int).__required_keys__
-                        // frozenset({'closed'})
-                        // >>> TypedDict("a", None, closed=int).__required_keys__
-                        // frozenset({'closed'})
-                        // ```
-                        let legacy_fields = self.target_version() < PythonVersion::PY313
-                            && matches!(&*arguments.args, [_] | [_, Expr::NoneLiteral(_)]);
-
-                        for Keyword { arg, value, .. } in &*arguments.keywords {
+                        for Keyword { arg, value, .. } in arguments.keywords() {
                             let is_type = match arg.as_deref() {
                                 // `total` is a boolean argument available since `TypedDict` was
                                 // introduced.
@@ -2212,7 +2213,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::MypyExtension) => {
-                        let mut args = arguments.args.iter();
+                        let mut args = arguments.args();
                         if let Some(arg) = args.next() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
                             self.visit_type_definition(arg);
@@ -2220,13 +2221,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             for arg in args {
                                 self.visit_non_type_definition(arg);
                             }
-                            for keyword in &*arguments.keywords {
+                            for keyword in arguments.keywords() {
                                 let Keyword { value, .. } = keyword;
                                 self.visit_non_type_definition(value);
                             }
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
-                            for keyword in &*arguments.keywords {
+                            for keyword in arguments.keywords() {
                                 let Keyword {
                                     value,
                                     arg,
@@ -2245,10 +2246,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        for arg in &*arguments.args {
+                        for arg in arguments.args() {
                             self.visit_non_type_definition(arg);
                         }
-                        for keyword in &*arguments.keywords {
+                        for keyword in arguments.keywords() {
                             let Keyword { value, .. } = keyword;
                             self.visit_non_type_definition(value);
                         }
@@ -3080,7 +3081,7 @@ impl<'a> Checker<'a> {
             self.semantic.flags |= SemanticModelFlags::DEFERRED_CLASS_BASE;
             // A forward base may only now identify this class as a `TypedDict`.
             if let Stmt::ClassDef(class_def) = self.semantic.current_statement()
-                && class_def.keywords().iter().any(|keyword| {
+                && class_def.keywords().any(|keyword| {
                     keyword.arg.as_ref().is_some_and(|arg| arg == "extra_items")
                         && keyword.value.range() == expr.range()
                 })

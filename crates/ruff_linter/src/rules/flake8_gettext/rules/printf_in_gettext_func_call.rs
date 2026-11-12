@@ -64,9 +64,13 @@ impl Violation for PrintfInGetTextFuncCall {
 }
 
 /// INT003
-pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn printf_in_gettext_func_call(
+    checker: &Checker,
+    func: &Expr,
+    arguments: &ast::Arguments,
+) {
     // Check first argument (singular)
-    if let Some(first) = args.first() {
+    if let Some(first) = arguments.args().next() {
         if is_printf_format(first) {
             checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: false }, first.range());
         }
@@ -74,7 +78,7 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
 
     // Check second argument (plural) for ngettext calls
     if is_ngettext_call(checker, func)
-        && let Some(second) = args.get(1)
+        && let Some(second) = arguments.args().nth(1)
         && is_printf_format(second)
     {
         checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: true }, second.range());

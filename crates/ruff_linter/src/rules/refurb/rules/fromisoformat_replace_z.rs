@@ -90,11 +90,7 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
 
     let (func, arguments) = (&*call.func, &call.arguments);
 
-    if !arguments.keywords.is_empty() {
-        return;
-    }
-
-    let [argument] = &*arguments.args else {
+    let Some(argument) = arguments.as_single_positional() else {
         return;
     };
 
@@ -158,19 +154,14 @@ impl<'a> ReplaceTimeZone<'a> {
 
     /// Returns `Some` if the call expression is a call to `str.replace` and matches `date.replace("Z", "+00:00")`
     fn from_call(call: &'a ExprCall) -> Option<Self> {
-        let arguments = &call.arguments;
-
-        if !arguments.keywords.is_empty() {
-            return None;
-        }
-
         let ExprAttribute { value, attr, .. } = call.func.as_attribute_expr()?;
 
         if attr != "replace" {
             return None;
         }
 
-        let [z, Expr::StringLiteral(zero_offset)] = &*arguments.args else {
+        let Some([z, Expr::StringLiteral(zero_offset)]) = call.arguments.as_positional_array()
+        else {
             return None;
         };
 
@@ -226,13 +217,7 @@ fn strip_z_date(call: &ExprCall) -> Option<(&Expr, &Expr)> {
         return None;
     }
 
-    if !arguments.keywords.is_empty() {
-        return None;
-    }
-
-    let [z] = &*arguments.args else {
-        return None;
-    };
+    let z = arguments.as_single_positional()?;
 
     if !is_upper_case_z_string(z) {
         return None;

@@ -1238,12 +1238,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Expr::Call(call) => {
-                for arg in &call.arguments.args {
-                    Self::walk_narrowing_alias_predicate(arg, f);
-                }
-                for keyword in &call.arguments.keywords {
-                    Self::walk_narrowing_alias_predicate(&keyword.value, f);
-                }
+                call.arguments.for_each_in_evaluation_order(|argument| {
+                    Self::walk_narrowing_alias_predicate(argument.value(), f);
+                });
             }
             ast::Expr::If(expr_if) => {
                 Self::walk_narrowing_alias_predicate(&expr_if.test, f);
@@ -6147,15 +6144,7 @@ impl<'ast> Unpackable<'ast> {
 /// Else, returns `None`.
 fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
     let ast::ExprCall {
-        func,
-        arguments:
-            ast::Arguments {
-                args,
-                keywords,
-                range: _,
-                node_index: _,
-            },
-        ..
+        func, arguments, ..
     } = value.as_call_expr()?;
 
     let ast::ExprAttribute { value, attr, .. } = func.as_attribute_expr()?;
@@ -6170,11 +6159,7 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
         return None;
     }
 
-    if !keywords.is_empty() {
-        return None;
-    }
-
-    let [single_argument] = &**args else {
+    let [ast::Argument::Positional(single_argument)] = arguments.items.as_slice() else {
         return None;
     };
 

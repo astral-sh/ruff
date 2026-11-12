@@ -4,7 +4,7 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, ArgOrKeyword, Arguments, Expr};
 
 /// Return `true` if the statement containing the current expression is the last
 /// top-level expression in the cell. This assumes that the source is a Jupyter
@@ -33,9 +33,7 @@ pub(super) fn at_last_top_level_expression_in_cell(
 /// `itertools.cycle` or similar).
 pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     }) = &arg
     else {
         return false;
@@ -46,29 +44,52 @@ pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool
         .is_some_and(|qualified_name| match qualified_name.segments() {
             ["itertools", "cycle" | "count"] => true,
             ["itertools", "repeat"] => {
-                // Ex) `itertools.repeat(1)`
-                if keywords.is_empty() && args.len() == 1 {
-                    return true;
-                }
-
-                // Ex) `itertools.repeat(1, None)`
-                if args.len() == 2 && args[1].is_none_literal_expr() {
-                    return true;
-                }
-
-                // Ex) `itertools.repeat(1, times=None)`
-                for keyword in keywords {
-                    if keyword.arg.as_ref().is_some_and(|name| name == "times")
-                        && keyword.value.is_none_literal_expr()
-                    {
-                        return true;
+                let mut positionals = 0;
+                let mut second_is_none = false;
+                for item in arguments.iter_source_order() {
+                    match item {
+                        ArgOrKeyword::Arg(arg) => {
+                            positionals += 1;
+                            if positionals == 2 {
+                                second_is_none = arg.is_none_literal_expr();
+                            }
+                        }
+                        ArgOrKeyword::Keyword(keyword)
+                            if keyword.arg.as_ref().is_some_and(|name| name == "times")
+                                && keyword.value.is_none_literal_expr() =>
+                        {
+                            return true;
+                        }
+                        ArgOrKeyword::Keyword(_) => {}
                     }
                 }
-
-                false
+                (positionals == 1 && arguments.len() == 1) || (positionals == 2 && second_is_none)
             }
             _ => false,
         })
+}
+
+/// Tests the positional arity for B905 and B912. An iterable unpacking can
+/// supply any number of arguments, while an explicit `strict` suppresses both rules.
+pub(crate) fn needs_strict_argument(arguments: &Arguments, mut required: usize) -> bool {
+    for item in arguments.iter_source_order() {
+        match item {
+            ArgOrKeyword::Keyword(keyword)
+                if keyword.arg.as_ref().is_some_and(|name| name == "strict") =>
+            {
+                return false;
+            }
+            ArgOrKeyword::Arg(arg) if required > 0 => {
+                required = if arg.is_starred_expr() {
+                    0
+                } else {
+                    required - 1
+                };
+            }
+            _ => {}
+        }
+    }
+    required == 0
 }
 
 /// Return `true` if any expression in the iterator appears to be an infinite iterator.

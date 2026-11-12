@@ -749,8 +749,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
         }) => {
             if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
                 if !checker.settings().flake8_pytest_style.fixture_parentheses
-                    && arguments.args.is_empty()
-                    && arguments.keywords.is_empty()
+                    && arguments.is_empty()
                 {
                     let fix = Fix::applicable_edit(
                         Edit::range_deletion(arguments.range()),
@@ -771,7 +770,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
             }
 
             if checker.is_rule_enabled(Rule::PytestFixturePositionalArgs) {
-                if !arguments.args.is_empty() {
+                if arguments.args().next().is_some() {
                     checker.report_diagnostic(
                         PytestFixturePositionalArgs {
                             function: func_name.to_string(),

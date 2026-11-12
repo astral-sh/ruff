@@ -68,18 +68,14 @@ pub(crate) fn comparison_with_itself(checker: &Checker, compare: &ExprCompare) {
             // Ex) `id(foo) == id(foo)`
             (Expr::Call(left_call), Expr::Call(right_call)) => {
                 // Both calls must take a single argument, of the same name.
-                if !left_call.arguments.keywords.is_empty()
-                    || !right_call.arguments.keywords.is_empty()
-                {
-                    continue;
-                }
-                let [Expr::Name(left_arg)] = &*left_call.arguments.args else {
+                let Some(Expr::Name(left_arg)) = left_call.arguments.as_single_positional() else {
                     continue;
                 };
-                let [Expr::Name(right_right)] = &*right_call.arguments.args else {
+                let Some(Expr::Name(right_arg)) = right_call.arguments.as_single_positional()
+                else {
                     continue;
                 };
-                if left_arg.id != right_right.id {
+                if left_arg.id != right_arg.id {
                     continue;
                 }
 

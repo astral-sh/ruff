@@ -6,8 +6,8 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use ruff_python_ast::{
-    self as ast, Arguments, Expr, ExprCall, ExprName, ExprSubscript, Identifier, PythonVersion,
-    Stmt, StmtAssign, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    self as ast, Expr, ExprCall, ExprName, ExprSubscript, Identifier, PythonVersion, Stmt,
+    StmtAssign, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
     name::Name,
     visitor::{self, Visitor},
 };
@@ -329,8 +329,8 @@ pub(crate) fn expr_name_to_type_var<'a>(
             };
 
             if arguments
-                .args
-                .first()
+                .args()
+                .next()
                 .is_some_and(Expr::is_string_literal_expr)
             {
                 // `default` was added in PEP 696 and Python 3.13. We now support converting
@@ -348,12 +348,12 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 // ```
                 let default = arguments
                     .find_keyword("default")
-                    .map(|default| &default.value);
+                    .map(|default| default.value.as_ref());
                 let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                     Some(TypeVarRestriction::Bound(&bound.value))
-                } else if arguments.args.len() > 1 {
+                } else if arguments.args().nth(1).is_some() {
                     Some(TypeVarRestriction::Constraint(
-                        arguments.args.iter().skip(1).collect(),
+                        arguments.args().skip(1).collect(),
                     ))
                 } else {
                     None
@@ -429,14 +429,14 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
 /// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
 /// any), along with its index in the class's bases tuple.
 pub(crate) fn find_generic<'a>(
-    class_bases: &'a Arguments,
+    mut class_bases: impl Iterator<Item = &'a Expr>,
     semantic: &SemanticModel,
-) -> Option<(usize, &'a ExprSubscript)> {
-    class_bases.args.iter().enumerate().find_map(|(idx, expr)| {
+) -> Option<&'a ExprSubscript> {
+    class_bases.find_map(|expr| {
         expr.as_subscript_expr().and_then(|sub_expr| {
             semantic
                 .match_typing_expr(&sub_expr.value, "Generic")
-                .then_some((idx, sub_expr))
+                .then_some(sub_expr)
         })
     })
 }

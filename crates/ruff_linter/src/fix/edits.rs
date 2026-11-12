@@ -212,17 +212,24 @@ pub(crate) fn remove_argument<T: Ranged>(
     source: &str,
     tokens: &Tokens,
 ) -> Result<Edit> {
-    // Partition into arguments before and after the argument to remove.
-    let (before, after): (Vec<_>, Vec<_>) = arguments
-        .iter_source_order()
-        .map(|arg| arg.range())
-        .filter(|range| argument.range() != *range)
-        .partition(|range| range.start() < argument.start());
-
-    let arg = arguments
-        .iter_source_order()
-        .find(|arg| arg.range() == argument.range())
-        .context("Unable to find argument")?;
+    let target = argument.range();
+    let mut previous = None;
+    let mut has_following = false;
+    let mut arg = None;
+    for item in arguments.iter_source_order() {
+        let range = item.range();
+        if range == target {
+            arg.get_or_insert(item);
+        } else if range.start() < target.start() {
+            previous = previous.max(Some(range.end()));
+        } else {
+            has_following = true;
+        }
+        if has_following && arg.is_some() {
+            break;
+        }
+    }
+    let arg = arg.context("Unable to find argument")?;
 
     let parenthesized_range = match arg {
         ast::ArgOrKeyword::Keyword(keyword) => keyword.range(),
@@ -232,7 +239,7 @@ pub(crate) fn remove_argument<T: Ranged>(
         }
     };
 
-    if !after.is_empty() {
+    if has_following {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
         // argument to the end of the subsequent comma.
         let mut tokenizer = SimpleTokenizer::starts_at(argument.end(), source);
@@ -250,7 +257,7 @@ pub(crate) fn remove_argument<T: Ranged>(
             .context("Unable to find next token")?;
 
         Ok(Edit::deletion(parenthesized_range.start(), next.start()))
-    } else if let Some(previous) = before.iter().map(Ranged::end).max() {
+    } else if let Some(previous) = previous {
         // Case 2: argument or keyword is the last node, so delete from the start of the
         // previous comma to the end of the argument.
         let mut tokenizer = SimpleTokenizer::starts_at(previous, source);
@@ -276,7 +283,7 @@ pub(crate) fn remove_argument<T: Ranged>(
 /// The new argument will be inserted before the first existing keyword argument in `arguments`, if
 /// there are any present. Otherwise, the new argument is added to the end of the argument list.
 pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Tokens) -> Edit {
-    if let Some(keyword) = arguments.keywords.first() {
+    if let Some(keyword) = arguments.keywords().next() {
         // The keyword's range starts at its name, even if its value is parenthesized.
         Edit::insertion(format!("{argument}, "), keyword.start())
     } else if let Some(last) = arguments.iter_source_order().last() {

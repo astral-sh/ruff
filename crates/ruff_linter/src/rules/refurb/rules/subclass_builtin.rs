@@ -1,5 +1,6 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Arguments, StmtClassDef, helpers::map_subscript};
+use ruff_python_ast::{StmtClassDef, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -91,12 +92,12 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
         return;
     }
 
-    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
+    let Some(arguments) = class.arguments.as_deref() else {
         return;
     };
 
     // Expect only one base class else return
-    let [base] = &**bases else {
+    let Some([base]) = arguments.args().collect_array() else {
         return;
     };
 

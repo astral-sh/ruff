@@ -87,7 +87,7 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
 fn exc_info_arg_is_falsey(call: &ExprCall, checker: &Checker) -> bool {
     call.arguments
         .find_keyword("exc_info")
-        .map(|keyword| &keyword.value)
+        .map(|keyword| keyword.value.as_ref())
         .is_some_and(|value| {
             let truthiness =
                 Truthiness::from_expr(value, |id| checker.semantic().has_builtin_binding(id));

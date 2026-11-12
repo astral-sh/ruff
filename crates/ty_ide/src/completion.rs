@@ -1560,7 +1560,7 @@ impl<'m> ContextCursor<'m> {
 
             // arguments := (positional arguments | keyword arguments | "*" expression | "**" expression)*
             ast::AnyNodeRef::Arguments(args) => {
-                args.args.iter().any(contains) || args.keywords.iter().any(|kw| contains(&kw.value))
+                args.iter_source_order().any(|arg| contains(arg.value()))
             }
             ast::AnyNodeRef::Parameter(param) => param.annotation.as_deref().is_some_and(contains),
             ast::AnyNodeRef::ParameterWithDefault(param) => {
@@ -1777,7 +1777,6 @@ impl<'db> CollectionContext<'db> {
 fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<CompactString> {
     class_def
         .bases()
-        .iter()
         .filter_map(UnqualifiedName::from_expr)
         .map(|name| name.segments().join_compact("."))
         .collect()
@@ -2227,8 +2226,7 @@ fn detect_set_function_args<'m>(cursor: &ContextCursor<'m>) -> FxHashSet<&'m str
             _ => None,
         })
         .map(|args| {
-            args.keywords
-                .iter()
+            args.keywords()
                 .filter_map(|kw| kw.arg.as_ref().map(|ident| ident.id.as_str()))
                 .collect()
         })

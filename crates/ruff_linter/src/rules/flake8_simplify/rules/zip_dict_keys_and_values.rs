@@ -1,6 +1,7 @@
 use ast::{ExprAttribute, ExprName, Identifier};
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Argument::{Keyword, Positional};
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
@@ -68,21 +69,25 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 /// SIM911
 pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) {
     let ast::ExprCall {
-        func,
-        arguments: Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     } = expr;
-    match &keywords[..] {
-        [] => {}
-        [
-            ast::Keyword {
-                arg: Some(name), ..
-            },
-        ] if name.as_str() == "strict" => {}
-        _ => return,
-    }
-    let [arg1, arg2] = &args[..] else {
-        return;
+    let [arg1, arg2] = if let Some(pair) = arguments.as_positional_array::<2>() {
+        pair
+    } else {
+        let ([Positional(a), Positional(b), Keyword(keyword)]
+        | [Positional(a), Keyword(keyword), Positional(b)]
+        | [Keyword(keyword), Positional(a), Positional(b)]) = arguments.items.as_slice()
+        else {
+            return;
+        };
+        if keyword
+            .arg
+            .as_ref()
+            .is_none_or(|name| name.as_str() != "strict")
+        {
+            return;
+        }
+        [a, b]
     };
     let Some((var1, attr1, args1)) = get_var_attr_args(arg1) else {
         return;

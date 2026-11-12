@@ -103,11 +103,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
         return;
     };
 
-    if !arguments.keywords.is_empty() {
-        return;
-    }
-
-    let [arg] = &*arguments.args else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

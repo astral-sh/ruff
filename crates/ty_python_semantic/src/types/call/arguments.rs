@@ -632,7 +632,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         arg: None, value, ..
                     }),
                 ) => {
-                    let ast::Expr::Dict(ast::ExprDict { items, .. }) = value else {
+                    let ast::Expr::Dict(ast::ExprDict { items, .. }) = value.as_ref() else {
                         continue;
                     };
                     let mut keywords = FxIndexMap::with_capacity_and_hasher(

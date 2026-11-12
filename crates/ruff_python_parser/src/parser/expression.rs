@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use bitflags::bitflags;
+use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
 use ruff_python_ast::name::Name;
@@ -726,13 +727,12 @@ impl<'src> Parser<'src> {
             return ast::Arguments {
                 range: self.node_range(start),
                 node_index: AtomicNodeIndex::NONE,
-                args: ThinVec::new(),
-                keywords: ThinVec::default(),
+                items: ThinVec::new(),
             };
         }
 
-        let args_snapshot = self.expr_scratch.snapshot();
-        let keywords_snapshot = self.keyword_scratch.snapshot();
+        let snapshot = self.argument_scratch.snapshot();
+        let mut bare_generators = SmallVec::<[TextRange; 1]>::new();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -742,12 +742,14 @@ impl<'src> Parser<'src> {
                 if parser.eat(TokenKind::DoubleStar) {
                     let value = parser.parse_conditional_expression_or_higher();
 
-                    parser.keyword_scratch.push(ast::Keyword {
-                        arg: None,
-                        value: value.expr,
-                        range: parser.node_range(argument_start),
-                        node_index: AtomicNodeIndex::NONE,
-                    });
+                    parser
+                        .argument_scratch
+                        .push(ast::Argument::Keyword(ast::Keyword {
+                            arg: None,
+                            value: Box::new(value.expr),
+                            range: parser.node_range(argument_start),
+                            node_index: AtomicNodeIndex::NONE,
+                        }));
 
                     seen_keyword_unpacking = true;
                 } else {
@@ -772,6 +774,10 @@ impl<'src> Parser<'src> {
                                 Parenthesized::No,
                             ))
                             .into();
+                            // A recovered `expr = value` becomes a keyword and loses its left side.
+                            if !parser.at(TokenKind::Equal) {
+                                bare_generators.push(parsed_expr.range());
+                            }
                         }
                         _ => {
                             if seen_keyword_unpacking
@@ -832,12 +838,14 @@ impl<'src> Parser<'src> {
 
                         let value = parser.parse_conditional_expression_or_higher();
 
-                        parser.keyword_scratch.push(ast::Keyword {
-                            arg: Some(arg),
-                            value: value.expr,
-                            range: parser.node_range(argument_start),
-                            node_index: AtomicNodeIndex::NONE,
-                        });
+                        parser
+                            .argument_scratch
+                            .push(ast::Argument::Keyword(ast::Keyword {
+                                arg: Some(arg),
+                                value: Box::new(value.expr),
+                                range: parser.node_range(argument_start),
+                                node_index: AtomicNodeIndex::NONE,
+                            }));
                     } else {
                         if !parsed_expr.is_unparenthesized_starred_expr() {
                             if seen_keyword_unpacking {
@@ -852,22 +860,40 @@ impl<'src> Parser<'src> {
                                 );
                             }
                         }
-                        parser.expr_scratch.push(parsed_expr.expr);
+                        parser
+                            .argument_scratch
+                            .push(ast::Argument::Positional(parsed_expr.expr));
                     }
                 }
             });
 
         self.expect(TokenKind::Rpar);
 
-        let keywords = self.keyword_scratch.take_thin_vec(keywords_snapshot);
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: self.expr_scratch.take_thin_vec(args_snapshot),
-            keywords,
+            items: self.argument_scratch.take_thin_vec(snapshot),
         };
 
-        self.validate_arguments(&arguments, has_trailing_comma, context);
+        // A call may omit parentheses around its sole generator. Class bases always require them.
+        if !bare_generators.is_empty()
+            && (matches!(context, ArgumentsContext::ClassDefinition)
+                || has_trailing_comma
+                || arguments.len() > 1)
+        {
+            for range in bare_generators {
+                // test_ok args_unparenthesized_generator
+                // zip((x for x in range(10)), (y for y in range(10)))
+                // sum(x for x in range(10))
+                // sum((x for x in range(10)),)
+
+                // test_err args_unparenthesized_generator
+                // sum(x for x in range(10), 5)
+                // total(1, 2, x for x in range(5), 6)
+                // sum(x for x in range(10),)
+                self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
+            }
+        }
 
         arguments
     }
@@ -2997,44 +3023,6 @@ impl<'src> Parser<'src> {
         }
 
         command
-    }
-
-    /// Performs the following validations on the arguments:
-    /// - Generator expressions are parenthesized when required by the argument context.
-    fn validate_arguments(
-        &mut self,
-        arguments: &ast::Arguments,
-        has_trailing_comma: bool,
-        context: ArgumentsContext,
-    ) {
-        let generator_must_be_parenthesized = match context {
-            ArgumentsContext::Call => has_trailing_comma || arguments.len() > 1,
-            // CPython rejects an unparenthesized generator expression as a class base even though
-            // this restriction isn't specified in the class definition grammar.
-            ArgumentsContext::ClassDefinition => true,
-        };
-
-        if generator_must_be_parenthesized {
-            for arg in &*arguments.args {
-                if let Some(ast::ExprGenerator {
-                    range,
-                    parenthesized: false,
-                    ..
-                }) = arg.as_generator_expr()
-                {
-                    // test_ok args_unparenthesized_generator
-                    // zip((x for x in range(10)), (y for y in range(10)))
-                    // sum(x for x in range(10))
-                    // sum((x for x in range(10)),)
-
-                    // test_err args_unparenthesized_generator
-                    // sum(x for x in range(10), 5)
-                    // total(1, 2, x for x in range(5), 6)
-                    // sum(x for x in range(10),)
-                    self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
-                }
-            }
-        }
     }
 }
 
