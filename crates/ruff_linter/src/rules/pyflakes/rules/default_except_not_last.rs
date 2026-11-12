@@ -63,11 +63,8 @@ pub(crate) fn default_except_not_last(
     locator: &Locator,
 ) {
     for (idx, handler) in handlers.iter().enumerate() {
-        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-            type_,
-            ..
-        }) = handler.fields();
-        if type_.is_none() && idx < handlers.len() - 1 {
+        let ast::ExceptHandlerKind::ExceptHandler(handler_node) = handler.classify();
+        if handler_node.type_().is_none() && idx < handlers.len() - 1 {
             checker.report_diagnostic(DefaultExceptNotLast, except(handler, locator.contents()));
         }
     }

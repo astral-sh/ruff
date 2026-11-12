@@ -58,12 +58,9 @@ pub(crate) fn verbose_raise(
 ) {
     for handler in handlers {
         // If the handler assigned a name to the exception...
-        if let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-            name: Some(exception_name),
-            body,
-            ..
-        }) = handler.fields()
-        {
+        let ast::ExceptHandlerKind::ExceptHandler(handler_node) = handler.classify();
+        if let Some(exception_name) = handler_node.name() {
+            let body = handler_node.body();
             let raises = {
                 let mut visitor = RaiseStatementVisitor::default();
                 visitor.visit_body(body);

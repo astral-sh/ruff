@@ -67,10 +67,8 @@ impl Violation for BinaryOpException {
 
 /// PLW0711
 pub(crate) fn binary_op_exception(checker: &Checker, except_handler: ExceptHandler<'_>) {
-    let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-        type_,
-        ..
-    }) = except_handler.fields();
+    let ast::ExceptHandlerKind::ExceptHandler(except_handler_node) = except_handler.classify();
+    let type_ = except_handler_node.type_();
 
     let Some(type_) = type_ else {
         return;

@@ -64,11 +64,8 @@ pub(crate) fn redundant_tuple_in_exception_handler(
     handlers: NodeList<'_, ruff_python_ast::kind::ExceptHandler>,
 ) {
     for handler in handlers {
-        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-            type_: Some(type_),
-            ..
-        }) = handler.fields()
-        else {
+        let ast::ExceptHandlerKind::ExceptHandler(handler_node) = handler.classify();
+        let Some(type_) = handler_node.type_() else {
             continue;
         };
         let ExprKind::Tuple(tuple_node) = type_.classify() else {

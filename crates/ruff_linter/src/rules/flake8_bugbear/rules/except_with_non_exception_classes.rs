@@ -59,11 +59,8 @@ pub(crate) fn except_with_non_exception_classes(
     checker: &Checker,
     except_handler: ExceptHandler<'_>,
 ) {
-    let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-        type_,
-        ..
-    }) = except_handler.fields();
-    let Some(type_) = type_ else {
+    let ast::ExceptHandlerKind::ExceptHandler(except_handler_node) = except_handler.classify();
+    let Some(type_) = except_handler_node.type_() else {
         return;
     };
     for expr in flatten_iterables(type_) {

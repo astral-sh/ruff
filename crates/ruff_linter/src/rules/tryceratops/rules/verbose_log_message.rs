@@ -55,10 +55,8 @@ pub(crate) fn verbose_log_message(
     handlers: NodeList<'_, ruff_python_ast::kind::ExceptHandler>,
 ) {
     for handler in handlers {
-        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-            body,
-            ..
-        }) = handler.fields();
+        let ast::ExceptHandlerKind::ExceptHandler(handler_node) = handler.classify();
+        let body = handler_node.body();
 
         // Find all calls to `logging.exception`.
         let calls = {

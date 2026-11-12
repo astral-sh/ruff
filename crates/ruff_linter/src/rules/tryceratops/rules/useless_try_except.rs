@@ -46,11 +46,9 @@ pub(crate) fn useless_try_except(
     handlers: NodeList<'_, ruff_python_ast::kind::ExceptHandler>,
 ) {
     if handlers.iter().all(|handler| {
-        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-            name,
-            body,
-            ..
-        }) = handler.fields();
+        let ast::ExceptHandlerKind::ExceptHandler(handler_node) = handler.classify();
+        let name = handler_node.name();
+        let body = handler_node.body();
         let Some(ast::StmtFields::Raise(ast::StmtRaiseFields {
             exc, cause: None, ..
         })) = body.first().map(ruff_python_ast::Stmt::fields)

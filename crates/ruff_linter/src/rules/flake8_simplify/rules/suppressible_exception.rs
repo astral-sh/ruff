@@ -108,12 +108,10 @@ pub(crate) fn suppressible_exception(
     let Some([except_handler]) = handlers.as_array() else {
         return;
     };
-    let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-        body,
-        range,
-        type_,
-        ..
-    }) = except_handler.fields();
+    let ast::ExceptHandlerKind::ExceptHandler(except_handler_node) = except_handler.classify();
+    let body = except_handler_node.body();
+    let range = except_handler_node.range();
+    let type_ = except_handler_node.type_();
 
     if !is_empty(body) {
         return;

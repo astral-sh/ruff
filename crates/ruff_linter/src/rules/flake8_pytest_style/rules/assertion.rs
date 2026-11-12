@@ -630,11 +630,9 @@ pub(crate) fn assert_in_exception_handler(
     handlers: NodeList<'_, ruff_python_ast::kind::ExceptHandler>,
 ) {
     for handler in handlers {
-        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-            name,
-            body,
-            ..
-        }) = handler.fields();
+        let ast::ExceptHandlerKind::ExceptHandler(handler_node) = handler.classify();
+        let name = handler_node.name();
+        let body = handler_node.body();
         if let Some(name) = name {
             check_assert_in_except(checker, name.as_str(), body);
         }

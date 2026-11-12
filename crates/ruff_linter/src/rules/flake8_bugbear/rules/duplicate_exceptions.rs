@@ -191,11 +191,8 @@ pub(crate) fn duplicate_exceptions(
     let mut seen: FxHashSet<UnqualifiedName> = FxHashSet::default();
     let mut duplicates: FxHashMap<UnqualifiedName, Vec<Expr<'_>>> = FxHashMap::default();
     for handler in handlers {
-        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-            type_: Some(type_),
-            ..
-        }) = handler.fields()
-        else {
+        let ast::ExceptHandlerKind::ExceptHandler(handler_node) = handler.classify();
+        let Some(type_) = handler_node.type_() else {
             continue;
         };
         match type_.classify() {

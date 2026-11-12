@@ -471,9 +471,9 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 }
 
                 for handler in handlers {
-                    let ast::ExceptHandlerFields::ExceptHandler(
-                        ast::ExceptHandlerExceptHandlerFields { type_, body, .. },
-                    ) = handler.fields();
+                    let ast::ExceptHandlerKind::ExceptHandler(handler_node) = handler.classify();
+                    let type_ = handler_node.type_();
+                    let body = handler_node.body();
                     self.enter_new_branch();
                     if let Some(type_) = type_ {
                         self.visit_expr(type_);

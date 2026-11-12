@@ -129,11 +129,8 @@ pub(crate) fn os_error_alias_handlers(
     handlers: NodeList<'_, ast::kind::ExceptHandler>,
 ) {
     for handler in handlers {
-        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-            type_,
-            ..
-        }) = handler.fields();
-        let Some(expr) = type_ else {
+        let ast::ExceptHandlerKind::ExceptHandler(handler_node) = handler.classify();
+        let Some(expr) = handler_node.type_() else {
             continue;
         };
         match expr.classify() {

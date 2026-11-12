@@ -291,11 +291,8 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
         let prev_nested = self.nested;
         self.nested = true;
 
-        let ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
-            body,
-            ..
-        }) = except_handler.fields();
-        for stmt in body {
+        let ast::ExceptHandlerKind::ExceptHandler(except_handler_node) = except_handler.classify();
+        for stmt in except_handler_node.body() {
             self.visit_stmt(stmt);
         }
         self.finalize(None);
