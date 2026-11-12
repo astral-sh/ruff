@@ -32,7 +32,7 @@ use crate::{
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
-        member::{class_member, inherited_class_body_declaration},
+        member::{class_member_with_symbol, inherited_class_body_declaration},
         signatures::{CallableSignature, walk_signature},
         variance::infer_protocol_variance,
     },
@@ -169,9 +169,8 @@ impl<'db> ProtocolClass<'db> {
             // runtime-checkable protocols still consider them members for `isinstance()` and
             // `issubclass()`.
             for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_bindings() {
-                let name = place_table.symbol(symbol_id).name();
                 // Defaults retain inherited annotations, just as they do for ordinary classes.
-                let member = class_member(db, parent_scope, name).inner;
+                let member = class_member_with_symbol(db, parent_scope, Some(symbol_id)).inner;
                 if let Place::Defined(place) = member.place {
                     let ty = if member.is_class_var() {
                         place.public_type(db, env)
