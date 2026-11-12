@@ -3512,8 +3512,30 @@ impl Parameters {
         )
     }
 
+    /// Returns the first parameter in argument-binding order.
+    pub fn first(&self) -> Option<AnyParameterRef<'_>> {
+        let first = self.items.first()?;
+        if matches!(
+            first,
+            ParameterItem::PositionalOnly(_) | ParameterItem::PositionalOrKeyword(_)
+        ) || self.is_in_binding_order()
+        {
+            Some(first.as_ref())
+        } else {
+            self.iter_grouped().next()
+        }
+    }
+
     /// Iterates parameters in argument-binding order.
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = AnyParameterRef<'_>> {
+        if self.is_in_binding_order() {
+            itertools::Either::Left(self.iter_source_order())
+        } else {
+            itertools::Either::Right(self.iter_grouped())
+        }
+    }
+
+    fn iter_grouped(&self) -> impl DoubleEndedIterator<Item = AnyParameterRef<'_>> {
         self.iter_positional_params()
             .map(AnyParameterRef::NonVariadic)
             .chain(std::iter::once_with(|| self.vararg().map(AnyParameterRef::Variadic)).flatten())
