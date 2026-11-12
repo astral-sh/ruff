@@ -296,12 +296,14 @@ impl Session {
         let db = &mut project.db;
         let environments = db.uv_environments().clone();
         let changes = environments.poll_sync(db);
-        if matches!(
-            changes.project,
-            Some(ProjectReloadResult::Changed {
-                files_changed: true,
-            })
-        ) {
+        if self.global_settings.diagnostic_mode().is_workspace()
+            && matches!(
+                changes.project,
+                Some(ProjectReloadResult::Changed {
+                    files_changed: true,
+                })
+            )
+        {
             let scripts = db.project().scripts_to_synchronize(db);
             Self::synchronize_closed_scripts(
                 db,
@@ -556,6 +558,7 @@ impl Session {
 
         let capabilities = self.resolved_client_capabilities;
         let script_progress = self.script_progress.clone();
+        let workspace_diagnostics = self.global_settings.diagnostic_mode().is_workspace();
         let db = self.project_db_mut(path);
         let result = db.apply_changes(changes);
         if let Some(project_path) = result.project_sync_path() {
@@ -573,8 +576,10 @@ impl Session {
                     )))
                 });
         }
-        let scripts = result.scripts_to_synchronize(db);
-        Self::synchronize_closed_scripts(db, &scripts, client, capabilities, &script_progress);
+        if workspace_diagnostics {
+            let scripts = result.scripts_to_synchronize(db);
+            Self::synchronize_closed_scripts(db, &scripts, client, capabilities, &script_progress);
+        }
         self.update_file_watcher(client);
         result
     }
@@ -675,9 +680,22 @@ impl Session {
             let global_settings = global_options.into_settings();
             self.global_settings = Arc::new(global_settings);
         }
-        if let Some(check_mode) = self.global_settings.diagnostic_mode().to_check_mode() {
+        let diagnostic_mode = self.global_settings.diagnostic_mode();
+        if let Some(check_mode) = diagnostic_mode.to_check_mode() {
             for project in self.projects.values_mut() {
-                project.db.set_check_mode(check_mode);
+                let db = &mut project.db;
+                db.set_check_mode(check_mode);
+                // A new folder's settings can enable workspace diagnostics for existing projects.
+                if diagnostic_mode.is_workspace() {
+                    let scripts = db.project().scripts_to_synchronize(db);
+                    Self::synchronize_closed_scripts(
+                        db,
+                        &scripts,
+                        client,
+                        self.resolved_client_capabilities,
+                        &self.script_progress,
+                    );
+                }
             }
         }
 
@@ -821,7 +839,7 @@ impl Session {
                 ProjectDatabase::fallible(metadata.clone(), system.clone())
             });
 
-        let mut db = project.unwrap_or_else(|err| {
+        let db = project.unwrap_or_else(|err| {
             tracing::error!(
                 "Failed to load project for workspace `{uri}`: {err:#}. \
                  Continuing with valid settings"
@@ -838,14 +856,6 @@ impl Session {
         let untracked = previous
             .map(|state| state.untracked_files_with_pushed_diagnostics)
             .unwrap_or_default();
-        let scripts = db.project().scripts_to_synchronize(&db);
-        Self::synchronize_closed_scripts(
-            &mut db,
-            &scripts,
-            client,
-            self.resolved_client_capabilities,
-            &self.script_progress,
-        );
         self.projects.insert(
             root.clone(),
             ProjectState {
@@ -2245,8 +2255,8 @@ impl OpenDocumentHandle {
             } else {
                 // Restore file and script membership from the saved contents. Discarding
                 // unsaved script metadata can bring a file back into the project when
-                // `exclude-scripts` is enabled. Also request synchronization for saved
-                // metadata changes that were skipped while the editor overlay was present.
+                // `exclude-scripts` is enabled. In workspace mode, this also synchronizes
+                // saved metadata changes skipped while the editor overlay was present.
                 self.update_in_databases(session, client);
             }
         } else {
