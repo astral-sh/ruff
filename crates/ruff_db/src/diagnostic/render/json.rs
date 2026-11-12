@@ -10,7 +10,7 @@ use crate::diagnostic::{
     ConciseMessage, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig, Severity,
 };
 
-use super::{FileResolver, Renderer};
+use super::{FileResolver, FmtAdapter, Renderer};
 
 /// Print diagnostics in JSON format.
 ///
@@ -28,10 +28,8 @@ impl<'a> JsonRenderer<'a> {
 
 impl Renderer for JsonRenderer<'_> {
     fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
-        let mut output = Vec::new();
-        self.write(&mut output, diagnostics)
-            .map_err(|_| fmt::Error)?;
-        f.write_str(str::from_utf8(&output).map_err(|_| fmt::Error)?)
+        self.write(&mut FmtAdapter { fmt: f }, diagnostics)
+            .map_err(|_| fmt::Error)
     }
 
     fn write(&self, writer: &mut dyn io::Write, diagnostics: &[Diagnostic]) -> io::Result<()> {

@@ -7,7 +7,7 @@ use ruff_source_file::LineColumn;
 
 use crate::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, Severity,
-    render::{FileResolver, Renderer},
+    render::{FileResolver, FmtAdapter, Renderer},
 };
 
 /// Print diagnostics as a JUnit-style XML report.
@@ -155,33 +155,6 @@ fn group_diagnostics_by_filename<'a>(
             });
     }
     grouped_diagnostics
-}
-
-struct FmtAdapter<'a> {
-    fmt: &'a mut dyn std::fmt::Write,
-}
-
-impl std::io::Write for FmtAdapter<'_> {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.fmt
-            .write_str(std::str::from_utf8(buf).map_err(|_| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Invalid UTF-8 in JUnit report",
-                )
-            })?)
-            .map_err(std::io::Error::other)?;
-
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> std::io::Result<()> {
-        self.fmt.write_fmt(args).map_err(std::io::Error::other)
-    }
 }
 
 #[cfg(test)]
