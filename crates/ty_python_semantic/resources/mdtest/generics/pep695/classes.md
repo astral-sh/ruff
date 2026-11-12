@@ -313,6 +313,15 @@ factory: type[Box[str]] | None = Box
 reveal_type(factory())  # revealed: Box[str]
 ```
 
+The bare class is also the runtime class of a `Box[str]`. Comparing with it preserves the
+constructor's specialization.
+
+```py
+def construct(factory: type[Box[str]]):
+    if factory == Box:
+        reveal_type(factory())  # revealed: Box[str]
+```
+
 Without a concrete type context, the default still applies:
 
 ```py
@@ -341,6 +350,22 @@ def inspect(generic: BoxAlias[int], default: DefaultBox):
     reveal_type(default)  # revealed: Box[str]
 
 def invalid(forwarded: ForwardedDefault[int]): ...  # error: [not-subscriptable]
+```
+
+## Class equality with a constrained type variable
+
+The metaclass of one constraint can make its class compare equal to another constraint.
+
+```py
+class EqualMeta(type):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class Custom(metaclass=EqualMeta): ...
+
+def check[T: (int, Custom)](cls: type[T]):
+    if cls == int:
+        reveal_type(cls)  # revealed: type[T@check]
 ```
 
 ## Narrowing class objects of final generic classes

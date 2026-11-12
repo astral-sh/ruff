@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::LazyCell;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
@@ -59,6 +60,7 @@ use super::match_pattern::is_typed_dict_runtime_domain;
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
+use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
@@ -4104,8 +4106,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         /// Return the expression being tested by an exact runtime-class check.
         ///
-        /// `x.__class__` is modeled as equivalent to `type(x)` by [`Type::dunder_class`], so class
-        /// identity checks against either expression can narrow `x`.
+        /// `x.__class__` is modeled as equivalent to `type(x)` by [`Type::dunder_class`], so
+        /// comparing either expression with a class can narrow `x`.
         fn exact_class_narrowing_target<'a, 'db>(
             db: &'db dyn Db,
             inference: &ExpressionInference<'db>,
@@ -4444,6 +4446,24 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         };
         let mut last_rhs_ty: Option<Type> = None;
 
+        // A class check constrains the value that was read. In `type(x) == (x := C)` the
+        // branch sees a later binding of x. Collect assignments once for the whole chain.
+        let last_assignments = LazyCell::new(|| {
+            let mut ends = FxHashMap::default();
+            for operand in operands {
+                any_over_expr(operand, |expr| {
+                    if let ast::Expr::Named(named) = expr
+                        && let Some(name) = named.target.as_name_expr()
+                    {
+                        let end = ends.entry(name.id.clone()).or_default();
+                        *end = std::cmp::max(*end, named.end());
+                    }
+                    false
+                });
+            }
+            ends
+        });
+
         for (left, op, right) in expr_compare.iter() {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| expression_type(left, &self.env));
             let rhs_ty = expression_type(right, &self.env);
@@ -4454,58 +4474,76 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 rhs_ty
             };
 
-            // Narrowing for:
-            // - `if type(x) is Y`
-            // - `if type(x) is not Y`
-            // - `if Y is type(x)`
-            // - `if Y is not type(x)`
-            // - `if type(x) is type(y)`
-            // - `if type(x) is not type(y)`
-            // - `if x.__class__ is Y`
-            // - `if x.__class__ is not Y`
-            // - `if Y is x.__class__`
-            // - `if Y is not x.__class__`
-            // - `if x.__class__ is y.__class__`
-            // - `if x.__class__ is not y.__class__`
-            let exact_class_checks = match (
-                exact_class_narrowing_target(db, inference, left),
-                exact_class_narrowing_target(db, inference, right),
-            ) {
-                (Some(left_target), Some(right_target)) => {
-                    [Some((left_target, rhs_ty)), Some((right_target, lhs_ty))]
-                }
-                (Some(target), None) => [Some((target, rhs_ty)), None],
-                (None, Some(target)) => [Some((target, lhs_ty)), None],
-                (None, None) => [None, None],
-            };
-            for (target_expr, other) in exact_class_checks.into_iter().flatten() {
-                // If this is `None`, it indicates that we cannot do `if type(x) is Y`
-                // narrowing: we can only do narrowing for `if type(x) is Y` and
-                // `if type(x) is not Y`, not for `if type(x) == Y` or `if type(x) != Y`.
-                let is_positive = match op {
-                    ast::CmpOp::Is => Some(is_positive),
-                    ast::CmpOp::IsNot => Some(!is_positive),
-                    _ => None,
+            // A comparison of `type(x)` or `x.__class__` can constrain `x` on either side.
+            for (expr, other) in [(left, rhs_ty), (right, lhs_ty)] {
+                let Some(target_expr) = exact_class_narrowing_target(db, inference, expr) else {
+                    continue;
                 };
-
-                if let Some(is_positive) = is_positive
-                    && let Some(target) = PlaceExpr::try_from_expr(target_expr)
-                    && let Some(other_class) =
-                        find_underlying_class(db, &self.env, other,
-                        )
-                    // `else`-branch narrowing for `if type(x) is Y` can only be done
-                    // if `Y` is a final class
-                    && (is_positive || other_class.is_final(db))
+                let Some(target) = PlaceExpr::try_from_expr(target_expr) else {
+                    continue;
+                };
+                let positive = match op {
+                    ast::CmpOp::Is | ast::CmpOp::Eq => is_positive,
+                    ast::CmpOp::IsNot | ast::CmpOp::NotEq => !is_positive,
+                    _ => continue,
+                };
+                let Some(other_class) = find_underlying_class(db, &self.env, other) else {
+                    continue;
+                };
+                if !last_assignments.is_empty()
+                    && any_over_expr(target_expr, |part| {
+                        part.as_name_expr()
+                            .and_then(|name| last_assignments.get(&name.id))
+                            .is_some_and(|end| *end > target_expr.end())
+                    })
                 {
-                    let place = self.expect_place(&target);
-                    constraints.insert(
-                        place,
-                        NarrowingConstraint::intersection(
-                            Type::instance(db, &self.env, other_class.top_materialization(db))
-                                .negate_if(db, &self.env, !is_positive),
-                        ),
-                    );
+                    continue;
                 }
+                // Excluding the exact class still permits instances of its subclasses.
+                if !positive && !other_class.is_final(db) {
+                    continue;
+                }
+                let instance_constraint =
+                    Type::instance(db, &self.env, other_class.top_materialization(db))
+                        .negate_if(db, &self.env, !positive);
+                let constraint = if matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq) {
+                    // Keep union members whose metaclass could make a different class compare equal.
+                    let target_ty = inference.expression_type(target_expr);
+                    let expected_class = other.negate_if(db, &self.env, !positive);
+                    let soundness_policy = self.comparison_soundness_policy();
+                    let narrow_instance = |instance: Type<'db>| match self.evaluate_expr_compare_op(
+                        instance.dunder_class(db, &self.env),
+                        other,
+                        *op,
+                        is_positive,
+                        soundness_policy,
+                    ) {
+                        Some(Type::Never) => Type::Never,
+                        Some(classes) if classes.is_subtype_of(db, &self.env, expected_class) => {
+                            IntersectionType::from_two_elements(
+                                db,
+                                &self.env,
+                                instance,
+                                instance_constraint,
+                            )
+                        }
+                        _ => instance,
+                    };
+                    let narrowed = match target_ty.resolve_type_alias(db) {
+                        Type::Union(union) => {
+                            union.map(db, &self.env, |element| narrow_instance(*element))
+                        }
+                        _ => narrow_instance(target_ty),
+                    };
+                    if narrowed == target_ty {
+                        continue;
+                    }
+                    narrowed
+                } else {
+                    instance_constraint
+                };
+                let place = self.expect_place(&target);
+                constraints.insert(place, NarrowingConstraint::intersection(constraint));
             }
 
             // Left-hand-side narrowing for:

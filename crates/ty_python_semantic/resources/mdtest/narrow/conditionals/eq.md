@@ -1858,6 +1858,53 @@ def _(flag: bool):
         reveal_type(C)  # revealed: <class 'A'>
 ```
 
+## Equality between class objects
+
+A class's own `__eq__` affects comparisons between its instances. With the ordinary metaclass,
+comparing `cls == Child` identifies the exact class and lets us pass `Child`'s constructor keyword.
+
+```py
+class Base: ...
+
+class Child(Base):
+    def __init__(self, *, size: int): ...
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def construct(cls: type[Base]):
+    if cls == Child:
+        reveal_type(cls)  # revealed: <class 'Child'>
+        reveal_type(cls(size=1))  # revealed: Child
+```
+
+Distinct classes can compare equal when either metaclass defines or inherits an `__eq__` override.
+
+```py
+class EqualMeta(type):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class DerivedMeta(EqualMeta): ...
+class Custom(Base, metaclass=DerivedMeta): ...
+
+def compare(cls: type[Base], custom: type[Custom] | None):
+    if cls == Custom:
+        reveal_type(cls)  # revealed: type[Base]
+    if custom == Child:
+        reveal_type(custom)  # revealed: type[Custom]
+```
+
+The override also remains possible when the metaclass is selected at runtime.
+
+```py
+def choose(flag: bool, cls: type[Base]):
+    meta = EqualMeta if flag else type
+    class Candidate(Base, metaclass=meta): ...
+
+    if cls == Candidate:
+        reveal_type(cls)  # revealed: type[Base]
+```
+
 ## `x != y` where `y` has multiple literal options
 
 ```py
@@ -3344,6 +3391,43 @@ def tuple_union(value: Foo | None, other: tuple[int, ...]):
         reveal_type(value)  # revealed: Foo | None
     else:
         reveal_type(value)  # revealed: Foo | None
+```
+
+Strict mode accounts for a subclass that introduces a metaclass with custom equality. A union of
+exact class objects can still narrow because their metaclasses are known.
+
+```py
+class Base: ...
+class Child(Base): ...
+
+def compare_classes(cls: type[Base], flag: bool):
+    if cls == Child:
+        reveal_type(cls)  # revealed: type[Base]
+
+    either = Base if flag else Child
+    if either == Child:
+        reveal_type(either)  # revealed: <class 'Child'>
+```
+
+A final metaclass fixes the comparison method for every subclass. Equality on its own metaclass only
+affects comparisons with the metaclass itself.
+
+```py
+from typing import final
+
+class MetaMeta(type):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+@final
+class Meta(type, metaclass=MetaMeta): ...
+
+class Parent(metaclass=Meta): ...
+class Derived(Parent): ...
+
+def compare_final_metaclass(cls: type[Parent]):
+    if cls == Derived:
+        reveal_type(cls)  # revealed: <class 'Derived'>
 ```
 
 ## The strict literal narrowing alias
