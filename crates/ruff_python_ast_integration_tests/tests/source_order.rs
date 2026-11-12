@@ -16,6 +16,23 @@ fn interleaved_call_arguments() {
 }
 
 #[test]
+fn find_call_argument_in_source_order() {
+    let source = "f(first, *rest, named=keyword, *more)";
+    let parsed = ruff_python_parser::parse_expression(source).unwrap();
+    let call = parsed.expr().as_call_expr().unwrap();
+    let arguments = &call.arguments;
+    let value = |name, position| {
+        arguments
+            .find_argument_value(name, position)
+            .map(|arg| &source[arg.range()])
+    };
+
+    assert_eq!(value("named", 0), Some("keyword"));
+    assert_eq!(value("other", 0), Some("first"));
+    assert_eq!(value("other", 1), None);
+}
+
+#[test]
 fn function_arguments() {
     let source = r"def a(b, c,/, d, e = 20, *args, named=5, other=20, **kwargs): pass";
 
