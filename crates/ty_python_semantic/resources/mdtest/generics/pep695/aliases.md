@@ -916,12 +916,12 @@ A `TypeVar` with a default cannot follow a `TypeVarTuple` in a type alias. Its d
 ambiguous how many arguments belong to the pack.
 
 ```py
-# snapshot: invalid-type-variable-default
+# snapshot: invalid-type-parameter-order
 type Alias1[*Ts, T = int] = tuple[*Ts, T]
 ```
 
 ```snapshot
-error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+error[invalid-type-parameter-order]: TypeVars with defaults cannot follow a TypeVarTuple
  --> src/mdtest_snippet.py:2:18
   |
 2 | type Alias1[*Ts, T = int] = tuple[*Ts, T]
@@ -932,12 +932,12 @@ info: Using the default would let the TypeVarTuple consume an extra positional t
 ```
 
 ```py
-# snapshot: invalid-type-variable-default
+# snapshot: invalid-type-parameter-order
 type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
 ```
 
 ```snapshot
-error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+error[invalid-type-parameter-order]: TypeVars with defaults cannot follow a TypeVarTuple
  --> src/mdtest_snippet.py:4:22
   |
 4 | type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
@@ -948,12 +948,12 @@ info: Using the default would let the TypeVarTuple consume an extra positional t
 ```
 
 ```py
-# snapshot: invalid-type-variable-default
+# snapshot: invalid-type-parameter-order
 type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
 ```
 
 ```snapshot
-error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+error[invalid-type-parameter-order]: TypeVars with defaults cannot follow a TypeVarTuple
  --> src/mdtest_snippet.py:6:18
   |
 6 | type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]

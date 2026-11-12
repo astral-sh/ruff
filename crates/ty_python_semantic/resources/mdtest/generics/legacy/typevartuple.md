@@ -263,19 +263,19 @@ class Covariant(Generic[*Ts_co]):
     def returns(self) -> tuple[*Ts_co]:
         raise NotImplementedError
 
-    # snapshot: invalid-generic-class
+    # snapshot: invalid-type-variable-variance
     def accepts(self, *args: *Ts_co) -> None: ...
 
 class Contravariant(Generic[*Ts_contra]):
     def accepts(self, *args: *Ts_contra) -> None: ...
 
-    # error: [invalid-generic-class] "Variance of type variable `Ts_contra` is incompatible with method `returns`"
+    # error: [invalid-type-variable-variance] "Variance of type variable `Ts_contra` is incompatible with method `returns`"
     def returns(self) -> tuple[*Ts_contra]:
         raise NotImplementedError
 ```
 
 ```snapshot
-error[invalid-generic-class]: Variance of type variable `Ts_co` is incompatible with method `accepts`
+error[invalid-type-variable-variance]: Variance of type variable `Ts_co` is incompatible with method `accepts`
   --> src/mdtest_snippet.py:11:30
    |
 11 |     def accepts(self, *args: *Ts_co) -> None: ...
@@ -288,7 +288,7 @@ arguments.
 
 ```py
 class CovariantTuple(Generic[*Ts_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def accepts(self, value: tuple[*Ts_co]) -> None: ...
 
 class ContravariantTuple(Generic[*Ts_contra]):
@@ -305,7 +305,7 @@ class Callbacks(Generic[*Ts_contra]):
     def returns(self) -> Callable[[*Ts_contra], None]:
         raise NotImplementedError
 
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def accepts(self, callback: Callable[[*Ts_contra], None]) -> None: ...
 ```
 
@@ -341,7 +341,7 @@ Ts_co = TypeVarTuple("Ts_co", covariant=True)
 
 class Overloaded(Generic[*Ts_co]):
     @overload
-    # TODO: Emit `invalid-generic-class`; this use of `Ts_co` requires contravariance.
+    # TODO: Emit `invalid-type-variable-variance`; this use of `Ts_co` requires contravariance.
     def method(self, value: tuple[*Ts_co]) -> int: ...
     @overload
     def method(self, value: int) -> str: ...
@@ -378,11 +378,11 @@ contravariant `TypeVarTuple` in the return annotations below would otherwise be 
 Ts_contra = TypeVarTuple("Ts_contra", contravariant=True)
 
 class GenericMethods(Generic[*Ts_contra]):
-    # TODO: Emit `invalid-generic-class`; this use of `Ts_contra` requires covariance.
+    # TODO: Emit `invalid-type-variable-variance`; this use of `Ts_contra` requires covariance.
     def legacy(self, value: T) -> tuple[*Ts_contra]:
         raise NotImplementedError
 
-    # TODO: Emit `invalid-generic-class`; this use of `Ts_contra` requires covariance.
+    # TODO: Emit `invalid-type-variable-variance`; this use of `Ts_contra` requires covariance.
     def pep695[U](self, value: U) -> tuple[*Ts_contra]:
         raise NotImplementedError
 ```
@@ -403,10 +403,10 @@ from typing import Generic, Self, TypeVarTuple
 Ts_co = TypeVarTuple("Ts_co", covariant=True)
 
 class Unrestricted(Generic[*Ts_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def method(self: "Unrestricted[*Ts_co]", value: tuple[*Ts_co]) -> None: ...
     @classmethod
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def class_method(cls: type[Self], value: tuple[*Ts_co]) -> None: ...
     def returns(self: Self) -> tuple[*Ts_co]:
         raise NotImplementedError
@@ -416,7 +416,7 @@ A specialized receiver does not make this contravariant use of `Ts_co` valid.
 
 ```py
 class Restricted(Generic[*Ts_co]):
-    # error: [invalid-generic-class]
+    # error: [invalid-type-variable-variance]
     def method(self: "Restricted[int]", value: tuple[*Ts_co]) -> None: ...
 ```
 

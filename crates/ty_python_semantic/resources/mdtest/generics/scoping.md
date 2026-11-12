@@ -491,6 +491,14 @@ def f[T](x: T, y: T) -> None:
 
 <!-- snapshot-diagnostics -->
 
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+invalid-generic-class = "ignore"
+```
+
 ```py
 from typing import Iterable
 
@@ -662,9 +670,7 @@ python-version = "3.13"
 ```
 
 Per the [typing spec][scoping rules], the default of a type parameter must not reference type
-parameters from an outer scope. Out-of-scope defaults on class type parameters are validated as part
-of `invalid-generic-class`; the tests here cover the remaining cases for PEP 695 function and type
-alias scopes, as well as legacy `TypeVar`s used in function/method signatures.
+parameters from an outer scope.
 
 ### Nested functions
 
@@ -769,7 +775,7 @@ from typing import TypeVar, Generic
 T = TypeVar("T", default=int)
 U = TypeVar("U", default=T)
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 def bad(y: U, z: T) -> tuple[U, T]:
     return y, z
 
@@ -790,15 +796,15 @@ T2 = TypeVar("T2")
 T3 = TypeVar("T3")
 DefaultStrT = TypeVar("DefaultStrT", default=str)
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 def f(x: T1, y: T2) -> tuple[T1, T2]:
     return x, y
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 def g(x: T2, y: T1, z: T3) -> tuple[T2, T1, T3]:
     return x, y, z
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 def h(x: T1, y: T2, z: DefaultStrT, w: T3) -> tuple[T1, T2, DefaultStrT, T3]:
     return x, y, z, w
 

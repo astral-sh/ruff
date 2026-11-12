@@ -81,12 +81,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 66 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
 67 | class GoodOrder(Generic[WithDefaultT1, WithDefaultT2]): ...
 68 | 
-69 | # error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
+69 | # error: [invalid-type-parameter-order] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
 70 | class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
 71 | 
 72 | WithDefaultU2 = TypeVar("WithDefaultU2", default=int)
 73 | 
-74 | # error: [invalid-generic-class]
+74 | # error: [invalid-type-parameter-order]
 75 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU2]): ...
 76 | from typing_extensions import TypeVar, Generic
 77 | 
@@ -96,7 +96,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 81 | Start2T = TypeVar("Start2T", default="StopT")
 82 | Stop2T = TypeVar("Stop2T", default=int)
 83 | 
-84 | # error: [invalid-generic-class] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
+84 | # error: [invalid-type-variable-default] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
 85 | class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
@@ -164,7 +164,7 @@ error[invalid-type-arguments]: Too many type arguments to class `WithDefault`: e
 ```
 
 ```
-error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
+error[invalid-type-parameter-order]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
   --> src/mdtest_snippet.py:70:7
    |
 70 | class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
@@ -180,7 +180,7 @@ error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later 
 ```
 
 ```
-error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
+error[invalid-type-parameter-order]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
   --> src/mdtest_snippet.py:75:7
    |
 75 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU2]): ...
@@ -196,7 +196,7 @@ error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later 
 ```
 
 ```
-error[invalid-generic-class]: Default of `Start2T` cannot reference out-of-scope type variable `StopT`
+error[invalid-type-variable-default]: Default of `Start2T` cannot reference out-of-scope type variable `StopT`
   --> src/mdtest_snippet.py:85:7
    |
 85 | class Bad(Generic[Start2T, Stop2T, StepT]): ...

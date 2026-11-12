@@ -70,7 +70,7 @@ use crate::types::diagnostic::{
     INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
     INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    INVALID_TYPE_PARAMETER_ORDER, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     MISMATCHED_SENTINEL_NAME, MISSING_ATTRIBUTE, MISSING_UNION_ATTRIBUTE,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_GLOBAL,
     UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind,
@@ -4367,7 +4367,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         valid_type_params = false;
                         if let Some(builder) = self
                             .context
-                            .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, element)
+                            .report_lint(&INVALID_TYPE_PARAMETER_ORDER, element)
                         {
                             builder.into_diagnostic(format_args!(
                                 "Type parameter `{}` with a default follows TypeVarTuple `{}`",
@@ -4382,7 +4382,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if !reported_default_order_error
                         && let Some(builder) = self
                             .context
-                            .report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, element)
+                            .report_lint(&INVALID_TYPE_PARAMETER_ORDER, element)
                     {
                         reported_default_order_error = true;
                         builder.into_diagnostic(format_args!(

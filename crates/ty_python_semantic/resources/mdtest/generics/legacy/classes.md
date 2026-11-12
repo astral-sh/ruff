@@ -629,20 +629,20 @@ class Parent(Grandparent[T1, T2]): ...
 # Consistent ordering is fine:
 class GoodChild(Parent[T1, T2], Grandparent[T1, T2]): ...
 
-# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild, T1@BadChild]` and `Grandparent[T1@BadChild, T2@BadChild]`"
+# error: [inconsistent-generic-bases] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild, T1@BadChild]` and `Grandparent[T1@BadChild, T2@BadChild]`"
 class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...
 
 # The same applies when the explicit base is partially specialized differently:
 class Parent2(Grandparent[T1, T2]): ...
 
-# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild2, int]` and `Grandparent[T1@BadChild2, T2@BadChild2]`"
+# error: [inconsistent-generic-bases] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild2, int]` and `Grandparent[T1@BadChild2, T2@BadChild2]`"
 class BadChild2(Parent2[T1, T2], Grandparent[T2, int]): ...
 
 # The inconsistency can also come through two intermediate classes (diamond):
 class Parent3(Grandparent[T1, T2]): ...
 class Parent4(Grandparent[T1, T2]): ...
 
-# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild3, T1@BadChild3]` and `Grandparent[T1@BadChild3, T2@BadChild3]`"
+# error: [inconsistent-generic-bases] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild3, T1@BadChild3]` and `Grandparent[T1@BadChild3, T2@BadChild3]`"
 class BadChild3(Parent3[T1, T2], Parent4[T2, T1]): ...
 
 # Implicit specialization is fine:
@@ -658,24 +658,24 @@ class Dandy(Parent, Parent3, Parent4): ...
 # (or explicitly specialized with `Any`s), but later classes are not:
 
 # error: [missing-type-argument]
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
 
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
 
 # error: [missing-type-argument]
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
 
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
 
 # error: [missing-type-argument]
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
 
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
 ```
 
@@ -695,7 +695,7 @@ class Unspecified(Base): ...  # error: [missing-type-argument]
 class IntBase(Base[int]): ...
 class Combined(Unspecified, IntBase): ...
 
-# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[str]` and `Base[int]`"
+# error: [inconsistent-generic-bases] "Inconsistent type arguments: class cannot inherit from both `Base[str]` and `Base[int]`"
 class Conflicting(Combined, Base[str]): ...
 class Compatible(Combined, Base[int]): ...
 class Inherited(Conflicting): ...
@@ -706,7 +706,7 @@ Classes constructed with `type()` also account for every inherited specializatio
 ```py
 class StrBase(Base[str]): ...
 
-# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[str]` and `Base[int]`"
+# error: [inconsistent-generic-bases] "Inconsistent type arguments: class cannot inherit from both `Base[str]` and `Base[int]`"
 Dynamic = type("Dynamic", (Combined, StrBase), {})
 ```
 
@@ -727,10 +727,10 @@ class Second(Base[Any, str]): ...
 class Combined(First, Second): ...
 class Compatible(Combined, Base[int, str]): ...
 
-# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[Any, str]`"
+# error: [inconsistent-generic-bases] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[Any, str]`"
 class Conflicting(Combined, Base[int, bytes]): ...
 
-# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[bytes, str]` and `Base[int, Any]`"
+# error: [inconsistent-generic-bases] "Inconsistent type arguments: class cannot inherit from both `Base[bytes, str]` and `Base[int, Any]`"
 class OtherConflict(Combined, Base[bytes, str]): ...
 class Inherited(Conflicting): ...
 ```
@@ -739,12 +739,12 @@ With three direct bases, the diagnostic identifies `First` and the third base as
 conflicting arguments. `Second` leaves the first type argument unconstrained.
 
 ```py
-# snapshot: invalid-generic-class
+# snapshot: inconsistent-generic-bases
 class Mixed(First, Second, Base[bytes, str]): ...
 ```
 
 ```snapshot
-error[invalid-generic-class]: Inconsistent type arguments for `Base` among class bases
+error[inconsistent-generic-bases]: Inconsistent type arguments for `Base` among class bases
   --> src/mdtest_snippet.py:19:7
    |
 19 | class Mixed(First, Second, Base[bytes, str]): ...
@@ -761,7 +761,7 @@ the conflicting argument.
 class Reversed(Second, First): ...
 class ReversedCompatible(Reversed, Base[int, str]): ...
 
-# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[bytes, str]` and `Base[int, Any]`"
+# error: [inconsistent-generic-bases] "Inconsistent type arguments: class cannot inherit from both `Base[bytes, str]` and `Base[int, Any]`"
 class ReversedConflict(Reversed, Base[bytes, str]): ...
 ```
 
@@ -772,7 +772,7 @@ class Specific(Base[int, str]): ...
 class Right(Specific, Base[int, Any]): ...
 class Diamond(First, Right): ...
 
-# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[int, str]`"
+# error: [inconsistent-generic-bases] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[int, str]`"
 class DiamondConflict(Diamond, Base[int, bytes]): ...
 ```
 
@@ -781,7 +781,7 @@ Classes constructed with `type()` also preserve constraints from partially gradu
 ```py
 class BytesBase(Base[int, bytes]): ...
 
-# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[Any, str]`"
+# error: [inconsistent-generic-bases] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[Any, str]`"
 Dynamic = type("Dynamic", (Combined, BytesBase), {})
 ```
 
@@ -885,12 +885,12 @@ WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
 # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
 class GoodOrder(Generic[WithDefaultT1, WithDefaultT2]): ...
 
-# error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
+# error: [invalid-type-parameter-order] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
 class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
 
 WithDefaultU2 = TypeVar("WithDefaultU2", default=int)
 
-# error: [invalid-generic-class]
+# error: [invalid-type-parameter-order]
 class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU2]): ...
 ```
 
@@ -905,7 +905,7 @@ StepT = TypeVar("StepT", default=int | None)
 Start2T = TypeVar("Start2T", default="StopT")
 Stop2T = TypeVar("Stop2T", default=int)
 
-# error: [invalid-generic-class] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
+# error: [invalid-type-variable-default] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
 class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
@@ -3698,19 +3698,19 @@ Ts2 = TypeVarTuple("Ts2", default=Unpack[tuple[int, str]])
 Us = TypeVarTuple("Us")
 P = ParamSpec("P", default=[int, str])
 
-# error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
+# error: [invalid-type-parameter-order] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
 class Foo(Generic[*Ts, T]): ...
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 class Bar(Generic[U, *Ts, T]): ...
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 class Baz(Protocol[*Ts, T]): ...
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 class Qux(Generic[*Ts, T, T2]): ...
 
-# error: [invalid-type-variable-default]
+# error: [invalid-type-parameter-order]
 class Quux(Generic[Unpack[Ts], T]): ...
 
 # A parameter list for a ParamSpec is distinguishable from the types that fill the pack.
@@ -3727,12 +3727,12 @@ class Ok2(Generic[U, Unpack[Ts]]): ...
 A required `TypeVar` between the pack and the defaulted `TypeVar` leaves the same ambiguity.
 
 ```py
-# snapshot: invalid-type-variable-default
+# snapshot: invalid-type-parameter-order
 class Separated(Generic[*Ts, U, T]): ...
 ```
 
 ```snapshot
-error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+error[invalid-type-parameter-order]: TypeVars with defaults cannot follow a TypeVarTuple
   --> src/mdtest_snippet.py:36:33
    |
 36 | class Separated(Generic[*Ts, U, T]): ...

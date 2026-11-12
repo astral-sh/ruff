@@ -227,10 +227,10 @@ class Container(Generic[T]): ...
 class IntContainerBase(Container[int]): ...
 class StrContainerBase(Container[str]): ...
 
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 ConflictingContainer = types.new_class("ConflictingContainer", (IntContainerBase, StrContainerBase))
 
-# error: [invalid-generic-class]
+# error: [inconsistent-generic-bases]
 conflicting_container = types.new_class("InlineConflictingContainer", (IntContainerBase, StrContainerBase))()
 ```
 
