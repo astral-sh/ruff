@@ -1911,7 +1911,6 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         pylint::rules::invalid_envvar_value(checker, call, &qualified_name);
     }
     if checker.any_rule_enabled(&[
-        Rule::OsPathJoin,
         Rule::OsPathSplitext,
         Rule::PyPath,
         Rule::Glob,
@@ -1967,6 +1966,9 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
     }
     if checker.is_rule_enabled(Rule::OsPathIslink) {
         flake8_use_pathlib::rules::os_path_islink(checker, call, segments);
+    }
+    if checker.is_rule_enabled(Rule::OsPathJoin) {
+        flake8_use_pathlib::rules::os_path_join(checker, call, segments);
     }
     if checker.is_rule_enabled(Rule::OsReadlink) {
         flake8_use_pathlib::rules::os_readlink(checker, call, segments);

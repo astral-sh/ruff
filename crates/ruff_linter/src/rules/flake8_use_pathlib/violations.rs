@@ -4,69 +4,6 @@ use crate::codes::Category;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for uses of `os.path.join`.
-///
-/// ## Why is this bad?
-/// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os.path`. When possible, using `Path` object
-/// methods such as `Path.joinpath()` or the `/` operator can improve
-/// readability over the `os.path` module's counterparts (e.g., `os.path.join()`).
-///
-/// ## Examples
-/// ```python
-/// import os
-///
-/// os.path.join(os.path.join(ROOT_PATH, "folder"), "file.py")
-/// ```
-///
-/// Use instead:
-/// ```python
-/// from pathlib import Path
-///
-/// Path(ROOT_PATH) / "folder" / "file.py"
-/// ```
-///
-/// ## Known issues
-/// While using `pathlib` can improve the readability and type safety of your code,
-/// it can be less performant than the lower-level alternatives that work directly with strings,
-/// especially on older versions of Python.
-///
-/// ## References
-/// - [Python documentation: `PurePath.joinpath`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.joinpath)
-/// - [Python documentation: `os.path.join`](https://docs.python.org/3/library/os.path.html#os.path.join)
-/// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
-/// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
-/// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231", category = Category::Pedantic)]
-pub(crate) struct OsPathJoin {
-    pub(crate) module: String,
-    pub(crate) joiner: Joiner,
-}
-
-impl Violation for OsPathJoin {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let OsPathJoin { module, joiner } = self;
-        match joiner {
-            Joiner::Slash => {
-                format!("`os.{module}.join()` should be replaced by `Path` with `/` operator")
-            }
-            Joiner::Joinpath => {
-                format!("`os.{module}.join()` should be replaced by `Path.joinpath()`")
-            }
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum Joiner {
-    Slash,
-    Joinpath,
-}
-
-/// ## What it does
 /// Checks for uses of `os.path.splitext`.
 ///
 /// ## Why is this bad?
