@@ -187,9 +187,9 @@ where
                         // Later comparisons can be skipped by short-circuiting.
                         self.can_complete(compare.first_operand())
                             && compare
-                                .iter()
+                                .operators_and_comparators()
                                 .next()
-                                .is_none_or(|(_, _, right)| self.can_complete(right))
+                                .is_none_or(|(_, right)| self.can_complete(right))
                     }
                     _ => true,
                 };

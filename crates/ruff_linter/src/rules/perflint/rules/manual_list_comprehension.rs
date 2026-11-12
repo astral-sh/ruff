@@ -191,7 +191,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: StmtFor<'_>
     // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
     if any_over_expr(arg, |expr| {
         expr.as_name_expr()
-            .is_some_and(|expr| expr.id() == list_name.id())
+            .is_some_and(|expr| expr.name_id() == list_name.name_id())
     }) {
         return;
     }
@@ -225,7 +225,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: StmtFor<'_>
     if if_test.is_some_and(|test| {
         any_over_expr(test, |expr| {
             expr.as_name_expr()
-                .is_some_and(|expr| expr.id() == list_name.id())
+                .is_some_and(|expr| expr.name_id() == list_name.name_id())
         })
     }) {
         return;

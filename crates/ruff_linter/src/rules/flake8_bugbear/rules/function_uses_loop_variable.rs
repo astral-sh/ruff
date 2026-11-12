@@ -103,7 +103,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                         if visitor
                             .stored
                             .iter()
-                            .any(|stored| stored.id() == loaded.id())
+                            .any(|stored| stored.name_id() == loaded.name_id())
                         {
                             return false;
                         }
@@ -193,7 +193,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                         if visitor
                             .stored
                             .iter()
-                            .any(|stored| stored.id() == loaded.id())
+                            .any(|stored| stored.name_id() == loaded.name_id())
                         {
                             return false;
                         }

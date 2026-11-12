@@ -99,18 +99,17 @@ before the kind. [Row implementation](src/flat/row.rs)
 Lists store a starting slot and an element count. A `NodeList<T>` reads a row ID from one
 four-byte word for each element and returns a `T::Borrowed` with the same tree borrow. A `Suite` is
 a `NodeList<kind::Stmt>`. An empty list consumes no element slots in the extra-data column.
-Call and pattern arguments share a boundary between their positional and keyword lists. The
-row stores that boundary and both lengths in twelve bytes. The parser appends the lists next
-to each other. A builder that supplies two nonadjacent, nonempty lists copies them into
-consecutive slots.
+Call arguments and class pattern arguments store child IDs in source order. The child’s
+kind distinguishes a positional argument from a keyword. The full list has a stored length.
+Counting a filtered subset, such as the keyword arguments, visits the slots.
 
-An `ExprCompare` row shares a boundary between its operators and operands. For a single
-comparison such as `a == b`, a spare byte holds the operator. The `as_single` accessor can
-therefore reject a chain such as `a < b < c` before reading either list.
+An `ExprCompare` row stores the starting slot and length of the operand list and the length of
+the operator list immediately before it. For `a < b <= c`, the two operator slots precede the
+three operand IDs. `as_single` checks the operator count before reading the children.
 
-A `Parameters` row stores the positional-or-keyword list inline. For a signature such as
-`def f(x, y=0)`, this is the whole parameter list. The row allocates extra-data slots for
-the other four fields only when it has positional-only, variadic, or keyword-only parameters.
+A `Parameters` row stores the starting slot and count of its source-ordered parameter IDs.
+An adjacent list of role words distinguishes positional-only, ordinary, variadic and
+keyword-only parameters. A role-only query can read those words without resolving child nodes.
 
 A dictionary display stores a list of `DictItem` IDs. Each item holds its optional key and its
 value. In `{**mapping}` the entry starts at `**` and its only child is `mapping`. Every AST list
@@ -183,8 +182,8 @@ the rows and side tables without recursively dropping statements or expressions.
 
 Source order and evaluation order differ in Python. In `f(k=x, *ys)`, the keyword precedes the
 starred argument in the source, but the positional arguments are evaluated before the keywords.
-The source-order visitor follows the ordering recorded when parsing the arguments. The evaluation-order visitor reads the
-positional list first. Both walk the same rows.
+The source-order visitor walks the stored list directly. The evaluation-order visitor visits
+the positional arguments before the keywords in that list.
 
 `node.children()` yields the immediate children in forward source order. For a binary expression
 it borrows the two adjacent operand IDs from the row. For a module it borrows the statement IDs

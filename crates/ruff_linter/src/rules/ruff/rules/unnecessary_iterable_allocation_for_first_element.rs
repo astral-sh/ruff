@@ -289,7 +289,7 @@ fn match_simple_comprehension(
     // Verify that the generator is, e.g. `i for i in x`, as opposed to `i for j in x`.
     let elt = elt.as_name_expr()?;
     let target = generator.target().as_name_expr()?;
-    if elt.id() != target.id() {
+    if elt.name_id() != target.name_id() {
         return None;
     }
 

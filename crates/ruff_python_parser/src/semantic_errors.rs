@@ -707,16 +707,15 @@ impl SemanticSyntaxChecker {
         type_params: ast::TypeParams<'_>,
         ctx: &Ctx,
     ) {
-        if type_params.iter().len() < 2 {
+        if type_params.iter().len() < 2
+            || !names_may_repeat(type_params.iter().map(|param| param.name().name_id()))
+        {
             return;
         }
 
-        for (i, type_param) in type_params.iter().enumerate() {
-            if type_params
-                .iter()
-                .take(i)
-                .any(|t| t.name().id() == type_param.name().id())
-            {
+        let mut seen = FxHashSet::with_capacity_and_hasher(type_params.iter().len(), FxBuildHasher);
+        for type_param in type_params {
+            if !seen.insert(type_param.name().name_id()) {
                 // test_ok non_duplicate_type_parameter_names
                 // type Alias[T] = list[T]
                 // def f[T](t: T): ...

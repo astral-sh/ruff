@@ -7266,8 +7266,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 aliased_type,
             )));
         }
-        if literal.value().len() <= Self::MAX_STRING_LITERAL_SIZE {
-            Type::string_literal(self.db(), literal.value().to_str())
+        let value = literal.value().to_str();
+        if value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+            Type::string_literal(self.db(), value)
         } else {
             Type::literal_string()
         }
@@ -7275,7 +7276,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_bytes_literal_expression(&mut self, literal: ast::ExprBytesLiteral<'_>) -> Type<'db> {
         // TODO: ignoring r/R prefixes for now, should normalize bytes values
-        let bytes: Vec<u8> = literal.value().bytes().collect();
+        let bytes = Cow::<[u8]>::from(literal.value());
         Type::bytes_literal(self.db(), &bytes)
     }
 

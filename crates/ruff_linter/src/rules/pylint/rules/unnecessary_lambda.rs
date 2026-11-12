@@ -170,8 +170,7 @@ fn forwards_arguments(parameters: ast::Parameters<'_>, arguments: ast::Arguments
                     let Some(parameter) = positional.next() else {
                         return false;
                     };
-                    if parameter.default().is_some()
-                        || parameter.parameter().name().as_str() != name.id().as_str()
+                    if parameter.default().is_some() || parameter.name().name_id() != name.name_id()
                     {
                         return false;
                     }

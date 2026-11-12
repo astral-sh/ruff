@@ -4897,6 +4897,9 @@ impl Builder {
     }
 }
 impl<'a> crate::BytesLiteral<'a> {
+    pub(super) fn byte_range(self) -> super::Interval {
+        super::Interval::decode(self.syntax.row.bytes_literal_value())
+    }
     #[inline]
     pub fn value(self) -> &'a [u8] {
         let word = self.syntax.row.bytes_literal_value();
@@ -6277,7 +6280,7 @@ impl<'a> crate::ExprCompare<'a> {
     ) {
         let node = self;
         visitor.visit_expr(node.first_operand());
-        for (_, op, right) in node.iter() {
+        for (op, right) in node.operators_and_comparators() {
             visitor.visit_cmp_op(op);
             visitor.visit_expr(right);
         }

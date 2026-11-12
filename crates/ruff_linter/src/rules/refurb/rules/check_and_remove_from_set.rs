@@ -86,7 +86,7 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
     };
 
     // `set` in the check should be the same as `set` in the body
-    if check_set.id() != remove_set.id() {
+    if check_set.name_id() != remove_set.name_id() {
         return;
     }
 

@@ -193,7 +193,7 @@ fn for_loop_writes(
     let locator = checker.locator();
     let content = match (for_stmt.target().classify(), write_arg.classify()) {
         (ExprKind::Name(for_target), ExprKind::Name(write_arg))
-            if for_target.id() == write_arg.id() =>
+            if for_target.name_id() == write_arg.name_id() =>
         {
             format!(
                 "{}.writelines({})",

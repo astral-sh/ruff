@@ -84,7 +84,7 @@ fn visit_assignments(checker: &Checker, left: Expr<'_>, right: Expr<'_>) {
                 visit_assignments(checker, lhs_elem, rhs_elem);
             }
         }
-        (ExprKind::Name(lhs), ExprKind::Name(rhs)) if lhs.id() == rhs.id() => {
+        (ExprKind::Name(lhs), ExprKind::Name(rhs)) if lhs.name_id() == rhs.name_id() => {
             checker.report_diagnostic(
                 SelfAssigningVariable {
                     name: lhs.id().to_string(),

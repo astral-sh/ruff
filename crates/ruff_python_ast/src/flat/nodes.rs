@@ -135,17 +135,32 @@ impl<'a> ExprCompare<'a> {
     }
 
     pub fn comparators(self) -> List<'a, AstNodeId<crate::kind::Expr>> {
-        self.operands().slice(1..self.operands().len())
+        self.operands().slice(1..)
+    }
+
+    /// Yields each comparison operator and the operand to its right, in source order.
+    #[inline]
+    pub fn operators_and_comparators(
+        self,
+    ) -> impl DoubleEndedIterator<Item = (CmpOp, Expr<'a>)>
+    + ExactSizeIterator
+    + std::iter::FusedIterator
+    + Clone {
+        self.ops().iter().zip(self.comparators())
     }
 
     #[inline]
     pub fn iter(
         self,
-    ) -> impl DoubleEndedIterator<Item = (Expr<'a>, CmpOp, Expr<'a>)> + ExactSizeIterator {
-        self.operands()
+    ) -> impl DoubleEndedIterator<Item = (Expr<'a>, CmpOp, Expr<'a>)>
+    + ExactSizeIterator
+    + std::iter::FusedIterator
+    + Clone {
+        let operands = self.operands();
+        operands
             .iter()
             .zip(self.ops())
-            .zip(self.comparators())
+            .zip(operands.slice(1..))
             .map(|((left, op), right)| (left, op, right))
     }
 }
@@ -658,15 +673,29 @@ impl BytesValue<'_> {
 
 impl<'a> From<BytesValue<'a>> for std::borrow::Cow<'a, [u8]> {
     fn from(value: BytesValue<'a>) -> Self {
-        if let Some([part]) = value.0.as_array() {
-            Self::Borrowed(part.value())
-        } else {
-            let mut joined = Vec::with_capacity(value.len());
-            for part in value {
-                joined.extend_from_slice(part.value());
-            }
-            Self::Owned(joined)
+        let mut parts = value.iter();
+        let Some(first) = parts.next() else {
+            return Self::Borrowed(&[]);
+        };
+        if parts.len() == 0 {
+            return Self::Borrowed(first.value());
         }
+
+        // Parsed parts are consecutive in the byte buffer. A builder can reuse parts
+        // from anywhere in that buffer or put them in a different order.
+        let mut range = first.byte_range().indices();
+        for part in parts {
+            let next = part.byte_range().indices();
+            if range.end != next.start {
+                let mut joined = Vec::with_capacity(value.len());
+                for part in value {
+                    joined.extend_from_slice(part.value());
+                }
+                return Self::Owned(joined);
+            }
+            range.end = next.end;
+        }
+        Self::Borrowed(&value.0.ast.bytes[range])
     }
 }
 

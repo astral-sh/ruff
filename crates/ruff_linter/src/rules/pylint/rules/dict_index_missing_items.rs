@@ -138,7 +138,7 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
             };
 
             // Check that the sliced dictionary name is the same as the iterated object name.
-            if name.id() != self.dict_name.id() {
+            if name.name_id() != self.dict_name.name_id() {
                 return;
             }
 

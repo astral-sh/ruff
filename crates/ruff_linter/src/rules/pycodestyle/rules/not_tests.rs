@@ -90,46 +90,30 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: ast::ExprUnaryOp<'_>) {
         return;
     };
 
-    let left = compare.first_operand();
-    let comparators = compare.comparators();
-
-    match &compare.ops().as_array() {
-        Some([CmpOp::In]) if checker.is_rule_enabled(Rule::NotInTest) => {
-            let mut diagnostic = checker.report_diagnostic(NotInTest, unary_op.operand().range());
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                pad(
-                    generate_comparison(
-                        left,
-                        &[CmpOp::NotIn],
-                        comparators,
-                        unary_op.into(),
-                        checker.tokens(),
-                        checker.source(),
-                    ),
-                    unary_op.range(),
-                    checker.locator(),
-                ),
-                unary_op.range(),
-            )));
-        }
-        Some([CmpOp::Is]) if checker.is_rule_enabled(Rule::NotIsTest) => {
-            let mut diagnostic = checker.report_diagnostic(NotIsTest, unary_op.operand().range());
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                pad(
-                    generate_comparison(
-                        left,
-                        &[CmpOp::IsNot],
-                        comparators,
-                        unary_op.into(),
-                        checker.tokens(),
-                        checker.source(),
-                    ),
-                    unary_op.range(),
-                    checker.locator(),
-                ),
-                unary_op.range(),
-            )));
-        }
-        _ => {}
-    }
+    let (operator, mut diagnostic) = match compare.ops().as_array() {
+        Some([CmpOp::In]) if checker.is_rule_enabled(Rule::NotInTest) => (
+            CmpOp::NotIn,
+            checker.report_diagnostic(NotInTest, unary_op.operand().range()),
+        ),
+        Some([CmpOp::Is]) if checker.is_rule_enabled(Rule::NotIsTest) => (
+            CmpOp::IsNot,
+            checker.report_diagnostic(NotIsTest, unary_op.operand().range()),
+        ),
+        _ => return,
+    };
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        pad(
+            generate_comparison(
+                compare.first_operand(),
+                &[operator],
+                compare.comparators(),
+                unary_op.into(),
+                checker.tokens(),
+                checker.source(),
+            ),
+            unary_op.range(),
+            checker.locator(),
+        ),
+        unary_op.range(),
+    )));
 }

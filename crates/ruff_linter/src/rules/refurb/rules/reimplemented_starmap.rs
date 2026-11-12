@@ -118,7 +118,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             // If the argument is used outside the function call, we can't replace it.
             if any_over_expr(func, |expr| {
                 expr.as_name_expr()
-                    .is_some_and(|expr| expr.id() == name.id())
+                    .is_some_and(|expr| expr.name_id() == name.name_id())
             }) {
                 return;
             }

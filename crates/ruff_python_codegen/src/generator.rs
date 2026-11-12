@@ -1204,7 +1204,7 @@ impl<'a> Generator<'a> {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
                     self.unparse_expr(compare.first_operand(), new_lvl);
-                    for (_, op, cmp) in compare.iter() {
+                    for (op, cmp) in compare.operators_and_comparators() {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",

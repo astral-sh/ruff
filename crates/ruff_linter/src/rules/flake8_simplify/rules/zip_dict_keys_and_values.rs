@@ -90,7 +90,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCallFi
     let Some((var2, attr2, args2)) = get_var_attr_args(arg2) else {
         return;
     };
-    if var1.id() != var2.id()
+    if var1.name_id() != var2.name_id()
         || attr1 != "keys"
         || attr2 != "values"
         || !args1.is_empty()

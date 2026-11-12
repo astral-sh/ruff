@@ -464,7 +464,7 @@ fn is_same_expression(param: ast::ParameterWithDefault<'_>, expr: Expr<'_>) -> b
     if param.default().is_some() {
         false
     } else if let ExprKind::Name(name) = expr.classify() {
-        name.id() == param.name().as_str()
+        name.name_id() == param.name().name_id()
     } else {
         false
     }

@@ -108,7 +108,9 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt_fields: &StmtFo
 
     let locator = checker.locator();
     let content = match (for_stmt_fields.target.classify(), arg.classify()) {
-        (ExprKind::Name(for_target), ExprKind::Name(arg)) if for_target.id() == arg.id() => {
+        (ExprKind::Name(for_target), ExprKind::Name(arg))
+            if for_target.name_id() == arg.name_id() =>
+        {
             format!(
                 "{}.{batch_method_name}({})",
                 set.id(),

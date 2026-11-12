@@ -92,7 +92,7 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: ExprBo
             continue;
         };
 
-        if left_compare_right.id() != right_compare_left.id() {
+        if left_compare_right.name_id() != right_compare_left.name_id() {
             continue;
         }
 

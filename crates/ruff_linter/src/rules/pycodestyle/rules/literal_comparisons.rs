@@ -214,7 +214,6 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: ast::ExprCompare<'
 
     // Check `left`.
     let left = compare.first_operand();
-    let comparators = compare.comparators();
     let mut comparator = left;
     let op = compare.first_operator();
     let next = compare.second_operand();
@@ -275,7 +274,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: ast::ExprCompare<'
     }
 
     // Check each comparator in order.
-    for (index, (op, next)) in compare.ops().iter().zip(comparators).enumerate() {
+    for (index, (op, next)) in compare.operators_and_comparators().enumerate() {
         if helpers::is_constant_non_singleton(comparator) {
             comparator = next;
             continue;
@@ -362,6 +361,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: ast::ExprCompare<'
         let tokens = checker.tokens();
         let source = checker.source();
 
+        let comparators = compare.comparators();
         let content = match (&compare.ops(), comparators) {
             (items, args)
                 if let Some([op]) = items.as_array()

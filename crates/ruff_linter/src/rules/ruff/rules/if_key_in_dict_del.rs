@@ -84,23 +84,10 @@ pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &ast::StmtIfFields<'_>
 }
 
 fn extract_dict_and_key_from_test(test: Expr<'_>) -> Option<(Dict<'_>, Key<'_>)> {
-    let ExprKind::Compare(comp) = test.classify() else {
+    let (key, CmpOp::In, dict) = test.as_compare_expr()?.as_single()? else {
         return None;
     };
-
-    let Some([key, ExprKind::Name(dict)]) = comp
-        .operands()
-        .as_array()
-        .map(|items| items.map(Expr::classify))
-    else {
-        return None;
-    };
-
-    if !matches!(comp.ops().as_array(), Some([CmpOp::In])) {
-        return None;
-    }
-
-    Some((dict, key.view()))
+    Some((dict.as_name_expr()?, key))
 }
 
 fn extract_dict_and_key_from_del(
@@ -120,40 +107,28 @@ fn extract_dict_and_key_from_del(
 }
 
 fn is_same_key(test: Key<'_>, del: Key<'_>) -> bool {
-    match (test.fields(), del.fields()) {
-        (
-            ast::ExprFields::Name(ast::ExprNameFields { id: test, .. }),
-            ast::ExprFields::Name(ast::ExprNameFields { id: del, .. }),
-        ) => test.as_str() == del.as_str(),
-
-        (ast::ExprFields::NoneLiteral(..), ast::ExprFields::NoneLiteral(..)) => true,
-        (ast::ExprFields::EllipsisLiteral(..), ast::ExprFields::EllipsisLiteral(..)) => true,
-
-        (
-            ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields { node: test, .. }),
-            ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields { node: del, .. }),
-        ) => test.value() == del.value(),
-        (
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields { node: test, .. }),
-            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields { node: del, .. }),
-        ) => test.value() == del.value(),
-
-        (
-            ast::ExprFields::BytesLiteral(ast::ExprBytesLiteralFields { node: test, .. }),
-            ast::ExprFields::BytesLiteral(ast::ExprBytesLiteralFields { node: del, .. }),
-        ) => Iterator::eq(test.value().bytes(), del.value().bytes()),
-
-        (
-            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { node: test, .. }),
-            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { node: del, .. }),
-        ) => Iterator::eq(test.value().chars(), del.value().chars()),
-
+    match (test.classify(), del.classify()) {
+        (ExprKind::Name(test), ExprKind::Name(del)) => test.name_id() == del.name_id(),
+        (ExprKind::NoneLiteral(_), ExprKind::NoneLiteral(_))
+        | (ExprKind::EllipsisLiteral(_), ExprKind::EllipsisLiteral(_)) => true,
+        (ExprKind::BooleanLiteral(test), ExprKind::BooleanLiteral(del)) => {
+            test.value() == del.value()
+        }
+        (ExprKind::NumberLiteral(test), ExprKind::NumberLiteral(del)) => {
+            test.value() == del.value()
+        }
+        (ExprKind::BytesLiteral(test), ExprKind::BytesLiteral(del)) => {
+            test.value().bytes().eq(del.value().bytes())
+        }
+        (ExprKind::StringLiteral(test), ExprKind::StringLiteral(del)) => {
+            test.value().to_str() == del.value().to_str()
+        }
         _ => false,
     }
 }
 
 fn is_same_dict(test: Dict<'_>, del: Dict<'_>) -> bool {
-    test.id().as_str() == del.id().as_str()
+    test.name_id() == del.name_id()
 }
 
 fn replace_with_dict_pop_fix(

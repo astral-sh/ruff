@@ -668,7 +668,7 @@ def walk_fields(node: Node, nodes: set[str]) -> str:
         for value in values { visitor.visit_expr(value); }"""
     if node.name == "ExprCompare":
         return """visitor.visit_expr(node.first_operand());
-        for (_, op, right) in node.iter() { visitor.visit_cmp_op(op); visitor.visit_expr(right); }"""
+        for (op, right) in node.operators_and_comparators() { visitor.visit_cmp_op(op); visitor.visit_expr(right); }"""
     statements = []
     for field in source_order_fields(node):
         inner = field.ty
@@ -1175,9 +1175,12 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                         f"#[inline] pub fn name_id(self) -> super::NameId {{ super::NameId(split_words({raw})[0]) }}"
                     )
                 words_by_node[n.name][f.name] = shared
-                if (n.name, f.name) == ("StringLiteral", "value"):
+                if n.name in {"StringLiteral", "BytesLiteral"} and f.name == "value":
+                    accessor = (
+                        "byte_range" if n.name == "BytesLiteral" else "text_range"
+                    )
                     out.append(
-                        f"pub(super) fn text_range(self) -> super::Interval {{ super::Interval::decode({raw}) }}"
+                        f"pub(super) fn {accessor}(self) -> super::Interval {{ super::Interval::decode({raw}) }}"
                     )
                 if f.name == "iter":
                     out.append(

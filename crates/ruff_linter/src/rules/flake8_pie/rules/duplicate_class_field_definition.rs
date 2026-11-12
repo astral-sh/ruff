@@ -90,7 +90,7 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: Suite<'_
         if let Some(value) = value
             && any_over_expr(value, |expr| {
                 expr.as_name_expr()
-                    .is_some_and(|name| name.id() == target.id())
+                    .is_some_and(|name| name.name_id() == target.name_id())
             })
         {
             continue;

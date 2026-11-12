@@ -3603,7 +3603,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ExprKind::Compare(compare) => {
                 self.visit_expr(compare.first_operand());
-                for (_, op, right) in compare.iter() {
+                for (op, right) in compare.operators_and_comparators() {
                     self.visit_expr(right);
                     self.record_exception_checkpoint_if(!matches!(op, CmpOp::Is | CmpOp::IsNot));
                 }
@@ -4068,7 +4068,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let (symbol_name, is_reexported) = if let Some(asname) = alias.asname() {
                         self.ast_ids
                             .record_expression(&asname, self.current_scope());
-                        (asname.id().clone(), asname.id() == alias.name().id())
+                        (
+                            asname.id().clone(),
+                            asname.name_id() == alias.name().name_id(),
+                        )
                     } else {
                         (
                             Name::new(alias.name().id().split('.').next().unwrap()),
@@ -4278,7 +4281,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.ast_ids
                             .record_expression(&asname, self.current_scope());
                         // It's re-exported if it's `from ... import x as x`
-                        (asname.id(), asname.id() == alias.name().id())
+                        (asname.id(), asname.name_id() == alias.name().name_id())
                     } else {
                         // As a non-standard rule to handle stubs in the wild, we consider
                         // `from . import x` and `from whatever.thispackage import x` in an

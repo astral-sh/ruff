@@ -77,7 +77,7 @@ pub(crate) fn list_assign_reversed(checker: &Checker, assign: &ast::StmtAssignFi
         return;
     };
 
-    if reversed_expr.id() != target_expr.id() {
+    if reversed_expr.name_id() != target_expr.name_id() {
         return;
     }
 

@@ -89,7 +89,36 @@ impl Builder {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+    use std::convert::Infallible;
+
     use super::{Builder, BytesLiteralFlags, StringLiteralFlags, TextRange};
+    use crate::flat::BytesValue;
+
+    #[test]
+    fn byte_literals_borrow_consecutive_parts() -> Result<(), Infallible> {
+        let mut builder = Builder::default();
+        let mut part = |data: &[u8]| {
+            builder
+                .try_bytes_literal(TextRange::default(), BytesLiteralFlags::empty(), |out| {
+                    out.extend_from_slice(data);
+                    Ok::<(), Infallible>(())
+                })
+                .map(|(id, _, _)| id)
+        };
+        let a = part(b"a")?;
+        let empty = part(b"")?;
+        let b = part(b"b")?;
+        let c = part(b"c")?;
+        let adjacent = builder.list([a, empty, b]);
+        let gap = builder.list([a, c]);
+        let reversed = builder.list([b, a]);
+        let value = |list| Cow::<[u8]>::from(BytesValue::new(builder.get_list(list)));
+        assert!(matches!(value(adjacent), Cow::Borrowed(b"ab")));
+        assert_eq!(value(gap).as_ref(), b"ac");
+        assert_eq!(value(reversed).as_ref(), b"ba");
+        Ok(())
+    }
 
     #[test]
     fn decoding_errors_discard_only_the_partial_literal() {

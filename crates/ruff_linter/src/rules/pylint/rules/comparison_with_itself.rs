@@ -52,7 +52,7 @@ pub(crate) fn comparison_with_itself(checker: &Checker, compare: ExprCompare<'_>
         match (left.classify(), right.classify()) {
             // Ex) `foo == foo`
             (ExprKind::Name(left_name), ExprKind::Name(right_name))
-                if left_name.id() == right_name.id() =>
+                if left_name.name_id() == right_name.name_id() =>
             {
                 let actual = format!(
                     "{} {} {}",
@@ -84,7 +84,7 @@ pub(crate) fn comparison_with_itself(checker: &Checker, compare: ExprCompare<'_>
                 else {
                     continue;
                 };
-                if left_arg.id() != right_arg.id() {
+                if left_arg.name_id() != right_arg.name_id() {
                     continue;
                 }
 
