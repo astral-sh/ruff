@@ -56,11 +56,11 @@ pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
     let (func, arguments) = (&call.func, &call.arguments);
 
-    if arguments.keywords().next().is_some() {
-        return;
-    }
-
-    let Some([expr, types]) = arguments.args().collect_array() else {
+    let [
+        ruff_python_ast::Argument::Positional(expr),
+        ruff_python_ast::Argument::Positional(types),
+    ] = arguments.items.as_slice()
+    else {
         return;
     };
 

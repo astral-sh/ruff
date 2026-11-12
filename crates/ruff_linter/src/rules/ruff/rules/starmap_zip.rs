@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::QualifiedName;
@@ -64,11 +63,11 @@ impl Violation for StarmapZip {
 pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
     let semantic = checker.semantic();
 
-    if call.arguments.keywords().next().is_some() {
-        return;
-    }
-
-    let Some([_map_func, Expr::Call(iterable_call)]) = call.arguments.args().collect_array() else {
+    let [
+        ruff_python_ast::Argument::Positional(_map_func),
+        ruff_python_ast::Argument::Positional(Expr::Call(iterable_call)),
+    ] = call.arguments.items.as_slice()
+    else {
         return;
     };
 

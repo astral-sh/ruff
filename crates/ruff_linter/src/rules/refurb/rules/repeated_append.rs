@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use ast::traversal;
@@ -276,7 +275,7 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Appen
     };
 
     // `append` should have just one argument, an element to be added.
-    let [argument] = arguments.args().collect_array()?;
+    let argument = arguments.as_single_positional()?;
 
     // The called function should be an attribute, ie `value.attr`.
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
@@ -284,7 +283,7 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Appen
     };
 
     // `attr` should be `append` and it shouldn't have any keyword arguments.
-    if attr != "append" || arguments.keywords().next().is_some() {
+    if attr != "append" {
         return None;
     }
 

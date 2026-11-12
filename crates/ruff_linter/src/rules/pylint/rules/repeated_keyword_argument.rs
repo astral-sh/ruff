@@ -1,5 +1,4 @@
-use itertools::Itertools;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprCall, ExprStringLiteral};
@@ -42,36 +41,40 @@ impl Violation for RepeatedKeywordArgument {
 pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
     let ExprCall { arguments, .. } = call;
 
-    // Avoid allocating if there's only one non-unpacked keyword argument, or the unpacked value is
-    // not a dict literal.
-    if let Some([keyword]) = arguments.keywords().collect_array() {
-        if keyword.arg.is_some() || !keyword.value.is_dict_expr() {
-            return;
-        }
+    let mut unpacked_dicts = arguments
+        .keywords()
+        .filter_map(|keyword| {
+            if keyword.arg.is_none() {
+                keyword.value.as_dict_expr()
+            } else {
+                None
+            }
+        })
+        .peekable();
+    if unpacked_dicts.peek().is_none() {
+        return;
     }
 
-    let mut seen = FxHashSet::with_capacity_and_hasher(arguments.keywords().count(), FxBuildHasher);
-
-    for keyword in arguments.keywords() {
-        if let Some(id) = &keyword.arg {
-            seen.insert(id.as_str());
-        }
-    }
-
-    for keyword in arguments.keywords() {
-        if keyword.arg.is_none()
-            && let Expr::Dict(dict) = keyword.value.as_ref()
-        {
-            for key in dict.iter_keys().flatten() {
-                if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = key {
-                    if !seen.insert(value.to_str()) {
-                        checker.report_diagnostic(
-                            RepeatedKeywordArgument {
-                                duplicate_keyword: value.to_string(),
-                            },
-                            key.range(),
-                        );
-                    }
+    // Explicit names anywhere in the call take precedence over names in unpacked dicts.
+    let mut seen: FxHashSet<_> = arguments
+        .keywords()
+        .filter_map(|keyword| {
+            keyword
+                .arg
+                .as_ref()
+                .map(ruff_python_ast::Identifier::as_str)
+        })
+        .collect();
+    for dict in unpacked_dicts {
+        for key in dict.iter_keys().flatten() {
+            if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = key {
+                if !seen.insert(value.to_str()) {
+                    checker.report_diagnostic(
+                        RepeatedKeywordArgument {
+                            duplicate_keyword: value.to_string(),
+                        },
+                        key.range(),
+                    );
                 }
             }
         }

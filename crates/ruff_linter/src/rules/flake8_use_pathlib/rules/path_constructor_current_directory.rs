@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use std::ops::Range;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -76,11 +75,7 @@ pub(crate) fn path_constructor_current_directory(
         return;
     }
 
-    if arguments.keywords().next().is_some() {
-        return;
-    }
-
-    let Some([Expr::StringLiteral(arg)]) = arguments.args().collect_array() else {
+    let Some(Expr::StringLiteral(arg)) = arguments.as_single_positional() else {
         return;
     };
 
