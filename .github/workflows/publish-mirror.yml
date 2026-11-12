@@ -51,9 +51,10 @@ jobs:
         run: |
           # R2 recommends single-part uploads for files under approximately 100 MB.
           # AWS CLI interprets 100MB as 100 MiB. Release artifacts do not currently
-          # need multipart uploads; larger files would still use the multipart path,
-          # which is not idempotent against the immutable bucket without further
-          # reconciliation.
+          # need multipart uploads, so this avoids R2's multipart completion path.
+          # `--no-overwrite` is list-based rather than an atomic write condition.
+          # Larger files still use multipart uploads. That path is not idempotent on
+          # retries against immutable keys without explicit reconciliation.
           # https://developers.cloudflare.com/r2/objects/upload-objects/#choose-an-upload-method
           aws configure set default.s3.multipart_threshold 100MB
 
