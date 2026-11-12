@@ -168,6 +168,7 @@ RUF068 [*] `__all__` contains duplicate entries
    |             |
    |             previous occurrence of `B` here
 31 | __all__.extend(["B", "B"])
+32 | __all__ = ["A", ("B"), ("B")]
    |
 help: Remove duplicate entries from `__all__`
    |
@@ -186,54 +187,133 @@ RUF068 [*] `__all__` contains duplicate entries
    |                 ---  ^^^ `B` duplicated here
    |                 |
    |                 previous occurrence of `B` here
-32 |
-33 | # Bad, unsafe
+32 | __all__ = ["A", ("B"), ("B")]
+33 | __all__ = ["A", ("A"), "B"]
    |
 help: Remove duplicate entries from `__all__`
    |
 30 | __all__ += ["B", "B"]
    - __all__.extend(["B", "B"])
 31 + __all__.extend(["B"])
-32 |
+32 | __all__ = ["A", ("B"), ("B")]
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:36:5
+  --> RUF068.py:32:25
    |
-33 | # Bad, unsafe
-34 | __all__ = [
-35 |     "A",
+30 | __all__ += ["B", "B"]
+31 | __all__.extend(["B", "B"])
+32 | __all__ = ["A", ("B"), ("B")]
+   |                  ---    ^^^ `B` duplicated here
+   |                  |
+   |                  previous occurrence of `B` here
+33 | __all__ = ["A", ("A"), "B"]
+34 | __all__ = [("A"), "B", ("A")]
+   |
+help: Remove duplicate entries from `__all__`
+   |
+31 | __all__.extend(["B", "B"])
+   - __all__ = ["A", ("B"), ("B")]
+32 + __all__ = ["A", ("B")]
+33 | __all__ = ["A", ("A"), "B"]
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:33:18
+   |
+31 | __all__.extend(["B", "B"])
+32 | __all__ = ["A", ("B"), ("B")]
+33 | __all__ = ["A", ("A"), "B"]
+   |            ---   ^^^ `A` duplicated here
+   |            |
+   |            previous occurrence of `A` here
+34 | __all__ = [("A"), "B", ("A")]
+35 | __all__ = ("A", ("B"), ("B"))
+   |
+help: Remove duplicate entries from `__all__`
+   |
+32 | __all__ = ["A", ("B"), ("B")]
+   - __all__ = ["A", ("A"), "B"]
+33 + __all__ = ["A", "B"]
+34 | __all__ = [("A"), "B", ("A")]
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:34:25
+   |
+32 | __all__ = ["A", ("B"), ("B")]
+33 | __all__ = ["A", ("A"), "B"]
+34 | __all__ = [("A"), "B", ("A")]
+   |             ---         ^^^ `A` duplicated here
+   |             |
+   |             previous occurrence of `A` here
+35 | __all__ = ("A", ("B"), ("B"))
+   |
+help: Remove duplicate entries from `__all__`
+   |
+33 | __all__ = ["A", ("A"), "B"]
+   - __all__ = [("A"), "B", ("A")]
+34 + __all__ = [("A"), "B"]
+35 | __all__ = ("A", ("B"), ("B"))
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:35:25
+   |
+33 | __all__ = ["A", ("A"), "B"]
+34 | __all__ = [("A"), "B", ("A")]
+35 | __all__ = ("A", ("B"), ("B"))
+   |                  ---    ^^^ `B` duplicated here
+   |                  |
+   |                  previous occurrence of `B` here
+36 |
+37 | # Bad, unsafe
+   |
+help: Remove duplicate entries from `__all__`
+   |
+34 | __all__ = [("A"), "B", ("A")]
+   - __all__ = ("A", ("B"), ("B"))
+35 + __all__ = ("A", ("B"))
+36 |
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:40:5
+   |
+37 | # Bad, unsafe
+38 | __all__ = [
+39 |     "A",
    |     --- previous occurrence of `A` here
-36 |     "A",
+40 |     "A",
    |     ^^^ `A` duplicated here
-37 |     "B",
-38 |     # Comment
+41 |     "B",
+42 |     # Comment
    |
 help: Remove duplicate entries from `__all__`
    |
-35 |     "A",
+39 |     "A",
    -     "A",
-36 |     "B",
+40 |     "B",
    |
 
 RUF068 [*] `__all__` contains duplicate entries
-  --> RUF068.py:39:5
+  --> RUF068.py:43:5
    |
-35 |     "A",
-36 |     "A",
-37 |     "B",
+39 |     "A",
+40 |     "A",
+41 |     "B",
    |     --- previous occurrence of `B` here
-38 |     # Comment
-39 |     "B",  # 2
+42 |     # Comment
+43 |     "B",  # 2
    |     ^^^ `B` duplicated here
-40 |     # 3
-41 | ]
+44 |     # 3
+45 | ]
    |
 help: Remove duplicate entries from `__all__`
    |
-36 |     "A",
+40 |     "A",
    -     "B",
    -     # Comment
-37 |     "B",  # 2
+41 |     "B",  # 2
    |
 note: This is an unsafe fix and may change runtime behavior

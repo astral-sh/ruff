@@ -193,6 +193,7 @@ B033 [*] Sets should not contain duplicate item `"value1"`
 27 |     "value1",
    |     ^^^^^^^^
 28 | }
+29 | incorrect_set = {1, (1)}
    |
 help: Remove duplicate item
    |
@@ -202,3 +203,79 @@ help: Remove duplicate item
 26 | }
    |
 note: This is an unsafe fix and may change runtime behavior
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:29:22
+   |
+27 |     "value1",
+28 | }
+29 | incorrect_set = {1, (1)}
+   |                  -   ^
+   |                  |
+   |                  Previous occurrence here
+30 | incorrect_set = {1, (1), 2}
+31 | incorrect_set = {1, ((1)), 2}
+   |
+help: Remove duplicate item
+   |
+28 | }
+   - incorrect_set = {1, (1)}
+29 + incorrect_set = {1}
+30 | incorrect_set = {1, (1), 2}
+   |
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:30:22
+   |
+28 | }
+29 | incorrect_set = {1, (1)}
+30 | incorrect_set = {1, (1), 2}
+   |                  -   ^
+   |                  |
+   |                  Previous occurrence here
+31 | incorrect_set = {1, ((1)), 2}
+32 | incorrect_set = {("a"), ("a")}
+   |
+help: Remove duplicate item
+   |
+29 | incorrect_set = {1, (1)}
+   - incorrect_set = {1, (1), 2}
+30 + incorrect_set = {1, 2}
+31 | incorrect_set = {1, ((1)), 2}
+   |
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:31:23
+   |
+29 | incorrect_set = {1, (1)}
+30 | incorrect_set = {1, (1), 2}
+31 | incorrect_set = {1, ((1)), 2}
+   |                  -    ^
+   |                  |
+   |                  Previous occurrence here
+32 | incorrect_set = {("a"), ("a")}
+   |
+help: Remove duplicate item
+   |
+30 | incorrect_set = {1, (1), 2}
+   - incorrect_set = {1, ((1)), 2}
+31 + incorrect_set = {1, 2}
+32 | incorrect_set = {("a"), ("a")}
+   |
+
+B033 [*] Sets should not contain duplicate item `"a"`
+  --> B033.py:32:26
+   |
+30 | incorrect_set = {1, (1), 2}
+31 | incorrect_set = {1, ((1)), 2}
+32 | incorrect_set = {("a"), ("a")}
+   |                   ---    ^^^
+   |                   |
+   |                   Previous occurrence here
+help: Remove duplicate item
+   |
+31 | incorrect_set = {1, ((1)), 2}
+   - incorrect_set = {("a"), ("a")}
+32 + incorrect_set = {("a")}
+33 |
+   |

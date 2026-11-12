@@ -167,7 +167,7 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
             diagnostic.set_primary_annotation_message(format_args!("`{name}` duplicated here"));
 
             diagnostic.try_set_fix(|| {
-                edits::remove_member(elts, index, source).map(|edit| {
+                edits::remove_member(elts, index, source, checker.tokens()).map(|edit| {
                     let applicability = if checker.comment_ranges().intersects(edit.range()) {
                         Applicability::Unsafe
                     } else {

@@ -26,6 +26,11 @@ incorrect_set_multiline_with_comment = {
     # B033
     "value1",
 }
+incorrect_set = {1, (1)}
+incorrect_set = {1, (1), 2}
+incorrect_set = {1, ((1)), 2}
+incorrect_set = {("a"), ("a")}
+
 
 ###
 # Non-errors.

@@ -85,17 +85,20 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
                 );
                 diagnostic.secondary_annotation("Previous occurrence here", existing);
                 diagnostic.try_set_fix(|| {
-                    edits::remove_member(&set.elts, index, checker.locator().contents()).map(
-                        |edit| {
-                            let applicability = if checker.comment_ranges().intersects(edit.range())
-                            {
-                                Applicability::Unsafe
-                            } else {
-                                Applicability::Safe
-                            };
-                            Fix::applicable_edit(edit, applicability)
-                        },
+                    edits::remove_member(
+                        &set.elts,
+                        index,
+                        checker.locator().contents(),
+                        checker.tokens(),
                     )
+                    .map(|edit| {
+                        let applicability = if checker.comment_ranges().intersects(edit.range()) {
+                            Applicability::Unsafe
+                        } else {
+                            Applicability::Safe
+                        };
+                        Fix::applicable_edit(edit, applicability)
+                    })
                 });
             }
         }
