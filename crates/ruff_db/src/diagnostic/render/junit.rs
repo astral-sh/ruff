@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::io::{BufWriter, Write as _};
 use std::path::Path;
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
@@ -103,8 +104,9 @@ impl Renderer for JunitRenderer<'_> {
             }
         }
 
-        let adapter = FmtAdapter { fmt: f };
-        report.serialize(adapter).map_err(|_| std::fmt::Error)
+        let mut writer = BufWriter::new(FmtAdapter { fmt: f });
+        report.serialize(&mut writer).map_err(|_| std::fmt::Error)?;
+        writer.flush().map_err(|_| std::fmt::Error)
     }
 }
 

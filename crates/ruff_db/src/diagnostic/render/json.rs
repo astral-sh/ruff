@@ -1,4 +1,5 @@
 use serde::{Serialize, Serializer, ser::SerializeSeq};
+use std::io::Write as _;
 use std::{fmt, io};
 
 use ruff_diagnostics::{Applicability, Edit};
@@ -28,7 +29,9 @@ impl<'a> JsonRenderer<'a> {
 
 impl Renderer for JsonRenderer<'_> {
     fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
-        self.write(&mut FmtAdapter { fmt: f }, diagnostics)
+        let mut writer = io::BufWriter::new(FmtAdapter { fmt: f });
+        self.write(&mut writer, diagnostics)
+            .and_then(|()| writer.flush())
             .map_err(|_| fmt::Error)
     }
 
