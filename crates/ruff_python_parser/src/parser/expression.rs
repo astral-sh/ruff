@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use bitflags::bitflags;
+use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
 use ruff_python_ast::name::Name;
@@ -731,6 +732,7 @@ impl<'src> Parser<'src> {
         }
 
         let snapshot = self.argument_scratch.snapshot();
+        let mut bare_generators = SmallVec::<[TextRange; 1]>::new();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -772,6 +774,10 @@ impl<'src> Parser<'src> {
                                 Parenthesized::No,
                             ))
                             .into();
+                            // A recovered `expr = value` becomes a keyword and loses its left side.
+                            if !parser.at(TokenKind::Equal) {
+                                bare_generators.push(parsed_expr.range());
+                            }
                         }
                         _ => {
                             if seen_keyword_unpacking
@@ -869,7 +875,25 @@ impl<'src> Parser<'src> {
             items: self.argument_scratch.take_thin_vec(snapshot),
         };
 
-        self.validate_arguments(&arguments, has_trailing_comma, context);
+        // A call may omit parentheses around its sole generator. Class bases always require them.
+        if !bare_generators.is_empty()
+            && (matches!(context, ArgumentsContext::ClassDefinition)
+                || has_trailing_comma
+                || arguments.len() > 1)
+        {
+            for range in bare_generators {
+                // test_ok args_unparenthesized_generator
+                // zip((x for x in range(10)), (y for y in range(10)))
+                // sum(x for x in range(10))
+                // sum((x for x in range(10)),)
+
+                // test_err args_unparenthesized_generator
+                // sum(x for x in range(10), 5)
+                // total(1, 2, x for x in range(5), 6)
+                // sum(x for x in range(10),)
+                self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
+            }
+        }
 
         arguments
     }
@@ -2999,44 +3023,6 @@ impl<'src> Parser<'src> {
         }
 
         command
-    }
-
-    /// Performs the following validations on the arguments:
-    /// - Generator expressions are parenthesized when required by the argument context.
-    fn validate_arguments(
-        &mut self,
-        arguments: &ast::Arguments,
-        has_trailing_comma: bool,
-        context: ArgumentsContext,
-    ) {
-        let generator_must_be_parenthesized = match context {
-            ArgumentsContext::Call => has_trailing_comma || arguments.len() > 1,
-            // CPython rejects an unparenthesized generator expression as a class base even though
-            // this restriction isn't specified in the class definition grammar.
-            ArgumentsContext::ClassDefinition => true,
-        };
-
-        if generator_must_be_parenthesized {
-            for arg in arguments.args() {
-                if let Some(ast::ExprGenerator {
-                    range,
-                    parenthesized: false,
-                    ..
-                }) = arg.as_generator_expr()
-                {
-                    // test_ok args_unparenthesized_generator
-                    // zip((x for x in range(10)), (y for y in range(10)))
-                    // sum(x for x in range(10))
-                    // sum((x for x in range(10)),)
-
-                    // test_err args_unparenthesized_generator
-                    // sum(x for x in range(10), 5)
-                    // total(1, 2, x for x in range(5), 6)
-                    // sum(x for x in range(10),)
-                    self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
-                }
-            }
-        }
     }
 }
 
