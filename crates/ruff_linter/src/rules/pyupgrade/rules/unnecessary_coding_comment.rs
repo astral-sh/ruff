@@ -1,7 +1,4 @@
 use std::iter::FusedIterator;
-use std::sync::LazyLock;
-
-use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::CommentRanges;
@@ -47,9 +44,22 @@ impl AlwaysFixableViolation for UTF8EncodingDeclaration {
     }
 }
 
-// Regex from PEP263.
-static CODING_COMMENT_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[ \t\f]*#.*?coding[:=][ \t]*(?<name>[-_.a-zA-Z0-9]+)").unwrap());
+/// Extract the encoding name from a physical line using the PEP 263 grammar.
+fn declared_encoding(line: &str) -> Option<&str> {
+    let comment = line
+        .trim_start_matches([' ', '\t', '\x0c'])
+        .strip_prefix('#')?;
+    comment.match_indices("coding").find_map(|(start, marker)| {
+        let rest = comment[start + marker.len()..]
+            .strip_prefix([':', '='])?
+            .trim_start_matches([' ', '\t']);
+        let end = rest
+            .bytes()
+            .take_while(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+            .count();
+        (end > 0).then(|| &rest[..end])
+    })
+}
 
 #[derive(Debug)]
 enum CodingComment {
@@ -161,20 +171,13 @@ impl Iterator for CodingCommentIterator<'_> {
 
         self.last_trivia_end = Some(comment.end());
 
-        let result = if let Some(parts_of_interest) =
-            CODING_COMMENT_REGEX.captures(self.locator.slice(line_range))
-        {
-            let coding_name = parts_of_interest.name("name").unwrap();
-
-            match coding_name.as_str() {
-                "utf8" | "utf-8" => CodingComment::UTF8(CodingCommentRange {
-                    comment: comment.range(),
-                    line: line_range,
-                }),
-                _ => CodingComment::OtherEncoding,
-            }
-        } else {
-            CodingComment::NoEncoding
+        let result = match declared_encoding(self.locator.slice(line_range)) {
+            Some("utf8" | "utf-8") => CodingComment::UTF8(CodingCommentRange {
+                comment: comment.range(),
+                line: line_range,
+            }),
+            Some(_) => CodingComment::OtherEncoding,
+            None => CodingComment::NoEncoding,
         };
 
         Some(result)
@@ -182,3 +185,21 @@ impl Iterator for CodingCommentIterator<'_> {
 }
 
 impl FusedIterator for CodingCommentIterator<'_> {}
+
+#[cfg(test)]
+mod tests {
+    use super::declared_encoding;
+
+    #[test]
+    fn first_valid_encoding_declaration() {
+        assert_eq!(
+            declared_encoding("# coding:é encoding=\tutf-8"),
+            Some("utf-8")
+        );
+        assert_eq!(
+            declared_encoding("# coding:latin.1 coding:utf8"),
+            Some("latin.1")
+        );
+        assert_eq!(declared_encoding("# coding:\x0cutf8"), None);
+    }
+}
