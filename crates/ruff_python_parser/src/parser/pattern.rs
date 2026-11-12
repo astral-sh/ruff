@@ -189,7 +189,7 @@ impl Parser<'_> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        let mut items = Vec::new();
+        let mut items = id::NodeListBuilder::new();
         let mut has_rest = false;
 
         self.parse_comma_separated_list(RecoveryContextKind::MatchPatternMapping, |parser| {
@@ -254,7 +254,7 @@ impl Parser<'_> {
 
         build::PatternMatchMapping {
             range: self.node_range(start),
-            items: self.storage.mapping_pattern_items(items),
+            items: self.storage.mapping_pattern_items(items.into_items()),
         }
         .parsed(&mut self.storage)
     }
@@ -770,7 +770,7 @@ impl Parser<'_> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut items = Vec::new();
+        let mut items = id::NodeListBuilder::new();
         let mut has_seen_keyword_pattern = false;
 
         self.parse_comma_separated_list(
@@ -830,7 +830,7 @@ impl Parser<'_> {
         build::PatternMatchClass {
             cls: cls.id,
             arguments: build::PatternArguments {
-                items: self.storage.list(items),
+                items: items.finish(&mut self.storage),
                 range: self.node_range(arguments_start),
             }
             .parsed(&mut self.storage)

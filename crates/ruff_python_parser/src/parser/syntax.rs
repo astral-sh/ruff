@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, AstNode, AstNodeId, BuildId, Builder, Emit, NodeKind};
+use ruff_python_ast::{self as ast, AstNode, BuildId, Builder, Emit, NodeKind};
 use ruff_text_size::{Ranged, TextRange};
 
 /// The Pratt parser uses the range and kind of its current result for lookahead and errors.
@@ -48,11 +48,11 @@ impl<T: Emit> Construct for T {}
 /// Collects child IDs until the parser can put them in a contiguous arena list.
 /// Keeping the first ID inline avoids a temporary allocation for single-element lists.
 pub(super) struct NodeListBuilder<T> {
-    first: Option<BuildId<T>>,
-    additional: Vec<BuildId<T>>,
+    first: Option<T>,
+    additional: Vec<T>,
 }
 
-impl<T: ast::NodeType + 'static> NodeListBuilder<T> {
+impl<T> NodeListBuilder<T> {
     pub(super) fn new() -> Self {
         Self {
             first: None,
@@ -60,7 +60,7 @@ impl<T: ast::NodeType + 'static> NodeListBuilder<T> {
         }
     }
 
-    pub(super) fn push(&mut self, id: BuildId<T>) {
+    pub(super) fn push(&mut self, id: T) {
         if self.first.is_none() {
             self.first = Some(id);
         } else {
@@ -68,8 +68,15 @@ impl<T: ast::NodeType + 'static> NodeListBuilder<T> {
         }
     }
 
-    pub(super) fn finish(self, builder: &mut Builder) -> ast::ListId<AstNodeId<T>> {
-        builder.list(self.first.into_iter().chain(self.additional))
+    pub(super) fn into_items(self) -> impl Iterator<Item = T> {
+        self.first.into_iter().chain(self.additional)
+    }
+
+    pub(super) fn finish(self, builder: &mut Builder) -> ast::ListId<T::Element>
+    where
+        T: ast::ListItem,
+    {
+        builder.list(self.into_items())
     }
 }
 
