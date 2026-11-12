@@ -1879,6 +1879,61 @@ x10: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(
 # fmt: on
 ```
 
+## Type context and explicitly annotated `self`
+
+When `self` is explicitly annotated with a concrete specialization, ty uses it when inferring the
+type of unspecialized constructor calls:
+
+```py
+class Reader[T]:
+    def __init__(self: "Reader[int]") -> None: ...
+    def read(self) -> T:
+        raise NotImplementedError
+
+reveal_type(Reader())  # revealed: Reader[int]
+```
+
+When trying to specialize explicitly, the call will fail:
+
+```py
+Reader[str]()  # error: [invalid-argument-type]
+```
+
+`Reader[int]` is also inferred if it is assignable to the assignment context (`Reader` is covariant
+in `T`):
+
+```py
+# revealed: Reader[int]
+reader: Reader[int] = reveal_type(Reader())
+
+# revealed: Reader[int]
+reader: Reader[int | str] = reveal_type(Reader())
+```
+
+Interestingly, it is not just valid to annotate the result with a supertype (`int | str`), but also
+with a subtype (`bool`). In the case below, `Reader()` can be inferred as `Reader[bool]`, which is a
+valid argument to the `self: Reader[int]` parameter, again due to covariance.
+
+```py
+# TODO: this should not be an error, and Reader[bool] should be inferred (see https://github.com/astral-sh/ty/issues/4993)
+# revealed: Reader[int]
+narrow_reader: Reader[bool] = reveal_type(Reader())  # error: [invalid-assignment]
+```
+
+The same is also true if the receiver is annotated with a union:
+
+```py
+class ReaderUnion[T]:
+    def __init__(self: "ReaderUnion[int | str]") -> None: ...
+
+# revealed: ReaderUnion[int | str]
+reader: ReaderUnion[int | str] = reveal_type(ReaderUnion())
+# revealed: ReaderUnion[int | str]
+reader: ReaderUnion[int | str | None] = reveal_type(ReaderUnion())
+# revealed: ReaderUnion[int]
+narrow_union: ReaderUnion[int] = reveal_type(ReaderUnion())
+```
+
 ## Generic class specialization through recursive callable aliases
 
 A recursive callable context specializes a generic class used as a factory. The returned container
