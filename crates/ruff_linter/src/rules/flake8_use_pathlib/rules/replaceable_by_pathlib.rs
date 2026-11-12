@@ -26,7 +26,7 @@ pub(crate) fn replaceable_by_pathlib(
             checker.report_diagnostic_if_enabled(
                 OsPathJoin {
                     module: module.to_string(),
-                    joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
+                    joiner: if call.arguments.args().any(Expr::is_starred_expr) {
                         Joiner::Joinpath
                     } else {
                         Joiner::Slash

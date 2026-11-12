@@ -75,7 +75,7 @@ pub(crate) fn re_sub_positional_args(
         _ => return,
     };
 
-    if call.arguments.args.len() > method.num_args() {
+    if call.arguments.args().nth(method.num_args()).is_some() {
         checker.report_diagnostic(ReSubPositionalArgs { method }, call.range());
     }
 }

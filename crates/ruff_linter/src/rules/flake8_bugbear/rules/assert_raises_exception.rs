@@ -140,7 +140,7 @@ pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCa
     } = call;
     let semantic = checker.semantic();
 
-    if arguments.args.len() < 2 && arguments.find_argument("func", 1).is_none() {
+    if arguments.args().nth(1).is_none() && arguments.find_argument("func", 1).is_none() {
         return;
     }
 

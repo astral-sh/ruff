@@ -114,7 +114,7 @@ pub(crate) fn is_likely_pytest_test(func: &StmtFunctionDef, checker: &Checker) -
 }
 
 pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {
-    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &keyword.value {
+    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = keyword.value.as_ref() {
         value == literal
     } else {
         false

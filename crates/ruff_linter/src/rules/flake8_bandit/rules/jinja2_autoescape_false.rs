@@ -66,7 +66,7 @@ pub(crate) fn jinja2_autoescape_false(
 ) {
     if matches!(qualified_name.segments(), ["jinja2", "Environment"]) {
         if let Some(keyword) = call.arguments.find_keyword("autoescape") {
-            match &keyword.value {
+            match keyword.value.as_ref() {
                 Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) => (),
                 Expr::Call(ast::ExprCall { func, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {

@@ -66,7 +66,7 @@ pub(crate) fn ssl_insecure_version(
         return;
     };
 
-    match &keyword.value {
+    match keyword.value.as_ref() {
         Expr::Name(ast::ExprName { id, .. }) if is_insecure_protocol(id) => {
             checker.report_diagnostic(
                 SslInsecureVersion {

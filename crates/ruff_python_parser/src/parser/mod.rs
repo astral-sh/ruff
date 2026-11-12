@@ -7,7 +7,7 @@ use hashbrown::HashSet;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    Alias, AtomicNodeIndex, ElifElseClause, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression,
+    Alias, Argument, AtomicNodeIndex, ElifElseClause, Expr, Int, IpyEscapeKind, Mod, ModExpression,
     ModModule, ParameterItem, Stmt, StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
@@ -100,7 +100,7 @@ pub(crate) struct Parser<'src> {
     expr_scratch: ScratchBuffer<Expr>,
 
     /// Reusable, nesting-safe scratch storage for call keywords.
-    keyword_scratch: ScratchBuffer<Keyword>,
+    argument_scratch: ScratchBuffer<Argument>,
 
     /// Reusable, nesting-safe scratch storage for function and lambda parameters.
     parameter_scratch: ScratchBuffer<ParameterItem>,
@@ -144,7 +144,7 @@ impl<'src> Parser<'src> {
             recursion_depth: 0,
             current_token_id: TokenId::default(),
             expr_scratch: ScratchBuffer::with_capacity(16),
-            keyword_scratch: ScratchBuffer::new(),
+            argument_scratch: ScratchBuffer::new(),
             parameter_scratch: ScratchBuffer::new(),
             stmt_scratch: ScratchBuffer::with_capacity(32),
             alias_scratch: ScratchBuffer::new(),

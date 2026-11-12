@@ -1478,7 +1478,7 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
 
     let mut schema = TypedDictSchema::default();
 
-    if let Some(fields_arg) = node.arguments.args.get(1) {
+    if let Some(fields_arg) = node.arguments.args().nth(1) {
         let ast::Expr::Dict(dict_expr) = fields_arg else {
             return schema;
         };
@@ -1562,10 +1562,10 @@ pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> Typ
     // Note that it is fine to only check for Boolean literals here
     // (https://typing.python.org/en/latest/spec/typeddict.html#totality)
     if let Some(arguments) = &class_stmt.arguments {
-        for keyword in &arguments.keywords {
+        for keyword in arguments.keywords() {
             if keyword.arg.as_deref() == Some("total")
                 && matches!(
-                    &keyword.value,
+                    keyword.value.as_ref(),
                     ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: false, .. })
                 )
             {
@@ -2168,13 +2168,12 @@ pub(super) fn infer_unpacked_keyword_types<'db>(
     mut expression_type_fn: impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> Vec<Option<Type<'db>>> {
     arguments
-        .keywords
-        .iter()
+        .keywords()
         .map(|keyword| {
             keyword
                 .arg
                 .is_none()
-                .then(|| expression_type_fn(&keyword.value, TypeContext::default()))
+                .then(|| expression_type_fn(keyword.value.as_ref(), TypeContext::default()))
         })
         .collect()
 }
@@ -2203,17 +2202,15 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
     unpacked_keyword_types: &[Option<Type<'db>>],
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
-    debug_assert_eq!(arguments.keywords.len(), unpacked_keyword_types.len());
+    debug_assert_eq!(arguments.keywords().count(), unpacked_keyword_types.len());
 
     let mut provided_keys: OrderSet<Name> = arguments
-        .keywords
-        .iter()
+        .keywords()
         .filter_map(|keyword| keyword.arg.as_ref().map(|arg| arg.id.clone()))
         .collect();
 
     for (keyword, unpacked_type) in arguments
-        .keywords
-        .iter()
+        .keywords()
         .zip(unpacked_keyword_types.iter().copied())
     {
         if keyword.arg.is_some() {
@@ -2232,7 +2229,7 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
             db,
             env,
             typed_dict,
-            &keyword.value,
+            keyword.value.as_ref(),
             unpacked_type,
             &mut provided_keys,
             expression_type_fn,
@@ -2612,14 +2609,14 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     let typed_dict_ty = Type::TypedDict(typed_dict);
     let env = context.program_environment();
 
-    if arguments.args.len() > 1 {
-        if let Some(builder) =
-            context.report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, &arguments.args[1])
-        {
+    let mut positional = arguments.args();
+    let positional_arg = positional.next();
+    if let Some(extra) = positional.next() {
+        if let Some(builder) = context.report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, extra) {
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to TypedDict `{}` constructor: expected 1, got {}",
                 typed_dict_ty.display(db, env),
-                arguments.args.len(),
+                arguments.args().count(),
             ));
         }
         // TODO: Consider validating the first positional argument too, without producing
@@ -2628,12 +2625,13 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     }
 
     // Check for a single positional argument, and whether it's a dict literal.
-    let has_single_positional_arg = arguments.args.len() == 1;
-    let positional_dict_literal = arguments.args.first().and_then(ast::Expr::as_dict_expr);
+    let positional_dict_literal = positional_arg.and_then(ast::Expr::as_dict_expr);
 
     let unpacked_keyword_types = infer_unpacked_keyword_types(arguments, &mut expression_type_fn);
 
-    if has_single_positional_arg && !arguments.keywords.is_empty() {
+    if let Some(arg) = positional_arg
+        && arguments.keywords().next().is_some()
+    {
         // Mixed positional-and-keyword construction: guaranteed keyword-provided keys override the
         // positional mapping, so validate the positional argument against the remaining schema.
         let keyword_keys = validate_from_keywords(
@@ -2654,7 +2652,6 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
                 &keyword_keys,
             )
         } else {
-            let arg = &arguments.args[0];
             let positional_inference_target =
                 typed_dict_with_relaxed_keys(db, typed_dict, &keyword_keys);
             let positional_target = typed_dict_without_keys(db, typed_dict, &keyword_keys);
@@ -2711,12 +2708,11 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             &OrderSet::new(),
         );
         validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
-    } else if has_single_positional_arg {
+    } else if let Some(arg) = positional_arg {
         // Single positional argument: check if assignable to the target TypedDict.
         // This handles TypedDict, intersections, unions, and type aliases correctly.
         // Assignability already checks for required keys and type compatibility,
         // so we don't need separate validation.
-        let arg = &arguments.args[0];
         let arg_ty = expression_type_fn(arg, TypeContext::declared(Some(typed_dict_ty)));
 
         if !arg_ty.is_assignable_to(db, env, typed_dict_ty) {
@@ -2785,14 +2781,13 @@ fn validate_from_keywords<'db, 'ast>(
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
     let db = context.db();
-    debug_assert_eq!(arguments.keywords.len(), unpacked_keyword_types.len());
+    debug_assert_eq!(arguments.keywords().count(), unpacked_keyword_types.len());
 
     let mut guaranteed_keys = BTreeMap::new();
 
     // Validate that each key is assigned a type that is compatible with the key's value type
     for (keyword, unpacked_type) in arguments
-        .keywords
-        .iter()
+        .keywords()
         .zip(unpacked_keyword_types.iter().copied())
     {
         let keyword_node: AnyNodeRef<'ast> = keyword.into();
@@ -2811,7 +2806,7 @@ fn validate_from_keywords<'db, 'ast>(
                 .item(db, arg_name.id.as_str())
                 .map(|field| TypeContext::declared(Some(field.declared_ty)))
                 .unwrap_or_default();
-            let value_ty = expression_type_fn(&keyword.value, value_tcx);
+            let value_ty = expression_type_fn(keyword.value.as_ref(), value_tcx);
             TypedDictKeyAssignment {
                 context,
                 typed_dict,
@@ -2820,7 +2815,7 @@ fn validate_from_keywords<'db, 'ast>(
                 value_ty,
                 typed_dict_node,
                 key_node: keyword_node,
-                value_node: (&keyword.value).into(),
+                value_node: keyword.value.as_ref().into(),
                 assignment_kind: TypedDictAssignmentKind::Constructor,
                 emit_diagnostic: true,
             }
@@ -2840,12 +2835,12 @@ fn validate_from_keywords<'db, 'ast>(
             validate_merged_unpacked_keyword_argument(
                 context,
                 typed_dict,
-                &keyword.value,
+                keyword.value.as_ref(),
                 unpacked_type,
                 TypedDictAssignmentNodes {
                     typed_dict: typed_dict_node,
                     key: keyword_node,
-                    value: (&keyword.value).into(),
+                    value: keyword.value.as_ref().into(),
                 },
                 &mut unpacked_guaranteed_keys,
                 &mut shadowed_keys,

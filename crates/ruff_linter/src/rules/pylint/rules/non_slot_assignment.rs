@@ -69,7 +69,6 @@ pub(crate) fn non_slot_assignment(checker: &Checker, class_def: &ast::StmtClassD
     // the parent class defines the relevant `__slots__`.
     if !class_def
         .bases()
-        .iter()
         .all(|base| semantic.match_builtin_expr(base, "object"))
     {
         return;

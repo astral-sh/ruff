@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
@@ -96,8 +97,10 @@ pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
     }
 
     // Single argument and no keyword arguments
-    let [argument] = &*arguments.args else { return };
-    if !arguments.keywords.is_empty() {
+    let Some([argument]) = arguments.args().collect_array() else {
+        return;
+    };
+    if arguments.keywords().next().is_some() {
         return;
     }
 

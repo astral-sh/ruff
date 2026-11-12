@@ -1,4 +1,4 @@
-use ruff_python_ast::{Arguments, Stmt, StmtClassDef};
+use ruff_python_ast::{Stmt, StmtClassDef};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
@@ -57,13 +57,13 @@ pub(crate) fn no_slots_in_tuple_subclass(checker: &Checker, stmt: &Stmt, class: 
     if checker.source_type.is_stub() {
         return;
     }
-    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
+    let Some(arguments) = class.arguments.as_deref() else {
         return;
     };
 
     let semantic = checker.semantic();
 
-    if bases.iter().any(|base| {
+    if arguments.args().any(|base| {
         let base = map_subscript(base);
         semantic.match_builtin_expr(base, "tuple") || semantic.match_typing_expr(base, "Tuple")
     }) {

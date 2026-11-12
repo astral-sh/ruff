@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace;
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::LineRanges;
@@ -187,9 +187,7 @@ impl Violation for DotFormatInException {
 /// EM101, EM102, EM103
 pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
+        func, arguments, ..
     }) = exc
     else {
         return;
@@ -199,7 +197,7 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
         return;
     }
 
-    if let Some(first) = args.first() {
+    if let Some(first) = arguments.args().next() {
         match first {
             // Check for string literals.
             Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. })

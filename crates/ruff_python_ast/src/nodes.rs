@@ -30,19 +30,15 @@ use crate::{
 
 impl StmtClassDef {
     /// Return an iterator over the bases of the class.
-    pub fn bases(&self) -> &[Expr] {
-        match &self.arguments {
-            Some(arguments) => &arguments.args,
-            None => &[],
-        }
+    pub fn bases(&self) -> impl DoubleEndedIterator<Item = &Expr> + FusedIterator + Clone {
+        self.arguments.iter().flat_map(|arguments| arguments.args())
     }
 
-    /// Return an iterator over the metaclass keywords of the class.
-    pub fn keywords(&self) -> &[Keyword] {
-        match &self.arguments {
-            Some(arguments) => &arguments.keywords,
-            None => &[],
-        }
+    /// Return the keyword arguments in the class header.
+    pub fn keywords(&self) -> impl DoubleEndedIterator<Item = &Keyword> + FusedIterator + Clone {
+        self.arguments
+            .iter()
+            .flat_map(|arguments| arguments.keywords())
     }
 }
 
@@ -3053,7 +3049,9 @@ pub struct Keyword {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
     pub arg: Option<Identifier>,
-    pub value: Expr,
+    // Every argument takes up the same space in `Arguments::items`. Boxing the value
+    // keeps positional arguments from reserving space for both an expression and a keyword name.
+    pub value: Box<Expr>,
 }
 
 /// See also [alias](https://docs.python.org/3/library/ast.html#ast.alias)
@@ -3612,14 +3610,43 @@ impl ParameterWithDefault {
 /// In the context of a class definition, the Python-style AST refers to the arguments as `bases`,
 /// as they represent the "explicitly specified base classes", while the keyword arguments are
 /// typically used for `metaclass`, with any additional arguments being passed to the `metaclass`.
-
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Arguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub args: ThinVec<Expr>,
-    pub keywords: ThinVec<Keyword>,
+    pub items: ThinVec<Argument>,
+}
+
+/// A positional or keyword argument, stored in the order it appears in the source.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub enum Argument {
+    Positional(Expr),
+    Keyword(Keyword),
+}
+
+impl Argument {
+    pub fn as_positional(&self) -> Option<&Expr> {
+        match self {
+            Self::Positional(expr) => Some(expr),
+            Self::Keyword(_) => None,
+        }
+    }
+
+    pub fn as_keyword(&self) -> Option<&Keyword> {
+        match self {
+            Self::Keyword(keyword) => Some(keyword),
+            Self::Positional(_) => None,
+        }
+    }
+
+    pub fn as_ref(&self) -> ArgOrKeyword<'_> {
+        match self {
+            Self::Positional(expr) => ArgOrKeyword::Arg(expr),
+            Self::Keyword(keyword) => ArgOrKeyword::Keyword(keyword),
+        }
+    }
 }
 
 /// An entry in the argument list of a function call.
@@ -3681,9 +3708,19 @@ impl Ranged for ArgOrKeyword<'_> {
 }
 
 impl Arguments {
+    /// Positional arguments, including iterable unpacking.
+    pub fn args(&self) -> impl DoubleEndedIterator<Item = &Expr> + FusedIterator + Clone {
+        self.items.iter().filter_map(Argument::as_positional)
+    }
+
+    /// Keyword arguments, including mapping unpacking.
+    pub fn keywords(&self) -> impl DoubleEndedIterator<Item = &Keyword> + FusedIterator + Clone {
+        self.items.iter().filter_map(Argument::as_keyword)
+    }
+
     /// Return the number of positional and keyword arguments.
     pub fn len(&self) -> usize {
-        self.args.len() + self.keywords.len()
+        self.items.len()
     }
 
     /// Return `true` if there are no positional or keyword arguments.
@@ -3693,7 +3730,7 @@ impl Arguments {
 
     /// Return the [`Keyword`] with the given name, or `None` if no such [`Keyword`] exists.
     pub fn find_keyword(&self, keyword_name: &str) -> Option<&Keyword> {
-        self.keywords.iter().find(|keyword| {
+        self.keywords().find(|keyword| {
             let Keyword { arg, .. } = keyword;
             arg.as_ref().is_some_and(|arg| arg == keyword_name)
         })
@@ -3701,8 +3738,7 @@ impl Arguments {
 
     /// Return the positional argument at the given index, or `None` if no such argument exists.
     pub fn find_positional(&self, position: usize) -> Option<&Expr> {
-        self.args
-            .iter()
+        self.args()
             .take_while(|expr| !expr.is_starred_expr())
             .nth(position)
     }
@@ -3735,35 +3771,13 @@ impl Arguments {
     /// ```
     /// where `*args` and `args2` are `args` while `a=1` and `kwargs` are `keywords`.
     ///
-    /// If you would just chain `args` and `keywords` the call would get reordered which we don't
-    /// want. This function instead "merge sorts" them into the correct order.
-    ///
-    /// Note that the order of evaluation is always first `args`, then `keywords`:
-    /// ```python
-    /// def f(*args, **kwargs):
-    ///     pass
-    ///
-    /// def g(x):
-    ///     print(x)
-    ///     return x
-    ///
-    ///
-    /// f(*g([1]), a=g(2), *g([3]), **g({"4": 5}))
-    /// ```
-    /// Output:
-    /// ```text
-    /// [1]
-    /// [3]
-    /// 2
-    /// {'4': 5}
-    /// ```
-    pub fn iter_source_order(&self) -> ArgumentsSourceOrder<'_> {
-        ArgumentsSourceOrder {
-            args: &self.args,
-            keywords: &self.keywords,
-            next_arg: 0,
-            next_keyword: 0,
-        }
+    /// Python evaluates positional arguments before keyword arguments, even when a starred
+    /// argument appears after a keyword. Evaluation-order visitors use the two groups separately.
+    pub fn iter_source_order(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = ArgOrKeyword<'_>> + ExactSizeIterator + FusedIterator + Clone
+    {
+        self.items.iter().map(Argument::as_ref)
     }
 
     pub fn inner_range(&self) -> TextRange {
@@ -3778,38 +3792,6 @@ impl Arguments {
         TextRange::new(self.end() - ')'.text_len(), self.end())
     }
 }
-
-/// The iterator returned by [`Arguments::iter_source_order`].
-#[derive(Clone)]
-pub struct ArgumentsSourceOrder<'a> {
-    args: &'a [Expr],
-    keywords: &'a [Keyword],
-    next_arg: usize,
-    next_keyword: usize,
-}
-
-impl<'a> Iterator for ArgumentsSourceOrder<'a> {
-    type Item = ArgOrKeyword<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let arg = self.args.get(self.next_arg);
-        let keyword = self.keywords.get(self.next_keyword);
-
-        if let Some(arg) = arg
-            && keyword.is_none_or(|keyword| arg.start() <= keyword.start())
-        {
-            self.next_arg += 1;
-            Some(ArgOrKeyword::Arg(arg))
-        } else if let Some(keyword) = keyword {
-            self.next_keyword += 1;
-            Some(ArgOrKeyword::Keyword(keyword))
-        } else {
-            None
-        }
-    }
-}
-
-impl FusedIterator for ArgumentsSourceOrder<'_> {}
 
 /// An AST node used to represent a sequence of type parameters.
 ///
@@ -4123,7 +4105,9 @@ mod tests {
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 64);
         assert_eq!(std::mem::size_of::<Parameters>(), 24);
-        assert_eq!(std::mem::size_of::<Arguments>(), 32);
+        assert_eq!(std::mem::size_of::<Arguments>(), 24);
+        assert_eq!(std::mem::size_of::<crate::Argument>(), 64);
+        assert_eq!(std::mem::size_of::<crate::Keyword>(), 56);
         assert_eq!(std::mem::size_of::<Expr>(), 56);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
@@ -4131,7 +4115,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
         assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 16);
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 48);
-        assert_eq!(std::mem::size_of::<ExprCall>(), 48);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 40);
         assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
         assert_eq!(std::mem::size_of::<ExprDict>(), 40);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);

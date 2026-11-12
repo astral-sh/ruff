@@ -63,12 +63,11 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             })),
             arguments: Arguments {
-                args: if let Some(msg) = msg {
-                    [msg.clone()].into()
-                } else {
-                    [].into()
-                },
-                keywords: std::iter::empty().collect(),
+                items: msg
+                    .cloned()
+                    .into_iter()
+                    .map(ast::Argument::Positional)
+                    .collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },

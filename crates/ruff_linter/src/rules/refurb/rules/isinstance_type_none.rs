@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::SemanticModel;
@@ -55,11 +56,11 @@ pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall) {
     let semantic = checker.semantic();
     let (func, arguments) = (&call.func, &call.arguments);
 
-    if !arguments.keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return;
     }
 
-    let [expr, types] = arguments.args.as_ref() else {
+    let Some([expr, types]) = arguments.args().collect_array() else {
         return;
     };
 
@@ -95,11 +96,14 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
                     return false;
                 }
 
-                if !arguments.keywords.is_empty() {
+                if arguments.keywords().next().is_some() {
                     return false;
                 }
 
-                matches!(arguments.args.as_ref(), [Expr::NoneLiteral(_)])
+                matches!(
+                    arguments.args().collect_array(),
+                    Some([Expr::NoneLiteral(_)])
+                )
             }
 
             // Ex) `(type(None),)`

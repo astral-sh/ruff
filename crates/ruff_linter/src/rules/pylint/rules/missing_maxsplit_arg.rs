@@ -172,10 +172,10 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     }
 
     // Check maxsplit kwarg not set via unpacked dict literal
-    for keyword in &*arguments.keywords {
+    for keyword in arguments.keywords() {
         let Keyword { value, .. } = keyword;
 
-        if let Expr::Dict(ExprDict { items, .. }) = value {
+        if let Expr::Dict(ExprDict { items, .. }) = value.as_ref() {
             for item in items {
                 let DictItem { key, .. } = item;
                 if let Some(Expr::StringLiteral(ExprStringLiteral { value, .. })) = key {
@@ -217,11 +217,8 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         maxsplit_argument_edit,
         split_type_edit,
         // Mark the fix as unsafe, if there are `*args` or `**kwargs`
-        if arguments.args.iter().any(Expr::is_starred_expr)
-            || arguments
-                .keywords
-                .iter()
-                .any(|keyword| keyword.arg.is_none())
+        if arguments.args().any(Expr::is_starred_expr)
+            || arguments.keywords().any(|keyword| keyword.arg.is_none())
         {
             Applicability::Unsafe
         } else {

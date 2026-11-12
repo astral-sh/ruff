@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -92,8 +93,13 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
 }
 
 /// B010
-pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let [obj, name, value] = args else {
+pub(crate) fn setattr_with_constant(
+    checker: &Checker,
+    expr: &Expr,
+    func: &Expr,
+    arguments: &ast::Arguments,
+) {
+    let Some([obj, name, value]) = arguments.args().collect_array() else {
         return;
     };
     if obj.is_starred_expr() {

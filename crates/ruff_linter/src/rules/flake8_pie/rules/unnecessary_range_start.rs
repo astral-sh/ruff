@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -45,12 +46,12 @@ impl AlwaysFixableViolation for UnnecessaryRangeStart {
 /// PIE808
 pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
     // `range` doesn't accept keyword arguments.
-    if !call.arguments.keywords.is_empty() {
+    if call.arguments.keywords().next().is_some() {
         return;
     }
 
     // Verify that the call has exactly two arguments (no `step`).
-    let [start, _] = &*call.arguments.args else {
+    let Some([start, _]) = call.arguments.args().collect_array() else {
         return;
     };
 

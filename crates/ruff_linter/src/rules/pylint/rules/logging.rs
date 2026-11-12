@@ -98,15 +98,14 @@ impl Violation for LoggingTooManyArgs {
 /// PLE1206
 pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     // If there are any starred arguments, abort.
-    if call.arguments.args.iter().any(Expr::is_starred_expr) {
+    if call.arguments.args().any(Expr::is_starred_expr) {
         return;
     }
 
     // If there are any starred keyword arguments, abort.
     if call
         .arguments
-        .keywords
-        .iter()
+        .keywords()
         .any(|keyword| keyword.arg.is_none())
     {
         return;
@@ -160,8 +159,8 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let num_message_args = call.arguments.args.len() - 1;
-    let num_keywords = call.arguments.keywords.len();
+    let num_message_args = call.arguments.args().count() - 1;
+    let num_keywords = call.arguments.keywords().count();
 
     if checker.is_rule_enabled(Rule::LoggingTooManyArgs) {
         if summary.num_positional < num_message_args {

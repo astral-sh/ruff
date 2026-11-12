@@ -147,8 +147,7 @@ Module(
                                             arguments: Arguments {
                                                 range: 60..62,
                                                 node_index: NodeIndex(None),
-                                                args: [],
-                                                keywords: [],
+                                                items: [],
                                             },
                                         },
                                     ),

@@ -14,8 +14,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
-    PythonVersion,
+    self as ast, AnyNodeRef, ArgOrKeyword, ExprContext, HasNodeIndex, PythonVersion,
 };
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::typing::as_pep_585_generic;
@@ -3771,7 +3770,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let arguments = &call_expr.arguments;
 
-        if !arguments.keywords.is_empty() {
+        if arguments.keywords().next().is_some() {
             return error(
                 &self.context,
                 "Keyword arguments are not supported in `NewType` creation",
@@ -3779,7 +3778,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = arguments.args().find(|arg| arg.is_starred_expr()) {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `NewType` creation",
@@ -3787,18 +3786,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if arguments.args.len() != 2 {
+        let [
+            ast::Argument::Positional(name_arg),
+            ast::Argument::Positional(_),
+        ] = arguments.items.as_slice()
+        else {
             return error(
                 &self.context,
                 format!(
                     "Wrong number of arguments in `NewType` creation: expected 2, found {}",
-                    arguments.args.len()
+                    arguments.args().count()
                 ),
                 call_expr,
             );
-        }
+        };
 
-        let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
+        let name_param_ty = self.infer_expression(name_arg, TypeContext::default());
 
         let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
             return error(
@@ -3822,7 +3825,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if name != target_name {
             report_mismatched_type_name(
                 &self.context,
-                &arguments.args[0],
+                name_arg,
                 "NewType",
                 target_name,
                 Some(name),
@@ -3855,24 +3858,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
-        let ast::Arguments {
-            args,
-            keywords,
-            range: _,
-            node_index: _,
-        } = &call_expr.arguments;
+        let arguments = &call_expr.arguments;
 
-        if args.iter().any(ast::Expr::is_starred_expr) {
+        if arguments.args().any(ast::Expr::is_starred_expr) {
             return None;
         }
 
-        let (name_arg, mut repr_arg) = match &**args {
-            [name_arg] => (name_arg, None),
-            [name_arg, repr_arg] => (name_arg, Some(repr_arg)),
-            _ => return None,
-        };
+        let mut positional = arguments.args();
+        let name_arg = positional.next()?;
+        let mut repr_arg = positional.next();
+        if positional.next().is_some() {
+            return None;
+        }
 
-        for keyword in keywords {
+        for keyword in arguments.keywords() {
             let Some(keyword_name) = &keyword.arg else {
                 return None;
             };
@@ -3881,7 +3880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return None;
             }
 
-            repr_arg = Some(&keyword.value);
+            repr_arg = Some(keyword.value.as_ref());
         }
 
         let ast::Expr::StringLiteral(name_arg) = name_arg else {
@@ -3985,7 +3984,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if func_ty == Type::SpecialForm(SpecialFormType::NamedTuple) {
             // Only the `fields` argument is deferred for `NamedTuple`;
             // other arguments are inferred eagerly.
-            self.infer_typing_namedtuple_fields(&arguments.args[1]);
+            if let Some(fields) = arguments.args().nth(1) {
+                self.infer_typing_namedtuple_fields(fields);
+            }
             return;
         }
         let known_class = func_ty
@@ -4001,7 +4002,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 InferenceRegion::Deferred(definition),
             ) => {
                 self.infer_typealiastype_assignment_deferred(definition, target, arguments);
-                if !arguments.keywords.is_empty() {
+                if arguments.keywords().next().is_some() {
                     let mut call_arguments = self.prepare_call_arguments(arguments);
                     // Leave the types of `name`, `value`, and `type_params` unset because
                     // these parameters have their own validation rules.
@@ -4013,7 +4014,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             call_arguments.insert_type(
                                 index,
                                 TypeContext::default(),
-                                self.expression_type(&keyword.value),
+                                self.expression_type(keyword.value.as_ref()),
                             );
                         }
                     }
@@ -4042,7 +4043,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
         let mut constraint_tys = Vec::new();
-        for arg in arguments.args.iter().skip(1) {
+        for arg in arguments.args().skip(1) {
             let constraint = self.infer_type_expression(arg);
             constraint_tys.push(constraint);
 
@@ -4095,12 +4096,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let default_ty = self.infer_type_expression(&default.value);
                 let bound_or_constraints_node = arguments
                     .find_keyword("bound")
-                    .map(|kw| BoundOrConstraintsNodes::Bound(&kw.value))
+                    .map(|kw| BoundOrConstraintsNodes::Bound(kw.value.as_ref()))
                     .or_else(|| {
-                        if arguments.args.len() < 3 {
-                            return None;
-                        }
-                        Some(BoundOrConstraintsNodes::Constraints(&arguments.args[1..]))
+                        let mut args = arguments.args();
+                        let first = args.nth(1)?;
+                        let last = args.next_back()?;
+                        Some(BoundOrConstraintsNodes::Constraints(TextRange::new(
+                            first.start(),
+                            last.end(),
+                        )))
                     });
                 self.validate_typevar_default(
                     target.as_name_expr().map(|name| &*name.id),
@@ -4117,13 +4121,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
         let db = self.db();
         let env = self.program_environment();
-        let inferred = self.infer_type_expression(&arguments.args[1]);
+        let Some(base) = arguments.args().nth(1) else {
+            return;
+        };
+        let inferred = self.infer_type_expression(base);
 
         if inferred.has_typevar_or_typevar_instance(db, env) {
-            if let Some(builder) = self
-                .context
-                .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
-            {
+            if let Some(builder) = self.context.report_lint(&INVALID_NEWTYPE, base) {
                 let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
                 diag.set_primary_annotation_message("A `NewType` base cannot be generic");
             }
@@ -4146,10 +4150,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::Dynamic(DynamicType::Unknown) => return,
             _ => {}
         }
-        if let Some(builder) = self
-            .context
-            .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
-        {
+        if let Some(builder) = self.context.report_lint(&INVALID_NEWTYPE, base) {
             let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
             diag.set_primary_annotation_message(format!("type `{}`", inferred.display(db, env)));
             if matches!(inferred, Type::ProtocolInstance(_)) {
@@ -4188,7 +4189,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let arguments = &call_expr.arguments;
 
-        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = arguments.args().find(|arg| arg.is_starred_expr()) {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `TypeAliasType` creation",
@@ -4196,12 +4197,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if arguments.args.len() > 2 {
+        if arguments.args().count() > 2 {
             return error(
                 &self.context,
                 format_args!(
                     "Expected at most 2 positional arguments to `TypeAliasType`, got {}",
-                    arguments.args.len()
+                    arguments.args().count()
                 ),
                 call_expr,
             );
@@ -4281,7 +4282,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut type_params = FxHashSet::default();
         let mut valid_type_params = true;
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
-        for ast::Keyword { arg, value, .. } in &arguments.keywords {
+        for ast::Keyword { arg, value, .. } in arguments.keywords() {
+            let value = value.as_ref();
             if std::ptr::eq(value, name_arg) || std::ptr::eq(value, value_arg) {
                 continue;
             }
@@ -5663,10 +5665,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         let arguments = &call_expression.arguments;
-        let [decorated_expression] = &arguments.args[..] else {
+        let [ast::Argument::Positional(decorated_expression)] = arguments.items.as_slice() else {
             return return_ty;
         };
-        if !arguments.keywords.is_empty() || decorated_expression.is_starred_expr() {
+        if decorated_expression.is_starred_expr() {
             return return_ty;
         }
 
@@ -9396,7 +9398,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
             .with_known_unpacking(arguments, |expression| self.try_expression_type(expression));
 
-        for arg in &arguments.args {
+        for arg in arguments.args() {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
                 let iterable_type = self.expression_type(value);
                 if let Err(err) = iterable_type.try_iterate(db, env) {
@@ -9405,12 +9407,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        for keyword in arguments
-            .keywords
-            .iter()
-            .filter(|keyword| keyword.arg.is_none())
-        {
-            let mapping_type = self.expression_type(&keyword.value);
+        for keyword in arguments.keywords().filter(|keyword| keyword.arg.is_none()) {
+            let mapping_type = self.expression_type(keyword.value.as_ref());
 
             if mapping_type.as_paramspec_typevar(self.db()).is_some()
                 || mapping_type.unpack_keys_and_items(db, env).is_some()
@@ -9420,7 +9418,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let Some(builder) = self
                 .context
-                .report_lint(&INVALID_ARGUMENT_TYPE, &keyword.value)
+                .report_lint(&INVALID_ARGUMENT_TYPE, keyword.value.as_ref())
             else {
                 continue;
             };
@@ -9539,8 +9537,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
         if !class.is_known(self.db(), KnownClass::Range)
-            || !arguments.keywords.is_empty()
-            || arguments.args.iter().any(ast::Expr::is_starred_expr)
+            || arguments.keywords().next().is_some()
+            || arguments.args().any(ast::Expr::is_starred_expr)
         {
             return None;
         }
@@ -9552,7 +9550,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_int_literal()
         };
 
-        let is_non_empty = match arguments.args.len() {
+        let is_non_empty = match arguments.args().count() {
             1 => int_literal(0)? > 0,
             2 => int_literal(0)? < int_literal(1)?,
             3 => {
@@ -9756,10 +9754,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Type::TypedDict(typed_dict_ty) = value_type
                 && matches!(method_name, "get" | "pop" | "setdefault")
-                && !arguments.args.is_empty()
+                && arguments.args().next().is_some()
                 && let Some(first_arg) = (
                     // Validate the key argument for `TypedDict` methods
-                    arguments.args.first()
+                    arguments.args().next()
                 )
                 && let Some(key) = (match first_arg {
                     ast::Expr::StringLiteral(ast::ExprStringLiteral {
@@ -9788,10 +9786,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     if !is_declared
                         && method_name == "get"
-                        && arguments.keywords.is_empty()
-                        && matches!(arguments.args.len(), 1 | 2)
+                        && arguments.keywords().next().is_none()
+                        && matches!(arguments.args().count(), 1 | 2)
                     {
-                        let default_ty = if let Some(default) = arguments.args.get(1) {
+                        let default_ty = if let Some(default) = arguments.args().nth(1) {
                             self.get_or_infer_expression(
                                 default,
                                 TypeContext::declared(Some(field.declared_ty)),
@@ -9810,13 +9808,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if field.is_read_only() {
                         let mutation = match method_name {
                             "pop"
-                                if arguments.keywords.is_empty()
-                                    && matches!(arguments.args.len(), 1 | 2) =>
+                                if arguments.keywords().next().is_none()
+                                    && matches!(arguments.args().count(), 1 | 2) =>
                             {
                                 Some(("pop", "from"))
                             }
                             "setdefault"
-                                if arguments.keywords.is_empty() && arguments.args.len() == 2 =>
+                                if arguments.keywords().next().is_none()
+                                    && arguments.args().count() == 2 =>
                             {
                                 Some(("set default for", "on"))
                             }
@@ -9824,7 +9823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         };
                         if let Some((action, preposition)) = mutation {
                             // Report errors within the arguments even though this mutation is invalid.
-                            for argument in &arguments.args {
+                            for argument in arguments.args() {
                                 self.get_or_infer_expression(argument, TypeContext::default());
                             }
                             if let Some(builder) =
@@ -9846,10 +9845,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if !is_declared && !field.is_read_only() {
                         match method_name {
                             "pop"
-                                if arguments.keywords.is_empty()
-                                    && matches!(arguments.args.len(), 1 | 2) =>
+                                if arguments.keywords().next().is_none()
+                                    && matches!(arguments.args().count(), 1 | 2) =>
                             {
-                                return arguments.args.get(1).map_or(
+                                return arguments.args().nth(1).map_or(
                                     field.declared_ty,
                                     |default| {
                                         UnionType::from_two_elements(
@@ -9865,9 +9864,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 );
                             }
                             "setdefault"
-                                if arguments.keywords.is_empty() && arguments.args.len() == 2 =>
+                                if let [
+                                    ast::Argument::Positional(_),
+                                    ast::Argument::Positional(default),
+                                ] = arguments.items.as_slice() =>
                             {
-                                let default = &arguments.args[1];
                                 let default_ty = self.get_or_infer_expression(
                                     default,
                                     TypeContext::declared(Some(field.declared_ty)),
@@ -10185,7 +10186,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             _ => false,
                         };
-                        if is_reveal_type && let Some(first_arg) = arguments.args.first() {
+                        if is_reveal_type && let Some(first_arg) = arguments.args().next() {
                             let revealed_ty = self.expression_type(first_arg);
                             report_revealed_type(&self.context, revealed_ty, first_arg);
                         }
@@ -13264,13 +13265,13 @@ fn prefer_collection_literal_peer_context<'db>(
 /// An iterator over arguments to a functional call.
 #[derive(Clone)]
 enum ArgumentsIter<'a> {
-    FromAst(ArgumentsSourceOrder<'a>),
+    FromAst(std::slice::Iter<'a, ast::Argument>),
     Synthesized(std::slice::Iter<'a, ArgOrKeyword<'a>>),
 }
 
 impl<'a> ArgumentsIter<'a> {
     fn from_ast(arguments: &'a ast::Arguments) -> Self {
-        Self::FromAst(arguments.iter_source_order())
+        Self::FromAst(arguments.items.iter())
     }
 
     fn synthesized(arguments: &'a [ArgOrKeyword<'a>]) -> Self {
@@ -13283,7 +13284,7 @@ impl<'a> Iterator for ArgumentsIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ArgumentsIter::FromAst(args) => args.next(),
+            ArgumentsIter::FromAst(args) => args.next().map(ast::Argument::as_ref),
             ArgumentsIter::Synthesized(args) => args.next().copied(),
         }
     }
@@ -13765,5 +13766,5 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 #[derive(Copy, Clone, Debug)]
 enum BoundOrConstraintsNodes<'ast> {
     Bound(&'ast ast::Expr),
-    Constraints(&'ast [ast::Expr]),
+    Constraints(TextRange),
 }

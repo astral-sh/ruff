@@ -726,13 +726,11 @@ impl<'src> Parser<'src> {
             return ast::Arguments {
                 range: self.node_range(start),
                 node_index: AtomicNodeIndex::NONE,
-                args: ThinVec::new(),
-                keywords: ThinVec::default(),
+                items: ThinVec::new(),
             };
         }
 
-        let args_snapshot = self.expr_scratch.snapshot();
-        let keywords_snapshot = self.keyword_scratch.snapshot();
+        let snapshot = self.argument_scratch.snapshot();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -742,12 +740,14 @@ impl<'src> Parser<'src> {
                 if parser.eat(TokenKind::DoubleStar) {
                     let value = parser.parse_conditional_expression_or_higher();
 
-                    parser.keyword_scratch.push(ast::Keyword {
-                        arg: None,
-                        value: value.expr,
-                        range: parser.node_range(argument_start),
-                        node_index: AtomicNodeIndex::NONE,
-                    });
+                    parser
+                        .argument_scratch
+                        .push(ast::Argument::Keyword(ast::Keyword {
+                            arg: None,
+                            value: Box::new(value.expr),
+                            range: parser.node_range(argument_start),
+                            node_index: AtomicNodeIndex::NONE,
+                        }));
 
                     seen_keyword_unpacking = true;
                 } else {
@@ -832,12 +832,14 @@ impl<'src> Parser<'src> {
 
                         let value = parser.parse_conditional_expression_or_higher();
 
-                        parser.keyword_scratch.push(ast::Keyword {
-                            arg: Some(arg),
-                            value: value.expr,
-                            range: parser.node_range(argument_start),
-                            node_index: AtomicNodeIndex::NONE,
-                        });
+                        parser
+                            .argument_scratch
+                            .push(ast::Argument::Keyword(ast::Keyword {
+                                arg: Some(arg),
+                                value: Box::new(value.expr),
+                                range: parser.node_range(argument_start),
+                                node_index: AtomicNodeIndex::NONE,
+                            }));
                     } else {
                         if !parsed_expr.is_unparenthesized_starred_expr() {
                             if seen_keyword_unpacking {
@@ -852,19 +854,19 @@ impl<'src> Parser<'src> {
                                 );
                             }
                         }
-                        parser.expr_scratch.push(parsed_expr.expr);
+                        parser
+                            .argument_scratch
+                            .push(ast::Argument::Positional(parsed_expr.expr));
                     }
                 }
             });
 
         self.expect(TokenKind::Rpar);
 
-        let keywords = self.keyword_scratch.take_thin_vec(keywords_snapshot);
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: self.expr_scratch.take_thin_vec(args_snapshot),
-            keywords,
+            items: self.argument_scratch.take_thin_vec(snapshot),
         };
 
         self.validate_arguments(&arguments, has_trailing_comma, context);
@@ -3015,7 +3017,7 @@ impl<'src> Parser<'src> {
         };
 
         if generator_must_be_parenthesized {
-            for arg in &*arguments.args {
+            for arg in arguments.args() {
                 if let Some(ast::ExprGenerator {
                     range,
                     parenthesized: false,

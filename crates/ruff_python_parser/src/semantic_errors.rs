@@ -788,18 +788,20 @@ impl SemanticSyntaxChecker {
     }
 
     fn duplicate_keyword_args<Ctx: SemanticSyntaxContext>(args: &ast::Arguments, ctx: &Ctx) {
-        if args.keywords.len() < 2 {
+        if args.len() < 2 {
             return;
         }
 
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(args.keywords.len(), FxBuildHasher);
+        let mut names = args
+            .keywords()
+            .filter_map(|kw| kw.arg.as_ref().map(|arg| (arg, kw.range)));
+        let (Some((first, _)), Some(second)) = (names.next(), names.next()) else {
+            return;
+        };
+        let mut all_arg_names = FxHashSet::default();
+        all_arg_names.insert(first.as_str());
 
-        for (ident, range) in args
-            .keywords
-            .iter()
-            .filter_map(|keyword| keyword.arg.as_ref().map(|arg| (arg, keyword.range)))
-        {
+        for (ident, range) in std::iter::once(second).chain(names) {
             if !all_arg_names.insert(ident.as_str()) {
                 // test_err duplicate_keyword_args
                 // def foo(x): ...

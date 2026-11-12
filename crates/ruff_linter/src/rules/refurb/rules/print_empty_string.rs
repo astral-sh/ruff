@@ -82,9 +82,10 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    match &*call.arguments.args {
+    let mut positional = call.arguments.args();
+    match (positional.next(), positional.next()) {
         // Ex) `print("")` or `print("", sep="\t")`
-        [arg] if is_empty_string(arg) => {
+        (Some(arg), None) if is_empty_string(arg) => {
             let reason = if call.arguments.find_keyword("sep").is_some() {
                 Reason::Both
             } else {
@@ -105,12 +106,12 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
             );
         }
 
-        [arg] if arg.is_starred_expr() => {
+        (Some(arg), None) if arg.is_starred_expr() => {
             // If there's a starred argument, we can't remove the empty string.
         }
 
         // Ex) `print(sep="\t")` or `print(obj, sep="\t")`
-        [] | [_] => {
+        (_, None) => {
             // If there's a `sep` argument, remove it, regardless of what it is.
             if call.arguments.find_keyword("sep").is_some() {
                 let mut diagnostic = checker.report_diagnostic(
@@ -137,8 +138,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
             // Ignore `**kwargs`.
             let has_kwargs = call
                 .arguments
-                .keywords
-                .iter()
+                .keywords()
                 .any(|keyword| keyword.arg.is_none());
             if has_kwargs {
                 return;
@@ -156,8 +156,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
             // Count the number of empty and non-empty arguments.
             let empty_arguments = call
                 .arguments
-                .args
-                .iter()
+                .args()
                 .filter(|arg| is_empty_string(arg))
                 .count();
             if empty_arguments == 0 {
@@ -166,8 +165,8 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
 
             // If removing the arguments would leave us with one or fewer, then we can remove the
             // separator too.
-            let separator = if call.arguments.args.len() - empty_arguments > 1
-                || call.arguments.args.iter().any(Expr::is_starred_expr)
+            let separator = if call.arguments.args().count() - empty_arguments > 1
+                || call.arguments.args().any(Expr::is_starred_expr)
             {
                 Separator::Retain
             } else {
@@ -237,39 +236,18 @@ impl EmptyStringFix {
             applicability = Applicability::Unsafe;
         }
 
-        // Remove all empty string positional arguments.
-        call.arguments.args = call
-            .arguments
-            .args
-            .iter()
-            .filter(|arg| !is_empty_string(arg))
-            .cloned()
-            .collect();
-
-        // Remove the `sep` keyword argument if it exists.
-        if separator == Separator::Remove {
-            call.arguments.keywords = call
-                .arguments
-                .keywords
-                .iter()
-                .filter(|keyword| {
-                    let Some(arg) = keyword.arg.as_ref() else {
-                        return true;
-                    };
-
-                    if arg.as_str() != "sep" {
-                        return true;
-                    }
-
-                    if !is_known_valid_separator(&keyword.value) {
-                        applicability = Applicability::Unsafe;
-                    }
-
-                    false
-                })
-                .cloned()
-                .collect();
-        }
+        call.arguments.items.retain(|item| match item {
+            ast::Argument::Positional(arg) => !is_empty_string(arg),
+            ast::Argument::Keyword(keyword)
+                if separator == Separator::Remove && keyword.arg.as_deref() == Some("sep") =>
+            {
+                if !is_known_valid_separator(&keyword.value) {
+                    applicability = Applicability::Unsafe;
+                }
+                false
+            }
+            ast::Argument::Keyword(_) => true,
+        });
 
         let contents = generator.expr(&call.into());
 

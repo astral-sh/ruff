@@ -140,7 +140,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
                         if matches!(id.as_str(), "filter" | "reduce" | "map") {
-                            for arg in &*arguments.args {
+                            for arg in arguments.args() {
                                 if arg.is_lambda_expr() {
                                     self.safe_functions.push(arg);
                                 }
@@ -150,7 +150,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                     Expr::Attribute(ast::ExprAttribute { value, attr, .. }) if attr == "reduce" => {
                         if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                             if id == "functools" {
-                                for arg in &*arguments.args {
+                                for arg in arguments.args() {
                                     if arg.is_lambda_expr() {
                                         self.safe_functions.push(arg);
                                     }
@@ -161,7 +161,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                     _ => {}
                 }
 
-                for keyword in &*arguments.keywords {
+                for keyword in arguments.keywords() {
                     if keyword.arg.as_ref().is_some_and(|arg| arg == "key")
                         && keyword.value.is_lambda_expr()
                     {

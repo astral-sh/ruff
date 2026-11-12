@@ -835,8 +835,7 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
 
     if call
         .arguments
-        .keywords
-        .iter()
+        .keywords()
         .any(|keyword| keyword.arg.is_none())
     {
         return Some(ModelConfig::unknown());
@@ -931,11 +930,7 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
     let Some(arguments) = class_node.arguments.as_ref() else {
         return ModelConfig::default();
     };
-    if arguments
-        .keywords
-        .iter()
-        .any(|keyword| keyword.arg.is_none())
-    {
+    if arguments.keywords().any(|keyword| keyword.arg.is_none()) {
         return ModelConfig::unknown();
     }
     // Keep this list of recognized options in sync with `own_model_config` and
@@ -1077,7 +1072,7 @@ fn function_has_before_or_plain_field_validator<'db>(
             return false;
         }
 
-        call.arguments.args.iter().any(|field| {
+        call.arguments.args().any(|field| {
             decorators
                 .expression_type(field)
                 .and_then(Type::as_string_literal)

@@ -53,8 +53,7 @@ Module(
                         Arguments {
                             range: 32..34,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -122,57 +121,61 @@ Module(
                         Arguments {
                             range: 93..107,
                             node_index: NodeIndex(None),
-                            args: [
-                                Starred(
-                                    ExprStarred {
+                            items: [
+                                Keyword(
+                                    Keyword {
+                                        range: 94..97,
                                         node_index: NodeIndex(None),
-                                        range: 99..101,
-                                        value: Name(
-                                            ExprName {
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("a"),
+                                                range: 94..95,
                                                 node_index: NodeIndex(None),
-                                                range: 100..101,
-                                                id: Name("A"),
-                                                ctx: Load,
                                             },
                                         ),
-                                        ctx: Load,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 96..97,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
                                     },
                                 ),
-                            ],
-                            keywords: [
-                                Keyword {
-                                    range: 94..97,
-                                    node_index: NodeIndex(None),
-                                    arg: Some(
-                                        Identifier {
-                                            id: Name("a"),
-                                            range: 94..95,
+                                Positional(
+                                    Starred(
+                                        ExprStarred {
                                             node_index: NodeIndex(None),
-                                        },
-                                    ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 96..97,
-                                            value: Int(
-                                                1,
+                                            range: 99..101,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 100..101,
+                                                    id: Name("A"),
+                                                    ctx: Load,
+                                                },
                                             ),
-                                        },
-                                    ),
-                                },
-                                Keyword {
-                                    range: 103..106,
-                                    node_index: NodeIndex(None),
-                                    arg: None,
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 105..106,
-                                            id: Name("k"),
                                             ctx: Load,
                                         },
                                     ),
-                                },
+                                ),
+                                Keyword(
+                                    Keyword {
+                                        range: 103..106,
+                                        node_index: NodeIndex(None),
+                                        arg: None,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 105..106,
+                                                id: Name("k"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
                             ],
                         },
                     ),
@@ -287,25 +290,28 @@ Module(
                         Arguments {
                             range: 181..187,
                             node_index: NodeIndex(None),
-                            args: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 182..183,
-                                        id: Name("A"),
-                                        ctx: Load,
-                                    },
+                            items: [
+                                Positional(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 182..183,
+                                            id: Name("A"),
+                                            ctx: Load,
+                                        },
+                                    ),
                                 ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 185..186,
-                                        id: Name("B"),
-                                        ctx: Load,
-                                    },
+                                Positional(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 185..186,
+                                            id: Name("B"),
+                                            ctx: Load,
+                                        },
+                                    ),
                                 ),
                             ],
-                            keywords: [],
                         },
                     ),
                     body: [
@@ -478,8 +484,7 @@ Module(
                         Arguments {
                             range: 344..346,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -542,8 +547,7 @@ Module(
                         Arguments {
                             range: 395..397,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -606,8 +610,7 @@ Module(
                         Arguments {
                             range: 443..445,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -694,8 +697,7 @@ Module(
                         Arguments {
                             range: 515..517,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -776,8 +778,7 @@ Module(
                         Arguments {
                             range: 578..580,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -844,8 +845,7 @@ Module(
                         Arguments {
                             range: 622..624,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -912,8 +912,7 @@ Module(
                         Arguments {
                             range: 665..667,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -966,8 +965,7 @@ Module(
                         Arguments {
                             range: 704..706,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -1077,8 +1075,7 @@ Module(
                         Arguments {
                             range: 782..784,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -1180,8 +1177,7 @@ Module(
                         Arguments {
                             range: 861..863,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -1234,8 +1230,7 @@ Module(
                         Arguments {
                             range: 897..899,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -1314,8 +1309,7 @@ Module(
                         Arguments {
                             range: 959..961,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -1415,8 +1409,7 @@ Module(
                         Arguments {
                             range: 1012..1014,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [

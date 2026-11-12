@@ -43,7 +43,7 @@ impl Violation for UnnecessarySubscriptReversal {
 
 /// C415
 pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::ExprCall) {
-    let Some(first_arg) = call.arguments.args.first() else {
+    let Some(first_arg) = call.arguments.args().next() else {
         return;
     };
     let Expr::Subscript(ast::ExprSubscript { slice, .. }) = first_arg else {

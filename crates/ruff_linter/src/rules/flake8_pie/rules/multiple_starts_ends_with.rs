@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::collections::BTreeMap;
 use std::iter;
 
@@ -84,13 +85,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
     for (index, call) in values.iter().enumerate() {
         let Expr::Call(ast::ExprCall {
             func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                    node_index: _,
-                },
+            arguments,
             range_start: _,
             node_index: _,
         }) = &call
@@ -98,11 +93,11 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
             continue;
         };
 
-        if !keywords.is_empty() {
+        if arguments.keywords().next().is_some() {
             continue;
         }
 
-        let [arg] = &**args else {
+        let Some([arg]) = arguments.args().collect_array() else {
             continue;
         };
 
@@ -145,13 +140,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                 .map(|expr| {
                     let Expr::Call(ast::ExprCall {
                         func: _,
-                        arguments:
-                            Arguments {
-                                args,
-                                keywords: _,
-                                range: _,
-                                node_index: _,
-                            },
+                        arguments,
                         range_start: _,
                         node_index: _,
                     }) = expr
@@ -161,7 +150,9 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                             format!("Indices should only contain `{attr_name}` calls")
                         )
                     };
-                    args.first()
+                    arguments
+                        .args()
+                        .next()
                         .unwrap_or_else(|| panic!("`{attr_name}` should have one argument"))
                 })
                 .collect();
@@ -199,8 +190,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
             let node3 = Expr::Call(ast::ExprCall {
                 func: Box::new(node2),
                 arguments: Arguments {
-                    args: [node].into(),
-                    keywords: std::iter::empty().collect(),
+                    items: [ast::Argument::Positional(node)].into(),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },

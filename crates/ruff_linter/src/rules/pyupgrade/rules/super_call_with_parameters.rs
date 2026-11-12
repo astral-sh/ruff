@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
@@ -93,7 +94,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     // For a `super` invocation to be unnecessary, the first argument needs to match
     // the enclosing class, and the second argument needs to match the first
     // argument to the enclosing function.
-    let [first_arg, second_arg] = &*call.arguments.args else {
+    let Some([first_arg, second_arg]) = call.arguments.args().collect_array() else {
         return;
     };
 
@@ -236,7 +237,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         {
             arguments.find_keyword("slots").is_some_and(|keyword| {
                 matches!(
-                    keyword.value,
+                    keyword.value.as_ref(),
                     Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. })
                 )
             })
@@ -250,7 +251,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
 
     // Only provide a fix if there are no keyword arguments, since super() doesn't accept keyword arguments
-    if call.arguments.keywords.is_empty() {
+    if call.arguments.keywords().next().is_none() {
         let applicability = if checker.comment_ranges().intersects(call.arguments.range()) {
             Applicability::Unsafe
         } else {

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
@@ -82,11 +83,11 @@ pub(crate) fn redundant_log_base(
     call: &ast::ExprCall,
     qualified_name: &QualifiedName,
 ) {
-    if !call.arguments.keywords.is_empty() {
+    if call.arguments.keywords().next().is_some() {
         return;
     }
 
-    let [arg, base] = &*call.arguments.args else {
+    let Some([arg, base]) = call.arguments.args().collect_array() else {
         return;
     };
 

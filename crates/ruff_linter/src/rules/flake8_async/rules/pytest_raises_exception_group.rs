@@ -94,14 +94,14 @@ pub(crate) fn pytest_raises_exception_group(checker: &Checker, call: &ExprCall) 
             false,
         ),
         ["pytest", "RaisesExc"] => (
-            call.arguments.args.first().filter(is_exception_group),
+            call.arguments.args().next().filter(is_exception_group),
             false,
         ),
-        ["pytest", "RaisesGroup"] => (call.arguments.args.iter().find(is_exception_group), true),
+        ["pytest", "RaisesGroup"] => (call.arguments.args().find(is_exception_group), true),
         ["pytest", "mark", "xfail"] => (
             call.arguments
                 .find_keyword("raises")
-                .map(|keyword| &keyword.value)
+                .map(|keyword| keyword.value.as_ref())
                 .filter(is_exception_group),
             false,
         ),

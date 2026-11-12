@@ -190,13 +190,7 @@ pub(crate) fn native_literals(
 ) {
     let ast::ExprCall {
         func,
-        arguments:
-            ast::Arguments {
-                args,
-                keywords,
-                range: _,
-                node_index: _,
-            },
+        arguments,
         range_start: _,
         node_index: _,
     } = call;
@@ -207,10 +201,12 @@ pub(crate) fn native_literals(
         return;
     };
 
-    let call_arg = match (args.as_ref(), keywords.as_ref()) {
-        ([], []) => None,
-        ([arg], []) => Some(arg),
-        ([], [keyword]) if is_redundant_keyword(builtin, keyword) => Some(&keyword.value),
+    let call_arg = match arguments.items.as_slice() {
+        [] => None,
+        [ast::Argument::Positional(arg)] => Some(arg),
+        [ast::Argument::Keyword(keyword)] if is_redundant_keyword(builtin, keyword) => {
+            Some(keyword.value.as_ref())
+        }
         _ => return,
     };
 

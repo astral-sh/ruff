@@ -31,23 +31,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let env = self.program_environment();
         let db = self.db();
 
-        let ast::Arguments {
-            args,
-            keywords,
-            range: _,
-            node_index: _,
-        } = &call_expr.arguments;
+        let arguments = &call_expr.arguments;
 
         // `new_class(name, bases=(), kwds=None, exec_body=None)`
         // We need at least the `name` argument.
-        let no_positional_args = args.is_empty();
+        let no_positional_args = arguments.args().next().is_none();
         if no_positional_args {
             // Check if `name` is provided as a keyword argument.
-            let name_keyword = keywords.iter().find(|kw| kw.arg.as_deref() == Some("name"));
+            let name_keyword = arguments
+                .keywords()
+                .find(|kw| kw.arg.as_deref() == Some("name"));
 
             if name_keyword.is_none() {
                 // Infer all keyword values for side effects.
-                for keyword in keywords {
+                for keyword in arguments.keywords() {
                     self.infer_expression(&keyword.value, TypeContext::default());
                 }
                 if let Some(builder) = self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr) {
@@ -58,11 +55,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Find the arguments we treat specially while preserving normal call-binding diagnostics.
-        let name_node = args.first().or_else(|| {
-            keywords
-                .iter()
+        let name_node = arguments.args().next().or_else(|| {
+            arguments
+                .keywords()
                 .find(|kw| kw.arg.as_deref() == Some("name"))
-                .map(|kw| &kw.value)
+                .map(|kw| kw.value.as_ref())
         });
         let bases_arg = dynamic_class_bases_argument(&call_expr.arguments);
 
@@ -131,11 +128,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // TODO: Model `kwds`, especially `{"metaclass": Meta}`. `types.new_class()` uses the
         // third argument for explicit metaclass overrides, but we currently only account for
         // metaclass behavior that follows from the resolved bases.
-        let exec_body_arg = args.get(3).or_else(|| {
-            keywords
-                .iter()
+        let exec_body_arg = arguments.args().nth(3).or_else(|| {
+            arguments
+                .keywords()
                 .find(|kw| kw.arg.as_deref() == Some("exec_body"))
-                .map(|kw| &kw.value)
+                .map(|kw| kw.value.as_ref())
         });
         let has_exec_body = exec_body_arg.is_some_and(|arg| !arg.is_none_literal_expr());
         let members: Box<[(ast::name::Name, Type<'db>)]> = Box::new([]);
@@ -163,7 +160,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     report_instance_layout_conflict(
                         &self.context,
                         dynamic_class.header_range(db),
-                        bases_arg.as_tuple_expr().map(|tuple| tuple.elts.as_slice()),
+                        |index| {
+                            bases_arg
+                                .as_tuple_expr()
+                                .and_then(|tuple| tuple.elts.get(index))
+                        },
                         &disjoint_bases,
                     );
                 }

@@ -144,7 +144,7 @@ pub(crate) fn unraw_re_pattern(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    match call.arguments.args.as_ref().first() {
+    match call.arguments.args().next() {
         Some(Expr::StringLiteral(ExprStringLiteral { value, .. })) => {
             value
                 .iter()

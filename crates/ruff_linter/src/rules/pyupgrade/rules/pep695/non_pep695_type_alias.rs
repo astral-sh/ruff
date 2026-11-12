@@ -146,7 +146,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         return;
     };
 
-    let [Expr::StringLiteral(name), value] = arguments.args.as_ref() else {
+    let Some([Expr::StringLiteral(name), value]) = arguments.args().collect_array() else {
         return;
     };
 
@@ -154,15 +154,21 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         return;
     }
 
-    let type_params = match arguments.keywords.as_ref() {
-        [] => &[],
-        [
-            Keyword {
+    let mut keywords = arguments.keywords();
+    let type_params = match (keywords.next(), keywords.next()) {
+        (None, _) => &[],
+        (
+            Some(Keyword {
                 arg: Some(name),
-                value: Expr::Tuple(type_params),
+                value,
                 ..
-            },
-        ] if name.as_str() == "type_params" => type_params.elts.as_slice(),
+            }),
+            None,
+        ) if name.as_str() == "type_params"
+            && let Expr::Tuple(type_params) = value.as_ref() =>
+        {
+            type_params.elts.as_slice()
+        }
         _ => return,
     };
 

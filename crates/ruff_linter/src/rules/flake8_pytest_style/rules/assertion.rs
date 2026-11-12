@@ -13,7 +13,7 @@ use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
+    self as ast, AnyNodeRef, Arguments, BoolOp, ExceptHandler, Expr, Stmt, UnaryOp,
 };
 use ruff_python_ast::{visitor, whitespace};
 use ruff_python_codegen::Stylist;
@@ -298,8 +298,7 @@ pub(crate) fn unittest_assertion(
     checker: &Checker,
     expr: &Expr,
     func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
+    arguments: &Arguments,
 ) {
     let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
         return;
@@ -322,7 +321,7 @@ pub(crate) fn unittest_assertion(
         && checker.semantic().current_expression_parent().is_none()
         && !checker.comment_ranges().intersects(expr.range())
     {
-        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+        if let Ok(stmt) = unittest_assert.generate_assert(arguments) {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 checker.generator().stmt(&stmt),
                 parenthesized_range(
@@ -524,11 +523,11 @@ fn to_pytest_raises_args<'a>(
 ) -> Option<Cow<'a, str>> {
     let args = match attr {
         "assertRaises" | "failUnlessRaises" => {
-            match (&*arguments.args, &*arguments.keywords) {
+            match arguments.items.as_slice() {
                 // Ex) `assertRaises(Exception)`
-                ([arg], []) => Cow::Borrowed(checker.locator().slice(arg)),
+                [ast::Argument::Positional(arg)] => Cow::Borrowed(checker.locator().slice(arg)),
                 // Ex) `assertRaises(expected_exception=Exception)`
-                ([], [kwarg])
+                [ast::Argument::Keyword(kwarg)]
                     if kwarg
                         .arg
                         .as_ref()
@@ -540,19 +539,28 @@ fn to_pytest_raises_args<'a>(
             }
         }
         "assertRaisesRegex" | "assertRaisesRegexp" => {
-            match (&*arguments.args, &*arguments.keywords) {
+            match arguments.items.as_slice() {
                 // Ex) `assertRaisesRegex(Exception, regex)`
-                ([arg1, arg2], []) => Cow::Owned(format!(
+                [
+                    ast::Argument::Positional(arg1),
+                    ast::Argument::Positional(arg2),
+                ] => Cow::Owned(format!(
                     "{}, match={}",
                     checker.locator().slice(arg1),
                     checker.locator().slice(arg2)
                 )),
                 // Ex) `assertRaisesRegex(Exception, expected_regex=regex)`
-                ([arg], [kwarg])
-                    if kwarg
-                        .arg
-                        .as_ref()
-                        .is_some_and(|arg| arg.as_str() == "expected_regex") =>
+                [
+                    ast::Argument::Positional(arg),
+                    ast::Argument::Keyword(kwarg),
+                ]
+                | [
+                    ast::Argument::Keyword(kwarg),
+                    ast::Argument::Positional(arg),
+                ] if kwarg
+                    .arg
+                    .as_ref()
+                    .is_some_and(|arg| arg.as_str() == "expected_regex") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
@@ -561,15 +569,17 @@ fn to_pytest_raises_args<'a>(
                     ))
                 }
                 // Ex) `assertRaisesRegex(expected_exception=Exception, expected_regex=regex)`
-                ([], [kwarg1, kwarg2])
-                    if kwarg1
+                [
+                    ast::Argument::Keyword(kwarg1),
+                    ast::Argument::Keyword(kwarg2),
+                ] if kwarg1
+                    .arg
+                    .as_ref()
+                    .is_some_and(|id| id.as_str() == "expected_exception")
+                    && kwarg2
                         .arg
                         .as_ref()
-                        .is_some_and(|id| id.as_str() == "expected_exception")
-                        && kwarg2
-                            .arg
-                            .as_ref()
-                            .is_some_and(|id| id.as_str() == "expected_regex") =>
+                        .is_some_and(|id| id.as_str() == "expected_regex") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",
@@ -578,15 +588,17 @@ fn to_pytest_raises_args<'a>(
                     ))
                 }
                 // Ex) `assertRaisesRegex(expected_regex=regex, expected_exception=Exception)`
-                ([], [kwarg1, kwarg2])
-                    if kwarg1
+                [
+                    ast::Argument::Keyword(kwarg1),
+                    ast::Argument::Keyword(kwarg2),
+                ] if kwarg1
+                    .arg
+                    .as_ref()
+                    .is_some_and(|id| id.as_str() == "expected_regex")
+                    && kwarg2
                         .arg
                         .as_ref()
-                        .is_some_and(|id| id.as_str() == "expected_regex")
-                        && kwarg2
-                            .arg
-                            .as_ref()
-                            .is_some_and(|id| id.as_str() == "expected_exception") =>
+                        .is_some_and(|id| id.as_str() == "expected_exception") =>
                 {
                     Cow::Owned(format!(
                         "{}, match={}",

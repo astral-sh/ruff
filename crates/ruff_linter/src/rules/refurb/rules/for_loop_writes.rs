@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
@@ -160,10 +161,10 @@ fn for_loop_writes(
         return;
     }
 
-    if !call_expr.arguments.keywords.is_empty() {
+    if call_expr.arguments.keywords().next().is_some() {
         return;
     }
-    let [write_arg] = call_expr.arguments.args.as_ref() else {
+    let Some([write_arg]) = call_expr.arguments.args().collect_array() else {
         return;
     };
 

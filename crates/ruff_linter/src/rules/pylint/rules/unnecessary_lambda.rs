@@ -114,8 +114,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         Some(parameters) => {
             // Collect all starred arguments (e.g., `lambda *args: func(*args)`).
             let call_varargs: Vec<&Expr> = arguments
-                .args
-                .iter()
+                .args()
                 .filter_map(|arg| {
                     if let Expr::Starred(ast::ExprStarred { value, .. }) = arg {
                         Some(value.as_ref())
@@ -127,15 +126,13 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
 
             // Collect all keyword arguments (e.g., `lambda x, y: func(x=x, y=y)`).
             let call_kwargs: Vec<&Expr> = arguments
-                .keywords
-                .iter()
-                .map(|kw| &kw.value)
+                .keywords()
+                .map(|kw| kw.value.as_ref())
                 .collect::<Vec<_>>();
 
             // Collect all positional arguments (e.g., `lambda x, y: func(x, y)`).
             let call_posargs: Vec<&Expr> = arguments
-                .args
-                .iter()
+                .args()
                 .filter(|arg| !arg.is_starred_expr())
                 .collect::<Vec<_>>();
 

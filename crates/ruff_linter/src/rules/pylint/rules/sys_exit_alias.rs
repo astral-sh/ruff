@@ -86,11 +86,7 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
         call.func.range(),
     );
 
-    let has_star_kwargs = call
-        .arguments
-        .keywords
-        .iter()
-        .any(|kwarg| kwarg.arg.is_none());
+    let has_star_kwargs = call.arguments.keywords().any(|kwarg| kwarg.arg.is_none());
     // only one optional argument allowed, and we can't convert **kwargs
     if call.arguments.len() > 1 || has_star_kwargs {
         return;

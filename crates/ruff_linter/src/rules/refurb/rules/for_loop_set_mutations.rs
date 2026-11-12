@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
@@ -76,7 +77,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
     let Expr::Attribute(expr_attr) = expr_call.func.as_ref() else {
         return;
     };
-    if !expr_call.arguments.keywords.is_empty() {
+    if expr_call.arguments.keywords().next().is_some() {
         return;
     }
 
@@ -99,7 +100,7 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
     {
         return;
     }
-    let [arg] = expr_call.arguments.args.as_ref() else {
+    let Some([arg]) = expr_call.arguments.args().collect_array() else {
         return;
     };
 

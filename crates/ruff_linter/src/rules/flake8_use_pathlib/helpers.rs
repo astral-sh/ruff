@@ -200,11 +200,11 @@ pub(crate) fn has_unknown_keywords_or_starred_expr(
     arguments: &Arguments,
     allowed: &[&str],
 ) -> bool {
-    if arguments.args.iter().any(Expr::is_starred_expr) {
+    if arguments.args().any(Expr::is_starred_expr) {
         return true;
     }
 
-    arguments.keywords.iter().any(|kw| match &kw.arg {
+    arguments.keywords().any(|kw| match &kw.arg {
         Some(arg) => !allowed.contains(&arg.as_str()),
         None => true,
     })

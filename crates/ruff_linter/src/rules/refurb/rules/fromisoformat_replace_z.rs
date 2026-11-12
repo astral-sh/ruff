@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{
@@ -90,11 +91,11 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
 
     let (func, arguments) = (&*call.func, &call.arguments);
 
-    if !arguments.keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return;
     }
 
-    let [argument] = &*arguments.args else {
+    let Some([argument]) = arguments.args().collect_array() else {
         return;
     };
 
@@ -160,7 +161,7 @@ impl<'a> ReplaceTimeZone<'a> {
     fn from_call(call: &'a ExprCall) -> Option<Self> {
         let arguments = &call.arguments;
 
-        if !arguments.keywords.is_empty() {
+        if arguments.keywords().next().is_some() {
             return None;
         }
 
@@ -170,7 +171,7 @@ impl<'a> ReplaceTimeZone<'a> {
             return None;
         }
 
-        let [z, Expr::StringLiteral(zero_offset)] = &*arguments.args else {
+        let Some([z, Expr::StringLiteral(zero_offset)]) = arguments.args().collect_array() else {
             return None;
         };
 
@@ -226,13 +227,11 @@ fn strip_z_date(call: &ExprCall) -> Option<(&Expr, &Expr)> {
         return None;
     }
 
-    if !arguments.keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return None;
     }
 
-    let [z] = &*arguments.args else {
-        return None;
-    };
+    let [z] = arguments.args().collect_array()?;
 
     if !is_upper_case_z_string(z) {
         return None;

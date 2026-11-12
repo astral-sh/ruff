@@ -1,10 +1,11 @@
+use itertools::Itertools;
 use ruff_notebook::CellOffsets;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Expr};
 
 /// Return `true` if the statement containing the current expression is the last
 /// top-level expression in the cell. This assumes that the source is a Jupyter
@@ -33,9 +34,7 @@ pub(super) fn at_last_top_level_expression_in_cell(
 /// `itertools.cycle` or similar).
 pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     }) = &arg
     else {
         return false;
@@ -47,17 +46,20 @@ pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool
             ["itertools", "cycle" | "count"] => true,
             ["itertools", "repeat"] => {
                 // Ex) `itertools.repeat(1)`
-                if keywords.is_empty() && args.len() == 1 {
+                if matches!(arguments.items.as_slice(), [ast::Argument::Positional(_)]) {
                     return true;
                 }
 
                 // Ex) `itertools.repeat(1, None)`
-                if args.len() == 2 && args[1].is_none_literal_expr() {
+                if matches!(
+                    arguments.args().collect_array(),
+                    Some([_, Expr::NoneLiteral(_)])
+                ) {
                     return true;
                 }
 
                 // Ex) `itertools.repeat(1, times=None)`
-                for keyword in keywords {
+                for keyword in arguments.keywords() {
                     if keyword.arg.as_ref().is_some_and(|name| name == "times")
                         && keyword.value.is_none_literal_expr()
                     {

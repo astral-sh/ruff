@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
@@ -302,12 +303,10 @@ fn handle_non_finite_float_special_case(
     }
 
     // Must have exactly one argument, which is a string literal.
-    if !arguments.keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return None;
     }
-    let [float_arg] = arguments.args.as_ref() else {
-        return None;
-    };
+    let [float_arg] = arguments.args().collect_array()?;
     let normalized = as_non_finite_float_string_literal(float_arg)?;
     let replacement_text = format!(
         r#"{constructor_name}("{}")"#,

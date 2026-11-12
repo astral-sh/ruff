@@ -1,5 +1,5 @@
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
+use ruff_python_ast::{self as ast, Expr, str_prefix::StringLiteralPrefix};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -151,14 +151,12 @@ pub(crate) fn use_capital_environment_variables(checker: &Checker, expr: &Expr) 
 
     // Ex) `os.environ.get('foo')`, `os.getenv('foo')`
     let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
+        func, arguments, ..
     }) = expr
     else {
         return;
     };
-    let Some(arg) = args.first() else {
+    let Some(arg) = arguments.args().next() else {
         return;
     };
     let Expr::StringLiteral(ast::ExprStringLiteral { value: env_var, .. }) = arg else {
@@ -256,14 +254,14 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
 pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
-        arguments: Arguments { args, keywords, .. },
+        arguments,
         range_start: _,
         node_index: _,
     }) = expr
     else {
         return;
     };
-    if !keywords.is_empty() {
+    if arguments.keywords().next().is_some() {
         return;
     }
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
@@ -272,10 +270,10 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     if attr != "get" {
         return;
     }
-    let Some(key) = args.first() else {
+    let Some(key) = arguments.args().next() else {
         return;
     };
-    let Some(default) = args.get(1) else {
+    let Some(default) = arguments.args().nth(1) else {
         return;
     };
     if !default.is_none_literal_expr() {
