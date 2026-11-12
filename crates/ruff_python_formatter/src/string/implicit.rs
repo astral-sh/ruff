@@ -158,7 +158,8 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 // That means the joined string formatting would have to call into
                 // the docstring formatting or otherwise guarantee that the output
                 // won't change on a second run.
-                if part.flags().is_triple_quoted() || part.flags().is_raw_string() {
+                let kind = part.classify();
+                if kind.flags().is_triple_quoted() || kind.flags().is_raw_string() {
                     return None;
                 }
 
@@ -169,7 +170,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                     return None;
                 }
 
-                match part.classify() {
+                match kind {
                     StringLikePartKind::FString(fstring) => {
                         if matches!(string.classify(), StringLikeKind::TString(_)) {
                             // Don't concatenate t-strings and f-strings
@@ -182,11 +183,11 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                                 context,
                             ) {
                                 if preserve_quotes_requirement
-                                    .is_some_and(|quote| quote != part.flags().quote_style())
+                                    .is_some_and(|quote| quote != fstring.flags().quote_style())
                                 {
                                     return None;
                                 }
-                                preserve_quotes_requirement = Some(part.flags().quote_style());
+                                preserve_quotes_requirement = Some(fstring.flags().quote_style());
                             }
                         }
                         // Avoid invalid syntax for pre Python 312:
@@ -198,11 +199,11 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             )
                         {
                             if preserve_quotes_requirement
-                                .is_some_and(|quote| quote != part.flags().quote_style())
+                                .is_some_and(|quote| quote != fstring.flags().quote_style())
                             {
                                 return None;
                             }
-                            preserve_quotes_requirement = Some(part.flags().quote_style());
+                            preserve_quotes_requirement = Some(fstring.flags().quote_style());
                         }
                     }
                     StringLikePartKind::TString(tstring) => {
@@ -212,11 +213,11 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                             context,
                         ) {
                             if preserve_quotes_requirement
-                                .is_some_and(|quote| quote != part.flags().quote_style())
+                                .is_some_and(|quote| quote != tstring.flags().quote_style())
                             {
                                 return None;
                             }
-                            preserve_quotes_requirement = Some(part.flags().quote_style());
+                            preserve_quotes_requirement = Some(tstring.flags().quote_style());
                         }
                     }
                     StringLikePartKind::Bytes(_) | StringLikePartKind::String(_) => {}
