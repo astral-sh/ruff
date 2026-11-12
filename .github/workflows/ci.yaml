@@ -1036,6 +1036,7 @@ jobs:
           name: ty-fuzz-failures
           path: |
             ty-fuzz-failures/*.py
+            ty-fuzz-failures/*.json
             ty-new
             ty-old
           compression-level: 1
