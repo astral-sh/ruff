@@ -506,16 +506,6 @@
             }
           ]
         },
-        "dataclass-field-order": {
-          "title": "detects dataclass definitions with required fields after fields with default values",
-          "description": "## What it does\n\nChecks for dataclass definitions where required fields are defined after fields with default values.\n\n## Why is this bad?\n\nIn dataclasses, all required fields (fields without default values) must be defined before fields\nwith default values. This is a Python requirement that will raise a `TypeError` at runtime if\nviolated.\n\n## Example\n\n```python\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Example:\n    x: int = 1  # Field with default value\n    # Required field after field with default\n    y: str  # error\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "deprecated": {
           "title": "detects uses of deprecated items",
           "description": "## What it does\n\nChecks for uses of deprecated items\n\n## Why is this bad?\n\nDeprecated items should no longer be used.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.13\"\n```\n\n```python\nimport warnings\n\n\n@warnings.deprecated(\"use new_func instead\")\ndef old_func(): ...\n\n\nold_func()  # error: [deprecated]\n```",
@@ -809,6 +799,16 @@
         "invalid-dataclass": {
           "title": "detects invalid `@dataclass` applications",
           "description": "## What it does\n\nChecks for invalid applications of the `@dataclass` decorator.\n\n## Why is this bad?\n\nApplying `@dataclass` with incompatible arguments raises an exception while creating the class:\n\n- `order=True` with `eq=False`\n- `weakref_slot=True` with `slots=False`\n- `slots=True` when the class already defines `__slots__`\n\nApplying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`, `Enum`, or `Protocol`\nis also invalid:\n\n- `NamedTuple` and `TypedDict` classes will raise an exception at runtime when instantiating the\n    class.\n- `Enum` classes with `@dataclass` are [explicitly not supported].\n- `Protocol` classes define interfaces and cannot be instantiated.\n\n## Examples\n\n```python\nfrom dataclasses import dataclass\nfrom typing import NamedTuple\n\n\n@dataclass(order=True, eq=False)  # error: [invalid-dataclass]\nclass Ordered: ...\n\n\n@dataclass\nclass Foo(NamedTuple):  # error: [invalid-dataclass]\n    x: int\n```\n\nSee: <https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass>\n\n[explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-dataclass-field-order": {
+          "title": "detects dataclass definitions with required fields after fields with default values",
+          "description": "## What it does\n\nChecks for dataclass definitions where required fields are defined after fields with default values.\n\n## Why is this bad?\n\nIn dataclasses, all required fields (fields without default values) must be defined before fields\nwith default values. This is a Python requirement that will raise a `TypeError` at runtime if\nviolated.\n\n## Example\n\n```python\nfrom dataclasses import dataclass\n\n\n@dataclass\nclass Example:\n    x: int = 1  # Field with default value\n    # Required field after field with default\n    y: str  # error\n```\n\n## Rule history\n\n- v0.0.102: Renamed from `dataclass-field-order`.\n\n    `dataclass-field-order` remains as a compatibility alias for this rule.",
           "default": "error",
           "oneOf": [
             {

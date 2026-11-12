@@ -82,7 +82,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DYNAMIC_FUNCTION_DECORATOR_RETURN);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
-    registry.register_lint(&DATACLASS_FIELD_ORDER);
+    registry.register_lint(&INVALID_DATACLASS_FIELD_ORDER);
+    registry.register_alias(
+        LintName::of("dataclass-field-order"),
+        &INVALID_DATACLASS_FIELD_ORDER,
+    );
     registry.register_lint(&INVALID_IMPLICIT_RETURN_IN_FUNCTION_WITH_STUB_BODY);
     registry.register_alias(
         LintName::of("empty-body"),
@@ -363,8 +367,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/dataclass-field-order.md")]
-    pub(crate) static DATACLASS_FIELD_ORDER = {
+    #[doc = include_str!("../../resources/lint_docs/invalid-dataclass-field-order.md")]
+    pub(crate) static INVALID_DATACLASS_FIELD_ORDER = {
         summary: "detects dataclass definitions with required fields after fields with default values",
         status: LintStatus::stable("0.0.15"),
         default_level: Level::Error,

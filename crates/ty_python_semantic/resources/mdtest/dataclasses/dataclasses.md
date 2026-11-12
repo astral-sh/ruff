@@ -118,14 +118,14 @@ from dataclasses import field
 @dataclass
 class D:
     x: int = 1
-    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
     y: str
 
 @dataclass
 class E:
     x: int = field(default=3)
     y: int = field(default_factory=lambda: 4)
-    # error: [dataclass-field-order]
+    # error: [invalid-dataclass-field-order]
     z: str
 
 import sys
@@ -134,7 +134,7 @@ import sys
 class F:
     x: int = 1
     if sys.version_info > (3, 7):
-        # error: [dataclass-field-order]
+        # error: [invalid-dataclass-field-order]
         y: str
 ```
 
@@ -152,7 +152,7 @@ class GoodWithInitFalse:
 class BadWithInitFalse:
     x: int = 1
     y: str = field(init=False)
-    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
     z: float
 ```
 
@@ -170,7 +170,7 @@ class GoodWithClassInitFalse:
 GoodWithClassInitFalse("value")
 
 @dataclass
-class BadWithReenabledInit(GoodWithClassInitFalse):  # error: [dataclass-field-order]
+class BadWithReenabledInit(GoodWithClassInitFalse):  # error: [invalid-dataclass-field-order]
     pass
 ```
 
@@ -197,7 +197,7 @@ class AlsoGoodWithKwOnly:
 class BadWithKwOnly:
     x: int = 1
     y: str = field(kw_only=True)
-    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
     z: float
 ```
 
@@ -216,7 +216,7 @@ class GoodWithKwOnlySentinel:
 @dataclass
 class BadWithKwOnlySentinel:
     x: int = 1
-    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
     y: str
     _: KW_ONLY
     z: float
@@ -1472,7 +1472,7 @@ The class-level `kw_only` parameter can be overridden per-field.
 class KwOnlyClassWithPositionalField:
     x: int = 1
     y: str = field(kw_only=False, default="hello")
-    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
     z: float = field(kw_only=False)
 ```
 
@@ -1511,7 +1511,7 @@ PositionalField(1)
 @dataclass
 class InvalidFieldOrder:
     optional: int = field(default=1, kw_only=True)
-    required: str  # error: [dataclass-field-order]
+    required: str  # error: [invalid-dataclass-field-order]
 ```
 
 ### `kw_only` - Python 3.13
@@ -2024,7 +2024,7 @@ EllipsisDefault(1)
 
 @dataclass
 class InvalidEllipsisChild(EllipsisDefault):
-    added: str  # error: [dataclass-field-order]
+    added: str  # error: [invalid-dataclass-field-order]
 ```
 
 ### Required fields after inherited defaults
@@ -2046,7 +2046,7 @@ class DefaultedBase:
 
 @dataclass
 class InvalidChild(DefaultedBase):
-    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
     y: int
 ```
 
@@ -2059,7 +2059,7 @@ class DefaultFactoryBase:
 
 @dataclass
 class InvalidDefaultFactoryChild(DefaultFactoryBase):
-    # error: [dataclass-field-order]
+    # error: [invalid-dataclass-field-order]
     y: int
 ```
 
@@ -2069,7 +2069,7 @@ An ordering violation already present in an ancestor is not reported again on it
 @dataclass
 class InvalidAncestor:
     optional: int = 1
-    required: int  # error: [dataclass-field-order]
+    required: int  # error: [invalid-dataclass-field-order]
 
 @dataclass
 class ChildOfInvalidAncestor(InvalidAncestor):
@@ -2087,7 +2087,7 @@ hierarchy.
 @dataclass
 class IgnoredInvalidAncestor:
     optional: int = 1
-    required: int  # ty: ignore[dataclass-field-order]
+    required: int  # ty: ignore[invalid-dataclass-field-order]
 
 @dataclass
 class ChildOfIgnoredAncestor(IgnoredInvalidAncestor):
@@ -2105,14 +2105,14 @@ violation in an ancestor.
 @dataclass
 class IgnoredViolationsBase:
     first: int = 1
-    second: int  # ty: ignore[dataclass-field-order]
-    third: int  # ty: ignore[dataclass-field-order]
+    second: int  # ty: ignore[invalid-dataclass-field-order]
+    third: int  # ty: ignore[invalid-dataclass-field-order]
 
 @dataclass
 class NewlyInvalidOverride(IgnoredViolationsBase):
     first: int = field()
     second: int = 1
-    third: int = field()  # error: [dataclass-field-order]
+    third: int = field()  # error: [invalid-dataclass-field-order]
 ```
 
 Combining independently valid bases can introduce a new ordering violation even when the child
@@ -2128,7 +2128,7 @@ class RequiredOnlyBase:
     required: int
 
 @dataclass
-class InvalidMergedBases(RequiredOnlyBase, DefaultOnlyBase):  # error: [dataclass-field-order]
+class InvalidMergedBases(RequiredOnlyBase, DefaultOnlyBase):  # error: [invalid-dataclass-field-order]
     pass
 
 @dataclass
@@ -2177,7 +2177,7 @@ class RequiredBase:
     second: int
 
 @dataclass
-class InvalidDefaultOverride(RequiredBase):  # error: [dataclass-field-order]
+class InvalidDefaultOverride(RequiredBase):  # error: [invalid-dataclass-field-order]
     first: int = 1
 ```
 
@@ -2217,7 +2217,7 @@ class OrdinaryClassVariableOverride(DefaultedFieldBase):
 
 @dataclass
 class DataclassAfterOrdinaryOverride(OrdinaryClassVariableOverride):
-    y: int  # error: [dataclass-field-order]
+    y: int  # error: [invalid-dataclass-field-order]
 ```
 
 An annotation-only class variable also masks the inherited instance field.
