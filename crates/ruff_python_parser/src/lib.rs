@@ -772,6 +772,12 @@ mod tests {
                 items.keys().eq(items.entries().map(|(key, _)| key)),
                 "{pattern}"
             );
+            assert!(
+                items
+                    .patterns()
+                    .eq(items.entries().map(|(_, pattern)| pattern)),
+                "{pattern}"
+            );
         }
     }
 

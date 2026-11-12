@@ -640,7 +640,7 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, kind: flat::Pa
             for key in items.keys() {
                 visitor.visit_expr(key);
             }
-            for (_, pattern) in items.entries() {
+            for pattern in items.patterns() {
                 visitor.visit_pattern(pattern);
             }
         }

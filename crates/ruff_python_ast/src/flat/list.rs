@@ -574,6 +574,23 @@ impl<'a> MappingPatternItems<'a> {
         })
     }
 
+    pub fn patterns(self) -> impl Iterator<Item = Pattern<'a>> {
+        let mut ids = self.0.words();
+        std::iter::from_fn(move || {
+            while let [_, second, tail @ ..] = ids {
+                // An entry stores its key immediately before its pattern. If the second child
+                // isn't a pattern, the first child is a rest capture, even in recovered syntax.
+                let node: super::SyntaxNode<'_> = self.0.ast.child(u64::from(*second));
+                if let Some(pattern) = node.cast::<Pattern>() {
+                    ids = tail;
+                    return Some(pattern);
+                }
+                ids = &ids[1..];
+            }
+            None
+        })
+    }
+
     pub fn entries(self) -> impl Iterator<Item = (Expr<'a>, Pattern<'a>)> {
         self.into_iter().filter_map(|item| match item {
             MappingPatternItem::Entry { key, pattern } => Some((key, pattern)),
