@@ -398,13 +398,10 @@ where
                 range_start: _,
                 node_index: _,
             }) => {
-                // Note that this is the evaluation order but not necessarily the declaration order
-                // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
                 any_over_expr(call_func, &mut *func)
-                    || arguments.args().any(|expr| any_over_expr(expr, &mut *func))
                     || arguments
-                        .keywords()
-                        .any(|keyword| any_over_expr(&keyword.value, &mut *func))
+                        .iter_source_order()
+                        .any(|argument| any_over_expr(argument.value(), &mut *func))
             }
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 any_over_expr(value, &mut *func) || any_over_expr(slice, &mut *func)
@@ -559,13 +556,10 @@ where
                 decorator_list,
                 ..
             }) => {
-                // Note that e.g. `class A(*args, a=2, *args2, **kwargs): pass` is a valid class
-                // definition
                 arguments.as_deref().is_some_and(|arguments| {
-                    arguments.args().any(|expr| any_over_expr(expr, &mut *func))
-                        || arguments
-                            .keywords()
-                            .any(|keyword| any_over_expr(&keyword.value, &mut *func))
+                    arguments
+                        .iter_source_order()
+                        .any(|argument| any_over_expr(argument.value(), &mut *func))
                 }) || type_params.as_ref().is_some_and(|type_params| {
                     type_params
                         .iter()

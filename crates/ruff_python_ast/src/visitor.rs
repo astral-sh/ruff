@@ -4,7 +4,7 @@ pub mod source_order;
 pub mod transformer;
 
 use crate::{
-    self as ast, Alias, AnyParameterRef, Argument, Arguments, BoolOp, BytesLiteral, CmpOp,
+    self as ast, Alias, AnyParameterRef, ArgOrKeyword, Arguments, BoolOp, BytesLiteral, CmpOp,
     Comprehension, Decorator, DictItem, ElifElseClause, ExceptHandler, Expr, ExprContext, FString,
     FStringPartRef, InterpolatedStringElement, Keyword, MatchCase, Operator, Parameter, Parameters,
     Pattern, PatternArguments, PatternKeyword, Stmt, StringLiteral, TString, TypeParam,
@@ -658,24 +658,10 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
 }
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
-    // In `f(first(), key=second(), *third())`, Python evaluates `first` and
-    // `third` before `second`. Only the suffix after the first keyword can
-    // still contain positional arguments that must move ahead of it.
-    let mut items = arguments.items.iter();
-    let first_keyword = loop {
-        match items.next() {
-            Some(Argument::Positional(arg)) => visitor.visit_expr(arg),
-            Some(Argument::Keyword(keyword)) => break keyword,
-            None => return,
-        }
-    };
-    for arg in items.clone().filter_map(Argument::as_positional) {
-        visitor.visit_expr(arg);
-    }
-    visitor.visit_keyword(first_keyword);
-    for keyword in items.filter_map(Argument::as_keyword) {
-        visitor.visit_keyword(keyword);
-    }
+    arguments.for_each_in_evaluation_order(|argument| match argument {
+        ArgOrKeyword::Arg(expr) => visitor.visit_expr(expr),
+        ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),
+    });
 }
 
 pub fn walk_parameters<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameters: &'a Parameters) {
