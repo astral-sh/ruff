@@ -3733,7 +3733,7 @@ impl<'a> LintContext<'a> {
 
     #[inline]
     pub(crate) fn has_rules_for(&self, source: LintSource) -> bool {
-        self.rules.any_enabled_in(source.rules())
+        self.rules.any_enabled_in(source.rule_set())
     }
 
     #[inline]

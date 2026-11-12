@@ -246,7 +246,9 @@ pub enum LintSource {
 }
 
 impl LintSource {
-    pub(crate) const fn rules(self) -> &'static RuleSet {
+    /// Returns all rules checked by this lint source. The sets are built at compile time so
+    /// the linter can skip a pass when its set has no overlap with the enabled rules.
+    pub(crate) const fn rule_set(self) -> &'static RuleSet {
         static RULES: [RuleSet; LintSource::COUNT] = {
             let mut groups = [const { RuleSet::empty() }; LintSource::COUNT];
             let mut remaining = Rule::VARIANTS;

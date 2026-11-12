@@ -27,7 +27,10 @@ bitflags! {
 
 impl Flags {
     pub fn from_settings(settings: &LinterSettings) -> Self {
-        if settings.rules.any_enabled_in(LintSource::Imports.rules()) {
+        if settings
+            .rules
+            .any_enabled_in(LintSource::Imports.rule_set())
+        {
             Self::NOQA | Self::ISORT
         } else {
             Self::NOQA
