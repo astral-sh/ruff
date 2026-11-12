@@ -4469,7 +4469,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
+            (Type::TypeVar(bound_typevar), ty)
                 if bound_typevar.is_inferable(db, self.inferable) =>
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db, self.env) {
@@ -4588,6 +4588,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                     _ => self.add_type_mapping(bound_typevar, ty, polarity),
                 }
+            }
+
+            (_, Type::TypeVar(actual_typevar))
+                if actual_typevar.is_inferable(db, self.inferable) =>
+            {
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                return self.infer_from_constraint_set(when);
             }
 
             (Type::NominalInstance(_), Type::TypeVar(actual_typevar))
