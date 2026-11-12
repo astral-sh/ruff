@@ -3618,10 +3618,8 @@ impl<'a> LintContext<'a> {
     /// Create a new collector for `path` with an empty collection of `Diagnostic`s.
     pub(crate) fn new(path: &'a Path, contents: &'a str, settings: &'a LinterSettings) -> Self {
         // Ignore diagnostics based on per-file-ignores.
-        let mut rules = settings.rules.clone();
-        for ignore in crate::fs::ignores_from_path(path, &settings.per_file_ignores) {
-            rules.disable(ignore);
-        }
+        let ignored = crate::fs::ignores_from_path(path, &settings.per_file_ignores);
+        let rules = settings.rules.clone().without(&ignored);
 
         Self {
             diagnostics: RefCell::default(),
