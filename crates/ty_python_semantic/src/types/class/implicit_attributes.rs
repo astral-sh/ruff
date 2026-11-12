@@ -96,14 +96,15 @@ impl<'db> StaticClassLiteral<'db> {
         result
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
-    fn has_implicit_attribute_inner(
+    /// Return the declared member, or `None` if an inferred binding establishes the member.
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    fn implicit_attribute_before_binding(
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
-    ) -> bool {
+    ) -> Option<Member<'db>> {
         match Self::implicit_attribute_impl(db, attribute, |_| ControlFlow::Break(())) {
-            ControlFlow::Break(()) => true,
-            ControlFlow::Continue(result) => !result.member.is_undefined(),
+            ControlFlow::Break(()) => None,
+            ControlFlow::Continue(result) => Some(result.member),
         }
     }
 
@@ -511,8 +512,17 @@ impl<'db> ClassMemberSources<'db> {
     pub(super) fn has_implicit_instance_attribute(&self, db: &'db dyn Db, name: &str) -> bool {
         self.implicit_attribute_name(db, name, MethodDecorator::None)
             .is_some_and(|attribute| {
-                StaticClassLiteral::has_implicit_attribute_inner(db, attribute)
+                StaticClassLiteral::implicit_attribute_before_binding(db, attribute)
+                    .is_none_or(|member| !member.is_undefined())
             })
+    }
+
+    pub(super) fn declared_instance_attribute(&self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        self.implicit_attribute_name(db, name, MethodDecorator::None)
+            .and_then(|attribute| {
+                StaticClassLiteral::implicit_attribute_before_binding(db, attribute)
+            })
+            .unwrap_or_else(Member::unbound)
     }
 
     /// Tries to find declarations/bindings of an attribute named `name` that are only
