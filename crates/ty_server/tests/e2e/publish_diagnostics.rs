@@ -968,12 +968,13 @@ mod uv_metadata {
     use lsp_types::Message;
     use lsp_types::{Code, PublishDiagnosticsNotification};
     use ruff_db::system::SystemPath;
-    #[cfg(feature = "test-uv")]
     use ruff_python_trivia::textwrap::dedent;
     use serde_json::json;
     use ty_project::UseUv;
     #[cfg(feature = "test-uv")]
     use ty_project::uv_test_env_vars;
+    #[cfg(feature = "test-uv")]
+    use ty_server::{ClientOptions, DiagnosticMode};
 
     use crate::TestServerBuilder;
 
@@ -990,7 +991,10 @@ mod uv_metadata {
         ",
         );
         let mut server = TestServerBuilder::new()?
-            .with_workspace(SystemPath::new("src"), None)?
+            .with_workspace(
+                SystemPath::new("src"),
+                Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+            )?
             .with_file(script, &source)?
             .with_real_uv(UseUv::Scripts)?
             .enable_work_done_progress(true)
@@ -1089,11 +1093,18 @@ package = "invalid"
     fn untrusted_workspace_keeps_semantic_diagnostics() -> Result<()> {
         let workspace_root = SystemPath::new("src");
         let script = SystemPath::new("src/script.py");
-        let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+        let source = dedent(
+            "
+            # /// script
+            # dependencies = []
+            # ///
+            missing
+            ",
+        );
 
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
-            .with_file(script, source)?
+            .with_file(script, &source)?
             .with_raw_initialization_options(json!({"untrustedWorkspace": true}))
             .with_use_uv(UseUv::On)
             .with_env_var("TY_UV", "true")
@@ -1123,11 +1134,18 @@ package = "invalid"
     fn pushes_empty_diagnostics_while_the_initial_environment_is_pending() -> Result<()> {
         let workspace_root = SystemPath::new("src");
         let script = SystemPath::new("src/script.py");
-        let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+        let source = dedent(
+            "
+            # /// script
+            # dependencies = []
+            # ///
+            missing
+            ",
+        );
 
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
-            .with_file(script, source)?
+            .with_file(script, &source)?
             // Exclude the script from discovery so `didOpen` starts its first sync.
             // `didOpen` publishes before the main loop can apply the sync result.
             .with_file(

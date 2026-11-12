@@ -13,18 +13,20 @@
 //! check is necessary because the script's dependencies and Python version must be known to
 //! produce accurate diagnostics.
 //!
-//! The language server requests synchronization for indexed scripts when opening a project,
-//! including scripts that are not open in the editor. It also requests synchronization when
-//! scripts are discovered, opened or saved, or when a file-watcher event reports a change to a
-//! closed script. Project metadata is refreshed when configuration changes.
+//! The language server synchronizes scripts on open and save. With workspace diagnostics enabled,
+//! it also synchronizes closed scripts at startup and after relevant file or configuration changes.
 //!
 //! These operations run in the background because synchronizing scripts can create environments
 //! and install packages. Waiting for them would increase the latency of other editor requests;
 //! for example, semantic tokens should remain available while synchronization is running.
-//! Scripts are discovered independently of diagnostics because workspace symbols and references
-//! also need their environments.
 //! This avoids a rust-analyzer-like experience where editor operations wait for `cargo check` to
 //! complete before becoming available.
+//!
+//! When `diagnosticMode` is `off` or `openFilesOnly`, ty doesn't report diagnostics for closed
+//! scripts. We accept incomplete navigation in those scripts to avoid scanning the project and
+//! installing dependencies for files the user may never open. Until ty synchronizes a script's
+//! environment on open, unresolved imports can cause LSP requests to miss symbols from its
+//! dependencies or references to those symbols in the script.
 //!
 //! While a script's first uv sync is pending, the language server reports empty diagnostics for
 //! that script to avoid incorrect missing-dependency errors. Workspace diagnostics continue

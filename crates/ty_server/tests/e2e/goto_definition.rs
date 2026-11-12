@@ -66,6 +66,7 @@ mod uv_metadata {
         WorkspaceDocumentDiagnosticReport,
     };
     use ruff_db::system::{SystemPath, SystemPathBuf};
+    use ruff_python_trivia::textwrap::dedent;
     use ty_project::UseUv;
     use ty_server::{ClientOptions, DiagnosticMode};
 
@@ -334,7 +335,12 @@ from attrs import define
     #[test]
     fn workspace_check_does_not_synchronize_unsaved_script_metadata() -> Result<()> {
         let script = SystemPath::new("src/script.py");
-        let ordinary = "from attrs import define\nprint(define)\n";
+        let ordinary = dedent(
+            "
+            from attrs import define
+            print(define)
+            ",
+        );
         let source = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['attrs==25.4.0']
@@ -495,7 +501,10 @@ from idna import encode
 "#;
 
         let mut server = TestServerBuilder::new()?
-            .with_workspace(workspace_root, None)?
+            .with_workspace(
+                workspace_root,
+                Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+            )?
             .with_file(script, initial)?
             .with_real_uv(UseUv::Scripts)?
             .enable_workspace_diagnostic_refresh(true)
