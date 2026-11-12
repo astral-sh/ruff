@@ -148,5 +148,27 @@ We use the [Salsa](https://github.com/salsa-rs/salsa) library for incremental co
 methods take a Salsa database (usually `db: &'db dyn Db`) as an argument. This should always be the
 first argument (or second after `self`).
 
+### Deciding when to use a separate rule
+
+Avoid broad rules that catch many different kinds of errors. When deciding whether to reuse a
+rule for a new diagnostic or split an existing rule, consider whether users would benefit from
+enabling or disabling the cases independently. If several other Python type checkers give
+users separate controls for the same cases, that may be a signal that the distinction is useful.
+
+### Adding a rule
+
+Follow [Ruff's rule naming convention](../../docs/rule-proposals.md#rule-naming-convention).
+Name the pattern the rule reports so that its name reads naturally in a suppression such as
+`# ty: ignore[invalid-assignment]`.
+
+Use [Ruff's rule categorization guidelines](../../docs/rule-proposals.md#rule-categorization-guidelines)
+to choose the default severity for a new ty rule:
+
+- Use `error` for correctness issues, such as assigning a value of an incompatible type (`invalid-assignment`).
+- Use `warn` for suspicious patterns that are usually mistakes but can be intentional (`single-overload`),
+    or for uses of deprecated APIs (`deprecated`).
+- Use `ignore` for pedantic or restrictive checks that projects can opt into for stricter typing,
+    such as requiring explicit type arguments (`missing-type-argument`).
+
 [mdtest-readme]: ../ty_test/README.md
 [resources-mdtest]: ../ty_python_semantic/resources/mdtest

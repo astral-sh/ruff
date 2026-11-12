@@ -68,9 +68,7 @@ fn detect_blind_exception(
         &Expr::Attribute(ast::ExprAttribute { ref attr, .. }) if attr.as_str() == "assertRaises"
     );
 
-    let is_pytest_raises = semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]));
+    let is_pytest_raises = semantic.matches_qualified_name(func, &["pytest", "raises"]);
 
     if !(is_assert_raises || is_pytest_raises) {
         return None;

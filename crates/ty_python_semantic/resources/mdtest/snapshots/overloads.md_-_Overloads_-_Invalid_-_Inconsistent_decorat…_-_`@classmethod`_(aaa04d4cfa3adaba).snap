@@ -54,7 +54,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 39 |     # error: [inconsistent-overload-decorator]
 40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
 41 |         if isinstance(x, int):
-42 |             # error: [call-non-callable]
+42 |             # error: [not-callable]
 43 |             return cls(x)
 44 |         return None
 45 | 
@@ -143,7 +143,7 @@ error[inconsistent-overload-decorator]: Overloaded function `try_from3` does not
 ```
 
 ```
-error[call-non-callable]: Object of type `CheckClassMethod` is not callable
+error[not-callable]: Object of type `CheckClassMethod` is not callable
   --> src/mdtest_snippet.py:43:20
    |
 43 |             return cls(x)

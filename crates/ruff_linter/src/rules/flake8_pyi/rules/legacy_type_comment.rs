@@ -1,7 +1,3 @@
-use std::sync::LazyLock;
-
-use regex::Regex;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PySourceType;
 use ruff_python_trivia::CommentRanges;
@@ -60,14 +56,18 @@ pub(crate) fn legacy_type_comment(
     for range in comment_ranges {
         let comment = locator.slice(range);
 
-        if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
+        let Some(annotation) = comment
+            .strip_prefix('#')
+            .and_then(|body| body.trim_start().strip_prefix("type:"))
+        else {
+            continue;
+        };
+
+        if !annotation.is_empty()
+            && !annotation.starts_with('#')
+            && !annotation.trim_start().starts_with("ignore")
+        {
             context.report_diagnostic(LegacyTypeComment, range);
         }
     }
 }
-
-static TYPE_COMMENT_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^#\s*type:\s*([^#]+)(\s*#.*?)?$").unwrap());
-
-static TYPE_IGNORE_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^#\s*type:\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());

@@ -7,3 +7,6 @@ FIRST, [FIRST, SECOND, [THIRD, FIRST]] = (1, (1, 2))  # PLW0128
 FIRST, *FIRST = (1, 2) # PLW0128
 
 FIRST, SECOND, _, _, _ignored = (1, 2, 3, 4, 5)  # OK
+
+FIRST = SECOND = FIRST = 1  # PLW0128
+_ = _ = 1  # OK

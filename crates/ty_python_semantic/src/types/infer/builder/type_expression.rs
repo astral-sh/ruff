@@ -550,7 +550,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ast::Operator::BitOr => {
                         let left = self.infer_type_expression(&binary.left);
                         let right = self.infer_type_expression(&binary.right);
-                        UnionType::from_elements_leave_aliases(db, env, [left, right])
+                        UnionType::from_two_elements_leave_aliases(db, env, left, right)
                     }
                     ast::Operator::BitAnd => {
                         if let Some(builder) =
@@ -1326,10 +1326,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             None
         };
         InferredUnionOperand {
-            annotation: UnionType::from_elements_leave_aliases(
+            annotation: UnionType::from_two_elements_leave_aliases(
                 db,
                 env,
-                [left.annotation, right.annotation],
+                left.annotation,
+                right.annotation,
             ),
             runtime_value,
         }
@@ -2593,7 +2594,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
-                UnionType::from_elements_leave_aliases(db, env, [param_type, Type::none(db, env)])
+                UnionType::from_two_elements_leave_aliases(db, env, param_type, Type::none(db, env))
             }
             SpecialFormType::Union => {
                 // TODO: Support the union of a `TypeVarTuple`'s elements. Until then, reject

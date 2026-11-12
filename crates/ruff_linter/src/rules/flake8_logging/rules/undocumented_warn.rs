@@ -58,8 +58,7 @@ pub(crate) fn undocumented_warn(checker: &Checker, expr: &Expr) {
 
     if checker
         .semantic()
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["logging", "WARN"]))
+        .matches_qualified_name(expr, &["logging", "WARN"])
     {
         let mut diagnostic = checker.report_diagnostic(UndocumentedWarn, expr.range());
         diagnostic.try_set_fix(|| {

@@ -3160,7 +3160,8 @@ impl<'db> TupleSpecBuilder<'db> {
                 if our_elements.len() == new_elements.len() =>
             {
                 for (existing, new) in our_elements.iter_mut().zip(new_elements.all_elements()) {
-                    *existing = UnionType::from_elements_leave_aliases(db, env, [*existing, *new]);
+                    *existing =
+                        UnionType::from_two_elements_leave_aliases(db, env, *existing, *new);
                 }
                 self
             }

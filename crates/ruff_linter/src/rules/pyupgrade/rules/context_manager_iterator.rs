@@ -91,17 +91,17 @@ pub(crate) fn context_manager_iterator(checker: &Checker, function: &ast::StmtFu
     let Some(decorator) = function.decorator_list.last() else {
         return;
     };
-    let Some(qualified_name) = checker
+    let (decorator_name, iterator, generator) = if function.is_async {
+        ("asynccontextmanager", "AsyncIterator", "AsyncGenerator")
+    } else {
+        ("contextmanager", "Iterator", "Generator")
+    };
+    if !checker
         .semantic()
-        .resolve_qualified_name(&decorator.expression)
-    else {
+        .matches_qualified_name(&decorator.expression, &["contextlib", decorator_name])
+    {
         return;
-    };
-    let (iterator, generator) = match (function.is_async, qualified_name.segments()) {
-        (false, ["contextlib", "contextmanager"]) => ("Iterator", "Generator"),
-        (true, ["contextlib", "asynccontextmanager"]) => ("AsyncIterator", "AsyncGenerator"),
-        _ => return,
-    };
+    }
     let Some(annotation) = function.returns.as_deref() else {
         return;
     };

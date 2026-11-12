@@ -8,24 +8,29 @@ use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 use crate::{
-    Db, FxOrderMap, TypeQualifiers,
+    Db, FxIndexSet, FxOrderMap, TypeQualifiers,
     place::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
         TypeOrigin,
     },
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, ClassLiteral, CycleDetector, DynamicType,
-        GenericContext, InstanceProjection, IntersectionType, KnownClass, KnownInstanceType,
-        MaterializationKind, Parameter, Parameters, RecursiveType, Specialization, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
-        any_over_type, any_over_type_including_alias_arguments, binding_type,
+        GenericAlias, GenericContext, InstanceProjection, IntersectionType, KnownClass,
+        KnownInstanceType, MaterializationKind, Parameter, Parameters, RecursiveType, Signature,
+        Specialization, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
+        UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
+        binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
         generics::{enclosing_binding_contexts, walk_specialization_types},
         tuple::Tuple,
         type_alias::walk_type_alias_arguments,
         variance::VarianceInferable,
-        visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{
+            self, NonAtomicType, TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type,
+            walk_type_with_recursion_guard,
+        },
+        walk_signature,
     },
 };
 use ty_python_core::{
@@ -1938,6 +1943,127 @@ impl<'db> BoundTypeVarIdentity<'db> {
 
         self.paramspec_attr = None;
         self
+    }
+}
+
+impl<'db> Type<'db> {
+    /// Returns the free type variables in this type and whether any lazy attributes were skipped.
+    pub(super) fn free_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> (TypeVarSet<'db>, bool) {
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| (TypeVarSet::None, false), heap_size=ruff_memory_usage::heap_size)]
+        fn non_atomic_free_typevars<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: NonAtomicType<'db>,
+        ) -> (TypeVarSet<'db>, bool) {
+            struct CollectFreeTypeVars<'a, 'db> {
+                env: &'a ProgramEnvironment<'db>,
+                variables: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
+                skipped_lazy: Cell<bool>,
+            }
+
+            impl<'db> TypeVisitor<'db> for CollectFreeTypeVars<'_, 'db> {
+                fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                    self.env
+                }
+
+                fn should_visit_lazy_type_attributes(&self) -> bool {
+                    false
+                }
+
+                fn notify_skipped_lazy_type_attributes(&self) {
+                    self.skipped_lazy.set(true);
+                }
+
+                fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
+                    // Immediately return, since we don't need to recurse into the typevar's bounds,
+                    // constraints, or default. Those might contain other typevars, but those other
+                    // typevars are not free variables of this occurrence, and don't need to be added
+                    // to the final result.
+                }
+
+                fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
+                    // Each overload binds its own type variables. A captured type variable is still
+                    // free in the callable.
+                    let Some(context) = signature.generic_context else {
+                        return walk_signature(db, signature, self);
+                    };
+                    let enclosing = self.variables.take();
+                    walk_signature(db, signature, self);
+                    let locals = context.inferable_typevars(db);
+                    let candidates = self.variables.replace(enclosing);
+                    self.variables
+                        .borrow_mut()
+                        .extend(candidates.into_iter().filter(|variable| {
+                            let mut identity = variable.identity(db);
+                            if variable.paramspec_attr(db).is_some() {
+                                identity = identity.without_paramspec_attr(db);
+                            }
+                            !identity.is_inferable(db, locals)
+                        }));
+                }
+
+                fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+                    for ty in alias.specialization(db).types(db) {
+                        self.visit_type(db, *ty);
+                    }
+                }
+
+                fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                    self.notify_skipped_lazy_type_attributes();
+                    let Some(specialization) = alias.specialization(db) else {
+                        return;
+                    };
+                    let parameters = specialization.generic_context(db).variables(db);
+                    let origin = alias.unspecialized(db);
+                    for (parameter, &argument) in parameters.zip(specialization.types(db)) {
+                        // With `type Constant[T] = int`, the value of T has no effect on the alias.
+                        let variance = origin.variance_of(db, self.env, parameter.identity(db));
+                        if variance.evaluate(db) != TypeVarVariance::Bivariant {
+                            self.visit_type(db, argument);
+                        }
+                    }
+                }
+
+                fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                    let (typevars, skipped_lazy) = ty.free_typevars(db, self.env);
+                    self.variables.borrow_mut().extend(typevars.iter(db));
+                    if skipped_lazy {
+                        self.notify_skipped_lazy_type_attributes();
+                    }
+                }
+            }
+
+            let collector = CollectFreeTypeVars {
+                env: &ProgramEnvironment::from_program(program),
+                variables: RefCell::default(),
+                skipped_lazy: Cell::new(false),
+            };
+            walk_non_atomic_type(db, ty, &collector);
+            (
+                TypeVarSet::from_typevars(db, collector.variables.into_inner()),
+                collector.skipped_lazy.get(),
+            )
+        }
+
+        match TypeKind::from(self) {
+            TypeKind::Atomic => (TypeVarSet::None, false),
+            TypeKind::NonAtomic(NonAtomicType::TypeVar(variable)) => {
+                // Walking `Callable[P, R]` visits P.args and P.kwargs separately. Both
+                // projections also depend on P itself.
+                let unprojected = variable
+                    .paramspec_attr(db)
+                    .map(|_| variable.without_paramspec_attr(db));
+                (
+                    TypeVarSet::from_typevars(db, std::iter::once(variable).chain(unprojected)),
+                    false,
+                )
+            }
+            TypeKind::NonAtomic(ty) => non_atomic_free_typevars(db, env.program(db), ty),
+        }
     }
 }
 

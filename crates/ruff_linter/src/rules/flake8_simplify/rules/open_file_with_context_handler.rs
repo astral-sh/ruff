@@ -72,12 +72,7 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if semantic
-                        .resolve_qualified_name(func)
-                        .is_some_and(|qualified_name| {
-                            matches!(qualified_name.segments(), ["contextlib", "AsyncExitStack"])
-                        })
-                    {
+                    if semantic.matches_qualified_name(func, &["contextlib", "AsyncExitStack"]) {
                         return true;
                     }
                 }
@@ -106,12 +101,7 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if semantic
-                        .resolve_qualified_name(func)
-                        .is_some_and(|qualified_name| {
-                            matches!(qualified_name.segments(), ["contextlib", "ExitStack"])
-                        })
-                    {
+                    if semantic.matches_qualified_name(func, &["contextlib", "ExitStack"]) {
                         return true;
                     }
                 }

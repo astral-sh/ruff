@@ -1036,6 +1036,7 @@ jobs:
           name: ty-fuzz-failures
           path: |
             ty-fuzz-failures/*.py
+            ty-fuzz-failures/*.json
             ty-new
             ty-old
           compression-level: 1
@@ -1055,7 +1056,7 @@ jobs:
           if [[ "$FUZZ_OUTCOME" == "success" ]]; then
             echo 'The fuzzer found no new ty panics or timeouts.' > status.md
           else
-            echo 'Panic or timeout detected. Minimization in progress…' > status.md
+            echo '⚠️ Panic or timeout detected. Minimization in progress…' > status.md
             printf 'Minimization report unavailable. [Download the failing inputs](%s).\n' "$FAILURES_URL" > ty-fuzz-report.md
           fi
       - name: Upload the fuzz status messages
@@ -1083,7 +1084,7 @@ jobs:
       report: ty-fuzz
       artifact: ty-fuzz-status
       filename: status.md
-      title: ty fuzz results
+      title: ${{ needs.fuzz-ty.result == 'success' && 'ty fuzzing passed ✅' || '❌ ty fuzz failures' }}
       update-existing-only: ${{ needs.fuzz-ty.result == 'success' }}
 
   minimize-ty-fuzz:
@@ -1152,7 +1153,7 @@ jobs:
       report: ty-fuzz
       artifact: ${{ needs.minimize-ty-fuzz.outputs.report != '' && 'ty-fuzz-report' || 'ty-fuzz-status' }}
       filename: ty-fuzz-report.md
-      title: ty fuzz failures
+      title: ❌ ty fuzz failures
 
   cargo-cooldowns:
     name: "crates cooldowns"

@@ -3184,7 +3184,7 @@ def _(v: OptionalX | RequiredX) -> None:
     # TODO: it's correct that we emit an error,
     # but this is a terrible error message:
     #
-    # error: [call-non-callable] "Object of type `Overload[]` is not callable"
+    # error: [not-callable] "Object of type `Overload[]` is not callable"
     reveal_type(v.pop("x"))  # revealed: int | Unknown
 
 def union_pop_with_default(u: OptionalX | OptStrX) -> None:

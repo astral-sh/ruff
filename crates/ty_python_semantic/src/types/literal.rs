@@ -186,6 +186,21 @@ impl<'db> LiteralValueType<'db> {
         }
     }
 
+    /// Returns whether these literal types are known to have no value in common.
+    pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self.kind(), other.kind()) {
+            (LiteralValueTypeKind::String(_), LiteralValueTypeKind::LiteralString)
+            | (LiteralValueTypeKind::LiteralString, LiteralValueTypeKind::String(_)) => false,
+            (LiteralValueTypeKind::Enum(left), LiteralValueTypeKind::Enum(right))
+                if left.enum_class_literal(db) == right.enum_class_literal(db)
+                    && !left.enum_class_literal(db).aliases_are_known(db) =>
+            {
+                false
+            }
+            (left, right) => left != right,
+        }
+    }
+
     pub(crate) fn as_bytes(self) -> Option<BytesLiteralType<'db>> {
         if let LiteralValueTypeKind::Bytes(v) = self.kind() {
             Some(v)
