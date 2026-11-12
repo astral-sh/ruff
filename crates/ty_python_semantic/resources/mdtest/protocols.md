@@ -2466,13 +2466,13 @@ A property returning the right class type satisfies instance reads, but class ac
 property itself. Such an implementation does not satisfy the nested class member's contract.
 
 ```py
-class PropertyImplementation:
+class InvalidPropertyImplementation:
     @property
     def Meta(self) -> type[HasMeta.Meta]:
         return HasMeta.Meta
 
-static_assert(not is_subtype_of(PropertyImplementation, HasMeta))
-static_assert(not is_subtype_of(TypeOf[PropertyImplementation], type[HasMeta]))
+static_assert(not is_subtype_of(InvalidPropertyImplementation, HasMeta))
+static_assert(not is_subtype_of(TypeOf[InvalidPropertyImplementation], type[HasMeta]))
 ```
 
 A protocol that permits replacing `Meta` rejects `Implementation`, even when its setter accepts only
@@ -2515,7 +2515,7 @@ def access(obj: HasDescriptor, cls: type[HasDescriptor]):
 An instance property cannot satisfy the class-side read contract.
 
 ```py
-class InstanceOnly:
+class InvalidInstanceOnly:
     @property
     def attribute(self) -> type[HasDescriptor.attribute]:
         return HasDescriptor.attribute
@@ -2523,7 +2523,7 @@ class InstanceOnly:
     @attribute.setter
     def attribute(self, value: type) -> None: ...
 
-static_assert(not is_subtype_of(InstanceOnly, HasDescriptor))
+static_assert(not is_subtype_of(InvalidInstanceOnly, HasDescriptor))
 ```
 
 When the metaclass defines `__get__`, its return type determines instance reads.
