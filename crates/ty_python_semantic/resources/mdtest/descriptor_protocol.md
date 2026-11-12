@@ -272,12 +272,14 @@ Base.Inner = Base.Inner  # error: [invalid-assignment]
 del Base.Inner  # error: [invalid-assignment]
 ```
 
-A receiver annotation does not override the descriptor's setter contract, including during
-initialization.
+`Child` inherits the data descriptor `Inner`, which takes precedence over instance attributes. Even
+though `Child.__init__` annotates `self.Inner` as `object`, assigning `"wrong"` passes a `str` to
+`DescriptorMeta.__set__`, whose `value` parameter requires an `int`.
 
 ```py
 class Child(Base):
     def __init__(self):
+        # TODO: explicit diagnostic that this `: object` annotation is not a valid override
         self.Inner: object = "wrong"  # error: [invalid-assignment]
 
 Child().Inner = 1  # ok
