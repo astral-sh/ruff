@@ -87,17 +87,15 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         return;
     };
 
-    let fields = match arguments.items.as_slice() {
+    let mut positional = arguments.args();
+    let fields = match (positional.next(), positional.next()) {
         // Ex) `NamedTuple("MyType")`
-        [ast::Argument::Positional(_)] => Suite::from([Stmt::Pass(ast::StmtPass {
+        (Some(_), None) if arguments.len() == 1 => Suite::from([Stmt::Pass(ast::StmtPass {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })]),
         // Ex) `NamedTuple("MyType", [("a", int), ("b", str)])`
-        [
-            ast::Argument::Positional(_),
-            ast::Argument::Positional(fields),
-        ] => {
+        (Some(_), Some(fields)) if arguments.len() == 2 => {
             if let Some(fields) = create_fields_from_fields_arg(fields) {
                 fields
             } else {
@@ -106,7 +104,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             }
         }
         // Ex) `NamedTuple("MyType", a=int, b=str)`
-        _ if arguments.args().count() == 1 => {
+        (Some(_), None) => {
             if let Some(fields) = create_fields_from_keywords(arguments) {
                 fields
             } else {

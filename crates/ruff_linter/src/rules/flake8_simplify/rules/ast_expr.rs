@@ -261,22 +261,22 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     else {
         return;
     };
-    if arguments.keywords().next().is_some() {
-        return;
-    }
+
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
         return;
     };
     if attr != "get" {
         return;
     }
-    let Some(key) = arguments.args().next() else {
+    let mut items = arguments.iter_source_order();
+    let (Some(ast::ArgOrKeyword::Arg(key)), Some(ast::ArgOrKeyword::Arg(default))) =
+        (items.next(), items.next())
+    else {
         return;
     };
-    let Some(default) = arguments.args().nth(1) else {
-        return;
-    };
-    if !default.is_none_literal_expr() {
+    if !default.is_none_literal_expr()
+        || items.any(|item| matches!(item, ast::ArgOrKeyword::Keyword(_)))
+    {
         return;
     }
 

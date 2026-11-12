@@ -301,10 +301,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let arguments = &call_expr.arguments;
 
+        let [mut value_kw, mut names_kw, mut start_kw, mut type_kw] = [None; 4];
         for kw in arguments.keywords() {
             let Some(name) = &kw.arg else {
                 continue;
             };
+            let slot = match name.as_str() {
+                "value" => Some(&mut value_kw),
+                "names" => Some(&mut names_kw),
+                "start" => Some(&mut start_kw),
+                "type" => Some(&mut type_kw),
+                _ => None,
+            };
+            if let Some(slot) = slot {
+                slot.get_or_insert(kw);
+            }
             let env = self.program_environment();
             let python_version = env.python_version(db);
             if !enum_functional_call_keyword_is_valid(name.as_str(), python_version)
@@ -316,11 +327,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ));
             }
         }
-
-        let value_kw = call_expr.arguments.find_keyword("value");
-        let names_kw = call_expr.arguments.find_keyword("names");
-        let start_kw = call_expr.arguments.find_keyword("start");
-        let type_kw = call_expr.arguments.find_keyword("type");
 
         let mut positional = arguments.args();
         let first = positional.next();
@@ -408,7 +414,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to function `{base_name}`: expected 2, got {}",
-                arguments.args().count(),
+                3 + positional.count(),
                 base_name = base_class.name(self.program_environment().python_version(db)),
             ));
         }

@@ -2604,7 +2604,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to TypedDict `{}` constructor: expected 1, got {}",
                 typed_dict_ty.display(db, env),
-                arguments.args().count(),
+                2 + positional.count(),
             ));
         }
         // TODO: Consider validating the first positional argument too, without producing
@@ -2618,7 +2618,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
     let unpacked_keyword_types = infer_unpacked_keyword_types(arguments, &mut expression_type_fn);
 
     if let Some(arg) = positional_arg
-        && arguments.keywords().next().is_some()
+        && arguments.len() > 1
     {
         // Mixed positional-and-keyword construction: guaranteed keyword-provided keys override the
         // positional mapping, so validate the positional argument against the remaining schema.

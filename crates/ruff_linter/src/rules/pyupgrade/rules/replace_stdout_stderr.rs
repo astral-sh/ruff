@@ -72,10 +72,10 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
     {
         // Find `stdout` and `stderr` kwargs.
-        let Some(stdout) = call.arguments.find_keyword("stdout") else {
-            return;
-        };
-        let Some(stderr) = call.arguments.find_keyword("stderr") else {
+        let [Some(stdout), Some(stderr), capture_output] =
+            call.arguments
+                .find_keywords(["stdout", "stderr", "capture_output"])
+        else {
             return;
         };
 
@@ -97,7 +97,7 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
         }
 
         let mut diagnostic = checker.report_diagnostic(ReplaceStdoutStderr, call.range());
-        if call.arguments.find_keyword("capture_output").is_none() {
+        if capture_output.is_none() {
             diagnostic.try_set_fix(|| {
                 generate_fix(
                     stdout,

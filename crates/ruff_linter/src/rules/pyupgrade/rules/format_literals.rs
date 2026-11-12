@@ -5,7 +5,7 @@ use libcst_native::{Arg, Expression};
 use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_text_size::Ranged;
 
@@ -90,22 +90,17 @@ pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: 
     let arguments = if is_sequential(&summary.indices) {
         Arguments::Preserve
     } else {
-        // Ex) `"{1} {0}".format(foo=1, bar=2)`
-        if call.arguments.keywords().next().is_some() {
-            return;
-        }
-
-        // Ex) `"{1} {0}".format(foo)`
-        if call.arguments.args().count() < summary.indices.len() {
-            return;
-        }
-
-        // Ex) `"{1} {0}".format(*foo)`
-        if call
-            .arguments
-            .args()
-            .take(summary.indices.len())
-            .any(Expr::is_starred_expr)
+        if call.arguments.len() < summary.indices.len()
+            || call
+                .arguments
+                .iter_source_order()
+                .enumerate()
+                .any(|(index, item)| match item {
+                    ast::ArgOrKeyword::Arg(arg) => {
+                        index < summary.indices.len() && arg.is_starred_expr()
+                    }
+                    ast::ArgOrKeyword::Keyword(_) => true,
+                })
         {
             return;
         }

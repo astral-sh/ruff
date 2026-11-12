@@ -57,7 +57,7 @@ impl<'expr> TypedDictConstructorForm<'expr> {
         if positional.next().is_some() {
             return Self::MultiplePositionalArguments;
         }
-        match (argument, arguments.keywords().next().is_none()) {
+        match (argument, arguments.len() == 1) {
             (argument, _) if argument.is_starred_expr() => Self::VariadicPositional,
             (ast::Expr::Dict(_), true) => Self::LiteralOnly(argument),
             (ast::Expr::Dict(dict_expr), false) => Self::MixedLiteralAndKeywords {

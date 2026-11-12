@@ -93,14 +93,16 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
     //
     // NOTE: `func` is not necessarily just a function name, it can be an attribute access,
     //       or even a call itself.
-    let Some((args, func)) = match_call(target.element()) else {
+    let Some(call) = target.element().as_call_expr() else {
         return;
     };
+    let arguments = &call.arguments;
+    let func = call.func.as_ref();
 
     match value {
         // Ex) `f(*x) for x in iter`
         ComprehensionTarget::Name(name) => {
-            let [ast::Argument::Positional(arg)] = args.items.as_slice() else {
+            let Some(arg) = arguments.as_single_positional() else {
                 return;
             };
 
@@ -121,9 +123,10 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
         }
         // Ex) `f(x, y, z) for x, y, z in iter`
         ComprehensionTarget::Tuple(tuple) => {
-            if tuple.len() != args.len()
-                || std::iter::zip(tuple, args.args())
-                    .any(|(x, y)| ComparableExpr::from(x) != ComparableExpr::from(y))
+            if tuple.len() != arguments.len()
+                || !std::iter::zip(tuple, arguments.iter_source_order()).all(|(target, arg)| {
+                    matches!(arg, ast::ArgOrKeyword::Arg(expr) if ComparableExpr::from(target) == ComparableExpr::from(expr))
+                })
             {
                 return;
             }
@@ -371,17 +374,4 @@ fn match_comprehension_target(
         Expr::Name(name) => Some(ComprehensionTarget::Name(name)),
         _ => None,
     }
-}
-
-/// Match that the given expression is `func(x, y, z, ...)`.
-fn match_call(element: &Expr) -> Option<(&ast::Arguments, &Expr)> {
-    let ast::ExprCall {
-        func, arguments, ..
-    } = element.as_call_expr()?;
-
-    if arguments.keywords().next().is_some() {
-        return None;
-    }
-
-    Some((arguments, func))
 }

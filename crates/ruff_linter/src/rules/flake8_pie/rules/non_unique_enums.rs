@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_python_semantic::SemanticModel;
 use rustc_hash::FxHashSet;
 
@@ -124,14 +123,9 @@ fn member_has_unknown_value(semantic: &SemanticModel, expr: &Expr) -> bool {
                 return false;
             }
 
-            if arguments.keywords().next().is_some() {
-                return false;
-            }
-
-            matches!(
-                arguments.args().collect_array(),
-                Some([_, Expr::EllipsisLiteral(_)])
-            )
+            arguments
+                .as_positional_array()
+                .is_some_and(|[_, value]| value.is_ellipsis_literal_expr())
         }
 
         _ => false,
