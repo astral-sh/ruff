@@ -40,23 +40,25 @@ impl FormatNodeRule<PatternMatchMapping> for FormatPatternMatchMapping {
         //    # own-line "after rest comment"
         // }
         // ```
-        let (open_parenthesis_comments, double_star_comments, after_rest_comments) =
-            if let Some((double_star, rest)) = find_double_star(item, f.context().source()) {
-                let (open_parenthesis_comments, dangling) =
-                    dangling.split_at(dangling.partition_point(|comment| {
-                        comment.line_position().is_end_of_line()
-                            && comment.start() < double_star.start()
-                    }));
-                let (double_star_comments, after_rest_comments) = dangling
-                    .split_at(dangling.partition_point(|comment| comment.start() < rest.start()));
-                (
-                    open_parenthesis_comments,
-                    double_star_comments,
-                    after_rest_comments,
-                )
-            } else {
-                (dangling, [].as_slice(), [].as_slice())
-            };
+        let (open_parenthesis_comments, double_star_comments, after_rest_comments) = if !dangling
+            .is_empty()
+            && let Some((double_star, rest)) = find_double_star(item, f.context().source())
+        {
+            let (open_parenthesis_comments, dangling) =
+                dangling.split_at(dangling.partition_point(|comment| {
+                    comment.line_position().is_end_of_line()
+                        && comment.start() < double_star.start()
+                }));
+            let (double_star_comments, after_rest_comments) = dangling
+                .split_at(dangling.partition_point(|comment| comment.start() < rest.start()));
+            (
+                open_parenthesis_comments,
+                double_star_comments,
+                after_rest_comments,
+            )
+        } else {
+            (dangling, [].as_slice(), [].as_slice())
+        };
 
         let format_pairs = format_with(|f| {
             let mut joiner = f.join_comma_separated(item.end());
