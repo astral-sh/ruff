@@ -22,7 +22,7 @@ pub(crate) fn ignores_from_path(path: &Path, ignore_list: &CompiledPerFileIgnore
     }
     ignore_list
         .iter_matches(path, "Adding per-file ignores")
-        .fold(RuleSet::empty(), |ignored, rules| ignored.union(rules))
+        .fold(RuleSet::empty(), RuleSet::union)
 }
 
 /// Convert any path to an absolute path (based on the current working
