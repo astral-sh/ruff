@@ -748,36 +748,21 @@ impl<'src> Parser<'src> {
         self.recovery_context = saved_context;
     }
 
-    /// Parses a comma separated list of elements into a vector where each element
-    /// is parsed using the given `parse_element` function.
-    fn parse_comma_separated_list_into_vec<T>(
+    /// Parses a comma-separated list of nodes into the AST arena.
+    fn parse_comma_separated_node_list<T: ast::NodeType + 'static>(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
-    ) -> Vec<T> {
-        self.parse_comma_separated_list_into_vec_with_capacity(
-            recovery_context_kind,
-            parse_element,
-            0,
-        )
-    }
-
-    /// Parses a comma separated list of elements into a vector with an initial capacity.
-    fn parse_comma_separated_list_into_vec_with_capacity<T>(
-        &mut self,
-        recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
-        capacity: usize,
-    ) -> Vec<T> {
-        let mut elements = Vec::with_capacity(capacity);
+        parse_element: impl Fn(&mut Parser<'src>) -> BuildId<T>,
+    ) -> ast::ListId<ast::AstNodeId<T>> {
+        let mut elements = id::NodeListBuilder::new();
         self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
-        elements
+        elements.finish(&mut self.storage)
     }
 
     /// Parses a comma separated list of elements where each element is parsed
     /// using the given `parse_element` function.
     ///
-    /// The difference between this function and `parse_comma_separated_list_into_vec`
+    /// The difference between this function and `parse_comma_separated_node_list`
     /// is that this function does not return the parsed elements. Instead, it is the
     /// caller's responsibility to handle the parsed elements. This is the reason
     /// that the `parse_element` parameter is bound to [`FnMut`] instead of [`Fn`].

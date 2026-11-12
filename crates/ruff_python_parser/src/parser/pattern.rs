@@ -1,4 +1,4 @@
-use crate::parser::syntax::{self as id, Construct, IntoList};
+use crate::parser::syntax::{self as id, Construct};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     self as ast, AstNode, ExprContext, ExprKind, ListId, Number, Operator, PatternKind, Singleton,
@@ -102,19 +102,19 @@ impl Parser<'_> {
                 self.add_error(ParseErrorType::InvalidStarPatternUsage, lhs);
             }
 
-            let mut patterns = vec![lhs];
+            let mut additional = Vec::new();
             let mut progress = ParserProgress::default();
 
             while self.eat(TokenKind::Vbar) {
                 progress.assert_progressing(self);
                 let pattern = self.parse_match_pattern_lhs(AllowStarPattern::No);
-                patterns.push(pattern);
+                additional.push(pattern.id);
             }
 
             lhs = id::Pattern::from(
                 build::PatternMatchOr {
                     range: self.node_range(start),
-                    patterns: patterns.into_list(&mut self.storage),
+                    patterns: self.storage.list(std::iter::once(lhs.id).chain(additional)),
                 }
                 .parsed(&mut self.storage),
             );
@@ -377,11 +377,11 @@ impl Parser<'_> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut patterns = vec![first_element];
+        let mut additional = Vec::new();
 
         self.parse_comma_separated_list(
             RecoveryContextKind::SequenceMatchPattern(parentheses),
-            |parser| patterns.push(parser.parse_match_pattern(AllowStarPattern::Yes)),
+            |parser| additional.push(parser.parse_match_pattern(AllowStarPattern::Yes).id),
         );
 
         if let Some(parentheses) = parentheses {
@@ -390,7 +390,9 @@ impl Parser<'_> {
 
         build::PatternMatchSequence {
             range: self.node_range(start),
-            patterns: patterns.into_list(&mut self.storage),
+            patterns: self
+                .storage
+                .list(std::iter::once(first_element.id).chain(additional)),
         }
         .parsed(&mut self.storage)
     }

@@ -1,8 +1,5 @@
-use ruff_python_ast::{
-    self as ast, AstNode, AstNodeId, BuildId, Builder, Emit, ListId, ListItem, NodeKind,
-};
+use ruff_python_ast::{self as ast, AstNode, AstNodeId, BuildId, Builder, Emit, NodeKind};
 use ruff_text_size::{Ranged, TextRange};
-use thin_vec::ThinVec;
 
 /// The Pratt parser uses the range and kind of its current result for lookahead and errors.
 /// Only its four-byte slot is written into its parent.
@@ -48,33 +45,33 @@ pub(crate) trait Construct: Emit + Sized {
 }
 impl<T: Emit> Construct for T {}
 
-impl<T: ast::NodeType + 'static> ListItem for Node<T> {
-    type Element = AstNodeId<T>;
-    fn word(self) -> u32 {
-        self.id.word()
-    }
+/// Collects child IDs until the parser can put them in a contiguous arena list.
+/// Keeping the first ID inline avoids a temporary allocation for single-element lists.
+pub(super) struct NodeListBuilder<T> {
+    first: Option<BuildId<T>>,
+    additional: Vec<BuildId<T>>,
 }
 
-pub(crate) trait IntoList<E> {
-    fn into_list(self, builder: &mut Builder) -> ListId<E>;
-}
-impl<E> IntoList<E> for ListId<E> {
-    fn into_list(self, _: &mut Builder) -> Self {
-        self
+impl<T: ast::NodeType + 'static> NodeListBuilder<T> {
+    pub(super) fn new() -> Self {
+        Self {
+            first: None,
+            additional: Vec::new(),
+        }
+    }
+
+    pub(super) fn push(&mut self, id: BuildId<T>) {
+        if self.first.is_none() {
+            self.first = Some(id);
+        } else {
+            self.additional.push(id);
+        }
+    }
+
+    pub(super) fn finish(self, builder: &mut Builder) -> ast::ListId<AstNodeId<T>> {
+        builder.list(self.first.into_iter().chain(self.additional))
     }
 }
-macro_rules! collection {
-    ($ty:ty) => {
-        impl<T: ListItem> IntoList<T::Element> for $ty {
-            fn into_list(self, builder: &mut Builder) -> ListId<T::Element> {
-                builder.list(self)
-            }
-        }
-    };
-}
-collection!(Vec<T>);
-collection!(ThinVec<T>);
-collection!(Box<[T]>);
 
 macro_rules! upcast {
     ($group:ident, $($ty:ident),+) => {$(
@@ -249,7 +246,6 @@ pub(crate) type StringLiteral = Node<ast::kind::StringLiteral>;
 pub(crate) type TString = Node<ast::kind::TString>;
 pub(crate) type TypeParam = Node<ast::kind::TypeParam>;
 pub(crate) type TypeParams = Node<ast::kind::TypeParams>;
-pub(crate) type WithItem = Node<ast::kind::WithItem>;
 
 impl Expr {
     pub(super) const fn is_starred_expr(self) -> bool {

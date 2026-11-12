@@ -1,4 +1,4 @@
-use crate::parser::syntax::{self as id, Construct, IntoList};
+use crate::parser::syntax::{self as id, Construct};
 use ruff_python_ast::AstNode as _;
 use ruff_python_ast::{AstNodeId, ExprKind, ListId, build};
 use std::fmt::{Display, Write};
@@ -117,9 +117,11 @@ impl<'src> Parser<'src> {
             TokenKind::For => id::Stmt::from(self.parse_for_statement(start, false)),
             TokenKind::While => id::Stmt::from(self.parse_while_statement()),
             TokenKind::Def => {
-                id::Stmt::from(self.parse_function_definition(Vec::new(), start, false))
+                id::Stmt::from(self.parse_function_definition(ListId::default(), start, false))
             }
-            TokenKind::Class => id::Stmt::from(self.parse_class_definition(Vec::new(), start)),
+            TokenKind::Class => {
+                id::Stmt::from(self.parse_class_definition(ListId::default(), start))
+            }
             TokenKind::Try => id::Stmt::from(self.parse_try_statement()),
             TokenKind::With => id::Stmt::from(self.parse_with_statement(start, false)),
             TokenKind::At => self.parse_decorators(),
@@ -408,29 +410,30 @@ impl<'src> Parser<'src> {
         // z
         // del x, y[
         // z
-        let targets = self.parse_comma_separated_list_into_vec(
-            RecoveryContextKind::DeleteTargets,
-            |parser| {
-                // Allow starred expression to raise a better error message for
-                // an invalid delete target later.
-                let target = parser.parse_conditional_expression_or_higher_impl(
-                    ExpressionContext::starred_conditional(),
-                );
-                parser
-                    .storage
-                    .set_expr_context(target.expr.id, ExprContext::Del);
+        let targets_snapshot = self.expr_scratch.snapshot();
+        self.parse_comma_separated_list(RecoveryContextKind::DeleteTargets, |parser| {
+            // Allow starred expression to raise a better error message for
+            // an invalid delete target later.
+            let target = parser.parse_conditional_expression_or_higher_impl(
+                ExpressionContext::starred_conditional(),
+            );
+            parser
+                .storage
+                .set_expr_context(target.expr.id, ExprContext::Del);
 
-                // test_err invalid_del_target
-                // del x + 1
-                // del {'x': 1}
-                // del {'x', 'y'}
-                // del None, True, False, 1, 1.0, "abc"
-                parser.validate_delete_target(&target.expr);
+            // test_err invalid_del_target
+            // del x + 1
+            // del {'x': 1}
+            // del {'x', 'y'}
+            // del None, True, False, 1, 1.0, "abc"
+            parser.validate_delete_target(&target.expr);
 
-                target.expr
-            },
-        );
+            parser.expr_scratch.push(target.expr.id);
+        });
 
+        let targets = self
+            .expr_scratch
+            .take_range(targets_snapshot, &mut self.storage);
         if targets.is_empty() {
             // test_err del_stmt_empty
             // del
@@ -441,7 +444,7 @@ impl<'src> Parser<'src> {
         }
 
         build::StmtDelete {
-            targets: self.storage.list(targets).into_list(&mut self.storage),
+            targets,
             range: self.node_range(start),
         }
         .parsed(&mut self.storage)
@@ -996,10 +999,9 @@ impl<'src> Parser<'src> {
 
         // test_err global_stmt_expression
         // global x + 1
-        let names = self.parse_comma_separated_list_into_vec(
-            RecoveryContextKind::Identifiers,
-            Parser::parse_identifier,
-        );
+        let names = self.parse_comma_separated_node_list(RecoveryContextKind::Identifiers, |p| {
+            p.parse_identifier().id
+        });
 
         if names.is_empty() {
             // test_err global_stmt_empty
@@ -1012,7 +1014,7 @@ impl<'src> Parser<'src> {
         // global x, y, z
         build::StmtGlobal {
             range: self.node_range(start),
-            names: names.into_list(&mut self.storage),
+            names,
         }
         .parsed(&mut self.storage)
     }
@@ -1037,10 +1039,9 @@ impl<'src> Parser<'src> {
         // test_err nonlocal_stmt_expression
         // def _():
         //     nonlocal x + 1
-        let names = self.parse_comma_separated_list_into_vec(
-            RecoveryContextKind::Identifiers,
-            Parser::parse_identifier,
-        );
+        let names = self.parse_comma_separated_node_list(RecoveryContextKind::Identifiers, |p| {
+            p.parse_identifier().id
+        });
 
         if names.is_empty() {
             // test_err nonlocal_stmt_empty
@@ -1058,7 +1059,7 @@ impl<'src> Parser<'src> {
         //     nonlocal x, y, z
         build::StmtNonlocal {
             range: self.node_range(start),
-            names: names.into_list(&mut self.storage),
+            names,
         }
         .parsed(&mut self.storage)
     }
@@ -1297,7 +1298,7 @@ impl<'src> Parser<'src> {
         }
 
         build::StmtAssign {
-            targets: self.storage.list(targets),
+            targets: self.storage.list(targets.map(|target| target.id)),
             value: value.expr.id,
             range: self.node_range(start),
         }
@@ -1493,7 +1494,7 @@ impl<'src> Parser<'src> {
 
         build::StmtIf {
             test: test.expr.id,
-            body: body.into_list(&mut self.storage),
+            body,
             elif_else_clauses: self
                 .elif_else_scratch
                 .take_range(elif_else_snapshot, &mut self.storage),
@@ -1540,7 +1541,7 @@ impl<'src> Parser<'src> {
 
         build::ElifElseClause {
             test: test.map(|node| node.id),
-            body: body.into_list(&mut self.storage),
+            body,
             range: self.node_range(start),
         }
         .parsed(&mut self.storage)
@@ -1588,7 +1589,7 @@ impl<'src> Parser<'src> {
         // except* ExceptionGroup:
         //     pass
         let mut mixed_except_ranges = Vec::new();
-        let mut handlers = Vec::new();
+        let mut handlers = id::NodeListBuilder::new();
         self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
             if let ExceptClauseKind::Star(range) = kind {
@@ -1599,12 +1600,8 @@ impl<'src> Parser<'src> {
             } else if is_star != Some(kind.is_star()) {
                 mixed_except_ranges.push(handler.range());
             }
-            if handlers.is_empty() {
-                handlers.reserve_exact(1);
-            }
-            handlers.push(handler);
+            handlers.push(handler.id);
         });
-        handlers.shrink_to_fit();
 
         // Empty handler has `is_star` false.
         let is_star = is_star.unwrap_or_default();
@@ -1692,10 +1689,10 @@ impl<'src> Parser<'src> {
         // except    *     Error: ...
 
         build::StmtTry {
-            body: try_body.into_list(&mut self.storage),
-            handlers: handlers.into_list(&mut self.storage),
-            orelse: orelse.into_list(&mut self.storage),
-            finalbody: finalbody.into_list(&mut self.storage),
+            body: try_body,
+            handlers: handlers.finish(&mut self.storage),
+            orelse,
+            finalbody,
             is_star,
             range: self.node_range(try_start),
         }
@@ -1846,7 +1843,7 @@ impl<'src> Parser<'src> {
                 build::ExceptHandlerExceptHandler {
                     type_: type_.map(|node| node.id),
                     name: name.map(|node| node.id),
-                    body: except_body.into_list(&mut self.storage),
+                    body: except_body,
                     range: self.node_range(start),
                 }
                 .parsed(&mut self.storage),
@@ -1959,8 +1956,8 @@ impl<'src> Parser<'src> {
             target: target.expr.id,
             iter: iter.expr.id,
             is_async,
-            body: body.into_list(&mut self.storage),
-            orelse: orelse.into_list(&mut self.storage),
+            body,
+            orelse,
             range: self.node_range(start),
         }
         .parsed(&mut self.storage)
@@ -2007,8 +2004,8 @@ impl<'src> Parser<'src> {
 
         build::StmtWhile {
             test: test.expr.id,
-            body: body.into_list(&mut self.storage),
-            orelse: orelse.into_list(&mut self.storage),
+            body,
+            orelse,
             range: self.node_range(start),
         }
         .parsed(&mut self.storage)
@@ -2028,7 +2025,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#function-definitions>
     fn parse_function_definition(
         &mut self,
-        decorator_list: Vec<id::Node<ast::kind::Decorator>>,
+        decorator_list: ListId<AstNodeId<ast::kind::Decorator>>,
         start: TextSize,
         is_async: bool,
     ) -> id::StmtFunctionDef {
@@ -2136,8 +2133,8 @@ impl<'src> Parser<'src> {
             name: name.id,
             type_params: type_params.map(|node| node.id),
             parameters: parameters.id,
-            body: body.into_list(&mut self.storage),
-            decorator_list: decorator_list.into_list(&mut self.storage),
+            body,
+            decorator_list,
             is_async,
             returns: returns.map(|node| node.id),
             range: self.node_range(start),
@@ -2159,7 +2156,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-classdef>
     fn parse_class_definition(
         &mut self,
-        decorator_list: Vec<id::Node<ast::kind::Decorator>>,
+        decorator_list: ListId<AstNodeId<ast::kind::Decorator>>,
         start: TextSize,
     ) -> id::StmtClassDef {
         self.bump(TokenKind::Class);
@@ -2213,11 +2210,11 @@ impl<'src> Parser<'src> {
 
         build::StmtClassDef {
             range: self.node_range(start),
-            decorator_list: decorator_list.into_list(&mut self.storage),
+            decorator_list,
             name: name.id,
             type_params: type_params.map(|node| node.id),
             arguments: arguments.map(|node| node.id),
-            body: body.into_list(&mut self.storage),
+            body,
         }
         .parsed(&mut self.storage)
     }
@@ -2235,16 +2232,15 @@ impl<'src> Parser<'src> {
     fn parse_with_statement(&mut self, start: TextSize, is_async: bool) -> id::StmtWith {
         self.bump(TokenKind::With);
 
-        let mut items = self.parse_with_items();
-        items.shrink_to_fit();
+        let items = self.parse_with_items();
 
         self.expect(TokenKind::Colon);
 
         let body = self.parse_body(Clause::With);
 
         build::StmtWith {
-            items: items.into_list(&mut self.storage),
-            body: body.into_list(&mut self.storage),
+            items,
+            body,
             is_async,
             range: self.node_range(start),
         }
@@ -2254,7 +2250,7 @@ impl<'src> Parser<'src> {
     /// Parses a list of with items.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#the-with-statement>
-    fn parse_with_items(&mut self) -> Vec<id::WithItem> {
+    fn parse_with_items(&mut self) -> ListId<AstNodeId<ast::kind::WithItem>> {
         if !self.at_expr() {
             self.add_error(
                 ParseErrorType::OtherError(
@@ -2262,7 +2258,7 @@ impl<'src> Parser<'src> {
                 ),
                 self.current_token_range(),
             );
-            return vec![];
+            return ListId::default();
         }
 
         let open_paren_range = self.current_token_range();
@@ -2335,17 +2331,15 @@ impl<'src> Parser<'src> {
                 // with (a | b) << c | d: ...
                 // # Postfix should still be parsed first
                 // with (a)[0] + b * c: ...
-                self.parse_comma_separated_list_into_vec_with_capacity(
+                self.parse_comma_separated_node_list(
                     RecoveryContextKind::WithItems(WithItemKind::ParenthesizedExpression),
                     |p| p.parse_with_item(WithItemParsingState::Regular).item,
-                    1,
                 )
             }
         } else {
-            self.parse_comma_separated_list_into_vec_with_capacity(
+            self.parse_comma_separated_node_list(
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized),
                 |p| p.parse_with_item(WithItemParsingState::Regular).item,
-                1,
             )
         }
     }
@@ -2375,7 +2369,9 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_stmt_contents>
-    fn try_parse_parenthesized_with_items(&mut self) -> (Option<Vec<id::WithItem>>, bool) {
+    fn try_parse_parenthesized_with_items(
+        &mut self,
+    ) -> (Option<ListId<AstNodeId<ast::kind::WithItem>>>, bool) {
         let checkpoint = self.checkpoint();
 
         // We'll start with the assumption that the with items are parenthesized.
@@ -2395,11 +2391,7 @@ impl<'src> Parser<'src> {
         let has_trailing_comma =
             self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |p| {
                 let parsed_with_item = p.parse_with_item(WithItemParsingState::Speculative);
-                has_optional_vars |= parsed_with_item
-                    .item
-                    .view(&p.storage)
-                    .optional_vars()
-                    .is_some();
+                has_optional_vars |= parsed_with_item.has_optional_vars;
                 parsed_with_items.push(parsed_with_item);
             });
 
@@ -2413,31 +2405,9 @@ impl<'src> Parser<'src> {
             //
             // So, named, starred and yield expressions not allowed.
             for parsed_with_item in &parsed_with_items {
-                if parsed_with_item.is_parenthesized {
-                    // Parentheses resets the precedence.
-                    continue;
+                if let Some((error, range)) = parsed_with_item.unparenthesized_error() {
+                    self.add_error(error, range);
                 }
-                let error = match parsed_with_item
-                    .item
-                    .view(&self.storage)
-                    .context_expr()
-                    .classify()
-                {
-                    ExprKind::Named(_) => ParseErrorType::UnparenthesizedNamedExpression,
-                    ExprKind::Starred(_) => ParseErrorType::InvalidStarredExpressionUsage,
-                    ExprKind::Yield(_) | ExprKind::YieldFrom(_) => {
-                        ParseErrorType::InvalidYieldExpressionUsage
-                    }
-                    _ => continue,
-                };
-                self.add_error(
-                    error,
-                    parsed_with_item
-                        .item
-                        .view(&self.storage)
-                        .context_expr()
-                        .range(),
-                );
             }
         } else if self.at(TokenKind::Rpar)
             && (
@@ -2456,20 +2426,10 @@ impl<'src> Parser<'src> {
                 // These expressions, if unparenthesized, are only allowed if it's a
                 // parenthesized expression and none of the with items have an optional
                 // variable.
-                if parsed_with_items.iter().any(|parsed_with_item| {
-                    !parsed_with_item.is_parenthesized
-                        && matches!(
-                            parsed_with_item
-                                .item
-                                .view(&self.storage)
-                                .context_expr()
-                                .classify(),
-                            ExprKind::Named(_)
-                                | ExprKind::Starred(_)
-                                | ExprKind::Yield(_)
-                                | ExprKind::YieldFrom(_)
-                        )
-                }) {
+                if parsed_with_items
+                    .iter()
+                    .any(|item| item.unparenthesized_error().is_some())
+                {
                     with_item_kind = WithItemKind::ParenthesizedExpression;
                 }
             }
@@ -2493,12 +2453,10 @@ impl<'src> Parser<'src> {
         }
 
         let with_items = if with_item_kind.is_parenthesized() {
-            let with_items: Vec<_> = parsed_with_items
-                .into_iter()
-                .map(|parsed_with_item| parsed_with_item.item)
-                .collect();
-
-            Some(with_items)
+            Some(
+                self.storage
+                    .list(parsed_with_items.into_iter().map(|parsed| parsed.item)),
+            )
         } else {
             self.rewind(checkpoint);
 
@@ -2548,13 +2506,16 @@ impl<'src> Parser<'src> {
             .then(|| self.parse_with_item_optional_vars().expr);
 
         ParsedWithItem {
-            is_parenthesized: context_expr.is_parenthesized,
+            unparenthesized_context: (!context_expr.is_parenthesized)
+                .then_some((context_expr.expr.kind, context_expr.expr.range)),
+            has_optional_vars: optional_vars.is_some(),
             item: build::WithItem {
                 range: self.node_range(start),
                 context_expr: context_expr.expr.id,
                 optional_vars: optional_vars.map(|node| node.id),
             }
-            .parsed(&mut self.storage),
+            .parsed(&mut self.storage)
+            .id,
         }
     }
 
@@ -2652,7 +2613,7 @@ impl<'src> Parser<'src> {
                 Some(
                     build::StmtMatch {
                         subject: subject.id,
-                        cases: cases.into_list(&mut self.storage),
+                        cases,
                         range: self.node_range(start),
                     }
                     .parsed(&mut self.storage),
@@ -2677,7 +2638,7 @@ impl<'src> Parser<'src> {
                 Some(
                     build::StmtMatch {
                         subject: subject.id,
-                        cases: cases.into_list(&mut self.storage),
+                        cases,
                         range: self.node_range(start),
                     }
                     .parsed(&mut self.storage),
@@ -2726,7 +2687,7 @@ impl<'src> Parser<'src> {
 
         build::StmtMatch {
             subject: subject.id,
-            cases: cases.into_list(&mut self.storage),
+            cases,
             range: self.node_range(start),
         }
         .parsed(&mut self.storage)
@@ -2787,7 +2748,7 @@ impl<'src> Parser<'src> {
     ///
     /// This method expects that the parser is positioned at a `Newline` token. If not, it adds a
     /// syntax error and continues parsing.
-    fn parse_match_body(&mut self) -> Vec<id::MatchCase> {
+    fn parse_match_body(&mut self) -> ListId<AstNodeId<ast::kind::MatchCase>> {
         // test_err match_stmt_no_newline_before_case
         // match foo: case _: ...
         self.expect(TokenKind::Newline);
@@ -2814,9 +2775,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses a list of match case blocks.
-    fn parse_match_case_blocks(&mut self) -> Vec<id::MatchCase> {
-        let mut cases = vec![];
-
+    fn parse_match_case_blocks(&mut self) -> ListId<AstNodeId<ast::kind::MatchCase>> {
         if !self.at(TokenKind::Case) {
             // test_err match_stmt_expected_case_block
             // match x:
@@ -2828,17 +2787,18 @@ impl<'src> Parser<'src> {
                 ParseErrorType::OtherError("Expected `case` block".to_string()),
                 self.current_token_range(),
             );
-            return cases;
+            return ListId::default();
         }
 
         let mut progress = ParserProgress::default();
 
+        let mut cases = id::NodeListBuilder::new();
         while self.at(TokenKind::Case) {
             progress.assert_progressing(self);
-            cases.push(self.parse_match_case());
+            cases.push(self.parse_match_case().id);
         }
 
-        cases
+        cases.finish(&mut self.storage)
     }
 
     /// Parses a single match case block.
@@ -2905,7 +2865,7 @@ impl<'src> Parser<'src> {
         build::MatchCase {
             pattern: pattern.id,
             guard: guard.map(|node| node.id),
-            body: body.into_list(&mut self.storage),
+            body,
             range: self.node_range(start),
         }
         .parsed(&mut self.storage)
@@ -2928,7 +2888,7 @@ impl<'src> Parser<'src> {
             // test_ok async_function_definition
             // async def foo(): ...
             TokenKind::Def => {
-                id::Stmt::from(self.parse_function_definition(Vec::new(), async_start, true))
+                id::Stmt::from(self.parse_function_definition(ListId::default(), async_start, true))
             }
 
             // test_ok async_with_statement
@@ -2966,7 +2926,7 @@ impl<'src> Parser<'src> {
     fn parse_decorators(&mut self) -> id::Stmt {
         let start = self.node_start();
 
-        let mut decorators = Vec::new();
+        let mut decorators = id::NodeListBuilder::new();
         let mut progress = ParserProgress::default();
 
         // test_err decorator_missing_expression
@@ -3079,7 +3039,8 @@ impl<'src> Parser<'src> {
                     expression: parsed_expr.expr.id,
                     range: self.node_range(decorator_start),
                 }
-                .parsed(&mut self.storage),
+                .parsed(&mut self.storage)
+                .id,
             );
 
             // test_err decorator_missing_newline
@@ -3089,7 +3050,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Newline);
         }
 
-        decorators.shrink_to_fit();
+        let decorators = decorators.finish(&mut self.storage);
 
         match self.current_token_kind() {
             TokenKind::Def => {
@@ -3124,7 +3085,7 @@ impl<'src> Parser<'src> {
                 build::StmtFunctionDef {
                     range,
                     is_async: false,
-                    decorator_list: decorators.into_list(&mut self.storage),
+                    decorator_list: decorators,
                     name: build::Identifier {
                         id: self.storage.intern_name(""),
                         range: self.missing_node_range(),
@@ -3700,10 +3661,10 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lsqb);
 
-        let type_params = self.parse_comma_separated_list_into_vec(
-            RecoveryContextKind::TypeParams,
-            Parser::parse_type_param,
-        );
+        let type_params = self
+            .parse_comma_separated_node_list(RecoveryContextKind::TypeParams, |p| {
+                p.parse_type_param().id
+            });
 
         if type_params.is_empty() {
             // test_err type_params_empty
@@ -3717,7 +3678,7 @@ impl<'src> Parser<'src> {
 
         build::TypeParams {
             range: self.node_range(start),
-            type_params: type_params.into_list(&mut self.storage),
+            type_params,
         }
         .parsed(&mut self.storage)
     }
@@ -4243,10 +4204,26 @@ enum WithItemParsingState {
 
 #[derive(Debug)]
 struct ParsedWithItem {
-    /// The contained with item.
-    item: id::WithItem,
-    /// If the context expression of the item is parenthesized.
-    is_parenthesized: bool,
+    item: ast::BuildId<ast::kind::WithItem>,
+    /// An unparenthesized expression may require an error once we know which parentheses
+    /// belong to the with-item list.
+    unparenthesized_context: Option<(ast::NodeKind, TextRange)>,
+    has_optional_vars: bool,
+}
+
+impl ParsedWithItem {
+    fn unparenthesized_error(&self) -> Option<(ParseErrorType, TextRange)> {
+        let (kind, range) = self.unparenthesized_context?;
+        let error = match kind {
+            ast::NodeKind::ExprNamed => ParseErrorType::UnparenthesizedNamedExpression,
+            ast::NodeKind::ExprStarred => ParseErrorType::InvalidStarredExpressionUsage,
+            ast::NodeKind::ExprYield | ast::NodeKind::ExprYieldFrom => {
+                ParseErrorType::InvalidYieldExpressionUsage
+            }
+            _ => return None,
+        };
+        Some((error, range))
+    }
 }
 
 #[derive(Debug, Copy, Clone)]

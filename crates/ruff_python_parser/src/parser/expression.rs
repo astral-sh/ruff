@@ -1,4 +1,4 @@
-use crate::parser::syntax::{self as id, Construct, IntoList};
+use crate::parser::syntax::{self as id, Construct};
 use ruff_python_ast::AstNode as _;
 use ruff_python_ast::{Builder, ExprKind, FStringPartId, ListId, build};
 use std::iter;
@@ -954,8 +954,7 @@ impl<'src> Parser<'src> {
                 build::ExprTuple {
                     elts: self
                         .expr_scratch
-                        .take_range(slices_snapshot, &mut self.storage)
-                        .into_list(&mut self.storage),
+                        .take_range(slices_snapshot, &mut self.storage),
                     ctx: ExprContext::Load,
                     range: self.node_range(slice_start),
                     parenthesized: false,
@@ -968,7 +967,7 @@ impl<'src> Parser<'src> {
             // in the `slices` rule in the Python grammar.
             slice = id::Expr::from(
                 build::ExprTuple {
-                    elts: self.storage.list([slice]),
+                    elts: self.storage.list([slice.id]),
                     ctx: ExprContext::Load,
                     range: self.node_range(slice_start),
                     parenthesized: false,
@@ -1223,8 +1222,7 @@ impl<'src> Parser<'src> {
         build::ExprBoolOp {
             values: self
                 .expr_scratch
-                .take_range(values_snapshot, &mut self.storage)
-                .into_list(&mut self.storage),
+                .take_range(values_snapshot, &mut self.storage),
             op,
             range: self.node_range(start),
         }
@@ -1339,14 +1337,14 @@ impl<'src> Parser<'src> {
                 StringType::Str(value) => build::ExprStringLiteral {
                     range,
 
-                    value: self.storage.list([value]),
+                    value: self.storage.list([value.id]),
                 }
                 .parsed(&mut self.storage)
                 .into(),
                 StringType::Bytes(value) => build::ExprBytesLiteral {
                     range,
 
-                    value: self.storage.list([value]),
+                    value: self.storage.list([value.id]),
                 }
                 .parsed(&mut self.storage)
                 .into(),
@@ -1360,7 +1358,7 @@ impl<'src> Parser<'src> {
                 StringType::TString(value) => build::ExprTString {
                     range,
 
-                    value: self.storage.list([value]),
+                    value: self.storage.list([value.id]),
                 }
                 .parsed(&mut self.storage)
                 .into(),
@@ -1472,13 +1470,10 @@ impl<'src> Parser<'src> {
             // otherwise, we'll try either string, t-string, or f-string. This is to retain
             // as much information as possible.
             else {
-                let mut values = Vec::with_capacity(strings.len());
-                for string in strings {
-                    values.push(match string {
-                        StringType::Bytes(value) => value,
-                        _ => unreachable!("Expected `StringType::Bytes`"),
-                    });
-                }
+                let values = strings.into_iter().filter_map(|string| match string {
+                    StringType::Bytes(value) => Some(value.id),
+                    _ => None,
+                });
                 return id::Expr::from(
                     build::ExprBytesLiteral {
                         value: self.storage.list(values),
@@ -1495,13 +1490,10 @@ impl<'src> Parser<'src> {
             // otherwise, we'll try either string or f-string. This is to retain
             // as much information as possible.
             else {
-                let mut values = Vec::with_capacity(strings.len());
-                for string in strings {
-                    values.push(match string {
-                        StringType::TString(value) => value,
-                        _ => unreachable!("Expected `StringType::TString`"),
-                    });
-                }
+                let values = strings.into_iter().filter_map(|string| match string {
+                    StringType::TString(value) => Some(value.id),
+                    _ => None,
+                });
                 return id::Expr::from(
                     build::ExprTString {
                         value: self.storage.list(values),
@@ -1535,57 +1527,40 @@ impl<'src> Parser<'src> {
         // 2 + 2
 
         if !has_fstring && !has_tstring {
-            let mut values = Vec::with_capacity(strings.len());
-            for string in strings {
-                values.push(match string {
-                    StringType::Str(value) => value,
-                    _ => self.invalid_string_literal(string.range()),
+            let value = self
+                .storage
+                .map_list(strings, |builder, string| match string {
+                    StringType::Str(value) => value.id,
+                    other => Self::invalid_string_literal(builder, other.range()),
                 });
-            }
             return id::Expr::from(
-                build::ExprStringLiteral {
-                    value: self.storage.list(values),
-                    range,
-                }
-                .parsed(&mut self.storage),
+                build::ExprStringLiteral { value, range }.parsed(&mut self.storage),
             );
         }
 
-        let mut parts = Vec::with_capacity(strings.len());
-        for string in strings {
-            match string {
-                StringType::FString(fstring) => {
-                    parts.push(FStringPartId::FString(fstring.id));
+        let value = self
+            .storage
+            .map_list(strings, |builder, string| match string {
+                StringType::FString(fstring) => FStringPartId::FString(fstring.id),
+                StringType::Str(literal) => FStringPartId::Literal(literal.id),
+                // Mixed bytes and template strings become invalid literal parts for recovery.
+                other => {
+                    FStringPartId::Literal(Self::invalid_string_literal(builder, other.range()))
                 }
-                StringType::Str(string) => parts.push(FStringPartId::Literal(string.id)),
-                // Bytes and Template strings are invalid at this point
-                // and stored as invalid string literal parts in the
-                // f-string
-                StringType::TString(tstring) => parts.push(FStringPartId::Literal(
-                    self.invalid_string_literal(tstring.range()).id,
-                )),
-                StringType::Bytes(bytes) => parts.push(FStringPartId::Literal(
-                    self.invalid_string_literal(bytes.range()).id,
-                )),
-            }
-        }
+            });
 
-        id::Expr::from(
-            build::ExprFString {
-                value: self.storage.list(parts),
-                range,
-            }
-            .parsed(&mut self.storage),
-        )
+        id::Expr::from(build::ExprFString { value, range }.parsed(&mut self.storage))
     }
 
-    fn invalid_string_literal(&mut self, range: TextRange) -> id::StringLiteral {
-        build::StringLiteral {
+    fn invalid_string_literal(
+        builder: &mut Builder,
+        range: TextRange,
+    ) -> ast::BuildId<ast::kind::StringLiteral> {
+        builder.add(build::StringLiteral {
             range,
             value: "",
             flags: ast::StringLiteralFlags::empty().with_invalid(),
-        }
-        .parsed(&mut self.storage)
+        })
     }
 
     fn report_mixed_string_literal_error(&mut self, strings: &[StringType], range: TextRange) {
@@ -1730,7 +1705,7 @@ impl<'src> Parser<'src> {
         elements_kind: InterpolatedStringElementsKind,
         string_kind: InterpolatedStringKind,
     ) -> ListId<ast::AstNodeId<ast::kind::InterpolatedStringElement>> {
-        let mut elements = vec![];
+        let mut elements = id::NodeListBuilder::new();
         let middle_token_kind = string_kind.middle_token();
 
         self.parse_list(
@@ -1782,11 +1757,11 @@ impl<'src> Parser<'src> {
                         );
                     }
                 };
-                elements.push(element);
+                elements.push(element.id);
             },
         );
 
-        self.storage.list(elements)
+        elements.finish(&mut self.storage)
     }
 
     /// Parses an f/t-string expression element.
@@ -1938,7 +1913,7 @@ impl<'src> Parser<'src> {
             Some(
                 build::InterpolatedStringFormatSpec {
                     range: self.node_range(spec_start),
-                    elements: elements.into_list(&mut self.storage),
+                    elements,
                 }
                 .parsed(&mut self.storage),
             )
@@ -2507,8 +2482,7 @@ impl<'src> Parser<'src> {
         build::ExprTuple {
             elts: self
                 .expr_scratch
-                .take_range(elts_snapshot, &mut self.storage)
-                .into_list(&mut self.storage),
+                .take_range(elts_snapshot, &mut self.storage),
             ctx: ExprContext::Load,
             range: self.node_range(start),
 
@@ -2540,8 +2514,7 @@ impl<'src> Parser<'src> {
         build::ExprList {
             elts: self
                 .expr_scratch
-                .take_range(elts_snapshot, &mut self.storage)
-                .into_list(&mut self.storage),
+                .take_range(elts_snapshot, &mut self.storage),
             ctx: ExprContext::Load,
             range: self.node_range(start),
         }
@@ -2597,8 +2570,7 @@ impl<'src> Parser<'src> {
 
             elts: self
                 .expr_scratch
-                .take_range(elts_snapshot, &mut self.storage)
-                .into_list(&mut self.storage),
+                .take_range(elts_snapshot, &mut self.storage),
         }
         .parsed(&mut self.storage)
     }
@@ -2623,7 +2595,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut items = vec![first.id];
+        let mut additional = Vec::new();
         self.parse_comma_separated_list(RecoveryContextKind::DictElements, |parser| {
             let item_start = parser.node_start();
             let (key, value) = if parser.eat(TokenKind::DoubleStar) {
@@ -2640,7 +2612,7 @@ impl<'src> Parser<'src> {
                     parser.parse_conditional_expression_or_higher().expr,
                 )
             };
-            items.push(
+            additional.push(
                 build::DictItem {
                     range: parser.node_range(item_start),
                     key,
@@ -2656,7 +2628,7 @@ impl<'src> Parser<'src> {
         build::ExprDict {
             range: self.node_range(start),
 
-            items: self.storage.list(items),
+            items: self.storage.list(iter::once(first.id).chain(additional)),
         }
         .parsed(&mut self.storage)
     }
@@ -2667,20 +2639,18 @@ impl<'src> Parser<'src> {
     /// followed by `if` clauses.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#grammar-token-python-grammar-comp_for>
-    fn parse_generators(&mut self) -> ThinVec<id::Comprehension> {
+    fn parse_generators(&mut self) -> ListId<ast::AstNodeId<ast::kind::Comprehension>> {
         const GENERATOR_SET: TokenSet = TokenSet::new([TokenKind::For, TokenKind::Async]);
 
-        let mut generators = ThinVec::with_capacity(1);
+        let mut generators = id::NodeListBuilder::new();
         let mut progress = ParserProgress::default();
 
         while self.at_ts(GENERATOR_SET) {
             progress.assert_progressing(self);
-            generators.push(self.parse_comprehension());
+            generators.push(self.parse_comprehension().id);
         }
 
-        generators.shrink_to_fit();
-
-        generators
+        generators.finish(&mut self.storage)
     }
 
     /// Parses a comprehension.
@@ -2732,8 +2702,7 @@ impl<'src> Parser<'src> {
             iter: iter.expr.id,
             ifs: self
                 .expr_scratch
-                .take_range(ifs_snapshot, &mut self.storage)
-                .into_list(&mut self.storage),
+                .take_range(ifs_snapshot, &mut self.storage),
             is_async,
         }
         .parsed(&mut self.storage)
@@ -2759,7 +2728,7 @@ impl<'src> Parser<'src> {
 
         build::ExprGenerator {
             elt: element.id,
-            generators: generators.into_list(&mut self.storage),
+            generators,
             range: self.node_range(start),
 
             parenthesized: parenthesized.is_yes(),
@@ -2781,7 +2750,7 @@ impl<'src> Parser<'src> {
 
         build::ExprListComp {
             elt: element.id,
-            generators: generators.into_list(&mut self.storage),
+            generators,
             range: self.node_range(start),
         }
         .parsed(&mut self.storage)
@@ -2803,7 +2772,7 @@ impl<'src> Parser<'src> {
         build::ExprDictComp {
             key: key.map(|node| node.id),
             value: value.id,
-            generators: generators.into_list(&mut self.storage),
+            generators,
             range: self.node_range(start),
         }
         .parsed(&mut self.storage)
@@ -2823,7 +2792,7 @@ impl<'src> Parser<'src> {
 
         build::ExprSetComp {
             elt: element.id,
-            generators: generators.into_list(&mut self.storage),
+            generators,
             range: self.node_range(start),
         }
         .parsed(&mut self.storage)

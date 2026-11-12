@@ -43,7 +43,7 @@ impl Parser<'_> {
                 let elts = self.patterns_to_exprs(node.patterns().id());
                 build::ExprList {
                     range,
-                    elts: self.storage.list(elts),
+                    elts,
                     ctx: ExprContext::Store,
                 }
                 .parsed(&mut self.storage)
@@ -202,13 +202,14 @@ impl Parser<'_> {
     fn patterns_to_exprs(
         &mut self,
         patterns: ListId<AstNodeId<ast::kind::Pattern>>,
-    ) -> Vec<id::Expr> {
-        (0..patterns.len())
-            .map(|index| {
-                let pattern = self.storage.get_list(patterns).at(index).build_id();
-                self.pattern_to_expr(pattern)
-            })
-            .collect()
+    ) -> ListId<AstNodeId<ast::kind::Expr>> {
+        let snapshot = self.expr_scratch.snapshot();
+        for index in 0..patterns.len() {
+            let pattern = self.storage.get_list(patterns).at(index).build_id();
+            let expr = self.pattern_to_expr(pattern);
+            self.expr_scratch.push(expr.id);
+        }
+        self.expr_scratch.take_range(snapshot, &mut self.storage)
     }
 }
 
