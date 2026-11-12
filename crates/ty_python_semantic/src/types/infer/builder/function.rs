@@ -886,11 +886,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         function: &ast::StmtFunctionDef,
         definition: Definition<'db>,
     ) -> Option<bool> {
-        let receiver = function
-            .parameters
-            .posonlyargs()
-            .next()
-            .or_else(|| function.parameters.args().next())?;
+        let receiver = function.parameters.iter_positional_params().next()?;
         let annotation = receiver.parameter.annotation.as_deref()?;
         let receiver_kind = MethodReceiverKind::from_function(self.db(), definition, function)?;
 
@@ -999,8 +995,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let overlapping = parameters
-            .iter_non_variadic_params()
-            .skip(parameters.posonlyargs().count() + pep_484_positional_only_count)
+            .iter_keyword_params()
+            .skip(pep_484_positional_only_count)
             .map(|parameter| &parameter.parameter)
             .filter(|parameter| unpacked_keys.contains_key(&parameter.name.id))
             .collect::<Vec<_>>();

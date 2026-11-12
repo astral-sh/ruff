@@ -3401,6 +3401,16 @@ impl Parameters {
         })
     }
 
+    /// Positional-or-keyword and keyword-only parameters, in source order.
+    pub fn iter_keyword_params(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = &ParameterWithDefault> + Clone {
+        self.items.iter().filter_map(|item| match item {
+            ParameterItem::PositionalOrKeyword(p) | ParameterItem::KeywordOnly(p) => Some(p),
+            _ => None,
+        })
+    }
+
     /// Parameters which can have defaults, including keyword-only parameters.
     pub fn iter_non_variadic_params(
         &self,
