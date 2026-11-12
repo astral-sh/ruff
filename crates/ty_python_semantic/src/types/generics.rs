@@ -1967,13 +1967,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // For lazy type-variable evaluation, those two directions describe a single
             // constraint. Constructing it directly avoids combinatorial path expansion when many
             // invariant specializations are combined in a union. Subtyping uses the gradual
-            // type's materialization range, while assignability uses the type itself for both
-            // bounds.
+            // type's materialization range, while assignability uses an equivalence bound.
             (None, None, _) => {
                 if self.typevar_evaluation == TypeVarEvaluation::Lazy
                     && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
                         (source_type, target_type)
-                    && !ty.is_type_var()
+                    && (!ty.is_type_var() || self.relation.is_assignability())
                     && (
                         // Preserve union distribution before constructing constraints. Storing the
                         // entire union as an exact bound makes solving common generic calls involving
