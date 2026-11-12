@@ -3263,8 +3263,13 @@ impl<'a> ResolvedNames<'a> {
                 .copied()
                 .and_then(Self::decode)
         } else {
-            self.offsets().get(&name.start()).copied()
+            self.get_by_offset(name.start())
         }
+    }
+
+    #[cold]
+    fn get_by_offset(&self, start: TextSize) -> Option<BindingId> {
+        self.offsets().get(&start).copied()
     }
 
     #[inline]
