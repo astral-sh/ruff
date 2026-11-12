@@ -478,14 +478,9 @@ fn any_over_pattern(pattern: &Pattern, func: &mut dyn FnMut(&Expr) -> bool) -> b
         }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, &mut *func)),
-        Pattern::MatchMapping(mapping) => {
-            mapping
-                .entries()
-                .any(|(key, _)| any_over_expr(key, &mut *func))
-                || mapping
-                    .entries()
-                    .any(|(_, pattern)| any_over_pattern(pattern, &mut *func))
-        }
+        Pattern::MatchMapping(mapping) => mapping.entries().any(|(key, pattern)| {
+            any_over_expr(key, &mut *func) || any_over_pattern(pattern, &mut *func)
+        }),
         Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
             any_over_expr(cls, &mut *func)
                 || arguments
