@@ -542,6 +542,26 @@ mod stack_growth {
 }
 
 #[test]
+fn keyword_parameters_follow_source_order() {
+    for (source, expected) in [
+        ("def f(p, /, x, *args, y, **kw): pass", &["x", "y"][..]),
+        ("def f(p, /, *args, **kw): pass", &[]),
+        ("def f(x, **kw, *args, y): pass", &["x", "y"]),
+    ] {
+        let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module))
+            .try_into_module()
+            .unwrap();
+        let [Stmt::FunctionDef(function)] = parsed.suite().as_slice() else {
+            panic!("expected one function")
+        };
+        let parameters = &function.parameters;
+        let names = parameters.iter_keyword_params().map(|p| p.name().as_str());
+        assert!(names.clone().eq(expected.iter().copied()), "{source}");
+        assert!(names.rev().eq(expected.iter().rev().copied()), "{source}");
+    }
+}
+
+#[test]
 fn recovered_parameters_keep_written_and_binding_order() {
     let parsed = parse_unchecked(
         "def f(**old, x, /, *first, *discarded, y, **last, z): pass",
