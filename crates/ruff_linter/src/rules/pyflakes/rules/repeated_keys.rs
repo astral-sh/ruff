@@ -172,7 +172,7 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: ast::ExprDict<'_>) {
         };
 
         let mut diagnostic = match key.classify() {
-            key if is_literal_key(key.view())
+            key if is_literal_key(key)
                 && checker.is_rule_enabled(Rule::MultiValueRepeatedKeyLiteral) =>
             {
                 checker.report_diagnostic(
@@ -207,8 +207,8 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: ast::ExprDict<'_>) {
     }
 }
 
-fn is_literal_key(expr: Expr<'_>) -> bool {
-    match expr.classify() {
+fn is_literal_key(expr: ExprKind<'_>) -> bool {
+    match expr {
         ast::ExprKind::StringLiteral(_)
         | ast::ExprKind::BytesLiteral(_)
         | ast::ExprKind::NumberLiteral(_)
