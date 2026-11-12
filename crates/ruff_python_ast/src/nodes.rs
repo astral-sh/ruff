@@ -3754,9 +3754,30 @@ impl Arguments {
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
     pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword<'_>> {
-        self.find_keyword(name)
-            .map(ArgOrKeyword::from)
-            .or_else(|| self.find_positional(position).map(ArgOrKeyword::from))
+        let mut position = Some(position);
+        let mut positional = None;
+        for item in self.iter_source_order() {
+            match item {
+                ArgOrKeyword::Keyword(keyword)
+                    if keyword.arg.as_ref().is_some_and(|arg| arg == name) =>
+                {
+                    // An explicit keyword takes precedence over a positional argument.
+                    return Some(ArgOrKeyword::Keyword(keyword));
+                }
+                ArgOrKeyword::Arg(arg) if let Some(index) = position => {
+                    if arg.is_starred_expr() {
+                        position = None;
+                    } else if index == 0 {
+                        positional = Some(arg);
+                        position = None;
+                    } else {
+                        position = Some(index - 1);
+                    }
+                }
+                _ => {}
+            }
+        }
+        positional.map(ArgOrKeyword::Arg)
     }
 
     /// Iterates over the positional and keyword arguments in the order of declaration.
