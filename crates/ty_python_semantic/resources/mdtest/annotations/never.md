@@ -74,6 +74,6 @@ python-version = "3.10"
 ```
 
 ```py
-# error: [import-not-found]
+# error: [module-attribute-not-found]
 from typing import Never
 ```

@@ -76,7 +76,10 @@ If the same table specifies both a rule's current name and an alias, the current
 
 ### `allowed-unresolved-imports`
 
-A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
+A list of module glob patterns for which `import-not-found` and
+`module-attribute-not-found` diagnostics should be suppressed.
+For `from pkg import name`, ty matches against `pkg` if the module cannot be resolved,
+and against `pkg.name` if the module resolves but the name cannot be imported.
 
 Details on supported glob patterns:
 - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
@@ -772,7 +775,10 @@ severity levels or disable them entirely.
 
 #### `allowed-unresolved-imports`
 
-A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
+A list of module glob patterns for which `import-not-found` and
+`module-attribute-not-found` diagnostics should be suppressed.
+For `from pkg import name`, ty matches against `pkg` if the module cannot be resolved,
+and against `pkg.name` if the module resolves but the name cannot be imported.
 
 Details on supported glob patterns:
 - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but

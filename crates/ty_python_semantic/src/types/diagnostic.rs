@@ -192,6 +192,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISSING_SLOT);
     registry.register_lint(&IMPORT_NOT_FOUND);
     registry.register_alias(LintName::of("unresolved-import"), &IMPORT_NOT_FOUND);
+    registry.register_lint(&MODULE_ATTRIBUTE_NOT_FOUND);
     registry.register_lint(&UNRESOLVED_REFERENCE);
     registry.register_lint(&UNSUPPORTED_BASE);
     registry.register_lint(&UNSUPPORTED_DYNAMIC_BASE);
@@ -1273,8 +1274,17 @@ declare_lint! {
 declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/import-not-found.md")]
     pub(crate) static IMPORT_NOT_FOUND = {
-        summary: "detects unresolved imports",
+        summary: "detects imports of unresolved modules",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/module-attribute-not-found.md")]
+    pub(crate) static MODULE_ATTRIBUTE_NOT_FOUND = {
+        summary: "detects imports of missing names from resolved modules",
+        status: LintStatus::stable("0.0.102"),
         default_level: Level::Error,
     }
 }

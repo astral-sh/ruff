@@ -1786,7 +1786,10 @@ pub struct AnalysisOptions {
     )]
     pub respect_type_ignore_comments: Option<bool>,
 
-    /// A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
+    /// A list of module glob patterns for which `import-not-found` and
+    /// `module-attribute-not-found` diagnostics should be suppressed.
+    /// For `from pkg import name`, ty matches against `pkg` if the module cannot be resolved,
+    /// and against `pkg.name` if the module resolves but the name cannot be imported.
     ///
     /// Details on supported glob patterns:
     /// - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but

@@ -337,7 +337,7 @@ python-version = "3.10"
 ```py
 import tomllib  # error: [import-not-found]
 from string.templatelib import Template  # error: [import-not-found]
-from importlib.resources import abc  # error: [import-not-found]
+from importlib.resources import abc  # error: [module-attribute-not-found]
 ```
 
 ## Attempting to import a stdlib submodule when both parts haven't yet been added
@@ -383,7 +383,7 @@ x: int
 ```
 
 ```py
-# error: [import-not-found]
+# error: [module-attribute-not-found]
 from types import x
 
 from types import FunctionType

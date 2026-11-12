@@ -15,7 +15,7 @@ TODO: This is correctly flagged as an error, but we could clean up the diagnosti
 ```py
 # TODO: No second diagnostic
 # error: [invalid-syntax] "Expected `,`, found `.`"
-# error: [import-not-found] "Module `a` has no member `c`"
+# error: [module-attribute-not-found] "Module `a` has no member `c`"
 from a import b.c
 
 # TODO: Should these be inferred as Unknown?

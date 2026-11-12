@@ -84,7 +84,7 @@
       "type": "object",
       "properties": {
         "allowed-unresolved-imports": {
-          "description": "A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
+          "description": "A list of module glob patterns for which `import-not-found` and\n`module-attribute-not-found` diagnostics should be suppressed.\nFor `from pkg import name`, ty matches against `pkg` if the module cannot be resolved,\nand against `pkg.name` if the module resolves but the name cannot be imported.\n\nDetails on supported glob patterns:\n- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but\n  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`\n  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.\n- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.",
           "type": [
             "array",
             "null"
@@ -647,8 +647,8 @@
           ]
         },
         "import-not-found": {
-          "title": "detects unresolved imports",
-          "description": "## What it does\n\nChecks for imports where ty cannot find the module or a member named in a `from` import.\n\n## Why is this bad?\n\nImporting a missing module raises `ModuleNotFoundError` at runtime. Importing a missing member from\nan existing module raises `ImportError`.\n\nThese diagnostics can often be caused due to ty's Python environment or search paths being\nconfigured incorrectly. See the\n[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)\nfor more details.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'mathh'\nimport mathh  # error\n\n# ImportError: cannot import name 'sine' from 'math'\nfrom math import sine  # error\n```\n\n## Rule history\n\n- v0.0.97: Renamed from `unresolved-import`.\n\n    `unresolved-import` remains as a compatibility alias for this rule.",
+          "title": "detects imports of unresolved modules",
+          "description": "## What it does\n\nChecks for imports where ty cannot resolve the module.\n\n## Why is this bad?\n\nImporting a missing module raises `ModuleNotFoundError` at runtime.\n\nThese diagnostics can often be caused due to ty's Python environment or search paths being\nconfigured incorrectly. See the\n[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)\nfor more details.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'mathh'\nimport mathh  # error\n```\n\n## Rule history\n\n- v0.0.97: Renamed from `unresolved-import`.\n\n    `unresolved-import` remains as a compatibility alias for this rule.\n\n- v0.0.102: Split out `module-attribute-not-found` for missing names in resolved modules.\n\n    To retain a custom severity set for `import-not-found` or `unresolved-import` for both kinds of\n    errors, set the same severity for `module-attribute-not-found`. In ignore comments for missing\n    names in resolved modules, replace `import-not-found` or `unresolved-import` with\n    `module-attribute-not-found`.",
           "default": "error",
           "oneOf": [
             {
@@ -1389,6 +1389,16 @@
         "missing-union-attribute": {
           "title": "detects attribute accesses where some union members lack the attribute",
           "description": "## What it does\n\nChecks for reads or deletions of attributes that are present on some members of a union and missing\nfrom others.\n\n## Why is this bad?\n\nReading or deleting the attribute raises an `AttributeError` when the runtime value lacks it.\n\n## Examples\n\n```python\ndef normalize(value: str | bytes) -> str:\n    return value.decode()  # error: [missing-union-attribute]\n```\n\nNarrow the type before accessing the attribute:\n\n```python\ndef normalize(value: str | bytes) -> str:\n    if isinstance(value, bytes):\n        return value.decode()\n    return value\n```\n\n## See also\n\n- `missing-attribute` reports attributes missing from every union member and explains how to migrate\n    from `unresolved-attribute`.",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "module-attribute-not-found": {
+          "title": "detects imports of missing names from resolved modules",
+          "description": "## What it does\n\nChecks for names in a `from ... import ...` statement that ty cannot find in the resolved module.\nFor a package, an importable submodule also satisfies the import.\n\n## Why is this bad?\n\nImporting a missing name from an existing module raises `ImportError` at runtime. Check the spelling\nof the imported name and whether the installed version of the module provides it.\n\n## Examples\n\n```python\nfrom math import sine  # error\n```\n\nUse instead:\n\n```python\nfrom math import sin\n```\n\n## See also\n\n- `import-not-found` covers missing modules and explains how to update existing settings and ignore\n    comments after the split.\n\n## Rule history\n\n- v0.0.102: Split from `import-not-found`.",
           "default": "error",
           "oneOf": [
             {
