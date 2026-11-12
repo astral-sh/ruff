@@ -78,7 +78,7 @@ use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGener
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    walk_non_atomic_type, walk_type_with_recursion_guard,
+    any_over_type_including_alias_arguments, walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
@@ -6236,8 +6236,7 @@ fn parameter_context_specialization<'db>(
     env: &ProgramEnvironment<'db>,
     generic_context: GenericContext<'db>,
     inference: Option<TypeVarInference<'db>>,
-    return_type_solutions: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
-    return_context_kind: TypeContextKind,
+    return_type_solutions: &FxHashMap<BoundTypeVarIdentity<'db>, (Type<'db>, TypeContextKind)>,
 ) -> ArgumentContextSpecialization<'db> {
     let specialization = if let Some(inference) = inference {
         inferred_parameter_specialization(db, env, generic_context, inference)
@@ -6250,7 +6249,7 @@ fn parameter_context_specialization<'db>(
                 Some(
                     return_type_solutions
                         .get(&typevar.identity(db))
-                        .copied()
+                        .map(|(ty, _)| *ty)
                         .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
                 )
             }),
@@ -6262,8 +6261,8 @@ fn parameter_context_specialization<'db>(
         .variables(db)
         .map(|typevar| {
             let identity = typevar.identity(db);
-            if return_type_solutions.contains_key(&identity) {
-                Some(return_context_kind)
+            if let Some((_, kind)) = return_type_solutions.get(&identity) {
+                Some(*kind)
             } else {
                 inference
                     .is_some_and(|inference| inference.has_inferred_type(db, identity))
@@ -8551,6 +8550,29 @@ impl<'db> ArgumentContextSpecialization<'db> {
 
         self.kinds[index]
     }
+
+    fn kind_for_parameter(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        parameter: Type<'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<TypeContextKind> {
+        if let Type::TypeVar(variable) = parameter.resolve_type_alias(db) {
+            return self.kind_for(db, variable);
+        }
+
+        // A structural match can specialize a compound parameter such as `list[T]`. Giving the
+        // resulting `list[Any]` a preference would discard element evidence from a nested call.
+        let fallback = TypeContextKind::Expected { prefer: false };
+        (call_expression_tcx.should_prefer_expected_type()
+            && self.kinds.contains(&Some(fallback))
+            && any_over_type_including_alias_arguments(db, env, parameter, |ty| {
+                ty.as_typevar()
+                    .is_some_and(|variable| self.kind_for(db, variable) == Some(fallback))
+            }))
+        .then_some(fallback)
+    }
 }
 
 /// The type context to use when inferring a call-site argument, for a given binding.
@@ -9195,8 +9217,8 @@ impl<'db> Binding<'db> {
             }
 
             let ordinary_context = ordinary_context();
-            if let Type::TypeVar(variable) = parameter_type.resolve_type_alias(db)
-                && let Some(parameter_tcx_kind) = ordinary_context.kind_for(db, variable)
+            if let Some(parameter_tcx_kind) =
+                ordinary_context.kind_for_parameter(db, env, parameter_type, call_expression_tcx)
             {
                 tcx_kind = parameter_tcx_kind;
             }
@@ -9412,12 +9434,10 @@ impl<'db> Binding<'db> {
                 generic_context,
                 Some(inference),
                 &FxHashMap::default(),
-                TypeContextKind::preference(),
             ))
         }
 
-        let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
-            FxHashMap::default();
+        let mut return_type_solutions = FxHashMap::default();
         if let Some(expected_return_ty) = call_expression_tcx.expected_type() {
             let inferable = generic_context.inferable_typevars(db);
             let normalized_return_ty = self.unspecialized_return_type(db);
@@ -9428,25 +9448,34 @@ impl<'db> Binding<'db> {
                 inferable,
             );
 
-            let solutions = path_bounds.solve_for_argument_context(db, env, constraints);
-            if let Solutions::Constrained(solutions) = solutions {
-                for solution in solutions.into_vec() {
-                    for binding in solution.solved_typevars {
-                        let identity = binding.bound_typevar.identity(db);
-                        return_type_solutions
-                            .entry(identity)
-                            .and_modify(|existing| {
-                                *existing = UnionType::from_two_elements(
-                                    db,
-                                    env,
-                                    *existing,
-                                    binding.solution,
-                                );
-                            })
-                            .or_insert(binding.solution);
-                    }
-                }
-            }
+            path_bounds.for_each_argument_context_solution(
+                db,
+                env,
+                constraints,
+                |variable, solution, directly_declared| {
+                    let kind = if !directly_declared
+                        && call_expression_tcx.should_prefer_expected_type()
+                    {
+                        TypeContextKind::Expected { prefer: false }
+                    } else {
+                        call_expression_tcx.kind()
+                    };
+                    return_type_solutions
+                        .entry(variable.identity(db))
+                        .and_modify(|(existing, existing_kind)| {
+                            // An explicitly declared solution supplies the preference even if
+                            // structural matching offers another way to satisfy the protocol.
+                            if *existing_kind == kind {
+                                *existing =
+                                    UnionType::from_two_elements(db, env, *existing, solution);
+                            } else if directly_declared {
+                                *existing = solution;
+                                *existing_kind = kind;
+                            }
+                        })
+                        .or_insert((solution, kind));
+                },
+            );
         }
 
         if return_type_solutions.is_empty()
@@ -9463,7 +9492,6 @@ impl<'db> Binding<'db> {
             generic_context,
             self.inference,
             &return_type_solutions,
-            call_expression_tcx.kind(),
         ))
     }
 

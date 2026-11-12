@@ -1559,6 +1559,43 @@ reveal_type(pick_sequence(items))  # revealed: tuple[float]
 reveal_type(pick_sequence(list(range(2))))  # revealed: tuple[float]
 ```
 
+Even in an annotated assignment, the `Any` from matching `FloatSequence.count` does not take
+precedence over the element type inferred from the iterable. It can still supply an element type for
+an empty list:
+
+```py
+view: FloatSequence = list(range(2))
+reveal_type(view)  # revealed: list[int]
+
+empty_view: FloatSequence = list()
+reveal_type(empty_view)  # revealed: list[Any]
+```
+
+A single annotation can supply context for two type variables in different ways. The first list
+matches `FloatSequence` structurally. The second has an explicitly declared element type:
+
+```py
+def pair_lists[T, U](first: list[T], second: list[U]) -> tuple[list[T], list[U]]:
+    return first, second
+
+views: tuple[FloatSequence, list[Any]] = pair_lists(list(range(2)), list(range(2)))
+reveal_type(views)  # revealed: tuple[list[int], list[Any]]
+
+empty_first: tuple[FloatSequence, list[Any]] = pair_lists(list(), list(range(2)))
+reveal_type(empty_first)  # revealed: tuple[list[Any], list[Any]]
+```
+
+When both parts of the annotation constrain the same type variable, the explicit `list[Any]` still
+supplies a declared type preference:
+
+```py
+def repeat_list[T](items: list[T]) -> tuple[list[T], list[T]]:
+    return items, items
+
+repeated: tuple[FloatSequence, list[Any]] = repeat_list(list(range(2)))
+reveal_type(repeated)  # revealed: tuple[list[Any], list[Any]]
+```
+
 An annotation on the result can specialize the chosen overload. During selection, the first overload
 accepts every `list[Any]`. Preferring `T = int` at that point would leave both overloads in play and
 make the call ambiguous.

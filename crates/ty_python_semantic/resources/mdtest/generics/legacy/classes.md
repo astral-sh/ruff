@@ -1336,6 +1336,37 @@ class Explicit(Generic[T]):
 reveal_type(Explicit(1))  # revealed: Explicit[int]
 ```
 
+### Protocol annotations as constructor type context
+
+An explicit base of `Reader[T]` makes the annotation's `T` a preferred constructor specialization.
+When only the `read` method matches, the constructor preserves the type inferred from its argument:
+
+```py
+from typing import Any, Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class Reader(Protocol[T_co]):
+    def read(self) -> T_co: ...
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        self.value = value
+
+    def read(self) -> T:
+        return self.value
+
+class ExplicitBox(Box[T], Reader[T]): ...
+
+def check(value: T | Any):
+    explicit: Reader[T] = ExplicitBox(value)
+    reveal_type(explicit)  # revealed: ExplicitBox[T@check]
+
+    implicit: Reader[T] = Box(value)
+    reveal_type(implicit)  # revealed: Box[T@check | Any]
+```
+
 ### Constrained constructor inference uses argument evidence
 
 Constructor arguments should select the narrowest compatible declared constraint. A string argument

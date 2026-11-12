@@ -55,11 +55,14 @@ bitflags::bitflags! {
     /// often an evidence bound that is a better choice.
     ///
     /// Derived constraints retain the union of their inputs' provenance.
-    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::SalsaValue)]
+    #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, salsa::SalsaValue)]
     pub(crate) struct ConstraintProvenance: u8 {
         const INFERRED = 1 << 0;
         const DECLARED = 1 << 1;
         const VALIDITY = 1 << 2;
+        /// Marks declared bounds derived by matching protocol members. They can supply a
+        /// fallback for an unsolved variable.
+        const STRUCTURAL = 1 << 3;
     }
 }
 

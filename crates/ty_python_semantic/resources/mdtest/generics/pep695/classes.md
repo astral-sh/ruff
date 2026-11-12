@@ -680,6 +680,34 @@ def accepts_dog(value: Dog) -> None: ...
 consumer: Consumer[Animal] = Consumer(accepts_dog)
 ```
 
+### Protocol annotations as constructor type context
+
+An explicit base of `Reader[T]` makes the annotation's `T` a preferred constructor specialization.
+When only the `read` method matches, the constructor preserves the type inferred from its argument:
+
+```py
+from typing import Any, Protocol
+
+class Reader[T](Protocol):
+    def read(self) -> T: ...
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.value = value
+
+    def read(self) -> T:
+        return self.value
+
+class ExplicitBox[T](Box[T], Reader[T]): ...
+
+def check[T](value: T | Any):
+    explicit: Reader[T] = ExplicitBox(value)
+    reveal_type(explicit)  # revealed: ExplicitBox[T@check]
+
+    implicit: Reader[T] = Box(value)
+    reveal_type(implicit)  # revealed: Box[T@check | Any]
+```
+
 ### Constrained constructor inference uses argument evidence
 
 Constructor arguments should select the narrowest compatible declared constraint. A string argument

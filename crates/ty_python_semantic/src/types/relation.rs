@@ -10,7 +10,6 @@ use crate::types::constraints::{
     ConstraintProvenance, ConstraintSetBuilder, IteratorConstraintsExtension,
     OptionConstraintsExtension, OwnedConstraintSet,
 };
-use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
@@ -1200,35 +1199,14 @@ impl<'db> Type<'db> {
 pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
     'db,
     TypeRelation,
-    (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation),
+    (
+        Type<'db>,
+        (TypeRelation, TypeVarEvaluation, ConstraintProvenance),
+        Type<'db>,
+    ),
     ConstraintSet<'db, 'c>,
     1,
 >;
-
-impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation) {
-    type Id = (
-        TypeIdentity<'db>,
-        TypeIdentity<'db>,
-        TypeRelation,
-        TypeVarEvaluation,
-    );
-
-    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.0.may_share_type_identity(db, other.0)
-            && self.1.may_share_type_identity(db, other.1)
-            && self.2 == other.2
-            && self.3 == other.3
-    }
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (
-            self.0.to_type_identity(db),
-            self.1.to_type_identity(db),
-            self.2,
-            self.3,
-        )
-    }
-}
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
@@ -1236,8 +1214,14 @@ impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     }
 }
 
-/// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
-pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db, 'c>>;
+/// A [`CycleDetector`] that is used in `is_disjoint_from` methods.
+pub(crate) type IsDisjointVisitor<'db, 'c> = CycleDetector<
+    'db,
+    IsDisjoint,
+    (Type<'db>, ConstraintProvenance, Type<'db>),
+    ConstraintSet<'db, 'c>,
+    1,
+>;
 
 #[derive(Debug)]
 pub(crate) struct IsDisjoint;
@@ -1397,6 +1381,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable,
             ..self.clone()
         }
+    }
+
+    /// When a type satisfies a protocol only structurally, a constraint can come from a
+    /// member's own annotation, such as the `Any` in `count(self, value: Any)`. An explicit
+    /// protocol base can supply a preferred specialization through its type arguments.
+    pub(super) fn for_protocol_members(&self, nominally_satisfied: ConstraintSet<'db, 'c>) -> Self {
+        let mut checker = self.clone();
+        if checker.provenance == ConstraintProvenance::DECLARED
+            && nominally_satisfied.is_trivially_never_satisfied()
+        {
+            checker.provenance |= ConstraintProvenance::STRUCTURAL;
+        }
+        checker
     }
 
     /// Checks class subtyping without discarding the active recursive relation state.
@@ -1883,7 +1880,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         self.relation_visitor
             .try_visit(
                 db,
-                (source, target, self.relation, self.typevar_evaluation),
+                (
+                    source,
+                    (self.relation, self.typevar_evaluation, self.provenance),
+                    target,
+                ),
                 // Cached constraints do not retain explanations. When collecting context,
                 // recompute unsatisfiable comparisons while preserving the active recursion
                 // guards. Satisfiable constraints remain reusable, including those that
@@ -1893,7 +1894,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 },
                 work,
             )
-            .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
+            .unwrap_or_else(|(source, _, target)| {
+                self.recursive_type_pair_fallback(db, source, target)
+            })
     }
 
     fn recursive_type_pair_fallback(
@@ -3567,7 +3570,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        self.disjointness_visitor.visit(db, (source, target), work)
+        self.disjointness_visitor
+            .visit(db, (source, self.provenance, target), work)
     }
 
     fn any_protocol_members_absent_or_disjoint(

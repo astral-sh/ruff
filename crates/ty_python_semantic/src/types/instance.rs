@@ -998,15 +998,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
+        let checker = self.for_protocol_members(result);
         let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
-            self.check_protocol_interface_pair(
+            checker.check_protocol_interface_pair(
                 db,
                 ty,
                 source_protocol.interface(db),
                 protocol.interface(db),
             )
         } else if let Some(structurally_satisfied) =
-            self.try_check_nominal_recursive_protocol_members(db, ty, protocol, result)
+            checker.try_check_nominal_recursive_protocol_members(db, ty, protocol, result)
         {
             structurally_satisfied
         } else {
@@ -1017,7 +1018,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .members(db)
                 .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
                 .when_all(db, self.constraints, |member| {
-                    self.type_satisfies_protocol_member(db, ty, &member)
+                    checker.type_satisfies_protocol_member(db, ty, &member)
                 })
         };
         if let Some(context) = self.report_context()
@@ -1277,15 +1278,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // non-recursive, but the source's `value() -> Chain[int]` refers to `Chain`. Filtering both
         // interfaces would remove the source member we need to establish that valid return-type
         // comparison.
-        let structurally_satisfied = self.check_protocol_interface_pair(
-            db,
-            ty,
-            source_interface,
-            ProtocolInterfaceView::new(
-                target_non_recursive,
-                target_interface.materialization_kind(),
-            ),
-        );
+        let structurally_satisfied = self
+            .for_protocol_members(nominally_satisfied)
+            .check_protocol_interface_pair(
+                db,
+                ty,
+                source_interface,
+                ProtocolInterfaceView::new(
+                    target_non_recursive,
+                    target_interface.materialization_kind(),
+                ),
+            );
 
         // A skipped member can be the only source of information about a type variable. In this
         // example, `marker: Any` ensures materialization changes the interface for static arguments:
@@ -1367,7 +1370,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let constructed_ty = meta_ty.instance_type_for_meta_protocol(db, env);
         self.check_type_pair(db, constructed_ty, Type::ProtocolInstance(protocol))
             .and(db, self.constraints, || {
-                self.check_meta_protocol_members(db, constructed_ty, meta_ty, protocol)
+                self.for_protocol_members(self.never())
+                    .check_meta_protocol_members(db, constructed_ty, meta_ty, protocol)
             })
     }
 

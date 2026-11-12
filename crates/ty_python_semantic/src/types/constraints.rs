@@ -3081,7 +3081,7 @@ struct InteriorNodeData {
 struct CandidateTypeVarSolver<'db> {
     lower: FxIndexSet<(ConstraintProvenance, Type<'db>)>,
     upper: UpperBound<'db>,
-    has_declared_evidence: bool,
+    provenance: ConstraintProvenance,
     has_declared_lower_evidence: bool,
 }
 
@@ -3134,7 +3134,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
         // element is typically cheap (in that it does not involve a combinatorial
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
-        self.has_declared_evidence |= provenance.contains(ConstraintProvenance::DECLARED);
+        self.provenance |= provenance;
         self.has_declared_lower_evidence |= provenance.contains(ConstraintProvenance::DECLARED);
         if provenance.is_evidence() || !ty.is_never() {
             self.lower.insert((provenance, ty));
@@ -3142,7 +3142,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
     }
 
     fn add_upper(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
-        self.has_declared_evidence |= provenance.contains(ConstraintProvenance::DECLARED);
+        self.provenance |= provenance;
         self.upper.add_clause(provenance, ty);
     }
 
@@ -3160,7 +3160,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
         let Self {
             lower,
             mut upper,
-            has_declared_evidence,
+            provenance,
             has_declared_lower_evidence,
         } = self;
 
@@ -3228,7 +3228,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
             declared_lower,
             validity_lower,
             upper,
-            has_declared_evidence,
+            provenance,
             has_only_non_concrete_evidence,
             selected_declared_constraint: None,
         };
@@ -3309,6 +3309,7 @@ impl EvidenceSource {
         match self {
             Self::All => evidence.is_evidence(),
             Self::Inferred => evidence == ConstraintProvenance::INFERRED,
+            // Bounds derived by matching protocol members also carry STRUCTURAL.
             Self::Declared => evidence == ConstraintProvenance::DECLARED,
         }
     }
@@ -3324,8 +3325,8 @@ pub(crate) struct CandidateTypeVarSolution<'db> {
     declared_lower: Option<Type<'db>>,
     validity_lower: Type<'db>,
     upper: UpperBound<'db>,
-    /// Whether any bound originates from declared evidence.
-    has_declared_evidence: bool,
+    /// Sources of all bounds on this variable.
+    provenance: ConstraintProvenance,
     /// Whether every original evidence bound is gradual or another `TypeVar`.
     has_only_non_concrete_evidence: Option<bool>,
     /// The declared constraint selected for this range, if the typevar is constrained.
@@ -3346,7 +3347,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
             declared_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
-            has_declared_evidence: false,
+            provenance: ConstraintProvenance::INFERRED,
             has_only_non_concrete_evidence: None,
             selected_declared_constraint: None,
         }
@@ -3379,6 +3380,37 @@ impl<'db> CandidateTypeVarSolution<'db> {
             EvidenceSource::Inferred => self.inferred_lower,
             EvidenceSource::Declared => self.declared_lower,
         }
+    }
+
+    fn direct_argument_context(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+        solution: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if !self.provenance.contains(ConstraintProvenance::STRUCTURAL) {
+            return Some(solution);
+        }
+        if self.declared_lower.is_none()
+            && !self
+                .upper
+                .has_evidence_without_validity(EvidenceSource::Declared)
+        {
+            return None;
+        }
+
+        // A structural lower bound can determine the preliminary solution even when
+        // a nominal component directly constrains the same variable.
+        let direct =
+            CandidateSolutions::solve_bounds(db, env, builder, self, EvidenceSource::Declared)
+                .as_type()?;
+        (direct == solution
+            || (!direct.is_provisional_marker()
+                && direct.is_assignable_to(db, env, solution)
+                && solution.is_assignable_to(db, env, direct)
+                && self.accepts_candidate(db, env, builder, direct)))
+        .then_some(direct)
     }
 
     fn declared_candidate(
@@ -3578,14 +3610,15 @@ impl<'db> Type<'db> {
             target,
             inferable,
             UnspecializedTypeVarPolicy::Ignore,
+            ConstraintProvenance::INFERRED,
         )
     }
 
     /// Calculates the [`CandidateSolutions`] that represent the valid solutions for when `self` is
     /// constraint-set assignable to `target`.
     ///
-    /// Unlike [`Self::assignable_solutions_with_inferable`], this method preserves unspecialized
-    /// type variables in the solution set.
+    /// Preserve unspecialized type variables and distinguish direct expected types from bounds
+    /// derived by matching the expected protocol's members.
     pub(crate) fn assignable_solutions_for_argument_context(
         self,
         db: &'db dyn Db,
@@ -3600,13 +3633,14 @@ impl<'db> Type<'db> {
             target,
             inferable,
             UnspecializedTypeVarPolicy::Retain,
+            ConstraintProvenance::DECLARED,
         )
     }
 }
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _, _, _, _, _| CandidateSolutions::Unsatisfiable,
+    cycle_initial=|_, _, _, _, _, _, _, _| CandidateSolutions::Unsatisfiable,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn assignable_solutions_impl<'db>(
@@ -3616,21 +3650,32 @@ fn assignable_solutions_impl<'db>(
     target: Type<'db>,
     inferable: TypeVarSet<'db>,
     unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
+    provenance: ConstraintProvenance,
 ) -> CandidateSolutions<'db> {
     let env = &ProgramEnvironment::from_program(program);
-    let when = source.when_constraint_set_assignable_to_owned(db, env, target);
-    when.query(|builder, when| {
-        let mut storage = builder.storage.borrow_mut();
+    let solve = |when: ConstraintSet<'db, '_>| {
         CandidateSolutions::compute(
             db,
             env,
-            &mut storage,
+            &mut when.builder.storage.borrow_mut(),
             when.node,
             inferable,
             when.source_order,
             unspecialized_type_var_policy,
         )
-    })
+    };
+    if provenance == ConstraintProvenance::INFERRED {
+        return source
+            .when_constraint_set_assignable_to_owned(db, env, target)
+            .query(|_, when| solve(when));
+    }
+
+    let builder = ConstraintSetBuilder::new();
+    solve(
+        source.when_constraint_set_assignable_to_with_provenance(
+            db, env, target, &builder, provenance,
+        ),
+    )
 }
 
 #[salsa::tracked(
@@ -4005,20 +4050,48 @@ impl<'db> CandidateSolutions<'db> {
         })
     }
 
-    pub(crate) fn solve_for_argument_context(
+    /// Visits each binding on a valid return-context path, along with whether it has direct
+    /// evidence from the expected type.
+    pub(crate) fn for_each_argument_context_solution(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &ConstraintSetBuilder<'db>,
-    ) -> Solutions<'db> {
-        self.solve_with(|_variance, path_bound| {
-            match Self::preliminary_solve(db, env, builder, path_bound) {
-                PathBoundSolution::Solved(ty) if ty.is_provisional_marker() => {
-                    PathBoundSolution::Unsolved
-                }
-                solution => solution,
+        mut visit: impl FnMut(BoundTypeVarInstance<'db>, Type<'db>, bool),
+    ) {
+        let Self::Constrained(paths) = self else {
+            return;
+        };
+        let mut fallback_only = FxHashSet::default();
+        for path in paths {
+            if !matches!(path.validity, SolutionValidity::Valid) {
+                continue;
             }
-        })
+            fallback_only.clear();
+            let mut choose = |_, bound: &CandidateTypeVarSolution<'db>| {
+                let solution = Self::preliminary_solve(db, env, builder, bound);
+                if matches!(solution, PathBoundSolution::Solved(ty) if ty.is_provisional_marker()) {
+                    return PathBoundSolution::Unsolved;
+                }
+                solution.map(|ty| {
+                    bound
+                        .direct_argument_context(db, env, builder, ty)
+                        .unwrap_or_else(|| {
+                            fallback_only.insert(bound.bound_typevar);
+                            ty
+                        })
+                })
+            };
+            if let Some((solution, _)) = Self::solve_path_with(path, &mut choose) {
+                for binding in solution.solved_typevars {
+                    visit(
+                        binding.bound_typevar,
+                        binding.solution,
+                        !fallback_only.contains(&binding.bound_typevar),
+                    );
+                }
+            }
+        }
     }
 
     /// Solves each path by applying a per-typevar solver function, collecting retained solutions.
@@ -4153,7 +4226,10 @@ impl<'db> CandidateSolutions<'db> {
             return PathBoundSolution::Unsatisfiable;
         }
 
-        if !path_bound.has_declared_evidence {
+        if !path_bound
+            .provenance
+            .contains(ConstraintProvenance::DECLARED)
+        {
             return default_solution;
         }
 
@@ -4193,6 +4269,20 @@ impl<'db> CandidateSolutions<'db> {
             if path_bound.accepts_candidate(db, env, builder, candidate) {
                 return PathBoundSolution::Solved(candidate);
             }
+        }
+
+        // Without argument evidence a protocol member can supply the same gradual fallback
+        // as an expected type. Other member bounds still check whether that fallback is valid.
+        if inferred.is_none()
+            && path_bound
+                .provenance
+                .contains(ConstraintProvenance::STRUCTURAL)
+            && let PathBoundSolution::Solved(fallback) =
+                Self::preliminary_solve(db, env, builder, path_bound)
+            && !fallback.has_provisional_marker(db, env)
+            && path_bound.accepts_candidate(db, env, builder, fallback)
+        {
+            return PathBoundSolution::Solved(fallback);
         }
 
         default_solution
@@ -5727,7 +5817,7 @@ mod tests {
             declared_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),
-            has_declared_evidence: false,
+            provenance: ConstraintProvenance::empty(),
             has_only_non_concrete_evidence: None,
             selected_declared_constraint: None,
         };
