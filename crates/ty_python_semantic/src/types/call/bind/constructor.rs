@@ -1,10 +1,7 @@
-use super::{
-    Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode, generic_context_has_paramspec,
-};
+use super::{Binding, Bindings, CallableBinding, CallableItem, generic_context_has_paramspec};
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
-use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::Parameter;
 use crate::types::typevar::TypeVarNonceGenerator;
@@ -216,47 +213,6 @@ impl<'db> ConstructorBinding<'db> {
         }
     }
 
-    /// Check types for all bindings in this constructor.
-    ///
-    /// Provisional checks preserve downstream constructors. Final checks discard inactive ones.
-    pub(super) fn check_types(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-        argument_types: &CallArguments<'_, 'db>,
-        call_expression_tcx: TypeContext<'db>,
-        mode: CheckTypesMode,
-    ) {
-        self.entry.check_types(
-            db,
-            env,
-            constraints,
-            argument_types,
-            call_expression_tcx,
-            mode,
-        );
-
-        // Now that we've fully checked our own callable, we can determine whether downstream
-        // constructors should be checked or not.
-        if mode.is_provisional() {
-            if let Some(downstream) = self.downstream_constructor_mut() {
-                let _ = downstream.check_types_impl(
-                    db,
-                    env,
-                    constraints,
-                    argument_types,
-                    call_expression_tcx,
-                    &[],
-                    mode,
-                );
-            }
-        } else if !self.should_check_downstream(db, env) {
-            // If not, we can discard the downstream constructor bindings entirely.
-            self.downstream_constructor = None;
-        }
-    }
-
     /// For constructors which may have downstreams (that is, metaclass `__call__` or `__new__`),
     /// analyze their overloads to determine whether to check downstream constructors.
     ///
@@ -264,7 +220,11 @@ impl<'db> ConstructorBinding<'db> {
     /// the overall callable, because in multiple-matching-overload cases where the overload
     /// resolution algorithm might just collapse to `Unknown`, we want to make a more informed
     /// decision based on whether all overloads return instance types, or not.
-    fn should_check_downstream(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+    pub(super) fn should_check_downstream(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
         let constructor_kind = self.constructor_kind();
         if constructor_kind.is_init() || self.downstream_constructor().is_none() {
             return false;
@@ -288,18 +248,16 @@ impl<'db> ConstructorBinding<'db> {
         })
     }
 
-    /// Discards an inactive downstream constructor.
-    pub(super) fn discard_downstream_constructor(
+    /// Returns the downstream constructor if active, otherwise discards it.
+    pub(super) fn retain_downstream_constructor(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> bool {
-        if self.should_check_downstream(db, env) {
-            true
-        } else {
+    ) -> Option<&mut Bindings<'db>> {
+        if !self.should_check_downstream(db, env) {
             self.downstream_constructor = None;
-            false
         }
+        self.downstream_constructor_mut()
     }
 
     pub(super) fn downstream_constructor(&self) -> Option<&Bindings<'db>> {
