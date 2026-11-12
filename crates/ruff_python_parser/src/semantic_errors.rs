@@ -2318,22 +2318,25 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
             }
-            Pattern::MatchMapping(ast::PatternMatchMapping {
-                keys,
-                patterns,
-                rest,
-                ..
-            }) => {
-                for pattern in patterns {
-                    self.visit_pattern(pattern);
+            Pattern::MatchMapping(mapping) => {
+                // Bind the final capture after nested patterns, including in recovered syntax.
+                let mut rest = None;
+                for item in &mapping.items {
+                    match item {
+                        ast::MappingPatternItem::Entry { pattern, .. } => {
+                            self.visit_pattern(pattern);
+                        }
+                        ast::MappingPatternItem::Rest(name) => rest = Some(name),
+                    }
                 }
                 if let Some(rest) = rest {
                     self.insert(rest);
                 }
 
                 let mut seen = FxHashSet::default();
-                for key in keys
-                    .iter()
+                for key in mapping
+                    .entries()
+                    .map(|(key, _)| key)
                     // Signed and complex numbers are allowed as keys but are represented as unary
                     // or binary expressions rather than literals.
                     .filter(|key| {

@@ -183,7 +183,7 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                 }
             }
             ast::Pattern::MatchMapping(p) => {
-                if let Some(rest) = &p.rest {
+                if let Some(rest) = p.rest() {
                     self.bound_places
                         .push(PlaceExpr::Symbol(Symbol::new(rest.id.clone())));
                 }
