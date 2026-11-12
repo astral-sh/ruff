@@ -3097,7 +3097,8 @@ error[incompatible-attribute-override]: Invalid override of attribute `value`
 
 ## Nested class overrides
 
-A subclass can override a read-only nested class with one of its subclasses.
+A subclass of `Base` can override its read-only nested class `Inner` with a subclass of
+`Base.Inner`, but not with an unrelated class.
 
 ```py
 class Base:
