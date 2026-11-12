@@ -303,8 +303,6 @@ pub(crate) fn unittest_assertion(
     func: Expr<'_>,
     arguments: ast::Arguments<'_>,
 ) {
-    let args = arguments.args();
-    let keywords = arguments.keywords();
     let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
@@ -327,9 +325,7 @@ pub(crate) fn unittest_assertion(
         && checker.semantic().current_expression_parent().is_none()
         && !checker.comment_ranges().intersects(expr.range())
     {
-        if let Ok(replacement) =
-            unittest_assert.generate_assert(args, keywords, checker.generator())
-        {
+        if let Ok(replacement) = unittest_assert.generate_assert(arguments, checker.generator()) {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 replacement,
                 parenthesized_range(

@@ -73,15 +73,9 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &StmtForFields<'_>) 
     };
     let func = call_node.func();
     let arguments = call_node.arguments();
-    let args = arguments.args();
-    let keywords = arguments.keywords();
     let call_range = value.range();
 
-    if !keywords.is_empty() {
-        return;
-    }
-
-    let Some([arg]) = args.as_array() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

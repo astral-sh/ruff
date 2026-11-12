@@ -5,7 +5,7 @@ use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtFunctionDefFields;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Arguments, Expr, ExprKind, Identifier};
+use ruff_python_ast::{Arguments, Expr, ExprKind, Identifier, ParameterItem};
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -120,20 +120,26 @@ pub(crate) fn airflow_3_incompatible_method_signature_def(
         },
     ) {
         let parameters = function_def.parameters;
-        let positional_count = parameters.iter_positional_params().count();
-
-        let is_valid_signature = match positional_count {
-            // check valid signature `def get_link(self, operator, *, ti_key)`
-            2 => parameters
-                .kwonlyargs()
-                .any(|p| p.name().as_str() == "ti_key"),
-            // check valid signature `def get_link(self, operator, ti_key)`
-            3 => parameters
-                .iter_positional_params()
-                .nth(2)
-                .is_some_and(|p| p.name().as_str() == "ti_key"),
-            _ => false,
-        };
+        let mut positional_count = 0;
+        let mut has_ti_key = false;
+        for item in parameters.items().iter() {
+            match item {
+                ParameterItem::PositionalOnly(p) | ParameterItem::PositionalOrKeyword(p) => {
+                    positional_count += 1;
+                    if positional_count == 3 {
+                        has_ti_key = p.name().as_str() == "ti_key";
+                    } else if positional_count > 3 {
+                        break;
+                    }
+                }
+                ParameterItem::KeywordOnly(p) if positional_count < 3 => {
+                    has_ti_key |= p.name().as_str() == "ti_key";
+                }
+                _ => {}
+            }
+        }
+        // Accept `get_link(self, operator, *, ti_key)` and `get_link(self, operator, ti_key)`.
+        let is_valid_signature = matches!(positional_count, 2 | 3) && has_ti_key;
 
         if !is_valid_signature {
             checker.report_diagnostic(

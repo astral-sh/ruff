@@ -1,7 +1,7 @@
 use std::assert_matches;
 
 use ruff_formatter::{FormatRuleWithOptions, format_args, write};
-use ruff_python_ast::{ParameterItem, Parameters, SyntaxNode};
+use ruff_python_ast::{ParameterItem, ParameterRole, Parameters, SyntaxNode};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 

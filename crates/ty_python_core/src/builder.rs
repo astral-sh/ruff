@@ -17,9 +17,8 @@ use ruff_python_ast::{
     self as ast, AnyParameter, AstNode, BoolOp, CmpOp, Comprehension, ElifElseClause,
     ExceptHandlerKind, Expr, ExprBoolOp, ExprContext, ExprIf, ExprKind, ExprLambda, ExprNamed,
     Identifier, Keyword, MappingPatternItem, NodeIndex, NodeList, Number, ParameterWithDefault,
-    Parameters, Pattern, PatternKeyword, PatternKind, PySourceType, PythonVersion, Stmt,
-    StmtAnnAssign, StmtAssign, StmtAugAssign, StmtFor, StmtKind, TypeParamKind, TypeParams,
-    UnaryOp, WithItem,
+    Parameters, Pattern, PatternKind, PySourceType, PythonVersion, Stmt, StmtAnnAssign, StmtAssign,
+    StmtAugAssign, StmtFor, StmtKind, TypeParamKind, TypeParams, UnaryOp, WithItem,
 };
 use ruff_python_parser::semantic_errors::{
     LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
@@ -2678,20 +2677,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     MappingPatternItem::Rest(_) => true,
                 })
             }
-            ast::PatternFields::MatchClass(ast::PatternMatchClassFields {
-                node: pattern, ..
-            }) => pattern
-                .arguments()
-                .patterns()
-                .iter()
-                .chain(
-                    pattern
-                        .arguments()
-                        .keywords()
-                        .iter()
-                        .map(PatternKeyword::pattern),
-                )
-                .any(Self::pattern_has_bindings),
+            ast::PatternFields::MatchClass(ast::PatternMatchClassFields { arguments, .. }) => {
+                arguments
+                    .items()
+                    .iter()
+                    .any(|item| Self::pattern_has_bindings(item.pattern()))
+            }
             ast::PatternFields::MatchStar(ast::PatternMatchStarFields {
                 node: pattern, ..
             }) => pattern.name().is_some(),
@@ -2747,17 +2738,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })
             }
             PatternKind::MatchMapping(pattern) => {
+                let mut entries = Vec::new();
+                let mut rest = None;
+                for item in pattern.items() {
+                    match item {
+                        ast::MappingPatternItem::Entry { key, pattern } => {
+                            entries.push(MappingPatternEntryPredicateKind {
+                                key: self.add_standalone_expression(key),
+                                pattern: self.predicate_kind(pattern),
+                            });
+                        }
+                        ast::MappingPatternItem::Rest(name) => rest = Some(name),
+                    }
+                }
+
                 // Retain keyed entries for subject-aware exhaustiveness analysis.
                 PatternPredicateKind::Mapping(MappingPatternPredicateKind {
-                    entries: pattern
-                        .items()
-                        .entries()
-                        .map(|(key, pattern)| MappingPatternEntryPredicateKind {
-                            key: self.add_standalone_expression(key),
-                            pattern: self.predicate_kind(pattern),
-                        })
-                        .collect(),
-                    rest: pattern.items().rest().map(|name| name.id().clone()),
+                    entries: entries.into_boxed_slice(),
+                    rest: rest.map(|name| name.id().clone()),
                 })
             }
             PatternKind::MatchSequence(pattern) => {
@@ -5686,7 +5684,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_keyword(&mut self, keyword: Keyword<'ast>) {
         walk_keyword(self, keyword);
 
-        if keyword.arg().is_some() {
+        if !keyword.is_variadic() {
             return;
         }
 

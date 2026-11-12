@@ -45,13 +45,8 @@ impl AlwaysFixableViolation for UnnecessaryRangeStart {
 
 /// PIE808
 pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCallFields<'_>) {
-    // `range` doesn't accept keyword arguments.
-    if !call.arguments.keywords().is_empty() {
-        return;
-    }
-
-    // Verify that the call has exactly two arguments (no `step`).
-    let Some([start, _]) = call.arguments.args().as_array() else {
+    // A third positional argument supplies the step.
+    let Some([start, _]) = call.arguments.as_positional_array() else {
         return;
     };
 

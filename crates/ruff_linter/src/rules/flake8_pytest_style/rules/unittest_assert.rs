@@ -1,6 +1,5 @@
 use anyhow::{Result, anyhow, bail};
-use ruff_python_ast::FilteredNodes;
-use ruff_python_ast::{Builder, CmpOp, Expr, UnaryOp, build};
+use ruff_python_ast::{ArgOrKeyword, Arguments, Builder, CmpOp, Expr, UnaryOp, build};
 use ruff_python_codegen::Generator;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
@@ -210,53 +209,22 @@ impl UnittestAssert {
     }
 
     /// Create a map from argument name to value.
-    fn args_map<'a>(
-        &'a self,
-        args: FilteredNodes<'a, ruff_python_ast::kind::Expr>,
-        keywords: FilteredNodes<'a, ruff_python_ast::kind::Keyword>,
-    ) -> Result<FxHashMap<&'a str, Expr<'a>>> {
-        // If we have variable-length arguments, abort.
-        if args.iter().any(ruff_python_ast::Expr::is_starred_expr)
-            || keywords.iter().any(|kw| kw.arg().is_none())
-        {
-            bail!("Variable-length arguments are not supported");
-        }
-
+    fn args_map<'a>(&'a self, arguments: Arguments<'a>) -> Result<FxHashMap<&'a str, Expr<'a>>> {
         let arg_spec = self.arg_spec();
-
-        // If any of the keyword arguments are not in the argument spec, abort.
-        if keywords.iter().any(|kw| {
-            kw.arg()
-                .is_some_and(|kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
-        }) {
-            bail!("Unknown keyword argument");
-        }
-
-        // Generate a map from argument name to value.
-        let mut args_map: FxHashMap<&str, Expr<'_>> =
-            FxHashMap::with_capacity_and_hasher(args.len() + keywords.len(), FxBuildHasher);
-
-        // Process positional arguments.
-        for (arg_name, value) in arg_spec.iter().zip(args) {
-            args_map.insert(arg_name, value);
-        }
-
-        // Process keyword arguments.
-        for arg_name in arg_spec.iter().skip(args.len()) {
-            if let Some(value) = keywords.iter().find_map(|keyword| {
-                if keyword
-                    .arg()
-                    .is_some_and(|kwarg_name| kwarg_name == *arg_name)
-                {
-                    Some(keyword.value())
-                } else {
-                    None
+        let mut positional_names = arg_spec.iter();
+        let mut args_map =
+            FxHashMap::with_capacity_and_hasher(arguments.len().min(arg_spec.len()), FxBuildHasher);
+        let mut unknown_keyword = false;
+        for argument in arguments.iter_source_order() {
+            match argument {
+                ArgOrKeyword::Arg(value) if !value.is_starred_expr() => {
+                    if let Some(&name) = positional_names.next() {
+                        args_map.insert(name, value);
+                    }
                 }
-                ArgOrKeyword::Keyword(keyword) if let Some(name) = &keyword.arg => {
+                ArgOrKeyword::Keyword(keyword) if let Some(name) = keyword.arg() => {
                     if arg_spec.contains(&name.as_str()) {
-                        args_map
-                            .entry(name.as_str())
-                            .or_insert(keyword.value.as_ref());
+                        args_map.entry(name.as_str()).or_insert(keyword.value());
                     } else {
                         unknown_keyword = true;
                     }
@@ -272,11 +240,10 @@ impl UnittestAssert {
 
     pub(crate) fn generate_assert(
         self,
-        args: FilteredNodes<'_, ruff_python_ast::kind::Expr>,
-        keywords: FilteredNodes<'_, ruff_python_ast::kind::Keyword>,
+        arguments: Arguments<'_>,
         generator: Generator,
     ) -> Result<String> {
-        let args = self.args_map(args, keywords)?;
+        let args = self.args_map(arguments)?;
         let required = |name: &str| {
             args.get(name)
                 .copied()

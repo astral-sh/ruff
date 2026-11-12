@@ -141,7 +141,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCallFields<'
                 .arguments
                 .keywords()
                 .iter()
-                .any(|keyword| keyword.arg().is_none());
+                .any(ruff_python_ast::Keyword::is_variadic);
             if has_kwargs {
                 return;
             }

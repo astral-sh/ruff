@@ -71,7 +71,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if arguments
             .keywords()
             .iter()
-            .any(|keyword| keyword.arg().is_none())
+            .any(ruff_python_ast::Keyword::is_variadic)
         {
             return None;
         }

@@ -1208,17 +1208,6 @@ fn is_generator_function_annotated_as_returning_none(
         .is_some_and(GeneratorOrIteratorArguments::indicates_none_returned)
 }
 
-fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<&'a str> {
-    let mut parameters = Vec::new();
-    let Some(function) = docstring.definition.as_function_def() else {
-        return parameters;
-    };
-    for param in function.parameters().iter() {
-        parameters.push(param.name().as_str());
-    }
-    parameters
-}
-
 fn is_one_line(docstring: &Docstring) -> bool {
     let mut non_empty_line_count = 0;
     for line in NewlineWithTrailingNewline::from(docstring.body().as_str()) {
@@ -1363,22 +1352,22 @@ pub(crate) fn check_docstring(
     }
 
     // DOC102
-    if checker.is_rule_enabled(Rule::DocstringExtraneousParameter) {
-        // Don't report extraneous parameters if the signature defines *args or **kwargs
-        if function_def.parameters().vararg().is_none()
-            && function_def.parameters().kwarg().is_none()
-        {
-            if let Some(docstring_params) = docstring_sections.parameters {
-                for docstring_param in &docstring_params.parameters {
-                    if !signature_parameters.contains(&docstring_param.name) {
-                        checker.report_diagnostic(
-                            DocstringExtraneousParameter {
-                                id: docstring_param.name.to_string(),
-                            },
-                            docstring_param.range(),
-                        );
-                    }
-                }
+    if checker.is_rule_enabled(Rule::DocstringExtraneousParameter)
+        && let Some(docstring_params) = docstring_sections.parameters
+        && !docstring_params.parameters.is_empty()
+        // A variadic parameter may account for any documented name.
+        && let Some(signature_parameters) = function_def.parameters().iter_source_order()
+            .map(|param| (!param.is_variadic()).then(|| param.name().as_str()))
+            .collect::<Option<Vec<_>>>()
+    {
+        for docstring_param in &docstring_params.parameters {
+            if !signature_parameters.contains(&docstring_param.name) {
+                checker.report_diagnostic(
+                    DocstringExtraneousParameter {
+                        id: docstring_param.name.to_string(),
+                    },
+                    docstring_param.range(),
+                );
             }
         }
     }

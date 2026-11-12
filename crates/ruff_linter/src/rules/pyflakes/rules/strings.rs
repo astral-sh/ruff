@@ -7,7 +7,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, ExprKind, Identifier};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -562,11 +562,7 @@ impl Violation for StringDotFormatMixingAutomatic {
 }
 
 fn has_star_star_kwargs(keywords: ast::FilteredNodes<'_, ruff_python_ast::kind::Keyword>) -> bool {
-    keywords.iter().any(|keyword| keyword.arg().is_none())
-}
-
-fn has_star_args(args: ast::FilteredNodes<'_, ruff_python_ast::kind::Expr>) -> bool {
-    args.iter().any(ruff_python_ast::Expr::is_starred_expr)
+    keywords.iter().any(ruff_python_ast::Keyword::is_variadic)
 }
 
 /// F502
@@ -964,25 +960,23 @@ pub(crate) fn string_dot_format_missing_argument(
     call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
 ) {
-    let args = call.arguments.args();
-    let keywords = call.arguments.keywords();
-    if has_star_args(args) || has_star_star_kwargs(keywords) {
-        return;
+    let mut positional_count = 0;
+    let mut keywords = FxHashSet::default();
+    for argument in call.arguments.iter_source_order() {
+        match argument {
+            ast::ArgOrKeyword::Arg(arg) if !arg.is_starred_expr() => positional_count += 1,
+            ast::ArgOrKeyword::Keyword(keyword) if let Some(name) = keyword.arg() => {
+                keywords.insert(name.id());
+            }
+            _ => return,
+        }
     }
-
-    let keywords: FxHashSet<_> = keywords
-        .iter()
-        .filter_map(|k| {
-            let arg = k.arg();
-            arg.map(Identifier::id)
-        })
-        .collect();
 
     let missing: Vec<String> = summary
         .autos
         .iter()
         .chain(&summary.indices)
-        .filter(|&&i| i >= args.len())
+        .filter(|&&i| i >= positional_count)
         .map(ToString::to_string)
         .chain(
             summary

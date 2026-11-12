@@ -62,7 +62,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Check for variadic arguments early, before extracting positional args.
         let has_starred = args.iter().any(ast::Expr::is_starred_expr);
-        let has_double_starred = keywords.iter().any(|kw| kw.arg().is_none());
+        let has_double_starred = keywords.iter().any(ruff_python_ast::Keyword::is_variadic);
 
         // Emit diagnostic for missing required arguments or unsupported variadic arguments.
         // For `typing.NamedTuple`, emit a diagnostic since variadic arguments are not supported.

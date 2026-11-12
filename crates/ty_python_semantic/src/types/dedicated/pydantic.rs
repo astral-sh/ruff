@@ -835,55 +835,7 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
         return Some(ModelConfig::unknown());
     }
 
-    if call
-        .arguments()
-        .keywords()
-        .iter()
-        .any(|keyword| keyword.arg().is_none())
-    {
-        return Some(ModelConfig::unknown());
-    }
-
-    // Keep this list of recognized options in sync with `model_config_from_dict` and
-    // `class_keyword_config`.
-    let extra = call.arguments().find_keyword("extra").map(|extra| {
-        let extra = definition_expression_type(db, definition, extra.value())
-            .as_string_literal()
-            .map(|literal| literal.value(db));
-        ExtraBehavior::from_value(extra)
-    });
-    let strict = config_boolean(db, definition, call.arguments().find_keyword("strict"));
-    let from_attributes = config_boolean(
-        db,
-        definition,
-        call.arguments().find_keyword("from_attributes"),
-    );
-    let frozen = config_boolean(db, definition, call.arguments().find_keyword("frozen"));
-    let validate_by_alias = config_boolean(
-        db,
-        definition,
-        call.arguments().find_keyword("validate_by_alias"),
-    );
-    let validate_by_name = config_boolean(
-        db,
-        definition,
-        call.arguments().find_keyword("validate_by_name"),
-    );
-    let populate_by_name = config_boolean(
-        db,
-        definition,
-        call.arguments().find_keyword("populate_by_name"),
-    );
-
-    Some(ModelConfig {
-        extra,
-        strict,
-        from_attributes,
-        frozen,
-        validate_by_alias,
-        validate_by_name,
-        populate_by_name,
-    })
+    Some(model_config_from_keywords(db, definition, call.arguments()))
 }
 
 fn model_config_from_dict(
@@ -904,8 +856,7 @@ fn model_config_from_dict(
         };
         let value = definition_expression_type(db, definition, item.value());
 
-        // Keep this match in sync with the options recognized for `ConfigDict` calls in
-        // `own_model_config` and for class keywords in `class_keyword_config`.
+        // Keep this match in sync with the options in `model_config_from_keywords`.
         match key.value().to_str() {
             "extra" => {
                 config.extra = Some(ExtraBehavior::from_value(
@@ -936,16 +887,42 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
     let Some(arguments) = class_node.arguments() else {
         return ModelConfig::default();
     };
-    if arguments
-        .keywords()
-        .iter()
-        .any(|keyword| keyword.arg().is_none())
-    {
-        return ModelConfig::unknown();
+    model_config_from_keywords(db, definition, arguments)
+}
+
+fn model_config_from_keywords(
+    db: &dyn Db,
+    definition: Definition<'_>,
+    arguments: Arguments<'_>,
+) -> ModelConfig {
+    let [
+        mut extra,
+        mut strict,
+        mut from_attributes,
+        mut frozen,
+        mut validate_by_alias,
+        mut validate_by_name,
+        mut populate_by_name,
+    ] = [None; 7];
+    for keyword in arguments.keywords() {
+        let Some(name) = keyword.arg() else {
+            // A mapping unpacking can override any option, including one seen earlier.
+            return ModelConfig::unknown();
+        };
+        let slot = match name.as_str() {
+            "extra" => &mut extra,
+            "strict" => &mut strict,
+            "from_attributes" => &mut from_attributes,
+            "frozen" => &mut frozen,
+            "validate_by_alias" => &mut validate_by_alias,
+            "validate_by_name" => &mut validate_by_name,
+            "populate_by_name" => &mut populate_by_name,
+            _ => continue,
+        };
+        // On a recovered duplicate, use the first explicit keyword, like argument lookup.
+        slot.get_or_insert(keyword);
     }
-    // Keep this list of recognized options in sync with `own_model_config` and
-    // `model_config_from_dict`.
-    let extra = arguments.find_keyword("extra").map(|extra| {
+    let extra = extra.map(|extra| {
         let extra = definition_expression_type(db, definition, extra.value())
             .as_string_literal()
             .map(|literal| literal.value(db));

@@ -155,8 +155,6 @@ fn match_remove(if_stmt: ast::StmtIf<'_>) -> Option<(Expr<'_>, ast::ExprName<'_>
     let expr_call = expr.as_call_expr()?;
     let attr = expr_call.func();
     let arguments = expr_call.arguments();
-    let args = arguments.args();
-    let keywords = arguments.keywords();
 
     let expr_attribute = attr.as_attribute_expr()?;
     let receiver = expr_attribute.value();
@@ -166,9 +164,7 @@ fn match_remove(if_stmt: ast::StmtIf<'_>) -> Option<(Expr<'_>, ast::ExprName<'_>
         return None;
     };
 
-    let [arg] = args.as_array()?;
-
-    if func_name != "remove" || !keywords.is_empty() {
+    if func_name != "remove" {
         return None;
     }
 

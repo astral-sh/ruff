@@ -85,7 +85,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let starred_arguments: SmallVec<[ast::Expr<'_>; 1]> =
             args.iter().filter(|arg| arg.is_starred_expr()).collect();
         let double_starred_arguments: SmallVec<[ast::Keyword<'_>; 1]> =
-            keywords.iter().filter(|kw| kw.arg().is_none()).collect();
+            keywords.iter().filter(|kw| kw.is_variadic()).collect();
 
         // The fallback type reflects the fact that if the call were successful,
         // it would return a class that is a subclass of `Mapping[str, object]`
@@ -414,7 +414,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         );
         if is_generic && arguments.args().is_empty() {
             for keyword in arguments.keywords() {
-                if keyword.arg().is_none() && !keyword.value().is_dict_expr() {
+                if keyword.is_variadic() && !keyword.value().is_dict_expr() {
                     self.get_or_infer_expression(keyword.value(), TypeContext::default());
                 }
             }

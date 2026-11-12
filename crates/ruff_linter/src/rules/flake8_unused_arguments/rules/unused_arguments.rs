@@ -289,74 +289,16 @@ impl Argumentable {
     }
 }
 
-/// Check a plain function for unused arguments.
-fn function(
+fn check_parameters(
     argumentable: Argumentable,
     parameters: Parameters<'_>,
-    scope: &Scope,
-    checker: &Checker,
-) {
-    let ignore_variadic_names = checker
-        .settings()
-        .flake8_unused_arguments
-        .ignore_variadic_names;
-    let args = parameters
-        .iter_non_variadic_params()
-        .map(ruff_python_ast::ParameterWithDefault::parameter)
-        .chain(
-            parameters
-                .vararg()
-                .into_iter()
-                .skip(usize::from(ignore_variadic_names)),
-        )
-        .chain(
-            parameters
-                .kwarg()
-                .into_iter()
-                .skip(usize::from(ignore_variadic_names)),
-        );
-    call(argumentable, args, scope, checker);
-}
-
-/// Check a method for unused arguments.
-fn method(
-    argumentable: Argumentable,
-    parameters: Parameters<'_>,
-    scope: &Scope,
-    checker: &Checker,
-) {
-    let ignore_variadic_names = checker
-        .settings()
-        .flake8_unused_arguments
-        .ignore_variadic_names;
-    let args = parameters
-        .iter_non_variadic_params()
-        .skip(1)
-        .map(ruff_python_ast::ParameterWithDefault::parameter)
-        .chain(
-            parameters
-                .vararg()
-                .into_iter()
-                .skip(usize::from(ignore_variadic_names)),
-        )
-        .chain(
-            parameters
-                .kwarg()
-                .into_iter()
-                .skip(usize::from(ignore_variadic_names)),
-        );
-    call(argumentable, args, scope, checker);
-}
-
-fn call<'a>(
-    argumentable: Argumentable,
-    parameters: impl Iterator<Item = Parameter<'a>>,
+    mut skip_receiver: bool,
     scope: &Scope,
     checker: &Checker,
 ) {
     let semantic = checker.semantic();
     let dummy_variable_rgx = &checker.settings().dummy_variable_rgx;
-    let check_argument = |arg: &Parameter| {
+    let check_argument = |arg: Parameter<'_>| {
         let Some(binding) = scope
             .get(arg.name().as_str())
             .map(|binding_id| semantic.binding(binding_id))
@@ -372,7 +314,7 @@ fn call<'a>(
     };
     let (vararg, kwarg) = parameters.split_variadic(|parameter| {
         if !std::mem::take(&mut skip_receiver) {
-            check_argument(&parameter.parameter);
+            check_argument(parameter.parameter());
         }
     });
     if !checker

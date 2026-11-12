@@ -247,7 +247,7 @@ pub(crate) fn missing_maxsplit_arg(
             || arguments
                 .keywords()
                 .iter()
-                .any(|keyword| keyword.arg().is_none())
+                .any(ruff_python_ast::Keyword::is_variadic)
         {
             Applicability::Unsafe
         } else {

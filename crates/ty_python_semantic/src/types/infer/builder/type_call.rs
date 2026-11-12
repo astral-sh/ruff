@@ -49,7 +49,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return if keywords.is_empty() {
                     arg_type.dunder_class(db, env)
                 } else {
-                    if keywords.iter().any(|keyword| keyword.arg().is_some())
+                    if keywords.iter().any(|keyword| !keyword.is_variadic())
                         && let Some(builder) =
                             self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr)
                     {

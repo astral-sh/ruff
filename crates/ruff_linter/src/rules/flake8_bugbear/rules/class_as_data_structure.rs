@@ -78,9 +78,12 @@ pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtCl
                         .iter()
                         // skip `self`
                         .skip(1)
-                        .all(|param| param.annotation().is_some() && !param.is_variadic())
-                    && (func_def.parameters().kwonlyargs().next().is_none()
-                        || checker.target_version() >= PythonVersion::PY310)
+                        .all(|param| !param.is_variadic() && param.annotation().is_some())
+                    && (checker.target_version() >= PythonVersion::PY310
+                        || !func_def
+                            .parameters()
+                            .roles()
+                            .any(|role| role == ast::ParameterRole::KeywordOnly))
                     && (
                         // `__init__` should not have complicated logic in it
                         // only assignments

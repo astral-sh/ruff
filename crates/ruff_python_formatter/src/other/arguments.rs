@@ -168,18 +168,10 @@ fn is_single_argument_parenthesized(argument: Expr<'_>, call_end: TextSize, sour
 /// of those collections.
 fn is_arguments_huggable(arguments: Arguments<'_>, context: &PyFormatContext) -> bool {
     // Find the lone argument or `**kwargs` keyword.
-    let arg = match (arguments.args(), arguments.keywords()) {
-        (args, keywords)
-            if let Some([arg]) = args.as_array()
-                && keywords.is_empty() =>
-        {
-            arg
-        }
-        (args, keywords)
-            if args.is_empty()
-                && let Some([keyword]) = keywords.as_array()
-                && keyword.arg().is_none()
-                && !context.comments().has(keyword) =>
+    let arg = match arguments.items().as_array() {
+        Some([ArgOrKeyword::Arg(arg)]) => arg,
+        Some([ArgOrKeyword::Keyword(keyword)])
+            if keyword.is_variadic() && !context.comments().has(keyword) =>
         {
             keyword.value()
         }

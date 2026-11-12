@@ -2172,18 +2172,17 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
 ///
 /// Mixed positional-and-keyword `TypedDict` construction needs to inspect unpacked keyword types
 /// in multiple validation passes. Precomputing them avoids re-inference in speculative builders.
-pub(super) fn infer_unpacked_keyword_types<'db>(
-    arguments: Arguments<'_>,
-    mut expression_type_fn: impl FnMut(Expr<'_>, TypeContext<'db>) -> Type<'db>,
-) -> Vec<Option<Type<'db>>> {
+pub(super) fn infer_unpacked_keyword_types<'ast, 'db>(
+    arguments: Arguments<'ast>,
+    mut expression_type_fn: impl FnMut(ast::Expr<'ast>, TypeContext<'db>) -> Type<'db>,
+) -> Vec<(ast::Expr<'ast>, Type<'db>)> {
     arguments
         .keywords()
         .iter()
+        .filter(|keyword| keyword.is_variadic())
         .map(|keyword| {
-            keyword
-                .arg()
-                .is_none()
-                .then(|| expression_type_fn(keyword.value(), TypeContext::default()))
+            let value = keyword.value();
+            (value, expression_type_fn(value, TypeContext::default()))
         })
         .collect()
 }
@@ -2209,27 +2208,17 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
     env: &ProgramEnvironment<'db>,
     typed_dict: TypedDictType<'db>,
     arguments: Arguments<'_>,
-    unpacked_keyword_types: &[Option<Type<'db>>],
+    unpacked_keyword_types: &[(ast::Expr<'_>, Type<'db>)],
     expression_type_fn: &mut impl FnMut(Expr<'_>, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
-    debug_assert_eq!(arguments.keywords().len(), unpacked_keyword_types.len());
-
     let mut provided_keys: OrderSet<Name> = arguments
         .keywords()
         .iter()
         .filter_map(|keyword| keyword.arg().map(|arg| arg.id().clone()))
         .collect();
 
-    for (keyword, unpacked_type) in arguments
-        .keywords()
-        .iter()
-        .zip(unpacked_keyword_types.iter().copied())
-    {
-        if keyword.arg().is_some() {
-            continue;
-        }
-
-        let unpacked_type = if keyword.value().is_dict_expr() {
+    for &(value, unpacked_type) in unpacked_keyword_types {
+        let unpacked_type = if value.is_dict_expr() {
             Type::unknown()
         } else {
             unpacked_type
@@ -2239,7 +2228,7 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
             db,
             env,
             typed_dict,
-            keyword.value(),
+            value,
             unpacked_type,
             &mut provided_keys,
             expression_type_fn,
@@ -2791,20 +2780,16 @@ fn validate_from_keywords<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: Arguments<'ast>,
     typed_dict_node: SyntaxNode<'ast>,
-    unpacked_keyword_types: &[Option<Type<'db>>],
+    unpacked_keyword_types: &[(ast::Expr<'_>, Type<'db>)],
     expression_type_fn: &mut impl FnMut(Expr<'_>, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
     let db = context.db();
-    debug_assert_eq!(arguments.keywords().len(), unpacked_keyword_types.len());
 
     let mut guaranteed_keys = BTreeMap::new();
 
     // Validate that each key is assigned a type that is compatible with the key's value type
-    for (keyword, unpacked_type) in arguments
-        .keywords()
-        .iter()
-        .zip(unpacked_keyword_types.iter().copied())
-    {
+    let mut unpacked_types = unpacked_keyword_types.iter();
+    for keyword in arguments.keywords() {
         let keyword_node: SyntaxNode<'ast> = keyword.into();
 
         if let Some(arg_name) = keyword.arg() {

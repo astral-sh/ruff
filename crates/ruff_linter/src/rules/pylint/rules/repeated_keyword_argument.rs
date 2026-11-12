@@ -45,7 +45,7 @@ pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ast::ExprCallF
         .keywords()
         .iter()
         .filter_map(|keyword| {
-            if keyword.arg().is_none() {
+            if keyword.is_variadic() {
                 keyword.value().as_dict_expr()
             } else {
                 None

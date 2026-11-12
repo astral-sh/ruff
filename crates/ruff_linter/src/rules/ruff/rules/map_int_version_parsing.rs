@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprCall, ExprKind};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 use ruff_python_semantic::SemanticModel;
 
 use crate::Violation;
@@ -49,7 +49,7 @@ impl Violation for MapIntVersionParsing {
 pub(crate) fn map_int_version_parsing(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     let semantic = checker.semantic();
 
-    let Some((first, second)) = map_call_with_two_arguments(semantic, call.node) else {
+    let Some((first, second)) = map_call_with_two_arguments(semantic, call) else {
         return;
     };
 
@@ -60,20 +60,10 @@ pub(crate) fn map_int_version_parsing(checker: &Checker, call: &ast::ExprCallFie
 
 fn map_call_with_two_arguments<'a>(
     semantic: &SemanticModel,
-    call: ExprCall<'a>,
+    call: &ast::ExprCallFields<'a>,
 ) -> Option<(Expr<'a>, Expr<'a>)> {
-    let func = call.func();
-    let arguments = call.arguments();
-    let args = arguments.args();
-    let keywords = arguments.keywords();
-
-    if !keywords.is_empty() {
-        return None;
-    }
-
-    let [first, second] = args.as_array()?;
-
-    if !semantic.match_builtin_expr(func, "map") {
+    let [first, second] = call.arguments.as_positional_array()?;
+    if !semantic.match_builtin_expr(call.func, "map") {
         return None;
     }
 

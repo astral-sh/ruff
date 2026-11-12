@@ -4,7 +4,9 @@ use std::fmt;
 use std::ops::Deref;
 
 use super::{AstNode, AstNodeId, ExprKind, List};
-use crate::{CmpOp, Expr, ExprCompare, Identifier, NodeKind, Parameter, ParameterWithDefault};
+use crate::{
+    CmpOp, Expr, ExprCompare, Identifier, NodeKind, Parameter, ParameterWithDefault, Pattern,
+};
 
 impl<'a> Identifier<'a> {
     #[inline]
@@ -288,6 +290,16 @@ impl<'a> crate::ParameterItem<ParameterWithDefault<'a>, Parameter<'a>> {
 }
 
 impl<'a> crate::Parameters<'a> {
+    /// Iterates the parameter roles in source order, without looking up the child nodes.
+    pub fn roles(
+        self,
+    ) -> impl DoubleEndedIterator<Item = crate::ParameterRole>
+    + ExactSizeIterator
+    + std::iter::FusedIterator
+    + Clone {
+        self.items().parameter_roles()
+    }
+
     pub fn posonlyargs(self) -> impl DoubleEndedIterator<Item = ParameterWithDefault<'a>> + Clone {
         self.items()
             .matching(|role| role == super::ParameterItems::POSITIONAL_ONLY)
@@ -525,6 +537,15 @@ impl<'a> crate::PatternMatchMapping<'a> {
     }
 }
 
+impl<'a> crate::PatternOrKeyword<Pattern<'a>, crate::PatternKeyword<'a>> {
+    pub fn pattern(self) -> Pattern<'a> {
+        match self {
+            Self::Pattern(pattern) => pattern,
+            Self::Keyword(keyword) => keyword.pattern(),
+        }
+    }
+}
+
 impl<'a> crate::PatternArguments<'a> {
     pub fn patterns(self) -> super::FilteredNodes<'a, crate::kind::Pattern> {
         super::FilteredNodes::new(self.items())
@@ -699,6 +720,13 @@ impl<'a> crate::ExprTuple<'a> {
         self.elts().iter()
     }
 }
+impl crate::Keyword<'_> {
+    /// Return whether this keyword is a mapping unpacking (`**expression`).
+    pub fn is_variadic(self) -> bool {
+        self.syntax.row.keyword_arg() == 0
+    }
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum ArgOrKeyword<'a> {
     Arg(Expr<'a>),
@@ -723,11 +751,11 @@ impl<'a> ArgOrKeyword<'a> {
     pub fn is_variadic(self) -> bool {
         match self {
             Self::Arg(expr) => expr.is_starred_expr(),
-            Self::Keyword(keyword) => keyword.arg().is_none(),
+            Self::Keyword(keyword) => keyword.is_variadic(),
         }
     }
     pub fn as_variadic(self) -> Option<crate::Keyword<'a>> {
-        self.as_keyword().filter(|keyword| keyword.arg().is_none())
+        self.as_keyword().filter(|keyword| keyword.is_variadic())
     }
     pub fn as_keyword(self) -> Option<crate::Keyword<'a>> {
         match self {
@@ -747,6 +775,19 @@ impl Ranged for ArgOrKeyword<'_> {
 impl<'a> crate::Arguments<'a> {
     pub fn iter_source_order(self) -> ArgumentsSourceOrder<'a> {
         self.items().iter()
+    }
+
+    /// Return the `N` positional arguments if the call has exactly that shape.
+    /// A starred argument counts as positional.
+    pub fn as_positional_array<const N: usize>(self) -> Option<[Expr<'a>; N]> {
+        let items = self.items();
+        if items.len() != N {
+            return None;
+        }
+        itertools::Itertools::collect_array(items.iter().map_while(|item| match item {
+            ArgOrKeyword::Arg(arg) => Some(arg),
+            ArgOrKeyword::Keyword(_) => None,
+        }))
     }
 
     /// Return the argument if the call contains exactly one positional argument and no keywords.

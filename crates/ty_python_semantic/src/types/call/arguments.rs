@@ -637,7 +637,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     };
                 }
                 (CallArgument::Keywords(argument), ArgOrKeyword::Keyword(keyword))
-                    if keyword.arg().is_none() =>
+                    if keyword.is_variadic() =>
                 {
                     let value = keyword.value();
                     let ExprKind::Dict(dict) = value.classify() else {

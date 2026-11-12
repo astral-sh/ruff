@@ -93,7 +93,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCallFie
     let mut duplicate_keywords = None;
     for keyword in call.arguments.keywords() {
         // keyword is a spread operator (indicated by None).
-        if keyword.arg().is_some() {
+        if !keyword.is_variadic() {
             continue;
         }
 

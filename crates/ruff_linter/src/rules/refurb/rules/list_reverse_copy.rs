@@ -117,15 +117,11 @@ fn peel_lists(expr: Expr<'_>) -> Expr<'_> {
         return expr;
     };
 
-    if !arguments.keywords().is_empty() {
-        return expr;
-    }
-
     if func.as_name_expr().is_none_or(|name| name.id() != "list") {
         return expr;
     }
 
-    let Some([arg]) = arguments.args().as_array() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return expr;
     };
 

@@ -670,6 +670,7 @@ impl std::fmt::Display for ModeParseError {
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::ParameterRole;
     use std::hash::{BuildHasher, RandomState};
 
     use ruff_python_ast::comparable::{ComparableExpr, ComparableMod};
@@ -927,6 +928,26 @@ mod tests {
             );
             assert!(items.next().is_none());
         }
+    }
+
+    #[test]
+    fn recovered_parameter_roles() {
+        let source = "def f(p, /, x, **kw, *args, y): pass";
+        let parsed = parse_unchecked_source(source, PySourceType::Python);
+        let parameters = parsed
+            .root()
+            .descendants()
+            .find_map(AstNode::cast::<ruff_python_ast::Parameters>)
+            .unwrap();
+        let expected = [
+            ParameterRole::PositionalOnly,
+            ParameterRole::PositionalOrKeyword,
+            ParameterRole::Kwarg,
+            ParameterRole::Vararg,
+            ParameterRole::KeywordOnly,
+        ];
+        assert!(parameters.roles().eq(expected));
+        assert!(parameters.roles().rev().eq(expected.into_iter().rev()));
     }
 
     #[test]

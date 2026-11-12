@@ -42,7 +42,7 @@ fn find_multiple_keywords_in_source_order() {
 #[test]
 fn find_call_argument_in_source_order() {
     let source = "f(first, *rest, named=keyword, *more)";
-    let parsed = parse_expression(source).unwrap();
+    let parsed = ruff_python_parser::parse_expression(source).unwrap();
     let call = parsed.expr().as_call_expr().unwrap();
     let arguments = call.arguments();
     let value = |name, position| {
@@ -68,7 +68,7 @@ fn fixed_positional_call_shape() {
     ] {
         let parsed = parse_expression(source).unwrap();
         let call = parsed.expr().as_call_expr().unwrap();
-        let arguments = &call.arguments;
+        let arguments = call.arguments();
         assert_eq!(
             arguments.as_positional_array::<2>().is_some(),
             two_positionals,
@@ -78,7 +78,7 @@ fn fixed_positional_call_shape() {
 
     let parsed = parse_expression("f()").unwrap();
     let call = parsed.expr().as_call_expr().unwrap();
-    let arguments = &call.arguments;
+    let arguments = call.arguments();
     assert!(matches!(arguments.as_positional_array::<0>(), Some([])));
 }
 
@@ -86,9 +86,10 @@ fn fixed_positional_call_shape() {
 fn unpacked_call_keywords() {
     let parsed = parse_expression("f(key=value, *args, **kwargs)").unwrap();
     let call = parsed.expr().as_call_expr().unwrap();
-    let arguments = &call.arguments;
+    let arguments = call.arguments();
     let flags: Vec<_> = arguments
         .keywords()
+        .iter()
         .map(ruff_python_ast::Keyword::is_variadic)
         .collect();
     assert_eq!(flags, [false, true]);

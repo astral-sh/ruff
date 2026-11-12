@@ -13,6 +13,16 @@ use crate::{NodeIndex, int, name::Name};
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum FStringPart {}
 
+/// A parameter's role in a signature, ordered by argument binding order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ParameterRole {
+    PositionalOnly,
+    PositionalOrKeyword,
+    Vararg,
+    KeywordOnly,
+    Kwarg,
+}
+
 /// One parameter in a function or lambda signature, in its written position.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]

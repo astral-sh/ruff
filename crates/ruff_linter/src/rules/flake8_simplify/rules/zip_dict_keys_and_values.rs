@@ -1,5 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ArgOrKeyword::{Arg as Positional, Keyword};
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprKind, ExprName, Identifier};
 use ruff_python_semantic::analyze::typing::is_dict;
 
@@ -67,23 +68,21 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCallFields<'_>) {
     let func = expr.func;
     let arguments = expr.arguments;
-    let args = arguments.args();
-    let keywords = arguments.keywords();
-    match keywords {
-        keywords if keywords.is_empty() => {}
-        keywords
-            if let Some(
-                [
-                    ast::KeywordFields {
-                        arg: Some(name), ..
-                    },
-                ],
-            ) = keywords.as_array().map(|[keyword]| [keyword.fields()])
-                && name.as_str() == "strict" => {}
-        _ => return,
-    }
-    let Some([arg1, arg2]) = args.as_array() else {
-        return;
+    let [arg1, arg2] = if let Some(pair) = arguments.as_positional_array::<2>() {
+        pair
+    } else {
+        let Some(
+            [Positional(a), Positional(b), Keyword(keyword)]
+            | [Positional(a), Keyword(keyword), Positional(b)]
+            | [Keyword(keyword), Positional(a), Positional(b)],
+        ) = arguments.items().as_array()
+        else {
+            return;
+        };
+        if keyword.arg().is_none_or(|name| name.as_str() != "strict") {
+            return;
+        }
+        [a, b]
     };
     let Some((var1, attr1, args1)) = get_var_attr_args(arg1) else {
         return;

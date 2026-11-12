@@ -226,7 +226,7 @@ fn is_violation(call: ast::ExprCall<'_>, qualified_name: &Callee) -> bool {
         .arguments()
         .keywords()
         .iter()
-        .any(|keyword| keyword.arg().is_none())
+        .any(ruff_python_ast::Keyword::is_variadic)
     {
         return false;
     }

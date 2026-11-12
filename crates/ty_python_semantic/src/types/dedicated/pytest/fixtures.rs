@@ -547,7 +547,7 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
         let parameters = signature.parameters();
         let has_explicit_positional_only = LazyCell::new(|| {
             self.function
-                .parameters
+                .parameters()
                 .roles()
                 .any(|role| role == ast::ParameterRole::PositionalOnly)
         });
@@ -555,8 +555,7 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
             parameter.keyword_name().is_some()
                 // ty applies PEP 484's legacy positional-only convention to leading `__name`
                 // parameters, but Python and pytest still inspect them as positional-or-keyword.
-                || (self.function.parameters().posonlyargs().next().is_none()
-                    && parameter.is_positional_only())
+                || (parameter.is_positional_only() && !*has_explicit_positional_only)
         };
         let skips_receiver = self.function_type.has_implicit_receiver(db)
             && parameters

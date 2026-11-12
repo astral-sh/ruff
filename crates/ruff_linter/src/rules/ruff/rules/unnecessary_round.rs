@@ -162,7 +162,11 @@ pub(super) fn rounded_and_ndigits<'a>(
         return None;
     }
     // **kwargs
-    if arguments.keywords().iter().any(|kw| kw.arg().is_none()) {
+    if arguments
+        .keywords()
+        .iter()
+        .any(ruff_python_ast::Keyword::is_variadic)
+    {
         return None;
     }
 

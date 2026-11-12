@@ -237,7 +237,7 @@ fn find_file_open<'a>(
     // it could be a match; but in all other cases, the call _could_ contain unsupported keyword
     // arguments, like `buffering`.
     if args.iter().any(ast::Expr::is_starred_expr)
-        || keywords.iter().any(|keyword| keyword.arg().is_none())
+        || keywords.iter().any(ruff_python_ast::Keyword::is_variadic)
     {
         return None;
     }
@@ -284,7 +284,7 @@ fn find_path_open<'a>(
     let args = arguments.args();
     let keywords = arguments.keywords();
     if args.iter().any(ast::Expr::is_starred_expr)
-        || keywords.iter().any(|keyword| keyword.arg().is_none())
+        || keywords.iter().any(ruff_python_ast::Keyword::is_variadic)
     {
         return None;
     }

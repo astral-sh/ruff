@@ -4620,8 +4620,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     None
                 }
             }
-            Type::FunctionLiteral(function_type) if expr_call.arguments().keywords().is_empty() => {
-                let [first_arg, second_arg] = expr_call.arguments().args().as_array()?;
+            Type::FunctionLiteral(function_type) => {
+                let [first_arg, second_arg] = expr_call.arguments().as_positional_array()?;
                 let first_arg = PlaceExpr::try_from_expr(first_arg)?;
                 let function = function_type.known(db)?;
                 let place = self.expect_place(&first_arg);

@@ -144,10 +144,16 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             }
             PatternKind::MatchMapping(pattern_match_mapping) => {
                 let items = pattern_match_mapping.items();
-                for (_, pattern) in items.entries() {
-                    self.visit_pattern(pattern);
+                let mut rest = None;
+                for item in items {
+                    match item {
+                        ast::MappingPatternItem::Entry { pattern, .. } => {
+                            self.visit_pattern(pattern);
+                        }
+                        ast::MappingPatternItem::Rest(name) => rest = Some(name),
+                    }
                 }
-                if let Some(rest) = items.rest() {
+                if let Some(rest) = rest {
                     self.possibly_add_export(rest.id(), PossibleExportKind::Normal);
                 }
             }

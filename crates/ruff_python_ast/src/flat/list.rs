@@ -411,15 +411,31 @@ impl PartialEq for ParameterItems<'_> {
 }
 
 impl<'a> ParameterItems<'a> {
-    pub(super) const POSITIONAL_ONLY: u32 = 0;
-    pub(super) const POSITIONAL_OR_KEYWORD: u32 = 1;
-    pub(super) const VARARG: u32 = 2;
-    pub(super) const KEYWORD_ONLY: u32 = 3;
-    pub(super) const KWARG: u32 = 4;
+    pub(super) const POSITIONAL_ONLY: u32 = crate::ParameterRole::PositionalOnly as u32;
+    pub(super) const POSITIONAL_OR_KEYWORD: u32 = crate::ParameterRole::PositionalOrKeyword as u32;
+    pub(super) const VARARG: u32 = crate::ParameterRole::Vararg as u32;
+    pub(super) const KEYWORD_ONLY: u32 = crate::ParameterRole::KeywordOnly as u32;
+    pub(super) const KWARG: u32 = crate::ParameterRole::Kwarg as u32;
 
     fn roles(self) -> &'a [u32] {
         let start = self.0.range.indices().end;
         &self.0.ast.extra[start..start + self.len()]
+    }
+
+    pub(super) fn parameter_roles(
+        self,
+    ) -> impl DoubleEndedIterator<Item = crate::ParameterRole>
+    + ExactSizeIterator
+    + std::iter::FusedIterator
+    + Clone {
+        self.roles().iter().map(|role| match *role {
+            Self::POSITIONAL_ONLY => crate::ParameterRole::PositionalOnly,
+            Self::POSITIONAL_OR_KEYWORD => crate::ParameterRole::PositionalOrKeyword,
+            Self::VARARG => crate::ParameterRole::Vararg,
+            Self::KEYWORD_ONLY => crate::ParameterRole::KeywordOnly,
+            Self::KWARG => crate::ParameterRole::Kwarg,
+            _ => unreachable!("invalid parameter role"),
+        })
     }
 
     pub(super) fn is_in_binding_order(self) -> bool {

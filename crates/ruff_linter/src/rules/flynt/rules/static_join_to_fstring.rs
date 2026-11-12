@@ -167,15 +167,10 @@ pub(crate) fn static_join_to_fstring(checker: &Checker, expr: Expr<'_>, joiner: 
         return;
     };
     let arguments = call_node.arguments();
-    let args = arguments.args();
-    let keywords = arguments.keywords();
 
     // If there are kwargs or more than one argument, this is some non-standard
     // string join call.
-    if !keywords.is_empty() {
-        return;
-    }
-    let Some([arg]) = args.as_array() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

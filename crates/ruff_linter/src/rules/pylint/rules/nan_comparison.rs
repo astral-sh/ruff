@@ -111,14 +111,8 @@ fn is_nan_float(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
     };
     let func = call_node.func();
     let arguments = call_node.arguments();
-    let args = arguments.args();
-    let keywords = arguments.keywords();
 
-    if !keywords.is_empty() {
-        return false;
-    }
-
-    let Some([expr]) = args.as_array() else {
+    let Some(expr) = arguments.as_single_positional() else {
         return false;
     };
     if as_nan_float_string_literal(expr).is_none() {

@@ -730,14 +730,17 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         // narrow an explicit keyword argument. We don't know which keyword maps to the target
         // parameter while building the semantic index, so include every explicit keyword here.
         // This set is only a conservative upper bound.
-        for argument in expr_call.arguments().args().iter().take(2).chain(
-            expr_call
-                .arguments()
-                .keywords()
-                .iter()
-                .filter(|keyword| keyword.arg().is_some())
-                .map(ast::Keyword::value),
-        ) {
+        let arguments = expr_call.arguments();
+        let mut positional_count = 0;
+        for item in arguments.iter_source_order() {
+            let argument = match item {
+                ast::ArgOrKeyword::Arg(arg) if positional_count < 2 => {
+                    positional_count += 1;
+                    arg
+                }
+                ast::ArgOrKeyword::Keyword(keyword) if !keyword.is_variadic() => keyword.value(),
+                _ => continue,
+            };
             if let Some(place_expr) = PlaceExpr::try_from_expr(argument)
                 && let Some(place) = self.places.place_id((&place_expr).into())
             {
@@ -753,7 +756,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         }
 
         // `bool(expr)` can delegate to narrowing `expr` itself, e.g. `bool(x is not None)`
-        if let Some(arg) = expr_call.arguments().as_single_positional() {
+        if let Some(arg) = arguments.as_single_positional() {
             places.extend(self.expression_node(arg));
         }
 
@@ -786,8 +789,8 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
 
         match expr.expression_value().classify() {
             // type(x) is Y can narrow x
-            ExprKind::Call(call) if call.arguments().args().len() == 1 => {
-                if let Some(first_arg) = call.arguments().args().first()
+            ExprKind::Call(call) => {
+                if let Some([first_arg]) = call.arguments().args().as_array()
                     && let Some(place_expr) = PlaceExpr::try_from_expr(first_arg)
                     && let Some(place) = self.places.place_id((&place_expr).into())
                 {

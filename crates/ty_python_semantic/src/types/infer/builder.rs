@@ -2835,12 +2835,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         if let Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) = cls_ty {
-            if let Some(first_excess_pattern) = pattern.arguments().patterns().first() {
+            let mut positional = pattern.arguments().patterns().iter();
+            if let Some(first_excess_pattern) = positional.next() {
                 report_too_many_positional_patterns_for_class_pattern(
                     &self.context,
                     first_excess_pattern,
                     0,
-                    pattern.arguments().patterns().len(),
+                    1 + positional.count(),
                     "collections.abc.Callable",
                 );
             }
@@ -2863,18 +2864,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
 
-            let positional_patterns = pattern.arguments().patterns();
-            if let Some((first_positional_pattern, _)) = positional_patterns.split_first()
+            let mut positional = pattern.arguments().patterns().iter().peekable();
+            if let Some(&first_positional_pattern) = positional.peek()
                 && let Some(result) = class_pattern_positional_result(db, env, class)
             {
                 match result {
                     ClassPatternPositionalResult::Limit(limit) => {
-                        if let Some(first_excess_pattern) = positional_patterns.get(limit) {
+                        if let Some(first_excess_pattern) = positional.nth(limit) {
                             report_too_many_positional_patterns_for_class_pattern(
                                 &self.context,
                                 first_excess_pattern,
                                 limit,
-                                positional_patterns.len(),
+                                limit + 1 + positional.count(),
                                 cls_ty.display(db, env),
                             );
                         }
@@ -2954,10 +2955,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for (key, _) in items.entries() {
                     self.infer_maybe_standalone_expression(key, TypeContext::default());
                 }
-                for (_, pattern) in items.entries() {
-                    self.infer_nested_match_pattern(pattern);
+                let mut rest = None;
+                for item in items {
+                    match item {
+                        ast::MappingPatternItem::Entry { pattern, .. } => {
+                            self.infer_nested_match_pattern(pattern);
+                        }
+                        ast::MappingPatternItem::Rest(name) => rest = Some(name),
+                    }
                 }
-                if let Some(rest) = items.rest() {
+                if let Some(rest) = rest {
                     self.infer_definition(rest);
                 }
             }
@@ -5570,10 +5577,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         let arguments = call_expression.arguments();
-        let Some([decorated_expression]) = arguments.args().as_array() else {
+        let Some(decorated_expression) = arguments.as_single_positional() else {
             return return_ty;
         };
-        if !arguments.keywords().is_empty() || decorated_expression.is_starred_expr() {
+        if decorated_expression.is_starred_expr() {
             return return_ty;
         }
 
@@ -9230,7 +9237,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for keyword in arguments
             .keywords()
             .iter()
-            .filter(|keyword| keyword.arg().is_none())
+            .filter(|keyword| keyword.is_variadic())
         {
             let mapping_type = self.expression_type(keyword.value());
 

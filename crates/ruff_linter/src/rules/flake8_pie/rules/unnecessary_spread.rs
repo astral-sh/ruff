@@ -47,15 +47,12 @@ impl Violation for UnnecessarySpread {
 
 /// PIE800
 pub(crate) fn unnecessary_spread(checker: &Checker, dict: ast::ExprDict<'_>) {
-    // The first "end" is the start of the dictionary, immediately following the open bracket.
-    let mut prev_end = dict.start() + TextSize::from(1);
     for item in dict {
-        let value = item.value();
         if item.key().is_none()
-            && let ExprKind::Dict(inner) = value.classify()
+            && let ExprKind::Dict(inner) = item.value().classify()
         {
-            let mut diagnostic = checker.report_diagnostic(UnnecessarySpread, value.range());
-            if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.tokens()) {
+            let mut diagnostic = checker.report_diagnostic(UnnecessarySpread, inner.range());
+            if let Some(fix) = unnecessary_spread_fix(inner, item.start(), checker.tokens()) {
                 diagnostic.set_fix(fix);
             }
         }
@@ -65,7 +62,7 @@ pub(crate) fn unnecessary_spread(checker: &Checker, dict: ast::ExprDict<'_>) {
 /// Generate a [`Fix`] to remove an unnecessary dictionary spread.
 fn unnecessary_spread_fix(
     dict: ast::ExprDict<'_>,
-    prev_end: TextSize,
+    spread_start: TextSize,
     tokens: &Tokens,
 ) -> Option<Fix> {
     let (doublestar, after_spread) = tokens.after(spread_start).split_first()?;
@@ -73,7 +70,7 @@ fn unnecessary_spread_fix(
         return None;
     }
 
-    let (empty, entries_end) = if let Some(last) = dict.items.last() {
+    let (empty, entries_end) = if let Some(last) = dict.items().last() {
         (false, last.end())
     } else {
         (true, dict.start() + "{".text_len())

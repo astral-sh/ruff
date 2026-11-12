@@ -73,7 +73,7 @@ pub(crate) fn unnecessary_collection_call(
                 .iter_source_order()
                 .any(|item| match item {
                     ast::ArgOrKeyword::Arg(_) => true,
-                    ast::ArgOrKeyword::Keyword(keyword) => keyword.arg().is_none(),
+                    ast::ArgOrKeyword::Keyword(keyword) => keyword.is_variadic(),
                 }))
     {
         return;
