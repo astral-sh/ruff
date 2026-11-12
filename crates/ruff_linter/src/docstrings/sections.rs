@@ -53,6 +53,11 @@ pub(crate) enum SectionKind {
 
 impl SectionKind {
     fn from_str(s: &str) -> Option<Self> {
+        // Avoid allocating a lowercase copy of lines longer than the longest section name.
+        if s.len() > Self::KeywordArguments.as_str().len() {
+            return None;
+        }
+
         match s.to_ascii_lowercase().as_str() {
             "args" => Some(Self::Args),
             "arguments" => Some(Self::Arguments),
@@ -134,6 +139,10 @@ impl SectionKind {
             Self::Yields => "Yields",
         }
     }
+
+    fn text_len(self) -> TextSize {
+        self.as_str().text_len()
+    }
 }
 
 pub(crate) struct SectionContexts<'a> {
@@ -179,10 +188,8 @@ impl<'a> SectionContexts<'a> {
                 continue;
             }
 
-            if let Some((section_name, section_kind)) =
-                suspected_as_section(&line[indent.len()..], style)
-            {
-                let section_name_size = section_name.text_len();
+            if let Some(section_kind) = suspected_as_section(&line[indent.len()..], style) {
+                let section_name_size = section_kind.text_len();
 
                 if is_docstring_section(
                     &line,
@@ -432,11 +439,11 @@ impl Debug for SectionContext<'_> {
     }
 }
 
-fn suspected_as_section(unindented: &str, style: SectionStyle) -> Option<(&str, SectionKind)> {
+fn suspected_as_section(unindented: &str, style: SectionStyle) -> Option<SectionKind> {
     let title = unindented.trim_end();
     let name = title.strip_suffix(':').unwrap_or(title);
     let kind = SectionKind::from_str(name)?;
-    style.sections().contains(&kind).then_some((name, kind))
+    style.sections().contains(&kind).then_some(kind)
 }
 
 /// Check if the suspected context is really a section header.
@@ -574,4 +581,18 @@ fn has_parameter(definition: &Definition, section_name: &str) -> bool {
             .iter()
             .any(|param| param.name() == section_name)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::SectionKind;
+
+    #[test]
+    fn section_names_round_trip() {
+        for kind in SectionKind::iter() {
+            assert_eq!(SectionKind::from_str(kind.as_str()), Some(kind));
+        }
+    }
 }
