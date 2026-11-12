@@ -47,36 +47,30 @@ impl Violation for UnnecessarySpread {
 
 /// PIE800
 pub(crate) fn unnecessary_spread(checker: &Checker, dict: &ast::ExprDict) {
-    // The first "end" is the start of the dictionary, immediately following the open bracket.
-    let mut prev_end = dict.start() + TextSize::from(1);
-    for ast::DictItem { key, value, .. } in dict {
-        if key.is_none() {
-            // We only care about when the key is None which indicates a spread `**`
-            // inside a dict.
-            if let Expr::Dict(inner) = value {
-                let mut diagnostic = checker.report_diagnostic(UnnecessarySpread, value.range());
-                if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.tokens()) {
-                    diagnostic.set_fix(fix);
-                }
+    for item in dict {
+        if item.key.is_none()
+            && let Expr::Dict(inner) = &item.value
+        {
+            let mut diagnostic = checker.report_diagnostic(UnnecessarySpread, inner.range());
+            if let Some(fix) = unnecessary_spread_fix(inner, item.start(), checker.tokens()) {
+                diagnostic.set_fix(fix);
             }
         }
-        prev_end = value.end();
     }
 }
 
 /// Generate a [`Fix`] to remove an unnecessary dictionary spread.
 fn unnecessary_spread_fix(
     dict: &ast::ExprDict,
-    prev_end: TextSize,
+    spread_start: TextSize,
     tokens: &Tokens,
 ) -> Option<Fix> {
-    // Find the `**` token preceding the spread.
-    let doublestar = tokens
-        .after(prev_end)
-        .iter()
-        .find(|tok| matches!(tok.kind(), TokenKind::DoubleStar))?;
+    let (doublestar, after_spread) = tokens.after(spread_start).split_first()?;
+    if doublestar.kind() != TokenKind::DoubleStar {
+        return None;
+    }
 
-    let (empty, last_value_end) = if let Some(last) = dict.iter_values().last() {
+    let (empty, entries_end) = if let Some(last) = dict.items.last() {
         (false, last.end())
     } else {
         (true, dict.start() + "{".text_len())
@@ -85,7 +79,7 @@ fn unnecessary_spread_fix(
     let mut edits = vec![];
     let mut open_parens: u32 = 0;
 
-    for tok in tokens.after(doublestar.end()) {
+    for tok in after_spread {
         match tok.kind() {
             kind if kind.is_trivia() => {}
             TokenKind::Lpar => {
@@ -106,7 +100,7 @@ fn unnecessary_spread_fix(
     let mut found_r_curly = false;
     let mut found_dict_comma = false;
 
-    for tok in tokens.after(last_value_end) {
+    for tok in tokens.after(entries_end) {
         if found_r_curly && open_parens == 0 && (!empty || found_dict_comma) {
             break;
         }
