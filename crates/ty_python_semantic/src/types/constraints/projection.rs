@@ -162,7 +162,7 @@ impl<'db> ConstraintSet<'db, '_> {
             report_diagnostics,
         )?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
-        path_bounds.try_solve_with(choose, |solution| {
+        path_bounds.try_solve_with(db, env, choose, |solution| {
             for violation in solution.violations() {
                 for evidence in violation.evidence_types() {
                     type_budget.charge_type(db, *evidence)?;
@@ -214,6 +214,8 @@ impl<'db> ConstraintSet<'db, '_> {
         )?;
 
         path_bounds.try_fold_with(
+            db,
+            env,
             choose,
             initial,
             &mut ProjectionTypeBudget::new(budget.type_terms),
@@ -225,6 +227,8 @@ impl<'db> ConstraintSet<'db, '_> {
 impl<'db> CandidateSolutions<'db> {
     fn try_fold_with<T>(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         mut choose: impl FnMut(
             TypeVarVariance,
             &CandidateTypeVarSolution<'db>,
@@ -245,7 +249,9 @@ impl<'db> CandidateSolutions<'db> {
 
         let mut retained = false;
         for candidate in candidates {
-            let Some((solution, incomplete)) = Self::solve_path_with(candidate, &mut choose) else {
+            let Some((solution, incomplete)) =
+                Self::solve_path_with(db, env, candidate, &mut choose)
+            else {
                 continue;
             };
             if !solution.is_valid() {

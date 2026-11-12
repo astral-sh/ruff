@@ -5911,6 +5911,69 @@ def example(output: list[Literal["a", "b"]]):
     run: Callable[[Wrap], None] = make_runner("a", output, lambda item: output.append(item))
 ```
 
+## Inferred callable parameter types in a return context
+
+With the identity callback, `contains` can search any iterable of integers. A context that asks for
+a predicate on lists still allows the inferred predicate to accept tuples.
+
+```py
+from collections.abc import Callable, Iterable
+from typing import TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+def contains(items: Callable[[K], Iterable[V]], needle: V) -> Callable[[K], bool]:
+    return lambda value: needle in items(value)
+
+f: Callable[[list[int]], bool] = contains(identity, 1)
+reveal_type(f)  # revealed: (Iterable[int], /) -> bool
+f((1, 2))  # ok
+```
+
+The same inference preserves an element type supplied by a generic caller.
+
+```py
+def search_tuple(needle: T, values: tuple[T, ...]) -> bool:
+    has_needle: Callable[[list[T]], bool] = contains(identity, needle)
+    reveal_type(has_needle)  # revealed: (Iterable[T@search_tuple], /) -> bool
+    return has_needle(values)
+```
+
+An unrelated callback can leave its own parameter and return types unresolved. The predicate still
+accepts any iterable of integers.
+
+```py
+A = TypeVar("A")
+B = TypeVar("B")
+
+def contains_with_callback(items: Callable[[K], Iterable[V]], needle: V, callback: Callable[[A], B]) -> Callable[[K], bool]:
+    return lambda value: needle in items(value)
+
+with_callback: Callable[[list[int]], bool] = contains_with_callback(identity, 1, identity)
+with_callback((1, 2))  # ok
+```
+
+Two callbacks can share an element type. The invariant list in the result fixes the input of the
+second callback to `list[int]`. The predicate still accepts any `Iterable[int]`.
+
+```py
+def pair(
+    items: Callable[[K], Iterable[V]],
+    needle: V,
+    other_items: Callable[[A], Iterable[V]],
+) -> tuple[Callable[[K], bool], list[A]]:
+    return (lambda value: needle in items(value), [])
+
+result: tuple[Callable[[list[int]], bool], list[list[int]]] = pair(identity, 1, identity)
+reveal_type(result)  # revealed: tuple[(Iterable[int], /) -> bool, list[list[int]]]
+result[0]((1, 2))  # ok
+```
+
 ## Inferring a recursive protocol from a factory's return context
 
 The annotated assignment supplies `Stream[int]` as the type argument to `make_result`. Comparing the
