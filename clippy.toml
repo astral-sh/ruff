@@ -25,8 +25,7 @@ ignore-interior-mutability = [
     # A concatenated string's OnceLock caches only its decoded text.
     "ruff_python_ast::comparable::ComparableExpr",
     "ruff_python_ast::comparable::ComparableLiteral",
-    # The expression is read-only.
-    "ruff_python_ast::hashable::HashableExpr",
+    "ruff_python_ast::comparable::HashableExpr",
 ]
 
 disallowed-methods = [
