@@ -819,11 +819,15 @@ pub fn walk_pattern_arguments<V: Transformer + ?Sized>(
     visitor: &V,
     pattern_arguments: &mut PatternArguments,
 ) {
-    for pattern in &mut pattern_arguments.patterns {
-        visitor.visit_pattern(pattern);
+    for item in &mut pattern_arguments.items {
+        if let ast::PatternOrKeyword::Pattern(pattern) = item {
+            visitor.visit_pattern(pattern);
+        }
     }
-    for keyword in &mut pattern_arguments.keywords {
-        visitor.visit_pattern_keyword(keyword);
+    for item in &mut pattern_arguments.items {
+        if let ast::PatternOrKeyword::Keyword(keyword) = item {
+            visitor.visit_pattern_keyword(keyword);
+        }
     }
 }
 

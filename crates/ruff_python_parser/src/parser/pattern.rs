@@ -1,9 +1,10 @@
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, Patterns, Singleton,
+    self as ast, AtomicNodeIndex, Expr, ExprContext, Number, Operator, Pattern, Singleton,
 };
 use ruff_text_size::{Ranged, TextSize};
+use thin_vec::ThinVec;
 
 use crate::parser::progress::ParserProgress;
 use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses, recovery};
@@ -714,9 +715,7 @@ impl Parser<'_> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut patterns = Patterns::new();
-        let mut keywords = vec![];
-        let mut has_seen_pattern = false;
+        let mut items = ThinVec::new();
         let mut has_seen_keyword_pattern = false;
 
         self.parse_comma_separated_list(
@@ -726,7 +725,6 @@ impl Parser<'_> {
                 let pattern = parser.parse_match_pattern(AllowStarPattern::No);
 
                 if parser.eat(TokenKind::Equal) {
-                    has_seen_pattern = false;
                     has_seen_keyword_pattern = true;
 
                     let key = if let Pattern::MatchAs(ast::PatternMatchAs {
@@ -752,24 +750,22 @@ impl Parser<'_> {
 
                     let value_pattern = parser.parse_match_pattern(AllowStarPattern::No);
 
-                    keywords.push(ast::PatternKeyword {
+                    items.push(ast::PatternOrKeyword::Keyword(ast::PatternKeyword {
                         attr: key,
                         pattern: value_pattern,
                         range: parser.node_range(pattern_start),
                         node_index: AtomicNodeIndex::NONE,
-                    });
+                    }));
                 } else {
-                    has_seen_pattern = true;
-                    patterns.push(pattern);
-                }
-
-                if has_seen_keyword_pattern && has_seen_pattern {
-                    parser.add_error(
-                        ParseErrorType::OtherError(
-                            "Positional patterns cannot follow keyword patterns".to_string(),
-                        ),
-                        parser.node_range(pattern_start),
-                    );
+                    items.push(ast::PatternOrKeyword::Pattern(pattern));
+                    if has_seen_keyword_pattern {
+                        parser.add_error(
+                            ParseErrorType::OtherError(
+                                "Positional patterns cannot follow keyword patterns".to_string(),
+                            ),
+                            parser.node_range(pattern_start),
+                        );
+                    }
                 }
             },
         );
@@ -779,8 +775,7 @@ impl Parser<'_> {
         ast::PatternMatchClass {
             cls,
             arguments: ast::PatternArguments {
-                patterns,
-                keywords,
+                items,
                 range: self.node_range(arguments_start),
                 node_index: AtomicNodeIndex::NONE,
             },
