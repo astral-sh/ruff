@@ -47,8 +47,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     speculative_builder.infer_expression(expr, tcx)
                 })
                 .into_iter()
-                .flatten()
-                .all(|keyword_ty| {
+                .all(|(_, keyword_ty)| {
                     keyword_ty.is_assignable_to(db, env, Type::TypedDict(typed_dict))
                         || extract_unpacked_typed_dict_keys_from_value_type(db, env, keyword_ty)
                             .is_some()

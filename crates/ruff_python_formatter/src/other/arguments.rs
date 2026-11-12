@@ -173,7 +173,7 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
     let arg = match arguments.items.as_slice() {
         [Argument::Positional(arg)] => arg,
         [Argument::Keyword(keyword)]
-            if keyword.arg.is_none() && !context.comments().has(keyword) =>
+            if keyword.is_variadic() && !context.comments().has(keyword) =>
         {
             &keyword.value
         }

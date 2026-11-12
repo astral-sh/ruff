@@ -150,7 +150,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     };
     let call_range = value.range();
 
-    let [ast::Argument::Positional(arg)] = arguments.items.as_slice() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

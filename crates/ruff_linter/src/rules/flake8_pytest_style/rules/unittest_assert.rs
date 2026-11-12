@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow, bail};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Stmt, UnaryOp,
+    self as ast, ArgOrKeyword, Arguments, CmpOp, Expr, ExprContext, Identifier, Stmt, UnaryOp,
 };
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
@@ -228,50 +228,33 @@ impl UnittestAssert {
 
     /// Create a map from argument name to value.
     fn args_map<'a>(&'a self, arguments: &'a Arguments) -> Result<FxHashMap<&'a str, &'a Expr>> {
-        // If we have variable-length arguments, abort.
-        if arguments.args().any(Expr::is_starred_expr)
-            || arguments.keywords().any(|kw| kw.arg.is_none())
-        {
-            bail!("Variable-length arguments are not supported");
-        }
-
         let arg_spec = self.arg_spec();
-
-        // If any of the keyword arguments are not in the argument spec, abort.
-        if arguments.keywords().any(|kw| {
-            kw.arg
-                .as_ref()
-                .is_some_and(|kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
-        }) {
-            bail!("Unknown keyword argument");
-        }
-
-        // Generate a map from argument name to value.
-        let mut args_map: FxHashMap<&str, &Expr> =
-            FxHashMap::with_capacity_and_hasher(arguments.len(), FxBuildHasher);
-
-        // Process positional arguments.
-        for (arg_name, value) in arg_spec.iter().zip(arguments.args()) {
-            args_map.insert(arg_name, value);
-        }
-
-        // Process keyword arguments.
-        for arg_name in arg_spec.iter().skip(arguments.args().count()) {
-            if let Some(value) = arguments.keywords().find_map(|keyword| {
-                if keyword
-                    .arg
-                    .as_ref()
-                    .is_some_and(|kwarg_name| &kwarg_name == arg_name)
-                {
-                    Some(&keyword.value)
-                } else {
-                    None
+        let mut positional_names = arg_spec.iter();
+        let mut args_map =
+            FxHashMap::with_capacity_and_hasher(arguments.len().min(arg_spec.len()), FxBuildHasher);
+        let mut unknown_keyword = false;
+        for argument in arguments.iter_source_order() {
+            match argument {
+                ArgOrKeyword::Arg(value) if !value.is_starred_expr() => {
+                    if let Some(&name) = positional_names.next() {
+                        args_map.insert(name, value);
+                    }
                 }
-            }) {
-                args_map.insert(arg_name, value);
+                ArgOrKeyword::Keyword(keyword) if let Some(name) = &keyword.arg => {
+                    if arg_spec.contains(&name.as_str()) {
+                        args_map
+                            .entry(name.as_str())
+                            .or_insert(keyword.value.as_ref());
+                    } else {
+                        unknown_keyword = true;
+                    }
+                }
+                _ => bail!("Variable-length arguments are not supported"),
             }
         }
-
+        if unknown_keyword {
+            bail!("Unknown keyword argument");
+        }
         Ok(args_map)
     }
 
