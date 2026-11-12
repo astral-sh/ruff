@@ -268,12 +268,28 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
-        self.seen_typing()
-            && self
-                .resolve_qualified_name(expr)
-                .is_some_and(|qualified_name| {
-                    self.match_typing_qualified_name(&qualified_name, target)
-                })
+        if !self.seen_typing() {
+            return false;
+        }
+
+        if let Expr::Attribute(attr) = expr
+            && attr.attr.as_str() != target
+        {
+            return false;
+        }
+
+        // `from typing import Literal as L` allows `L` to match `Literal`.
+        // A name without a recorded binding still needs a scope lookup.
+        if let Expr::Name(name) = expr
+            && name.id.as_str() != target
+            && let Some(id) = self.resolve_name(name)
+            && !self.binding(id).is_alias()
+        {
+            return false;
+        }
+
+        self.resolve_qualified_name(expr)
+            .is_some_and(|qualified_name| self.match_typing_qualified_name(&qualified_name, target))
     }
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
