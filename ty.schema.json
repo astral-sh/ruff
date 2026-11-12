@@ -818,7 +818,7 @@
         },
         "invalid-dataclass": {
           "title": "detects invalid `@dataclass` applications",
-          "description": "## What it does\n\nChecks for invalid applications of the `@dataclass` decorator.\n\n## Why is this bad?\n\nApplying `@dataclass` with incompatible arguments raises an exception while creating the class:\n\n- `order=True` with `eq=False`\n- `weakref_slot=True` with `slots=False`\n- `slots=True` when the class already defines `__slots__`\n\nApplying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`, `Enum`, or `Protocol`\nis also invalid:\n\n- `NamedTuple` and `TypedDict` classes will raise an exception at runtime when instantiating the\n    class.\n- `Enum` classes with `@dataclass` are [explicitly not supported].\n- `Protocol` classes define interfaces and cannot be instantiated.\n\n## Examples\n\n```python\nfrom dataclasses import dataclass\nfrom typing import NamedTuple\n\n\n@dataclass(order=True, eq=False)  # error: [invalid-dataclass]\nclass Ordered: ...\n\n\n@dataclass\nclass Foo(NamedTuple):  # error: [invalid-dataclass]\n    x: int\n```\n\nSee: <https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass>\n\n[explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support",
+          "description": "## What it does\n\nChecks for invalid applications of the `@dataclass` decorator.\n\n## Why is this bad?\n\nApplying `@dataclass` with incompatible arguments raises an exception while creating the class:\n\n- `order=True` with `eq=False`\n- `weakref_slot=True` with `slots=False`\n- `slots=True` when the class already defines `__slots__`\n\nApplying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`, `Enum`, or `Protocol`\nis also invalid:\n\n- `NamedTuple` and `TypedDict` classes will raise an exception at runtime when instantiating the\n    class.\n- `Enum` classes with `@dataclass` are [explicitly not supported].\n- `Protocol` classes define interfaces and cannot be instantiated.\n\n## Examples\n\n```python\nfrom dataclasses import dataclass\nfrom typing import NamedTuple\n\n\n@dataclass(order=True, eq=False)  # error: [invalid-dataclass]\nclass Ordered: ...\n\n\n@dataclass\nclass Foo(NamedTuple):  # error: [invalid-dataclass]\n    x: int\n```\n\nSee: <https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass>\n\n## Rule history\n\n- v0.0.102: Split out `invalid-dataclass-post-init`. To keep a custom rule level for incompatible\n    `__post_init__` signatures, apply it to the new rule as well. Use `invalid-dataclass-post-init`\n    in suppression comments for those signatures.\n\n[explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support",
           "default": "error",
           "oneOf": [
             {
@@ -829,6 +829,16 @@
         "invalid-dataclass-override": {
           "title": "detects dataclasses with `frozen=True` that have a custom `__setattr__` or `__delattr__` implementation",
           "description": "## What it does\n\nChecks for dataclass definitions that have both `frozen=True` and a custom `__setattr__` or\n`__delattr__` method defined.\n\n## Why is this bad?\n\nFrozen dataclasses synthesize `__setattr__` and `__delattr__` methods which raise a\n`FrozenInstanceError` to emulate immutability.\n\nOverriding either of these methods raises a runtime error.\n\n## Examples\n\n```python\nfrom dataclasses import dataclass\n\n\n@dataclass(frozen=True)\nclass A:\n    def __setattr__(self, name: str, value: object) -> None: ...  # error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-dataclass-post-init": {
+          "title": "detects incompatible dataclass `__post_init__` signatures",
+          "description": "## What it does\n\nChecks whether a dataclass's `__post_init__` method accepts the arguments passed by the generated\n`__init__` method.\n\n## Why is this bad?\n\nThe generated `__init__` passes every `InitVar` field to `__post_init__` as a positional argument,\nin field order. If the number or kind of parameters is incompatible with that call, constructing an\ninstance raises `TypeError`. If a parameter has an incompatible type, the method can receive a value\nit cannot handle.\n\n## Example\n\n```python\nfrom dataclasses import InitVar, dataclass\n\n\n@dataclass\nclass Sample:\n    count: InitVar[int]\n\n    # error: [invalid-dataclass-post-init]\n    def __post_init__(self, count: str) -> None: ...\n```\n\nHere, annotating the `count` parameter as `int` allows the method to accept the value passed by\n`__init__`.\n\n## Rule history\n\n- v0.0.102: Split out from `invalid-dataclass`.",
           "default": "error",
           "oneOf": [
             {
