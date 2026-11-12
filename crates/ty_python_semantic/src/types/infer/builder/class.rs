@@ -436,9 +436,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.undecorated_type = undecorated_ty;
 
-        // A decorator can replace a nested class with an ordinary writable value.
+        // A decorator can replace a nested class with a writable value, including another class.
         let qualifiers = if self.scope().scope(db).kind().is_class()
-            && inferred_ty.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env))
+            && type_retains_original_class(db, env, original_class_ty, inferred_ty)
         {
             TypeQualifiers::NESTED_CLASS
         } else {
@@ -573,10 +573,10 @@ fn class_decorator_preserves_class_binding<'db>(
 
     match decorated_class {
         Type::ClassLiteral(decorated_literal) => {
-            let decorated_definition = decorated_literal.definition(db);
             decorated_literal == original_literal
-                || decorated_definition.is_some()
-                    && decorated_definition == original_literal.definition(db)
+                || decorated_literal
+                    .definition(db)
+                    .is_some_and(|definition| Some(definition) == original_literal.definition(db))
         }
         Type::SubclassOf(subclass_of) => subclass_of
             .subclass_of()
