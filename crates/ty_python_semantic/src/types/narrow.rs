@@ -4619,9 +4619,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     None
                 }
             }
-            Type::FunctionLiteral(function_type)
-                if expr_call.arguments.keywords().next().is_none() =>
-            {
+            Type::FunctionLiteral(function_type) => {
                 let [
                     ast::Argument::Positional(first_expr),
                     ast::Argument::Positional(second_arg),

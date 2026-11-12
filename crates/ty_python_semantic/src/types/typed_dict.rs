@@ -2163,17 +2163,16 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
 ///
 /// Mixed positional-and-keyword `TypedDict` construction needs to inspect unpacked keyword types
 /// in multiple validation passes. Precomputing them avoids re-inference in speculative builders.
-pub(super) fn infer_unpacked_keyword_types<'db>(
-    arguments: &Arguments,
-    mut expression_type_fn: impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
-) -> Vec<Option<Type<'db>>> {
+pub(super) fn infer_unpacked_keyword_types<'ast, 'db>(
+    arguments: &'ast Arguments,
+    mut expression_type_fn: impl FnMut(&'ast ast::Expr, TypeContext<'db>) -> Type<'db>,
+) -> Vec<(&'ast ast::Expr, Type<'db>)> {
     arguments
         .keywords()
+        .filter(|keyword| keyword.is_variadic())
         .map(|keyword| {
-            keyword
-                .arg
-                .is_none()
-                .then(|| expression_type_fn(keyword.value.as_ref(), TypeContext::default()))
+            let value = keyword.value.as_ref();
+            (value, expression_type_fn(value, TypeContext::default()))
         })
         .collect()
 }
@@ -2199,37 +2198,26 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
     env: &ProgramEnvironment<'db>,
     typed_dict: TypedDictType<'db>,
     arguments: &Arguments,
-    unpacked_keyword_types: &[Option<Type<'db>>],
+    unpacked_keyword_types: &[(&ast::Expr, Type<'db>)],
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
-    debug_assert_eq!(arguments.keywords().count(), unpacked_keyword_types.len());
-
     let mut provided_keys: OrderSet<Name> = arguments
         .keywords()
         .filter_map(|keyword| keyword.arg.as_ref().map(|arg| arg.id.clone()))
         .collect();
 
-    for (keyword, unpacked_type) in arguments
-        .keywords()
-        .zip(unpacked_keyword_types.iter().copied())
-    {
-        if keyword.arg.is_some() {
-            continue;
-        }
-
-        let unpacked_type = if keyword.value.is_dict_expr() {
+    for &(value, unpacked_type) in unpacked_keyword_types {
+        let unpacked_type = if value.is_dict_expr() {
             Type::unknown()
-        } else if let Some(unpacked_type) = unpacked_type {
-            unpacked_type
         } else {
-            continue;
+            unpacked_type
         };
 
         collect_guaranteed_keys_from_merged_unpacked_keyword(
             db,
             env,
             typed_dict,
-            keyword.value.as_ref(),
+            value,
             unpacked_type,
             &mut provided_keys,
             expression_type_fn,
@@ -2777,19 +2765,16 @@ fn validate_from_keywords<'db, 'ast>(
     typed_dict: TypedDictType<'db>,
     arguments: &'ast Arguments,
     typed_dict_node: AnyNodeRef<'ast>,
-    unpacked_keyword_types: &[Option<Type<'db>>],
+    unpacked_keyword_types: &[(&ast::Expr, Type<'db>)],
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
     let db = context.db();
-    debug_assert_eq!(arguments.keywords().count(), unpacked_keyword_types.len());
 
     let mut guaranteed_keys = BTreeMap::new();
 
     // Validate that each key is assigned a type that is compatible with the key's value type
-    for (keyword, unpacked_type) in arguments
-        .keywords()
-        .zip(unpacked_keyword_types.iter().copied())
-    {
+    let mut unpacked_types = unpacked_keyword_types.iter();
+    for keyword in arguments.keywords() {
         let keyword_node: AnyNodeRef<'ast> = keyword.into();
 
         if let Some(arg_name) = &keyword.arg {
@@ -2825,7 +2810,7 @@ fn validate_from_keywords<'db, 'ast>(
             // Unlike positional TypedDict arguments, unpacking passes all keys as explicit
             // keyword arguments, so extra keys should be flagged as errors (consistent with
             // explicitly providing those keys).
-            let Some(unpacked_type) = unpacked_type else {
+            let Some(&(_, unpacked_type)) = unpacked_types.next() else {
                 continue;
             };
             // Keep one unpack local while applying merged-dict overwrite semantics, then compare
