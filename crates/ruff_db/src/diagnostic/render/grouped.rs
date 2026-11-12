@@ -47,20 +47,18 @@ impl Renderer for GroupedRenderer<'_> {
             let column_length = max_column_length.digits();
 
             // Print the filename.
-            writeln!(
-                f,
-                "{}:",
-                fmt_styled(
-                    filename.unwrap_or("<no filename>".into()),
-                    stylesheet.underline
-                )
-            )?;
+            let indent = if let Some(filename) = filename {
+                writeln!(f, "{}:", fmt_styled(filename, stylesheet.underline))?;
+                "  "
+            } else {
+                ""
+            };
 
             // Print each message.
             for message in messages {
                 write!(
                     f,
-                    "{}",
+                    "{indent}{}",
                     DisplayGroupedMessage {
                         notebook_index: message
                             .primary_span_ref()
@@ -150,8 +148,6 @@ impl Display for DisplayGroupedMessage<'_> {
             message,
             start_location,
         } = &self.message;
-
-        write!(f, "  ")?;
 
         if let Some(start_location) = start_location {
             write!(
@@ -336,8 +332,7 @@ mod tests {
         });
 
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        <no filename>:
-          test-diagnostic: main diagnostic message
+        test-diagnostic: main diagnostic message
 
         fib.py:
            1:8  F401 `os` imported but unused
