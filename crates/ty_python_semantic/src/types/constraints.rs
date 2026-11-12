@@ -4059,7 +4059,7 @@ impl<'db> CandidateSolutions<'db> {
 
     /// Widen the inferred arguments for the next pass only when one viable path permits
     /// all the chosen promotions. If one path requires `T` to stay narrow and another
-    /// requires `U` to stay narrow, choosing which variable to widen would be arbitrary.
+    /// requires `U` to stay narrow, both can still permit widening a third variable.
     pub(super) fn promote_for_argument_context(
         &self,
         db: &'db dyn Db,
@@ -4084,10 +4084,11 @@ impl<'db> CandidateSolutions<'db> {
                 .next()
                 .is_none()
         };
-        let mut viable = paths
+        let viable = paths
             .iter()
             .filter(|path| matches!(path.validity, SolutionValidity::Valid));
-        let mut combined = original.types(db).to_vec();
+        let mut combined = Cow::Borrowed(original.types(db));
+        let mut common = Cow::Borrowed(widest.types(db));
         'paths: for path in viable.clone() {
             // Start with all promotions so related variables (e.g. `T = U`) can widen together.
             let mut selected = Cow::Borrowed(widest.types(db));
@@ -4105,18 +4106,24 @@ impl<'db> CandidateSolutions<'db> {
             if selected == original || !accepts(path, selected) {
                 continue;
             }
-            for (index, ty) in selected.types(db).iter().enumerate() {
-                if *ty != original.types(db)[index] {
-                    combined[index] = *ty;
+            for (index, &ty) in selected.types(db).iter().enumerate() {
+                if ty == original.types(db)[index] {
+                    common.to_mut()[index] = ty;
+                } else {
+                    combined.to_mut()[index] = ty;
                 }
             }
         }
-        let combined = context.specialize(db, combined);
-        if combined != original && viable.any(|path| accepts(path, combined)) {
-            combined
-        } else {
-            original
+
+        // If the proposals conflict, try just the promotions they share. Dropping a promotion
+        // can invalidate a dependent bound, so this combination also needs a complete path.
+        for types in [combined, common] {
+            let candidate = context.specialize(db, types);
+            if candidate == original || viable.clone().any(|path| accepts(path, candidate)) {
+                return candidate;
+            }
         }
+        original
     }
 
     /// Solves each path by applying a per-typevar solver function, collecting retained solutions.
@@ -5210,7 +5217,7 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
-    use crate::types::generics::ApplySpecialization;
+    use crate::types::generics::{ApplySpecialization, GenericContext};
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
         TypeVarInstance,
@@ -5319,6 +5326,37 @@ mod tests {
             solved_typevars,
             validity: SolutionValidity::Valid,
         }
+    }
+
+    #[test]
+    fn shared_promotion_respects_dependent_bounds() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let vars = ["A", "B", "C"].map(|name| create_typevar(db, name));
+        let context = GenericContext::from_typevar_instances(db, &env, vars);
+        let [a, b, c] = vars.map(Type::TypeVar);
+        let literal = Type::string_literal(db, "x");
+        let object = Type::object();
+        let tuple = |types| Type::heterogeneous_tuple(db, &env, types);
+
+        // The left arm permits widening C with B, and the right permits widening C with A.
+        // Widening C alone would violate its upper bound on both arms.
+        let left = tuple([literal, object, b]);
+        let right = tuple([object, literal, a]);
+        let target = UnionType::from_two_elements(db, &env, left, right);
+        let bounds = tuple([a, b, c]).assignable_solutions_for_argument_context(
+            db,
+            &env,
+            target,
+            context.inferable_typevars(db),
+        );
+        let original = context.repeat_specialization(db, literal);
+        let widest = context.repeat_specialization(db, known_instance(db, KnownClass::Str));
+        assert_eq!(
+            bounds.promote_for_argument_context(db, &env, original, widest),
+            original
+        );
     }
 
     #[test]

@@ -5864,6 +5864,23 @@ xy: Either = pair(first="a", second="b", visit=lambda x, y: reveal_type((x, y)))
 yx: Either = pair_reversed(first="a", second="b", visit=lambda x, y: reveal_type((x, y)))
 ```
 
+Both alternatives allow the third item to widen to `str`, even though they disagree on which of the
+first two items can widen.
+
+```py
+V = TypeVar("V")
+
+def triple(a: T, b: U, c: V, visit: Callable[[T, U, V], object]) -> tuple[tuple[T, U, V]]:
+    visit(a, b, c)
+    return ((a, b, c),)
+
+Left = tuple[Literal["a"] | None, object, str]
+Right = tuple[object, Literal["b"] | None, str]
+
+# revealed: tuple[Literal["a"], Literal["b"], str]
+result: tuple[Left | Right] = triple("a", "b", "c", lambda a, b, c: reveal_type((a, b, c)))
+```
+
 ## Related type variables in a callback's return context
 
 `Wrap` returns a list with the same element type as its argument. For a runner to accept a `Wrap`,
