@@ -1772,11 +1772,11 @@ class ValidModelWithInitFalse:
 @create_model
 class InvalidModel:
     x: int = 1
-    y: str  # error: [required-dataclass-field-after-default]
+    y: str  # error: [invalid-dataclass-field-order]
 
 @create_model
 class InvalidInheritedModel(ValidModel):
-    z: bytes  # error: [required-dataclass-field-after-default]
+    z: bytes  # error: [invalid-dataclass-field-order]
 
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 def create_kwonly_default_model[T](cls: type[T]) -> type[T]:
@@ -1797,7 +1797,7 @@ class AlsoValidKWOnlyDefaultModel:
 class InvalidKWOnlyDefaultModel:
     x: int
     y: str = field(kw_only=False, default="default")
-    z: bytes = field(kw_only=False)  # error: [required-dataclass-field-after-default]
+    z: bytes = field(kw_only=False)  # error: [invalid-dataclass-field-order]
 ```
 
 ### Keyword-only field specifiers before Python 3.10
@@ -1839,7 +1839,7 @@ Child("value", 2.0)  # error: [too-many-positional-arguments]
 @custom_dataclass
 class InvalidChild(Base):
     positional_default: str = custom_field(default="default", kw_only=False)
-    required: int  # error: [required-dataclass-field-after-default]
+    required: int  # error: [invalid-dataclass-field-order]
 ```
 
 ### For metaclass-based transformers
@@ -1868,7 +1868,7 @@ class ValidModelWithInitFalse(ModelBase):
 
 class InvalidModel(ModelBase):
     x: int = 1
-    y: str  # error: [required-dataclass-field-after-default]
+    y: str  # error: [invalid-dataclass-field-order]
 
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 class KWOnlyDefaultModelMeta(type): ...
@@ -1886,7 +1886,7 @@ class AlsoValidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
 class InvalidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
     x: int
     y: str = field(kw_only=False, default="default")
-    z: bytes = field(kw_only=False)  # error: [required-dataclass-field-after-default]
+    z: bytes = field(kw_only=False)  # error: [invalid-dataclass-field-order]
 ```
 
 ### For base-class-based transformers
@@ -1916,7 +1916,7 @@ class ValidModelWithInitFalse(ModelBase):
 
 class InvalidModel(ModelBase):
     x: int = 1
-    y: str  # error: [required-dataclass-field-after-default]
+    y: str  # error: [invalid-dataclass-field-order]
 
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 class KWOnlyDefaultModelBase:
@@ -1935,7 +1935,7 @@ class AlsoValidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
 class InvalidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
     x: int
     y: str = field(kw_only=False, default="default")
-    z: bytes = field(kw_only=False)  # error: [required-dataclass-field-after-default]
+    z: bytes = field(kw_only=False)  # error: [invalid-dataclass-field-order]
 ```
 
 ### Use cases

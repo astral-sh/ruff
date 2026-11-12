@@ -2167,6 +2167,51 @@ See: <https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass>
 
 [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
 
+<a id="dataclass-field-order"></a>
+
+## `invalid-dataclass-field-order`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.15">0.0.15</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22invalid-dataclass-field-order%22+OR+%22dataclass-field-order%22%29" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L369" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Checks for dataclass definitions where required fields are defined after fields with default values.
+
+**Why is this bad?**
+
+
+In dataclasses, all required fields (fields without default values) must be defined before fields
+with default values. This is a Python requirement that will raise a `TypeError` at runtime if
+violated.
+
+**Example**
+
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass
+class Example:
+    x: int = 1  # Field with default value
+    # Required field after field with default
+    y: str  # error
+```
+
+**Rule history**
+
+
+- v0.0.102: Renamed from [`dataclass-field-order`](#dataclass-field-order).
+
+    [`dataclass-field-order`](#dataclass-field-order) remains as a compatibility alias for this rule.
+
 ## `invalid-dataclass-override`
 
 <small>
@@ -6524,51 +6569,6 @@ ignore comments consistent across your codebase.
 
 If ty renames `old-rule-name` to `new-rule-name`, the automatic fix changes
 `# ty: ignore[old-rule-name]` to `# ty: ignore[new-rule-name]`.
-
-<a id="dataclass-field-order"></a>
-
-## `required-dataclass-field-after-default`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.15">0.0.15</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22required-dataclass-field-after-default%22+OR+%22dataclass-field-order%22%29" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L369" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-
-Checks for dataclass definitions where required fields are defined after fields with default values.
-
-**Why is this bad?**
-
-
-In dataclasses, all required fields (fields without default values) must be defined before fields
-with default values. This is a Python requirement that will raise a `TypeError` at runtime if
-violated.
-
-**Example**
-
-
-```python
-from dataclasses import dataclass
-
-
-@dataclass
-class Example:
-    x: int = 1  # Field with default value
-    # Required field after field with default
-    y: str  # error
-```
-
-**Rule history**
-
-
-- v0.0.102: Renamed from [`dataclass-field-order`](#dataclass-field-order).
-
-    [`dataclass-field-order`](#dataclass-field-order) remains as a compatibility alias for this rule.
 
 ## `shadowed-type-variable`
 
