@@ -811,7 +811,7 @@ impl<'src> Parser<'src> {
                                 );
                             }
 
-                            parser.storage.take_name(name).parsed(&mut parser.storage)
+                            parser.storage.take_name(name)
                         } else {
                             // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
                             // not a name expression. We could add the expression into `args` but
@@ -820,11 +820,11 @@ impl<'src> Parser<'src> {
                                 ParseErrorType::OtherError("Expected a parameter name".to_string()),
                                 parsed_expr,
                             );
-                            build::Identifier {
-                                id: parser.storage.intern_name(""),
+                            let id = parser.storage.intern_name("");
+                            parser.storage.add(build::Identifier {
+                                id,
                                 range: parsed_expr.range(),
-                            }
-                            .parsed(&mut parser.storage)
+                            })
                         };
 
                         parser.parse_keyword_argument(argument_start, Some(arg));
@@ -880,11 +880,15 @@ impl<'src> Parser<'src> {
         .parsed(&mut self.storage)
     }
 
-    fn parse_keyword_argument(&mut self, start: TextSize, name: Option<id::Identifier>) {
+    fn parse_keyword_argument(
+        &mut self,
+        start: TextSize,
+        name: Option<ast::BuildId<ast::kind::Identifier>>,
+    ) {
         let value = self.parse_conditional_expression_or_higher();
         self.argument_scratch.push(ast::ArgumentId::Keyword(
             build::Keyword {
-                arg: name.map(|node| node.id),
+                arg: name,
                 value: value.expr.id,
                 range: self.node_range(start),
             }

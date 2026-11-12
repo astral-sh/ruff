@@ -725,16 +725,20 @@ impl Builder {
 
     /// Turns a name expression into the identifier for a keyword argument. When the name is
     /// the last row, its expression handle expires and the identifier can reuse that row.
-    pub fn take_name(&mut self, name: BuildId<crate::kind::ExprName>) -> build::Identifier {
-        let expr = self.get(name);
-        let identifier = build::Identifier {
-            id: expr.name_id(),
-            range: expr.range(),
-        };
-        if name.slot() + 1 == self.ast.rows.len() {
-            self.ast.rows.pop();
+    pub fn take_name(
+        &mut self,
+        name: BuildId<crate::kind::ExprName>,
+    ) -> BuildId<crate::kind::Identifier> {
+        let slot = name.slot();
+        let expr = &self.ast.rows[slot];
+        let mut identifier = Row::new(NodeKind::Identifier, expr.range());
+        identifier.set_identifier_id(expr.expr_name_id());
+        if slot + 1 == self.ast.rows.len() {
+            self.ast.rows[slot] = identifier;
+            name.cast()
+        } else {
+            self.push(identifier)
         }
-        identifier
     }
 
     pub fn checkpoint(&self) -> Checkpoint {
