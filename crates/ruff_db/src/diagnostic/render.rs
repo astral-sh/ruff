@@ -78,6 +78,35 @@ pub trait Renderer {
     }
 }
 
+#[cfg(any(feature = "serde", feature = "junit"))]
+struct FmtAdapter<'a> {
+    fmt: &'a mut dyn std::fmt::Write,
+}
+
+#[cfg(any(feature = "serde", feature = "junit"))]
+impl std::io::Write for FmtAdapter<'_> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.fmt
+            .write_str(std::str::from_utf8(buf).map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Invalid UTF-8 in diagnostic output",
+                )
+            })?)
+            .map_err(std::io::Error::other)?;
+
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> std::io::Result<()> {
+        self.fmt.write_fmt(args).map_err(std::io::Error::other)
+    }
+}
+
 /// A sequence of resolved diagnostics.
 ///
 /// Resolving a diagnostic refers to the process of restructuring its internal
