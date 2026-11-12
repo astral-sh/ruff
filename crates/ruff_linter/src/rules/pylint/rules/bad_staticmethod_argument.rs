@@ -92,10 +92,7 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
     let Some(ParameterWithDefault {
         parameter: self_or_cls,
         ..
-    }) = parameters
-        .posonlyargs()
-        .next()
-        .or_else(|| parameters.args().next())
+    }) = parameters.iter_positional_params().next()
     else {
         return;
     };

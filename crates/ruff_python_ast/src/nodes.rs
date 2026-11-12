@@ -3317,6 +3317,16 @@ pub enum ParameterItem {
 }
 
 impl ParameterItem {
+    fn binding_order(&self) -> u8 {
+        match self {
+            Self::PositionalOnly(_) => 0,
+            Self::PositionalOrKeyword(_) => 1,
+            Self::Vararg(_) => 2,
+            Self::KeywordOnly(_) => 3,
+            Self::Kwarg(_) => 4,
+        }
+    }
+
     pub fn as_ref(&self) -> AnyParameterRef<'_> {
         match self {
             Self::PositionalOnly(p) | Self::PositionalOrKeyword(p) | Self::KeywordOnly(p) => {
@@ -3338,6 +3348,14 @@ pub struct Parameters {
 }
 
 impl Parameters {
+    fn is_in_binding_order(&self) -> bool {
+        self.items.iter().is_sorted_by(|left, right| {
+            let a = left.binding_order();
+            let b = right.binding_order();
+            a < b || (a == b && !matches!(left, ParameterItem::Vararg(_) | ParameterItem::Kwarg(_)))
+        })
+    }
+
     pub fn posonlyargs(&self) -> impl DoubleEndedIterator<Item = &ParameterWithDefault> + Clone {
         self.items.iter().filter_map(|item| match item {
             ParameterItem::PositionalOnly(p) => Some(p),
@@ -3393,6 +3411,28 @@ impl Parameters {
         })
     }
 
+    /// Visits parameters that can have defaults and returns `*args` and `**kwargs`.
+    /// Callers that process variadic parameters last can do so in the same pass.
+    pub fn split_variadic<'a>(
+        &'a self,
+        mut non_variadic: impl FnMut(&'a ParameterWithDefault),
+    ) -> (Option<&'a Parameter>, Option<&'a Parameter>) {
+        let mut vararg = None;
+        let mut kwarg = None;
+        for item in &self.items {
+            match item {
+                ParameterItem::PositionalOnly(p)
+                | ParameterItem::PositionalOrKeyword(p)
+                | ParameterItem::KeywordOnly(p) => non_variadic(p),
+                ParameterItem::Vararg(p) => {
+                    vararg.get_or_insert(p);
+                }
+                ParameterItem::Kwarg(p) => kwarg = Some(p),
+            }
+        }
+        (vararg, kwarg)
+    }
+
     pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
         self.iter_non_variadic_params()
             .find(|p| p.parameter.name.as_str() == name)
@@ -3409,6 +3449,39 @@ impl Parameters {
     ) -> impl DoubleEndedIterator<Item = AnyParameterRef<'_>> + ExactSizeIterator + FusedIterator + Clone
     {
         self.items.iter().map(ParameterItem::as_ref)
+    }
+
+    /// Iterates parameter roles and nodes in argument-binding order, including in recovered syntax.
+    pub fn items_in_binding_order(&self) -> impl DoubleEndedIterator<Item = &ParameterItem> {
+        let items = self.items.iter();
+        if self.is_in_binding_order() {
+            return itertools::Either::Left(items);
+        }
+        itertools::Either::Right(
+            items
+                .clone()
+                .filter(|p| matches!(p, ParameterItem::PositionalOnly(_)))
+                .chain(
+                    items
+                        .clone()
+                        .filter(|p| matches!(p, ParameterItem::PositionalOrKeyword(_))),
+                )
+                .chain(
+                    items
+                        .clone()
+                        .find(|p| matches!(p, ParameterItem::Vararg(_))),
+                )
+                .chain(
+                    items
+                        .clone()
+                        .filter(|p| matches!(p, ParameterItem::KeywordOnly(_))),
+                )
+                .chain(
+                    items
+                        .clone()
+                        .rfind(|p| matches!(p, ParameterItem::Kwarg(_))),
+                ),
+        )
     }
 
     /// Iterates parameters in argument-binding order.

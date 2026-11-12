@@ -9186,67 +9186,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         let parameters = if let Some(parameters) = parameters {
-            let positional_only = parameters
-                .posonlyargs()
-                .map(|param| {
-                    let parameter = Parameter::positional_only(Some(param.name().id.clone()))
-                        .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
-                        }));
-
-                    if let Some(annotated_type) = parameter_types.next().flatten() {
-                        parameter.with_annotated_type(annotated_type)
-                    } else {
-                        parameter
+            let parameters = parameters.items_in_binding_order().map(|item| {
+                let (parameter, default, positional) = match item {
+                    ast::ParameterItem::PositionalOnly(p) => (
+                        Parameter::positional_only(Some(p.name().id.clone())),
+                        p.default(),
+                        true,
+                    ),
+                    ast::ParameterItem::PositionalOrKeyword(p) => (
+                        Parameter::positional_or_keyword(p.name().id.clone()),
+                        p.default(),
+                        true,
+                    ),
+                    ast::ParameterItem::KeywordOnly(p) => (
+                        Parameter::keyword_only(p.name().id.clone()),
+                        p.default(),
+                        false,
+                    ),
+                    ast::ParameterItem::Vararg(p) => {
+                        (Parameter::variadic(p.name().id.clone()), None, false)
                     }
-                })
-                .collect::<Vec<_>>();
-            let positional_or_keyword = parameters
-                .args()
-                .map(|param| {
-                    let parameter = Parameter::positional_or_keyword(param.name().id.clone())
-                        .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
-                        }));
-
-                    if let Some(annotated_type) = parameter_types.next().flatten() {
-                        parameter.with_annotated_type(annotated_type)
-                    } else {
-                        parameter
-                    }
-                })
-                .collect::<Vec<_>>();
-            let variadic = parameters.vararg().map(|param| {
-                Parameter::variadic(param.name().id.clone())
+                    ast::ParameterItem::Kwarg(p) => (
+                        Parameter::keyword_variadic(p.name().id.clone()),
+                        None,
+                        false,
+                    ),
+                };
+                let parameter = parameter
                     .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
+                    .with_optional_default_type(default.map(|expr| {
+                        self.infer_expression(expr, TypeContext::default())
+                            .replace_parameter_defaults(db, env)
+                    }));
+                if positional && let Some(annotated_type) = parameter_types.next().flatten() {
+                    parameter.with_annotated_type(annotated_type)
+                } else {
+                    parameter
+                }
             });
-            let keyword_only = parameters
-                .kwonlyargs()
-                .map(|param| {
-                    Parameter::keyword_only(param.name().id.clone())
-                        .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
-                        }))
-                })
-                .collect::<Vec<_>>();
-            let keyword_variadic = parameters.kwarg().map(|param| {
-                Parameter::keyword_variadic(param.name().id.clone())
-                    .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-            });
-
-            let parameters = positional_only
-                .into_iter()
-                .chain(positional_or_keyword)
-                .chain(variadic)
-                .chain(keyword_only)
-                .chain(keyword_variadic);
-
             Parameters::from_annotation(db, parameters)
         } else {
             Parameters::empty()

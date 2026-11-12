@@ -965,9 +965,8 @@ pub(crate) fn definition(
         || (is_method
             && !visibility::is_staticmethod(decorator_list, checker.semantic())
             && parameters
-                .posonlyargs()
+                .iter_positional_params()
                 .next()
-                .or_else(|| parameters.args().next())
                 .is_some_and(|first_param| first_param.annotation().is_some()));
 
     if !diagnostics_enabled {
