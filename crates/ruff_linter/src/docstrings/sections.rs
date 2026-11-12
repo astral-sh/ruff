@@ -1,7 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
-use ruff_python_ast::docstrings::{leading_space, leading_words};
 use ruff_python_semantic::Definition;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
@@ -161,11 +160,11 @@ impl<'a> SectionContexts<'a> {
         let mut directive_indent = None;
 
         while let Some(line) = lines.next() {
-            let indent = leading_space(&line);
-            let indent_size = indent.text_len();
+            let trimmed = line.trim_start();
+            let indent_size = line.text_len() - trimmed.text_len();
 
             if let Some(active_indent) = directive_indent
-                && (line.trim().is_empty() || indent_size > active_indent)
+                && (trimmed.is_empty() || indent_size > active_indent)
             {
                 previous_line = Some(line);
                 continue;
@@ -173,39 +172,39 @@ impl<'a> SectionContexts<'a> {
 
             directive_indent = None;
 
-            if line.trim_start().starts_with(".. ") {
+            if trimmed.starts_with(".. ") {
                 directive_indent = Some(indent_size);
                 previous_line = Some(line);
                 continue;
             }
 
-            if let Some(section_kind) = suspected_as_section(&line, style) {
-                let section_name = leading_words(&line);
-                let section_name_size = section_name.text_len();
-
-                if is_docstring_section(
-                    &line,
+            // A section header occupies the entire line, apart from an optional colon.
+            let title = trimmed.trim_end();
+            let section_name = title.strip_suffix(':').unwrap_or(title);
+            if let Some(section_kind) = SectionKind::from_str(section_name)
+                && style.sections().contains(&section_kind)
+                && is_docstring_section(
+                    section_name,
                     indent_size,
-                    section_name_size,
                     section_kind,
                     last.as_ref(),
                     previous_line.as_ref(),
                     lines.peek(),
                     docstring.definition,
-                ) {
-                    if let Some(mut last) = last.take() {
-                        last.range = TextRange::new(last.start(), line.start());
-                        contexts.push(last);
-                    }
-
-                    last = Some(SectionContextData {
-                        kind: section_kind,
-                        indent_size: indent.text_len(),
-                        name_range: TextRange::at(line.start() + indent_size, section_name_size),
-                        range: TextRange::empty(line.start()),
-                        summary_full_end: line.full_end(),
-                    });
+                )
+            {
+                if let Some(mut last) = last.take() {
+                    last.range = TextRange::new(last.start(), line.start());
+                    contexts.push(last);
                 }
+
+                last = Some(SectionContextData {
+                    kind: section_kind,
+                    indent_size,
+                    name_range: TextRange::at(line.start() + indent_size, section_name.text_len()),
+                    range: TextRange::empty(line.start()),
+                    summary_full_end: line.full_end(),
+                });
             }
 
             previous_line = Some(line);
@@ -431,36 +430,16 @@ impl Debug for SectionContext<'_> {
     }
 }
 
-fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> {
-    if let Some(kind) = SectionKind::from_str(leading_words(line)) {
-        if style.sections().contains(&kind) {
-            return Some(kind);
-        }
-    }
-    None
-}
-
 /// Check if the suspected context is really a section header.
-#[expect(clippy::too_many_arguments)]
 fn is_docstring_section(
-    line: &Line,
+    verbatim: &str,
     indent_size: TextSize,
-    section_name_size: TextSize,
     section_kind: SectionKind,
     previous_section: Option<&SectionContextData>,
     previous_line: Option<&Line>,
     next_line: Option<&Line>,
     definition: &Definition<'_>,
 ) -> bool {
-    // for function definitions, track the known argument names for more accurate section detection.
-    // Determine whether the current line looks like a section header, e.g., "Args:".
-    let section_name_suffix = line[usize::from(indent_size + section_name_size)..].trim();
-    let this_looks_like_a_section_name =
-        section_name_suffix == ":" || section_name_suffix.is_empty();
-    if !this_looks_like_a_section_name {
-        return false;
-    }
-
     // Determine whether the next line is an underline, e.g., "-----".
     let next_line_is_underline = next_line.is_some_and(|next_line| {
         let next_line = next_line.trim();
@@ -509,8 +488,6 @@ fn is_docstring_section(
     // However, if the header is an _exact_ match (like `Returns:`, as opposed to `returns:`), then
     // continue to treat it as a section header.
     if let Some(previous_section) = previous_section {
-        let verbatim = &line[TextRange::at(indent_size, section_name_size)];
-
         // If the section is more deeply indented, assume it's a subsection, as in:
         // ```python
         // def func(args: tuple[int]):
