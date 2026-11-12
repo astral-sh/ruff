@@ -29,24 +29,7 @@ Released on 2026-11-12.
 
 ### Performance
 
-- Apply per-file ignores as rule sets ([#30375](https://github.com/astral-sh/ruff/pull/30375))
-- Avoid allocating for single-target assignments in `PLW0127` ([#30211](https://github.com/astral-sh/ruff/pull/30211))
-- Inline public `Cursor` methods across crates ([#30368](https://github.com/astral-sh/ruff/pull/30368))
-- Make `ComparableExpr` comparison lazy ([#30259](https://github.com/astral-sh/ruff/pull/30259))
-- Match docstring section headings against the whole line ([#30354](https://github.com/astral-sh/ruff/pull/30354))
-- Precompute the rule set for qualified call checks ([#30115](https://github.com/astral-sh/ruff/pull/30115))
-- Recognize `typing` calls by their resolved member name ([#30133](https://github.com/astral-sh/ruff/pull/30133))
-- Reuse the binding returned by scope insertion ([#30132](https://github.com/astral-sh/ruff/pull/30132))
-- Select lint passes with precomputed rule sets ([#30358](https://github.com/astral-sh/ruff/pull/30358))
-- Share resolved call names with pytest lint rules ([#30135](https://github.com/astral-sh/ruff/pull/30135))
-- Short-circuit `typing` member checks before resolving qualified names ([#30369](https://github.com/astral-sh/ruff/pull/30369))
-- Skip display-width calculation for lines that fit the length limit ([#30351](https://github.com/astral-sh/ruff/pull/30351))
-- Skip dummy-name checks for unique assignment targets in `PLW0128` ([#30352](https://github.com/astral-sh/ruff/pull/30352))
-- Skip the CST parse when deleting a single named import ([#30347](https://github.com/astral-sh/ruff/pull/30347))
-- Speed up streaming notebook reads ([#30379](https://github.com/astral-sh/ruff/pull/30379))
-- Skip a redundant positional argument lookup (`B017`) ([#30328](https://github.com/astral-sh/ruff/pull/30328))
-- Read string flags once per literal part (`W605`) ([#30329](https://github.com/astral-sh/ruff/pull/30329))
-- Use a hash map for banned APIs (`TID251`) ([#29446](https://github.com/astral-sh/ruff/pull/29446))
+- Various performance improvements ([#30375](https://github.com/astral-sh/ruff/pull/30375), [#30211](https://github.com/astral-sh/ruff/pull/30211), [#30368](https://github.com/astral-sh/ruff/pull/30368), [#30259](https://github.com/astral-sh/ruff/pull/30259), [#30354](https://github.com/astral-sh/ruff/pull/30354), [#30115](https://github.com/astral-sh/ruff/pull/30115), [#30133](https://github.com/astral-sh/ruff/pull/30133), [#30132](https://github.com/astral-sh/ruff/pull/30132), [#30358](https://github.com/astral-sh/ruff/pull/30358), [#30135](https://github.com/astral-sh/ruff/pull/30135), [#30369](https://github.com/astral-sh/ruff/pull/30369), [#30351](https://github.com/astral-sh/ruff/pull/30351), [#30352](https://github.com/astral-sh/ruff/pull/30352), [#30347](https://github.com/astral-sh/ruff/pull/30347), [#30379](https://github.com/astral-sh/ruff/pull/30379), [#30328](https://github.com/astral-sh/ruff/pull/30328), [#30329](https://github.com/astral-sh/ruff/pull/30329), [#29446](https://github.com/astral-sh/ruff/pull/29446))
 
 ### Other changes
 
