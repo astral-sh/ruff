@@ -254,7 +254,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'ast, 'db>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
-    current_first_parameter_name: Option<&'ast str>,
+    current_first_parameter_name: Option<ast::NameId>,
 
     /// The scope of a boolean test whose subexpressions we are currently visiting.
     ///
@@ -473,7 +473,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     fn is_symbol_bound_in_intermediate_eager_scopes(
         &self,
-        symbol_name: &str,
+        name: ast::ExprName<'_>,
         method_scope_id: FileScopeId,
     ) -> bool {
         for scope_info in self.scope_stack.iter().rev() {
@@ -483,7 +483,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 break;
             }
 
-            if let Some(symbol_id) = self.place_tables[scope_id].symbol_id(symbol_name) {
+            if let Some(symbol_id) = self.place_tables[scope_id].symbol_id(name.id()) {
                 let symbol = self.place_tables[scope_id].symbol(symbol_id);
                 if symbol.is_bound() {
                     return true;
@@ -3662,19 +3662,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // intermediate scope (e.g., a comprehension variable: `for self in [...]`)
                 // and that the AST base is still the original name rather than a
                 // rebinding expression such as `(self := other).x`.
-                let accessed_object_refers_to_first_parameter =
-                    self.current_first_parameter_name.is_some_and(|first| {
-                        attribute
-                            .value()
-                            .as_name_expr()
-                            .is_some_and(|name| name.id() == first)
-                            && !self.is_symbol_bound_in_intermediate_eager_scopes(
-                                first,
-                                method_scope_id,
-                            )
-                    });
-
-                if accessed_object_refers_to_first_parameter {
+                if let Some(first) = self.current_first_parameter_name
+                    && let Some(name) = attribute.value().as_name_expr()
+                    && name.name_id() == first
+                    && !self.is_symbol_bound_in_intermediate_eager_scopes(name, method_scope_id)
+                {
                     member.mark_instance_attribute();
                 }
             }
@@ -3943,7 +3935,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let mut first_parameter_name = parameters
                             .iter_non_variadic_params()
                             .next()
-                            .map(|first_param| first_param.parameter().name().id().as_str());
+                            .map(|first_param| first_param.parameter().name().name_id());
                         std::mem::swap(
                             &mut builder.current_first_parameter_name,
                             &mut first_parameter_name,
