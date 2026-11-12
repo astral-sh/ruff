@@ -139,8 +139,9 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
         _ => return,
     }
 
-    let Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. })) =
-        first.map(Expr::fields)
+    let Some(value) = first
+        .and_then(Expr::as_string_literal_expr)
+        .map(ast::ExprStringLiteral::value)
     else {
         return;
     };

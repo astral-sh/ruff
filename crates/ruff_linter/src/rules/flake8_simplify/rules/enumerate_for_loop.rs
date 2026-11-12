@@ -2,7 +2,7 @@ use crate::codes::Category;
 use crate::preview::is_enumerate_for_loop_int_index_enabled;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast, ExprName, Int, Operator, Stmt, StmtFor, StmtKind};
+use ruff_python_ast::{ExprName, Int, Operator, Stmt, StmtFor, StmtKind};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -165,23 +165,12 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: StmtFor<'_>) {
 /// If the statement is an index increment statement (e.g., `i += 1`), return
 /// the name of the index variable.
 fn match_index_increment(stmt: Stmt<'_>) -> Option<ExprName<'_>> {
-    let ast::StmtFields::AugAssign(ast::StmtAugAssignFields {
-        target,
-        op: Operator::Add,
-        value,
-        ..
-    }) = stmt.fields()
-    else {
-        return None;
-    };
-
-    let name = target.as_name_expr()?;
-
-    if value.as_int_literal() == Some(&Int::ONE) {
-        return Some(name);
+    let increment = stmt.as_aug_assign_stmt()?;
+    if increment.op() == Operator::Add && increment.value().as_int_literal() == Some(&Int::ONE) {
+        increment.target().as_name_expr()
+    } else {
+        None
     }
-
-    None
 }
 
 #[derive(Debug, Default)]

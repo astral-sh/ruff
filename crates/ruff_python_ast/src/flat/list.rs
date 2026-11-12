@@ -823,6 +823,15 @@ impl<'a, E: Element> List<'a, E> {
         start
     }
 
+    // This is only for lists whose stored words are node IDs.
+    pub(super) fn position_of_node(self, node: super::SyntaxNode<'a>) -> Option<usize> {
+        if !std::ptr::eq(self.ast, node.ast()) {
+            return None;
+        }
+        let slot = node.node_id().slot.get();
+        self.words().iter().position(|&word| word == slot)
+    }
+
     pub fn iter(self) -> Iter<'a, E> {
         self.into_iter()
     }
@@ -909,6 +918,17 @@ impl<E: Element> DoubleEndedIterator for Iter<'_, E> {
 impl<E: Element> ExactSizeIterator for Iter<'_, E> {}
 impl<E: Element> std::iter::FusedIterator for Iter<'_, E> {}
 
+impl<'a, T: NodeType + 'static> NodeList<'a, T> {
+    /// Finds the first occurrence of this node by its stored arena ID.
+    pub fn position_of(self, node: impl AstNode<'a>) -> Option<usize> {
+        self.position_of_node(node.syntax_node())
+    }
+
+    pub(super) fn starts_with_node(self, node: super::SyntaxNode<'a>) -> bool {
+        self.first().is_some_and(|first| first.is_same_node(node))
+    }
+}
+
 impl<'a> List<'a, AstNodeId<crate::kind::BytesLiteral>> {
     pub fn bytes(self) -> impl DoubleEndedIterator<Item = u8> + 'a {
         self.iter().flat_map(|part| part.value().iter().copied())
@@ -926,7 +946,26 @@ where
 
 #[cfg(test)]
 mod tests {
+    use ruff_text_size::TextRange;
+
     use super::Interval;
+    use crate::flat::{Builder, Emit, build};
+
+    #[test]
+    fn node_positions_use_ids_from_the_same_tree() {
+        let range = TextRange::default();
+        let mut builder = Builder::default();
+        let (a, ..) = build::StmtPass { range }.emit(&mut builder);
+        let (b, ..) = build::StmtPass { range }.emit(&mut builder);
+        let ids = builder.list([a, b, a]);
+        let list = builder.get_list(ids);
+        assert_eq!(list.position_of(builder.get(a)), Some(0));
+        assert_eq!(list.position_of(builder.get(b)), Some(1));
+
+        let mut other = Builder::default();
+        let (a, ..) = build::StmtPass { range }.emit(&mut other);
+        assert_eq!(list.position_of(other.get(a)), None);
+    }
 
     #[test]
     fn paired_lists_share_a_boundary() {

@@ -1031,7 +1031,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                 StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => break,
                 _ => None,
             };
-            if orelse.is_some_and(|orelse| !orelse.iter().any(|stmt| stmt.is_same_node(child))) {
+            if orelse.is_some_and(|orelse| orelse.position_of(child).is_none()) {
                 return true;
             }
             child = parent;
@@ -1154,9 +1154,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 for alias in names {
-                    // Given `import foo.bar`, `module` would be "foo", and `call_path` would be
-                    // `["foo", "bar"]`.
-                    let module = alias.name().as_str().split('.').next().unwrap();
+                    let ast::AliasFields { name, asname, .. } = alias.fields();
+                    let spelling = name.as_str();
+                    let (module, submodule) = spelling
+                        .split_once('.')
+                        .map_or((spelling, false), |(module, _)| (module, true));
 
                     // Mark the top-level module as "seen" by the semantic model.
                     self.semantic.add_module(module);
@@ -1168,32 +1170,29 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         flags |= BindingFlags::LAZY;
                     }
 
-                    if alias.asname().is_none() && alias.name().contains('.') {
-                        let qualified_name = QualifiedName::user_defined(alias.name().as_str());
+                    if asname.is_none() && submodule {
+                        let qualified_name = QualifiedName::user_defined(spelling);
                         self.add_binding(
                             module,
-                            alias.identifier(),
+                            name.range(),
                             BindingKind::SubmoduleImport(SubmoduleImport {
                                 qualified_name: Box::new(qualified_name),
                             }),
                             flags,
                         );
                     } else {
-                        if alias.asname().is_some() {
+                        if let Some(asname) = asname {
                             flags |= BindingFlags::ALIAS;
-                        }
-                        if alias
-                            .asname()
-                            .is_some_and(|asname| asname.as_str() == alias.name().as_str())
-                        {
-                            flags |= BindingFlags::EXPLICIT_EXPORT;
+                            if asname.name_id() == name.name_id() {
+                                flags |= BindingFlags::EXPLICIT_EXPORT;
+                            }
                         }
 
-                        let name = alias.asname().unwrap_or(alias.name());
-                        let qualified_name = QualifiedName::user_defined(alias.name().as_str());
+                        let bound_name = asname.unwrap_or(name);
+                        let qualified_name = QualifiedName::user_defined(spelling);
                         self.add_binding(
-                            name.as_str(),
-                            alias.identifier(),
+                            bound_name.as_str(),
+                            bound_name.range(),
                             BindingKind::Import(Import {
                                 qualified_name: Box::new(qualified_name),
                             }),
@@ -1204,7 +1203,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             StmtKind::ImportFrom(stmt_import_from) => {
                 let names = stmt_import_from.names();
-                let module = stmt_import_from.module();
+                let module = stmt_import_from.module().map(ast::Identifier::as_str);
                 let level = stmt_import_from.level();
                 let is_lazy = stmt_import_from.is_lazy();
 
@@ -1214,30 +1213,25 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 // Mark the top-level module as "seen" by the semantic model.
                 if level == 0 {
-                    if let Some(module) =
-                        module.and_then(|module| module.as_str().split('.').next())
-                    {
+                    if let Some(module) = module.and_then(|module| module.split('.').next()) {
                         self.semantic.add_module(module);
                     }
                 }
 
                 for alias in names {
-                    if !is_lazy && matches!(module.map(ast::Identifier::as_str), Some("__future__"))
-                    {
-                        let name = alias.asname().unwrap_or(alias.name());
+                    let ast::AliasFields { name, asname, .. } = alias.fields();
+                    if !is_lazy && module == Some("__future__") {
+                        let bound_name = asname.unwrap_or(name);
                         self.add_binding(
-                            name.as_str(),
-                            alias.identifier(),
+                            bound_name.as_str(),
+                            bound_name.range(),
                             BindingKind::FutureImport,
                             BindingFlags::empty(),
                         );
-                    } else if alias.name() == "*" {
+                    } else if name == "*" {
                         self.semantic
                             .current_scope_mut()
-                            .add_star_import(StarImport {
-                                level,
-                                module: module.map(ast::Identifier::as_str),
-                            });
+                            .add_star_import(StarImport { level, module });
                     } else {
                         let mut flags = BindingFlags::EXTERNAL;
                         if self.lazy_import_context().is_none()
@@ -1245,32 +1239,26 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         {
                             flags |= BindingFlags::LAZY;
                         }
-                        if alias.asname().is_some() {
+                        if let Some(asname) = asname {
                             flags |= BindingFlags::ALIAS;
-                        }
-                        if alias
-                            .asname()
-                            .is_some_and(|asname| asname.as_str() == alias.name().as_str())
-                        {
-                            flags |= BindingFlags::EXPLICIT_EXPORT;
+                            if asname.name_id() == name.name_id() {
+                                flags |= BindingFlags::EXPLICIT_EXPORT;
+                            }
                         }
 
                         // Given `from foo import bar`, `name` would be "bar" and `qualified_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `qualified_name` would be "foo.bar".
-                        let name = alias.asname().unwrap_or(alias.name());
+                        let bound_name = asname.unwrap_or(name);
 
                         // Attempt to resolve any relative imports; but if we don't know the current
                         // module path, or the relative import extends beyond the package root,
                         // fallback to a literal representation (e.g., `[".", "foo"]`).
-                        let qualified_name = collect_import_from_member(
-                            level,
-                            module.map(ast::Identifier::as_str),
-                            alias.name().as_str(),
-                        );
+                        let qualified_name =
+                            collect_import_from_member(level, module, name.as_str());
                         self.add_binding(
-                            name.as_str(),
-                            alias.identifier(),
+                            bound_name.as_str(),
+                            bound_name.range(),
                             BindingKind::FromImport(FromImport {
                                 qualified_name: Box::new(qualified_name),
                             }),

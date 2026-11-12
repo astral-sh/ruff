@@ -58,11 +58,12 @@ pub(crate) fn use_of_read_table(
     }
 
     if matches!(qualified_name.segments(), ["pandas", "read_table"])
-        && let Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. })) =
-            call.arguments
-                .find_keyword("sep")
-                .map(Keyword::value)
-                .map(Expr::fields)
+        && let Some(value) = call
+            .arguments
+            .find_keyword("sep")
+            .map(Keyword::value)
+            .and_then(Expr::as_string_literal_expr)
+            .map(ast::ExprStringLiteral::value)
         && value == ","
     {
         checker.report_diagnostic(PandasUseOfDotReadTable, call.func.range());

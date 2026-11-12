@@ -250,13 +250,11 @@ pub(crate) fn native_literals(
         Some(arg) => {
             let (has_unary_op, literal_expr) = if let Some(literal_expr) = arg.as_literal_expr() {
                 (false, literal_expr)
-            } else if let ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
-                op: UnaryOp::UAdd | UnaryOp::USub,
-                operand,
-                ..
-            }) = arg.fields()
+            } else if let Some(unary) = arg.as_unary_op_expr()
+                && matches!(unary.op(), UnaryOp::UAdd | UnaryOp::USub)
             {
-                if let Some(literal_expr) = operand
+                if let Some(literal_expr) = unary
+                    .operand()
                     .as_literal_expr()
                     .filter(|expr| matches!(expr, LiteralExpression::NumberLiteral(_)))
                 {

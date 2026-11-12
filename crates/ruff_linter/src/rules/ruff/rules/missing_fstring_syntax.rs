@@ -1,5 +1,5 @@
 use memchr::memchr2_iter;
-use ruff_python_ast::{AstNode, ExprKind, StmtKind};
+use ruff_python_ast::{ExprKind, StmtKind};
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -192,7 +192,7 @@ fn is_method_call_on_literal(
         return false;
     };
     let value = string_literal.value();
-    value.iter().any(|part| part.is_same_node(literal))
+    value.position_of(literal).is_some()
 }
 
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.

@@ -97,10 +97,11 @@ fn check(checker: &Checker, value: &str, range: TextRange) {
         return;
     }
 
-    if let Some(ast::ExprFields::Call(ast::ExprCallFields { func, .. })) = checker
+    if let Some(func) = checker
         .semantic()
         .current_expression_parent()
-        .map(Expr::fields)
+        .and_then(Expr::as_call_expr)
+        .map(ast::ExprCall::func)
     {
         if checker
             .semantic()

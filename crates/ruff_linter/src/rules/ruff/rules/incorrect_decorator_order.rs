@@ -119,7 +119,7 @@ fn classify_decorator(checker: &Checker, decorator: Decorator<'_>) -> Option<Kno
     let callable = map_callable(decorator.expression());
 
     // `@x.setter` / `.getter` / `.deleter` return a `property` object.
-    if let ast::ExprFields::Attribute(ast::ExprAttributeFields { attr, .. }) = callable.fields()
+    if let Some(attr) = callable.as_attribute_expr().map(ast::ExprAttribute::attr)
         && matches!(attr.as_str(), "setter" | "getter" | "deleter")
     {
         return Some(KnownDecorator::Property);

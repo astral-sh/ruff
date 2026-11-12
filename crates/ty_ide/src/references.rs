@@ -285,7 +285,7 @@ fn references_for_keyword_arguments_in_file(
 fn is_slots_assignment(node: SyntaxNode<'_>, value: SyntaxNode<'_>) -> bool {
     match node.classify() {
         AnyNode::StmtAssign(assign) => {
-            assign.value().range() == value.range()
+            assign.value().is_same_node(value)
                 && matches!(
                     assign.targets().as_array().map(|items| items.map(ast::Expr::classify)),
                     Some([ExprKind::Name(name)]) if name.id().as_str() == "__slots__"
@@ -294,7 +294,7 @@ fn is_slots_assignment(node: SyntaxNode<'_>, value: SyntaxNode<'_>) -> bool {
         AnyNode::StmtAnnAssign(assign) => {
             assign
                 .value()
-                .is_some_and(|assigned| assigned.range() == value.range())
+                .is_some_and(|assigned| assigned.is_same_node(value))
                 && matches!(
                     assign.target().classify(),
                     ExprKind::Name(name) if name.id().as_str() == "__slots__"
@@ -922,9 +922,7 @@ impl<'a> LocalReferencesFinder<'a> {
         let parent = ancestors.next()?;
         let container = match parent.classify() {
             AnyNode::ExprTuple(_) | AnyNode::ExprList(_) | AnyNode::ExprSet(_) => parent,
-            AnyNode::DictItem(item) if item.key()?.syntax_node() == string.syntax_node() => {
-                ancestors.next()?
-            }
+            AnyNode::DictItem(item) if item.key()?.is_same_node(string) => ancestors.next()?,
             _ => return None,
         };
 

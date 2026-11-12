@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::generate_comparison;
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprCompare, ExprKind};
+use ruff_python_ast::{CmpOp, Expr, ExprCompare, ExprKind};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -113,37 +113,26 @@ pub(crate) fn single_item_membership_test(checker: &Checker, compare: ExprCompar
 /// Return the single item wrapped in `Some` if the expression contains a single
 /// item, otherwise return `None`.
 fn single_item<'a>(expr: Expr<'a>, semantic: &'a SemanticModel) -> Option<Expr<'a>> {
-    match expr.fields() {
-        ast::ExprFields::List(ast::ExprListFields { elts, .. })
-        | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
-        | ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => {
-            match elts.as_array().map(|items| items.map(Expr::classify)) {
-                Some([ExprKind::Starred(_)]) => None,
-                Some([item]) => Some(item.view()),
-                _ => None,
-            }
+    let elts = match expr.classify() {
+        ExprKind::List(list) => list.elts(),
+        ExprKind::Tuple(tuple) => tuple.elts(),
+        ExprKind::Set(set) => set.elts(),
+        ExprKind::Call(call) => {
+            let arg = call.arguments().as_single_positional()?;
+            return if is_set_method(call.func(), semantic) {
+                single_item(arg, semantic)
+            } else {
+                None
+            };
         }
-        ast::ExprFields::Call(ast::ExprCallFields {
-            func,
-            arguments,
-            range: _,
-            node: _,
-        }) => {
-            if arguments.len() != 1 || !is_set_method(func, semantic) {
-                return None;
-            }
-
-            arguments
-                .find_positional(0)
-                .and_then(|arg| single_item(arg, semantic))
+        ExprKind::StringLiteral(literal) => {
+            let mut chars = literal.value().chars();
+            return (chars.next().is_some() && chars.next().is_none()).then_some(expr);
         }
-        ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value: string, .. })
-            if string.chars().count() == 1 =>
-        {
-            Some(expr)
-        }
-        _ => None,
-    }
+        _ => return None,
+    };
+    let [item] = elts.as_array()?;
+    (!item.is_starred_expr()).then_some(item)
 }
 
 fn is_set_method(func: Expr<'_>, semantic: &SemanticModel) -> bool {

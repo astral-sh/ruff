@@ -534,13 +534,14 @@ fn is_kwarg_parameter(semantic: &SemanticModel, name: ExprName<'_>) -> bool {
         return false;
     };
     let binding = semantic.binding(binding_id);
-    let Some(ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields { parameters, .. })) = binding
+    let Some(function) = binding
         .statement(semantic)
-        .map(ruff_python_ast::Stmt::fields)
+        .and_then(ast::Stmt::as_function_def_stmt)
     else {
         return false;
     };
-    parameters
+    function
+        .parameters()
         .kwarg()
         .is_some_and(|kwarg| kwarg.name().as_str() == name.id().as_str())
 }
@@ -1303,10 +1304,10 @@ fn is_context_key_access(checker: &Checker, expr: Expr<'_>, key: &str) -> bool {
             let value = attribute_node_view.value();
             let attr = attribute_node_view.attr();
             if attr.as_str() == "get" {
-                if let Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields {
-                    value: arg_key,
-                    ..
-                })) = arguments.find_positional(0).map(Expr::fields)
+                if let Some(arg_key) = arguments
+                    .find_positional(0)
+                    .and_then(Expr::as_string_literal_expr)
+                    .map(ast::ExprStringLiteral::value)
                 {
                     if arg_key.to_str() == key && is_context_variable(checker, value) {
                         return true;

@@ -154,13 +154,15 @@ fn find_antipattern(
     grandparent: Option<Expr<'_>>,
     parent: Option<Expr<'_>>,
 ) -> Option<DatetimeModuleAntipattern> {
-    let Some(ast::ExprFields::Call(ast::ExprCallFields { arguments, .. })) =
-        grandparent.map(Expr::fields)
+    let Some(arguments) = grandparent
+        .and_then(Expr::as_call_expr)
+        .map(ast::ExprCall::arguments)
     else {
         return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
     };
-    let Some(ast::ExprFields::Attribute(ast::ExprAttributeFields { attr, .. })) =
-        parent.map(Expr::fields)
+    let Some(attr) = parent
+        .and_then(Expr::as_attribute_expr)
+        .map(ast::ExprAttribute::attr)
     else {
         return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
     };

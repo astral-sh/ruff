@@ -73,7 +73,7 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: Alias<'_>) {
     let Some(asname) = alias.asname() else {
         return;
     };
-    if alias.name().as_str() != asname.as_str() {
+    if alias.name().name_id() != asname.name_id() {
         return;
     }
 
@@ -112,7 +112,7 @@ pub(crate) fn useless_import_from_alias(
     let Some(asname) = alias.asname() else {
         return;
     };
-    if alias.name().as_str() != asname.as_str() {
+    if alias.name().name_id() != asname.name_id() {
         return;
     }
 

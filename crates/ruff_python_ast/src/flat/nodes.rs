@@ -207,20 +207,24 @@ impl<'a> StringValue<'a> {
     }
 
     #[inline]
-    pub fn to_str(self) -> &'a str {
+    fn text_range(self) -> u64 {
         let [start, len] = super::split_words(self.text);
-        let text = if len == u32::from(u16::MAX) {
+        if len == u32::from(u16::MAX) {
             self.parts.ast.extra_word::<true>(start as usize)
         } else {
             self.text
-        };
-        self.parts.ast.string(text)
+        }
+    }
+    #[inline]
+    pub fn to_str(self) -> &'a str {
+        self.parts.ast.string(self.text_range())
     }
     pub fn len(self) -> usize {
-        self.to_str().len()
+        super::split_words(self.text_range())[1] as usize
     }
     pub fn is_empty(self) -> bool {
-        self.to_str().is_empty()
+        // The out-of-line marker is only used when the text is too long to fit inline.
+        super::split_words(self.text)[1] == 0
     }
     pub fn chars(self) -> std::str::Chars<'a> {
         self.to_str().chars()
@@ -259,7 +263,12 @@ impl<'a> IntoIterator for StringValue<'a> {
     }
 }
 
-impl crate::Arguments<'_> {
+impl<'a> crate::Arguments<'a> {
+    /// Returns the index of this keyword in the written argument list.
+    pub fn keyword_position(self, keyword: crate::Keyword<'a>) -> Option<usize> {
+        self.items().position_of_node(keyword.syntax_node())
+    }
+
     pub fn len(self) -> usize {
         self.items().len()
     }
@@ -702,10 +711,13 @@ literal_value!(TStringValue, AstNodeId<crate::kind::TString>);
 
 impl BytesValue<'_> {
     pub fn is_empty(self) -> bool {
-        self.iter().all(|part| part.value().is_empty())
+        self.iter()
+            .all(|part| part.byte_range().indices().is_empty())
     }
     pub fn len(self) -> usize {
-        self.iter().map(|part| part.value().len()).sum()
+        self.iter()
+            .map(|part| part.byte_range().indices().len())
+            .sum()
     }
 }
 
@@ -1190,72 +1202,41 @@ impl crate::SyntaxNode<'_> {
     }
 
     pub fn is_first_statement_in_body(self, body: Self) -> bool {
-        match body.fields() {
-            crate::AnyFields::StmtFor(crate::StmtForFields { body, orelse, .. })
-            | crate::AnyFields::StmtWhile(crate::StmtWhileFields { body, orelse, .. }) => {
-                body.first().is_some_and(|node| self.is_same_node(node))
-                    || orelse.first().is_some_and(|node| self.is_same_node(node))
+        match body.classify() {
+            super::AnyNode::StmtFor(node) => {
+                node.body().starts_with_node(self) || node.orelse().starts_with_node(self)
             }
-
-            crate::AnyFields::StmtTry(crate::StmtTryFields {
-                body,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                body.first().is_some_and(|node| self.is_same_node(node))
-                    || orelse.first().is_some_and(|node| self.is_same_node(node))
-                    || finalbody
-                        .first()
-                        .is_some_and(|node| self.is_same_node(node))
+            super::AnyNode::StmtWhile(node) => {
+                node.body().starts_with_node(self) || node.orelse().starts_with_node(self)
             }
-
-            crate::AnyFields::StmtIf(crate::StmtIfFields { body, .. })
-            | crate::AnyFields::ElifElseClause(crate::ElifElseClauseFields { body, .. })
-            | crate::AnyFields::StmtWith(crate::StmtWithFields { body, .. })
-            | crate::AnyFields::ExceptHandlerExceptHandler(
-                crate::ExceptHandlerExceptHandlerFields { body, .. },
-            )
-            | crate::AnyFields::MatchCase(crate::MatchCaseFields { body, .. })
-            | crate::AnyFields::StmtFunctionDef(crate::StmtFunctionDefFields { body, .. })
-            | crate::AnyFields::StmtClassDef(crate::StmtClassDefFields { body, .. }) => {
-                body.first().is_some_and(|node| self.is_same_node(node))
+            super::AnyNode::StmtTry(node) => {
+                node.body().starts_with_node(self)
+                    || node.orelse().starts_with_node(self)
+                    || node.finalbody().starts_with_node(self)
             }
-
-            crate::AnyFields::StmtMatch(crate::StmtMatchFields { cases, .. }) => {
-                cases.first().is_some_and(|node| self.is_same_node(node))
-            }
-
+            super::AnyNode::StmtIf(node) => node.body().starts_with_node(self),
+            super::AnyNode::ElifElseClause(node) => node.body().starts_with_node(self),
+            super::AnyNode::StmtWith(node) => node.body().starts_with_node(self),
+            super::AnyNode::ExceptHandlerExceptHandler(node) => node.body().starts_with_node(self),
+            super::AnyNode::MatchCase(node) => node.body().starts_with_node(self),
+            super::AnyNode::StmtFunctionDef(node) => node.body().starts_with_node(self),
+            super::AnyNode::StmtClassDef(node) => node.body().starts_with_node(self),
+            super::AnyNode::StmtMatch(node) => node.cases().starts_with_node(self),
             _ => false,
         }
     }
 
-    /// Returns `true` if `statement` is the first statement in an alternate `body` (e.g. the else of an if statement)
+    /// Returns `true` if this node is first in an alternate body (for example, the `else` of a loop).
     pub fn is_first_statement_in_alternate_body(self, body: Self) -> bool {
-        match body.fields() {
-            crate::AnyFields::StmtFor(crate::StmtForFields { orelse, .. })
-            | crate::AnyFields::StmtWhile(crate::StmtWhileFields { orelse, .. }) => {
-                orelse.first().is_some_and(|node| self.is_same_node(node))
+        match body.classify() {
+            super::AnyNode::StmtFor(node) => node.orelse().starts_with_node(self),
+            super::AnyNode::StmtWhile(node) => node.orelse().starts_with_node(self),
+            super::AnyNode::StmtTry(node) => {
+                node.handlers().starts_with_node(self)
+                    || node.orelse().starts_with_node(self)
+                    || node.finalbody().starts_with_node(self)
             }
-
-            crate::AnyFields::StmtTry(crate::StmtTryFields {
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                handlers.first().is_some_and(|node| self.is_same_node(node))
-                    || orelse.first().is_some_and(|node| self.is_same_node(node))
-                    || finalbody
-                        .first()
-                        .is_some_and(|node| self.is_same_node(node))
-            }
-
-            crate::AnyFields::StmtIf(crate::StmtIfFields {
-                elif_else_clauses, ..
-            }) => elif_else_clauses
-                .first()
-                .is_some_and(|node| self.is_same_node(node)),
+            super::AnyNode::StmtIf(node) => node.elif_else_clauses().starts_with_node(self),
             _ => false,
         }
     }

@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, ExprKind, NodeList, Stmt, StmtKind, Suite};
+use ruff_python_ast::{self as ast, Expr, ExprKind, NodeList, Stmt, Suite};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -9,7 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::registry::Rule;
 
-use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
+use crate::rules::flake8_pytest_style::helpers::{
+    is_complex_context_manager_body, is_empty_or_null_string,
+};
 
 /// ## What it does
 /// Checks for `pytest.raises` context managers with multiple statements.
@@ -178,14 +179,6 @@ pub(crate) fn is_pytest_raises(qualified_name: &QualifiedName) -> bool {
     matches!(qualified_name.segments(), ["pytest", "raises"])
 }
 
-fn is_non_trivial_with_body(body: Suite<'_>) -> bool {
-    if let Some([stmt]) = body.as_array() {
-        is_compound_statement(stmt)
-    } else {
-        true
-    }
-}
-
 /// PT010
 pub(crate) fn raises_call(
     checker: &Checker,
@@ -254,38 +247,8 @@ pub(crate) fn complex_raises(
         });
 
     // Check body for `pytest.raises` context manager
-    if raises_called {
-        let is_too_complex = if let Some([stmt]) = body.as_array() {
-            match stmt.fields() {
-                ast::StmtFields::With(ast::StmtWithFields { body, .. }) => {
-                    is_non_trivial_with_body(body)
-                }
-                // Allow function and class definitions to test decorators.
-                ast::StmtFields::ClassDef(_) | ast::StmtFields::FunctionDef(_) => false,
-                // Allow empty `for` loops to test iterators.
-                ast::StmtFields::For(ast::StmtForFields { body, .. }) => match body.slice(..) {
-                    body if let Some([stmt]) = body.as_array()
-                        && let StmtKind::Pass(_) = stmt.classify() =>
-                    {
-                        false
-                    }
-                    body if let Some([stmt]) = body.as_array()
-                        && let ast::StmtFields::Expr(ast::StmtExprFields { value, .. }) =
-                            stmt.fields() =>
-                    {
-                        !value.is_ellipsis_literal_expr()
-                    }
-                    _ => true,
-                },
-                stmt => is_compound_statement(stmt.view()),
-            }
-        } else {
-            true
-        };
-
-        if is_too_complex {
-            checker.report_diagnostic(PytestRaisesWithMultipleStatements, stmt.range());
-        }
+    if raises_called && is_complex_context_manager_body(body) {
+        checker.report_diagnostic(PytestRaisesWithMultipleStatements, stmt.range());
     }
 }
 

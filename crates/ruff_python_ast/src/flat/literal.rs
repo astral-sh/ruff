@@ -93,7 +93,34 @@ mod tests {
     use std::convert::Infallible;
 
     use super::{Builder, BytesLiteralFlags, StringLiteralFlags, TextRange};
-    use crate::flat::BytesValue;
+    use crate::flat::{BytesValue, Emit, build};
+
+    #[test]
+    fn string_lengths_at_inline_limit() -> Result<(), Infallible> {
+        let range = TextRange::default();
+        let mut builder = Builder::default();
+        for len in [
+            0,
+            1,
+            usize::from(u16::MAX) - 1,
+            usize::from(u16::MAX),
+            80_000,
+        ] {
+            let text = "x".repeat(len);
+            let (part, ..) =
+                builder.try_string_literal(range, StringLiteralFlags::empty(), |out| {
+                    out.push_str(&text);
+                    Ok::<(), Infallible>(())
+                })?;
+            let value = builder.list([part]);
+            let (literal, ..) = build::ExprStringLiteral { range, value }.emit(&mut builder);
+            let value = builder.get(literal).value();
+            assert_eq!(value.is_empty(), len == 0);
+            assert_eq!(value.len(), len);
+            assert_eq!(value.to_str(), text);
+        }
+        Ok(())
+    }
 
     #[test]
     fn byte_literals_borrow_consecutive_parts() -> Result<(), Infallible> {

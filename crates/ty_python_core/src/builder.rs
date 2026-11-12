@@ -4491,7 +4491,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.visit_expr(value);
 
-                if let ast::ExprFields::Name(ast::ExprNameFields { id, .. }) = target.fields()
+                if let Some(id) = target.as_name_expr().map(ast::ExprName::id)
                     && id == "__all__"
                     && op.is_add()
                     && self.in_module_scope()
@@ -4574,7 +4574,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     let next_falsy = if let Some(elif_test) = clause_test {
-                        if final_elif_test.is_some_and(|test| test.range() == elif_test.range()) {
+                        if final_elif_test.is_some_and(|test| test.is_same_node(elif_test)) {
                             self.current_use_def_map_mut()
                                 .set_if_chain_start(chain_start.take());
                         }

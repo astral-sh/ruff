@@ -450,8 +450,10 @@ pub(crate) fn unittest_raises_assertion_binding(checker: &Checker, binding: &Bin
 
         let mut ancestors = semantic.expressions(node_id).skip(1);
 
-        let Some(ast::ExprFields::Attribute(ast::ExprAttributeFields { attr, .. })) =
-            ancestors.next().map(Expr::fields)
+        let Some(attr) = ancestors
+            .next()
+            .and_then(Expr::as_attribute_expr)
+            .map(ast::ExprAttribute::attr)
         else {
             continue;
         };

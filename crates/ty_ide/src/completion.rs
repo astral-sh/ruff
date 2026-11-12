@@ -12,8 +12,8 @@ use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{
-    self as ast, AnyNode, Expr, ExprAttribute, ExprStringLiteral, ExprSubscript, Identifier,
-    StmtClassDef, StmtImport, StmtImportFrom, StringFlags, SyntaxNode,
+    self as ast, AnyNode, AstNode, Expr, ExprAttribute, ExprStringLiteral, ExprSubscript,
+    Identifier, StmtClassDef, StmtImport, StmtImportFrom, StringFlags, SyntaxNode,
 };
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -54,7 +54,7 @@ pub fn completion<'db>(
     let model = SemanticModel::new(db, program_file);
 
     if !matches!(context.kind, ContextKind::Keywords(_)) && context.cursor.is_in_string() {
-        let Some(string_expr) = context.cursor.enclosing_string_literal_expr() else {
+        let Some((string_expr, subscript)) = context.cursor.enclosing_string_literal_expr() else {
             return vec![];
         };
 
@@ -68,7 +68,7 @@ pub fn completion<'db>(
         add_string_literal_completions(
             &model,
             string_expr,
-            context.cursor.subscript_for_string(string_expr),
+            subscript,
             context.cursor.string_quote_style(),
             &mut completions,
         );
@@ -1031,39 +1031,17 @@ impl<'m> ContextCursor<'m> {
         })
     }
 
-    /// Returns the string literal expression that the cursor is positioned within, if any.
-    fn enclosing_string_literal_expr(&self) -> Option<ExprStringLiteral<'m>> {
-        match self
-            .covering_node
-            .parent()
-            .map(ruff_python_ast::SyntaxNode::classify)
-        {
-            Some(AnyNode::ExprStringLiteral(string_expr)) => Some(string_expr),
-            _ => None,
-        }
-    }
-
-    /// Returns the subscript whose complete slice is this string.
-    fn subscript_for_string(
+    /// Returns the enclosing string literal and the subscript, if the string is its complete slice.
+    fn enclosing_string_literal_expr(
         &self,
-        string_expr: ExprStringLiteral<'_>,
-    ) -> Option<ExprSubscript<'m>> {
-        let parent = self
-            .covering_node
-            .ancestors()
-            .skip_while(|node| {
-                !matches!(
-                    node.classify(),
-                    AnyNode::ExprStringLiteral(expr)
-                        if expr.range() == string_expr.range()
-                )
-            })
-            .nth(1)?;
-        let AnyNode::ExprSubscript(subscript) = parent.classify() else {
-            return None;
-        };
-
-        (subscript.slice().range() == string_expr.range()).then_some(subscript)
+    ) -> Option<(ExprStringLiteral<'m>, Option<ExprSubscript<'m>>)> {
+        let mut ancestors = self.covering_node.ancestors().skip(1);
+        let string = ancestors.next()?.cast::<ExprStringLiteral>()?;
+        let subscript = ancestors
+            .next()
+            .and_then(AstNode::cast::<ExprSubscript>)
+            .filter(|subscript| subscript.slice().is_same_node(string));
+        Some((string, subscript))
     }
 
     /// Returns the quote style of the string literal that the cursor is positioned within, if any.

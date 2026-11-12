@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_python_ast::helpers::{is_const_true, map_callable};
+use ruff_python_ast::helpers::{is_compound_statement, is_const_true, map_callable};
 use ruff_python_ast::{
     self as ast, Decorator, Expr, ExprKind, InterpolatedStringElementKind, Keyword, NodeList,
     StmtFunctionDef, StmtKind,
@@ -11,6 +11,30 @@ use ruff_python_trivia::PythonWhitespace;
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_pytest_asyncio_enabled;
+
+/// PT012 and PT031 allow a single simple statement, nested context manager, definition,
+/// or empty for loop inside `pytest.raises` and `pytest.warns`.
+pub(super) fn is_complex_context_manager_body(body: ast::Suite<'_>) -> bool {
+    let Some([stmt]) = body.as_array() else {
+        return true;
+    };
+    match stmt.classify() {
+        StmtKind::With(with) => with
+            .body()
+            .as_array()
+            .is_none_or(|[stmt]| is_compound_statement(stmt)),
+        // Allow function and class definitions to test decorators.
+        StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => false,
+        // Allow empty for loops to test iterators.
+        StmtKind::For(for_stmt) => for_stmt.body().as_array().is_none_or(|[stmt]| {
+            !stmt.is_pass_stmt()
+                && !stmt
+                    .as_expr_stmt()
+                    .is_some_and(|expr| expr.value().is_ellipsis_literal_expr())
+        }),
+        _ => is_compound_statement(stmt),
+    }
+}
 
 pub(super) fn get_mark_decorators<'a>(
     decorators: NodeList<'a, ast::kind::Decorator>,

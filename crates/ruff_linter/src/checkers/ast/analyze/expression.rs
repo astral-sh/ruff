@@ -1558,10 +1558,14 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             let generators = comp.generators();
 
             if checker.is_rule_enabled(Rule::UnnecessaryListIndexLookup) {
-                pylint::rules::unnecessary_list_index_lookup_comprehension(checker, &expr);
+                pylint::rules::unnecessary_list_index_lookup_comprehension(
+                    checker, elt, generators,
+                );
             }
             if checker.is_rule_enabled(Rule::UnnecessaryDictIndexLookup) {
-                pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, &expr);
+                pylint::rules::unnecessary_dict_index_lookup_comprehension(
+                    checker, elt, generators,
+                );
             }
             if checker.is_rule_enabled(Rule::UnnecessaryComprehension) {
                 flake8_comprehensions::rules::unnecessary_list_set_comprehension(
@@ -1585,10 +1589,14 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             let generators = comp.generators();
 
             if checker.is_rule_enabled(Rule::UnnecessaryListIndexLookup) {
-                pylint::rules::unnecessary_list_index_lookup_comprehension(checker, &expr);
+                pylint::rules::unnecessary_list_index_lookup_comprehension(
+                    checker, elt, generators,
+                );
             }
             if checker.is_rule_enabled(Rule::UnnecessaryDictIndexLookup) {
-                pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, &expr);
+                pylint::rules::unnecessary_dict_index_lookup_comprehension(
+                    checker, elt, generators,
+                );
             }
             if checker.is_rule_enabled(Rule::UnnecessaryComprehension) {
                 flake8_comprehensions::rules::unnecessary_list_set_comprehension(
@@ -1614,10 +1622,14 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             let generators = fields.generators;
 
             if checker.is_rule_enabled(Rule::UnnecessaryListIndexLookup) {
-                pylint::rules::unnecessary_list_index_lookup_comprehension(checker, &expr);
+                pylint::rules::unnecessary_list_index_lookup_comprehension(
+                    checker, value, generators,
+                );
             }
             if checker.is_rule_enabled(Rule::UnnecessaryDictIndexLookup) {
-                pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, &expr);
+                pylint::rules::unnecessary_dict_index_lookup_comprehension(
+                    checker, value, generators,
+                );
             }
 
             if checker.is_rule_enabled(Rule::UnnecessaryComprehension)
@@ -1650,10 +1662,18 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             let generators = generator.generators();
 
             if checker.is_rule_enabled(Rule::UnnecessaryListIndexLookup) {
-                pylint::rules::unnecessary_list_index_lookup_comprehension(checker, &expr);
+                pylint::rules::unnecessary_list_index_lookup_comprehension(
+                    checker,
+                    generator.elt(),
+                    generators,
+                );
             }
             if checker.is_rule_enabled(Rule::UnnecessaryDictIndexLookup) {
-                pylint::rules::unnecessary_dict_index_lookup_comprehension(checker, &expr);
+                pylint::rules::unnecessary_dict_index_lookup_comprehension(
+                    checker,
+                    generator.elt(),
+                    generators,
+                );
             }
             if checker.is_rule_enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Expr(expr));

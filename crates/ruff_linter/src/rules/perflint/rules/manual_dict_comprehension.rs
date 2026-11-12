@@ -362,11 +362,7 @@ fn convert_to_dict_comprehension(
     };
 
     // If the value is a tuple without parentheses, add them
-    let value_str = if let ast::ExprFields::Tuple(ast::ExprTupleFields {
-        parenthesized: false,
-        ..
-    }) = value.fields()
-    {
+    let value_str = if let Some(false) = value.as_tuple_expr().map(ast::ExprTuple::parenthesized) {
         format!("({})", locator.slice(value))
     } else {
         locator.slice(value).to_string()

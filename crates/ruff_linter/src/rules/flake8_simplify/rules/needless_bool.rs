@@ -1,7 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    self as ast, Builder, Expr, ExprKind, Stmt, StmtKind, Suite, build, traversal,
-};
+use ruff_python_ast::{self as ast, Builder, ExprKind, Stmt, StmtKind, Suite, build, traversal};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -318,10 +316,5 @@ fn return_bool(stmt: Stmt<'_>) -> Option<Bool> {
         return None;
     };
     let value = return_stmt.value();
-    let Some(ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields { value, .. })) =
-        value.map(Expr::fields)
-    else {
-        return None;
-    };
-    Some(value.into())
+    Some(value?.as_boolean_literal_expr()?.value().into())
 }

@@ -1,7 +1,7 @@
 use ruff_formatter::{FormatContext, FormatOwnedWithRule, FormatRuleWithOptions, write};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{
-    self as ast, AnyNode, ExprKind, PySourceType, Stmt, StmtExpr, StmtKind, Suite, SyntaxNode,
+    AnyNode, ExprKind, PySourceType, Stmt, StmtExpr, StmtKind, Suite, SyntaxNode,
 };
 use ruff_python_trivia::{
     SimpleTokenKind, SimpleTokenizer, lines_after, lines_after_ignoring_end_of_line_trivia,
@@ -748,17 +748,12 @@ fn contains_only_an_ellipsis(body: Suite<'_>, comments: &Comments) -> bool {
 /// Returns the ellipsis statement if it is the only statement in a function or class body
 /// and has no comments.
 pub(crate) fn as_only_an_ellipsis<'a>(body: Suite<'a>, comments: &Comments) -> Option<Stmt<'a>> {
-    if let Some([node @ ast::StmtFields::Expr(ast::StmtExprFields { value, .. })]) = body
-        .as_array()
-        .map(|items| items.map(ruff_python_ast::Stmt::fields))
-        && value.is_ellipsis_literal_expr()
-        && !comments.has_leading(node.view())
-        && !comments.has_trailing_own_line(node.view())
-    {
-        return Some(node.view());
-    }
-
-    None
+    let [stmt] = body.as_array()?;
+    let expr = stmt.as_expr_stmt()?;
+    (expr.value().is_ellipsis_literal_expr()
+        && !comments.has_leading(stmt)
+        && !comments.has_trailing_own_line(stmt))
+    .then_some(stmt)
 }
 
 /// Returns `true` if a [`Stmt`] is a class or function definition.

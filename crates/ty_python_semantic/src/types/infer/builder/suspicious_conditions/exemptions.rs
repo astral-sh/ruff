@@ -718,8 +718,10 @@ fn definition_contains_special_cased_condition<'db>(
 
     if let DefinitionKind::AnnotatedAssignment(annotated_assignment) = definition_kind
         && file.is_stub(db)
-        && let ast::ExprFields::Name(ast::ExprNameFields { id, .. }) =
-            annotated_assignment.target(&module).fields()
+        && let Some(id) = annotated_assignment
+            .target(&module)
+            .as_name_expr()
+            .map(ast::ExprName::id)
     {
         match &**id {
             "version_info" | "platform" if in_known_module(KnownModule::Sys) => {

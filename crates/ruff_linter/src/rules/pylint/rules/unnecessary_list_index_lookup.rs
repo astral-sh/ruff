@@ -73,23 +73,11 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &Checker, stmt_for: &ast::S
 }
 
 /// PLR1736
-pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &Checker, &expr: &Expr<'_>) {
-    let (elt, generators) = match expr.fields() {
-        ast::ExprFields::Generator(ast::ExprGeneratorFields {
-            elt, generators, ..
-        })
-        | ast::ExprFields::SetComp(ast::ExprSetCompFields {
-            elt, generators, ..
-        })
-        | ast::ExprFields::ListComp(ast::ExprListCompFields {
-            elt, generators, ..
-        }) => (elt, generators),
-        ast::ExprFields::DictComp(ast::ExprDictCompFields {
-            value, generators, ..
-        }) => (value, generators),
-        _ => return,
-    };
-
+pub(crate) fn unnecessary_list_index_lookup_comprehension<'a>(
+    checker: &Checker,
+    elt: Expr<'a>,
+    generators: ast::NodeList<'a, ast::kind::Comprehension>,
+) {
     for comp in generators {
         let Some((sequence, index_name, value_name)) =
             enumerate_items(comp.iter(), comp.target(), checker.semantic())

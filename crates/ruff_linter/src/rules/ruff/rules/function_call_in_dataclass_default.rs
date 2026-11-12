@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ExprKind, Stmt, StmtClassDef, StmtKind, Suite};
+use ruff_python_ast::{Expr, Stmt, StmtClassDef, StmtKind, Suite};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
@@ -122,15 +122,10 @@ pub(crate) fn function_call_in_dataclass_default(
         .collect();
 
     for statement in class_def.body() {
-        let ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields {
-            annotation,
-            value: Some(expr),
-            ..
-        }) = statement.fields()
-        else {
+        let Some(assignment) = statement.as_ann_assign_stmt() else {
             continue;
         };
-        let ExprKind::Call(call_node) = expr.classify() else {
+        let Some(call_node) = assignment.value().and_then(Expr::as_call_expr) else {
             continue;
         };
         let func = call_node.func();
@@ -143,6 +138,7 @@ pub(crate) fn function_call_in_dataclass_default(
             continue;
         }
 
+        let annotation = assignment.annotation();
         if is_field
             || is_immutable_annotation(annotation, checker.semantic(), &extend_immutable_calls)
             || is_class_var_annotation(annotation, checker.semantic())
@@ -159,7 +155,7 @@ pub(crate) fn function_call_in_dataclass_default(
         let kind = FunctionCallInDataclassDefaultArgument {
             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
         };
-        checker.report_diagnostic(kind, expr.range());
+        checker.report_diagnostic(kind, call_node.range());
     }
 }
 

@@ -1,4 +1,4 @@
-use super::{AnyNode, AstNode, Suite};
+use super::{AnyNode, Suite};
 use crate::Stmt;
 
 pub fn suite<'a>(
@@ -52,9 +52,7 @@ pub struct EnclosingSuite<'a> {
 
 impl<'a> EnclosingSuite<'a> {
     pub fn new(suite: Suite<'a>, stmt: crate::SyntaxNode<'a>) -> Option<Self> {
-        let position = suite
-            .iter()
-            .position(|sibling| sibling.is_same_node(stmt))?;
+        let position = suite.position_of(stmt)?;
 
         Some(EnclosingSuite { suite, position })
     }

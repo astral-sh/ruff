@@ -384,8 +384,10 @@ pub fn is_immutable_newtype_call(
         return false;
     }
 
-    let Some(ast::StmtFields::Assign(ast::StmtAssignFields { value, .. })) =
-        binding.statement(semantic).map(ast::Stmt::fields)
+    let Some(value) = binding
+        .statement(semantic)
+        .and_then(ast::Stmt::as_assign_stmt)
+        .map(ast::StmtAssign::value)
     else {
         return false;
     };
@@ -1082,9 +1084,10 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
     //   ...
     // ```
     if matches!(binding.kind, BindingKind::Argument) {
-        if let Some(ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields {
-            parameters, ..
-        })) = binding.statement(semantic).map(ast::Stmt::fields)
+        if let Some(parameters) = binding
+            .statement(semantic)
+            .and_then(ast::Stmt::as_function_def_stmt)
+            .map(ast::StmtFunctionDef::parameters)
         {
             if let Some(kwarg_parameter) = parameters.kwarg() {
                 if kwarg_parameter.name().range() == binding.range() {
@@ -1136,9 +1139,10 @@ pub fn is_tuple(binding: &Binding, semantic: &SemanticModel) -> bool {
     //   ...
     // ```
     if matches!(binding.kind, BindingKind::Argument) {
-        if let Some(ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields {
-            parameters, ..
-        })) = binding.statement(semantic).map(ast::Stmt::fields)
+        if let Some(parameters) = binding
+            .statement(semantic)
+            .and_then(ast::Stmt::as_function_def_stmt)
+            .map(ast::StmtFunctionDef::parameters)
         {
             if let Some(arg_parameter) = parameters.vararg() {
                 if arg_parameter.name().range() == binding.range() {

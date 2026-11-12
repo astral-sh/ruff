@@ -966,20 +966,16 @@ impl GotoTarget<'_> {
         if let Some(expr) = node.cast::<ast::Expr>()
             && string_annotation.is_none()
         {
-            let enclosing_subscript_with_slice_range =
-                |range: TextRange| -> Option<ast::ExprSubscript<'a>> {
-                    covering_node.ancestors().find_map(|node| {
-                        let AnyNode::ExprSubscript(subscript) = node.classify() else {
-                            return None;
-                        };
-                        (subscript.slice().range() == range).then_some(subscript)
-                    })
-                };
-
+            let subscript_for_slice = |slice: ast::Expr<'a>| -> Option<ast::ExprSubscript<'a>> {
+                let mut ancestors = covering_node.ancestors();
+                ancestors.find(|node| node.is_same_node(slice))?;
+                let subscript = ancestors.next()?.cast::<ast::ExprSubscript>()?;
+                subscript.slice().is_same_node(slice).then_some(subscript)
+            };
             // 1. Cursor on the `ExprSlice` itself (e.g. `values[<CURSOR>:2]`,
             // `values[:<CURSOR>2]`).
             if expr.is_slice_expr()
-                && let Some(subscript) = enclosing_subscript_with_slice_range(expr.range())
+                && let Some(subscript) = subscript_for_slice(expr)
             {
                 return Some(GotoTarget::Expression(subscript.into()));
             }
@@ -987,20 +983,12 @@ impl GotoTarget<'_> {
             // 2. Cursor on a literal or signed-literal `ExprSubscript.slice` (e.g. `values[0]`,
             // `person["name"]`, `values[-1]` where the covering node is the bracketed
             // expression).
-            let slice_expr_range = if expr.is_literal_expr() {
-                Some(expr.range())
-            } else if let Some(unary_op) = expr.as_unary_op_expr()
-                && matches!(unary_op.op(), ast::UnaryOp::USub | ast::UnaryOp::UAdd)
-                && unary_op.operand().is_literal_expr()
-            {
-                Some(unary_op.range())
-            } else {
-                None
-            };
-
-            if let Some(slice_range) = slice_expr_range
-                && let Some(subscript) = enclosing_subscript_with_slice_range(slice_range)
-            {
+            let is_literal_slice = expr.is_literal_expr()
+                || expr.as_unary_op_expr().is_some_and(|unary| {
+                    matches!(unary.op(), ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                        && unary.operand().is_literal_expr()
+                });
+            if is_literal_slice && let Some(subscript) = subscript_for_slice(expr) {
                 if let Some(literal) = subscript.slice().as_string_literal_expr() {
                     let key = literal.value().to_str();
                     return Some(GotoTarget::SubscriptStringLiteralKey {
@@ -1017,16 +1005,15 @@ impl GotoTarget<'_> {
                 && let Some(AnyNode::ExprUnaryOp(unary_op)) =
                     covering_node.parent().map(SyntaxNode::classify)
                 && matches!(unary_op.op(), ast::UnaryOp::USub | ast::UnaryOp::UAdd)
-                && unary_op.operand().is_literal_expr()
-                && unary_op.operand().range() == expr.range()
-                && let Some(subscript) = enclosing_subscript_with_slice_range(unary_op.range())
+                && unary_op.operand().is_same_node(expr)
+                && let Some(subscript) = subscript_for_slice(unary_op.into())
             {
                 return Some(GotoTarget::Expression(subscript.into()));
             }
 
             // 4. Cursor on a literal or signed-literal `ExprSlice` bound (e.g. `values[1:<CURSOR>2]`,
             // `values[:-<CURSOR>1]`).
-            if slice_expr_range.is_some()
+            if is_literal_slice
                 && let Some(slice) =
                     covering_node
                         .ancestors()
@@ -1034,7 +1021,7 @@ impl GotoTarget<'_> {
                             AnyNode::ExprSlice(slice) => Some(slice),
                             _ => None,
                         })
-                && let Some(subscript) = enclosing_subscript_with_slice_range(slice.range())
+                && let Some(subscript) = subscript_for_slice(slice.into())
             {
                 return Some(GotoTarget::Expression(subscript.into()));
             }
@@ -1043,7 +1030,7 @@ impl GotoTarget<'_> {
             // `values<CURSOR>[1:]`).
             if let Some(AnyNode::ExprSubscript(subscript)) =
                 covering_node.parent().map(SyntaxNode::classify)
-                && subscript.value().range() == expr.range()
+                && subscript.value().is_same_node(expr)
                 && expr.range().end() == offset
             {
                 return Some(GotoTarget::Expression(subscript.into()));

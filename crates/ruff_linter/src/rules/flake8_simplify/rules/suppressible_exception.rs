@@ -66,16 +66,13 @@ impl Violation for SuppressibleException {
 }
 
 fn is_empty(body: Suite<'_>) -> bool {
-    match body
-        .as_array()
-        .map(|items| items.map(ruff_python_ast::Stmt::fields))
-    {
-        Some([ast::StmtFields::Pass(_)]) => true,
-        Some([ast::StmtFields::Expr(ast::StmtExprFields { value, .. })]) => {
-            value.is_ellipsis_literal_expr()
-        }
-        _ => false,
-    }
+    let Some([stmt]) = body.as_array() else {
+        return false;
+    };
+    stmt.is_pass_stmt()
+        || stmt
+            .as_expr_stmt()
+            .is_some_and(|expr| expr.value().is_ellipsis_literal_expr())
 }
 
 /// SIM105

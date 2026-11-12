@@ -1633,10 +1633,8 @@ fn is_recognized_all_assignment(stmt: Stmt<'_>, name: ExprName<'_>) -> bool {
         StmtKind::Assign(assign) => assign
             .targets()
             .first()
-            .is_some_and(|target| is_dunder_all(target) && target.range() == name.range()),
-        StmtKind::AnnAssign(assign) => {
-            is_dunder_all(assign.target()) && assign.target().range() == name.range()
-        }
+            .is_some_and(|target| target.is_same_node(name)),
+        StmtKind::AnnAssign(assign) => assign.target().is_same_node(name),
         _ => false,
     }
 }
