@@ -383,17 +383,16 @@ mod schema {
             })
             .filter(|_rule| {
                 // Filter out all test-only rules
-                #[cfg(any(feature = "test-rules", test))]
-                #[expect(clippy::used_underscore_binding)]
-                if _rule.starts_with("RUF9")
-                    || _rule == "PLW0101"
-                    || Rule::from_name(_rule)
-                        .is_ok_and(|rule| matches!(rule.category(), Category::Testing))
-                {
-                    return false;
+                cfg_select! {
+                    any(feature = "test-rules", test) => {
+                    #[expect(clippy::used_underscore_binding)]
+                    !(_rule.starts_with("RUF9")
+                      || _rule == "PLW0101"
+                      || Rule::from_name(_rule)
+                      .is_ok_and(|rule| matches!(rule.category(), Category::Testing)))
+                    }
+                    _ => true,
                 }
-
-                true
             })
             .sorted()
             .collect();

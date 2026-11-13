@@ -1018,7 +1018,7 @@ impl<'a> SuppressionsBuilder<'a> {
             } else {
                 self.invalid.push(InvalidSuppression {
                     kind: InvalidSuppressionKind::Unmatched,
-                    comment: self.pending.remove(comment_index).comment.clone(),
+                    comment: self.pending.remove(comment_index).comment,
                 });
             }
         }
