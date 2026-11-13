@@ -16,7 +16,7 @@ use crate::types::{
     bound_super::walk_bound_super_type,
     callable::walk_callable_type,
     class::walk_generic_alias,
-    cyclic::{ActiveRecursionDetector, TypeIdentity},
+    cyclic::{ActiveRecursionDetector, CycleDetector, TypeIdentity},
     function::{FunctionType, walk_function_type},
     generics::{GenericContext, walk_specialization_types},
     instance::{walk_nominal_instance_type, walk_protocol_instance_type},
@@ -1094,47 +1094,39 @@ pub(super) fn any_over_type_including_alias_arguments<'db>(
 ///
 /// Revisiting a recursive alias counts as a match because its specialization can grow on each
 /// visit. Distinct specializations of a nonrecursive alias remain separate, so nested uses such as
-/// `Identity[Identity[int]]` are still considered finite.
+/// `Identity[Identity[int]]` are still considered finite. Shared alias specializations are
+/// expanded only once per search.
 pub(super) fn any_over_type_expanding_aliases<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
+    type AliasExpansions<'db> = CycleDetector<'db, (), Type<'db>, bool, 3>;
+
     fn search<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         query: &impl Fn(Type<'db>) -> bool,
-        active_aliases: &ActiveRecursionDetector<TypeIdentity<'db>>,
+        expansions: &AliasExpansions<'db>,
     ) -> bool {
+        let search_body = |body| search(db, env, body, query, expansions);
         any_over_type(db, env, ty, false, |nested| {
             query(nested)
                 || match nested {
-                    Type::TypeAlias(alias) => active_aliases.visit(
-                        &nested.to_type_identity(db),
-                        || true,
-                        || search(db, env, alias.value_type(db), query, active_aliases),
-                    ),
-                    Type::Recursive(recursive) => active_aliases.visit(
-                        &nested.to_type_identity(db),
-                        || true,
-                        || {
-                            search(
-                                db,
-                                env,
-                                recursive.unfold(db, env).into_type(),
-                                query,
-                                active_aliases,
-                            )
-                        },
-                    ),
+                    Type::TypeAlias(alias) => {
+                        expansions.visit(db, nested, || search_body(alias.value_type(db)))
+                    }
+                    Type::Recursive(recursive) => expansions.visit(db, nested, || {
+                        search_body(recursive.unfold(db, env).into_type())
+                    }),
                     _ => false,
                 }
         })
     }
 
-    search(db, env, ty, &query, &ActiveRecursionDetector::default())
+    search(db, env, ty, &query, &AliasExpansions::new(true))
 }
 
 /// Recurse into a type and calls the passed-in closure on every nested type
@@ -1170,6 +1162,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_python_core::ProgramFile;
@@ -1178,7 +1172,41 @@ mod tests {
     use crate::place::global_symbol;
     use crate::types::{DynamicType, Parameter, Parameters, SpecialFormType, Type};
 
-    use super::{CollectedTypes, DynamicContentMode, dynamic_content, dynamic_content_impl};
+    use super::{
+        CollectedTypes, DynamicContentMode, any_over_type_expanding_aliases, dynamic_content,
+        dynamic_content_impl,
+    };
+
+    #[test]
+    fn shared_alias_specializations_are_expanded_once() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            from typing import Literal
+
+            type Leaf[T] = T
+            type Branch = tuple[Leaf[Literal[1]], Leaf[Literal[2]]]
+            tree: tuple[Branch, Branch]
+            "#,
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/a.py")?;
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let tree = global_symbol(&db, module, "tree").place.expect_type();
+        let one = Cell::new(0);
+        let two = Cell::new(0);
+        assert!(!any_over_type_expanding_aliases(&db, &env, tree, |ty| {
+            match ty.as_int_literal() {
+                Some(1) => one.set(one.get() + 1),
+                Some(2) => two.set(two.get() + 1),
+                _ => {}
+            }
+            false
+        }));
+        assert_eq!((one.get(), two.get()), (1, 1));
+        Ok(())
+    }
 
     #[test]
     fn fully_static_paramspec_value_has_no_dynamic_content() {
