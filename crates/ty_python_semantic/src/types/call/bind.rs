@@ -6939,10 +6939,13 @@ impl<'db> CallInference<'_, 'db> {
                 validated || self.accepts_arguments(inference.merged_specialization(db))
             };
 
-        // An expected `list[None]` can specialize `wrap[B](x: B) -> list[B]` to `B = None`
-        // even when the argument has a caller-fixed type `S`. That solution assumes `S ≤ None`.
-        // TODO: Remove the extra argument check once the solver accounts for all specializations
-        // of caller-fixed type variables (https://github.com/astral-sh/ty/issues/4696).
+        // A specialization inferred from the return context can depend on a condition that only
+        // holds for some specializations of a non-inferable typevar. The resulting parameter types
+        // may be incompatible with the actual arguments. In that case, try re-inferring the
+        // specialization from the arguments alone.
+        //
+        // TODO[ty#4696]: Remove this argument recheck once the solver verifies that its solutions
+        // cover every specialization of any non-inferable typevars.
         if return_context.is_some() && !solution.as_ref().is_ok_and(accepts_arguments) {
             builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
             specialization_errors.clear();
