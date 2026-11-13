@@ -2758,6 +2758,53 @@ def _(handlers: list[Callable[[str], str]]):
     register(handlers, lambda s: reveal_type(s))  # revealed: str
 ```
 
+## Inferring a lambda parameter from a sibling argument
+
+The value passed to `apply` determines what the callback receives. A wider return annotation on the
+caller still allows the callback to use string methods.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+def apply(callback: Callable[[T], T], value: T) -> T:
+    return callback(value)
+
+def stripped() -> Any | None:
+    return apply(value="text", callback=lambda s: reveal_type(s).strip())  # revealed: str
+```
+
+If the value itself may be `None`, the callback must handle it. The callback can also return `None`
+when given a string, in which case `None` contributes to the inferred type of the call.
+
+```py
+def stripped_optional(value: str | None) -> Any | None:
+    return apply(lambda s: s.strip(), value)  # error: [missing-union-attribute]
+
+def _(value: str):
+    result = apply(lambda _: None, value)
+    reveal_type(result)  # revealed: None | str
+```
+
+An error on another argument still leaves the callback parameter's type available.
+
+```py
+def apply_n(callback: Callable[[T], T], value: T, count: int) -> T:
+    for _ in range(count):
+        value = callback(value)
+    return value
+
+def _(value: str) -> Any | None:
+    return apply_n(lambda s: s.strip(), value, "twice")  # error: [invalid-argument-type] "Expected `int`"
+
+def _(value: str):
+    # error: [invalid-argument-type] "Expected `int`"
+    result = apply_n(lambda _: None, value, "twice")
+    reveal_type(result)  # revealed: None | str
+```
+
 ## Passing generic functions to generic functions
 
 ```py
