@@ -178,8 +178,15 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
     ) {
         let result = Self::workspace_diagnostics(&snapshot, client, params.clone());
 
-        // A partial report means the client already received changed diagnostics. Finish
-        // the pull so its next request can include the result IDs for those files.
+        // Test if this is a no-op result, in which case we should long-poll the request and
+        // only respond once some diagnostics have changed to get the latest result ids.
+        //
+        // Bulk response: This the simple case. Simply test if all diagnostics are unchanged (or empty)
+        // Streaming: This trickier but follows the same principle.
+        // * If the server sent any partial results, then `result` is a `Partial` result (in which
+        //   case we shouldn't do any long polling because some diagnostics changed).
+        // * If this is a full report, then check if all items are unchanged (or empty), the same as for
+        //   the non-streaming case.
         if let WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items }) =
             &result
         {
