@@ -517,7 +517,7 @@ A writable protocol member is invariant. The caller may supply a source whose `v
 arbitrary `object`, so the callee cannot assume that member holds a `str`.
 
 ```py
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 Element = TypeVar("Element")
 
@@ -525,8 +525,9 @@ class Source(Protocol[Element]):
     value: Element
 
 SourceT = TypeVar("SourceT", bound=Source[object])
+Text = TypeVar("Text", bound=str)
 
-def consume(source: Source[T]) -> None: ...
+def consume(source: Source[Text]) -> None: ...
 def wrapper(source: SourceT) -> None:
     consume(source)  # error: [invalid-argument-type]
 ```
