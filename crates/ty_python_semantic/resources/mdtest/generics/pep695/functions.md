@@ -3877,6 +3877,34 @@ def _(handlers: list[Callable[[str], str]]):
     register(handlers, lambda s: reveal_type(s))  # revealed: str
 ```
 
+## Inferring a lambda parameter from a sibling argument
+
+The value passed to `apply` determines what the callback receives. A wider return annotation on the
+caller still allows the callback to use string methods.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def apply[T](callback: Callable[[T], T], value: T) -> T:
+    return callback(value)
+
+def stripped() -> Any | None:
+    return apply(lambda s: reveal_type(s).strip(), "text")  # revealed: str
+```
+
+If the value itself may be `None`, the callback must handle it. The callback can also return `None`
+when given a string, in which case `None` contributes to the inferred type of the call.
+
+```py
+def stripped_optional(value: str | None) -> Any | None:
+    return apply(lambda s: s.strip(), value)  # error: [missing-union-attribute]
+
+def _(value: str):
+    result = apply(lambda _: None, value)
+    reveal_type(result)  # revealed: None | str
+```
+
 ## Passing generic functions to generic functions
 
 `functions.pyi`:
@@ -5493,16 +5521,14 @@ this kind of transitive relationship. The same pattern does not hold for `S ≤ 
 because the two `Any`s can materialize to different types, we cannot infer that `S ≤ T`.
 
 We have lower level tests of this in [`type_properties/implies_subtype_of.md`][implies_subtype_of].
-`functools.reduce` has a signature that exercises this behavior, as well, so we also include this
-regression test.
+In this call to `functools.reduce`, the initial value and the iterable give the callback an `int`
+accumulator and a `str` key. Adding the length of each key produces another `int`.
 
 ```py
 from functools import reduce
 
 def _(keys: list[str]):
-    # TODO: revealed: int
-    # revealed: Unknown | Literal[0]
-    reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
+    reveal_type(reduce(lambda total, k: total + len(k), keys, 0))  # revealed: int
 ```
 
 ### Transitive constraints preserve typevar domains
