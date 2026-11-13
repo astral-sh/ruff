@@ -1295,16 +1295,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             definition,
                             &class_node.node(self.module()).decorator_list,
                         );
-                        let original_ty = match self.region {
-                            InferenceRegion::Definition(current) if current == definition => {
-                                self.undecorated_type
-                            }
-                            _ => original_class_type(self.db(), definition).map(Type::ClassLiteral),
+                        let Some(ClassLiteral::Static(class)) =
+                            original_class_type(self.db(), definition)
+                        else {
+                            continue;
                         };
-                        let ty = original_ty.unwrap_or(ty);
                         post_inference::static_class::check_static_class_definitions(
                             &self.context,
-                            ty,
+                            class,
                             class_node.node(self.module()),
                             self.index,
                             &|expr| self.file_expression_type(expr),

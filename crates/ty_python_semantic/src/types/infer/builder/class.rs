@@ -337,7 +337,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        let mut inferred_ty = infer_original_class_ty(
+        let original_class_ty = infer_original_class_ty(
             deprecated,
             type_check_only,
             dataclass_params,
@@ -345,12 +345,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             total_ordering,
         );
 
-        let original_class_ty = inferred_ty;
-        let mut undecorated_ty = None;
-
         // In the second pass, apply class decorators from inner to outer and use their return types
         // to update the public binding. `original_class_ty` remains the class object whose body and
         // metadata were inferred above.
+        let mut inferred_ty = original_class_ty;
         for (decorator_ty, decorator_node, application) in decorators_to_apply {
             let precomputed_result = match application {
                 ClassDecoratorApplication::Ordinary(precomputed_result) => precomputed_result,
@@ -425,15 +423,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     decorated_ty,
                 )
             } else {
-                // Only record an undecorated type once a decorator actually replaces the public
-                // binding. If all decorators preserve the class, there is no alternate class type
-                // to expose.
-                undecorated_ty.get_or_insert(inferred_ty);
                 decorated_ty
             };
         }
 
-        self.undecorated_type = undecorated_ty;
+        // An intermediate decorator result can contain a cycle marker. Class-body checks need
+        // the original class even while the public binding is still being inferred.
+        self.undecorated_type = (inferred_ty != original_class_ty).then_some(original_class_ty);
 
         // A decorator can replace a nested class with a writable value, including another class.
         let qualifiers = if self.scope().scope(db).kind().is_class()
