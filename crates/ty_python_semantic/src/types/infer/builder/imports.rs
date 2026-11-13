@@ -11,7 +11,7 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin},
     reachability::evaluate_reachability_with_cache,
     types::{
-        ModuleLiteralType, Type, TypeAndQualifiers,
+        DeclaredType, ModuleLiteralType, Type,
         diagnostic::{
             IMPORT_NOT_FOUND, MISSING_DIRECT_DEPENDENCY, POSSIBLY_MISSING_IMPORT,
             hint_if_stdlib_attribute_exists_on_other_versions,
@@ -58,7 +58,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if qualifiers.contains(TypeQualifiers::FINAL) {
             self.declarations.insert(
                 definition,
-                TypeAndQualifiers::new(ty, TypeOrigin::Declared, qualifiers)
+                DeclaredType::new(Some(ty), TypeOrigin::Declared, qualifiers)
                     .with_provenance(provenance),
             );
         }

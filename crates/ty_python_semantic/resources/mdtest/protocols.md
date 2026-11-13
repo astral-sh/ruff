@@ -2433,6 +2433,323 @@ as something that must be supported by type checkers:
 > To distinguish between protocol class variables and protocol instance variables, the special
 > `ClassVar` annotation should be used.
 
+## Inferring the type of a `ClassVar` protocol member
+
+With a bare `ClassVar`, the initializer determines the type that implementations must support for
+both reads and writes.
+
+```py
+from typing import ClassVar, Protocol
+
+class HasCount(Protocol):
+    count: ClassVar = 0
+
+def get_count(value: HasCount) -> int:
+    reveal_type(type(value).count)  # revealed: int
+    return value.count
+
+class Counter:
+    count: ClassVar = 1
+
+class TextCounter:
+    count: ClassVar = "one"
+
+class Flag:
+    count: ClassVar[bool] = True
+
+get_count(Counter())  # ok
+get_count(TextCounter())  # error: [invalid-argument-type]
+get_count(Flag())  # error: [invalid-argument-type]
+```
+
+The type stays unknown until a protocol supplies a default, including in a subclass.
+
+```py
+class NoDefault(Protocol):
+    count: ClassVar
+
+class WithDefault(NoDefault, Protocol):
+    count = 0
+
+def check_defaults(first: NoDefault, second: WithDefault) -> None:
+    reveal_type(type(first).count)  # revealed: Unknown
+    reveal_type(type(second).count)  # revealed: int
+```
+
+If only one branch gives an explicit type, the interface also includes the value inferred on the
+other branch.
+
+```py
+from random import random
+
+class Conditional(Protocol):
+    if random() < 0.5:
+        count: ClassVar = "one"
+    else:
+        count: ClassVar[int] = 0
+
+def check_conditional(value: Conditional) -> None:
+    reveal_type(type(value).count)  # revealed: Literal["one"] | int
+```
+
+## Descriptors stored in `ClassVar` protocol members
+
+A descriptor can return different types through an instance and through the class. Assigning through
+the class replaces the descriptor. These operations are the same whether the protocol infers the
+descriptor's type or declares it explicitly.
+
+```py
+from typing import ClassVar, Protocol, overload
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+class Field:
+    @overload
+    def __get__(self, instance: None, owner: type) -> str: ...
+    @overload
+    def __get__(self, instance: object, owner: type) -> bool: ...
+    def __get__(self, instance: object, owner: type) -> str | bool:
+        return "field" if instance is None else True
+
+class Inferred(Protocol):
+    field: ClassVar = Field()
+
+class Explicit(Protocol):
+    field: ClassVar[Field]
+
+class Implementation:
+    field: ClassVar = Field()
+
+def check_inferred(value: Inferred) -> None:
+    reveal_type(value.field)  # revealed: bool
+    reveal_type(type(value).field)  # revealed: str
+    type(value).field = Field()  # ok
+    type(value).field = "field"  # error: [invalid-assignment]
+
+def check_explicit(value: Explicit) -> None:
+    reveal_type(value.field)  # revealed: bool
+    reveal_type(type(value).field)  # revealed: str
+    check_inferred(value)  # ok
+
+check_inferred(Implementation())  # ok
+check_explicit(Implementation())  # ok
+static_assert(not is_disjoint_from(Implementation, Inferred))
+```
+
+Class writes rule out an implementation that accepts only `NarrowField`, even though its read types
+match.
+
+```py
+class NarrowField(Field): ...
+
+class NarrowImplementation:
+    field: ClassVar = NarrowField()
+
+check_inferred(NarrowImplementation())  # error: [invalid-argument-type]
+```
+
+A descriptor whose getter accepts only `None` supports a class read. It can satisfy a protocol with
+the same descriptor. A protocol whose getter accepts any instance also requires an instance read.
+
+```py
+class ClassOnlyField:
+    def __get__(self, instance: None, owner: type) -> bool:
+        return True
+
+class ClassOnly(Protocol):
+    field: ClassVar = ClassOnlyField()
+
+class ClassOnlyImplementation:
+    field: ClassVar = ClassOnlyField()
+
+class ReadableField(ClassOnlyField):
+    def __get__(self, instance: object, owner: type) -> bool:
+        return True
+
+class Readable(Protocol):
+    field: ClassVar = ReadableField()
+
+def read(value: Readable) -> None: ...
+def check_class_only(value: ClassOnly) -> None:
+    reveal_type(type(value).field)  # revealed: bool
+    read(value)  # error: [invalid-argument-type]
+
+check_class_only(ClassOnlyImplementation())  # ok
+read(ClassOnlyImplementation())  # error: [invalid-argument-type]
+```
+
+A function stored in a `ClassVar` binds to the instance as a method. It can also be replaced through
+the class.
+
+```py
+def answer(instance: object) -> int:
+    return 42
+
+class HasFunction(Protocol):
+    get_answer: ClassVar = answer
+
+class ImplementationWithFunction:
+    get_answer: ClassVar = answer
+
+def replace(value: HasFunction) -> None:
+    reveal_type(value.get_answer())  # revealed: int
+    type(value).get_answer = answer  # ok
+
+replace(ImplementationWithFunction())  # ok
+```
+
+## Conditional `Final` protocol members
+
+When only one branch gives a `Final` an explicit type, a structural implementation can supply either
+that type or the value inferred on the other branch.
+
+```py
+from random import random
+from typing import Final, Protocol
+
+class HasValue(Protocol):
+    if random() < 0.5:
+        value: Final = "one"
+    else:
+        value: Final[int] = 0
+
+def check(value: HasValue) -> None:
+    reveal_type(value.value)  # revealed: Literal["one"] | int
+
+class One:
+    value: Final = "one"
+
+class Two:
+    value: Final = 2
+
+class Other:
+    value: Final = "other"
+
+check(One())  # ok
+check(Two())  # ok
+check(Other())  # error: [invalid-argument-type]
+```
+
+## Nested class members
+
+### Read-only nested classes
+
+A nested class declares a read-only member on both the protocol instance and its class. An
+implementation can provide a subclass of that nested class, so these accesses expose `type[Meta]`.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
+
+class HasMeta(Protocol):
+    class Meta: ...
+
+class Implementation:
+    class Meta(HasMeta.Meta): ...
+
+static_assert(is_subtype_of(Implementation, HasMeta))
+static_assert(is_subtype_of(TypeOf[Implementation], type[HasMeta]))
+
+def access(obj: HasMeta, cls: type[HasMeta]) -> None:
+    reveal_type(obj.Meta)  # revealed: type[Meta]
+    reveal_type(cls.Meta)  # revealed: type[Meta]
+    obj.Meta = HasMeta.Meta  # error: [invalid-assignment]
+    del obj.Meta  # error: [invalid-assignment]
+    del cls.Meta  # error: [invalid-assignment]
+```
+
+A property returning the right class type satisfies instance reads, but class access returns the
+property itself. Such an implementation does not satisfy the nested class member's contract.
+
+```py
+class InvalidPropertyImplementation:
+    @property
+    def Meta(self) -> type[HasMeta.Meta]:
+        return HasMeta.Meta
+
+static_assert(not is_subtype_of(InvalidPropertyImplementation, HasMeta))
+static_assert(not is_subtype_of(TypeOf[InvalidPropertyImplementation], type[HasMeta]))
+```
+
+A protocol that permits replacing `Meta` rejects `Implementation`, even when its setter accepts only
+the exact nested class.
+
+```py
+class Writable(Protocol):
+    @property
+    def Meta(self) -> object: ...
+    @Meta.setter
+    def Meta(self, value: TypeOf[Implementation.Meta]) -> None: ...
+
+static_assert(not is_assignable_to(Implementation, Writable))
+```
+
+### Nested class descriptors
+
+A nested class with a descriptor setter permits instance writes accepted by that setter. Without a
+getter, reads through either the instance or its class still expose the nested class object.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Setter(type):
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class HasDescriptor(Protocol):
+    class attribute(metaclass=Setter): ...
+
+def access(obj: HasDescriptor, cls: type[HasDescriptor]):
+    reveal_type(obj.attribute)  # revealed: type[attribute]
+    reveal_type(cls.attribute)  # revealed: type[attribute]
+    obj.attribute = 1  # ok
+    obj.attribute = "wrong"  # error: [invalid-assignment]
+    cls.attribute = 1  # error: [invalid-assignment]
+```
+
+An instance property cannot satisfy the class-side read contract.
+
+```py
+class InvalidInstanceOnly:
+    @property
+    def attribute(self) -> type[HasDescriptor.attribute]:
+        return HasDescriptor.attribute
+
+    @attribute.setter
+    def attribute(self, value: int) -> None: ...
+
+static_assert(not is_subtype_of(InvalidInstanceOnly, HasDescriptor))
+```
+
+When the metaclass defines `__get__`, its return type determines instance reads.
+
+```py
+class Getter(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> str:
+        return "value"
+
+class HasGetter(Protocol):
+    class attribute(metaclass=Getter): ...
+
+def access(obj: HasGetter):
+    reveal_type(obj.attribute)  # revealed: str
+```
+
+Both instance reads return a string. On the class, `HasGetter.attribute` returns a string while
+`PropertyOnly.attribute` returns the property itself, so `PropertyOnly` does not implement the
+protocol.
+
+```py
+class PropertyOnly:
+    @property
+    def attribute(self) -> str:
+        return "value"
+
+static_assert(not is_subtype_of(PropertyOnly, HasGetter))
+```
+
 ## Declared instance attribute members
 
 Declared protocol instance attributes should be available both on protocol-typed values and through
@@ -2603,6 +2920,16 @@ static_assert(is_subtype_of(MutableClassVarX, HasFinalClassVarX))
 static_assert(is_assignable_to(MutableClassVarX, HasFinalClassVarX))
 static_assert(is_subtype_of(FinalClassVarImplementation, HasFinalClassVarX))
 static_assert(is_assignable_to(FinalClassVarImplementation, HasFinalClassVarX))
+```
+
+A bare `Final` retains the literal type of its default. Here, the protocol requires a read to return
+zero.
+
+```py
+class HasFinalZero(Protocol):
+    x: Final = 0
+
+static_assert(not is_assignable_to(XReadProperty, HasFinalZero))
 ```
 
 A read/write property on a protocol, where the getter returns the same type that the setter takes,

@@ -29,12 +29,15 @@ use crate::{
     },
 };
 
-/// The instance operations promised by one attribute declaration.
+/// The operations promised by one attribute declaration.
 ///
 /// A descriptor can accept a different type from the one it returns. Ordinary mutable
 /// attributes use the same type for both operations, making their types invariant.
 struct AttributeContract<'db> {
-    read: Type<'db>,
+    /// A descriptor whose getter rejects the receiver provides no read on that receiver.
+    instance_read: Option<Type<'db>>,
+    /// A `ClassVar` also promises reads through the class, where `__get__` receives `None`.
+    class_read: Option<Type<'db>>,
     write: Option<Type<'db>>,
     is_property: bool,
     method_kind: AttributeMethodKind,
@@ -49,8 +52,8 @@ enum AttributeMethodKind {
     Other,
 }
 
-/// An inferred default has no declared attribute contract, but its value can still
-/// provide a call signature that an overriding method needs to preserve.
+/// An unannotated default without an inherited declaration can still provide a call
+/// signature that an overriding method needs to preserve.
 enum MemberContract<'db, A> {
     Attribute(A),
     Inferred(Type<'db>),
@@ -231,18 +234,21 @@ fn unbound_member_contract<'db>(
         return None;
     }
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
-    let is_descriptor = has_descriptor_method && !qualifiers.contains(TypeQualifiers::CLASS_VAR);
-    // Unannotated defaults with an inherited annotation already have a declared type.
-    // Other inferred bindings do not define an independent write contract: their raw
-    // types can retain literals that ordinary attribute access widens.
-    if own_place.origin == TypeOrigin::Inferred && !is_descriptor {
+    let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
+    let is_descriptor = has_descriptor_method && !is_class_var;
+    let ty = if own_place.origin.is_declared() || is_descriptor {
+        own_place.ty
+    } else if is_class_var && !qualifiers.contains(TypeQualifiers::FINAL) {
+        // A bare mutable `ClassVar` promises the public type inferred from its initializer.
+        own_place.public_type(db, env)
+    } else {
         return Some(MemberContract::Inferred(own_place.ty));
-    }
+    };
     // A decorator can turn a function into a property, in which case its exposed
     // value must be checked instead of the original function's signature.
     Some(MemberContract::Attribute(UnboundAttribute {
         literal,
-        ty: own_place.ty,
+        ty,
         class_member,
         instance_member,
         is_descriptor,
@@ -267,10 +273,18 @@ fn bind_attribute<'db>(
         is_method,
     } = *attribute;
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
+    let is_nested_class = qualifiers.contains(TypeQualifiers::NESTED_CLASS);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let is_method_wrapper = matches!(ty, Type::KnownInstance(KnownInstanceType::MethodWrapper(_)));
-    let (read, write) = if is_descriptor {
-        let read = Type::resolve_descriptor_access(
+    let (instance_read, class_read, write) = if is_class_var {
+        // A class variable has no instance storage. Both reads bind its descriptor, but
+        // assignment through the class replaces the stored value without calling its setter.
+        let stored = ty.bind_self_typevars(db, env, receiver);
+        let owner = receiver.to_meta_type(db, env);
+        let read = |instance| stored.class_variable_read_type(db, env, instance, owner);
+        (read(Some(receiver)), read(None), Some(stored))
+    } else if is_descriptor {
+        let member = Type::resolve_descriptor_access(
             db,
             env,
             class_member,
@@ -279,13 +293,16 @@ fn bind_attribute<'db>(
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
         .ok()?
-        .member(db)
-        .place
-        .ignore_possibly_undefined()?
-        .bind_self_typevars(db, env, receiver);
-        // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
-        // signatures, just like decorated definitions; the function's identity can change.
-        let read = if is_method || is_method_wrapper {
+        .member(db);
+        let read = member
+            .place
+            .ignore_possibly_undefined()?
+            .bind_self_typevars(db, env, receiver);
+        let read = if member.qualifiers.contains(TypeQualifiers::NESTED_CLASS) {
+            read.promote_class_literals(db, env)
+        } else if is_method || is_method_wrapper {
+            // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
+            // signatures, just like decorated definitions; the function's identity can change.
             read.try_upcast_to_callable(db, env)?.to_type(db, env)
         } else {
             read
@@ -306,13 +323,19 @@ fn bind_attribute<'db>(
                     .unwrap_or(read),
             )
         };
-        (read, write)
+        (Some(read), None, write)
     } else {
         // The selected declaration defines the contract, including inherited annotations.
         // Inferred instance assignments do not narrow a class-body declaration.
         let read = ty.bind_self_typevars(db, env, receiver);
+        let read = if is_nested_class {
+            read.promote_class_literals(db, env)
+        } else {
+            read
+        };
         (
-            read,
+            Some(read),
+            None,
             Some(
                 owner
                     .converter_input_type_for_field(db, name)
@@ -325,13 +348,15 @@ fn bind_attribute<'db>(
         .map_or(std::slice::from_ref(&ty), |union| union.elements(db));
     let is_frozen = literal.is_frozen_dataclass(db) == Some(true);
     Some(AttributeContract {
-        read,
+        instance_read,
+        class_read,
         // Attributes on `object` are included here because typeshed declares attributes such as
         // `__module__: str` on `object`, which normally implies writable instance attributes. But
         // `object()` provides no instance-attribute storage, so it does not actually guarantee
         // writability of these attributes.
         write: if owner.is_object(db)
             || qualifiers.contains(TypeQualifiers::FINAL)
+            || is_nested_class && !ty.is_data_descriptor(db, env)
             || !is_class_var && is_frozen
         {
             None
@@ -383,6 +408,21 @@ fn descriptor_write_domain<'db>(
     }
 }
 
+#[derive(Clone, Copy)]
+enum ReadAccess {
+    Instance,
+    Class,
+}
+
+impl ReadAccess {
+    const fn unavailable_message(self) -> &'static str {
+        match self {
+            Self::Instance => "Attribute cannot be read through an instance",
+            Self::Class => "Attribute cannot be read through the class",
+        }
+    }
+}
+
 enum AttributeViolation<'db> {
     Read {
         source: Type<'db>,
@@ -391,6 +431,7 @@ enum AttributeViolation<'db> {
     Write {
         target: Type<'db>,
     },
+    Unreadable(ReadAccess),
     ReadOnly,
 }
 
@@ -400,7 +441,9 @@ impl AttributeViolation<'_> {
         match self {
             _ if involves_property => &INCOMPATIBLE_PROPERTY_OVERRIDE,
             Self::Write { .. } => &INCOMPATIBLE_MUTABLE_OVERRIDE,
-            Self::Read { .. } | Self::ReadOnly => &INCOMPATIBLE_ATTRIBUTE_OVERRIDE,
+            Self::Read { .. } | Self::Unreadable(_) | Self::ReadOnly => {
+                &INCOMPATIBLE_ATTRIBUTE_OVERRIDE
+            }
         }
     }
 }
@@ -443,11 +486,21 @@ fn attribute_violation<'db>(
     {
         return None;
     }
-    if !source.read.is_assignable_to(db, env, target.read) {
-        return Some(AttributeViolation::Read {
-            source: source.read,
-            target: target.read,
-        });
+    for access in [ReadAccess::Instance, ReadAccess::Class] {
+        let (source, target) = match access {
+            ReadAccess::Instance => (source.instance_read, target.instance_read),
+            ReadAccess::Class if source.qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
+                (source.class_read, target.class_read)
+            }
+            ReadAccess::Class => continue,
+        };
+        let Some(target) = target else { continue };
+        let Some(source) = source else {
+            return Some(AttributeViolation::Unreadable(access));
+        };
+        if !source.is_assignable_to(db, env, target) {
+            return Some(AttributeViolation::Read { source, target });
+        }
     }
     if target.method_kind != AttributeMethodKind::Other {
         // ty allows methods to be shadowed with instance attributes. For example, it allows
@@ -460,6 +513,22 @@ fn attribute_violation<'db>(
         // These two rules are unsound together. The assignment above is valid through a
         // `Base` reference, but it would break a subclass with a return type of `str`.
         return None;
+    }
+    // Nested class declarations also constrain class access. A property returning a compatible
+    // value on instances does not necessarily preserve the class-side operation.
+    let class_read = |instance: Type<'db>| {
+        instance
+            .to_meta_type(db, env)
+            .member(db, env, name)
+            .ignore_possibly_undefined()
+            .map(|ty| ty.promote_class_literals(db, env))
+    };
+    if target.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+        && let Some(source) = class_read(receiver)
+        && let Some(target) = class_read(target_receiver)
+        && !source.is_assignable_to(db, env, target)
+    {
+        return Some(AttributeViolation::Read { source, target });
     }
     let write = target.write?;
     // A neutral dataclass-transform base explicitly permits frozen subclasses. Its
@@ -563,6 +632,9 @@ impl<'db> AttributeOverrideViolation<'db> {
                     target.display(db, env),
                 ));
             }
+            AttributeViolation::Unreadable(access) => {
+                diagnostic.set_primary_annotation_message(access.unavailable_message());
+            }
             AttributeViolation::ReadOnly => diagnostic.set_primary_annotation_message(
                 "Read-only attribute overrides a writable attribute",
             ),
@@ -651,7 +723,9 @@ pub(super) fn check_override<'db>(
     // must not hide an incompatible method signature.
     if source.method_kind == AttributeMethodKind::Method
         && target.qualifiers.contains(TypeQualifiers::FINAL)
-        && target.read.try_upcast_to_callable(db, env).is_some()
+        && target
+            .instance_read
+            .is_some_and(|read| read.try_upcast_to_callable(db, env).is_some())
     {
         return OverrideCheck::Callable;
     }
@@ -840,7 +914,8 @@ fn already_inherited<'db>(
             else {
                 return false;
             };
-            inherited.read == source.read
+            inherited.instance_read == source.instance_read
+                && inherited.class_read == source.class_read
                 && inherited.write == source.write
                 && inherited.is_frozen_field == source.is_frozen_field
                 && inherited.qualifiers == source.qualifiers
@@ -1007,6 +1082,9 @@ pub(super) fn check_inherited_conflict<'db>(
                 "Inherited attribute does not accept writes of type `{}`",
                 target.display(db, env),
             )),
+            AttributeViolation::Unreadable(access) => {
+                diagnostic.info(access.unavailable_message());
+            }
             AttributeViolation::ReadOnly => {
                 diagnostic.info("Inherited read-only attribute replaces a writable attribute");
             }

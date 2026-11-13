@@ -240,11 +240,6 @@ pub(crate) fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticMode
         else {
             return false;
         };
-        if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
-            if qualified_name.segments() == ["contextlib", "suppress"] {
-                return true;
-            }
-        }
-        false
+        semantic.matches_qualified_name(func, &["contextlib", "suppress"])
     })
 }

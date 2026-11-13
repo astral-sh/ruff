@@ -598,38 +598,17 @@ impl<'db> GenericContext<'db> {
         binding_context: Definition<'db>,
         type_param_node: &ast::TypeParam,
     ) -> Option<BoundTypeVarInstance<'db>> {
-        match type_param_node {
-            ast::TypeParam::TypeVar(node) => {
-                let definition = index.expect_single_definition(node);
-                let declared = inferred_declaration(db, definition).declared()?;
-                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declared.inner_type()
-                else {
-                    return None;
-                };
-                Some(typevar.with_binding_context(db, binding_context))
-            }
-            ast::TypeParam::ParamSpec(node) => {
-                let definition = index.expect_single_definition(node);
-                let declared = inferred_declaration(db, definition).declared()?;
-                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declared.inner_type()
-                else {
-                    return None;
-                };
-                Some(typevar.with_binding_context(db, binding_context))
-            }
-            ast::TypeParam::TypeVarTuple(node) => {
-                let definition = index.expect_single_definition(node);
-                let declared = inferred_declaration(db, definition).declared()?;
-                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declared.inner_type()
-                else {
-                    return None;
-                };
-                Some(typevar.with_binding_context(db, binding_context))
-            }
-        }
+        let definition = match type_param_node {
+            ast::TypeParam::TypeVar(node) => index.expect_single_definition(node),
+            ast::TypeParam::ParamSpec(node) => index.expect_single_definition(node),
+            ast::TypeParam::TypeVarTuple(node) => index.expect_single_definition(node),
+        };
+        let declared = inferred_declaration(db, definition).declared()?;
+        let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = declared.inner_type()?
+        else {
+            return None;
+        };
+        Some(typevar.with_binding_context(db, binding_context))
     }
 
     /// Creates a generic context from the legacy `TypeVar`s that appear in a function parameter

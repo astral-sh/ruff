@@ -1,8 +1,9 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::place::TypeOrigin;
 use crate::types::{
-    CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule, UnionType,
+    CallArguments, DataclassParams, DeclaredType, KnownClass, KnownInstanceType, SpecialFormType,
+    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypeQualifiers, TypingModule, UnionType,
     class::StaticClassHeader,
     function::{KnownFunction, OverloadLiteral},
     infer::{
@@ -434,10 +435,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.undecorated_type = undecorated_ty;
 
+        // A decorator can replace a nested class with a writable value, including another class.
+        let qualifiers = if self.scope().scope(db).kind().is_class()
+            && type_retains_original_class(db, env, original_class_ty, inferred_ty)
+        {
+            TypeQualifiers::NESTED_CLASS
+        } else {
+            TypeQualifiers::empty()
+        };
         self.add_declaration_with_binding(
             class_node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(inferred_ty),
+            &DeclaredAndInferredType::FromDeclaration(DeclaredType::new(
+                Some(inferred_ty),
+                TypeOrigin::Inferred,
+                qualifiers,
+            )),
         );
 
         // if there are type parameters, then the keywords and bases are within that scope
@@ -559,10 +572,10 @@ fn class_decorator_preserves_class_binding<'db>(
 
     match decorated_class {
         Type::ClassLiteral(decorated_literal) => {
-            let decorated_definition = decorated_literal.definition(db);
             decorated_literal == original_literal
-                || decorated_definition.is_some()
-                    && decorated_definition == original_literal.definition(db)
+                || decorated_literal
+                    .definition(db)
+                    .is_some_and(|definition| Some(definition) == original_literal.definition(db))
         }
         Type::SubclassOf(subclass_of) => subclass_of
             .subclass_of()

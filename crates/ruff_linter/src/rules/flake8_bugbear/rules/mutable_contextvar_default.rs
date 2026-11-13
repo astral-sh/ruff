@@ -99,10 +99,7 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
                     && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)))
         && checker
             .semantic()
-            .resolve_qualified_name(map_subscript(&call.func))
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["contextvars", "ContextVar"])
-            })
+            .matches_qualified_name(map_subscript(&call.func), &["contextvars", "ContextVar"])
     {
         checker.report_diagnostic(MutableContextvarDefault, default.range());
     }

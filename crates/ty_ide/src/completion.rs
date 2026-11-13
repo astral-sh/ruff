@@ -5511,6 +5511,29 @@ foo(b<CURSOR>
     }
 
     #[test]
+    fn call_keyword_argument_specialized_in_unmatched_overload() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal, overload
+
+@overload
+def select[T](key: Literal["number"], value: T, *, fallback: T | None = None) -> T: ...
+@overload
+def select(key: Literal["text"], value: str) -> str: ...
+def select(key, value, *, fallback=None): return value
+
+def use(value: str):
+    select("text", value, <CURSOR>)
+"#,
+        );
+
+        assert_snapshot!(
+            builder.filter(|c| c.name == "fallback").type_signatures().build().snapshot(),
+            @"fallback= :: str | None"
+        );
+    }
+
+    #[test]
     fn call_multiple_keyword_arguments_some_set() {
         let builder = completion_test_builder(
             "\

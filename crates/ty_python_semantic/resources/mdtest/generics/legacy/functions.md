@@ -2622,6 +2622,20 @@ result = as_list(reveal_type([1]))  # revealed: list[int]
 reveal_type(result)  # revealed: list[list[int] | int]
 ```
 
+The return annotation also constrains the nested `Sequence[T]` arm. Widening its element type to
+`tuple[str]` would lose the literal required by the assignment.
+
+```py
+from collections.abc import Sequence
+from typing import Literal
+
+def pick(items: T | Sequence[T]) -> T:
+    raise NotImplementedError
+
+red = ("red",)
+result: tuple[Literal["red"], ...] = pick([red])  # ok
+```
+
 ## Nested calls with ambiguous union parameters
 
 Each outer call to `choose` can use `T = None`. Its nested call returns `list[None]`, which matches
@@ -5812,6 +5826,89 @@ def identity_callback(value: I) -> Callable[[I], I]:
 def optional_callback(value: O) -> Callable[[O | None], O | None]:
     # revealed: (O@optional_callback | None, /) -> O@optional_callback | None
     return reveal_type(identity_callback(value))
+```
+
+When the second item is a string, the pair fits `tuple[object, str]`, so the callback's parameter
+can widen to `str`. An integer second item rules out that alternative, so the first item must retain
+its literal type.
+
+```py
+from typing import Literal
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def pair(first: T, second: U, visit: Callable[[T, U], object]) -> tuple[tuple[T, U]]:
+    visit(first, second)
+    return ((first, second),)
+
+Result = tuple[tuple[Literal["a"] | None, object] | tuple[object, str]]
+
+def example(text: str, number: int):
+    a: Result = pair("a", text, lambda first, _: reveal_type(first))  # revealed: str
+    b: Result = pair("a", number, lambda first, _: reveal_type(first))  # revealed: Literal["a"]
+```
+
+When each alternative allows a different item to widen, the callback receives both literal types
+regardless of the order of the type variables.
+
+```py
+def pair_reversed(second: U, first: T, visit: Callable[[T, U], object]) -> tuple[tuple[T, U]]:
+    return pair(first, second, visit)
+
+Either = tuple[tuple[Literal["a"] | None, object] | tuple[object, Literal["b"] | None]]
+
+# revealed: tuple[Literal["a"], Literal["b"]]
+xy: Either = pair(first="a", second="b", visit=lambda x, y: reveal_type((x, y)))
+# revealed: tuple[Literal["a"], Literal["b"]]
+yx: Either = pair_reversed(first="a", second="b", visit=lambda x, y: reveal_type((x, y)))
+```
+
+Both alternatives allow the third item to widen to `str`, even though they disagree on which of the
+first two items can widen.
+
+```py
+V = TypeVar("V")
+
+def triple(a: T, b: U, c: V, visit: Callable[[T, U, V], object]) -> tuple[tuple[T, U, V]]:
+    visit(a, b, c)
+    return ((a, b, c),)
+
+Left = tuple[Literal["a"] | None, object, str]
+Right = tuple[object, Literal["b"] | None, str]
+
+# revealed: tuple[Literal["a"], Literal["b"], str]
+result: tuple[Left | Right] = triple("a", "b", "c", lambda a, b, c: reveal_type((a, b, c)))
+```
+
+## Related type variables in a callback's return context
+
+`Wrap` returns a list with the same element type as its argument. For a runner to accept a `Wrap`,
+the input type `X` must therefore be assignable to the output element type `Y`. Widening `"a"` to
+`str` would break that relationship when the output only accepts two literals.
+
+```py
+from collections.abc import Callable
+from typing import Literal, Protocol, TypeVar
+
+X = TypeVar("X")
+Y = TypeVar("Y")
+V = TypeVar("V")
+
+class Wrap(Protocol):
+    def __call__(self, value: V, /) -> list[V]: ...
+
+Runner = Callable[[Callable[[X], list[Y]]], None]
+
+def make_runner(value: X, output: list[Y], visit: Callable[[X], None]) -> Runner[X, Y]:
+    def run(wrap: Callable[[X], list[Y]]) -> None:
+        visit(value)
+        output.extend(wrap(value))
+
+    return run
+
+def example(output: list[Literal["a", "b"]]):
+    run: Callable[[Wrap], None] = make_runner("a", output, lambda item: output.append(item))
 ```
 
 ## Inferring a recursive protocol from a factory's return context

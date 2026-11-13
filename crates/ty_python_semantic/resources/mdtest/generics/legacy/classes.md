@@ -2816,6 +2816,26 @@ reveal_type(Box[int].shared)  # revealed: int
 reveal_type(Box[int].get)  # revealed: def get(self) -> int | None
 ```
 
+## Inferred `ClassVar` types in generic classes
+
+`Cache[int]` and `Cache[str]` share the same list, so its element type cannot depend on the `T`
+bound by `Cache`. A function stored on the class can bind its own `T`.
+
+```py
+from typing import ClassVar, Generic, TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+class Cache(Generic[T]):
+    values: ClassVar = list[T]()  # error: [invalid-type-form]
+    pending: ClassVar
+    pending = list[T]()  # error: [invalid-type-form]
+    transform: ClassVar = identity  # ok
+```
+
 ## Inherited generic instance attributes
 
 The restriction also applies to inherited attributes. A subclass that fixes the type argument can

@@ -59,10 +59,7 @@ pub(crate) fn collections_named_tuple(checker: &Checker, expr: &Expr) {
 
     if checker
         .semantic()
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["collections", "namedtuple"])
-        })
+        .matches_qualified_name(expr, &["collections", "namedtuple"])
     {
         checker.report_diagnostic(CollectionsNamedTuple, expr.range());
     }

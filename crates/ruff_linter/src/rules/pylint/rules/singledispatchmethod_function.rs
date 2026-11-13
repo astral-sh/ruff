@@ -87,16 +87,10 @@ pub(crate) fn singledispatchmethod_function(checker: &Checker, scope: &Scope) {
     }
 
     for decorator in decorator_list {
-        if checker
-            .semantic()
-            .resolve_qualified_name(&decorator.expression)
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["functools", "singledispatchmethod"]
-                )
-            })
-        {
+        if checker.semantic().matches_qualified_name(
+            &decorator.expression,
+            &["functools", "singledispatchmethod"],
+        ) {
             let mut diagnostic =
                 checker.report_diagnostic(SingledispatchmethodFunction, decorator.range());
             diagnostic.try_set_fix(|| {

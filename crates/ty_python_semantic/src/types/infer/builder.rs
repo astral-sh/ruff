@@ -51,7 +51,9 @@ use crate::reachability::{
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::annotation_target::{is_valid_annotation_target, receiver_method_scope};
-use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
+use crate::types::attribute_write::{
+    AssignmentAttributeMembers, assignment_attribute_members, nested_class_instance_override,
+};
 use crate::types::call::bind::{
     ArgumentContextCache, ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
     inferable_typevar_occurrences, requires_overload_evaluation,
@@ -133,15 +135,15 @@ use crate::types::unpacker::{
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    ClassType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind,
-    Parameter, Parameters, ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    ClassType, DeclaredType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet,
+    InternedType, IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
+    ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, PropertyDeprecations,
+    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
+    binding_type, extract_fixed_length_iterable_element_types, infer_complete_scope_types,
+    infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::ast_ids::PlaceUse;
@@ -191,22 +193,23 @@ mod typevar;
 
 use super::comparisons;
 
-/// A helper to track if we already know that declared and inferred types are the same.
+/// How to determine the binding type for a definition that also declares its target.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DeclaredAndInferredType<'db> {
-    /// We know that both the declared and inferred types are the same.
-    AreTheSame(TypeAndQualifiers<'db>),
+    /// The declaration supplies the binding type. A qualifier-only declaration in a stub
+    /// binds the name even though its value's type is unknown.
+    FromDeclaration(DeclaredType<'db>),
     /// Declared and inferred types might be different, we need to check assignability.
     MightBeDifferent {
-        declared_ty: TypeAndQualifiers<'db>,
+        declared_ty: DeclaredType<'db>,
         inferred_ty: Type<'db>,
     },
 }
 
 impl<'db> DeclaredAndInferredType<'db> {
     fn are_the_same_type(ty: Type<'db>) -> Self {
-        Self::AreTheSame(TypeAndQualifiers::new(
-            ty,
+        Self::FromDeclaration(DeclaredType::new(
+            Some(ty),
             TypeOrigin::Inferred,
             TypeQualifiers::empty(),
         ))
@@ -357,7 +360,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The types and type qualifiers of every valid declaration in this region.
     ///
     /// The list should only contain one entry per declaration at most.
-    declarations: VecMap<Definition<'db>, TypeAndQualifiers<'db>>,
+    declarations: VecMap<Definition<'db>, DeclaredType<'db>>,
 
     /// The definitions with deferred sub-parts.
     ///
@@ -1249,7 +1252,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut seen_public_functions = FxHashSet::default();
 
             for (&definition, ty_and_quals) in &self.declarations {
-                let ty = ty_and_quals.inner_type();
+                let Some(ty) = ty_and_quals.inner_type() else {
+                    continue;
+                };
                 match definition.kind(self.db()) {
                     DefinitionKind::Function(function) => {
                         post_inference::decorator::check_decorator_calls(
@@ -1622,6 +1627,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.reachability_cache(),
             );
         }
+        let mut qualifier_only = declared.is_qualifier_only();
         let (mut place_and_quals, conflicting) = declared.into_place_and_conflicting_declarations();
 
         // Imports into `global` and `nonlocal` names retain their qualifiers in the forwarding
@@ -1634,18 +1640,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.reachability_cache(),
             );
             has_final_declaration |= local_declared.qualifiers().contains(TypeQualifiers::FINAL);
-            let local_place = local_declared
-                .with_imported_final_for_assignment(
-                    db,
-                    env,
-                    use_def.imported_final_candidates_at_binding(binding),
-                    self.reachability_cache(),
-                )
-                .ignore_conflicting_declarations();
+            let local_declared = local_declared.with_imported_final_for_assignment(
+                db,
+                env,
+                use_def.imported_final_candidates_at_binding(binding),
+                self.reachability_cache(),
+            );
+            let local_place = local_declared.ignore_conflicting_declarations();
 
             place_and_quals.qualifiers |= local_place.qualifiers;
             if place_and_quals.place.is_undefined() {
                 place_and_quals.place = local_place.place;
+                qualifier_only = local_declared.is_qualifier_only();
             }
         }
 
@@ -1698,12 +1704,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Place::Undefined => None,
         };
 
-        let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
-            self.fallback_member_declared_type(node)
-        } else {
-            None
-        }
-        .or_else(|| resolved_place.ignore_possibly_undefined());
+        let declared_ty = match resolved_place {
+            Place::Defined(place) => (!qualifier_only).then_some(place.ty),
+            Place::Undefined if !place.is_symbol() => self.fallback_member_declared_type(node),
+            Place::Undefined => None,
+        };
 
         AddBinding {
             declared_ty,
@@ -1724,18 +1729,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let value_type = self.try_expression_type(value).unwrap_or_else(|| {
                 self.infer_maybe_standalone_expression(value, TypeContext::default())
             });
+            let member = value_type.member(db, self.program_environment(), attr);
             if let Place::Defined(DefinedPlace {
                 ty,
+                origin,
                 definedness: Definedness::AlwaysDefined,
                 ..
-            }) = value_type
-                .member(db, self.program_environment(), attr)
-                .place
+            }) = member.place
+                // A bare `Final` gets its type from this assignment. It supplies no declared
+                // type that could guide inference of the right-hand side.
+                && (origin.is_declared() || !member.qualifiers.contains(TypeQualifiers::FINAL))
             {
-                // TODO: also consider qualifiers on the attribute
-                Some(ty)
-            } else {
-                None
+                return Some(ty);
             }
         } else if let AnyNodeRef::ExprSubscript(
             subscript @ ast::ExprSubscript {
@@ -1745,13 +1750,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             let value_ty = self.get_or_infer_expression(value, TypeContext::default());
             let slice_ty = self.get_or_infer_expression(slice, TypeContext::default());
-            Some(
+            return Some(
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
                     .unwrap_or_else(|recovery_ty| recovery_ty),
-            )
-        } else {
-            None
+            );
         }
+        None
     }
 
     /// Returns the owner of an assignment redirected by `global` or `nonlocal`.
@@ -1848,7 +1852,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         node: AnyNodeRef,
         declaration: Definition<'db>,
-        ty: TypeAndQualifiers<'db>,
+        ty: DeclaredType<'db>,
     ) {
         let db = self.db();
         debug_assert!(
@@ -1857,6 +1861,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .category(self.context.in_stub(), self.module())
                 .is_declaration()
         );
+        let Some(declared_ty) = ty.inner_type() else {
+            self.declarations.insert(declaration, ty);
+            return;
+        };
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_definition(declaration);
         let env = self.program_environment();
@@ -1888,17 +1896,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .place
         .ignore_possibly_undefined()
         .unwrap_or(Type::Never);
-        let ty = if inferred_ty.is_assignable_to(db, env, ty.inner_type()) {
+        let ty = if inferred_ty.is_assignable_to(db, env, declared_ty) {
             ty
         } else {
             if let Some(builder) = self.context.report_lint(&INVALID_DECLARATION, node) {
                 builder.into_diagnostic(format_args!(
                     "Cannot declare type `{}` for inferred type `{}`",
-                    ty.inner_type().display(db, env),
+                    declared_ty.display(db, env),
                     inferred_ty.display(db, env)
                 ));
             }
-            TypeAndQualifiers::declared(Type::unknown())
+            DeclaredType::from_type(Type::unknown())
         };
         self.declarations.insert(declaration, ty);
     }
@@ -1924,13 +1932,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
-            DeclaredAndInferredType::AreTheSame(type_and_qualifiers) => {
-                (type_and_qualifiers, type_and_qualifiers.inner_type())
+            DeclaredAndInferredType::FromDeclaration(declared_ty) => {
+                (declared_ty, declared_ty.inner_type_or_unknown())
             }
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
-            } => {
+            } if let Some(declared_type) = declared_ty.inner_type() => {
                 let env = self.program_environment();
                 let file_scope_id = self.scope().file_scope_id(self.db());
                 if file_scope_id.is_global() {
@@ -1946,59 +1954,58 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             )
                         })
                         .and_then(|place| place.place.ignore_possibly_undefined())
-                    {
-                        let declared_type = declared_ty.inner_type();
-                        if !declared_type.is_assignable_to(
+                        && !declared_type.is_assignable_to(
                             db,
                             env,
                             module_type_implicit_declaration,
-                        ) {
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_DECLARATION, node)
-                            {
-                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Cannot shadow implicit global attribute `{place}` \
-                                    with declaration of type `{}`",
-                                    declared_type.display(db, env)
-                                ));
-                                diagnostic.info(format_args!(
-                                    "The global symbol `{}` \
-                                    must always have a type assignable to `{}`",
-                                    place,
-                                    module_type_implicit_declaration.display(db, env)
-                                ));
-                            }
-                        }
+                        )
+                        && let Some(builder) = self.context.report_lint(&INVALID_DECLARATION, node)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Cannot shadow implicit global attribute `{place}` \
+                            with declaration of type `{}`",
+                            declared_type.display(db, env)
+                        ));
+                        diagnostic.info(format_args!(
+                            "The global symbol `{place}` \
+                            must always have a type assignable to `{}`",
+                            module_type_implicit_declaration.display(db, env)
+                        ));
                     }
                 }
-                let declared_type = declared_ty.inner_type();
-                if self.validate_assignment_type(node, definition, None, declared_type, inferred_ty)
-                {
-                    // TODO We currently can't distinguish here between "no declared type" and
-                    // "declared types is `Unknown` (e.g. due to a bad annotation, missing
-                    // import, etc.)". Ideally we would still prefer `Unknown` declared type,
-                    // but use inferred type if there is no declared type.
-                    // Keep the inferred value while a cyclic annotation is unresolved. For
-                    // `str: "str" = ""`, that value lets the next iteration reject the annotation
-                    // instead of leaving both the annotation and the binding divergent.
+                let binding_ty = if self.validate_assignment_type(
+                    node,
+                    definition,
+                    None,
+                    declared_type,
+                    inferred_ty,
+                ) {
+                    // For `str: "str" = ""`, retaining the binding lets the next cycle
+                    // iteration reject the annotation. Unqualified annotations that resolve to
+                    // `Unknown` also recover with the inferred value. A type argument to
+                    // `Final` or `ClassVar` supplies a declared type even if it is `Unknown`.
                     if !should_preserve_inferred_binding_type(inferred_ty)
-                        && !matches!(
-                            declared_type,
-                            Type::Dynamic(DynamicType::Unknown) | Type::Divergent(_)
-                        )
+                        && !matches!(declared_type, Type::Divergent(_))
+                        && (!matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
+                            || declared_ty
+                                .qualifiers()
+                                .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR))
                         && declared_type.is_assignable_to(db, env, inferred_ty)
                     {
-                        (declared_ty, declared_type)
+                        declared_type
                     } else {
-                        (declared_ty, inferred_ty)
+                        inferred_ty
                     }
                 } else {
                     self.discard_dict_key_assignments_for(definition);
-
-                    // if the assignment is invalid, fall back to assuming the annotation is correct
-                    (declared_ty, declared_type)
-                }
+                    declared_type
+                };
+                (declared_ty, binding_ty)
             }
+            DeclaredAndInferredType::MightBeDifferent {
+                declared_ty,
+                inferred_ty,
+            } => (declared_ty, inferred_ty),
         };
 
         self.declarations.insert(definition, declared_ty);
@@ -3248,6 +3255,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
+                let members = assignment_attribute_members(db, env, object_ty, attribute);
+                let read_only_receiver_member = members
+                    .as_ref()
+                    .and_then(AssignmentAttributeMembers::receiver_member)
+                    .is_some_and(PlaceAndQualifiers::is_read_only);
+                let type_member = members.and_then(AssignmentAttributeMembers::type_member);
+                if read_only_receiver_member
+                    || type_member.is_some_and(|member| {
+                        member.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+                            && !member
+                                .ignore_possibly_undefined()
+                                .is_some_and(|ty| ty.is_data_descriptor(db, env))
+                            && nested_class_instance_override(db, env, object_ty, attribute, None)
+                                .is_none()
+                    })
+                {
+                    if emit_diagnostics
+                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot delete read-only attribute `{attribute}` on type `{}`",
+                            object_ty.display(db, env),
+                        ));
+                    }
+                    return false;
+                }
                 let frozen_dataclass_dispatch = object_ty
                     .nominal_class(db, env)
                     .and_then(|class| class.static_class_literal(db))
@@ -3376,8 +3409,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ..
                         }),
                     ..
-                }) = assignment_attribute_members(db, env, object_ty, attribute)
-                    .and_then(AssignmentAttributeMembers::type_member)
+                }) = type_member
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, env, object_ty);
                     let delete_dunder_call_result = attr_ty.try_call_dunder(
@@ -4480,7 +4512,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // P.args and P.kwargs are only valid as annotations on *args and **kwargs.
-            if let Type::TypeVar(typevar) = annotated.inner_type()
+            if let Some(Type::TypeVar(typevar)) = annotated.inner_type()
                 && typevar.is_paramspec(self.db())
                 && let Some(attr) = typevar.paramspec_attr(self.db())
             {
@@ -4564,11 +4596,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
 
+            let declared_ty = annotated.inner_type();
             let value_ty = value.as_ref().map(|value| {
-                self.infer_maybe_standalone_expression(
-                    value,
-                    TypeContext::declared(Some(annotated.inner_type())),
-                )
+                self.infer_maybe_standalone_expression(value, TypeContext::declared(declared_ty))
             });
 
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
@@ -4601,34 +4631,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // inferred type (matching the name-target definition path); otherwise fall
             // back to the annotated type. If the value is not assignable to the declared
             // type, report an error and fall back to the annotated type.
-            let target_ty = if let Some(value_ty) = value_ty {
-                let declared_ty = annotated.inner_type();
-                if value_ty.is_assignable_to(db, env, declared_ty) {
-                    value_ty
-                } else {
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_ASSIGNMENT, value.as_deref().unwrap())
-                    {
-                        let mut diag = builder.into_diagnostic(format_args!(
-                            "Object of type `{}` is not assignable to `{}`",
-                            value_ty.display(db, env),
-                            declared_ty.display(db, env),
-                        ));
-                        diag.annotate(
-                            self.context
-                                .secondary(annotation.as_ref())
-                                .message("Declared type"),
-                        );
-                        diag.set_primary_annotation_message(format_args!(
-                            "Incompatible value of type `{}`",
-                            value_ty.display(db, env),
-                        ));
-                    }
-                    declared_ty
+            let assignment = value.as_deref().zip(value_ty);
+            let target_ty = if let Some((value, value_ty)) = assignment
+                && let Some(declared_ty) = declared_ty
+                && !value_ty.is_assignable_to(db, env, declared_ty)
+            {
+                if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, value) {
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "Object of type `{}` is not assignable to `{}`",
+                        value_ty.display(db, env),
+                        declared_ty.display(db, env),
+                    ));
+                    diag.annotate(
+                        self.context
+                            .secondary(annotation.as_ref())
+                            .message("Declared type"),
+                    );
+                    diag.set_primary_annotation_message(format_args!(
+                        "Incompatible value of type `{}`",
+                        value_ty.display(db, env),
+                    ));
                 }
+                declared_ty
             } else {
-                annotated.inner_type()
+                if let Some((value, value_ty)) = assignment
+                    && let ast::Expr::Attribute(target) = target.as_ref()
+                    && let object_ty = self.expression_type(&target.value)
+                    && assignment_attribute_members(db, env, object_ty, target.attr.as_str())
+                        .is_some_and(|members| {
+                            members.effective_members().any(|member| {
+                                member.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+                            })
+                        })
+                {
+                    self.validate_attribute_assignment(
+                        target,
+                        value,
+                        object_ty,
+                        target.attr.as_str(),
+                        &mut |_, _| value_ty,
+                        true,
+                    );
+                }
+                value_ty.or(declared_ty).unwrap_or_else(Type::unknown)
             };
             self.expressions.insert((&**target).into(), target_ty);
         }
@@ -4638,7 +4683,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_annotated_assignment_annotation(
         &mut self,
         assignment: &AnnotatedAssignmentDefinitionKind,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> DeclaredType<'db> {
         let annotation = assignment.annotation(self.module());
 
         // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
@@ -4705,7 +4750,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .unwrap_or(value_ty)
             } else {
                 // Annotation-only definitions are bindings in stubs.
-                add.declared_ty.unwrap_or(Type::unknown())
+                add.declared_ty.unwrap_or_else(Type::unknown)
             };
             self.store_expression_type(target, target_ty);
             add.insert(self, target_ty);
@@ -4718,7 +4763,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
         // not as variable annotations. Check both resolved type and AST form.
-        if let Type::TypeVar(typevar) = declared.inner_type()
+        if let Some(Type::TypeVar(typevar)) = declared.inner_type()
             && typevar.is_paramspec(self.db())
             && let Some(attr) = typevar.paramspec_attr(self.db())
         {
@@ -4758,7 +4803,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
+        let is_pep_613_type_alias = declared
+            .inner_type()
+            .is_some_and(|ty| ty.is_typealias_special_form());
 
         if !declared.qualifiers.is_empty() {
             for qualifier in TypeQualifier::iter() {
@@ -4878,11 +4925,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_name_expr()
             .is_some_and(|name| &name.id == "TYPE_CHECKING")
         {
-            if !KnownClass::Bool.to_instance(db, env).is_assignable_to(
-                db,
-                env,
-                declared.inner_type(),
-            ) {
+            if let Some(declared_ty) = declared.inner_type()
+                && !KnownClass::Bool
+                    .to_instance(db, env)
+                    .is_assignable_to(db, env, declared_ty)
+            {
                 // annotation not assignable from `bool` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
             } else if self.in_stub()
@@ -4900,7 +4947,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // otherwise, assigning something other than `False` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
             }
-            declared.inner = Type::bool_literal(true);
+            declared.inner = Some(Type::bool_literal(true));
         }
 
         // Handle various singletons.
@@ -4914,7 +4961,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &name_expr.id,
             )
         {
-            declared.inner = Type::SpecialForm(special_form);
+            declared.inner = Some(Type::SpecialForm(special_form));
         }
 
         // If the target of an assignment is not one of the place expressions we support,
@@ -4939,7 +4986,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
-                TypeContext::declared(Some(declared.inner_type())),
+                TypeContext::declared(declared.inner_type()),
             );
             let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
                 // Alias type inference emits the diagnostic, but this runtime value is
@@ -4972,7 +5019,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 Type::bool_literal(true)
             } else if self.in_stub() && value.is_ellipsis_literal_expr() {
-                declared.inner_type()
+                declared.inner_type_or_unknown()
             } else {
                 inferred_ty
             };
@@ -4995,7 +5042,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
-                    &DeclaredAndInferredType::AreTheSame(TypeAndQualifiers::declared(inferred_ty)),
+                    &DeclaredAndInferredType::FromDeclaration(DeclaredType::from_type(inferred_ty)),
                 );
             } else {
                 // Check for annotated enum members. The typing spec states that enum
@@ -5003,11 +5050,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(name_expr) = target.as_name_expr()
                     && !name_expr.id.starts_with("__")
                     && !matches!(name_expr.id.as_str(), "_ignore_" | "_value_" | "_name_")
-                    && (
-                        // Not bare Final (bare Final is allowed on enum members)
-                        !(declared.qualifiers.contains(TypeQualifiers::FINAL)
-                            && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
-                    )
+                    // Bare Final is allowed on enum members.
+                    && !declared.is_bare_final()
                     && (
                         // Value type would be an enum member at runtime (exclude callables,
                         // which are never members)
@@ -5052,19 +5096,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         "`TypeAlias` must be assigned a value in annotated assignments",
                     );
                 }
-                declared.inner = Type::unknown();
+                declared.inner = Some(Type::unknown());
             }
             if self.in_stub() {
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
-                    &DeclaredAndInferredType::AreTheSame(declared),
+                    &DeclaredAndInferredType::FromDeclaration(declared),
                 );
             } else {
                 self.add_declaration(target.into(), definition, declared);
             }
 
-            self.store_expression_type(target, declared.inner_type());
+            self.store_expression_type(target, declared.inner_type_or_unknown());
         }
     }
 
@@ -10336,7 +10380,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ReturnCallableTypeVarScope::Public,
         )
         .return_ty;
-        let return_type_span = enclosing_function.spans(self.db()).return_type;
+        let return_type_span = enclosing_function.spans(db).return_type;
 
         let Some(generator_type_params) =
             declared_return_ty.generator_types(db, env, GeneratorTypeMode::IteratorDefaults)
@@ -10345,7 +10389,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
 
-        let expected_yield_ty = generator_type_params.yield_ty;
+        // An unannotated generator's synthesized `Unknown` supplies no expected type.
+        let expected_yield_ty = generator_type_params
+            .yield_ty
+            .filter(|_| return_type_span.is_some());
         let tcx = TypeContext::declared(expected_yield_ty);
         let yielded_ty = self
             .infer_optional_expression(value.as_deref(), tcx)
@@ -10394,9 +10441,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let _ = self.infer_expression(value, TypeContext::default());
             return Type::unknown();
         };
-        let return_type_span = enclosing_function.spans(self.db()).return_type;
+        let return_type_span = enclosing_function.spans(db).return_type;
 
-        let tcx = TypeContext::declared(outer_expected.yield_ty.map(|yielded_ty| {
+        let outer_yield_ty = outer_expected
+            .yield_ty
+            .filter(|_| return_type_span.is_some());
+        let tcx = TypeContext::declared(outer_yield_ty.map(|yielded_ty| {
             KnownClass::Iterable.to_specialized_instance(db, env, &[yielded_ty])
         }));
         let iterable_type = self.infer_expression(value, tcx);
@@ -10409,7 +10459,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        if let Some(outer_yield_ty) = outer_expected.yield_ty
+        if let Some(outer_yield_ty) = outer_yield_ty
             && let Some(known_inner_yield_type) = known_inner_yield_type
         {
             self.validate_generator_yield_type(
@@ -13510,7 +13560,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         inferred_ty: Type<'db>,
     ) -> Type<'db> {
         let env = builder.program_environment();
-        let declared_ty = self.declared_ty.unwrap_or(Type::unknown());
+        let declared_ty = self.declared_ty.unwrap_or_else(Type::unknown);
 
         let db = builder.db();
         let file_scope_id = self.binding.file_scope(db);

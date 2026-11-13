@@ -25,7 +25,10 @@ use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
-use crate::place::{DefinedPlace, Provenance, TypeOrigin, place_from_declarations};
+use crate::place::{
+    ConsideredDefinitions, DefinedPlace, Provenance, RequiresExplicitReExport, TypeOrigin,
+    place_by_id, place_from_declarations,
+};
 use crate::reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
@@ -2859,7 +2862,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         }
     }
 
-    /// Finds the annotation governing a new class-body default, without inferring existing defaults.
+    /// Finds the type governing a new class-body default. A bare `ClassVar` gets its public type
+    /// from the base class's bindings.
     ///
     /// An unannotated binding retains its owner's inherited declaration. Resolving that owner
     /// before continuing the MRO prevents a later sibling base from supplying a different contract.
@@ -2885,9 +2889,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             };
             let use_def = use_def_map(db, scope);
             let declarations = use_def.end_of_scope_symbol_declarations(symbol);
-            let declared = place_from_declarations(db, &self.env, declarations.clone())
-                .ignore_conflicting_declarations();
-            let declaration = if declared.is_undefined() {
+            let declared = place_from_declarations(db, &self.env, declarations.clone());
+            let qualifier_only = declared.is_qualifier_only();
+            let declared = declared.ignore_conflicting_declarations();
+            let mut declaration = if declared.is_undefined() {
                 let mut bindings = use_def.end_of_scope_symbol_bindings(symbol);
                 let predicates = bindings.predicates();
                 let constraints = bindings.reachability_constraints();
@@ -2899,16 +2904,43 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }) {
                     continue;
                 }
-                inherited_class_body_declaration(db, scope, symbol)
+                inherited_class_body_declaration(db, scope, symbol)?
+            } else if declared.qualifiers.contains(TypeQualifiers::FINAL)
+                || !declarations.contains_only_annotated_assignments(db)
+            {
+                return None;
             } else {
-                (!declared.qualifiers.contains(TypeQualifiers::FINAL)
-                    && declarations.contains_only_annotated_assignments(db))
-                .then_some(ClassBodyDeclaration {
-                    member: declared,
+                ClassBodyDeclaration {
+                    member: if qualifier_only {
+                        Place::Undefined.with_qualifiers(declared.qualifiers)
+                    } else {
+                        declared
+                    },
                     class: base,
-                })
+                }
             };
-            return declaration.map(|declaration| ClassBodyDeclaration {
+            // The first class to bind a bare ClassVar supplies its type to subclasses.
+            // An uninitialized declaration or a stub placeholder supplies only the qualifier.
+            if declaration.member.is_class_var()
+                && !declaration.member.place.is_definitely_bound()
+                && let Place::Defined(binding) = place_by_id(
+                    db,
+                    scope,
+                    symbol.into(),
+                    RequiresExplicitReExport::No,
+                    ConsideredDefinitions::EndOfScope,
+                )
+                .place
+                && (!declaration.member.is_undefined() || !binding.ty.is_unknown())
+            {
+                declaration.member.place = Place::Defined(DefinedPlace {
+                    ty: binding.public_type(db, &self.env),
+                    public_type_policy: PublicTypePolicy::Raw,
+                    ..binding
+                });
+                declaration.class = base;
+            }
+            return Some(ClassBodyDeclaration {
                 member: declaration
                     .member
                     .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
@@ -3119,11 +3151,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     let member = class.own_instance_member(db, &self.env, name);
                     let definitely_declared = matches!(
                         member.inner.place,
-                        Place::Defined(DefinedPlace {
-                            origin: TypeOrigin::Declared,
-                            definedness: Definedness::AlwaysDefined,
-                            ..
-                        })
+                        Place::Defined(place) if place.is_definitely_defined()
+                            && (place.origin.is_declared() || member.qualifiers().contains(TypeQualifiers::FINAL))
                     );
                     if definitely_declared {
                         let overriding_class_default =

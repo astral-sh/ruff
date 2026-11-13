@@ -87,8 +87,7 @@ pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCall) {
 
     if !checker
         .semantic()
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pathlib", "Path"]))
+        .matches_qualified_name(func, &["pathlib", "Path"])
     {
         return;
     }

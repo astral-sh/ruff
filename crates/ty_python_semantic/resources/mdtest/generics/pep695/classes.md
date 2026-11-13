@@ -1925,6 +1925,44 @@ box.value = 1
 reveal_type(box.value)  # revealed: Literal[1]
 ```
 
+## Inferred `ClassVar` types in generic classes
+
+`Cache[int]` and `Cache[str]` share the same list, so its element type cannot depend on the `T`
+bound by `Cache`. For a stored function, the same check allows a type parameter bound by the
+function and rejects a signature that depends on `Cache`'s parameter.
+
+```py
+from typing import ClassVar, Self
+
+def identity[T](value: T) -> T:
+    return value
+
+class Cache[T]:
+    values: ClassVar = list[T]()  # error: [invalid-type-form]
+    pending: ClassVar
+    pending = list[T]()  # error: [invalid-type-form]
+    transform: ClassVar = identity  # ok
+    peers: ClassVar = list[Self]()  # ok
+
+    def echo(self, value: T) -> T:
+        return value
+
+    echo_again: ClassVar = echo  # error: [invalid-type-form]
+```
+
+The same restriction applies when the `ClassVar` declaration follows the assignment or comes from a
+base class.
+
+```py
+class Base:
+    inherited: ClassVar
+
+class OtherCache[T](Base):
+    values = list[T]()  # error: [invalid-type-form]
+    values: ClassVar
+    inherited = list[T]()  # error: [invalid-type-form]
+```
+
 ## Generic attributes accessed through subclass methods
 
 The `cls` receiver in a classmethod, `__new__`, or `__init_subclass__` can refer to a concrete

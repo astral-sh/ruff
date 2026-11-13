@@ -339,7 +339,14 @@ impl<'db> CallableItem<'db> {
     ) {
         match self {
             CallableItem::Regular(binding) => {
-                binding.check_types(db, env, constraints, argument_types, call_expression_tcx);
+                binding.check_types(
+                    db,
+                    env,
+                    constraints,
+                    argument_types,
+                    call_expression_tcx,
+                    mode,
+                );
             }
             CallableItem::Constructor(binding) => {
                 binding.check_types(
@@ -658,6 +665,10 @@ pub(crate) enum CheckTypesMode {
     /// After checking, retain only the callable bindings that contribute to the call
     /// evaluation.
     Finalize,
+
+    /// Finalize the call with inferred parameter types for every arity-compatible overload.
+    /// Signature help and keyword completion also display parameters from unmatched overloads.
+    SignatureDetails,
 
     /// Preserve all callable bindings, regardless of whether they evaluate successfully.
     ///
@@ -1351,18 +1362,18 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    /// Verify that the type of each argument is assignable to type of the parameter that it was
-    /// matched to.
+    /// Verify that each argument type is assignable to its matched parameter type.
     ///
-    /// You must provide an `call_arguments` that was created from the same `arguments` that you
-    /// provided to [`match_parameters`][Self::match_parameters].
+    /// `call_arguments` must come from the same arguments passed to [`Self::match_parameters`].
     ///
     /// The type context of the call expression is also used to infer the specialization of generic
     /// calls.
     ///
-    /// We update the bindings to include the return type of the call, the bound types for all
-    /// parameters, and any errors resulting from binding the call, all for each union element and
-    /// overload (if any).
+    /// For each overload we type-check, the binding records its return type, bound parameter
+    /// types, and errors. If another overload matches, an overload ruled out by a disjoint literal
+    /// can remain in [`CallableBinding::overloads`] with no bound parameter types and only
+    /// [`BindingError::UnmatchedOverload`]. Call [`Self::check_types_impl`] with
+    /// [`CheckTypesMode::SignatureDetails`] for inferred types from every arity-compatible overload.
     pub(crate) fn check_types(
         mut self,
         db: &'db dyn Db,
@@ -1419,14 +1430,18 @@ impl<'db> Bindings<'db> {
 
         // For constructor bindings with deferred downstream checks: validate downstream bindings
         // if the matched overload is instance-returning.
-        for constructor in self.iter_constructor_items_mut() {
-            constructor.check_downstream_constructor(
+        for downstream in self
+            .iter_constructor_items_mut()
+            .filter_map(ConstructorBinding::downstream_constructor_mut)
+        {
+            let _ = downstream.check_types_impl(
                 db,
                 env,
                 constraints,
                 call_arguments,
                 call_expression_tcx,
                 dataclass_field_specifiers,
+                mode,
             );
         }
 
@@ -3914,6 +3929,7 @@ impl<'db> CallableBinding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        mode: CheckTypesMode,
     ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -3973,8 +3989,21 @@ impl<'db> CallableBinding<'db> {
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
-        for (_, overload) in self.matching_overloads_mut() {
+        let check_types = |overload: &mut Binding<'db>| {
             overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+        };
+        // Signature details and provisional inference need the types of losing candidates too.
+        // An expandable `*args` can also change which parameters the arguments match.
+        if mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity {
+            self.check_overloads_deferring_literal_mismatches(
+                db,
+                call_arguments.as_ref(),
+                check_types,
+            );
+        } else {
+            for (_, overload) in self.matching_overloads_mut() {
+                check_types(overload);
+            }
         }
 
         tracing::trace!(
@@ -4261,6 +4290,37 @@ impl<'db> CallableBinding<'db> {
         // argument types. This is necessary because we restore the state to the pre-evaluation
         // snapshot when processing the expanded argument lists.
         snapshotter.restore(self, post_evaluation_snapshot);
+    }
+
+    /// Defer type checking for overloads ruled out by a literal argument. If another candidate
+    /// matches, we can skip inference for those overloads entirely.
+    fn check_overloads_deferring_literal_mismatches(
+        &mut self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+        check_types: impl Fn(&mut Binding<'db>),
+    ) {
+        let mut literal_mismatches = SmallVec::<[_; 4]>::new();
+        let mut found_match = false;
+        for (_, overload) in self.matching_overloads_mut() {
+            if overload.has_disjoint_literal_argument(db, arguments) {
+                literal_mismatches.push(overload);
+            } else {
+                check_types(overload);
+                found_match = found_match || !overload.has_errors_affecting_overload_resolution();
+            }
+        }
+
+        if found_match {
+            for overload in literal_mismatches {
+                overload.mark_as_unmatched_overload();
+            }
+        } else {
+            // A failed call needs each candidate's diagnostics and inferred return type for recovery.
+            for overload in literal_mismatches {
+                check_types(overload);
+            }
+        }
     }
 
     /// Returns the set of overload candidates that may contribute to the call evaluation.
@@ -5965,6 +6025,8 @@ fn inferred_parameter_specialization<'db>(
     env: &ProgramEnvironment<'db>,
     generic_context: GenericContext<'db>,
     inference: TypeVarInference<'db>,
+    return_type_solutions: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    return_bounds: Option<&CandidateSolutions<'db>>,
 ) -> Specialization<'db> {
     // The marker distinguishes unsolved type variables without defaults from gradual types
     // inferred from arguments. Only the former are ignored during fixpoint iteration.
@@ -5980,36 +6042,58 @@ fn inferred_parameter_specialization<'db>(
     // approach would be to propagate constraint sets as type context, making bidirectional
     // inference constraint-set-aware, or to infer constraint sets directly for argument types,
     // and avoid the need to construct type context before call inference has completed.
-    generic_context.specialize_recursive(
+    let mut literal_arguments = SmallVec::<[_; 2]>::new();
+    let widest = generic_context.specialize_recursive(
         db,
-        generic_context.variables(db).map(|typevar| {
-            let Some(ty) = argument_specialization
-                .get(db, typevar)
-                .filter(|ty| !ty.is_recursive_divergent() && !ty.is_provisional_marker())
-            else {
-                return Some(unsolved);
-            };
-            let promoted = ty.promote(db, env);
-            let Some(bound) = typevar.typevar(db).upper_bound(db, env) else {
-                return Some(promoted);
-            };
-            let bound = bound.apply_specialization(db, argument_specialization);
-
-            // Context for other arguments must still satisfy the type variable's
-            // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
-            // promoting it to `str` would violate that bound.
-            Some(if promoted.is_assignable_to(db, env, bound) {
-                promoted
-            } else if ty.is_assignable_to(db, env, bound) {
-                ty
-            } else {
-                // TODO: Diagnostic recovery can sometimes solve a type variable to
-                // a type incompatible with its bound, and so we avoid using an incompatible
-                // inference as type context.
-                bound
-            })
-        }),
-    )
+        generic_context
+            .variables(db)
+            .enumerate()
+            .map(|(index, typevar)| {
+                let Some(ty) = argument_specialization
+                    .get(db, typevar)
+                    .filter(|ty| !ty.is_recursive_divergent() && !ty.is_provisional_marker())
+                else {
+                    return Some(unsolved);
+                };
+                let promoted = ty.promote(db, env);
+                // Context for other arguments must still satisfy the type variable's
+                // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
+                // promoting it to `str` would violate that bound.
+                if let Some(bound) = typevar.typevar(db).upper_bound(db, env)
+                    && let bound = bound.apply_specialization(db, argument_specialization)
+                    && !promoted.is_assignable_to(db, env, bound)
+                {
+                    // TODO: Diagnostic recovery can sometimes solve a type variable to
+                    // a type incompatible with its bound, and so we avoid using an incompatible
+                    // inference as type context.
+                    return Some(if ty.is_assignable_to(db, env, bound) {
+                        ty
+                    } else {
+                        bound
+                    });
+                }
+                if promoted != ty && return_type_solutions.contains_key(&typevar.identity(db)) {
+                    literal_arguments.push((index, ty));
+                }
+                Some(promoted)
+            }),
+    );
+    if let Some(bounds) = return_bounds
+        && !literal_arguments.is_empty()
+    {
+        let mut original = widest.types(db).to_vec();
+        for (index, ty) in literal_arguments {
+            original[index] = ty;
+        }
+        bounds.promote_for_argument_context(
+            db,
+            env,
+            generic_context.specialize(db, original),
+            widest,
+        )
+    } else {
+        widest
+    }
 }
 
 /// Combines the expected return type and the type arguments inferred so far
@@ -6021,9 +6105,17 @@ fn parameter_context_specialization<'db>(
     inference: Option<TypeVarInference<'db>>,
     return_type_solutions: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
     return_context_kind: TypeContextKind,
+    return_bounds: Option<&CandidateSolutions<'db>>,
 ) -> ArgumentContextSpecialization<'db> {
     let specialization = if let Some(inference) = inference {
-        inferred_parameter_specialization(db, env, generic_context, inference)
+        inferred_parameter_specialization(
+            db,
+            env,
+            generic_context,
+            inference,
+            return_type_solutions,
+            return_bounds,
+        )
     } else {
         // Mark variables without a solution so the concrete parts of the parameter type can
         // still provide context for argument inference.
@@ -8787,6 +8879,7 @@ impl<'db> Binding<'db> {
                         db,
                         env,
                         generic,
+                        specialized_overload.inference,
                         constraints,
                         call_expression_tcx,
                     );
@@ -8943,6 +9036,7 @@ impl<'db> Binding<'db> {
                         db,
                         env,
                         generic_context,
+                        self.inference,
                         constraints,
                         call_expression_tcx,
                     )
@@ -9136,9 +9230,17 @@ impl<'db> Binding<'db> {
         {
             return None;
         }
-        Some(inferred_parameter_specialization(
-            db, env, generic, inference,
-        ))
+        Some(
+            self.argument_type_context_specialization(
+                db,
+                env,
+                generic,
+                Some(inference),
+                constraints,
+                tcx,
+            )
+            .specialization,
+        )
     }
 
     /// Returns the specialization that should be applied to the parameters of this overload for
@@ -9156,6 +9258,7 @@ impl<'db> Binding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         generic_context: GenericContext<'db>,
+        inference: Option<TypeVarInference<'db>>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Cow<'db, ArgumentContextSpecialization<'db>> {
@@ -9195,21 +9298,22 @@ impl<'db> Binding<'db> {
                 Some(inference),
                 &FxHashMap::default(),
                 TypeContextKind::Declared,
+                None,
             ))
         }
 
         let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
             FxHashMap::default();
-        if let Some(declared_return_ty) = call_expression_tcx.declared_type() {
-            let inferable = generic_context.inferable_typevars(db);
-            let normalized_return_ty = self.unspecialized_return_type(db);
-            let path_bounds = normalized_return_ty.assignable_solutions_for_argument_context(
-                db,
-                env,
-                declared_return_ty,
-                inferable,
-            );
-
+        let return_bounds = call_expression_tcx.declared_type().map(|expected| {
+            self.unspecialized_return_type(db)
+                .assignable_solutions_for_argument_context(
+                    db,
+                    env,
+                    expected,
+                    generic_context.inferable_typevars(db),
+                )
+        });
+        if let Some(path_bounds) = return_bounds {
             let solutions = path_bounds.solve_for_argument_context(db, env, constraints);
             if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions.into_vec() {
@@ -9234,7 +9338,7 @@ impl<'db> Binding<'db> {
         if return_type_solutions.is_empty()
             && let Some(specialization) = inferred_parameter_context(
                 db,
-                ParameterContextKey::new(db, env, generic_context, self.inference),
+                ParameterContextKey::new(db, env, generic_context, inference),
             )
         {
             return Cow::Borrowed(specialization);
@@ -9243,9 +9347,10 @@ impl<'db> Binding<'db> {
             db,
             env,
             generic_context,
-            self.inference,
+            inference,
             &return_type_solutions,
             call_expression_tcx.kind(),
+            return_bounds,
         ))
     }
 
@@ -9315,6 +9420,53 @@ impl<'db> Binding<'db> {
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
         self.argument_matches = matcher.finish(db, env);
+    }
+
+    /// A disjoint literal argument rules out an overload regardless of how its type variables
+    /// are specialized. For example, a `TypedDict` lookup can skip overloads for other literal keys.
+    fn has_disjoint_literal_argument(
+        &self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> bool {
+        if self.is_partial_application
+            || self
+                .signature
+                .parameters()
+                .as_paramspec_with_prefix()
+                .is_some()
+        {
+            return false;
+        }
+        self.argument_matches
+            .iter()
+            .zip(arguments.iter())
+            .any(|(matched, argument)| {
+                if !matches!(
+                    argument,
+                    CallArgument::Positional(_) | CallArgument::Keyword { .. }
+                ) {
+                    return false;
+                }
+                let [matched] = matched.parameters.as_slice() else {
+                    return false;
+                };
+                let parameter = &self.signature.parameters()[matched.index];
+                if parameter.is_variadic()
+                    || parameter.is_keyword_variadic()
+                    || matched.expected_type.is_some()
+                {
+                    return false;
+                }
+                let declared = parameter.annotated_type();
+                let Some(expected) = declared.as_literal_value() else {
+                    return false;
+                };
+                argument
+                    .matched_type(declared, matched.argument_type)
+                    .and_then(Type::as_literal_value)
+                    .is_some_and(|actual| actual.is_disjoint_from(db, expected))
+            })
     }
 
     fn check_types(
