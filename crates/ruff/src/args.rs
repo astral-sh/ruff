@@ -782,6 +782,10 @@ impl ConfigurationTransformer for ConfigArguments {
         let with_config_overrides = self.overrides.clone().combine(config);
         self.per_flag_overrides.transform(with_config_overrides)
     }
+
+    fn use_inline_config(&self) -> bool {
+        !self.isolated
+    }
 }
 
 impl CheckCommand {
