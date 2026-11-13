@@ -53,8 +53,8 @@ use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::annotation_target::{is_valid_annotation_target, receiver_method_scope};
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
-    ArgumentContextCache, ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
-    inferable_typevar_occurrences, requires_overload_evaluation,
+    ArgumentContextCache, ArgumentTypeContext, BindingError, CallableDescription, CheckTypesMode,
+    OverloadSet, inferable_typevar_occurrences, requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
@@ -6017,10 +6017,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast_arguments.clone().zip(&generic_arguments).enumerate()
             {
                 if is_generic
-                    && arg
+                    && let Some(parameters) = arg
                         .value()
                         .as_lambda_expr()
-                        .is_some_and(|lambda| lambda.parameters.is_some())
+                        .and_then(|lambda| lambda.parameters.as_deref())
+                    && (!parameters.posonlyargs.is_empty() || !parameters.args.is_empty())
                 {
                     deferred_lambdas.push(index);
                 }
@@ -6465,20 +6466,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // A callback can also widen `T`. For example, `apply(lambda _: None, "x")`
         // admits a union even though `None` is incompatible with the initial `str`.
-        // Retry with all the arguments contributing constraints from the outset.
-        if !deferred_lambdas.is_empty() && result.is_err() {
-            return self.infer_and_check_argument_types_unified(
-                ast_arguments,
-                argument_types,
-                infer_argument_ty,
-                bindings,
-                constraints,
-                call_expression_tcx,
-                generic_arguments,
-                fixpoint_iteration_limit,
-                candidates,
-                &[],
-            );
+        // Retry with all arguments contributing together if a deferred argument
+        // rejected that specialization. An unrelated error should preserve the
+        // parameter types already inferred for the lambda body.
+        if result.is_err() && !deferred_lambdas.is_empty() {
+            let mut retry = false;
+            next_bindings.visit_overload_set(candidates, &mut |overload, _| {
+                retry |= overload.errors().iter().any(|error| {
+                    matches!(
+                        error,
+                        BindingError::InvalidArgumentType { argument_index: Some(index), .. }
+                            | BindingError::SpecializationError { argument_index: Some(index), .. }
+                            if deferred_lambdas.contains(index)
+                    )
+                });
+            });
+            if retry {
+                return self.infer_and_check_argument_types_unified(
+                    ast_arguments,
+                    argument_types,
+                    infer_argument_ty,
+                    bindings,
+                    constraints,
+                    call_expression_tcx,
+                    generic_arguments,
+                    fixpoint_iteration_limit,
+                    candidates,
+                    &[],
+                );
+            }
         }
 
         // If the set of candidate bindings contained multiple matching overloads, re-infer the argument

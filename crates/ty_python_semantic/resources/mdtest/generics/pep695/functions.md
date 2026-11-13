@@ -3905,6 +3905,23 @@ def _(value: str):
     reveal_type(result)  # revealed: None | str
 ```
 
+An error on another argument still leaves the callback parameter's type available.
+
+```py
+def apply_n[T](callback: Callable[[T], T], value: T, count: int) -> T:
+    for _ in range(count):
+        value = callback(value)
+    return value
+
+def _(value: str) -> Any | None:
+    return apply_n(lambda s: s.strip(), value, "twice")  # error: [invalid-argument-type] "Expected `int`"
+
+def _(value: str):
+    # error: [invalid-argument-type] "Expected `int`"
+    result = apply_n(lambda _: None, value, "twice")
+    reveal_type(result)  # revealed: None | str
+```
+
 ## Passing generic functions to generic functions
 
 `functions.pyi`:
