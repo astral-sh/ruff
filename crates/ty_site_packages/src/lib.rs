@@ -391,10 +391,25 @@ impl PythonEnvironment {
         origin: SysPrefixPathOrigin,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
-        let path = PythonEnvironmentPath::new(path.as_ref(), origin, system)?;
+        Self::new_with_visited(path.as_ref(), origin, system, &mut IndexSet::new())
+    }
+
+    fn new_with_visited(
+        path: &SystemPath,
+        origin: SysPrefixPathOrigin,
+        system: &dyn System,
+        visited: &mut IndexSet<SystemPathBuf>,
+    ) -> SitePackagesDiscoveryResult<Self> {
+        let path = PythonEnvironmentPath::new(path, origin, system)?;
+        // Environment prefixes are canonical, so aliases cannot hide a parent cycle.
+        if !visited.insert(path.sys_prefix().to_path_buf()) {
+            return Err(SitePackagesDiscoveryError::CyclicEnvironment(
+                path.sys_prefix().clone(),
+            ));
+        }
 
         // Attempt to inspect as a virtual environment first
-        match VirtualEnvironment::new(path.sys_prefix(), system) {
+        match VirtualEnvironment::new(path.sys_prefix(), system, visited) {
             Ok(venv) => Ok(Self::Virtual(venv)),
             // If there's not a `pyvenv.cfg` marker, attempt to inspect as a system environment
             Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(_, _, _))
@@ -754,7 +769,11 @@ pub struct VirtualEnvironment {
 }
 
 impl VirtualEnvironment {
-    fn new(path: &SysPrefixPath, system: &dyn System) -> SitePackagesDiscoveryResult<Self> {
+    fn new(
+        path: &SysPrefixPath,
+        system: &dyn System,
+        visited: &mut IndexSet<SystemPathBuf>,
+    ) -> SitePackagesDiscoveryResult<Self> {
         let pyvenv_cfg_path = path.join("pyvenv.cfg");
         tracing::debug!("Attempting to parse virtual environment metadata at '{pyvenv_cfg_path}'");
 
@@ -822,12 +841,17 @@ impl VirtualEnvironment {
         let parent_environment = if created_with_uv {
             parent_environment
                 .and_then(|sys_prefix| {
-                    PythonEnvironment::new(
-                        sys_prefix,
+                    PythonEnvironment::new_with_visited(
+                        SystemPath::new(sys_prefix),
                         SysPrefixPathOrigin::DerivedFromPyvenvCfg,
                         system,
+                        visited,
                     )
                     .inspect_err(|err| {
+                        if matches!(err, SitePackagesDiscoveryError::CyclicEnvironment(_)) {
+                            tracing::warn!("{err}");
+                            return;
+                        }
                         tracing::warn!(
                             "Failed to resolve the parent environment \
                             of this ephemeral uv virtual environment \
@@ -1273,6 +1297,9 @@ pub enum SitePackagesDiscoveryError {
     /// `site-packages` discovery failed because the `pyvenv.cfg` file could not be parsed.
     PyvenvCfgParseError(SystemPathBuf, PyvenvCfgParseErrorKind),
 
+    /// An environment's `extends-environment` chain includes the same prefix more than once.
+    CyclicEnvironment(SysPrefixPath),
+
     /// `site-packages` discovery failed because we're on a Unix system,
     /// we weren't able to figure out from the `pyvenv.cfg` file exactly where `site-packages`
     /// would be relative to the `sys.prefix` path, and we tried to fallback to iterating
@@ -1310,6 +1337,7 @@ impl std::error::Error for SitePackagesDiscoveryError {
             }
             Self::NoPyvenvCfgFile(_, io_err, _) => Some(io_err),
             Self::PyvenvCfgParseError(_, _)
+            | Self::CyclicEnvironment(_)
             | Self::CouldNotReadLibDirectory(_, _)
             | Self::NoSitePackagesDirFound(_, _) => None,
         }
@@ -1354,6 +1382,13 @@ impl std::fmt::Display for SitePackagesDiscoveryError {
                 write!(
                     f,
                     "Failed to parse the `pyvenv.cfg` file at `{path}` because {kind}"
+                )
+            }
+            Self::CyclicEnvironment(path) => {
+                write!(
+                    f,
+                    "Cycle in `extends-environment` chain at `{}`",
+                    path.as_str()
                 )
             }
             Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }, system) => {
@@ -2350,6 +2385,7 @@ impl PartialEq<SystemPathBuf> for PythonHomePath {
 #[cfg(test)]
 mod tests {
     use std::assert_matches;
+    use std::fmt::Write as _;
 
     use ruff_db::system::TestSystem;
     #[cfg(unix)]
@@ -4233,5 +4269,63 @@ mod tests {
                 [system.canonicalize_path(&python314_site_packages).unwrap()]
             );
         }
+    }
+
+    #[test]
+    fn parent_environment_cycles() -> Result<(), Box<dyn std::error::Error>> {
+        for length in [1, 3] {
+            for cyclic in [false, true] {
+                let system = TestSystem::default();
+                let fs = system.memory_file_system();
+                fs.create_directory_all("/python")?;
+                let mut expected = Vec::new();
+
+                for index in 0..length {
+                    let prefix = SystemPathBuf::from(format!("/env{index}"));
+                    let packages = prefix.join(if cfg!(windows) {
+                        "Lib/site-packages"
+                    } else {
+                        "lib/python3.13/site-packages"
+                    });
+                    fs.create_directory_all(&packages)?;
+                    expected.push(system.canonicalize_path(&packages)?);
+                    let mut config = "home = /python\nversion = 3.13\nuv = 0.13.7\n".to_string();
+                    if index + 1 < length || cyclic {
+                        writeln!(config, "extends-environment = /env{}", (index + 1) % length)?;
+                    }
+                    fs.write_file_all(prefix.join("pyvenv.cfg"), config)?;
+                }
+
+                let environment =
+                    PythonEnvironment::new("/env0", SysPrefixPathOrigin::PythonCliFlag, &system)?;
+                assert_eq!(
+                    environment.site_packages_paths(&system)?.into_vec(),
+                    expected
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parent_environment_cycle_through_symlink() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = tempfile::tempdir()?;
+        let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
+        let system = OsSystem::new(root);
+        let prefix = root.join("venv");
+        let alias = root.join("alias");
+        std::fs::create_dir(prefix.as_std_path())?;
+        std::os::unix::fs::symlink("venv", alias.as_std_path())?;
+        std::fs::write(
+            prefix.join("pyvenv.cfg").as_std_path(),
+            format!("home = {root}\nuv = 0.13.7\nextends-environment = {alias}\n"),
+        )?;
+
+        let environment =
+            PythonEnvironment::new(&prefix, SysPrefixPathOrigin::PythonCliFlag, &system)?
+                .expect_venv();
+        assert!(environment.parent_environment.is_none());
+        Ok(())
     }
 }
