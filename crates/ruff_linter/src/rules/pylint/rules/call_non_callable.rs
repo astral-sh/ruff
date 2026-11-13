@@ -47,12 +47,8 @@ pub(crate) struct CallNonCallable {
 }
 
 impl Violation for CallNonCallable {
-    // No reliable fix in general, since we can't know the author's intent.
-    // In theory, an unsafe fix could be offered to insert a comma, e.g. for
-    // - collection literals: `[2 (3, 4)]` -> `[2, (3, 4)]`
-    // - function args: `foo(1(2, 3))` -> `foo(1, (2, 3))`
-    // or other cases, but to not complicate things, we'll wait for feedback
-    // from users.
+    // No fix: CPython suggests a missing comma, but we can't know the author's
+    // intent (e.g. `"foo"()` vs `foo()`).
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
