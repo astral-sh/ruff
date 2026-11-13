@@ -130,17 +130,29 @@ where
             continue;
         };
 
+        // Match the path formatting used by `UnifiedFile::relative_path`.
+        let display_path = path
+            .strip_prefix(db.system().current_directory())
+            .unwrap_or(path);
+
+        if !diagnostics
+            .iter()
+            .any(|diagnostic| fix_mode.is_fixable(diagnostic))
+        {
+            tracing::debug!("Skipping file `{display_path}` without applicable fixes.");
+            continue;
+        }
+
         let python_file = db.program_file(file).python_file(db);
         let parsed = parsed_module(db, python_file);
         if parsed.load(db).has_syntax_errors() {
-            tracing::warn!("Skipping file `{path}` with syntax errors");
+            tracing::warn!("Skipping file `{display_path}` with syntax errors");
             continue;
         }
 
         let fixes = fix_mode.fixes(db, python_file, diagnostics);
 
         if fixes.is_empty() {
-            tracing::debug!("Skipping file `{path}` without applicable fixes.");
             continue;
         }
 
