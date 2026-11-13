@@ -1045,7 +1045,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let tcx_tuple = tcx
-            .declared_type()
+            .expected_type()
             .and_then(|annotation| {
                 annotation.known_specialization(db, visitor.env, KnownClass::Tuple)
             })
@@ -1062,7 +1062,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             Some(tuple) => Either::Left(
                 tuple
                     .iter_element_types(db)
-                    .map(|tcx| TypeContext::declared(Some(tcx))),
+                    .map(|tcx| TypeContext::preference(Some(tcx))),
             ),
         };
 

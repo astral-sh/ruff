@@ -341,7 +341,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = dict;
 
         let key_tcx =
-            tcx.with_declared_type(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
+            tcx.with_expected_type(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
 
         for item in items {
             let key_ty = self.infer_optional_expression(item.key.as_ref(), key_tcx);
@@ -353,12 +353,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 && let Some(key) = key_ty.as_string_literal()
                 && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
             {
-                self.infer_expression(&item.value, tcx.with_declared_type(Some(field.declared_ty)))
+                self.infer_expression(&item.value, tcx.with_expected_type(Some(field.declared_ty)))
             } else if let Some(key_ty) = key_ty {
                 if key_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
                     && let Some(value_ty) = typed_dict.arbitrary_key_initialization_type(db, env)
                 {
-                    self.infer_expression(&item.value, tcx.with_declared_type(Some(value_ty)))
+                    self.infer_expression(&item.value, tcx.with_expected_type(Some(value_ty)))
                 } else {
                     self.infer_expression(&item.value, TypeContext::default())
                 }
@@ -517,7 +517,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `Node(child=...)` cannot infer through the recursive field.
         let has_gradual_class_context = class_literal
             .as_static()
-            .zip(call_expression_tcx.declared_type())
+            .zip(call_expression_tcx.expected_type())
             .is_some_and(|(class_literal, annotation)| {
                 any_over_type(db, env, annotation.resolve_type_alias(db), false, |ty| {
                     ty.resolve_type_alias(db)
@@ -575,12 +575,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match form {
             TypedDictConstructorForm::LiteralOnly(argument) => {
                 let target_ty = Type::TypedDict(typed_dict);
-                self.get_or_infer_expression(argument, TypeContext::declared(Some(target_ty)));
+                self.get_or_infer_expression(argument, TypeContext::preference(Some(target_ty)));
                 return;
             }
             TypedDictConstructorForm::SinglePositional(argument) => {
                 let target_ty = Type::TypedDict(typed_dict);
-                self.get_or_infer_expression(argument, TypeContext::declared(Some(target_ty)));
+                self.get_or_infer_expression(argument, TypeContext::preference(Some(target_ty)));
             }
             TypedDictConstructorForm::MixedPositionalAndKeywords => {
                 let unpacked_keyword_types =
@@ -599,7 +599,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let target_ty = Type::TypedDict(positional_target);
                 self.get_or_infer_expression(
                     &arguments.args[0],
-                    TypeContext::declared(Some(target_ty)),
+                    TypeContext::preference(Some(target_ty)),
                 );
             }
             TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
@@ -644,7 +644,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .arg
                 .as_ref()
                 .and_then(|arg_name| typed_dict.item(self.db(), arg_name.id.as_str()))
-                .map(|field| tcx.with_declared_type(Some(field.declared_ty)))
+                .map(|field| tcx.with_expected_type(Some(field.declared_ty)))
                 .unwrap_or_default();
             self.get_or_infer_expression(&keyword.value, value_tcx);
         }
@@ -664,7 +664,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
         let key_tcx =
-            TypeContext::declared(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
+            TypeContext::preference(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
 
         for item in &dict_expr.items {
             let key_ty = item
@@ -674,10 +674,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let value_tcx = if let Some(key) = key_ty.and_then(Type::as_string_literal)
                 && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
             {
-                TypeContext::declared(Some(field.declared_ty))
+                TypeContext::preference(Some(field.declared_ty))
             } else if let Some(key_ty) = key_ty {
                 if key_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env)) {
-                    TypeContext::declared(typed_dict.arbitrary_key_initialization_type(db, env))
+                    TypeContext::preference(typed_dict.arbitrary_key_initialization_type(db, env))
                 } else {
                     TypeContext::default()
                 }
