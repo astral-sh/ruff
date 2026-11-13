@@ -1154,6 +1154,10 @@ impl<'m> ContextCursor<'m> {
     /// E.g. naming a parameter, type parameter, or `for` `<name>`).
     fn is_in_variable_binding(&self) -> bool {
         self.covering_node.ancestors().any(|node| match node {
+            ast::AnyNodeRef::Alias(alias) => alias
+                .asname
+                .as_ref()
+                .is_some_and(|name| name.range.contains_range(self.range)),
             ast::AnyNodeRef::Parameter(param) => param.name.range.contains_range(self.range),
             ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
                 type_param.name.range.contains_range(self.range)
@@ -8861,6 +8865,20 @@ from collections import defaultdict as f<CURSOR>
             builder.build().snapshot(),
             @"<No completions found>",
         );
+    }
+
+    #[test]
+    fn typing_import_alias_on_next_line_suppresses_completions() {
+        let builder = completion_test_builder(&ruff_python_trivia::textwrap::dedent(
+            "
+            from datetime import (
+                date as
+                timede<CURSOR>
+            )
+            ",
+        ));
+
+        assert_snapshot!(builder.build().snapshot(), @"<No completions found>");
     }
 
     #[test]
