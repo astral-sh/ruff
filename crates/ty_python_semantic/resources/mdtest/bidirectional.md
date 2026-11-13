@@ -1910,9 +1910,8 @@ reader: Reader[int] = reveal_type(Reader())
 reader: Reader[int | str] = reveal_type(Reader())
 ```
 
-Interestingly, it is not just valid to annotate the result with a supertype (`int | str`), but also
-with a subtype (`bool`). In the case below, `Reader()` can be inferred as `Reader[bool]`, which is a
-valid argument to the `self: Reader[int]` parameter, again due to covariance.
+The assignment context can also narrow the inferred type argument from `int` to `bool`. Since
+`Reader` is covariant, `Reader[bool]` is a valid argument for `self: Reader[int]`.
 
 ```py
 # TODO: this should not be an error, and Reader[bool] should be inferred (see https://github.com/astral-sh/ty/issues/4993)
