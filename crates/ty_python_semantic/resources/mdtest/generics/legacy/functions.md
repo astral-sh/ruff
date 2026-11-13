@@ -2758,6 +2758,47 @@ def _(handlers: list[Callable[[str], str]]):
     register(handlers, lambda s: reveal_type(s))  # revealed: str
 ```
 
+## Nested calls with optional return context
+
+When checking a nested call like `first(wrap(value))`, we use the expected return type to infer a
+provisional specialization for the call, which we use to guide the inference of the call's
+arguments. If that expected return type is a union, we check each union element separately and only
+fall back to the union as a whole if no element succeeds.
+
+In this example, `T@find` is non-inferable, so the entire `first(wrap(value))` call needs to be
+valid for all possible specializations of `T@find`. The expected return type is `T | None` (from the
+assignment annotation), so we check a narrowed return type of `None`. With that narrowed type,
+`wrap(value)` would have a return type of `list[None]`, which is only valid when `T@find ≤ None`.
+The caller can choose (among many other choices) `T@find = int`, so the `None` attempt should fail.
+We should therefore _not_ use the narrowed return type to choose the provisional specialization for
+the inferred `T@wrap` and `T@first`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def first(items: list[T]) -> T | None:
+    return items[0] if items else None
+
+def wrap(value: T) -> list[T]:
+    return [value]
+
+def find(value: T) -> T | None:
+    result: T | None = first(wrap(value))
+    reveal_type(result)  # revealed: T@find | None
+    return result
+```
+
+The same applies to the iterator passed to `next` when the caller's type variable has a bound.
+
+```py
+Bounded = TypeVar("Bounded", bound=int)
+
+def first_int(values: list[Bounded]) -> Bounded | None:
+    return next(iter(values), None)
+```
+
 ## Passing generic functions to generic functions
 
 ```py

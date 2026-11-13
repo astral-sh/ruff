@@ -6934,12 +6934,19 @@ impl<'db> CallInference<'_, 'db> {
 
         let mut solution = self.solve(constraints, &mut builder, return_context);
 
-        // If we failed to infer a compatible specialization, retry without the declared type.
+        let accepts_arguments =
+            |&(inference, _, validated): &(TypeVarInference<'db>, Type<'db>, bool)| {
+                validated || self.accepts_arguments(inference.merged_specialization(db))
+            };
+
+        // A specialization inferred from the return context can depend on a condition that only
+        // holds for some specializations of a non-inferable typevar. The resulting parameter types
+        // may be incompatible with the actual arguments. In that case, try re-inferring the
+        // specialization from the arguments alone.
         //
-        // Note that this retry only exists to provide more precise diagnostics in cases where
-        // the declared type may partially influence the type inferred for the call, leading to
-        // confusing results.
-        if return_context.is_some() && solution.is_err() {
+        // TODO[ty#4696]: Remove this argument recheck once the solver verifies that its solutions
+        // cover every specialization of any non-inferable typevars.
+        if return_context.is_some() && !solution.as_ref().is_ok_and(accepts_arguments) {
             builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
             specialization_errors.clear();
             constraint_set_errors.fill(false);
@@ -6952,7 +6959,14 @@ impl<'db> CallInference<'_, 'db> {
                 &mut constraint_set_errors,
             );
 
-            solution = self.solve(constraints, &mut builder, None);
+            let retry = self.solve(constraints, &mut builder, None);
+            // If neither specialization accepts the arguments, the contextual parameter types
+            // give more precise diagnostics when available.
+            if solution.is_err()
+                || (specialization_errors.is_empty() && retry.as_ref().is_ok_and(accepts_arguments))
+            {
+                solution = retry;
+            }
         }
 
         let (inference, return_ty, arguments_validated) = solution.unwrap_or_else(|errors| {
