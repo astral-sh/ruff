@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCall};
-use ruff_python_semantic::analyze::type_inference::ResolvedPythonType;
+use ruff_python_ast::{Expr, ExprCall, Number};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -14,7 +13,7 @@ use crate::{FixAvailability, Violation};
 /// ## Why is this bad?
 /// Only objects whose type implements `__call__` can be called. Calling
 /// an object of a type that doesn't implement `__call__` will result in a
-/// `TypeError` at runtime, and, for many literal types, a `SyntaxWarning`
+/// `TypeError` at runtime, and a `SyntaxWarning`
 /// when Python compiles the constant expression.
 ///
 /// This often happens unintentionally, for example, due to a missing
@@ -63,27 +62,36 @@ impl Violation for CallNonCallable {
 pub(crate) fn call_non_callable(checker: &Checker, call: &ExprCall) {
     let func = &*call.func;
 
-    let resolved_type = ResolvedPythonType::from(func);
-    match resolved_type {
-        // A `Union` is just a union `PythonType` non-callable atoms.
-        ResolvedPythonType::Atom(_) | ResolvedPythonType::Union(_) => {
-            checker.report_diagnostic(
-                CallNonCallable {
-                    python_type: resolved_type.to_string(),
-                },
-                func.range(),
-            );
-        }
-        _ => {
-            // TODO: Move to PythonType?
-            if let Expr::TString(t_string) = func {
-                checker.report_diagnostic(
-                    CallNonCallable {
-                        python_type: "Template".to_string(),
-                    },
-                    t_string.range(),
-                );
-            }
-        }
+    if let Some(python_type) = non_callable_type(func) {
+        checker.report_diagnostic(
+            CallNonCallable {
+                python_type: python_type.to_string(),
+            },
+            func.range(),
+        );
     }
+}
+
+fn non_callable_type(expr: &Expr) -> Option<&'static str> {
+    let python_type = match expr {
+        Expr::StringLiteral(_) => "str",
+        Expr::BytesLiteral(_) => "bytes",
+        Expr::BooleanLiteral(_) => "bool",
+        Expr::NumberLiteral(number) => match number.value {
+            Number::Int(_) => "int",
+            Number::Float(_) => "float",
+            Number::Complex { .. } => "complex",
+        },
+        Expr::NoneLiteral(_) => "NoneType",
+        Expr::EllipsisLiteral(_) => "ellipsis",
+        Expr::Tuple(_) => "tuple",
+        Expr::List(_) | Expr::ListComp(_) => "list",
+        Expr::Dict(_) | Expr::DictComp(_) => "dict",
+        Expr::Set(_) | Expr::SetComp(_) => "set",
+        Expr::Generator(_) => "generator",
+        Expr::FString(_) => "str",
+        Expr::TString(_) => "Template",
+        _ => return None,
+    };
+    Some(python_type)
 }

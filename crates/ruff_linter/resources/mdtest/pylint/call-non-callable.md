@@ -94,21 +94,3 @@ None()  # error: [call-non-callable]
 t"hello {name}"()  # error: [call-non-callable]
 
 ```
-
-## Errors caught using type inference
-
-Given that we have a small type inference engine it allows us to catch some more complex non-callables. Those would also result in `TypeError` at runtime, but they do not emit `SyntaxWarning` during compilation.
-
-```python
-# BinOp
-("a" + "b")()  # error: [call-non-callable]
-
-# If (Union)
-(1 if True else "a")()  # error: [call-non-callable]
-
-# UnaryOp
-(not 1)()  # error: [call-non-callable]
-
-# BoolOp
-(True or False)()  # error: [call-non-callable]
-```
