@@ -188,7 +188,7 @@ fn parse_doc_attr(doc_attr: &Attribute) -> syn::Result<(String, String)> {
 }
 
 fn parse_markdown_link(link: &str) -> Option<(&str, &str)> {
-    link.strip_prefix('[')?.strip_suffix(')')?.split_once("](")
+    link.strip_circumfix('[', ')')?.split_once("](")
 }
 
 enum ParseStrategy {

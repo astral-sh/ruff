@@ -428,12 +428,10 @@ fn is_underline(line: &str) -> bool {
 fn is_static_substitution(line: ParsedLine<'_>, section_indent: TextSize) -> bool {
     let text = line.text.trim();
     let is_percent_marker = text
-        .strip_prefix("%(")
-        .and_then(|line| line.strip_suffix(")s"))
+        .strip_circumfix("%(", ")s")
         .is_some_and(|name| !name.is_empty() && !name.contains('(') && !name.contains(')'));
     let is_dollar_marker = text
-        .strip_prefix("${")
-        .and_then(|line| line.strip_suffix('}'))
+        .strip_circumfix("${", '}')
         .or_else(|| text.strip_prefix('$'))
         .is_some_and(is_dotted_identifier);
 

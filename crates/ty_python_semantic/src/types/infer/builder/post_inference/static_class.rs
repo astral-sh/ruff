@@ -384,8 +384,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                     if let ast::Expr::Subscript(node) = node {
                         let source = source_text(db, context.file());
                         // The parser can recover a type parameter list without a closing bracket.
-                        if let Some(type_params) = source[type_params.range()].strip_prefix('[')
-                            && let Some(type_params) = type_params.strip_suffix(']')
+                        if let Some(type_params) =
+                            source[type_params.range()].strip_circumfix('[', ']')
                             && type_params == &source[node.slice.range()]
                         {
                             diagnostic.help("Remove the type parameters from the `Protocol` base");
