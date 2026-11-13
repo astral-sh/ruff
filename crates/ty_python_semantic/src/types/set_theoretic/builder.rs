@@ -35,9 +35,9 @@
 //! operations on literal strings/bytes. For normal unions, it's most efficient to just store the
 //! member types in a vector, and do O(n^2) redundancy checks to maintain the union in simplified
 //! form. But literal unions can grow to a size where this becomes a performance problem. For this
-//! reason, we group literal types in `UnionBuilder`. Since every different string literal type
-//! shares exactly the same possible super-types, and none of them are subtypes of each other
-//! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
+//! reason, we group literal types in `UnionBuilder`. For example, every string literal is a
+//! subtype of `str`, so checking one member suffices to remove the entire group. When a type can
+//! distinguish individual literals, we check each member of the group.
 
 use std::convert::Infallible;
 use std::hint::cold_path;
@@ -416,6 +416,12 @@ impl<'db> Type<'db> {
             //     Y = 1
             // ```
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => true,
+            // A protocol can distinguish enum members by `name`, integers by `numerator`,
+            // and strings and bytes by `__len__`.
+            (Type::ProtocolInstance(_), _) => true,
+            // A preserved alias can hide any of these types. Let the per-literal relation
+            // checks handle unfolding, including for recursive aliases.
+            (ty, _) if ty.is_alias_like() => true,
             (Type::LiteralValue(literal), _) => match (literal.kind(), kind) {
                 (LiteralValueTypeKind::String(_), LiteralKind::String) => true,
                 (LiteralValueTypeKind::Bytes(_), LiteralKind::Bytes) => true,
