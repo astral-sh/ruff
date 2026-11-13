@@ -1,13 +1,15 @@
 use memchr::memmem::Finder;
 use unicode_normalization::is_nfkc;
 
+use crate::tokenizer::{is_identifier_continuation, is_identifier_start};
+
 /// A reusable text prefilter for an identifier or keyword.
 ///
 /// A match only indicates that a source may contain the name: matches in
 /// comments and strings are included. Matchers created with [`Self::new`] accept
-/// sources that change under NFKC normalization because Python normalizes
-/// identifiers this way. Matchers created with [`Self::keyword`] search their literal
-/// spelling instead. Callers should validate candidates using the AST or semantic analysis.
+/// sources containing an identifier spelling that changes under NFKC normalization.
+/// Matchers created with [`Self::keyword`] search their literal spelling instead.
+/// Callers should validate candidates using the AST or semantic analysis.
 ///
 /// Construct a matcher once and reuse it across sources to avoid preprocessing
 /// the name for each source. Cache matchers for fixed names in a [`std::sync::LazyLock`].
@@ -41,21 +43,30 @@ impl<'a> NameMatcher<'a> {
 
     /// Returns whether `source` may contain the configured identifier or keyword.
     ///
-    /// Identifier matchers conservatively return `true` if the source changes under
-    /// NFKC normalization. Otherwise, searches for the literal spelling bounded by bytes
-    /// other than ASCII letters, digits or `_`. Matches may occur in comments, strings,
-    /// or Unicode identifiers.
+    /// The literal search checks for boundaries at bytes other than ASCII letters, digits,
+    /// or `_`. Identifier matchers also accept files with a non-ASCII identifier spelling
+    /// that changes under NFKC.
     pub fn may_match(&self, source: &str) -> bool {
-        if !self.is_keyword && !source.is_ascii() && !is_nfkc(source) {
+        let bytes = source.as_bytes();
+        let len = self.finder.needle().len();
+        if self
+            .finder
+            .find_iter(bytes)
+            .any(|start| has_identifier_boundaries(bytes, start, start + len))
+        {
             return true;
         }
 
-        let bytes = source.as_bytes();
-        let len = self.finder.needle().len();
-        self.finder
-            .find_iter(bytes)
-            .any(|start| has_identifier_boundaries(bytes, start, start + len))
+        !self.is_keyword
+            && !source.is_ascii()
+            && unicode_identifiers(source).any(|word| !is_nfkc(word))
     }
+}
+
+fn unicode_identifiers(source: &str) -> impl Iterator<Item = &str> {
+    source
+        .split(|c| !is_identifier_continuation(c))
+        .filter(|word| !word.is_ascii() && word.starts_with(is_identifier_start))
 }
 
 fn has_identifier_boundaries(source: &[u8], start: usize, end: usize) -> bool {
@@ -120,6 +131,13 @@ mod tests {
         assert!(matcher.may_match("Ｃ = 1"));
         assert!(NameMatcher::new("ffi").may_match("ﬃ = 1"));
         assert!(NameMatcher::new("café").may_match("cafe\u{301} = 1"));
+    }
+
+    #[test]
+    fn non_identifier_punctuation() {
+        let matcher = NameMatcher::new("C");
+        assert!(!matcher.may_match("# …"));
+        assert!(matcher.may_match("obj.C  # …"));
     }
 
     #[test]
