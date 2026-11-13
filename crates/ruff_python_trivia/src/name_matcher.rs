@@ -1,5 +1,6 @@
+use bstr::ByteSlice;
 use memchr::memmem::Finder;
-use unicode_normalization::is_nfkc;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::tokenizer::{is_identifier_continuation, is_identifier_start};
 
@@ -7,8 +8,8 @@ use crate::tokenizer::{is_identifier_continuation, is_identifier_start};
 ///
 /// A match only indicates that a source may contain the name: matches in
 /// comments and strings are included. Matchers created with [`Self::new`] accept
-/// sources containing an identifier spelling that changes under NFKC normalization.
-/// Matchers created with [`Self::keyword`] search their literal spelling instead.
+/// sources containing an identifier that normalizes to the searched name under NFKC.
+/// Matchers created with [`Self::keyword`] look for the exact keyword text.
 /// Callers should validate candidates using the AST or semantic analysis.
 ///
 /// Construct a matcher once and reuse it across sources to avoid preprocessing
@@ -16,7 +17,7 @@ use crate::tokenizer::{is_identifier_continuation, is_identifier_start};
 #[derive(Debug, Clone)]
 pub struct NameMatcher<'a> {
     finder: Finder<'a>,
-    is_keyword: bool,
+    identifier: Option<&'a str>,
 }
 
 impl<'a> NameMatcher<'a> {
@@ -26,26 +27,26 @@ impl<'a> NameMatcher<'a> {
     pub fn new(name: &'a str) -> Self {
         Self {
             finder: Finder::new(name),
-            is_keyword: false,
+            identifier: Some(name),
         }
     }
 
     /// Creates a keyword matcher that borrows `keyword` without allocating.
     ///
-    /// Python recognizes keywords by their literal spelling, without NFKC normalization,
-    /// so keyword matchers skip the normalization check.
+    /// Python recognizes keywords before NFKC normalization, so keyword matchers
+    /// compare the source text directly.
     pub fn keyword(keyword: &'a str) -> Self {
         Self {
             finder: Finder::new(keyword),
-            is_keyword: true,
+            identifier: None,
         }
     }
 
     /// Returns whether `source` may contain the configured identifier or keyword.
     ///
     /// The literal search checks for boundaries at bytes other than ASCII letters, digits,
-    /// or `_`. Identifier matchers also accept files with a non-ASCII identifier spelling
-    /// that changes under NFKC.
+    /// or `_`. Identifier matchers also check whether a whole non-ASCII identifier
+    /// normalizes to the searched name.
     pub fn may_match(&self, source: &str) -> bool {
         let bytes = source.as_bytes();
         let len = self.finder.needle().len();
@@ -57,16 +58,42 @@ impl<'a> NameMatcher<'a> {
             return true;
         }
 
-        !self.is_keyword
-            && !source.is_ascii()
-            && unicode_identifiers(source).any(|word| !is_nfkc(word))
+        let Some(name) = self.identifier else {
+            return false;
+        };
+        unicode_identifiers(source).any(|word| word.nfkc().eq(name.chars()))
     }
 }
 
-fn unicode_identifiers(source: &str) -> impl Iterator<Item = &str> {
-    source
-        .split(|c| !is_identifier_continuation(c))
-        .filter(|word| !word.is_ascii() && word.starts_with(is_identifier_start))
+fn unicode_identifiers(mut source: &str) -> impl Iterator<Item = &str> {
+    std::iter::from_fn(move || {
+        loop {
+            // Only identifiers containing a non-ASCII character can change under NFKC.
+            // The first non-ASCII byte in a UTF-8 string always starts a character.
+            let index = source.as_bytes().find_non_ascii_byte()?;
+            let (ascii, rest) = source.split_at(index);
+            let mut chars = rest.chars();
+            let first = chars.next()?;
+            if !is_identifier_continuation(first) {
+                // Punctuation such as `…` separates identifiers. Resume just after it.
+                source = chars.as_str();
+                continue;
+            }
+
+            // In `obj.myＣache()`, we landed on `Ｃ`. Scan left over `my` and right
+            // over `ache` so we yield the whole identifier and resume at `(`.
+            let start = ascii.trim_end_matches(is_identifier_continuation).len();
+            let remaining = chars
+                .as_str()
+                .trim_start_matches(is_identifier_continuation);
+            let word = &source[start..source.len() - remaining.len()];
+            source = remaining;
+            // Skip runs like `1Ｃ`: a Python identifier cannot start with a digit.
+            if word.starts_with(is_identifier_start) {
+                return Some(word);
+            }
+        }
+    })
 }
 
 fn has_identifier_boundaries(source: &[u8], start: usize, end: usize) -> bool {
@@ -111,7 +138,7 @@ mod tests {
     }
 
     #[test]
-    fn normalized_unicode_uses_literal_spelling() {
+    fn unrelated_unicode_does_not_match() {
         let matcher = NameMatcher::new("C");
         assert!(!matcher.may_match("# note — a comment"));
         assert!(!matcher.may_match("# café"));
@@ -141,7 +168,24 @@ mod tests {
     }
 
     #[test]
-    fn keyword_uses_literal_spelling() {
+    fn normalized_whole_identifier() {
+        let source = "obj.myＣache";
+        assert!(!NameMatcher::new("C").may_match(source));
+        assert!(NameMatcher::new("myCache").may_match(source));
+        assert!(!NameMatcher::new("C").may_match("obj.Ｃβ"));
+        assert!(!NameMatcher::new("f").may_match("obj.ﬃ"));
+        assert!(NameMatcher::new("C").may_match(r#"x: "models.Ｃ""#));
+    }
+
+    #[test]
+    fn skips_to_the_next_unicode_identifier() {
+        let source = "ascii…1Ｃ 𝒞β / myＣache — cafe\u{301}";
+        let words: Vec<_> = super::unicode_identifiers(source).collect();
+        assert_eq!(words, ["𝒞β", "myＣache", "cafe\u{301}"]);
+    }
+
+    #[test]
+    fn keyword_matches_exact_text() {
         let matcher = NameMatcher::keyword("class");
         assert!(matcher.may_match("class C: pass"));
         assert!(matcher.may_match("class Café: pass"));
