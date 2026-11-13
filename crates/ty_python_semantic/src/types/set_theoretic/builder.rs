@@ -652,7 +652,6 @@ pub(crate) struct UnionBuilder<'db> {
     /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
     cycle_recovery: bool,
     recursively_defined: RecursivelyDefined,
-    widened_literals: bool,
 }
 
 /// Accumulates types into a union.
@@ -727,7 +726,6 @@ impl<'db> UnionBuilder<'db> {
             unpack_aliases: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
-            widened_literals: false,
         }
     }
 
@@ -782,13 +780,8 @@ impl<'db> UnionBuilder<'db> {
             }
         }
         for ty in replace_with {
-            self.add_literal_fallback(ty, seen_aliases);
+            self.add_in_place_impl(ty, seen_aliases);
         }
-    }
-
-    fn add_literal_fallback(&mut self, fallback: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
-        self.widened_literals = true;
-        self.add_in_place_impl(fallback, seen_aliases);
     }
 
     /// Adds a type to this union.
@@ -867,7 +860,7 @@ impl<'db> UnionBuilder<'db> {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with =
                                             KnownClass::Str.to_instance(db, &self.env);
-                                        self.add_literal_fallback(replace_with, seen_aliases);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
                                         return;
                                     }
                                     found = Some(literals);
@@ -922,7 +915,7 @@ impl<'db> UnionBuilder<'db> {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with =
                                             KnownClass::Bytes.to_instance(db, &self.env);
-                                        self.add_literal_fallback(replace_with, seen_aliases);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
                                         return;
                                     }
                                     found = Some(literals);
@@ -979,7 +972,7 @@ impl<'db> UnionBuilder<'db> {
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let replace_with =
                                             KnownClass::Int.to_instance(db, &self.env);
-                                        self.add_literal_fallback(replace_with, seen_aliases);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
                                         return;
                                     }
                                     found = Some(literals);
@@ -1056,7 +1049,7 @@ impl<'db> UnionBuilder<'db> {
                                         let (literal, _) = literals.first().unwrap();
                                         let replace_with =
                                             literal.enum_class_instance(db, &self.env);
-                                        self.add_literal_fallback(replace_with, seen_aliases);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
                                         return;
                                     }
                                     found = Some(literals);
@@ -1402,17 +1395,7 @@ impl<'db> UnionBuilder<'db> {
         self.try_build().unwrap_or(Type::Never)
     }
 
-    pub(crate) fn try_build(mut self) -> Option<Type<'db>> {
-        self.finish()
-    }
-
-    /// Return `None` if the literal limit caused any group of literals to widen.
-    pub(in crate::types) fn build_without_literal_widening(mut self) -> Option<Type<'db>> {
-        let union = self.finish().unwrap_or(Type::Never);
-        (!self.widened_literals).then_some(union)
-    }
-
-    fn finish(&mut self) -> Option<Type<'db>> {
+    pub(crate) fn try_build(self) -> Option<Type<'db>> {
         let db = self.db;
 
         let unpack_aliases = self.unpack_aliases;
@@ -1421,7 +1404,7 @@ impl<'db> UnionBuilder<'db> {
 
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
         let mut types = Vec::with_capacity(type_count);
-        for element in self.elements.drain(..) {
+        for element in self.elements {
             match element {
                 UnionElement::IntLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
@@ -1463,10 +1446,14 @@ impl<'db> UnionBuilder<'db> {
             && normalize_covered_literal_exclusions(db, &self.env, &mut types, unpack_aliases))
             || normalize_enum_complement_unions(db, &self.env, &mut types)
         {
-            for ty in types {
-                self.add_in_place(ty);
-            }
-            return self.finish();
+            let builder = UnionBuilder::new(db, &self.env)
+                .unpack_aliases(unpack_aliases)
+                .cycle_recovery(cycle_recovery)
+                .or_recursively_defined(recursively_defined);
+            return types
+                .into_iter()
+                .fold(builder, UnionBuilder::add)
+                .try_build();
         }
 
         match types.len() {

@@ -15,7 +15,6 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::set_theoretic::builder::UnionBuilder;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::typevar::TypeVarDomain;
@@ -1763,48 +1762,33 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         let env = self.env;
-        let mut upper_elements = std::iter::once(target).chain(intersection.iter_negative(db));
-        // Match other type variables in place so they receive their own inference evidence.
-        if upper_elements.any(|ty| {
-            any_over_type_expanding_aliases(db, env, ty, |nested| match nested {
-                Type::TypeVar(_) => true,
-                // Materializing a class-based TypedDict can leave its gradual fields intact.
-                Type::TypedDict(_) => !nested.is_fully_static(db, env),
-                _ => false,
+        let upper_elements = || std::iter::once(target).chain(intersection.iter_negative(db));
+        // Match type variables and structural types in place. A protocol member or
+        // TypedDict field can refer to another type variable that needs its own evidence.
+        if upper_elements().any(|ty| {
+            any_over_type_expanding_aliases(db, env, ty, |nested| {
+                matches!(
+                    nested,
+                    Type::TypeVar(_) | Type::ProtocolInstance(_) | Type::TypedDict(_)
+                )
             }) || ty.top_materialization(db, env) != ty.bottom_materialization(db, env)
         }) {
             return None;
         }
 
         let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
-        // For a fixed U, check what remains of its declared domain. For example,
-        // `object` is assignable to `Hashable`, but `object & ~Hashable` contains lists.
-        // Keeping a gradual bound intact also lets it materialize during assignability.
+        // For a fixed U, compare what remains of its declared domain. Keeping a gradual
+        // bound intact lets it materialize during assignability.
         if self.typevar_evaluation == TypeVarEvaluation::Eager {
             return Some(self.check_type_pair(db, expanded, target));
         }
 
-        // The declared domain can establish the relation without constraining U, or
-        // supply evidence from a TypedDict field. Its top materialization covers every U.
+        // The declared domain can establish the relation without constraining U.
+        // Its top materialization covers every legal choice of U.
         let when_expanded = self.check_type_pair(db, expanded.top_materialization(db, env), target);
         Some(when_expanded.or(db, self.constraints, || {
-            let check_upper = |upper| self.check_type_pair(db, positive, upper);
-            let with_exclusions = |builder| {
-                intersection
-                    .iter_negative(db)
-                    .fold(builder, UnionBuilder::add)
-                    .build_without_literal_widening()
-            };
-            if let Some(upper) = with_exclusions(UnionBuilder::new(db, env).add(target)) {
-                return check_upper(upper);
-            }
-
-            // Widening can admit values outside both operands. Checking them separately
-            // preserves specializations inside either operand, but misses ones spanning both.
-            check_upper(target).or(db, self.constraints, || {
-                let excluded = with_exclusions(UnionBuilder::new(db, env));
-                excluded.when_some_and(db, self.constraints, check_upper)
-            })
+            let upper = UnionType::from_elements(db, env, upper_elements());
+            self.check_type_pair(db, positive, upper)
         }))
     }
 
