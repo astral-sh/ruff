@@ -24,3 +24,6 @@ name = "unicode_names2"
 # Upstream unit tests, benchmarks, and macro doctests require nightly Rust.
 test = false
 bench = false
+
+[lints.cargo]
+redundant_homepage = "allow"
