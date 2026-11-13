@@ -37,16 +37,13 @@ impl PyProject {
         content: &str,
         source: ValueSource,
     ) -> Result<Self, PyProjectError> {
+        let file_source = matches!(source, ValueSource::File(_)).then_some(content);
         let _guard = ValueSourceGuard::new(source, true);
-        Self::deserialize_toml(content)
-    }
-
-    fn deserialize_toml(content: &str) -> Result<Self, PyProjectError> {
         let mut pyproject: Self = toml::from_str(content).map_err(PyProjectError::TomlSyntax)?;
         if let Some(tool) = &mut pyproject.tool
             && let Some(ty) = &mut tool.ty
         {
-            ty.order_rule_selectors(ty_python_semantic::default_lint_registry());
+            ty.order_rule_selectors(ty_python_semantic::default_lint_registry(), file_source);
         }
         Ok(pyproject)
     }

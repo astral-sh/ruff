@@ -43,6 +43,7 @@ pub use uv::{
 pub mod baseline;
 mod db;
 mod files;
+mod fixes;
 pub mod glob;
 pub mod metadata;
 pub mod parallel;
@@ -179,13 +180,41 @@ pub trait UvSyncProgress: Send {
 pub type ProjectSyncProgressFactory<'a> =
     dyn Fn(&dyn Db, Project) -> Option<Box<dyn UvSyncProgress>> + 'a;
 
-/// Reporter that collects all diagnostics into a `Vec`.
+/// Reporter that collects [`CheckDiagnostics`].
 #[derive(Default)]
-pub struct CollectReporter(std::sync::Mutex<Vec<Diagnostic>>);
+pub struct CollectReporter(std::sync::Mutex<CheckDiagnostics>);
 
 impl CollectReporter {
+    /// Returns the collected diagnostics.
+    pub fn into_diagnostics(self) -> CheckDiagnostics {
+        self.0.into_inner().unwrap()
+    }
+}
+
+/// Workspace diagnostics and diagnostics from individual file checks. Each file check records
+/// which file was checked, even when its diagnostics annotate a different file.
+#[derive(Debug, Default)]
+pub struct CheckDiagnostics {
+    workspace: Vec<Diagnostic>,
+    file_diagnostics: Vec<(File, Diagnostic)>,
+}
+
+impl CheckDiagnostics {
+    /// Retains diagnostics that pass the filter, regardless of where they were reported.
+    pub fn retain(&mut self, filter: impl Fn(&Diagnostic) -> bool) {
+        self.workspace.retain(&filter);
+        self.file_diagnostics
+            .retain(|(_, diagnostic)| filter(diagnostic));
+    }
+
+    /// Combines workspace and file diagnostics in rendering order.
     pub fn into_sorted(self, db: &dyn Db) -> Vec<Diagnostic> {
-        let mut diagnostics = self.0.into_inner().unwrap();
+        let mut diagnostics = self.workspace;
+        diagnostics.extend(
+            self.file_diagnostics
+                .into_iter()
+                .map(|(_, diagnostic)| diagnostic),
+        );
         diagnostics.sort_by(|left, right| {
             left.rendering_sort_key(db)
                 .cmp(&right.rendering_sort_key(db))
@@ -196,19 +225,21 @@ impl CollectReporter {
 
 impl ProgressReporter for CollectReporter {
     fn set_files(&mut self, _files: usize) {}
-    fn report_checked_file(&self, _db: &ProjectDatabase, _file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, _db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         if diagnostics.is_empty() {
             return;
         }
 
-        self.0
-            .lock()
-            .unwrap()
-            .extend(diagnostics.iter().map(Clone::clone));
+        self.0.lock().unwrap().file_diagnostics.extend(
+            diagnostics
+                .iter()
+                .cloned()
+                .map(|diagnostic| (file, diagnostic)),
+        );
     }
 
     fn report_diagnostics(&mut self, _db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
-        self.0.get_mut().unwrap().extend(diagnostics);
+        self.0.get_mut().unwrap().workspace.extend(diagnostics);
     }
 }
 
@@ -528,14 +559,9 @@ impl Project {
             name = self.name(db)
         );
 
-        let mut diagnostics = self.check_settings(db);
-
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
-
-        diagnostics.extend_from_slice(files.diagnostics());
-
-        reporter.report_diagnostics(db, diagnostics);
+        reporter.report_diagnostics(db, self.workspace_diagnostics(db, &files));
 
         let reporter: &dyn ProgressReporter = reporter;
         let open_files = self.open_files(db);
@@ -846,6 +872,13 @@ impl Project {
         }
     }
 
+    /// Returns diagnostics from project settings and file discovery.
+    fn workspace_diagnostics(self, db: &dyn Db, files: &ProjectFiles<'_>) -> Vec<Diagnostic> {
+        let mut diagnostics = self.check_settings(db);
+        diagnostics.extend_from_slice(files.diagnostics());
+        diagnostics
+    }
+
     /// Check if the project's settings have any issues
     pub fn check_settings(&self, db: &dyn Db) -> Vec<Diagnostic> {
         let metadata = self.metadata(db);
@@ -865,7 +898,7 @@ impl Project {
 
         self.settings_diagnostics(db)
             .iter()
-            .map(OptionDiagnostic::to_diagnostic)
+            .map(|diagnostic| diagnostic.to_diagnostic(db))
             .chain(uv_diagnostic)
             .chain(baseline::settings_diagnostic(db))
             .collect()

@@ -210,7 +210,7 @@ fn parse_script_metadata(
     };
 
     if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
-        options.order_rule_selectors(registry);
+        options.order_rule_selectors(registry, None);
     }
 
     metadata
@@ -233,7 +233,7 @@ fn resolve_script_options(
             config
                 .lint_unmerged(db)
                 .into_iter()
-                .map(|diagnostic| diagnostic.to_diagnostic()),
+                .map(|diagnostic| diagnostic.to_diagnostic(db)),
         );
         if metadata.ty().is_none()
             && let Some(mut environment) = project_metadata.options().environment.clone()
@@ -287,7 +287,7 @@ fn resolve_script_settings(
     {
         Ok(settings) => settings,
         Err(error) => {
-            diagnostics.report_invalid(error.into_diagnostic().to_diagnostic());
+            diagnostics.report_invalid(error.into_diagnostic().to_diagnostic(db));
             let Ok(settings) = options.to_settings(db, context, &UseDefaultStrategy);
             settings
         }
@@ -295,7 +295,7 @@ fn resolve_script_settings(
     diagnostics.extend(
         settings_diagnostics
             .into_iter()
-            .map(|diagnostic| diagnostic.to_diagnostic()),
+            .map(|diagnostic| diagnostic.to_diagnostic(db)),
     );
     settings
 }
@@ -342,7 +342,7 @@ fn resolve_script_program_settings(
     diagnostics.extend(
         settings_diagnostics
             .into_iter()
-            .map(|diagnostic| diagnostic.into_diagnostic(db).to_diagnostic()),
+            .map(|diagnostic| diagnostic.into_diagnostic(db).to_diagnostic(db)),
     );
     settings
 }

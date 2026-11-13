@@ -24,7 +24,6 @@ doctest = false
 [dependencies]
 ruff_command_line = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
-ruff_diagnostics = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true, features = ["stacker"] }
 ruff_ranged_value = { workspace = true }

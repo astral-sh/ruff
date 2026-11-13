@@ -18,8 +18,11 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span, SubDiagnostic,
     SubDiagnosticSeverity,
 };
+use ruff_db::files::File;
+use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionSetKind, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
@@ -28,6 +31,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 use std::fmt::{self, Debug, Display};
 use std::hash::BuildHasherDefault;
 use std::ops::Deref;
@@ -133,9 +137,10 @@ pub struct Options {
 
 impl Options {
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
+        let file_source = matches!(source, ValueSource::File(_)).then_some(content);
         let _guard = ValueSourceGuard::new(source, true);
         let mut options: Self = toml::from_str(content)?;
-        options.order_rule_selectors(ty_python_semantic::default_lint_registry());
+        options.order_rule_selectors(ty_python_semantic::default_lint_registry(), file_source);
         Ok(options)
     }
 
@@ -170,8 +175,13 @@ impl Options {
     ///
     /// TOML tables are unordered. Establish the order before merging so an alias in a
     /// higher-precedence table can still override the current name in a lower-precedence table.
-    pub(crate) fn order_rule_selectors(&mut self, registry: &LintRegistry) {
-        let sort = |rules: &mut Rules| {
+    pub(crate) fn order_rule_selectors(
+        &mut self,
+        registry: &LintRegistry,
+        file_source: Option<&str>,
+    ) {
+        let mut shared_source: Option<Arc<str>> = None;
+        let mut sort = |rules: &mut Rules| {
             rules.inner.sort_by_cached_key(|name, _| {
                 if name.as_str() == "all" {
                     0
@@ -181,6 +191,16 @@ impl Options {
                     2
                 }
             });
+            // Retain the original text so we can detect when rule-key spans are stale.
+            if let Some(source) = file_source
+                && rules.inner.keys().any(|name| registry.is_alias(name))
+            {
+                rules.source = Some(
+                    shared_source
+                        .get_or_insert_with(|| Arc::from(source))
+                        .clone(),
+                );
+            }
         };
 
         if let Some(rules) = &mut self.rules {
@@ -205,7 +225,7 @@ impl Options {
     {
         let _guard = ValueSourceGuard::new(source, false);
         let mut options = Self::deserialize(deserializer)?;
-        options.order_rule_selectors(registry);
+        options.order_rule_selectors(registry, None);
         Ok(options)
     }
 
@@ -1184,7 +1204,7 @@ impl SrcOptions {
 }
 
 #[derive(
-    Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash, get_size2::GetSize,
+    Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, get_size2::GetSize,
 )]
 #[serde(transparent)]
 pub struct Rules {
@@ -1193,6 +1213,17 @@ pub struct Rules {
     /// by a specific rule selector coming after it but if `all` is the last selector, then it
     /// overrides even specific rule codes).
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
+    /// Original TOML file text, retained for tables with rule aliases so rename fixes can
+    /// detect stale key ranges.
+    #[serde(skip)]
+    source: Option<Arc<str>>,
+}
+
+impl Combine for Rules {
+    fn combine_with(&mut self, other: Self) {
+        self.inner.combine_with(other.inner);
+        self.source = None;
+    }
 }
 
 impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
@@ -1217,11 +1248,25 @@ impl Rules {
                 continue;
             }
             let diagnostic = match registry.get(name) {
-                Ok(lint) if lint.name().as_str() != name.as_str() => OptionDiagnostic::new(
-                    DiagnosticId::RenamedRule,
-                    format!("Rule `{name}` has been renamed to `{}`", lint.name()),
-                    Severity::Warning,
-                ),
+                Ok(lint) if lint.name().as_str() != name.as_str() => {
+                    let canonical = lint.name().as_str();
+                    let mut diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::RenamedRule,
+                        format!("Rule `{name}` has been renamed to `{canonical}`"),
+                        Severity::Warning,
+                    );
+                    // Renaming two selectors for the same rule could create a duplicate TOML key.
+                    if let Some(source) = &self.source
+                        && !self.inner.keys().any(|other| {
+                            other != name
+                                && (other.as_str() == canonical
+                                    || registry.alias_target(other) == Some(lint))
+                        })
+                    {
+                        diagnostic.rule_rename = rename_rule_key(name, canonical, source);
+                    }
+                    diagnostic
+                }
                 Ok(_) => continue,
                 // TODO: Add a note if the value was configured on the CLI.
                 Err(error) => {
@@ -1281,6 +1326,32 @@ impl Rules {
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
+}
+
+/// Replaces a bare or quoted rule key in a TOML file with its canonical name.
+fn rename_rule_key(
+    name: &RangedValue<String>,
+    canonical: &str,
+    original_source: &Arc<str>,
+) -> Option<RuleRename> {
+    let range = name.range()?;
+    let key = original_source.get(range.to_std_range())?;
+    let replacement = if key == name.as_str() {
+        canonical.to_string()
+    } else {
+        let quote = key
+            .chars()
+            .next()
+            .filter(|quote| matches!(quote, '\'' | '"'))?;
+        if key.strip_prefix(quote)?.strip_suffix(quote)? != name.as_str() {
+            return None;
+        }
+        format!("{quote}{canonical}{quote}")
+    };
+    Some(RuleRename {
+        edit: Edit::range_replacement(replacement, range),
+        source: Arc::clone(original_source),
+    })
 }
 
 /// Default exclude patterns for src options.
@@ -2267,8 +2338,15 @@ impl OverrideOptions {
 
         let files = IncludeExcludeFilter::new(include, exclude);
 
+        // Drop the TOML text used for rename diagnostics so `merge_overrides` keys depend only
+        // on the rule and analysis settings.
+        let rules = self.rules.as_ref().map(|rules| Rules {
+            inner: rules.inner.clone(),
+            source: None,
+        });
+
         // Merge global rules with override rules, with override rules taking precedence
-        let mut merged_rules = self.rules.clone().unwrap_or_default();
+        let mut merged_rules = rules.clone().unwrap_or_default();
 
         if let Some(global_rules) = global_rules {
             merged_rules = merged_rules.combine(global_rules.clone());
@@ -2289,7 +2367,7 @@ impl OverrideOptions {
         let override_instance = Override {
             files,
             options: Arc::new(InnerOverrideOptions {
-                rules: self.rules.clone(),
+                rules,
                 analysis: self.analysis.clone(),
             }),
             settings: Arc::new(OverrideSettings {
@@ -2388,8 +2466,11 @@ impl ToSettingsError {
             write!(
                 f,
                 "{}",
-                self.output_format
-                    .display(db, &display_config, &[self.diagnostic.to_diagnostic()])
+                self.output_format.display(
+                    db,
+                    &display_config,
+                    &[self.diagnostic.to_diagnostic(db)]
+                )
             )
         })
     }
@@ -2489,6 +2570,13 @@ pub enum TyTomlError {
     TomlSyntax(#[from] toml::de::Error),
 }
 
+/// A rule-key replacement and the original TOML text used to compute its byte range.
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
+pub(crate) struct RuleRename {
+    pub(crate) edit: Edit,
+    pub(crate) source: Arc<str>,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub struct OptionDiagnostic {
     id: DiagnosticId,
@@ -2496,10 +2584,35 @@ pub struct OptionDiagnostic {
     concise_message: Option<String>,
     severity: Severity,
     annotation: Option<Annotation>,
+    rule_rename: Option<RuleRename>,
     sub: Vec<SubDiagnostic>,
 }
 
 impl OptionDiagnostic {
+    /// Skips rule renames when two paths refer to the same configuration file.
+    pub(crate) fn remove_aliased_rule_renames(db: &dyn Db, diagnostics: &mut [Self]) {
+        let files: BTreeSet<_> = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.id == DiagnosticId::RenamedRule)
+            .filter_map(|diagnostic| diagnostic.annotation.as_ref())
+            .map(|annotation| annotation.get_span().expect_ty_file())
+            .collect();
+
+        for diagnostic in diagnostics {
+            if let Some((file, _)) = diagnostic.rule_rename()
+                && let Some(path) = file.path(db).as_system_path()
+                && files.iter().copied().any(|other| {
+                    other != file
+                        && other.path(db).as_system_path().is_some_and(|other_path| {
+                            db.system().is_same_file(path, other_path).unwrap_or(false)
+                        })
+                })
+            {
+                diagnostic.rule_rename = None;
+            }
+        }
+    }
+
     fn new(id: DiagnosticId, message: String, severity: Severity) -> Self {
         Self {
             id,
@@ -2507,6 +2620,7 @@ impl OptionDiagnostic {
             concise_message: None,
             severity,
             annotation: None,
+            rule_rename: None,
             sub: Vec::new(),
         }
     }
@@ -2611,22 +2725,38 @@ impl OptionDiagnostic {
         self
     }
 
-    pub(crate) fn to_diagnostic(&self) -> Diagnostic {
-        let mut diag = Diagnostic::new(self.id, self.severity, &self.message);
+    pub(crate) fn to_diagnostic(&self, db: &dyn Db) -> Diagnostic {
+        let mut diagnostic = Diagnostic::new(self.id, self.severity, &self.message);
 
         if let Some(concise_message) = &self.concise_message {
-            diag.set_concise_message(concise_message);
+            diagnostic.set_concise_message(concise_message);
         }
 
         if let Some(annotation) = self.annotation.clone() {
-            diag.annotate(annotation);
+            diagnostic.annotate(annotation);
         }
-
         for sub in &self.sub {
-            diag.sub(sub.clone());
+            diagnostic.sub(sub.clone());
         }
 
-        diag
+        if let Some((file, rename)) = self.rule_rename() {
+            if source_text(db, file).as_str() == rename.source.as_ref() {
+                diagnostic.set_fix(Fix::safe_edit(rename.edit.clone()));
+            } else if let Some(annotation) = diagnostic.primary_annotation_mut() {
+                annotation.set_span(Span::from(file));
+                annotation.hide_snippet(true);
+            }
+        }
+
+        diagnostic
+    }
+
+    /// Returns the proposed rename and its file. Check the file text before applying the edit.
+    pub(crate) fn rule_rename(&self) -> Option<(File, &RuleRename)> {
+        Some((
+            self.annotation.as_ref()?.get_span().expect_ty_file(),
+            self.rule_rename.as_ref()?,
+        ))
     }
 }
 

@@ -235,7 +235,7 @@ impl ProjectDatabase {
     pub fn check(&self) -> Vec<Diagnostic> {
         let mut collector = CollectReporter::default();
         self.project().check(self, &mut collector);
-        collector.into_sorted(self)
+        collector.into_diagnostics().into_sorted(self)
     }
 
     /// Checks the files in the project and its dependencies, using the given reporter.
