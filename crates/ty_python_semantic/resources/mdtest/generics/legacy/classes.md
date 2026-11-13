@@ -951,6 +951,15 @@ factory: type[Box[str]] | None = Box
 reveal_type(factory())  # revealed: Box[str]
 ```
 
+The bare class is also the runtime class of a `Box[str]`. Comparing with it preserves the
+constructor's specialization.
+
+```py
+def construct(factory: type[Box[str]]):
+    if factory == Box:
+        reveal_type(factory())  # revealed: Box[str]
+```
+
 Without a concrete type context, the default still applies:
 
 ```py
