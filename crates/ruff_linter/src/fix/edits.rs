@@ -291,7 +291,16 @@ pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Token
 }
 
 /// Remove the member at the given index from a sequence of expressions.
-pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> Result<Edit> {
+pub(crate) fn remove_member(
+    elts: &[ast::Expr],
+    index: usize,
+    parent: AnyNodeRef,
+    source: &str,
+    tokens: &Tokens,
+) -> Result<Edit> {
+    let range =
+        parenthesized_range((&elts[index]).into(), parent, tokens).unwrap_or(elts[index].range());
+
     if index < elts.len() - 1 {
         // Case 1: the expression is _not_ the last node, so delete from the start of the
         // expression to the end of the subsequent comma.
@@ -310,7 +319,7 @@ pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> R
             })
             .context("Unable to find next token")?;
 
-        Ok(Edit::deletion(elts[index].start(), next.start()))
+        Ok(Edit::deletion(range.start(), next.start()))
     } else if index > 0 {
         // Case 2: the expression is the last node, but not the _only_ node, so delete from the
         // start of the previous comma to the end of the expression.
@@ -322,11 +331,11 @@ pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> R
             .find(|token| token.kind == SimpleTokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
-        Ok(Edit::deletion(comma.start(), elts[index].end()))
+        Ok(Edit::deletion(comma.start(), range.end()))
     } else {
         // Case 3: expression is the only node, so delete it.
         // Ex) Delete `"a"` in `{"a"}`.
-        Ok(Edit::range_deletion(elts[index].range()))
+        Ok(Edit::range_deletion(range))
     }
 }
 
