@@ -480,3 +480,18 @@ help: Remove `Generic` base class
 111 |
     |
 note: This is an unsafe fix and may change runtime behavior
+
+RUF053 [*] Class with type parameter list inherits from `Generic`
+   --> RUF053.py:114:26
+    |
+113 | # A `Protocol[...]` base before the `Generic[...]` base doesn't hide it.
+114 | class C[T](Protocol[_A], Generic[_B]): ...
+    |                          ^^^^^^^^^^^
+help: Remove `Generic` base class
+    |
+113 | # A `Protocol[...]` base before the `Generic[...]` base doesn't hide it.
+    - class C[T](Protocol[_A], Generic[_B]): ...
+114 + class C[T, _B: int](Protocol[_A]): ...
+115 |
+    |
+note: This is an unsafe fix and may change runtime behavior

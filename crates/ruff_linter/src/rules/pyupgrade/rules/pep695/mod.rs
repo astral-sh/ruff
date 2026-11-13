@@ -426,17 +426,55 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
     (vars.iter().unique_by(|tvar| tvar.name).count() == vars.len()).then_some(vars)
 }
 
-/// Search `class_bases` for a `typing.Generic` base class. Returns the `Generic` expression (if
-/// any), along with its index in the class's bases tuple.
-pub(crate) fn find_generic<'a>(
+// TODO(FrancescoPezzella): https://github.com/astral-sh/ruff/issues/29481
+// Add other Generic classes such as Mapping, a class itself, etc.
+/// Both `Generic[T]` and `Protocol[T]` declare `T` as a type parameter, but they differ in how
+/// they translate to PEP 695 syntax:
+///
+/// ```python
+/// class A(Generic[T]): ...   # -> class A[T]: ...
+/// class B(Protocol[T]): ...  # -> class B[T](Protocol): ...
+/// ```
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum GenericBase {
+    Generic,
+    Protocol,
+}
+
+impl GenericBase {
+    const fn as_str(self) -> &'static str {
+        match self {
+            GenericBase::Generic => "Generic",
+            GenericBase::Protocol => "Protocol",
+        }
+    }
+}
+
+/// Search `class_bases` for a subscripted `typing.Generic` base class, or also for a subscripted
+/// `typing.Protocol` base class if `include_protocol` is `true`. Returns the subscript expression
+/// (if any), along with its index in the class's bases tuple and the kind of base that was found.
+///
+/// Rules that only know how to handle `Generic[...]` should pass `false` for `include_protocol`.
+/// Otherwise, a class like `class C(Protocol[T], Generic[T])` would stop the search at
+/// `Protocol[T]`, and the `Generic[T]` base would never be found.
+///
+/// If a class has more than one matching base, only the first one is returned.
+pub(crate) fn find_generic_class<'a>(
     class_bases: &'a Arguments,
     semantic: &SemanticModel,
-) -> Option<(usize, &'a ExprSubscript)> {
+    include_protocol: bool,
+) -> Option<(usize, &'a ExprSubscript, GenericBase)> {
     class_bases.args.iter().enumerate().find_map(|(idx, expr)| {
         expr.as_subscript_expr().and_then(|sub_expr| {
-            semantic
-                .match_typing_expr(&sub_expr.value, "Generic")
-                .then_some((idx, sub_expr))
+            let kind = if semantic.match_typing_expr(&sub_expr.value, "Generic") {
+                GenericBase::Generic
+            } else if include_protocol && semantic.match_typing_expr(&sub_expr.value, "Protocol") {
+                GenericBase::Protocol
+            } else {
+                return None;
+            };
+
+            Some((idx, sub_expr, kind))
         })
     })
 }

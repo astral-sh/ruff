@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::pyupgrade::rules::pep695::{
-    DisplayTypeVars, TypeParamKind, TypeVar, expr_name_to_type_var, find_generic,
+    DisplayTypeVars, TypeParamKind, TypeVar, expr_name_to_type_var, find_generic_class,
 };
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
@@ -122,7 +122,11 @@ fn typing_generic_base_and_arguments<'a>(
     class_arguments: &'a Arguments,
     semantic: &SemanticModel,
 ) -> Option<(&'a ExprSubscript, &'a Expr)> {
-    let (_, base @ ExprSubscript { slice, .. }) = find_generic(class_arguments, semantic)?;
+    // TODO(FrancescoPezzella): https://github.com/astral-sh/ruff/issues/30261
+    // `Protocol[...]` bases are not searched for yet: the fix removes the entire base, which would
+    // turn the protocol into a regular class instead of only dropping the subscript.
+    let (_, base @ ExprSubscript { slice, .. }, _) =
+        find_generic_class(class_arguments, semantic, false)?;
 
     Some((base, slice.as_ref()))
 }

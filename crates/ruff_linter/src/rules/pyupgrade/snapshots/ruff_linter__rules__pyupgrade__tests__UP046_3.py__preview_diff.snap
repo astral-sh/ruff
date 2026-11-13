@@ -1,0 +1,143 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 1
+Added: 9
+
+--- Removed ---
+UP046 [*] Generic class `ProtocolAndGeneric` uses `Generic` subclass instead of type parameters
+  --> UP046_3.py:48:39
+   |
+46 | # Outside of preview, `Generic[T]` is found and fixed. In preview, the search stops at the first
+47 | # matching base, `Protocol[T]`, which is not the last base, so there is no fix.
+48 | class ProtocolAndGeneric(Protocol[T], Generic[T]): ...
+   |                                       ^^^^^^^^^^
+help: Use type parameters
+   |
+47 | # matching base, `Protocol[T]`, which is not the last base, so there is no fix.
+   - class ProtocolAndGeneric(Protocol[T], Generic[T]): ...
+48 + class ProtocolAndGeneric[T](Protocol[T]): ...
+49 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+
+--- Added ---
+UP046 [*] Generic class `Basic` uses `Protocol` subclass instead of type parameters
+  --> UP046_3.py:15:13
+   |
+15 | class Basic(Protocol[T]):
+   |             ^^^^^^^^^^^
+16 |     def method(self) -> T: ...
+   |
+help: Use type parameters
+   |
+14 |
+   - class Basic(Protocol[T]):
+15 + class Basic[T](Protocol):
+16 |     def method(self) -> T: ...
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP046 [*] Generic class `Qualified` uses `Protocol` subclass instead of type parameters
+  --> UP046_3.py:19:17
+   |
+19 | class Qualified(typing.Protocol[T]): ...
+   |                 ^^^^^^^^^^^^^^^^^^
+help: Use type parameters
+   |
+18 |
+   - class Qualified(typing.Protocol[T]): ...
+19 + class Qualified[T](typing.Protocol): ...
+20 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP046 [*] Generic class `Multiple` uses `Protocol` subclass instead of type parameters
+  --> UP046_3.py:22:16
+   |
+22 | class Multiple(Protocol[T, S]): ...
+   |                ^^^^^^^^^^^^^^
+help: Use type parameters
+   |
+21 |
+   - class Multiple(Protocol[T, S]): ...
+22 + class Multiple[T, S](Protocol): ...
+23 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP046 [*] Generic class `OtherBaseFirst` uses `Protocol` subclass instead of type parameters
+  --> UP046_3.py:28:37
+   |
+28 | class OtherBaseFirst(OtherProtocol, Protocol[T]): ...
+   |                                     ^^^^^^^^^^^
+help: Use type parameters
+   |
+27 |
+   - class OtherBaseFirst(OtherProtocol, Protocol[T]): ...
+28 + class OtherBaseFirst[T](OtherProtocol, Protocol): ...
+29 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP046 [*] Generic class `Parenthesized` uses `Protocol` subclass instead of type parameters
+  --> UP046_3.py:31:21
+   |
+31 | class Parenthesized((Protocol)[T]): ...
+   |                     ^^^^^^^^^^^^^
+help: Use type parameters
+   |
+30 |
+   - class Parenthesized((Protocol)[T]): ...
+31 + class Parenthesized[T]((Protocol)): ...
+32 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+UP046 Generic class `NotLast` uses `Protocol` subclass instead of type parameters
+  --> UP046_3.py:35:15
+   |
+34 | # Diagnostic without a fix: `Protocol[T]` is not the last base.
+35 | class NotLast(Protocol[T], OtherProtocol): ...
+   |               ^^^^^^^^^^^
+help: Use type parameters
+
+
+UP046 Generic class `ExternalType` uses `Protocol` subclass instead of type parameters
+  --> UP046_3.py:39:20
+   |
+38 | # Diagnostic without a fix: the type parameter can't be resolved to a `TypeVar`.
+39 | class ExternalType(Protocol[SupportsRichComparisonT]): ...
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Use type parameters
+
+
+UP046 Generic class `NotATypeVar` uses `Protocol` subclass instead of type parameters
+  --> UP046_3.py:43:19
+   |
+42 | # Diagnostic without a fix: `int` is not a type variable.
+43 | class NotATypeVar(Protocol[int]): ...
+   |                   ^^^^^^^^^^^^^
+help: Use type parameters
+
+
+UP046 Generic class `ProtocolAndGeneric` uses `Protocol` subclass instead of type parameters
+  --> UP046_3.py:48:26
+   |
+46 | # Outside of preview, `Generic[T]` is found and fixed. In preview, the search stops at the first
+47 | # matching base, `Protocol[T]`, which is not the last base, so there is no fix.
+48 | class ProtocolAndGeneric(Protocol[T], Generic[T]): ...
+   |                          ^^^^^^^^^^^
+help: Use type parameters
