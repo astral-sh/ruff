@@ -489,7 +489,7 @@ fn write_changes(
         return Err(WriteChangesError::FileWasModified);
     }
 
-    system.write_file_bytes(path, &new_text.to_bytes())?;
+    system.write_file_atomic(path, &new_text.to_bytes())?;
 
     Ok(())
 }
