@@ -11,8 +11,6 @@ use ruff_workspace::resolver::{
     resolve_root_settings,
 };
 
-use ruff_python_ast as ast;
-
 use crate::args::ConfigArguments;
 
 /// Resolve the relevant settings strategy and defaults for the current
@@ -91,8 +89,8 @@ pub fn resolve(
                 // over the `target-version` from the user configuration.
                 let fallback = find_fallback_target_version(&*path_dedot::CWD);
                 if let Some(fallback) = fallback {
-                    debug!("Derived `target-version` from found `requires-python`: {fallback:?}");
-                    configuration.target_version = Some(fallback.into());
+                    debug!("Derived `target-version` from found `requires-python`: {fallback}");
+                    configuration.target_version = Some(fallback);
                 }
 
                 self.arguments.transform(configuration)
@@ -132,9 +130,9 @@ pub fn resolve(
         // specified, and that is what we look for in this step.
         let fallback = find_fallback_target_version(stdin_filename.unwrap_or(&cwd));
         if let Some(version) = fallback {
-            debug!("Derived `target-version` from found `requires-python`: {version:?}");
+            debug!("Derived `target-version` from found `requires-python`: {version}");
         }
-        config.target_version = fallback.map(ast::PythonVersion::from);
+        config.target_version = fallback;
     }
     let settings = config.into_settings(&cwd)?;
     Ok(PyprojectConfig::new(
