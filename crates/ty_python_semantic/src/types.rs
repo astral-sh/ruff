@@ -11152,6 +11152,9 @@ impl<'db> Type<'db> {
         }
 
         match self {
+            // The complement of one class object contains ordinary instances, so no class literal
+            // can contain it.
+            Type::ClassLiteral(_) if target.is_class_literal() => false,
             Type::Intersection(intersection) => {
                 intersection.negation_is_subtype_of(db, env, target)
             }
