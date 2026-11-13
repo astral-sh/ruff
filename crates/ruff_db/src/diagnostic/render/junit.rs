@@ -131,22 +131,19 @@ fn group_diagnostics_by_filename<'a>(
 ) -> BTreeMap<&'a str, Vec<DiagnosticWithLocation<'a>>> {
     let mut grouped_diagnostics = BTreeMap::default();
     for diagnostic in diagnostics {
-        let (filename, start_location) = diagnostic
-            .primary_span_ref()
-            .map(|span| {
-                let file = span.file();
-                let start_location =
-                    span.range()
-                        .filter(|_| !resolver.is_notebook(file))
-                        .map(|range| {
-                            file.diagnostic_source(resolver)
-                                .as_source_code()
-                                .line_column(range.start())
-                        });
+        let (filename, start_location) = diagnostic.primary_span_ref().map_or_default(|span| {
+            let file = span.file();
+            let start_location =
+                span.range()
+                    .filter(|_| !resolver.is_notebook(file))
+                    .map(|range| {
+                        file.diagnostic_source(resolver)
+                            .as_source_code()
+                            .line_column(range.start())
+                    });
 
-                (span.file().path(resolver), start_location)
-            })
-            .unwrap_or_default();
+            (span.file().path(resolver), start_location)
+        });
 
         grouped_diagnostics
             .entry(filename)

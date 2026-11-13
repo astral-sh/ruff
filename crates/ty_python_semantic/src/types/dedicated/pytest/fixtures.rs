@@ -342,9 +342,7 @@ pub fn pytest_registered_plugin_files<'db>(
         Some(request_file)
     };
 
-    registration_file
-        .map(|file| pytest_registered_plugin_files_from(db, file))
-        .unwrap_or_default()
+    registration_file.map_or_default(|file| pytest_registered_plugin_files_from(db, file))
 }
 
 /// Returns the plugins registered through `pytest_plugins` by `registration_file` and its conftest
@@ -586,8 +584,7 @@ pub fn pytest_global_plugin_files<'db>(
     program: Program<'db>,
 ) -> &'db [ProgramFile<'db>] {
     pytest_config_file(db, program)
-        .map(|file| pytest_global_plugin_files_from_config(db, file))
-        .unwrap_or_default()
+        .map_or_default(|file| pytest_global_plugin_files_from_config(db, file))
 }
 
 /// Reads the installed core pytest plugin files from the resolved configuration module.

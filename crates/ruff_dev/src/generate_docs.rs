@@ -80,8 +80,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 .collect::<String>(),
             code = rule
                 .noqa_code()
-                .map(|code| format!("%20OR%20{code}"))
-                .unwrap_or_default(),
+                .map_or_default(|code| format!("%20OR%20{code}")),
         );
 
         let _ = writeln!(

@@ -1444,8 +1444,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .unwrap_or_else(|| Cow::Owned(format!("{indentation}{}", importer.indentation())));
 
         let line_ending = find_newline(&source)
-            .map(|(_, ending)| ending)
-            .unwrap_or_default()
+            .map_or_default(|(_, ending)| ending)
             .as_str();
 
         let mut end = logical_line_end(&source, self.module().tokens(), clause.end());
@@ -1616,8 +1615,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             condition.to_string()
         };
         let line_ending = find_newline(&source)
-            .map(|(_, ending)| ending)
-            .unwrap_or_default()
+            .map_or_default(|(_, ending)| ending)
             .as_str();
 
         Some(Fix::unsafe_edits(

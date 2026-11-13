@@ -692,8 +692,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let mut inferred_type_arguments = vec![None; type_arguments.len()];
 
-        let typevars =
-            generic_context.map_or_else(Vec::new, |context| context.variables(db).collect());
+        let typevars: Vec<_> =
+            generic_context.map_or_default(|context| context.variables(db).collect());
         let typevars_len = typevars.len();
         let typevartuple_index = typevars
             .iter()
@@ -1191,9 +1191,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .iter()
                         .map(|tv| tv.typevar(db).name(db))
                         .format("`, `"),
-                    description
-                        .map(|description| format!(" of {description}"))
-                        .unwrap_or_default()
+                    description.map_or_default(|description| format!(" of {description}"))
                 ));
             }
             error = Some(ExplicitSpecializationError::MissingTypeVars);
@@ -1229,9 +1227,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let description = CallableDescription::new(db, value_ty);
                     builder.into_diagnostic(format_args!(
                         "Too many type arguments{}: expected {}, got {}",
-                        description
-                            .map(|description| format!(" to {description}"))
-                            .unwrap_or_default(),
+                        description.map_or_default(|description| format!(" to {description}")),
                         if typevar_with_defaults == 0 {
                             format!("{typevars_len}")
                         } else {

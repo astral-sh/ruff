@@ -693,8 +693,7 @@ fn cells_after_cell_magic() -> anyhow::Result<()> {
     assert_json_snapshot!("cells_after_cell_magic_tokens", x_cell_tokens);
 
     let magic_cell_tokens = semantic_tokens_full_for_cell(&mut server, &magic_cell)
-        .map(|tokens| tokens.data)
-        .unwrap_or_default();
+        .map_or_default(|tokens| tokens.data);
     assert_eq!(magic_cell_tokens, vec![]);
 
     Ok(())

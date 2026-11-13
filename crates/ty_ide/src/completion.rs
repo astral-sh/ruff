@@ -2233,13 +2233,12 @@ fn detect_set_function_args<'m>(cursor: &ContextCursor<'m>) -> FxHashSet<&'m str
             ast::AnyNodeRef::Arguments(args) => Some(args),
             _ => None,
         })
-        .map(|args| {
+        .map_or_default(|args| {
             args.keywords
                 .iter()
                 .filter_map(|kw| kw.arg.as_ref().map(|ident| ident.id.as_str()))
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 pub(crate) struct ImportEdit {
