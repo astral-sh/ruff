@@ -559,7 +559,7 @@ review and remaining preparation steps below. To prepare the release locally, st
     1. Run `uv run scripts/update_schemastore.py --proto <https|ssh>`
     1. Once run successfully, you should follow the link in the output to create a PR.
 
-1. A stable Ruff release starts the [VS Code extension release workflow](https://github.com/astral-sh/ruff-vscode/actions/workflows/release.yml)
+1. A stable Ruff release starts the [VS Code extension preparation workflow](https://github.com/astral-sh/ruff-vscode/actions/workflows/release-prepare.yml)
     with the released Ruff version. After the extension builds succeed, approve its `release-gate` to
     publish to VS Code Marketplace and Open VSX. See the [extension release instructions](https://github.com/astral-sh/ruff-vscode/blob/main/CONTRIBUTING.md#release)
     to start the workflow manually if needed.
