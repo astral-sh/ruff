@@ -1128,7 +1128,8 @@ package = "invalid"
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, source)?
-            // Start the first sync on open so it is still pending when the server publishes.
+            // Exclude the script from discovery so `didOpen` starts its first sync.
+            // `didOpen` publishes before the main loop can apply the sync result.
             .with_file(
                 "src/ty.toml",
                 r"
