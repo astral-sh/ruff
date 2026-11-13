@@ -971,8 +971,9 @@ pub(super) fn contains_growing_type<'db>(
 enum TypeSearchMode {
     SkipLazyAttributes,
     IncludeLazyAttributes,
-    /// Visit the values of type aliases, but no other lazy attributes.
-    IncludeTypeAliasValues,
+    /// Visit the values of type aliases, but no other lazy attributes, and don't visit the
+    /// signatures of callables.
+    TypeAliasValuesOutsideSignatures,
     /// Visit alias arguments without evaluating alias bodies or other lazy attributes.
     IncludeAliasArguments,
 }
@@ -985,8 +986,12 @@ impl TypeSearchMode {
     const fn should_visit_type_alias_values(self) -> bool {
         matches!(
             self,
-            Self::IncludeLazyAttributes | Self::IncludeTypeAliasValues
+            Self::IncludeLazyAttributes | Self::TypeAliasValuesOutsideSignatures
         )
+    }
+
+    const fn should_visit_signatures(self) -> bool {
+        !matches!(self, Self::TypeAliasValuesOutsideSignatures)
     }
 
     const fn should_visit_alias_arguments(self) -> bool {
@@ -1030,6 +1035,26 @@ where
             self.mode.should_visit_type_alias_values()
         }
 
+        // Some types, such as `functools.partial(...)` instances, visit their signatures through
+        // these methods rather than through `visit_type`.
+        fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+            if self.mode.should_visit_signatures() {
+                walk_callable_type(db, callable, self);
+            }
+        }
+
+        fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+            if self.mode.should_visit_signatures() {
+                walk_function_type(db, function, self);
+            }
+        }
+
+        fn visit_bound_method_type(&self, db: &'db dyn Db, method: BoundMethodType<'db>) {
+            if self.mode.should_visit_signatures() {
+                walk_bound_method_type(db, method, self);
+            }
+        }
+
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             let default_value = U::default();
             let pre_existing = self.found_matching_type.get();
@@ -1039,6 +1064,20 @@ where
             let new_value = (self.query)(ty);
             self.found_matching_type.set(new_value);
             if new_value != default_value {
+                return;
+            }
+            if !self.mode.should_visit_signatures()
+                && matches!(
+                    ty,
+                    Type::FunctionLiteral(_)
+                        | Type::BoundMethod(_)
+                        | Type::KnownBoundMethod(_)
+                        | Type::WrapperDescriptor(_)
+                        | Type::DataclassDecorator(_)
+                        | Type::DataclassTransformer(_)
+                        | Type::Callable(_)
+                )
+            {
                 return;
             }
             if self.mode.should_visit_alias_arguments() {
@@ -1096,18 +1135,29 @@ pub(super) fn any_over_type<'db>(
 
 /// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.
 ///
-/// Of the lazily-inferred type attributes, this only visits the values of type aliases. It answers
-/// whether a type is written in terms of a type that matches, looking through aliases, so a value
-/// of a type alias `Json = dict[str, Any]` matches `Any`, but `Iterable[bytes]` does not match `Any`
-/// just because a method of `Iterable`'s interface mentions `Any`, and neither does
-/// `slice[int, int, None]` just because `slice`'s type parameters default to `Any`.
-pub(crate) fn any_over_type_through_aliases<'db>(
+/// It answers whether a type is written in terms of a type that matches, as the coverage report
+/// asks it of `Any`:
+///
+/// - Of the lazily-inferred type attributes, it only visits the values of type aliases. So a value
+///   of a type alias `Json = dict[str, Any]` matches `Any`, but `Iterable[bytes]` does not match
+///   `Any` just because a method of `Iterable`'s interface mentions `Any`, and neither does
+///   `slice[int, int, None]` just because `slice`'s type parameters default to `Any`.
+/// - It doesn't visit the signatures of callables (functions, methods and `Callable` types),
+///   wherever they appear. So neither `Callable[[Any], int]` nor `list[Callable[[Any], int]]`
+///   matches `Any`.
+pub(crate) fn any_over_type_outside_signatures<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(db, env, ty, TypeSearchMode::IncludeTypeAliasValues, query)
+    any_over_type_impl(
+        db,
+        env,
+        ty,
+        TypeSearchMode::TypeAliasValuesOutsideSignatures,
+        query,
+    )
 }
 
 /// Searches through the arguments of [`Type::TypeAlias`] without evaluating alias bodies or other

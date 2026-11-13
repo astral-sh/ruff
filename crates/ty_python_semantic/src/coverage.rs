@@ -18,7 +18,7 @@ use ruff_python_ast::{self as ast};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::types::visitor::any_over_type_through_aliases;
+use crate::types::visitor::any_over_type_outside_signatures;
 use crate::types::{KnownClass, ProgramEnvironment, Type};
 use crate::{Db, HasType, SemanticModel};
 
@@ -150,14 +150,10 @@ fn classify<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) 
         return LineCoverage::Dynamic;
     }
 
-    // Like mypy, we don't consider a reference to a function or class imprecise just because its
-    // signature mentions a dynamic type. For example, in `f(x)`, where `f` is `def f(a, b: int)`,
-    // the imprecision is reported on the line that defines `a`, and on any line that uses the
-    // `Unknown` return type of `f(x)`, but not on every line that mentions `f`.
-    if matches!(
-        ty,
-        Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_) | Type::ClassLiteral(_)
-    ) {
+    // Like mypy, we don't consider a reference to a class imprecise because its constructor's
+    // signature mentions a dynamic type. (The search below skips the signatures of functions and
+    // other callables for the same reason.)
+    if matches!(ty, Type::ClassLiteral(_)) {
         return LineCoverage::Precise;
     }
 
@@ -170,7 +166,12 @@ fn classify<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) 
         return classify(db, env, *result).min(LineCoverage::Imprecise);
     }
 
-    if any_over_type_through_aliases(db, env, ty, |ty| ty.is_dynamic()) {
+    // Like mypy, we don't consider a callable imprecise because its signature mentions a dynamic
+    // type, wherever the callable appears: in `f(x)`, where `f` is `def f(a, b: int)`, the
+    // imprecision is reported on the line that defines `a`, and on any line that uses the
+    // `Unknown` return type of `f(x)`, but not on every line that mentions `f` or stores it in a
+    // list or a `functools.partial`.
+    if any_over_type_outside_signatures(db, env, ty, |ty| ty.is_dynamic()) {
         LineCoverage::Imprecise
     } else {
         LineCoverage::Precise
@@ -225,7 +226,23 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: &ast::Expr) {
-        self.record(expr.inferred_type(&self.model), expr.range());
+        // Like mypy, we classify the elements of a container literal or comprehension, but not the
+        // container itself. Its type often comes from the type it's checked against, as in
+        // `x: dict[str, Any] = {"a": 1}`, where the imprecision is already reported on the
+        // declaration, and would otherwise be reported again on the line where the literal starts.
+        if !matches!(
+            expr,
+            ast::Expr::List(_)
+                | ast::Expr::Tuple(_)
+                | ast::Expr::Dict(_)
+                | ast::Expr::Set(_)
+                | ast::Expr::ListComp(_)
+                | ast::Expr::SetComp(_)
+                | ast::Expr::DictComp(_)
+                | ast::Expr::Generator(_)
+        ) {
+            self.record(expr.inferred_type(&self.model), expr.range());
+        }
         source_order::walk_expr(self, expr);
     }
 
@@ -342,7 +359,7 @@ mod tests {
         I | type Json = dict[str, Any]  # `Json`: TypeAliasType
           | 
         I | def parse() -> Json:  # `Json`: Json
-        I |     return {}  # `{}`: dict[str, Any]
+          |     return {}
           | 
         I | data = parse()  # `data`: Json, `parse()`: Json
         "#);
@@ -376,7 +393,7 @@ mod tests {
         P |     pass
           | 
         I | def load(raw: str) -> Json:  # `Json`: dict[str, Any]
-        I |     return {}  # `{}`: dict[str, Any]
+          |     return {}
           | 
         P | def first(values: list[int]) -> list[int]:
         P |     return values[1:]
@@ -408,6 +425,46 @@ mod tests {
         P |     default=len("x"),
           | ) -> None:
         P |     pass
+        "#);
+    }
+
+    #[test]
+    fn container_literals_and_callables() {
+        insta::assert_snapshot!(annotated(
+            r#"
+            import functools
+            from typing import Any, Callable
+
+            def handler(event: Any) -> int:
+                return 1
+
+            config: dict[str, Any] = {
+                "retries": 3,
+            }
+            pairs = [(1, 2), (3, 4)]
+            squares = [n * n for n in range(3)]
+            handlers = [handler]
+            bound = functools.partial(handler)
+            callback: Callable[[Any], int] = handler
+            result = callback(1)
+            "#
+        ), @r#"
+          | 
+        P | import functools
+        P | from typing import Any, Callable
+          | 
+        D | def handler(event: Any) -> int:  # `event`: Any, `Any`: Any
+        P |     return 1
+          | 
+        I | config: dict[str, Any] = {  # `config`: dict[str, Any], `dict[str, Any]`: dict[str, Any]
+        P |     "retries": 3,
+          | }
+        P | pairs = [(1, 2), (3, 4)]
+        P | squares = [n * n for n in range(3)]
+        P | handlers = [handler]
+        P | bound = functools.partial(handler)
+        P | callback: Callable[[Any], int] = handler
+        P | result = callback(1)
         "#);
     }
 
@@ -448,7 +505,7 @@ mod tests {
         D |     return y  # `y`: Unknown
           | 
         D | def explicit_any(z: Any) -> list[Any]:  # `z`: Any, `Any`: Any, `list[Any]`: list[Any]
-        D |     return [z]  # `[z]`: list[Any], `z`: Any
+        D |     return [z]  # `z`: Any
           | 
         P | a = annotated(1)
         D | b = unannotated(1)  # `b`: Unknown, `unannotated(1)`: Unknown
