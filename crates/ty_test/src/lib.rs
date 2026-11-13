@@ -256,15 +256,12 @@ fn run_test(
         PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
             .expect("Python environment to point to a valid path")
     });
-    let site_packages_paths = python_environment
-        .as_ref()
-        .map(|environment| {
-            environment
-                .site_packages_paths(db.system())
-                .expect("Python environment to be valid")
-                .into_vec()
-        })
-        .unwrap_or_default();
+    let site_packages_paths = python_environment.as_ref().map_or_default(|environment| {
+        environment
+            .site_packages_paths(db.system())
+            .expect("Python environment to be valid")
+            .into_vec()
+    });
 
     // Make any relative extra-paths be relative to src_path
     let extra_paths = configuration
@@ -517,7 +514,7 @@ fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleI
             },
         );
     }
-    if errs.is_empty() { Ok(()) } else { Err(errs) }
+    errs.is_empty().ok_or(errs)
 }
 
 impl std::fmt::Display for ModuleInconsistency<'_> {

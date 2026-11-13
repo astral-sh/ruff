@@ -705,10 +705,7 @@ where
 
                         let ignore = if metadata.is_empty() {
                             false
-                        } else if let Some(attributes) = metadata
-                            .strip_prefix('{')
-                            .and_then(|metadata| metadata.strip_suffix('}'))
-                        {
+                        } else if let Some(attributes) = metadata.strip_circumfix('{', '}') {
                             attributes
                                 .split_ascii_whitespace()
                                 .any(|attribute| attribute == r#"data-mdtest="ignore""#)

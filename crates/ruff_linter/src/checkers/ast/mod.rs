@@ -585,9 +585,7 @@ impl<'a> Checker<'a> {
     /// that we delete at most one statement per indented block per fixer pass. Fix isolation should
     /// thus be applied whenever we delete a statement, but can otherwise be omitted.
     pub(crate) fn isolation(node_id: Option<NodeId>) -> IsolationLevel {
-        node_id
-            .map(|node_id| IsolationLevel::Group(node_id.into()))
-            .unwrap_or_default()
+        node_id.map_or_default(|node_id| IsolationLevel::Group(node_id.into()))
     }
 
     /// Parse a stringified type annotation as an AST expression,

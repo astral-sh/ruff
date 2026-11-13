@@ -387,7 +387,7 @@ fn display_method<'db>(
     specialization: Option<Specialization<'db>>,
     name: &str,
 ) -> Option<Type<'db>> {
-    let field_name = name.strip_prefix("get_")?.strip_suffix("_display")?;
+    let field_name = name.strip_circumfix("get_", "_display")?;
     let field = own_model_fields(db, class)
         .iter()
         .find(|field| field.name == field_name)?;

@@ -1032,8 +1032,7 @@ fn check_class_declaration<'db>(
                         (
                             None,
                             CodeGeneratorKind::from_class(db, superclass_literal.into())
-                                .map(MethodKind::Synthesized)
-                                .unwrap_or_default(),
+                                .map_or_default(MethodKind::Synthesized),
                         )
                     }
                 } else if matches!(

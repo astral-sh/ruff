@@ -190,7 +190,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         .rev();
 
         let mut blank_lines_before = 0usize;
-        let mut blank_lines_start = lines.next().map(|line| line.start()).unwrap_or_default();
+        let mut blank_lines_start = lines.next().map_or_default(|line| line.start());
 
         for line in lines {
             if line.trim().is_empty() {
@@ -244,7 +244,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         }
 
         let first_line = lines.next();
-        let mut replacement_start = first_line.as_ref().map(Line::start).unwrap_or_default();
+        let mut replacement_start = first_line.as_ref().map_or_default(Line::start);
 
         // Edge case: There is trailing end-of-line content after the docstring, either a statement
         // separated by a semicolon or a comment.

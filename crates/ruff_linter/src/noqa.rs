@@ -1011,8 +1011,7 @@ fn find_suppression_comments<'a>(
 
         let noqa_offset = message
             .range()
-            .map(|range| noqa_line_for.resolve(range.start()))
-            .unwrap_or_default();
+            .map_or_default(|range| noqa_line_for.resolve(range.start()));
 
         // Or ignored by a `noqa` directive on the diagnostic's line itself?
         let existing_noqa =

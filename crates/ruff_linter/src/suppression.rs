@@ -795,8 +795,7 @@ impl<'a> SuppressionsBuilder<'a> {
                     };
                     token.kind() == TokenKind::Indent && count < 0
                 })
-                .map(|token| self.source.slice(token))
-                .unwrap_or_default();
+                .map_or_default(|token| self.source.slice(token));
 
             indents.push(last_indent);
 

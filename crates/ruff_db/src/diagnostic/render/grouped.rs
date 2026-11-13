@@ -103,22 +103,19 @@ fn group_diagnostics_by_filename<'a>(
 ) -> BTreeMap<Option<Cow<'a, str>>, Vec<MessageWithLocation<'a>>> {
     let mut grouped_messages = BTreeMap::default();
     for diagnostic in diagnostics {
-        let (filename, start_location) = diagnostic
-            .primary_span_ref()
-            .map(|span| {
-                let file = span.file();
-                let start_location = span.range().map(|range| {
-                    file.diagnostic_source(resolver)
-                        .as_source_code()
-                        .line_column(range.start())
-                });
+        let (filename, start_location) = diagnostic.primary_span_ref().map_or_default(|span| {
+            let file = span.file();
+            let start_location = span.range().map(|range| {
+                file.diagnostic_source(resolver)
+                    .as_source_code()
+                    .line_column(range.start())
+            });
 
-                (
-                    Some(span.file().relative_path(resolver).to_string_lossy()),
-                    start_location,
-                )
-            })
-            .unwrap_or_default();
+            (
+                Some(span.file().relative_path(resolver).to_string_lossy()),
+                start_location,
+            )
+        });
         grouped_messages
             .entry(filename)
             .or_insert_with(Vec::new)

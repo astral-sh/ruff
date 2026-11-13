@@ -611,7 +611,7 @@ pub(super) fn split_trailing_parenthetical(value: &str) -> Option<(&str, &str)> 
                 if depth == 0 && cursor.is_eof() {
                     let opening = outermost_opening?;
                     let (prefix, parenthetical) = value.split_at(opening.to_usize());
-                    let contents = parenthetical.strip_prefix('(')?.strip_suffix(')')?;
+                    let contents = parenthetical.strip_circumfix('(', ')')?;
                     return Some((prefix.trim(), contents.trim()));
                 }
             }

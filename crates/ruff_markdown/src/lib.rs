@@ -84,7 +84,7 @@ pub fn format_code_blocks(
         // Process code blocks
         } else if let Some(opening_capture) = MARKDOWN_CODE_FENCE.captures(&line) {
             let (_, [code_indent, opening_fence, language, _info]) = opening_capture.extract();
-            let start = lines.peek().map(Line::start).unwrap_or_default();
+            let start = lines.peek().map_or_default(Line::start);
 
             // Consume lines until reaching the matching/ending code fence
             for code_line in lines.by_ref() {

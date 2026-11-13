@@ -175,8 +175,7 @@ pub(crate) fn definitions_for_name<'db>(
     }
     let env = ProgramEnvironment::from_scope(scope);
     implicit_builtins_symbol_scope(db, &env, name)
-        .map(|scope| definitions_for_builtin(db, scope, name))
-        .unwrap_or_default()
+        .map_or_default(|scope| definitions_for_builtin(db, scope, name))
 }
 
 /// Resolves definitions in visible scopes, without falling back to implicit builtins.

@@ -64,11 +64,9 @@ enum LineEndingDetection<'a> {
 impl LineEndingDetection<'_> {
     fn get(&self) -> LineEnding {
         match self {
-            Self::Lazy { source, detected } => *detected.get_or_init(|| {
-                find_newline(source)
-                    .map(|(_, ending)| ending)
-                    .unwrap_or_default()
-            }),
+            Self::Lazy { source, detected } => {
+                *detected.get_or_init(|| find_newline(source).map_or_default(|(_, ending)| ending))
+            }
             Self::Detected(line_ending) => *line_ending,
         }
     }

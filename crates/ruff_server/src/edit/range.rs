@@ -108,9 +108,7 @@ impl ToRangeExt for TextRange {
         let end = source_location_to_position(&notebook_index.translate_source_location(&end));
 
         NotebookRange {
-            cell: starting_cell
-                .map(OneIndexed::to_zero_indexed)
-                .unwrap_or_default(),
+            cell: starting_cell.map_or_default(OneIndexed::to_zero_indexed),
             range: types::Range { start, end },
         }
     }

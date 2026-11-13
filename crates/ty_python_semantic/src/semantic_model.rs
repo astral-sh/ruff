@@ -714,16 +714,15 @@ impl<'db> SemanticModel<'db> {
             visitor: &StringLiteralCandidatesVisitor<'db>,
         ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
             match ty {
-                Type::LiteralValue(literal) => literal
-                    .as_string()
-                    .map(|string_literal| {
+                Type::LiteralValue(literal) => {
+                    literal.as_string().map_or_default(|string_literal| {
                         let value = string_literal.value(db).to_string();
                         vec![ExpectedStringLiteralCompletion {
                             ty: Type::string_literal(db, &*value),
                             value,
                         }]
                     })
-                    .unwrap_or_default(),
+                }
                 Type::Union(union) => union
                     .elements(db)
                     .iter()
@@ -749,9 +748,9 @@ impl<'db> SemanticModel<'db> {
         let db = self.db;
 
         let expected_ty = self.string_literal_completion_expected_type(string_expr);
-        let mut candidates = expected_ty
-            .map(|expected_ty| collect(db, expected_ty, &StringLiteralCandidatesVisitor::default()))
-            .unwrap_or_default();
+        let mut candidates = expected_ty.map_or_default(|expected_ty| {
+            collect(db, expected_ty, &StringLiteralCandidatesVisitor::default())
+        });
         // Finite choices from the expected type take precedence. A string used as the complete
         // subscript key can fall back to initializer keys that fit any known expected type.
         if candidates.is_empty()
@@ -844,8 +843,7 @@ impl<'db> SemanticModel<'db> {
         if let ast::Expr::Name(name) = receiver {
             return self
                 .reaching_definitions(name)
-                .map(|resolution| resolution.definitions().to_vec())
-                .unwrap_or_default();
+                .map_or_default(|resolution| resolution.definitions().to_vec());
         }
 
         let index = semantic_index(self.db, self.file);

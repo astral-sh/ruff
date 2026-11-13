@@ -5608,35 +5608,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         let tcx = if ret.value.is_some() {
-            nearest_enclosing_function(db, self.index, self.scope())
-                .map(|func| {
-                    // When inferring expressions within a function body,
-                    // the expected type passed should be the "raw" type,
-                    // i.e. type variables in the return type are non-inferable,
-                    // and the return types of async functions are not wrapped in `CoroutineType[...]`.
-                    let Some(return_ty) = lexical_return_type(
-                        db,
-                        func.definition(db),
-                        func.node(db, self.file(), self.module()),
-                    ) else {
-                        return TypeContext::default();
-                    };
+            nearest_enclosing_function(db, self.index, self.scope()).map_or_default(|func| {
+                // When inferring expressions within a function body,
+                // the expected type passed should be the "raw" type,
+                // i.e. type variables in the return type are non-inferable,
+                // and the return types of async functions are not wrapped in `CoroutineType[...]`.
+                let Some(return_ty) = lexical_return_type(
+                    db,
+                    func.definition(db),
+                    func.node(db, self.file(), self.module()),
+                ) else {
+                    return TypeContext::default();
+                };
 
-                    // For generator functions, the declared return type is e.g.
-                    // `Generator[YieldType, SendType, ReturnType]`. The type context
-                    // for a `return` statement should be the `ReturnType` type parameter
-                    let file_scope_id = self.scope().file_scope_id(self.db());
-                    let context_ty = if file_scope_id.is_generator_function(self.index) {
-                        return_ty
-                            .generator_return_type(db, env)
-                            .unwrap_or(return_ty)
-                    } else {
-                        return_ty
-                    };
+                // For generator functions, the declared return type is e.g.
+                // `Generator[YieldType, SendType, ReturnType]`. The type context
+                // for a `return` statement should be the `ReturnType` type parameter
+                let file_scope_id = self.scope().file_scope_id(self.db());
+                let context_ty = if file_scope_id.is_generator_function(self.index) {
+                    return_ty
+                        .generator_return_type(db, env)
+                        .unwrap_or(return_ty)
+                } else {
+                    return_ty
+                };
 
-                    TypeContext::declared(Some(context_ty))
-                })
-                .unwrap_or_default()
+                TypeContext::declared(Some(context_ty))
+            })
         } else {
             TypeContext::default()
         };
@@ -6650,9 +6648,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             match argument_tcx {
                 MatchingArgumentTypeContext::Unique(argument_tcx) => {
-                    let tcx = argument_tcx
-                        .map(ArgumentTypeContext::type_context)
-                        .unwrap_or_default();
+                    let tcx = argument_tcx.map_or_default(ArgumentTypeContext::type_context);
                     let inferred_ty = infer_argument_ty(self, (argument_index, ast_argument, tcx));
                     insert_argument_ty(argument_index, inferred_ty, argument_tcx, argument_types);
                 }
@@ -6703,9 +6699,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        let tcx = argument_tcx
-                            .map(ArgumentTypeContext::type_context)
-                            .unwrap_or_default();
+                        let tcx = argument_tcx.map_or_default(ArgumentTypeContext::type_context);
 
                         let mut speculative_builder = self.speculate();
                         let inferred_ty = infer_argument_ty(
@@ -7689,8 +7683,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let annotated_elt_tys = annotated_tuple
             .as_ref()
-            .map(|tuple| tuple.iter_element_types(self.db()).collect::<Vec<_>>())
-            .unwrap_or_default();
+            .map_or_default(|tuple| tuple.iter_element_types(self.db()).collect::<Vec<_>>());
         let mut annotated_elt_tys = annotated_elt_tys.into_iter();
 
         for elt in elts {

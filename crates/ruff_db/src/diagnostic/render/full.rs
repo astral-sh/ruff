@@ -197,9 +197,7 @@ impl<'a> Diff<'a> {
             // Find the new line number with the largest number of digits to align all of the line
             // number separators.
             let last_op = grouped_ops.last().and_then(|group| group.last());
-            let largest_new = last_op
-                .map(|op| op.new_range().end + line_offset)
-                .unwrap_or_default();
+            let largest_new = last_op.map_or_default(|op| op.new_range().end + line_offset);
 
             let digit_with = OneIndexed::new(largest_new).unwrap_or_default().digits();
 

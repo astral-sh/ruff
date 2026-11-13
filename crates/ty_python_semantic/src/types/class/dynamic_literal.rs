@@ -460,8 +460,7 @@ impl<'db> DynamicClassLiteral<'db> {
             .iter()
             .find_map(|(member_name, ty)| (name == member_name).then_some(*ty))
             .or_else(|| self.has_dynamic_namespace(db).then(Type::unknown))
-            .map(Member::definitely_declared)
-            .unwrap_or_default()
+            .map_or_default(Member::definitely_declared)
     }
 
     /// Look up an instance member defined directly on this class (not inherited).

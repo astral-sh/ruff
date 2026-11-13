@@ -51,9 +51,7 @@ pub(crate) fn format_stdin(
     let path = cli.stdin_filename.as_deref();
     let settings = &resolver.base_settings().formatter;
 
-    let source_type = path
-        .map(|path| settings.extension.get_source_type(path))
-        .unwrap_or_default();
+    let source_type = path.map_or_default(|path| settings.extension.get_source_type(path));
     if source_type.is_toml() {
         if mode.is_write() {
             parrot_stdin()?;
