@@ -1962,6 +1962,15 @@ enum DeclarationKind {
     VariadicParameter,
     KeywordVariadicParameter,
     Regular,
+    InheritedClassVar,
+}
+
+#[derive(Copy, Clone)]
+pub(super) enum AssignmentDeclaration<'db> {
+    /// The assignment has its own annotation or a separate declaration in the same file.
+    Ordinary(Option<Definition<'db>>),
+    /// A bare `ClassVar` on this assignment takes its value type from a base class.
+    InheritedClassVar,
 }
 
 struct AssignmentDeclarationAnnotation {
@@ -1986,6 +1995,9 @@ impl AssignmentDeclarationAnnotation {
                 "Variadic parameter annotation declares the type as `{target_type_display}`"
             )),
             DeclarationKind::Regular => annotation.message(ordinary_message),
+            DeclarationKind::InheritedClassVar => annotation.message(format_args!(
+                "Class variable inherits type `{target_type_display}`"
+            )),
         }
     }
 }
@@ -1994,21 +2006,21 @@ impl AssignmentDeclarationAnnotation {
 fn assignment_declaration_annotation<'db>(
     context: &InferContext<'db, '_>,
     definition_kind: &DefinitionKind<'db>,
-    declaration: Option<Definition<'db>>,
+    declaration: AssignmentDeclaration<'db>,
 ) -> Option<AssignmentDeclarationAnnotation> {
     let db = context.db();
-    let declaration_definition_kind =
-        if matches!(definition_kind, DefinitionKind::AnnotatedAssignment(_)) {
-            definition_kind
-        } else {
-            declaration?.kind(db)
-        };
+    let (declaration_definition_kind, kind) = match (declaration, definition_kind) {
+        (AssignmentDeclaration::InheritedClassVar, _) => {
+            (definition_kind, DeclarationKind::InheritedClassVar)
+        }
+        (_, DefinitionKind::AnnotatedAssignment(_)) => (definition_kind, DeclarationKind::Regular),
+        (AssignmentDeclaration::Ordinary(prior), _) => (prior?.kind(db), DeclarationKind::Regular),
+    };
 
     let (annotation, declaration_kind) = match declaration_definition_kind {
-        DefinitionKind::AnnotatedAssignment(assignment) => Some((
-            assignment.annotation(context.module()),
-            DeclarationKind::Regular,
-        )),
+        DefinitionKind::AnnotatedAssignment(assignment) => {
+            Some((assignment.annotation(context.module()), kind))
+        }
         DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => parameter
             .node(context.module())
             .parameter
@@ -2261,7 +2273,7 @@ pub(super) fn report_invalid_assignment<'db>(
     context: &InferContext<'db, '_>,
     target_node: AnyNodeRef,
     definition: Definition<'db>,
-    declaration: Option<Definition<'db>>,
+    declaration: AssignmentDeclaration<'db>,
     target_ty: Type,
     value_ty: Type<'db>,
 ) {
@@ -2378,7 +2390,7 @@ pub(super) fn report_unsound_assignment<'db>(
     context: &InferContext<'db, '_>,
     target_node: AnyNodeRef,
     definition: Definition<'db>,
-    declaration: Option<Definition<'db>>,
+    declaration: AssignmentDeclaration<'db>,
     target_ty: Type<'db>,
     value_ty: Type<'db>,
     expression_type: impl FnOnce(&ast::Expr) -> Type<'db>,

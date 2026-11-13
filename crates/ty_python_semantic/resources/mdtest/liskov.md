@@ -3964,7 +3964,7 @@ class NarrowBase:
 
 class WideOverride(NarrowBase):
     # error: [incompatible-attribute-override] "Type `IntDescriptor` is not assignable to inherited type `NarrowDescriptor`"
-    value: ClassVar = IntDescriptor()
+    value: ClassVar[IntDescriptor] = IntDescriptor()
 ```
 
 ## Class variables with restricted descriptor access
@@ -4005,7 +4005,7 @@ class NarrowClassOnly(ClassOnly): ...
 
 class NarrowOverride(ClassOnlyBase):
     # error: [incompatible-mutable-override] "Override does not accept writes of type `ClassOnly`"
-    value: ClassVar = NarrowClassOnly()
+    value: ClassVar[NarrowClassOnly] = NarrowClassOnly()
 ```
 
 A readable property can be implemented by an instance-only getter. A `ClassVar` that also supports
@@ -4028,7 +4028,7 @@ class BothReads(Readable):
 
 class LosesClassRead(BothReads):
     # error: [incompatible-attribute-override] "Attribute cannot be read through the class"
-    value: ClassVar = InstanceOnly()
+    value: ClassVar[InstanceOnly] = InstanceOnly()
 ```
 
 ## Conditional property definitions

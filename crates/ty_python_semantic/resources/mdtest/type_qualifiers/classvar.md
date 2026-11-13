@@ -43,7 +43,8 @@ c.e = 2
 c.f = 3
 ```
 
-With no type argument, the initializer determines which values can be assigned through the class.
+For a new class variable with no type argument, the initializer determines which values can be
+assigned through the class.
 
 ```py
 C.d = 2  # ok
@@ -82,15 +83,15 @@ reveal_type(C.header)  # revealed: bytes
 reveal_type(C.other)  # revealed: Unknown
 ```
 
-Inside the subclass, both assignments narrow the variable to `bytes`. An inherited
-`ClassVar[Unknown]` still exposes its declared type outside the class body.
+Inside the subclass, both assignments narrow the variable to `bytes`. Repeating the bare qualifier
+on `other` preserves its inherited type of `Unknown` outside the class body.
 
 ```py
 class Child(C):
     header = bytes.fromhex("ab")
     reveal_type(header)  # revealed: bytes
 
-    other = "data".encode()
+    other: ClassVar = "data".encode()
     reveal_type(other)  # revealed: bytes
 
 reveal_type(Child.header)  # revealed: bytes
@@ -127,9 +128,11 @@ class Compatible(Base):
 
 class Redeclared(Compatible):
     count: ClassVar[int] = 2  # ok
+    items: ClassVar = []
+    reveal_type(items)  # revealed: list[int]
 
 class Incompatible(Base):
-    count: ClassVar = "one"  # error: [incompatible-attribute-override]
+    count: ClassVar = "one"  # error: [invalid-assignment]
 
 class Narrower(Base):
     count: ClassVar[bool] = True  # error: [incompatible-mutable-override]
@@ -147,6 +150,54 @@ class Initialized(Uninitialized):
 class Grandchild(Initialized):
     items = []
     reveal_type(items)  # revealed: list[int]
+```
+
+## Repeating `ClassVar` in a subclass
+
+A subclass can repeat the qualifier while keeping the inherited value type.
+
+```py
+from typing import ClassVar
+
+class Message:
+    group_by: ClassVar[tuple[str, ...]] = ()
+
+class Record(Message):
+    group_by: ClassVar = ("record",)
+
+    # Inside the class body, we can use the locally inferred type.
+    reveal_type(group_by)  # revealed: tuple[Literal["record"]]
+
+# But externally, the inherited declared type governs the attribute.
+reveal_type(Record.group_by)  # revealed: tuple[str, ...]
+reveal_type(Record().group_by)  # revealed: tuple[str, ...]
+Record.group_by = ()  # ok
+Record().group_by = ()  # error: [invalid-attribute-access]
+```
+
+The inherited type constrains the initializer.
+
+```py
+class InvalidDefault(Message):
+    group_by: ClassVar = (1,)  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `tuple[Literal[1]]` is not assignable to `tuple[str, ...]`
+  --> src/mdtest_snippet.py:18:26
+   |
+18 |     group_by: ClassVar = (1,)  # snapshot: invalid-assignment
+   |               --------   ^^^^ Incompatible value of type `tuple[Literal[1]]`
+   |               |
+   |               Class variable inherits type `tuple[str, ...]`
+```
+
+An explicit type argument redeclares the variable and must support all writes allowed by the base
+class.
+
+```py
+class Narrower(Message):
+    group_by: ClassVar[tuple[str]] = ("record",)  # error: [incompatible-mutable-override]
 ```
 
 ## From stubs

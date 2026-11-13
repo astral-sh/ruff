@@ -3516,6 +3516,30 @@ static_assert(is_equivalent_to(Attribute, Property))
 static_assert(is_equivalent_to(WithDefault, Property))
 ```
 
+A repeated `ClassVar` binds the inherited `Self` to each implementation of the protocol, including
+when the protocol is defined inside a method.
+
+```py
+from typing import ClassVar
+
+class HasLatest(Protocol):
+    latest: ClassVar[Self | None]
+
+class Item:
+    latest: ClassVar[Self | None] = None
+
+class AlwaysNone:
+    latest: ClassVar[None] = None
+
+class Container:
+    def check(self, item: Item, empty: AlwaysNone) -> None:
+        class WithLatestDefault(HasLatest, Protocol):
+            latest: ClassVar = None
+
+        value: WithLatestDefault = item  # ok
+        value = empty  # error: [invalid-assignment]
+```
+
 ## `Self` in conditional protocol members
 
 `Self` still binds to the implementation type when an attribute has multiple definitions. The

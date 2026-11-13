@@ -166,9 +166,9 @@ fn find_typevar_binding<'db>(
                 .is_some_and(|definition| matches!(definition.kind(db), DefinitionKind::Class(_)))
     }
 
-    // typing.Self is treated like a legacy typevar, but doesn't follow the same scoping rules. It
-    // is always bound to the outermost method in the nearest enclosing class. The walk looks for a
-    // (function, class) pair in the scope hierarchy. The caller (`typing_self`) is responsible for
+    // In a class-body annotation, `Self` binds to that class. Inside a method, it binds to
+    // the outermost method of the nearest enclosing class. To find that method, we look for
+    // a (function, class) pair in the scope hierarchy. The caller (`typing_self`) is responsible for
     // ensuring that `containing_scope` starts from the function body scope rather than the scope
     // where the function is defined, so that the function itself appears in the ancestor chain.
     //
@@ -176,6 +176,11 @@ fn find_typevar_binding<'db>(
     // (e.g., `def foo[T](self) -> Self`), the type-params scope sits between the function body
     // and the class body in the ancestor chain.
     if matches!(typevar.kind(db), TypeVarKind::TypingSelf { .. }) {
+        if let Some(class_node) = index.scope(containing_scope).node().as_class() {
+            let definition = index.expect_single_definition(class_node);
+            return Some(typevar.with_binding_context(db, definition));
+        }
+
         for ((_, inner), (_, outer)) in index.ancestor_scopes(containing_scope).tuple_windows() {
             if outer.kind().is_class() {
                 match inner.node() {
@@ -187,13 +192,6 @@ fn find_typevar_binding<'db>(
                     _ => {}
                 }
             }
-        }
-
-        // Handle `Self` directly in class body annotations (not inside a method).
-        let scope = index.scope(containing_scope);
-        if let Some(class_node) = scope.node().as_class() {
-            let definition = index.expect_single_definition(class_node);
-            return Some(typevar.with_binding_context(db, definition));
         }
     }
     // Walk ancestor scopes, tracking whether we've crossed a class scope boundary.
