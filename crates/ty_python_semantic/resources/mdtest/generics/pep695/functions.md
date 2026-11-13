@@ -4105,6 +4105,25 @@ def f(
     reveal_type(close_and_return(g))  # revealed: Unknown
 ```
 
+## Binding `Self` through a protocol bound
+
+When `operator.mul` checks the left operand's `__mul__` method, `Self` refers to the operand's type
+variable. A second operand with the same upper bound can still have a different type.
+
+```py
+from operator import mul
+from typing import Protocol, Self, assert_type
+
+class SupportsProduct(Protocol):
+    def __mul__(self, other: Self, /) -> Self: ...
+
+type Element = SupportsProduct
+
+def check[R: Element, S: Element](left: R, other: S) -> None:
+    assert_type(mul(left, left), R)
+    mul(left, other)  # error: [no-matching-overload]
+```
+
 ## Opaque decorators don't affect typevar binding
 
 Inside the body of a generic function, we should be able to see that the typevars bound by that

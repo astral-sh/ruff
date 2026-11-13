@@ -3580,6 +3580,26 @@ reveal_type(result)  # revealed: Derived
 print(result.attr)  # No error
 ```
 
+## Binding the receiver through a protocol bound
+
+When `operator.mul` checks the left operand's `__mul__` method, it binds the method's generic `self`
+parameter to the operand's type variable.
+
+```py
+from operator import mul
+from typing import Protocol, TypeVar, assert_type
+
+T = TypeVar("T")
+
+class SupportsProduct(Protocol):
+    def __mul__(self: T, other: T, /) -> T: ...
+
+R = TypeVar("R", bound=SupportsProduct)
+
+def check(left: R, right: R) -> None:
+    assert_type(mul(left, right), R)
+```
+
 ## Callable instances
 
 Generic parameters can be inferred from the `__call__` method of a class instance.

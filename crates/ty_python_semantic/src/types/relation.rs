@@ -1516,6 +1516,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_callables_vs_callable(db, &callables, target_callable)
             });
         }
+        if let Type::ProtocolInstance(target_protocol) = target
+            && let TypeVarBoundOrConstraints::UpperBound(bound) = bound_or_constraints
+            && let bound @ Type::ProtocolInstance(_) = bound.resolve_type_alias(db)
+            && bound != target
+        {
+            // The bound supplies the protocol's members and nominal bases. Bind `Self` in
+            // those members to the fixed variable, the actual receiver of any method call.
+            return self.with_recursion_guard(db, source, target, || {
+                self.check_type_satisfies_protocol(db, bound, target_protocol, Some(typevar))
+            });
+        }
         self.check_source_typevar_bounds(db, bound_or_constraints, target)
     }
 
@@ -3024,7 +3035,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::ProtocolInstance(target_proto)) => {
                 self.with_recursion_guard(db, source, target, || {
-                    self.check_type_satisfies_protocol(db, source, target_proto)
+                    self.check_type_satisfies_protocol(db, source, target_proto, None)
                 })
             }
 
