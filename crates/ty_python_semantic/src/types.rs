@@ -4520,6 +4520,17 @@ impl<'db> Type<'db> {
         if let Some(fallback) = ty.materialized_divergent_fallback() {
             return fallback.class_member_with_policy(db, env, name, policy);
         }
+        if name == "__hash__"
+            && let Type::ProtocolInstance(protocol) = ty
+            && let interface = protocol.interface(db)
+            && interface.includes_member(db, "__eq__")
+        {
+            return if interface.includes_member(db, name) {
+                interface.instance_member(db, env, name)
+            } else {
+                Self::unspecified_protocol_hash(db, env, policy)
+            };
+        }
         if let Type::ProtocolInstance(protocol) = ty
             && let Some(origin) = protocol.materialized_origin(db)
         {
@@ -4607,6 +4618,18 @@ impl<'db> Type<'db> {
                     when called on a meta-type",
                 ),
         }
+    }
+
+    /// A protocol's implicit `__hash__ = None` belongs to the protocol class itself.
+    /// A structural implementation can provide a hash or disable hashing.
+    fn unspecified_protocol_hash(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        Type::object()
+            .class_member_with_policy(db, env, "__hash__", policy)
+            .map_type(|hash| UnionType::from_two_elements(db, env, hash, Type::none(db, env)))
     }
 
     /// Look up the class member that participates in descriptor access through an instance.
