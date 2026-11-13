@@ -18,6 +18,7 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::typevar::TypeVarDomain;
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -1743,6 +1744,54 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             })
     }
 
+    /// Check `(U & ~A) ≤ B` for static `A` and `B`. When collecting constraints,
+    /// use the equivalent bound `U ≤ B | A` to retain specializations such as `U = A`.
+    fn check_typevar_with_exclusions(
+        &self,
+        db: &'db dyn Db,
+        intersection: IntersectionType<'db>,
+        target: Type<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let positive = intersection.iter_positive(db).exactly_one().ok()?;
+        let typevar = positive.as_typevar()?;
+        // When specializing a generic callable, prefer the target as evidence for its local
+        // type variable. For example, matching `(T) -> T & ~str` against `(U) -> int`
+        // can infer `int` for both T and U.
+        if typevar.domain(db) != TypeVarDomain::Type || typevar.is_inferable(db, self.inferable) {
+            return None;
+        }
+
+        let env = self.env;
+        let upper_elements = || std::iter::once(target).chain(intersection.iter_negative(db));
+        // Match type variables and structural types in place. A protocol member or
+        // TypedDict field can refer to another type variable that needs its own evidence.
+        if upper_elements().any(|ty| {
+            any_over_type_expanding_aliases(db, env, ty, |nested| {
+                matches!(
+                    nested,
+                    Type::TypeVar(_) | Type::ProtocolInstance(_) | Type::TypedDict(_)
+                )
+            }) || ty.top_materialization(db, env) != ty.bottom_materialization(db, env)
+        }) {
+            return None;
+        }
+
+        let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
+        // For a fixed U, compare what remains of its declared domain. Keeping a gradual
+        // bound intact lets it materialize during assignability.
+        if self.typevar_evaluation == TypeVarEvaluation::Eager {
+            return Some(self.check_type_pair(db, expanded, target));
+        }
+
+        // The declared domain can establish the relation without constraining U.
+        // Its top materialization covers every legal choice of U.
+        let when_expanded = self.check_type_pair(db, expanded.top_materialization(db, env), target);
+        Some(when_expanded.or(db, self.constraints, || {
+            let upper = UnionType::from_elements(db, env, upper_elements());
+            self.check_type_pair(db, positive, upper)
+        }))
+    }
+
     fn check_source_intersection(
         &self,
         db: &'db dyn Db,
@@ -2480,6 +2529,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // `Any` could materialize to `Never`, `Never & T & ~S` simplifies to `Never` for any
                 // `T` and any `S`, and `Never` is a subtype of all types.
                 self.always()
+            }
+            // A specialization can span several union arms, so check its upper bound
+            // before splitting a union target.
+            (Type::Intersection(intersection), _)
+                if let Some(constraints) =
+                    self.check_typevar_with_exclusions(db, intersection, target) =>
+            {
+                constraints
             }
             (Type::Intersection(intersection), _)
                 if self.relation.can_safely_assume_reflexivity(target)

@@ -5911,6 +5911,40 @@ def example(output: list[Literal["a", "b"]]):
     run: Callable[[Wrap], None] = make_runner("a", output, lambda item: output.append(item))
 ```
 
+## Dictionary value context containing a bounded type variable
+
+The return annotation lets `dict.fromkeys` initialize a dictionary of `T | str` with a string. An
+arbitrary `int` is an invalid initial value because the caller can specialize `T` to a narrower
+type.
+
+```py
+from typing_extensions import TypeVar, assert_type
+
+T = TypeVar("T", bound=int)
+
+def defaults(keys: list[str]) -> dict[str, T | str]:
+    return assert_type(dict.fromkeys(keys, ""), dict[str, T | str])
+
+def int_defaults(keys: list[str], value: int) -> dict[str, T | str]:
+    return dict.fromkeys(keys, value)  # error: [invalid-explicit-return]
+```
+
+## Contextual key type for a dictionary copy
+
+The return annotation supplies `str | int` as the key type for the dictionary constructed inside
+`MappingProxyType`. Every key copied from `rows` fits that type, even when `K` is narrower.
+
+```py
+from collections.abc import Mapping
+from types import MappingProxyType
+from typing import TypeVar
+
+K = TypeVar("K", bound=str | int)
+
+def copy_proxy(rows: Mapping[K, int]) -> Mapping[str | int, int]:
+    return MappingProxyType(dict(rows.items()))
+```
+
 ## Inferring a recursive protocol from a factory's return context
 
 The annotated assignment supplies `Stream[int]` as the type argument to `make_result`. Comparing the
