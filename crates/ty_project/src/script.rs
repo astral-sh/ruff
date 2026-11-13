@@ -89,6 +89,12 @@ impl get_size2::GetSize for Script<'_> {}
 /// Resolve the `Script` for `file` if it has a PEP 723 metadata block or `None` otherwise.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
+    // Ordinary files must not depend on project membership.
+    script_tag(db, file)?;
+    if !crate::is_project_file(db, file) {
+        return None;
+    }
+
     let mut diagnostics = ScriptConfigurationDiagnostics::default();
     let fallback_metadata;
     let metadata = match script_metadata(db, file)? {
@@ -200,7 +206,8 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 
 /// Returns the script's inline `[tool.ty]` options unless `--config-file` takes precedence.
 ///
-/// These are the unmerged options (user configuration, LSP, CLI etc. have not been applied).
+/// Callers can read these unmerged options before indexing the project.
+/// User configuration, LSP, CLI etc. have not been applied.
 pub(crate) fn inline_script_options(db: &dyn Db, file: File) -> Option<&Options> {
     // Check the tag first so ordinary files skip the project lookup and avoid caching
     // a second `None` in `script_metadata`.
@@ -236,13 +243,7 @@ pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
 /// spans even when the option's value compares equal.
 #[salsa::tracked(returns(as_deref), no_eq, heap_size=ruff_memory_usage::heap_size)]
 fn script_metadata(db: &dyn Db, file: File) -> Option<Box<Result<ScriptMetadata, Diagnostic>>> {
-    // Files without script metadata must not depend on the low-durability open-file set.
     let tag = script_tag(db, file)?;
-
-    // Never treat third-party files as scripts.
-    if !crate::is_project_file(db, file) {
-        return None;
-    }
 
     let result = {
         let _guard = ValueSourceGuard::with_source_map(
