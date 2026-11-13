@@ -535,3 +535,21 @@ if (  # a
 ):
     pass
 ```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -258,9 +258,7 @@
+     a
+ )
+ 
+-(
+-    -(a)  # comment
+-)
++-(a)  # comment
+ 
+ if (  # a
+     # b
+```

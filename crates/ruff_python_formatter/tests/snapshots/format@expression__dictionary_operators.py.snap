@@ -1,0 +1,235 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/dictionary_operators.py
+---
+## Input
+```python
+send(
+    request,
+    translate("Hello, %(name)s") % {
+        "name": display_name,
+    },
+)
+message = "%s" % {
+    "name": display_name,
+}
+configure(
+    defaults | {
+        "first": first_value,
+        "second": second_value,
+    },
+)
+message = "%s" % {key: value for key, value in pairs}
+
+# Long prefixes and comments still need line breaks before the operator.
+message = very_long_left_hand_function_name(argument) % {
+    "key": value,
+}
+message = (
+    template  # comment on the left operand
+    % {"key": value,}
+)
+message = template % {
+    # comment in the dictionary
+    "key": value,
+}
+
+# Multiple operators retain their normal precedence and wrapping.
+message = template % {"key": value,} % {"key": value,}
+message = template % (first, second,)
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+send(
+    request,
+    translate("Hello, %(name)s")
+    % {
+        "name": display_name,
+    },
+)
+message = "%s" % {
+    "name": display_name,
+}
+configure(
+    defaults
+    | {
+        "first": first_value,
+        "second": second_value,
+    },
+)
+message = "%s" % {key: value for key, value in pairs}
+
+# Long prefixes and comments still need line breaks before the operator.
+message = very_long_left_hand_function_name(argument) % {
+    "key": value,
+}
+message = (
+    template  # comment on the left operand
+    % {
+        "key": value,
+    }
+)
+message = template % {
+    # comment in the dictionary
+    "key": value,
+}
+
+# Multiple operators retain their normal precedence and wrapping.
+message = (
+    template
+    % {
+        "key": value,
+    }
+    % {
+        "key": value,
+    }
+)
+message = template % (
+    first,
+    second,
+)
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,7 +1,6 @@
+ send(
+     request,
+-    translate("Hello, %(name)s")
+-    % {
++    translate("Hello, %(name)s") % {
+         "name": display_name,
+     },
+ )
+@@ -9,8 +8,7 @@
+     "name": display_name,
+ }
+ configure(
+-    defaults
+-    | {
++    defaults | {
+         "first": first_value,
+         "second": second_value,
+     },
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 40
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+send(
+    request,
+    translate("Hello, %(name)s")
+    % {
+        "name": display_name,
+    },
+)
+message = "%s" % {
+    "name": display_name,
+}
+configure(
+    defaults
+    | {
+        "first": first_value,
+        "second": second_value,
+    },
+)
+message = "%s" % {
+    key: value for key, value in pairs
+}
+
+# Long prefixes and comments still need line breaks before the operator.
+message = (
+    very_long_left_hand_function_name(
+        argument
+    )
+    % {
+        "key": value,
+    }
+)
+message = (
+    template  # comment on the left operand
+    % {
+        "key": value,
+    }
+)
+message = template % {
+    # comment in the dictionary
+    "key": value,
+}
+
+# Multiple operators retain their normal precedence and wrapping.
+message = (
+    template
+    % {
+        "key": value,
+    }
+    % {
+        "key": value,
+    }
+)
+message = template % (
+    first,
+    second,
+)
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,7 +1,6 @@
+ send(
+     request,
+-    translate("Hello, %(name)s")
+-    % {
++    translate("Hello, %(name)s") % {
+         "name": display_name,
+     },
+ )
+@@ -9,8 +8,7 @@
+     "name": display_name,
+ }
+ configure(
+-    defaults
+-    | {
++    defaults | {
+         "first": first_value,
+         "second": second_value,
+     },
+```

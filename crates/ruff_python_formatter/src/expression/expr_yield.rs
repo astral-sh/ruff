@@ -3,11 +3,13 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprYield, ExprYieldFrom};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parenthesize, is_type_annotation_of,
 };
 use crate::prelude::*;
+use crate::preview::is_parenthesize_tuple_in_yield_enabled;
 
 pub(super) enum AnyExpressionYield<'a> {
     Yield(&'a ExprYield),
@@ -105,6 +107,25 @@ impl Format<PyFormatContext<'_>> for AnyExpressionYield<'_> {
         };
 
         if let Some(val) = self.value() {
+            if is_parenthesize_tuple_in_yield_enabled(f.context())
+                && !self.is_yield_from()
+                && let Expr::Tuple(tuple) = val
+                && !f.context().is_expression_parenthesized(val.into())
+                && !f.context().comments().has_leading(tuple)
+                && !f.context().comments().has_trailing(tuple)
+            {
+                return write!(
+                    f,
+                    [
+                        token(keyword),
+                        space(),
+                        tuple
+                            .format()
+                            .with_options(TupleParentheses::OptionalParentheses)
+                    ]
+                );
+            }
+
             write!(
                 f,
                 [

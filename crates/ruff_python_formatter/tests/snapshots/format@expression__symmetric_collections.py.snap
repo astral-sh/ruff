@@ -1,0 +1,679 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/symmetric_collections.py
+---
+## Input
+```python
+values = [first_value, second_value] + [third_value, fourth_value]
+long_assignment_target_name = [first_value, second_value] + [third_value, fourth_value]
+values: list[str] = [first_value, second_value] + [third_value, fourth_value]
+values += [first_value, second_value] + [third_value, fourth_value]
+
+def function():
+    return [first_value, second_value] + [third_value, fourth_value]
+
+if [first_value, second_value] == [third_value, fourth_value]:
+    pass
+
+send([first_value, second_value] + [third_value, fourth_value])
+outer = [[first_value, second_value] + [third_value, fourth_value]]
+chained = [first_value, second_value] + [third_value, fourth_value] + [fifth_value]
+membership = [first_value, second_value] in [third_value, fourth_value]
+identity = [first_value, second_value] is [third_value, fourth_value]
+
+magic_left = [first_value, second_value,] + [third_value, fourth_value]
+magic_right = [first_value, second_value] + [third_value, fourth_value,]
+magic_nested = [[first_value, second_value,]] + [third_value, fourth_value]
+singletons = (first_long_value,) + (second_long_value,)
+empty = [] + []
+
+long_left = [first_value_with_a_very_long_name, second_value_with_a_very_long_name] + [third_value]
+long_right = [first_value] + [second_value_with_a_very_long_name, third_value_with_a_very_long_name]
+unicode_values = ["日本語", "日本語", "日本語"] + ["日本語", "日本語", "日本語"]
+
+multiline = ["""first
+second"""] + [third_value, fourth_value]
+comment_inside = [
+    first_value,  # first
+    second_value,
+] + [third_value, fourth_value]
+comment_between = (
+    [first_value, second_value]  # first collection
+    + [third_value, fourth_value]
+)
+comment_after = [first_value, second_value] + [third_value, fourth_value]  # both
+comment_operator = (
+    [first_value, second_value]
+    +  # operator
+    [third_value, fourth_value]
+)
+parenthesized_collections = ({first_value, second_value}) == ({third_value, fourth_value})
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+values = [first_value, second_value] + [third_value, fourth_value]
+long_assignment_target_name = [first_value, second_value] + [third_value, fourth_value]
+values: list[str] = [first_value, second_value] + [third_value, fourth_value]
+values += [first_value, second_value] + [third_value, fourth_value]
+
+
+def function():
+    return [first_value, second_value] + [third_value, fourth_value]
+
+
+if [first_value, second_value] == [third_value, fourth_value]:
+    pass
+
+send([first_value, second_value] + [third_value, fourth_value])
+outer = [[first_value, second_value] + [third_value, fourth_value]]
+chained = [first_value, second_value] + [third_value, fourth_value] + [fifth_value]
+membership = [first_value, second_value] in [third_value, fourth_value]
+identity = [first_value, second_value] is [third_value, fourth_value]
+
+magic_left = [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]
+magic_right = [first_value, second_value] + [
+    third_value,
+    fourth_value,
+]
+magic_nested = [
+    [
+        first_value,
+        second_value,
+    ]
+] + [third_value, fourth_value]
+singletons = (first_long_value,) + (second_long_value,)
+empty = [] + []
+
+long_left = [first_value_with_a_very_long_name, second_value_with_a_very_long_name] + [
+    third_value
+]
+long_right = [first_value] + [
+    second_value_with_a_very_long_name,
+    third_value_with_a_very_long_name,
+]
+unicode_values = ["日本語", "日本語", "日本語"] + ["日本語", "日本語", "日本語"]
+
+multiline = [
+    """first
+second"""
+] + [third_value, fourth_value]
+comment_inside = [
+    first_value,  # first
+    second_value,
+] + [third_value, fourth_value]
+comment_between = (
+    [first_value, second_value]  # first collection
+    + [third_value, fourth_value]
+)
+comment_after = [first_value, second_value] + [third_value, fourth_value]  # both
+comment_operator = (
+    [first_value, second_value]
+    +  # operator
+    [third_value, fourth_value]
+)
+parenthesized_collections = ({first_value, second_value}) == (
+    {third_value, fourth_value}
+)
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -34,13 +34,14 @@
+ singletons = (first_long_value,) + (second_long_value,)
+ empty = [] + []
+ 
+-long_left = [first_value_with_a_very_long_name, second_value_with_a_very_long_name] + [
+-    third_value
+-]
+-long_right = [first_value] + [
+-    second_value_with_a_very_long_name,
+-    third_value_with_a_very_long_name,
+-]
++long_left = (
++    [first_value_with_a_very_long_name, second_value_with_a_very_long_name]
++    + [third_value]
++)
++long_right = (
++    [first_value]
++    + [second_value_with_a_very_long_name, third_value_with_a_very_long_name]
++)
+ unicode_values = ["日本語", "日本語", "日本語"] + ["日本語", "日本語", "日本語"]
+ 
+ multiline = [
+@@ -61,6 +62,4 @@
+     +  # operator
+     [third_value, fourth_value]
+ )
+-parenthesized_collections = ({first_value, second_value}) == (
+-    {third_value, fourth_value}
+-)
++parenthesized_collections = {first_value, second_value} == {third_value, fourth_value}
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 40
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+values = [first_value, second_value] + [
+    third_value,
+    fourth_value,
+]
+long_assignment_target_name = [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]
+values: list[str] = [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]
+values += [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]
+
+
+def function():
+    return [
+        first_value,
+        second_value,
+    ] + [third_value, fourth_value]
+
+
+if [first_value, second_value] == [
+    third_value,
+    fourth_value,
+]:
+    pass
+
+send(
+    [first_value, second_value]
+    + [third_value, fourth_value]
+)
+outer = [
+    [first_value, second_value]
+    + [third_value, fourth_value]
+]
+chained = (
+    [first_value, second_value]
+    + [third_value, fourth_value]
+    + [fifth_value]
+)
+membership = [
+    first_value,
+    second_value,
+] in [third_value, fourth_value]
+identity = [
+    first_value,
+    second_value,
+] is [third_value, fourth_value]
+
+magic_left = [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]
+magic_right = [
+    first_value,
+    second_value,
+] + [
+    third_value,
+    fourth_value,
+]
+magic_nested = [
+    [
+        first_value,
+        second_value,
+    ]
+] + [third_value, fourth_value]
+singletons = (first_long_value,) + (
+    second_long_value,
+)
+empty = [] + []
+
+long_left = [
+    first_value_with_a_very_long_name,
+    second_value_with_a_very_long_name,
+] + [third_value]
+long_right = [first_value] + [
+    second_value_with_a_very_long_name,
+    third_value_with_a_very_long_name,
+]
+unicode_values = [
+    "日本語",
+    "日本語",
+    "日本語",
+] + ["日本語", "日本語", "日本語"]
+
+multiline = [
+    """first
+second"""
+] + [third_value, fourth_value]
+comment_inside = [
+    first_value,  # first
+    second_value,
+] + [third_value, fourth_value]
+comment_between = (
+    [
+        first_value,
+        second_value,
+    ]  # first collection
+    + [third_value, fourth_value]
+)
+comment_after = [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]  # both
+comment_operator = (
+    [first_value, second_value]
+    +  # operator
+    [third_value, fourth_value]
+)
+parenthesized_collections = (
+    {first_value, second_value}
+) == ({third_value, fourth_value})
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,32 +1,32 @@
+-values = [first_value, second_value] + [
+-    third_value,
+-    fourth_value,
+-]
+-long_assignment_target_name = [
+-    first_value,
+-    second_value,
+-] + [third_value, fourth_value]
+-values: list[str] = [
+-    first_value,
+-    second_value,
+-] + [third_value, fourth_value]
+-values += [
+-    first_value,
+-    second_value,
+-] + [third_value, fourth_value]
++values = (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)
++long_assignment_target_name = (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)
++values: list[str] = (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)
++values += (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)
+ 
+ 
+ def function():
+-    return [
+-        first_value,
+-        second_value,
+-    ] + [third_value, fourth_value]
++    return (
++        [first_value, second_value]
++        + [third_value, fourth_value]
++    )
+ 
+ 
+-if [first_value, second_value] == [
+-    third_value,
+-    fourth_value,
+-]:
++if (
++    [first_value, second_value]
++    == [third_value, fourth_value]
++):
+     pass
+ 
+ send(
+@@ -81,11 +81,10 @@
+     second_value_with_a_very_long_name,
+     third_value_with_a_very_long_name,
+ ]
+-unicode_values = [
+-    "日本語",
+-    "日本語",
+-    "日本語",
+-] + ["日本語", "日本語", "日本語"]
++unicode_values = (
++    ["日本語", "日本語", "日本語"]
++    + ["日本語", "日本語", "日本語"]
++)
+ 
+ multiline = [
+     """first
+@@ -102,10 +101,10 @@
+     ]  # first collection
+     + [third_value, fourth_value]
+ )
+-comment_after = [
+-    first_value,
+-    second_value,
+-] + [third_value, fourth_value]  # both
++comment_after = (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)  # both
+ comment_operator = (
+     [first_value, second_value]
+     +  # operator
+@@ -113,4 +112,5 @@
+ )
+ parenthesized_collections = (
+     {first_value, second_value}
+-) == ({third_value, fourth_value})
++    == {third_value, fourth_value}
++)
+```
+
+
+### Output 3
+```
+indent-style               = space
+line-width                 = 40
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Ignore
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+values = [first_value, second_value] + [
+    third_value,
+    fourth_value,
+]
+long_assignment_target_name = [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]
+values: list[str] = [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]
+values += [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]
+
+
+def function():
+    return [
+        first_value,
+        second_value,
+    ] + [third_value, fourth_value]
+
+
+if [first_value, second_value] == [
+    third_value,
+    fourth_value,
+]:
+    pass
+
+send(
+    [first_value, second_value]
+    + [third_value, fourth_value]
+)
+outer = [
+    [first_value, second_value]
+    + [third_value, fourth_value]
+]
+chained = (
+    [first_value, second_value]
+    + [third_value, fourth_value]
+    + [fifth_value]
+)
+membership = [
+    first_value,
+    second_value,
+] in [third_value, fourth_value]
+identity = [
+    first_value,
+    second_value,
+] is [third_value, fourth_value]
+
+magic_left = [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]
+magic_right = [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]
+magic_nested = [
+    [first_value, second_value]
+] + [third_value, fourth_value]
+singletons = (first_long_value,) + (
+    second_long_value,
+)
+empty = [] + []
+
+long_left = [
+    first_value_with_a_very_long_name,
+    second_value_with_a_very_long_name,
+] + [third_value]
+long_right = [first_value] + [
+    second_value_with_a_very_long_name,
+    third_value_with_a_very_long_name,
+]
+unicode_values = [
+    "日本語",
+    "日本語",
+    "日本語",
+] + ["日本語", "日本語", "日本語"]
+
+multiline = [
+    """first
+second"""
+] + [third_value, fourth_value]
+comment_inside = [
+    first_value,  # first
+    second_value,
+] + [third_value, fourth_value]
+comment_between = (
+    [
+        first_value,
+        second_value,
+    ]  # first collection
+    + [third_value, fourth_value]
+)
+comment_after = [
+    first_value,
+    second_value,
+] + [third_value, fourth_value]  # both
+comment_operator = (
+    [first_value, second_value]
+    +  # operator
+    [third_value, fourth_value]
+)
+parenthesized_collections = (
+    {first_value, second_value}
+) == ({third_value, fourth_value})
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,32 +1,32 @@
+-values = [first_value, second_value] + [
+-    third_value,
+-    fourth_value,
+-]
+-long_assignment_target_name = [
+-    first_value,
+-    second_value,
+-] + [third_value, fourth_value]
+-values: list[str] = [
+-    first_value,
+-    second_value,
+-] + [third_value, fourth_value]
+-values += [
+-    first_value,
+-    second_value,
+-] + [third_value, fourth_value]
++values = (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)
++long_assignment_target_name = (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)
++values: list[str] = (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)
++values += (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)
+ 
+ 
+ def function():
+-    return [
+-        first_value,
+-        second_value,
+-    ] + [third_value, fourth_value]
++    return (
++        [first_value, second_value]
++        + [third_value, fourth_value]
++    )
+ 
+ 
+-if [first_value, second_value] == [
+-    third_value,
+-    fourth_value,
+-]:
++if (
++    [first_value, second_value]
++    == [third_value, fourth_value]
++):
+     pass
+ 
+ send(
+@@ -51,20 +51,22 @@
+     second_value,
+ ] is [third_value, fourth_value]
+ 
+-magic_left = [
+-    first_value,
+-    second_value,
+-] + [third_value, fourth_value]
+-magic_right = [
+-    first_value,
+-    second_value,
+-] + [third_value, fourth_value]
+-magic_nested = [
++magic_left = (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)
++magic_right = (
+     [first_value, second_value]
+-] + [third_value, fourth_value]
+-singletons = (first_long_value,) + (
+-    second_long_value,
++    + [third_value, fourth_value]
++)
++magic_nested = (
++    [[first_value, second_value]]
++    + [third_value, fourth_value]
+ )
++singletons = (
++    (first_long_value,)
++    + (second_long_value,)
++)
+ empty = [] + []
+ 
+ long_left = [
+@@ -75,11 +77,10 @@
+     second_value_with_a_very_long_name,
+     third_value_with_a_very_long_name,
+ ]
+-unicode_values = [
+-    "日本語",
+-    "日本語",
+-    "日本語",
+-] + ["日本語", "日本語", "日本語"]
++unicode_values = (
++    ["日本語", "日本語", "日本語"]
++    + ["日本語", "日本語", "日本語"]
++)
+ 
+ multiline = [
+     """first
+@@ -96,10 +97,10 @@
+     ]  # first collection
+     + [third_value, fourth_value]
+ )
+-comment_after = [
+-    first_value,
+-    second_value,
+-] + [third_value, fourth_value]  # both
++comment_after = (
++    [first_value, second_value]
++    + [third_value, fourth_value]
++)  # both
+ comment_operator = (
+     [first_value, second_value]
+     +  # operator
+@@ -107,4 +108,5 @@
+ )
+ parenthesized_collections = (
+     {first_value, second_value}
+-) == ({third_value, fourth_value})
++    == {third_value, fourth_value}
++)
+```

@@ -14,6 +14,15 @@ None ** None
 
 # Space
 "a" ** "b"
+
+# Simple power operators remain unspaced when the expression wraps.
+result = 1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1**1
+
+# Comments remain attached when a power expression wraps.
+result = (
+    base **  # exponent
+    exponent
+)
 ```
 
 ## Output
@@ -28,4 +37,121 @@ None**None
 
 # Space
 "a" ** "b"
+
+# Simple power operators remain unspaced when the expression wraps.
+result = (
+    1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+    ** 1
+)
+
+# Comments remain attached when a power expression wraps.
+result = (
+    base  # exponent
+    ** exponent
+)
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -12,39 +12,39 @@
+ # Simple power operators remain unspaced when the expression wraps.
+ result = (
+     1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
+-    ** 1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
++    **1
+ )
+ 
+ # Comments remain attached when a power expression wraps.
+ result = (
+     base  # exponent
+-    ** exponent
++    **exponent
+ )
 ```

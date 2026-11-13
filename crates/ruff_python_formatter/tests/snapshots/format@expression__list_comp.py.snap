@@ -378,3 +378,21 @@ y = [
     x
 ]
 ```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -135,8 +135,8 @@
+ ]
+ 
+ # Parenthesized targets and iterators.
+-[x for (x) in y]
+-[x for x in (y)]
++[x for x in y]
++[x for x in y]
+ 
+ 
+ # Leading expression comments:
+```

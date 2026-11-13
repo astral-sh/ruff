@@ -1,0 +1,77 @@
+import sys
+from typing import overload
+
+def top_level_comment() -> None:
+    """docs"""
+# leading comment for the next statement
+top_level_attr: int
+
+def top_level_if() -> None:
+    """docs"""
+if sys.version_info >= (3, 12):
+    top_level_if_attr: int
+
+class C:
+    def before_comment(self) -> None:
+        """docs"""
+    # leading comment for the next method
+    def after_comment(self) -> None: ...
+
+    def before_if(self) -> None:
+        """docs"""
+    if sys.version_info >= (3, 12):
+        if_attr: int
+
+    if sys.version_info >= (3, 12):
+        def conditional_before_attr(self) -> None:
+            """docs"""
+    conditional_attr: int
+
+    def before_attr(self) -> None:
+        """docs"""
+    attr: int
+
+    @decorator
+    def before_decorator(self) -> None:
+        """docs"""
+    @decorator
+    def after_decorator(self) -> None: ...
+
+    @decorator
+    def decorated_before_comment(self) -> None:
+        """docs"""
+    # leading comment for the next attribute
+    decorated_attr: int
+
+    @overload
+    def overloaded(self, value: int) -> int:
+        """Int overload."""
+    @overload
+    def overloaded(self, value: str) -> str: ...
+
+    @overload
+    def overloaded_with_comment(self, value: int) -> int:
+        """Int overload."""
+    # comment inside the overload group
+    @overload
+    def overloaded_with_comment(self, value: str) -> str: ...
+
+    @overload
+    def overloaded_with_commented_if(self, value: int) -> int:
+        """Int overload."""
+    # comment inside the conditional overload group
+    if sys.version_info >= (3, 12):
+        @overload
+        def overloaded_with_commented_if(self, value: str) -> str: ...
+
+    @property
+    def prop(self) -> int:
+        """Property docs."""
+    @prop.setter
+    def prop(self, value: int) -> None: ...
+
+class EndsWithDecoratedDocstringAndComment:
+    @decorator
+    def method(self) -> None:
+        """docs"""
+    # trailing member comment

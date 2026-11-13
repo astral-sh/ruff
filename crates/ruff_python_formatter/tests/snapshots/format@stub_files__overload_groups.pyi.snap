@@ -1,0 +1,182 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/stub_files/overload_groups.pyi
+---
+## Input
+```python
+from typing import overload
+
+class MixedBranches:
+    before: int
+    if condition:
+        @overload
+        def same(self, value: int) -> int: ...
+    elif other:
+        @overload
+        def same(self, value: str) -> str: ...
+    else:
+        @overload
+        def different(self, value: bytes) -> bytes: ...
+    @overload
+    def same(self, value: bytes) -> bytes: ...
+    after: int
+
+class SeparateBranches:
+    if condition:
+        @overload
+        def first(self, value: int) -> int: ...
+        @overload
+        def first(self, value: str) -> str: ...
+    else:
+        @overload
+        def second(self, value: int) -> int: ...
+        @overload
+        def second(self, value: str) -> str: ...
+    def unrelated(self) -> None: ...
+
+class SeparateScopes:
+    @property
+    def value(self) -> int: ...
+    class Inner:
+        @property
+        def value(self) -> int: ...
+    @property
+    def value(self) -> int: ...
+
+@overload
+def suppressed(value: int) -> int: ...
+@overload
+def suppressed(value: str) -> str: ...  # fmt: skip
+def following() -> None: ...
+
+# fmt: off
+@overload
+def off(value: int) -> int: ...
+
+@overload
+def off(value: str) -> str: ...
+# fmt: on
+def after_off() -> None: ...
+
+@overload
+def ordinary(value: int) -> int: ...
+
+# A comment in the group.
+
+@overload
+def ordinary(value: str) -> str: ...
+var: int
+```
+
+## Output
+```python
+from typing import overload
+
+class MixedBranches:
+    before: int
+    if condition:
+        @overload
+        def same(self, value: int) -> int: ...
+    elif other:
+        @overload
+        def same(self, value: str) -> str: ...
+    else:
+        @overload
+        def different(self, value: bytes) -> bytes: ...
+    @overload
+    def same(self, value: bytes) -> bytes: ...
+    after: int
+
+class SeparateBranches:
+    if condition:
+        @overload
+        def first(self, value: int) -> int: ...
+        @overload
+        def first(self, value: str) -> str: ...
+    else:
+        @overload
+        def second(self, value: int) -> int: ...
+        @overload
+        def second(self, value: str) -> str: ...
+    def unrelated(self) -> None: ...
+
+class SeparateScopes:
+    @property
+    def value(self) -> int: ...
+    class Inner:
+        @property
+        def value(self) -> int: ...
+
+    @property
+    def value(self) -> int: ...
+
+@overload
+def suppressed(value: int) -> int: ...
+@overload
+def suppressed(value: str) -> str: ...  # fmt: skip
+def following() -> None: ...
+
+# fmt: off
+@overload
+def off(value: int) -> int: ...
+
+@overload
+def off(value: str) -> str: ...
+# fmt: on
+def after_off() -> None: ...
+@overload
+def ordinary(value: int) -> int: ...
+
+# A comment in the group.
+
+@overload
+def ordinary(value: str) -> str: ...
+
+var: int
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -8,9 +8,11 @@
+     elif other:
+         @overload
+         def same(self, value: str) -> str: ...
++
+     else:
+         @overload
+         def different(self, value: bytes) -> bytes: ...
++
+     @overload
+     def same(self, value: bytes) -> bytes: ...
+     after: int
+@@ -21,11 +23,13 @@
+         def first(self, value: int) -> int: ...
+         @overload
+         def first(self, value: str) -> str: ...
++
+     else:
+         @overload
+         def second(self, value: int) -> int: ...
+         @overload
+         def second(self, value: str) -> str: ...
++
+     def unrelated(self) -> None: ...
+ 
+ class SeparateScopes:
+@@ -52,11 +56,11 @@
+ def off(value: str) -> str: ...
+ # fmt: on
+ def after_off() -> None: ...
++
+ @overload
+ def ordinary(value: int) -> int: ...
+ 
+ # A comment in the group.
+-
+ @overload
+ def ordinary(value: str) -> str: ...
+ 
+```

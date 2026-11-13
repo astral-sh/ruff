@@ -10,6 +10,7 @@ use crate::comments::{
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_lambda::ExprLambdaLayout;
+use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, optional_parentheses,
 };
@@ -19,6 +20,7 @@ use crate::expression::{
 };
 use crate::other::interpolated_string::InterpolatedStringLayout;
 use crate::prelude::*;
+use crate::preview::is_remove_redundant_unpacking_parentheses_enabled;
 use crate::statement::trailing_semicolon;
 use crate::string::StringLikeExtensions;
 use crate::string::implicit::{
@@ -42,7 +44,8 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             "Expected at least on assignment target",
         ))?;
 
-        // The first target is special because it never gets parenthesized nor does the formatter remove parentheses if unnecessary.
+        // The first target does not gain optional parentheses. Tuple unpacking
+        // can provide its own parentheses when its elements need to wrap.
         let format_first = FormatTargetWithEqualOperator {
             target: first,
             preserve_parentheses: true,
@@ -74,7 +77,7 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             && !f.context().is_expression_parenthesized(first.into())
         {
             FormatStatementsLastExpression::RightToLeft {
-                before_operator: AnyBeforeOperator::Expression(first),
+                before_operator: AnyBeforeOperator::UnpackingTarget(first),
                 operator: AnyAssignmentOperator::Assign,
                 value,
                 statement: item.into(),
@@ -111,13 +114,23 @@ struct FormatTargetWithEqualOperator<'a> {
 
 impl Format<PyFormatContext<'_>> for FormatTargetWithEqualOperator<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        // Preserve parentheses for the first target or around targets with leading or trailing comments.
-        if self.preserve_parentheses
-            || f.context().comments().has_leading(self.target)
+        // Comments attached to a target can require its enclosing parentheses.
+        if f.context().comments().has_leading(self.target)
             || f.context().comments().has_trailing(self.target)
+            || (self.preserve_parentheses
+                && !is_remove_redundant_unpacking_parentheses_enabled(f.context()))
         {
             self.target.format().fmt(f)?;
-        } else if should_parenthesize_target(self.target, f.context()) {
+        } else if is_remove_redundant_unpacking_parentheses_enabled(f.context())
+            && self.preserve_parentheses
+            && let Expr::Tuple(tuple) = self.target
+        {
+            tuple
+                .format()
+                .with_options(TupleParentheses::NeverPreserve)
+                .fmt(f)?;
+        } else if !self.preserve_parentheses && should_parenthesize_target(self.target, f.context())
+        {
             parenthesize_if_expands(&self.target.format().with_options(Parentheses::Never))
                 .fmt(f)?;
         } else {
@@ -1245,13 +1258,15 @@ impl Format<PyFormatContext<'_>> for AnyAssignmentOperator {
 #[derive(Copy, Clone, Debug)]
 pub(super) enum AnyBeforeOperator<'a> {
     Expression(&'a Expr),
+    UnpackingTarget(&'a Expr),
     TypeParams(&'a TypeParams),
 }
 
 impl Format<PyFormatContext<'_>> for AnyBeforeOperator<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self {
-            AnyBeforeOperator::Expression(expression) => {
+            AnyBeforeOperator::Expression(expression)
+            | AnyBeforeOperator::UnpackingTarget(expression) => {
                 // Preserve parentheses around targets with comments.
                 if f.context().comments().has_leading(*expression)
                     || f.context().comments().has_trailing(*expression)
@@ -1260,9 +1275,15 @@ impl Format<PyFormatContext<'_>> for AnyBeforeOperator<'_> {
                         .format()
                         .with_options(Parentheses::Preserve)
                         .fmt(f)
-                }
-                // Never parenthesize targets that come with their own parentheses, e.g. don't parenthesize lists or dictionary literals.
-                else if should_parenthesize_target(expression, f.context()) {
+                } else if matches!(self, AnyBeforeOperator::UnpackingTarget(_))
+                    && is_remove_redundant_unpacking_parentheses_enabled(f.context())
+                    && let Expr::Tuple(tuple) = expression
+                {
+                    tuple
+                        .format()
+                        .with_options(TupleParentheses::NeverPreserve)
+                        .fmt(f)
+                } else if should_parenthesize_target(expression, f.context()) {
                     if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&expression.format().with_options(Parentheses::Never))
                             .fmt(f)
