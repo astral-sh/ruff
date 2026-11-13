@@ -139,14 +139,11 @@ workspace = true
 # This is fine because this crate is "dev-only".
 ignored = [
     "clap",
-    "divan",
-    "ruff",
     "ruff_linter",
     "ruff_python_formatter",
     # Also enables stack growth when only ty benchmarks are selected.
     "ruff_python_parser",
     "ruff_python_trivia",
-    "ty_ide",
     "ty_module_resolver",
     "ty_python_semantic",
     "mimalloc",

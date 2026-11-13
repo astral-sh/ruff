@@ -23,3 +23,6 @@ serde = { workspace = true, optional = true, features = [] }
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]
+
+[lints.cargo]
+redundant_homepage = "allow"

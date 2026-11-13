@@ -16,3 +16,6 @@ rand = { workspace = true }
 
 [lib]
 name = "unicode_names2_generator"
+
+[lints.cargo]
+redundant_homepage = "allow"

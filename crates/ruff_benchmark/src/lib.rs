@@ -1,5 +1,16 @@
 use std::path::PathBuf;
 
+// These optional dependencies are used by the benchmark targets or under the
+// CodSpeed cfg. Keep them visible to Cargo's unused-dependency check.
+#[cfg(feature = "codspeed-criterion-compat")]
+use codspeed_criterion_compat as _;
+#[cfg(feature = "divan")]
+use divan as _;
+#[cfg(feature = "ruff")]
+use ruff as _;
+#[cfg(feature = "ty_ide")]
+use ty_ide as _;
+
 #[cfg(any(
     feature = "ruff_walltime",
     feature = "ty_instrumented",
