@@ -972,12 +972,30 @@ reveal_type(payload({"value": 1}))  # revealed: Payload
 reveal_type(callback(lambda value: [value]))  # revealed: (value: int) -> list[int]
 ```
 
-As well as propagate through lambda bodies:
+Declared upper bounds are also propagated through lambda bodies, without restricting the range of
+nested gradual types:
 
 ```py
 def _(value: Any):
     f = callback(lambda _: singleton(value))
     reveal_type(f(1))  # revealed: list[Any | int]
+
+    annotated: Callable[[int], list[int]] = lambda _: singleton(value)
+    reveal_type(annotated(1))  # revealed: list[int]
+```
+
+As well as through nested `TypedDict` literals and constructor calls:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+def _(value: Any):
+    payload({"value": reveal_type(identity(value))})  # revealed: Any
+    literal: Payload = {"value": reveal_type(identity(value))}  # revealed: int
+
+    payload(dict(value=reveal_type(identity(value))))  # revealed: Any
+    constructed: Payload = dict(value=reveal_type(identity(value)))  # revealed: int
 ```
 
 ## Upper-bound context without inference evidence

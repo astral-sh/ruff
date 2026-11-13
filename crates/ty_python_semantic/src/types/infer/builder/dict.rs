@@ -56,7 +56,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             if supports_typed_dict_context {
-                self.infer_typed_dict_constructor_keyword_values(typed_dict, arguments);
+                self.infer_typed_dict_constructor_keyword_values(
+                    typed_dict,
+                    arguments,
+                    call_expression_tcx,
+                );
                 validate_typed_dict_constructor(
                     &self.context,
                     typed_dict,
