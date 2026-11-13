@@ -994,7 +994,9 @@ def invalid(forwarded: ForwardedDefault[int]): ...  # error: [not-subscriptable]
 
 ## Class equality with a constrained type variable
 
-The metaclass of one constraint can make its class compare equal to another constraint.
+The metaclass of one constraint can make its class compare equal to another constraint. We don't
+model the specific behavior of `EqualMeta.__eq__`. At runtime, both `int` and `Custom` satisfy
+`cls == int`, so narrowing `cls` to the class `int` would be unsound.
 
 ```py
 from typing import TypeVar
