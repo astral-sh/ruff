@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::type_inference::ResolvedPythonType;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -41,7 +42,7 @@ use crate::{FixAvailability, Violation};
 /// ]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Correctness)]
 pub(crate) struct CallNonCallable {
     python_type: String,
 }
