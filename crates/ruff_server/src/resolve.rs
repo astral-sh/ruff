@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::path::Path;
 
 use ruff_linter::settings::LinterSettings;
@@ -5,6 +6,19 @@ use ruff_workspace::resolver::{match_any_exclusion, match_any_inclusion};
 use ruff_workspace::{FileResolverSettings, FormatterSettings};
 
 use crate::edit::LanguageId;
+
+/// An editor can retain the original URI after a case-only rename. Return the on-disk
+/// filename if its spelling differs from the editor's.
+pub(crate) fn case_preserved_name(path: &Path) -> Option<OsString> {
+    // A symlink's own name is its module name. Canonicalizing it would give us the target's name.
+    if !path.symlink_metadata().ok()?.is_file() {
+        return None;
+    }
+
+    let canonical = path.canonicalize().ok()?;
+    let name = canonical.file_name()?;
+    (name != path.file_name()?).then(|| name.to_owned())
+}
 
 /// Return `true` if the document at the given [`Path`] should be excluded from linting.
 pub(crate) fn is_document_excluded_for_linting(

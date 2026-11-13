@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use crate::{
     PositionEncoding,
     edit::{Replacement, ToRangeExt},
-    resolve::is_document_excluded_for_linting,
+    resolve::{case_preserved_name, is_document_excluded_for_linting},
     session::DocumentQuery,
 };
 use ruff_linter::package::PackageRoot;
@@ -29,7 +29,7 @@ pub(crate) fn fix_all(
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
     let settings = query.settings();
-    let document_path = query.virtual_file_path();
+    let mut document_path = query.virtual_file_path();
 
     // If the document is excluded, return an empty list of fixes.
     if is_document_excluded_for_linting(
@@ -51,6 +51,9 @@ pub(crate) fn fix_all(
     let source_kind = query.make_python_source_kind(source_type);
 
     let file_path = query.file_path();
+    if let Some(name) = file_path.as_deref().and_then(case_preserved_name) {
+        document_path.to_mut().set_file_name(name);
+    }
     let package = if let Some(file_path) = &file_path {
         detect_package_root(
             file_path
