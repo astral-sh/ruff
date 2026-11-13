@@ -84,3 +84,88 @@ help: Replace with `a`
 20 + if 1 + (bool(a)):  # SIM208
 21 |     pass
    |
+
+SIM208 [*] Use `x in y` instead of `not (not x in y)`
+  --> SIM208.py:23:7
+   |
+21 |     pass
+22 |
+23 | print(not not x in y)  # SIM208
+   |       ^^^^^^^^^^^^^^
+24 | print(not not x not in y)  # SIM208
+25 | print(not not x is y)  # SIM208
+   |
+help: Replace with `x in y`
+   |
+22 |
+   - print(not not x in y)  # SIM208
+23 + print(x in y)  # SIM208
+24 | print(not not x not in y)  # SIM208
+   |
+
+SIM208 [*] Use `x not in y` instead of `not (not x not in y)`
+  --> SIM208.py:24:7
+   |
+23 | print(not not x in y)  # SIM208
+24 | print(not not x not in y)  # SIM208
+   |       ^^^^^^^^^^^^^^^^^^
+25 | print(not not x is y)  # SIM208
+26 | print(not not x is not y)  # SIM208
+   |
+help: Replace with `x not in y`
+   |
+23 | print(not not x in y)  # SIM208
+   - print(not not x not in y)  # SIM208
+24 + print(x not in y)  # SIM208
+25 | print(not not x is y)  # SIM208
+   |
+
+SIM208 [*] Use `x is y` instead of `not (not x is y)`
+  --> SIM208.py:25:7
+   |
+23 | print(not not x in y)  # SIM208
+24 | print(not not x not in y)  # SIM208
+25 | print(not not x is y)  # SIM208
+   |       ^^^^^^^^^^^^^^
+26 | print(not not x is not y)  # SIM208
+27 | print(not not bool(x))  # SIM208
+   |
+help: Replace with `x is y`
+   |
+24 | print(not not x not in y)  # SIM208
+   - print(not not x is y)  # SIM208
+25 + print(x is y)  # SIM208
+26 | print(not not x is not y)  # SIM208
+   |
+
+SIM208 [*] Use `x is not y` instead of `not (not x is not y)`
+  --> SIM208.py:26:7
+   |
+24 | print(not not x not in y)  # SIM208
+25 | print(not not x is y)  # SIM208
+26 | print(not not x is not y)  # SIM208
+   |       ^^^^^^^^^^^^^^^^^^
+27 | print(not not bool(x))  # SIM208
+   |
+help: Replace with `x is not y`
+   |
+25 | print(not not x is y)  # SIM208
+   - print(not not x is not y)  # SIM208
+26 + print(x is not y)  # SIM208
+27 | print(not not bool(x))  # SIM208
+   |
+
+SIM208 [*] Use `bool(x)` instead of `not (not bool(x))`
+  --> SIM208.py:27:7
+   |
+25 | print(not not x is y)  # SIM208
+26 | print(not not x is not y)  # SIM208
+27 | print(not not bool(x))  # SIM208
+   |       ^^^^^^^^^^^^^^^
+help: Replace with `bool(x)`
+   |
+26 | print(not not x is not y)  # SIM208
+   - print(not not bool(x))  # SIM208
+27 + print(bool(x))  # SIM208
+28 |
+   |

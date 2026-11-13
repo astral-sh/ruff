@@ -262,7 +262,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
         },
         expr.range(),
     );
-    if checker.semantic().in_boolean_test() {
+    if checker.semantic().in_boolean_test() || is_boolean(operand.as_ref(), checker.semantic()) {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.locator().slice(operand.as_ref()).to_string(),
             expr.range(),
@@ -289,5 +289,17 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
             checker.generator().expr(&node1.into()),
             expr.range(),
         )));
+    }
+}
+
+/// Returns `true` if `expr` is known to evaluate to a `bool`.
+fn is_boolean(expr: &Expr, semantic: &ruff_python_semantic::SemanticModel) -> bool {
+    match expr {
+        Expr::BooleanLiteral(_) | Expr::Compare(_) => true,
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: UnaryOp::Not, ..
+        }) => true,
+        Expr::Call(ast::ExprCall { func, .. }) => semantic.match_builtin_expr(func, "bool"),
+        _ => false,
     }
 }
