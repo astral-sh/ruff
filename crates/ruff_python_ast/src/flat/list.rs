@@ -158,6 +158,208 @@ impl ListItem for CmpOp {
     }
 }
 
+/// The two kinds of children that can occupy a position in a call's argument list.
+#[derive(Clone, Copy, Debug)]
+pub enum ArgumentId {
+    Positional(BuildId<crate::kind::Expr>),
+    Keyword(BuildId<crate::kind::Keyword>),
+}
+
+impl From<ListId<AstNodeId<crate::kind::Expr>>> for ListId<ArgumentId> {
+    fn from(positional: ListId<AstNodeId<crate::kind::Expr>>) -> Self {
+        Self::new(positional.range)
+    }
+}
+
+impl ListItem for ArgumentId {
+    type Element = Self;
+
+    fn word(self) -> u32 {
+        match self {
+            Self::Positional(expr) => expr.slot,
+            Self::Keyword(keyword) => keyword.slot,
+        }
+    }
+}
+
+impl Element for ArgumentId {
+    type Item<'a> = super::ArgOrKeyword<'a>;
+
+    fn read(ast: &Ast, word: u32) -> Self::Item<'_> {
+        let node: super::SyntaxNode<'_> = ast.child(u64::from(word));
+        if let Some(keyword) = node.cast::<crate::Keyword>() {
+            super::ArgOrKeyword::Keyword(keyword)
+        } else {
+            super::ArgOrKeyword::Arg(node.retype())
+        }
+    }
+}
+
+/// The node handles that can occupy a position in a class pattern's argument list.
+pub type PatternArgumentId =
+    crate::PatternOrKeyword<BuildId<crate::kind::Pattern>, BuildId<crate::kind::PatternKeyword>>;
+
+impl ListItem for PatternArgumentId {
+    type Element = Self;
+
+    fn word(self) -> u32 {
+        match self {
+            Self::Pattern(pattern) => pattern.slot,
+            Self::Keyword(keyword) => keyword.slot,
+        }
+    }
+}
+
+impl Element for PatternArgumentId {
+    type Item<'a> = crate::PatternOrKeyword<crate::Pattern<'a>, crate::PatternKeyword<'a>>;
+
+    fn read(ast: &Ast, word: u32) -> Self::Item<'_> {
+        let node: super::SyntaxNode<'_> = ast.child(u64::from(word));
+        if let Some(keyword) = node.cast::<crate::PatternKeyword>() {
+            crate::PatternOrKeyword::Keyword(keyword)
+        } else {
+            crate::PatternOrKeyword::Pattern(node.retype())
+        }
+    }
+}
+
+/// The children of one type in a heterogeneous, source-ordered AST list.
+pub struct FilteredNodes<'a, T> {
+    ast: &'a Ast,
+    words: &'a [u32],
+    marker: PhantomData<fn() -> T>,
+}
+
+impl<'a, T: NodeType> std::fmt::Debug for FilteredNodes<'a, T>
+where
+    T::Borrowed<'a>: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(*self).finish()
+    }
+}
+
+impl<T> Copy for FilteredNodes<'_, T> {}
+impl<T> Clone for FilteredNodes<'_, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, T: NodeType> FilteredNodes<'a, T> {
+    pub(super) fn new<E: Element>(items: List<'a, E>) -> Self {
+        Self {
+            ast: items.ast,
+            words: items.words(),
+            marker: PhantomData,
+        }
+    }
+
+    pub fn iter(self) -> FilteredNodeIter<'a, T> {
+        FilteredNodeIter(self)
+    }
+    pub fn is_empty(self) -> bool {
+        self.first().is_none()
+    }
+    pub fn len(self) -> usize {
+        self.iter().count()
+    }
+    pub fn get(self, index: usize) -> Option<T::Borrowed<'a>> {
+        self.iter().nth(index)
+    }
+
+    #[track_caller]
+    pub fn at(self, index: usize) -> T::Borrowed<'a> {
+        self.get(index).expect("AST child index out of bounds")
+    }
+
+    pub fn split_first(self) -> Option<(T::Borrowed<'a>, Self)> {
+        let mut iter = self.iter();
+        Some((iter.next()?, iter.0))
+    }
+
+    #[must_use]
+    pub fn skip_front(self, n: usize) -> Self {
+        let mut iter = self.iter();
+        if n > 0 {
+            iter.nth(n - 1);
+        }
+        iter.0
+    }
+
+    pub fn first(self) -> Option<T::Borrowed<'a>> {
+        self.iter().next()
+    }
+    pub fn last(self) -> Option<T::Borrowed<'a>> {
+        self.iter().next_back()
+    }
+
+    pub fn as_array<const N: usize>(self) -> Option<[T::Borrowed<'a>; N]> {
+        itertools::Itertools::collect_array(self.iter())
+    }
+}
+
+impl<'a, T: NodeType> IntoIterator for FilteredNodes<'a, T> {
+    type Item = T::Borrowed<'a>;
+    type IntoIter = FilteredNodeIter<'a, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+pub struct FilteredNodeIter<'a, T>(FilteredNodes<'a, T>);
+
+impl<T> Clone for FilteredNodeIter<'_, T> {
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
+
+impl<'a, T: NodeType> Iterator for FilteredNodeIter<'a, T> {
+    type Item = T::Borrowed<'a>;
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.0.words.len()))
+    }
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(word) = self.0.words.split_off_first() {
+            let node: super::SyntaxNode<'_> = self.0.ast.child(u64::from(*word));
+            if let Some(node) = node.cast::<T::Borrowed<'a>>() {
+                return Some(node);
+            }
+        }
+        None
+    }
+}
+
+impl<'a, T: NodeType> From<NodeList<'a, T>> for FilteredNodes<'a, T> {
+    fn from(nodes: NodeList<'a, T>) -> Self {
+        Self::new(nodes)
+    }
+}
+
+impl<'a, T: NodeType> DoubleEndedIterator for FilteredNodeIter<'a, T> {
+    fn next_back(&mut self) -> Option<T::Borrowed<'a>> {
+        while let Some(word) = self.0.words.split_off_last() {
+            let node: super::SyntaxNode<'_> = self.0.ast.child(u64::from(*word));
+            if let Some(node) = node.cast::<T::Borrowed<'a>>() {
+                return Some(node);
+            }
+        }
+        None
+    }
+}
+
+impl<T: NodeType> std::iter::FusedIterator for FilteredNodeIter<'_, T> {}
+
+impl<'a, T: NodeType> Default for FilteredNodes<'a, T> {
+    fn default() -> Self {
+        Self::new(NodeList::<'a, T>::default())
+    }
+}
+
 pub enum FStringPartId {
     Literal(BuildId<crate::kind::StringLiteral>),
     FString(BuildId<crate::kind::FString>),
@@ -187,6 +389,134 @@ impl Element for CmpOp {
 
     fn read(_: &Ast, word: u32) -> Self {
         super::scalar::Word::decode(u64::from(word))
+    }
+}
+
+pub type ParameterItemId = crate::ParameterItem<
+    BuildId<crate::kind::ParameterWithDefault>,
+    BuildId<crate::kind::Parameter>,
+>;
+type ParameterItemView<'a> =
+    crate::ParameterItem<crate::ParameterWithDefault<'a>, crate::Parameter<'a>>;
+
+/// The first half of the interval holds child IDs, so generic source-order traversal
+/// can borrow a contiguous slice. Each matching word in the second half holds its role.
+#[derive(Clone, Copy)]
+pub struct ParameterItems<'a>(pub(super) NodeList<'a, crate::kind::Any>);
+
+impl PartialEq for ParameterItems<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.roles() == other.roles() && self.0 == other.0
+    }
+}
+
+impl<'a> ParameterItems<'a> {
+    pub(super) const POSITIONAL_ONLY: u32 = 0;
+    pub(super) const POSITIONAL_OR_KEYWORD: u32 = 1;
+    pub(super) const VARARG: u32 = 2;
+    pub(super) const KEYWORD_ONLY: u32 = 3;
+    pub(super) const KWARG: u32 = 4;
+
+    fn roles(self) -> &'a [u32] {
+        let start = self.0.range.indices().end;
+        &self.0.ast.extra[start..start + self.len()]
+    }
+
+    /// Check the role before looking up the child row.
+    pub(super) fn matching<N: AstNode<'a>>(
+        self,
+        accepts: impl Fn(u32) -> bool + Clone,
+    ) -> impl DoubleEndedIterator<Item = N> + Clone {
+        self.0
+            .words()
+            .iter()
+            .zip(self.roles())
+            .filter(move |(_, role)| accepts(**role))
+            .map(move |(&id, _)| self.0.ast.child(u64::from(id)))
+    }
+
+    pub fn iter(
+        self,
+    ) -> impl DoubleEndedIterator<Item = ParameterItemView<'a>>
+    + ExactSizeIterator
+    + std::iter::FusedIterator
+    + Clone {
+        self.0
+            .iter()
+            .zip(self.roles())
+            .map(|(child, &role)| match role {
+                Self::POSITIONAL_ONLY => crate::ParameterItem::PositionalOnly(child.retype()),
+                Self::POSITIONAL_OR_KEYWORD => {
+                    crate::ParameterItem::PositionalOrKeyword(child.retype())
+                }
+                Self::VARARG => crate::ParameterItem::Vararg(child.retype()),
+                Self::KEYWORD_ONLY => crate::ParameterItem::KeywordOnly(child.retype()),
+                Self::KWARG => crate::ParameterItem::Kwarg(child.retype()),
+                _ => unreachable!("invalid parameter role"),
+            })
+    }
+
+    pub fn len(self) -> usize {
+        self.0.len()
+    }
+    pub fn is_empty(self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub(super) fn copy_to<R: super::Rewriter + ?Sized>(
+        self,
+        builder: &mut Builder,
+        rewriter: &mut R,
+    ) -> ParameterItemsId {
+        let children =
+            builder.map_list(self.0, |builder, child| builder.copy_with(child, rewriter));
+        builder.ast.extra.extend_from_slice(self.roles());
+        ParameterItemsId(children)
+    }
+}
+
+impl std::fmt::Debug for ParameterItems<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ParameterItemsId(ListId<AstNodeId<crate::kind::Any>>);
+impl ParameterItemsId {
+    pub(super) fn word(self) -> u64 {
+        self.0.word()
+    }
+}
+
+impl ParameterItemId {
+    fn words(self) -> (u32, u32) {
+        match self {
+            Self::PositionalOnly(p) => (p.slot, ParameterItems::POSITIONAL_ONLY),
+            Self::PositionalOrKeyword(p) => (p.slot, ParameterItems::POSITIONAL_OR_KEYWORD),
+            Self::Vararg(p) => (p.slot, ParameterItems::VARARG),
+            Self::KeywordOnly(p) => (p.slot, ParameterItems::KEYWORD_ONLY),
+            Self::Kwarg(p) => (p.slot, ParameterItems::KWARG),
+        }
+    }
+}
+
+impl Builder {
+    pub fn parameter_items(
+        &mut self,
+        items: impl IntoIterator<Item = ParameterItemId>,
+    ) -> ParameterItemsId {
+        let start = self.ast.extra.len();
+        let scratch = self.scratch.len();
+        for item in items {
+            let (id, role) = item.words();
+            self.ast.extra.push(id);
+            self.scratch.push(role);
+        }
+        let len = self.ast.extra.len() - start;
+        self.ast.extra.extend_from_slice(&self.scratch[scratch..]);
+        self.scratch.truncate(scratch);
+        ParameterItemsId(ListId::new(Interval::new(start, len)))
     }
 }
 

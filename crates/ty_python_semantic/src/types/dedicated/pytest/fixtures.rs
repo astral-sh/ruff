@@ -555,7 +555,7 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
             parameter.keyword_name().is_some()
                 // ty applies PEP 484's legacy positional-only convention to leading `__name`
                 // parameters, but Python and pytest still inspect them as positional-or-keyword.
-                || (self.function.parameters().posonlyargs().is_empty()
+                || (self.function.parameters().posonlyargs().next().is_none()
                     && parameter.is_positional_only())
         };
         let skips_receiver = self.function_type.has_implicit_receiver(db)

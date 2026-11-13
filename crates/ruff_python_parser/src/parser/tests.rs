@@ -2,10 +2,7 @@ use ruff_python_ast::AstNode as _;
 use ruff_python_ast::{self as ast, IpyEscapeKind, Number};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{
-    Mode, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_module,
-    parse_unchecked,
-};
+use crate::{Mode, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_module};
 
 #[test]
 fn test_modes() {

@@ -125,7 +125,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         return;
     }
 
-    for parameter in parameters.posonlyargs().iter().chain(parameters.args()) {
+    for parameter in parameters.iter_positional_params() {
         let Some(annotation) = parameter.annotation() else {
             continue;
         };

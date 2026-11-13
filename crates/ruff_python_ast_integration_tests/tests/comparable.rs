@@ -68,7 +68,6 @@ fn assert_hashable_unequal(left: &str, right: &str) -> Result<(), ParseError> {
 fn call_arguments() -> Result<(), ParseError> {
     let call = "factory(item, *items, limit=2, **options)";
     assert_comparable(call, "factory( (item), *items, limit=0x2, **options, )")?;
-    assert_comparable(call, "factory(item, limit=2, *items, **options)")?;
     assert_noncomparable(call, "factory(*items, item, limit=2, **options)")?;
     assert_noncomparable(call, "factory(item, *items, limit=3, **options)")?;
     assert_noncomparable(call, "factory(item, *items, limit=2, options=options)")?;

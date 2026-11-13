@@ -1,5 +1,6 @@
 use ruff_python_ast::{
-    AstNode, Expr, ExprCallFields, ExprContext, ExprKind, NodeKind, NodeList, Operator,
+    ArgOrKeyword, AstNode, Expr, ExprCallFields, ExprContext, ExprKind, NodeKind, NodeList,
+    Operator,
 };
 use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
@@ -518,7 +519,6 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             call_with_qualified_name(checker, &call_fields);
             let func = call_fields.func;
             let arguments = call_fields.arguments;
-            let args = arguments.args();
             let keywords = arguments.keywords();
             if checker.any_rule_enabled(&[
                 // pylint
@@ -585,7 +585,6 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                                             checker,
                                             &call_fields,
                                             &summary,
-                                            keywords,
                                         );
                                     }
                                     if checker.is_rule_enabled(
@@ -595,7 +594,6 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                                             checker,
                                             &call_fields,
                                             &summary,
-                                            args,
                                         );
                                     }
                                     if checker
@@ -605,8 +603,6 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                                             checker,
                                             &call_fields,
                                             &summary,
-                                            args,
-                                            keywords,
                                         );
                                     }
                                     if checker.is_rule_enabled(Rule::StringDotFormatMixingAutomatic)
@@ -655,7 +651,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 refurb::rules::bit_count(checker, &call_fields);
             }
             if checker.is_rule_enabled(Rule::TypeOfPrimitive) {
-                pyupgrade::rules::type_of_primitive(checker, &expr, func, args);
+                pyupgrade::rules::type_of_primitive(checker, &expr, func, arguments);
             }
             if checker.is_rule_enabled(Rule::DeprecatedUnittestAlias) {
                 pyupgrade::rules::deprecated_unittest_alias(checker, func);
@@ -681,7 +677,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::NonPEP604Isinstance) {
                 if checker.target_version() >= PythonVersion::PY310 {
-                    pyupgrade::rules::use_pep604_isinstance(checker, &expr, func, args);
+                    pyupgrade::rules::use_pep604_isinstance(checker, &expr, func, arguments);
                 }
             }
             if checker.is_rule_enabled(Rule::BlockingHttpCallInAsyncFunction) {
@@ -741,28 +737,24 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 flake8_bandit::rules::suspicious_function_call(checker, &call_fields);
             }
             if checker.is_rule_enabled(Rule::UnreliableCallableCheck) {
-                flake8_bugbear::rules::unreliable_callable_check(
-                    checker, &expr, func, args, keywords,
-                );
+                flake8_bugbear::rules::unreliable_callable_check(checker, &expr, func, arguments);
             }
             if checker.is_rule_enabled(Rule::StripWithMultiCharacters) {
-                flake8_bugbear::rules::strip_with_multi_characters(checker, &expr, func, args);
+                flake8_bugbear::rules::strip_with_multi_characters(checker, &expr, func, arguments);
             }
             if keywords.is_empty() {
                 if checker.is_rule_enabled(Rule::GetAttrWithConstant) {
-                    flake8_bugbear::rules::getattr_with_constant(checker, &expr, func, args);
+                    flake8_bugbear::rules::getattr_with_constant(checker, &expr, func, arguments);
                 }
                 if checker.is_rule_enabled(Rule::DelAttrWithConstant) {
-                    flake8_bugbear::rules::delattr_with_constant(checker, &expr, func, args);
+                    flake8_bugbear::rules::delattr_with_constant(checker, &expr, func, arguments);
                 }
                 if checker.is_rule_enabled(Rule::SetAttrWithConstant) {
-                    flake8_bugbear::rules::setattr_with_constant(checker, &expr, func, args);
+                    flake8_bugbear::rules::setattr_with_constant(checker, &expr, func, arguments);
                 }
             }
             if checker.is_rule_enabled(Rule::StarArgUnpackingAfterKeywordArg) {
-                flake8_bugbear::rules::star_arg_unpacking_after_keyword_arg(
-                    checker, args, keywords,
-                );
+                flake8_bugbear::rules::star_arg_unpacking_after_keyword_arg(checker, arguments);
             }
             if checker.is_rule_enabled(Rule::ZipWithoutExplicitStrict) {
                 if checker.target_version() >= PythonVersion::PY310 {
@@ -787,7 +779,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 flake8_bandit::rules::exec_used(checker, func);
             }
             if checker.is_rule_enabled(Rule::HardcodedPasswordFuncArg) {
-                flake8_bandit::rules::hardcoded_password_func_arg(checker, keywords);
+                flake8_bandit::rules::hardcoded_password_func_arg(checker, arguments);
             }
             if checker.is_rule_enabled(Rule::HardcodedSQLExpression) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, &expr);
@@ -839,10 +831,8 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 Rule::UnnecessaryLiteralSet,
                 Rule::UnnecessaryLiteralDict,
                 Rule::UnnecessaryLiteralWithinTupleCall,
-            ]) && args.len() == 1
-                && keywords.is_empty()
+            ]) && let Some([ArgOrKeyword::Arg(argument)]) = arguments.items().as_array()
                 && let Some(name) = func.as_name_expr()
-                && let Some(argument) = args.first()
             {
                 match (name.id().as_str(), argument.node_kind()) {
                     ("list", NodeKind::ExprGenerator)
@@ -936,12 +926,12 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryCallAroundSorted) {
                 flake8_comprehensions::rules::unnecessary_call_around_sorted(
-                    checker, &expr, func, args,
+                    checker, &expr, func, arguments,
                 );
             }
             if checker.is_rule_enabled(Rule::UnnecessaryDoubleCastOrProcess) {
                 flake8_comprehensions::rules::unnecessary_double_cast_or_process(
-                    checker, &expr, func, args, keywords,
+                    checker, &expr, func, arguments, keywords,
                 );
             }
             if checker.is_rule_enabled(Rule::UnnecessarySubscriptReversal) {
@@ -952,7 +942,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryComprehensionInCall) {
                 flake8_comprehensions::rules::unnecessary_comprehension_in_call(
-                    checker, &expr, func, args, keywords,
+                    checker, &expr, func, arguments,
                 );
             }
             if checker.is_rule_enabled(Rule::BooleanPositionalValueInCall) {
@@ -981,7 +971,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 pylint::rules::shallow_copy_environ(checker, &call_fields);
             }
             if checker.is_rule_enabled(Rule::NestedMinMax) {
-                pylint::rules::nested_min_max(checker, &expr, func, args, keywords);
+                pylint::rules::nested_min_max(checker, &expr, func, arguments);
             }
             if checker.is_rule_enabled(Rule::RepeatedKeywordArgument) {
                 pylint::rules::repeated_keyword_argument(checker, &call_fields);
@@ -993,9 +983,7 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 ruff::rules::shared_clock_mock(checker, &call_fields);
             }
             if checker.is_rule_enabled(Rule::PytestUnittestAssertion) {
-                flake8_pytest_style::rules::unittest_assertion(
-                    checker, &expr, func, args, keywords,
-                );
+                flake8_pytest_style::rules::unittest_assertion(checker, &expr, func, arguments);
             }
             if checker.is_rule_enabled(Rule::PytestUnittestRaisesAssertion) {
                 flake8_pytest_style::rules::unittest_raises_assertion_call(checker, &call_fields);
@@ -1024,13 +1012,13 @@ pub(crate) fn expression(kind: ExprKind<'_>, checker: &Checker) {
                 &checker.settings().flake8_gettext.function_names,
             ) {
                 if checker.is_rule_enabled(Rule::FStringInGetTextFuncCall) {
-                    flake8_gettext::rules::f_string_in_gettext_func_call(checker, func, args);
+                    flake8_gettext::rules::f_string_in_gettext_func_call(checker, func, arguments);
                 }
                 if checker.is_rule_enabled(Rule::FormatInGetTextFuncCall) {
-                    flake8_gettext::rules::format_in_gettext_func_call(checker, func, args);
+                    flake8_gettext::rules::format_in_gettext_func_call(checker, func, arguments);
                 }
                 if checker.is_rule_enabled(Rule::PrintfInGetTextFuncCall) {
-                    flake8_gettext::rules::printf_in_gettext_func_call(checker, func, args);
+                    flake8_gettext::rules::printf_in_gettext_func_call(checker, func, arguments);
                 }
             }
             if checker.is_rule_enabled(Rule::UncapitalizedEnvironmentVariables) {

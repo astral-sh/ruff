@@ -283,32 +283,32 @@ fn generate_with_statement(
         .arguments()
         .find_argument_value(func_arg_name, func_arg_position)?;
 
-    let (func_args, func_keywords): (Vec<_>, Vec<_>) = legacy_call
-        .arguments()
-        .iter_source_order()
-        .skip(if expected.is_some() { 2 } else { 1 })
-        .partition_map(|arg_or_keyword| match arg_or_keyword {
-            ArgOrKeyword::Arg(expr) => Either::Left(builder.copy_node(expr)),
-            ArgOrKeyword::Keyword(keyword) => Either::Right(builder.copy_node(keyword)),
-        });
+    let func_items = builder.map_list(
+        legacy_call
+            .arguments()
+            .iter_source_order()
+            .skip(if expected.is_some() { 2 } else { 1 }),
+        |builder, item| match item {
+            ArgOrKeyword::Arg(expr) => ast::ArgumentId::Positional(builder.copy_node(expr)),
+            ArgOrKeyword::Keyword(keyword) => ast::ArgumentId::Keyword(builder.copy_node(keyword)),
+        },
+    );
 
     let context_func = builder.copy_node(legacy_call.func());
-    let args = builder.copy_nodes(expected);
-    let keywords = builder.map_list(match_arg, |builder, expr| {
+    let exception = expected.map(|expr| ast::ArgumentId::Positional(builder.copy_node(expr)));
+    let pattern = match_arg.map(|expr| {
         let arg = syntax::identifier(builder, "match");
         let value = builder.copy_node(expr);
-        // The generator orders arguments by range. Keep `match` after the exception.
-        builder.add(build::Keyword {
+        ast::ArgumentId::Keyword(builder.add(build::Keyword {
             range: expr.range(),
             arg: Some(arg),
             value,
-        })
+        }))
     });
-    let context_expr = syntax::call_with_keywords(builder, context_func, args, keywords);
+    let items = builder.list(exception.into_iter().chain(pattern));
+    let context_expr = syntax::call(builder, context_func, items);
     let func = builder.copy_node(func);
-    let args = builder.list(func_args);
-    let keywords = builder.list(func_keywords);
-    let call = syntax::call_with_keywords(builder, func, args, keywords);
+    let call = syntax::call(builder, func, func_items);
     let statement = if let Some(targets) = assign_targets {
         let targets = builder.copy_nodes(targets);
         builder

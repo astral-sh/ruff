@@ -632,11 +632,11 @@ impl<'db> OverloadLiteral<'db> {
         ) -> bool {
             let parameters = node.parameters();
 
-            if !parameters.posonlyargs().is_empty() {
+            if parameters.posonlyargs().next().is_some() {
                 return false;
             }
 
-            let Some(first_param) = parameters.args().first() else {
+            let Some(first_param) = parameters.args().next() else {
                 return false;
             };
 
@@ -656,7 +656,7 @@ impl<'db> OverloadLiteral<'db> {
             // PEP-484 convention.
             if parameters
                 .args()
-                .get(1)
+                .nth(1)
                 .is_some_and(ast::ParameterWithDefault::uses_pep_484_positional_only_convention)
             {
                 return true;

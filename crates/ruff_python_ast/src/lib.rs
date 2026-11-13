@@ -3,14 +3,15 @@ use std::path::Path;
 
 pub use flat::fields::*;
 pub use flat::{
-    AnyNode, AnyParameter, ArgOrKeyword, ArgumentsSourceOrder, Ast, AstNode, AstNodeId, BuildId,
-    Builder, BytesValue, Checkpoint, Children, Descendants, Emit, EmittedNode, ExceptHandlerKind,
-    ExprKind, FStringPartId, FStringPartView, FStringValue, InterpolatedStringElementKind,
-    InterpolatedStringElements, List, ListId, ListItem, ListIter, LiteralExpression, LiteralWriter,
-    MappingPatternItemId, MappingPatternItems, MappingPatternItemsId, ModKind, NameId, NodeList,
-    NodeType, PatternKind, Rewriter, StmtKind, StringLike, StringLikeKind, StringLikePart,
-    StringLikePartKind, StringValue, Suite, SyntaxNode, TStringValue, Tree, TypeParamKind, build,
-    find_node, statement_visitor, traversal, visitor,
+    AnyNode, AnyParameter, ArgOrKeyword, ArgumentId, ArgumentsSourceOrder, Ast, AstNode, AstNodeId,
+    BuildId, Builder, BytesValue, Checkpoint, Children, Descendants, Emit, EmittedNode,
+    ExceptHandlerKind, ExprKind, FStringPartId, FStringPartView, FStringValue, FilteredNodes,
+    InterpolatedStringElementKind, InterpolatedStringElements, List, ListId, ListItem, ListIter,
+    LiteralExpression, LiteralWriter, MappingPatternItemId, MappingPatternItems,
+    MappingPatternItemsId, ModKind, NameId, NodeList, NodeType, ParameterItemId, ParameterItems,
+    ParameterItemsId, PatternArgumentId, PatternKind, Rewriter, StmtKind, StringLike,
+    StringLikeKind, StringLikePart, StringLikePartKind, StringValue, Suite, SyntaxNode,
+    TStringValue, Tree, TypeParamKind, build, find_node, statement_visitor, traversal, visitor,
 };
 pub use generated::*;
 pub use int::*;

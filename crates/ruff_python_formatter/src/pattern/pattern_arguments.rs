@@ -17,7 +17,7 @@ impl FormatNodeRule<ruff_python_ast::kind::PatternArguments> for FormatPatternAr
         //     # dangling
         // )
         // ```
-        if item.patterns().is_empty() && item.keywords().is_empty() {
+        if item.items().is_empty() {
             let comments = f.context().comments().clone();
             let dangling = comments.dangling(item);
             return write!(f, [empty_parenthesized("(", dangling, ")")]);
@@ -26,8 +26,8 @@ impl FormatNodeRule<ruff_python_ast::kind::PatternArguments> for FormatPatternAr
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
             let mut joiner = f.join_comma_separated(item.end());
-            match item.patterns().as_array() {
-                Some([pattern]) if item.keywords().is_empty() => {
+            match item.items().as_array() {
+                Some([PatternOrKeyword::Pattern(pattern)]) => {
                     let parentheses =
                         if is_single_argument_parenthesized(pattern, item.end(), source) {
                             Parentheses::Always
@@ -40,15 +40,19 @@ impl FormatNodeRule<ruff_python_ast::kind::PatternArguments> for FormatPatternAr
                     joiner.entry(&pattern, &pattern.format().with_options(parentheses));
                 }
                 _ => {
-                    let patterns = item.patterns();
-                    joiner
-                        .entries(patterns.iter().map(|pattern| {
-                            (
-                                pattern,
-                                pattern.format().with_options(Parentheses::Preserve),
-                            )
-                        }))
-                        .nodes(item.keywords());
+                    for argument in item.items() {
+                        match argument {
+                            PatternOrKeyword::Pattern(pattern) => {
+                                joiner.entry(
+                                    &pattern,
+                                    &pattern.format().with_options(Parentheses::Preserve),
+                                );
+                            }
+                            PatternOrKeyword::Keyword(keyword) => {
+                                joiner.entry(&keyword, &keyword.format());
+                            }
+                        }
+                    }
                 }
             }
 

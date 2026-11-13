@@ -284,16 +284,16 @@ fn match_comprehension_target(
 }
 
 /// Match that the given expression is `func(x, y, z, ...)`.
-fn match_call(element: Expr<'_>) -> Option<(NodeList<'_, ast::kind::Expr>, Expr<'_>)> {
+fn match_call(element: Expr<'_>) -> Option<(ast::FilteredNodes<'_, ast::kind::Expr>, Expr<'_>)> {
     let expr_call = element.as_call_expr()?;
     let func = expr_call.func();
     let arguments = expr_call.arguments();
     let args = arguments.args();
     let keywords = arguments.keywords();
 
-    if arguments.keywords().next().is_some() {
+    if !keywords.is_empty() {
         return None;
     }
 
-    Some((arguments, func))
+    Some((args, func))
 }

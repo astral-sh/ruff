@@ -1,6 +1,6 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprKind, NodeList};
+use ruff_python_ast::Arguments;
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -74,8 +74,9 @@ pub(crate) fn getattr_with_constant(
     checker: &Checker,
     &expr: &Expr<'_>,
     func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    arguments: Arguments<'_>,
 ) {
+    let args = arguments.args();
     let Some([obj, arg]) = args.as_array() else {
         return;
     };

@@ -238,8 +238,8 @@ fn is_method_receiver(
     let Some(first_parameter) = function
         .parameters()
         .posonlyargs()
-        .first()
-        .or_else(|| function.parameters().args().first())
+        .next()
+        .or_else(|| function.parameters().args().next())
     else {
         return false;
     };

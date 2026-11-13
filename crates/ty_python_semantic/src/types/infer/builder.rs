@@ -2869,12 +2869,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 match result {
                     ClassPatternPositionalResult::Limit(limit) => {
-                        if let Some(first_excess_pattern) = positional.nth(limit) {
+                        if let Some(first_excess_pattern) = positional_patterns.get(limit) {
                             report_too_many_positional_patterns_for_class_pattern(
                                 &self.context,
                                 first_excess_pattern,
                                 limit,
-                                limit + 1 + positional.count(),
+                                positional_patterns.len(),
                                 cls_ty.display(db, env),
                             );
                         }
@@ -3763,7 +3763,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ),
                 call_expr,
             );
-        };
+        }
 
         let name_param_ty = self.infer_expression(arguments.args().at(0), TypeContext::default());
 
@@ -3822,7 +3822,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let args = arguments_node.args();
         let keywords = arguments_node.keywords();
 
-        if arguments.args().any(ast::Expr::is_starred_expr) {
+        if args.iter().any(ast::Expr::is_starred_expr) {
             return None;
         }
 
@@ -4060,7 +4060,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             return None;
                         }
                         Some(BoundOrConstraintsNodes::Constraints(
-                            arguments.args().slice(1..),
+                            arguments.args().skip_front(1),
                         ))
                     });
                 self.validate_typevar_default(
@@ -5570,7 +5570,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         let arguments = call_expression.arguments();
-        let Some([decorated_expression]) = arguments.args().slice(..).as_array() else {
+        let Some([decorated_expression]) = arguments.args().as_array() else {
             return return_ty;
         };
         if !arguments.keywords().is_empty() || decorated_expression.is_starred_expr() {
@@ -9009,7 +9009,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let parameters = if let Some(parameters) = parameters {
             let positional_only = parameters
                 .posonlyargs()
-                .iter()
                 .map(|param| {
                     let parameter = Parameter::positional_only(Some(param.name().id().clone()))
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
@@ -9027,7 +9026,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .collect::<Vec<_>>();
             let positional_or_keyword = parameters
                 .args()
-                .iter()
                 .map(|param| {
                     let parameter = Parameter::positional_or_keyword(param.name().id().clone())
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
@@ -9058,7 +9056,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
             let keyword_only = parameters
                 .kwonlyargs()
-                .iter()
                 .map(|param| {
                     Parameter::keyword_only(param.name().id().clone())
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
@@ -10936,7 +10933,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_parameters = current_function.parameters();
 
         // `self`/`cls` can't be a keyword-only parameter.
-        if function_parameters.posonlyargs().is_empty() && function_parameters.args().is_empty() {
+        if function_parameters.posonlyargs().next().is_none()
+            && function_parameters.args().next().is_none()
+        {
             return;
         }
 
@@ -13098,7 +13097,7 @@ fn prefer_collection_literal_peer_context<'db>(
 /// An iterator over arguments to a functional call.
 #[derive(Clone)]
 enum ArgumentsIter<'a> {
-    FromAst(std::slice::Iter<'a, ast::Argument>),
+    FromAst(ArgumentsSourceOrder<'a>),
     Synthesized(std::slice::Iter<'a, ArgOrKeyword<'a>>),
 }
 
@@ -13117,7 +13116,7 @@ impl<'a> Iterator for ArgumentsIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ArgumentsIter::FromAst(args) => args.next().map(ast::Argument::as_ref),
+            ArgumentsIter::FromAst(args) => args.next(),
             ArgumentsIter::Synthesized(args) => args.next().copied(),
         }
     }
@@ -13602,5 +13601,5 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 #[derive(Copy, Clone, Debug)]
 enum BoundOrConstraintsNodes<'ast> {
     Bound(ast::Expr<'ast>),
-    Constraints(NodeList<'ast, ast::kind::Expr>),
+    Constraints(ruff_python_ast::FilteredNodes<'ast, ast::kind::Expr>),
 }

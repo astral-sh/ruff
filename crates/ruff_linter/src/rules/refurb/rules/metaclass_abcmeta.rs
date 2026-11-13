@@ -92,7 +92,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def_fields: &StmtClassD
         return;
     }
 
-    let applicability = if class_def.bases().next().is_some() {
+    let applicability = if !class_def.bases().is_empty() {
         // The class has base arguments (not just a `metaclass` keyword).
         // Applying the fix may change semantics, so it is considered unsafe.
         Applicability::Unsafe

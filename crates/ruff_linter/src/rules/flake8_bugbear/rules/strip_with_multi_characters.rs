@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Expr, ExprKind, NodeList};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
@@ -78,8 +78,9 @@ pub(crate) fn strip_with_multi_characters(
     checker: &Checker,
     &expr: &Expr<'_>,
     func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    arguments: ast::Arguments<'_>,
 ) {
+    let args = arguments.args();
     let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };

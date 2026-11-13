@@ -117,13 +117,11 @@ pub(super) fn validate_paramspec_components<'db>(
                 }
 
                 // Same ParamSpec - check no keyword-only params between them
-                if !parameters.kwonlyargs().is_empty() {
+                if let Some(first_keyword) = parameters.kwonlyargs().next() {
                     let name = args_tv.name(db);
                     let vararg = vararg_name.unwrap_or("args");
                     let kwarg = kwarg_name.unwrap_or("kwargs");
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_PARAMSPEC, parameters.kwonlyargs().at(0))
-                    {
+                    if let Some(builder) = context.report_lint(&INVALID_PARAMSPEC, first_keyword) {
                         builder.into_diagnostic(format_args!(
                             "No parameters may appear between \
                                  `*{vararg}: {name}.args` and `**{kwarg}: {name}.kwargs`",

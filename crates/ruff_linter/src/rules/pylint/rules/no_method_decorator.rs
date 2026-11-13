@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use std::collections::HashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};

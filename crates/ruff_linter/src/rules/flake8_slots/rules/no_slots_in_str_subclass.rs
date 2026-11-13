@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::{self as ast, NodeList, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{SemanticModel, analyze::class::is_enumeration};
 
 use crate::Violation;
@@ -60,15 +60,14 @@ pub(crate) fn no_slots_in_str_subclass(
     if checker.source_type.is_stub() {
         return;
     }
-    let Some(ast::ArgumentsFields { args: bases, .. }) =
-        class.arguments.map(ruff_python_ast::Arguments::fields)
-    else {
+    let Some(arguments) = class.arguments else {
         return;
     };
+    let bases = arguments.args();
 
     let semantic = checker.semantic();
 
-    if !is_str_subclass(arguments, semantic) {
+    if !is_str_subclass(bases, semantic) {
         return;
     }
 
@@ -86,7 +85,7 @@ pub(crate) fn no_slots_in_str_subclass(
 
 /// Return `true` if the class is a subclass of `str`.
 fn is_str_subclass(
-    bases: NodeList<'_, ruff_python_ast::kind::Expr>,
+    bases: ast::FilteredNodes<'_, ruff_python_ast::kind::Expr>,
     semantic: &SemanticModel,
 ) -> bool {
     bases

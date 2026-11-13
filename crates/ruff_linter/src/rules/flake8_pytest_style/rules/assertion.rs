@@ -301,9 +301,10 @@ pub(crate) fn unittest_assertion(
     checker: &Checker,
     &expr: &Expr<'_>,
     func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
-    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
+    arguments: ast::Arguments<'_>,
 ) {
+    let args = arguments.args();
+    let keywords = arguments.keywords();
     let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };

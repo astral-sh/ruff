@@ -51,6 +51,7 @@ types_requiring_crate_prefix = {
     "CmpOp",
     "Comprehension",
     "MappingPatternItems",
+    "ParameterItems",
     "UnaryOp",
     "BoolOp",
     "Operator",
@@ -242,13 +243,13 @@ def field_codec(field: Field, nodes: set[str]) -> WireField:
     ) -> WireField:
         return WireField(name, width, result, build_type or result, encode, read)
 
-    if inner == "MappingPatternItems":
+    if inner in {"MappingPatternItems", "ParameterItems"}:
         return codec(
             8,
-            "crate::flat::MappingPatternItems<'a>",
+            f"crate::flat::{inner}<'a>",
             f"{value}.word()",
-            "super::MappingPatternItems(List::new(self.syntax.ast, word))",
-            build_type="super::super::MappingPatternItemsId",
+            f"super::{inner}(List::new(self.syntax.ast, word))",
+            build_type=f"super::super::{inner}Id",
         )
     if field.is_list or inner in PARTS:
         item = PARTS.get(inner, inner)
@@ -448,7 +449,17 @@ def child_fields(node: Node, nodes: set[str]) -> list[Field]:
     return [
         field
         for field in source_order_fields(node)
-        if (field.ty in nodes or field.ty in PARTS or field.ty == "MappingPatternItems")
+        if (
+            field.ty in nodes
+            or field.ty in PARTS
+            or field.ty
+            in {
+                "ArgumentId",
+                "MappingPatternItems",
+                "ParameterItems",
+                "PatternArgumentId",
+            }
+        )
     ]
 
 
@@ -469,7 +480,17 @@ def child_sources(
                     f"{view}.format_spec().map_or(&[][..], |spec| spec.elements().words())",
                 )
             )
-        elif field.is_list or field.ty in PARTS or field.ty == "MappingPatternItems":
+        elif (
+            field.is_list
+            or field.ty in PARTS
+            or field.ty
+            in {
+                "ArgumentId",
+                "MappingPatternItems",
+                "ParameterItems",
+                "PatternArgumentId",
+            }
+        ):
             result.append(
                 (
                     "list",
@@ -524,10 +545,6 @@ def simple_children(
 def child_field(
     node: Node, nodes: set[str], words: dict[str, str], schema: list[InlineField]
 ) -> str:
-    if node.name == "Parameters":
-        return "node.retype::<crate::Parameters>().child_fields().into_iter().nth(usize::from(field)).unwrap_or(Field::One(None))"
-    if node.name in {"Arguments", "PatternArguments"}:
-        return "Field::One(None)"
     sources = child_sources(
         node, child_fields(node, nodes), words, f"node.retype::<crate::{node.name}>()"
     )
@@ -540,11 +557,6 @@ def child_field(
 def direct_children(
     node: Node, nodes: set[str], words: dict[str, str], schema: list[InlineField]
 ) -> str:
-    if node.name == "Parameters":
-        return "node.retype::<crate::Parameters>().parameter_children()"
-    if node.name in {"Arguments", "PatternArguments"}:
-        field = "args" if node.name == "Arguments" else "patterns"
-        return f"let group = node.retype::<crate::{node.name}>(); Children::merged(self, group.{field}().words(), group.keywords().words())"
     view = f"node.retype::<crate::{node.name}>()"
     sources = child_sources(node, child_fields(node, nodes), words, view)
     return (
@@ -571,11 +583,6 @@ def inline_child_slice(children: list[Field], schema: list[InlineField]) -> str 
 def next_descendant(
     node: Node, nodes: set[str], words: dict[str, str], _schema: list[InlineField]
 ) -> str:
-    if node.name == "Parameters":
-        return "node.retype::<crate::Parameters>().first_parameter(stack)"
-    if node.name in {"Arguments", "PatternArguments"}:
-        field = "args" if node.name == "Arguments" else "patterns"
-        return f"let group = node.retype::<crate::{node.name}>(); stack.descend_merged(self, group.{field}().words(), group.keywords().words())"
     sources = child_sources(
         node, child_fields(node, nodes), words, f"node.retype::<crate::{node.name}>()"
     )
@@ -627,33 +634,30 @@ def walk_fields(node: Node, nodes: set[str]) -> str:
     """Visit the fields of a projected node in Python source order."""
     if node.name == "Arguments":
         return """
-        if node.keywords().is_empty() {
-            for arg in node.args() { visitor.visit_expr(arg); }
-        } else if node.args().is_empty() {
-            for keyword in node.keywords() { visitor.visit_keyword(keyword); }
-        } else {
-            for argument in node.iter_source_order() {
-                match argument {
-                    super::ArgOrKeyword::Arg(expr) => visitor.visit_expr(expr),
-                    super::ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),
-                }
+        for argument in node.items() {
+            match argument {
+                super::ArgOrKeyword::Arg(expr) => visitor.visit_expr(expr),
+                super::ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),
             }
         }
         """
-    if node.name in {"PatternArguments", "PatternMatchMapping"}:
+    if node.name == "PatternArguments":
+        return """
+        for argument in node.items() {
+            match argument {
+                crate::PatternOrKeyword::Pattern(pattern) => visitor.visit_pattern(pattern),
+                crate::PatternOrKeyword::Keyword(keyword) => visitor.visit_pattern_keyword(keyword),
+            }
+        }
+        """
+    if node.name == "PatternMatchMapping":
         return "for child in node.children() { child.dispatch(visitor); }"
     if node.name == "Parameters":
         return """
-        if node.has_only_regular_args() {
-            for parameter in node.args() {
-                visitor.visit_parameter_with_default(parameter);
-            }
-        } else {
-            for parameter in node.iter_source_order() {
-                match parameter {
-                    super::AnyParameter::NonVariadic(node) => { visitor.visit_parameter_with_default(node); }
-                    super::AnyParameter::Variadic(node) => visitor.visit_parameter(node),
-                }
+        for parameter in node.iter_source_order() {
+            match parameter {
+                super::AnyParameter::NonVariadic(node) => { visitor.visit_parameter_with_default(node); }
+                super::AnyParameter::Variadic(node) => visitor.visit_parameter(node),
             }
         }
         """
@@ -703,12 +707,22 @@ def copy_field(field: Field, nodes: set[str]) -> str:
     """Build a field from a view into a different arena."""
     inner = field.ty
     value = f"node.{field.name}()"
-    if inner == "MappingPatternItems":
+    if inner in {"MappingPatternItems", "ParameterItems"}:
         return f"{value}.copy_to(self, rewriter)"
     if field.is_list or inner in PARTS:
         item = PARTS.get(inner, inner)
         if item in nodes:
             return f"self.map_list({value}, |b, child| b.copy_with(child, rewriter))"
+        if item == "ArgumentId":
+            return f"""self.map_list({value}, |b, item| match item {{
+                super::ArgOrKeyword::Arg(v) => super::ArgumentId::Positional(b.copy_with(v, rewriter)),
+                super::ArgOrKeyword::Keyword(v) => super::ArgumentId::Keyword(b.copy_with(v, rewriter)),
+            }})"""
+        if item == "PatternArgumentId":
+            return f"""self.map_list({value}, |b, item| match item {{
+                crate::PatternOrKeyword::Pattern(v) => crate::PatternOrKeyword::Pattern(b.copy_with(v, rewriter)),
+                crate::PatternOrKeyword::Keyword(v) => crate::PatternOrKeyword::Keyword(b.copy_with(v, rewriter)),
+            }})"""
         if item == "FStringPart":
             return f"""self.map_list({value}, |b, part| match part {{
                 super::FStringPartView::Literal(v) => super::FStringPartId::Literal(b.copy_with(v, rewriter)),
@@ -1019,7 +1033,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         out.append(f"_ => {fallback}, }} }} }}")
     for n in ast.all_nodes:
         fields = [field_codec(f, nodes) for f in n.fields]
-        paired_lists = n.name in {"ExprCompare", "Arguments", "PatternArguments"}
+        paired_lists = n.name == "ExprCompare"
         if paired_lists:
             first, second = fields
             fields = [replace(first, width=4), second]
@@ -1139,8 +1153,6 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                     }
                     """
                 )
-            if n.name == "Parameters":
-                out.append("pub(super) fn has_only_regular_args(self) -> bool { self.posonlyargs().is_empty() && self.kwonlyargs().is_empty() && self.vararg().is_none() && self.kwarg().is_none() }")
             for f in fields:
                 if f.name in offsets:
                     raw = f"self.syntax.row.{arm}_{f.name}()"

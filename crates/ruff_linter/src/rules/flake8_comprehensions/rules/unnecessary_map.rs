@@ -1,13 +1,12 @@
-use std::fmt;
-
 use itertools::Itertools;
+use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
-    self as ast, Expr, ExprCall, ExprContext, ExprKind, ExprLambda, NodeList, Parameters, Stmt,
-    Suite, visitor,
+    self as ast, Expr, ExprCall, ExprContext, ExprKind, ExprLambda, Parameters, Stmt, Suite,
+    visitor,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -209,7 +208,7 @@ fn is_list_set_or_dict(func: Expr<'_>, semantic: &SemanticModel) -> bool {
 fn map_lambda_and_iterables<'a>(
     call: ExprCall<'a>,
     semantic: &'a SemanticModel,
-) -> Option<(ExprLambda<'a>, NodeList<'a, ruff_python_ast::kind::Expr>)> {
+) -> Option<(ExprLambda<'a>, ast::FilteredNodes<'a, ast::kind::Expr>)> {
     if !semantic.match_builtin_expr(call.func(), "map") {
         return None;
     }
@@ -249,7 +248,7 @@ fn lambda_has_expected_arity(lambda: ExprLambda<'_>) -> bool {
         return false;
     }
 
-    let Some([parameter]) = parameters.args().as_array() else {
+    let Some((parameter,)) = parameters.args().collect_tuple() else {
         return false;
     };
 

@@ -283,8 +283,7 @@ node_payloads! {
         elements: u64 at 0 => interpolated_string_format_spec_elements, set_interpolated_string_format_spec_elements;
     }
     PatternArguments(pattern_arguments) {
-        keywords: u64 at 0 => pattern_arguments_keywords, set_pattern_arguments_keywords;
-        patterns: u32 at 8 => pattern_arguments_patterns, set_pattern_arguments_patterns;
+        items: u64 at 0 => pattern_arguments_items, set_pattern_arguments_items;
     }
     PatternKeyword(pattern_keyword) {
         attr: u32 at 0 => pattern_keyword_attr, set_pattern_keyword_attr;
@@ -297,13 +296,10 @@ node_payloads! {
         is_async: u8 at 12 => comprehension_is_async, set_comprehension_is_async;
     }
     Arguments(arguments) {
-        keywords: u64 at 0 => arguments_keywords, set_arguments_keywords;
-        args: u32 at 8 => arguments_args, set_arguments_args;
+        items: u64 at 0 => arguments_items, set_arguments_items;
     }
     Parameters(parameters) {
-        extra_offset: u32 at 0 => parameters_extra_offset, set_parameters_extra_offset;
-        vararg: u32 at 4 => parameters_vararg, set_parameters_vararg;
-        kwarg: u32 at 8 => parameters_kwarg, set_parameters_kwarg;
+        items: u64 at 0 => parameters_items, set_parameters_items;
     }
     Parameter(parameter) {
         name: u32 at 0 => parameter_name, set_parameter_name;
@@ -393,6 +389,9 @@ impl super::Ast {
             | NodeKind::PatternMatchMapping
             | NodeKind::PatternMatchOr
             | NodeKind::InterpolatedStringFormatSpec
+            | NodeKind::PatternArguments
+            | NodeKind::Arguments
+            | NodeKind::Parameters
             | NodeKind::TypeParams
             | NodeKind::FString
             | NodeKind::TString => Children::rows(
@@ -516,15 +515,6 @@ impl super::Ast {
                     .map_or(&[][..], |spec| spec.elements().words()),
                 None,
             ),
-            NodeKind::PatternArguments => {
-                let group = node.retype::<crate::PatternArguments>();
-                Children::merged(self, group.patterns().words(), group.keywords().words())
-            }
-            NodeKind::Arguments => {
-                let group = node.retype::<crate::Arguments>();
-                Children::merged(self, group.args().words(), group.keywords().words())
-            }
-            NodeKind::Parameters => node.retype::<crate::Parameters>().parameter_children(),
             NodeKind::ElifElseClause => Children::sequence(
                 self,
                 {
@@ -786,12 +776,6 @@ impl super::Ast {
                 ),
                 _ => Field::One(None),
             },
-            NodeKind::Parameters => node
-                .retype::<crate::Parameters>()
-                .child_fields()
-                .into_iter()
-                .nth(usize::from(field))
-                .unwrap_or(Field::One(None)),
             NodeKind::MatchCase => match field {
                 0 => Field::One(Some(AstNodeId::from_word(
                     split_words(record.inline_word::<4, 4>())[0],
@@ -839,6 +823,9 @@ impl super::Ast {
             | NodeKind::PatternMatchMapping
             | NodeKind::PatternMatchOr
             | NodeKind::InterpolatedStringFormatSpec
+            | NodeKind::PatternArguments
+            | NodeKind::Arguments
+            | NodeKind::Parameters
             | NodeKind::TypeParams
             | NodeKind::FString
             | NodeKind::TString => stack.descend_list(
@@ -1153,10 +1140,6 @@ impl super::Ast {
                 }
                 split_words(record.inline_word::<0, 4>())[0]
             }
-            NodeKind::PatternArguments => {
-                let group = node.retype::<crate::PatternArguments>();
-                stack.descend_merged(self, group.patterns().words(), group.keywords().words())
-            }
             NodeKind::Comprehension => {
                 stack.push_list(
                     List::<AstNodeId<crate::kind::Any>>::new(self, {
@@ -1168,11 +1151,6 @@ impl super::Ast {
                 stack.push_node(split_words(record.inline_word::<8, 4>())[0]);
                 split_words(record.inline_word::<4, 4>())[0]
             }
-            NodeKind::Arguments => {
-                let group = node.retype::<crate::Arguments>();
-                stack.descend_merged(self, group.args().words(), group.keywords().words())
-            }
-            NodeKind::Parameters => node.retype::<crate::Parameters>().first_parameter(stack),
             NodeKind::MatchCase => {
                 stack.push_list(
                     List::<AstNodeId<crate::kind::Any>>::new(self, {

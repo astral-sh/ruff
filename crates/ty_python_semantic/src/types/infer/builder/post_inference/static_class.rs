@@ -6,6 +6,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, ExprKind, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
+use std::cell::LazyCell;
 
 use crate::attribute_assignments;
 use crate::{
@@ -568,9 +569,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                             .map(|base| base.display(db, env))
                             .join(", ")
                     ));
-                    let can_rewrite_bases = bases_list.len() == class_node.bases().count()
-                        && !class_node.bases().any(ast::Expr::is_starred_expr);
-                    let mut bases = class_node.bases();
+                    let can_rewrite_bases = bases_list.len() == class_node.bases().len()
+                        && !class_node.bases().iter().any(ast::Expr::is_starred_expr);
                     if can_rewrite_bases
                         && let Some(index) = *generic_index
                         && let Some((first_base, rest)) = class_node.bases().split_first()
@@ -583,6 +583,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                         ));
                         let reordered_bases = class_node
                             .bases()
+                            .iter()
                             .enumerate()
                             .filter(|(i, _)| *i != index)
                             .map(|(_, base)| &source[base.range()])
@@ -616,24 +617,36 @@ pub(crate) fn check_static_class_definitions<'db>(
         Ok(_) => {
             disjoint_bases.remove_redundant_entries(db);
 
+            let explicit_bases = class.explicit_bases(db);
+            // These diagnostics look up multiple bases by index. Collect the AST
+            // nodes on the first lookup, when a diagnostic needs their spans.
+            let base_nodes = LazyCell::new(|| {
+                let nodes: Vec<_> = class_node.bases().iter().collect();
+                let match_explicit = nodes.len() == explicit_bases.len()
+                    && !nodes.iter().any(|base| base.is_starred_expr());
+                (nodes, match_explicit)
+            });
             if disjoint_bases.len() > 1 {
                 report_instance_layout_conflict(
                     context,
                     class.header_range(db),
-                    |index| class_node.bases().nth(index),
+                    |index| base_nodes.0.get(index).copied(),
                     &disjoint_bases,
                 );
             }
 
-            let explicit_bases = class.explicit_bases(context.db());
-            let base_nodes = (class_node.bases().count() == explicit_bases.len()
-                && !class_node.bases().any(ast::Expr::is_starred_expr))
-            .then_some(class_node);
             inconsistent_generic_bases = report_inconsistent_generic_bases(
                 context,
                 class.header_range(db),
                 explicit_bases,
-                |index| base_nodes.and_then(|node| node.bases().nth(index)),
+                |index| {
+                    let (nodes, match_explicit) = &*base_nodes;
+                    if *match_explicit {
+                        nodes.get(index).copied()
+                    } else {
+                        None
+                    }
+                },
             );
         }
     }

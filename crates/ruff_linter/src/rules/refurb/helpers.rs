@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Builder, Expr, ExprKind, ListId, NodeList, PythonVersion};
+use ruff_python_ast::{self as ast, Builder, Expr, ExprKind, ListId, PythonVersion};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -247,7 +247,7 @@ fn find_file_open<'a>(
     }
 
     // Match positional arguments, get filename and mode.
-    let (filename, pos_mode) = match_open_args(arguments)?;
+    let (filename, pos_mode) = match_open_args(args)?;
 
     // `open` accepts a file descriptor, but `Path` does not, so a `pathlib` replacement
     // would fail at runtime. `PTH123` skips these for the same reason.
@@ -256,7 +256,7 @@ fn find_file_open<'a>(
     }
 
     // Match keyword arguments, get keyword arguments to forward and possibly mode.
-    let (keywords, kw_mode) = match_open_keywords(arguments, read_mode, python_version)?;
+    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
 
     let mode = kw_mode.unwrap_or(pos_mode);
 
@@ -294,16 +294,16 @@ fn find_path_open<'a>(
     }
 
     let attr = func.as_attribute_expr()?;
-    let mut positional = arguments.args();
-    let mode = match positional.next() {
-        Some(mode) => match_open_mode(mode)?,
-        None => OpenMode::ReadText,
+    let mode = if args.is_empty() {
+        OpenMode::ReadText
+    } else {
+        match_open_mode(args.first()?)?
     };
     if positional.any(Expr::is_starred_expr) {
         return None;
     }
 
-    let (keywords, kw_mode) = match_open_keywords(arguments, read_mode, python_version)?;
+    let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
     let mode = kw_mode.unwrap_or(mode);
 
     resolve_file_open(
@@ -318,7 +318,7 @@ fn find_path_open<'a>(
 }
 
 /// Match positional arguments. Return expression for the file name and open mode.
-fn match_open_args(args: NodeList<'_, ast::kind::Expr>) -> Option<(Expr<'_>, OpenMode)> {
+fn match_open_args(args: ast::FilteredNodes<'_, ast::kind::Expr>) -> Option<(Expr<'_>, OpenMode)> {
     match args {
         args if let Some([filename]) = args.as_array() => Some((filename, OpenMode::ReadText)),
         args if let Some([filename, mode_literal]) = args.as_array() => {
@@ -337,7 +337,7 @@ fn match_open_args(args: NodeList<'_, ast::kind::Expr>) -> Option<(Expr<'_>, Ope
 
 /// Match keyword arguments. Return keyword arguments to forward and mode.
 fn match_open_keywords(
-    keywords: NodeList<'_, ast::kind::Keyword>,
+    keywords: ast::FilteredNodes<'_, ast::kind::Keyword>,
     read_mode: bool,
     target_version: PythonVersion,
 ) -> Option<(Vec<ast::Keyword<'_>>, Option<OpenMode>)> {

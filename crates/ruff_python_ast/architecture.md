@@ -104,10 +104,13 @@ row stores that boundary and both lengths in twelve bytes. The parser appends th
 to each other. A builder that supplies two nonadjacent, nonempty lists copies them into
 consecutive slots.
 
-An `ExprCompare` row shares a boundary between its operators and operands.
+An `ExprCompare` row shares a boundary between its operators and operands. For a single
+comparison such as `a == b`, a spare byte holds the operator. The `as_single` accessor can
+therefore reject a chain such as `a < b < c` before reading either list.
 
-A `Parameters` row stores its two optional variadic children inline. Its three groups of
-ordinary parameters have list bounds in the extra-data column.
+A `Parameters` row stores the positional-or-keyword list inline. For a signature such as
+`def f(x, y=0)`, this is the whole parameter list. The row allocates extra-data slots for
+the other four fields only when it has positional-only, variadic, or keyword-only parameters.
 
 A dictionary display stores a list of `DictItem` IDs. Each item holds its optional key and its
 value. In `{**mapping}` the entry starts at `**` and its only child is `mapping`. Every AST list

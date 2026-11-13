@@ -37,7 +37,7 @@ enum TypedDictConstructorForm<'expr> {
     /// // Ex) `TD({"x": 1}, y=2)`
     MixedLiteralAndKeywords(ast::ExprDict<'expr>),
     /// // Ex) `TD(other, y=2)`
-    MixedPositionalAndKeywords(&'expr ast::Expr),
+    MixedPositionalAndKeywords,
     /// // Ex) `TD(*args)` or `TD(*args, y=2)`
     VariadicPositional,
     /// // Ex) `TD(arg1, arg2)`
@@ -47,7 +47,7 @@ enum TypedDictConstructorForm<'expr> {
 impl<'expr> TypedDictConstructorForm<'expr> {
     /// Return the constructor form for `arguments`.
     fn from_arguments(arguments: ast::Arguments<'expr>) -> Self {
-        let Some([argument]) = arguments.args().slice(..).as_array() else {
+        let Some([argument]) = arguments.args().as_array() else {
             return if arguments.args().is_empty() {
                 Self::KeywordOnly
             } else {
@@ -60,7 +60,7 @@ impl<'expr> TypedDictConstructorForm<'expr> {
             (ExprKind::Dict(_), true) => Self::LiteralOnly(argument),
             (ExprKind::Dict(dict_expr), false) => Self::MixedLiteralAndKeywords(dict_expr),
             (_, true) => Self::SinglePositional(argument),
-            (_, false) => Self::MixedPositionalAndKeywords(argument),
+            (_, false) => Self::MixedPositionalAndKeywords,
         }
     }
 }
@@ -222,24 +222,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         if !starred_arguments.is_empty() || !double_starred_arguments.is_empty() {
-            for arg in arguments.args() {
+            for arg in args {
                 self.infer_expression(arg, TypeContext::default());
             }
             return fallback();
         }
 
-        if let Some(extra_arg) = arguments.args().nth(2)
+        if args.len() > 2
             && let Some(builder) = self
                 .context
                 .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, args.at(2))
         {
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to function `TypedDict`: expected 2, got {}",
-                arguments.args().count()
+                args.len()
             ));
         }
 
-        let Some(name_arg) = arguments.args().next() else {
+        let Some(name_arg) = args.first() else {
             if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
                 builder.into_diagnostic(
                     "No arguments provided for required parameters `typename` \
@@ -252,7 +252,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let name_type = self.infer_expression(name_arg, TypeContext::default());
 
-        let Some(fields_arg) = arguments.args().nth(1) else {
+        let Some(fields_arg) = args.get(1) else {
             if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
                 builder.into_diagnostic(
                     "No argument provided for required parameter `fields` of function `TypedDict`",
@@ -261,7 +261,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return fallback();
         };
 
-        for arg in arguments.args().skip(2) {
+        for arg in args.iter().skip(2) {
             self.infer_expression(arg, TypeContext::default());
         }
 
@@ -576,7 +576,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let target_ty = Type::TypedDict(typed_dict);
                 self.get_or_infer_expression(argument, TypeContext::declared(Some(target_ty)));
             }
-            TypedDictConstructorForm::MixedPositionalAndKeywords(argument) => {
+            TypedDictConstructorForm::MixedPositionalAndKeywords => {
                 let unpacked_keyword_types =
                     infer_unpacked_keyword_types(arguments, |expr, tcx| {
                         self.get_or_infer_expression(expr, tcx)

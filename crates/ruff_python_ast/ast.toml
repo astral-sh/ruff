@@ -598,10 +598,7 @@ fields = [
 
 [ungrouped.nodes.PatternArguments]
 doc = "The parenthesized arguments of a class pattern, as in `case Point(1, x=0, y=0)`."
-fields = [
-  { name = "patterns", type = "Pattern*" },
-  { name = "keywords", type = "PatternKeyword*" },
-]
+fields = [{ name = "items", type = "PatternArgumentId*" }]
 
 [ungrouped.nodes.PatternKeyword]
 doc = """
@@ -625,19 +622,10 @@ fields = [
 ]
 
 [ungrouped.nodes.Arguments]
-fields = [
-  { name = "args", type = "Expr*" },
-  { name = "keywords", type = "Keyword*" },
-]
+fields = [{ name = "items", type = "ArgumentId*" }]
 
 [ungrouped.nodes.Parameters]
-fields = [
-  { name = "posonlyargs", type = "ParameterWithDefault*" },
-  { name = "args", type = "ParameterWithDefault*" },
-  { name = "vararg", type = "Parameter?" },
-  { name = "kwonlyargs", type = "ParameterWithDefault*" },
-  { name = "kwarg", type = "Parameter?" },
-]
+fields = [{ name = "items", type = "ParameterItems" }]
 
 [ungrouped.nodes.Parameter]
 doc = "See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)"

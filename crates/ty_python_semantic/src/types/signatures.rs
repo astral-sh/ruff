@@ -5541,16 +5541,6 @@ impl<'db> Parameters<'db> {
         has_implicitly_positional_first_parameter: bool,
         annotation: &impl Fn(Expr<'_>) -> (Type<'db>, TypeExpressionFlags),
     ) -> Self {
-        let ast::ParametersFields {
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-            range: _,
-            node: _,
-        } = parameters.fields();
-
         let default_type = |param: ParameterWithDefault<'_>| {
             param.default().map(|_| {
                 ParameterDefault::Deferred(index.expect_single_definition(param.parameter()))
@@ -5573,7 +5563,7 @@ impl<'db> Parameters<'db> {
         let mut positional_only: Vec<Parameter> =
             parameters.posonlyargs().map(pos_only_param).collect();
 
-        let mut pos_or_keyword_iter = args.iter().peekable();
+        let mut pos_or_keyword_iter = parameters.args().peekable();
 
         // If there are no PEP-570 positional-only parameters, check for the legacy PEP-484 convention
         // for denoting positional-only parameters (parameters that start with `__` and do not end with `__`)
@@ -5604,7 +5594,7 @@ impl<'db> Parameters<'db> {
             )
         });
 
-        let variadic = vararg.map(|arg| {
+        let variadic = parameters.vararg().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 index,
@@ -5629,7 +5619,7 @@ impl<'db> Parameters<'db> {
             )
         });
 
-        let keywords = kwarg.map(|arg| {
+        let keywords = parameters.kwarg().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 index,

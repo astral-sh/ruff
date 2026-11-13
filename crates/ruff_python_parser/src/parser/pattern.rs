@@ -5,7 +5,6 @@ use ruff_python_ast::{
     build,
 };
 use ruff_text_size::{Ranged, TextSize};
-use thin_vec::ThinVec;
 
 use crate::parser::progress::ParserProgress;
 use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses};
@@ -769,9 +768,7 @@ impl Parser<'_> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut patterns = Vec::<id::Pattern>::new();
-        let mut keywords = vec![];
-        let mut has_seen_pattern = false;
+        let mut items = Vec::new();
         let mut has_seen_keyword_pattern = false;
 
         self.parse_comma_separated_list(
@@ -805,16 +802,15 @@ impl Parser<'_> {
 
                     let value_pattern = parser.parse_match_pattern(AllowStarPattern::No);
 
-                    keywords.push(
-                        build::PatternKeyword {
-                            attr: key.id,
-                            pattern: value_pattern.id,
-                            range: parser.node_range(pattern_start),
-                        }
-                        .parsed(&mut parser.storage),
-                    );
+                    let keyword = build::PatternKeyword {
+                        attr: key.id,
+                        pattern: value_pattern.id,
+                        range: parser.node_range(pattern_start),
+                    }
+                    .parsed(&mut parser.storage);
+                    items.push(ast::PatternOrKeyword::Keyword(keyword.id));
                 } else {
-                    items.push(ast::PatternOrKeyword::Pattern(pattern));
+                    items.push(ast::PatternOrKeyword::Pattern(pattern.id));
                     if has_seen_keyword_pattern {
                         parser.add_error(
                             ParseErrorType::OtherError(
@@ -832,8 +828,7 @@ impl Parser<'_> {
         build::PatternMatchClass {
             cls: cls.id,
             arguments: build::PatternArguments {
-                patterns: patterns.into_list(&mut self.storage),
-                keywords: keywords.into_list(&mut self.storage),
+                items: self.storage.list(items),
                 range: self.node_range(arguments_start),
             }
             .parsed(&mut self.storage)

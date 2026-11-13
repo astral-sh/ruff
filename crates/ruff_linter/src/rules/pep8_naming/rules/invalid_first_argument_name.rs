@@ -250,8 +250,8 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
         ..
     }) = parameters
         .posonlyargs()
-        .first()
-        .or_else(|| parameters.args().first())
+        .next()
+        .or_else(|| parameters.args().next())
         .map(ParameterWithDefault::fields)
     else {
         return;

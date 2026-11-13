@@ -79,11 +79,11 @@ pub(crate) struct Parser<'src> {
     /// Reusable, nesting-safe scratch storage for expression lists.
     expr_scratch: ScratchBuffer<BuildId<ast::kind::Expr>>,
 
-    /// Reusable, nesting-safe scratch storage for call keywords.
-    keyword_scratch: ScratchBuffer<BuildId<ast::kind::Keyword>>,
+    /// Reusable, nesting-safe scratch storage for call arguments in source order.
+    argument_scratch: ScratchBuffer<ast::ArgumentId>,
 
     /// Reusable, nesting-safe scratch storage for function and lambda parameters.
-    parameter_scratch: ScratchBuffer<BuildId<ast::kind::ParameterWithDefault>>,
+    parameter_scratch: ScratchBuffer<ast::ParameterItemId>,
 
     /// Reusable, nesting-safe scratch storage for statement lists.
     stmt_scratch: ScratchBuffer<BuildId<ast::kind::Stmt>>,

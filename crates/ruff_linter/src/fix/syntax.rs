@@ -96,7 +96,7 @@ pub(crate) fn call_name(
     args: ListId<AstNodeId<kind::Expr>>,
 ) -> BuildId<kind::Expr> {
     let func = name(builder, spelling);
-    call(builder, func, args)
+    call(builder, func, args.into())
 }
 
 pub(crate) fn attribute(
@@ -124,29 +124,16 @@ pub(crate) fn call_method(
     args: ListId<AstNodeId<kind::Expr>>,
 ) -> BuildId<kind::Expr> {
     let func = attribute(builder, object, method, ExprContext::Load);
-    call(builder, func, args)
+    call(builder, func, args.into())
 }
 
-fn call(
+pub(crate) fn call(
     builder: &mut Builder,
     func: BuildId<kind::Expr>,
-    args: ListId<AstNodeId<kind::Expr>>,
-) -> BuildId<kind::Expr> {
-    call_with_keywords(builder, func, args, ListId::default())
-}
-
-pub(crate) fn call_with_keywords(
-    builder: &mut Builder,
-    func: BuildId<kind::Expr>,
-    args: ListId<AstNodeId<kind::Expr>>,
-    keywords: ListId<AstNodeId<kind::Keyword>>,
+    items: ListId<ruff_python_ast::ArgumentId>,
 ) -> BuildId<kind::Expr> {
     let range = TextRange::default();
-    let arguments = builder.add(build::Arguments {
-        range,
-        args,
-        keywords,
-    });
+    let arguments = builder.add(build::Arguments { range, items });
     builder
         .add(build::ExprCall {
             range,

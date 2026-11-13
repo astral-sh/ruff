@@ -144,7 +144,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let default_ty = self.infer_type_expression(default_expr);
             if !self.check_default_for_outer_scope_typevars(default_ty, default_expr, name.id()) {
                 let bound_node = bound_node.map(|n| match n.classify() {
-                    ExprKind::Tuple(tuple) => BoundOrConstraintsNodes::Constraints(tuple.elts()),
+                    ExprKind::Tuple(tuple) => {
+                        BoundOrConstraintsNodes::Constraints(tuple.elts().into())
+                    }
                     _ => BoundOrConstraintsNodes::Bound(n),
                 });
                 self.validate_typevar_default(
@@ -220,7 +222,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && let Some((first, rest)) = nodes.split_first()
                         && let Some(last) = rest.last()
                     {
-                        let secondary = self.context.secondary(range);
+                        let secondary = self
+                            .context
+                            .secondary(TextRange::new(first.start(), last.end()));
                         let secondary = if let Some(name) = name {
                             secondary.message(format_args!("Constraints of `{name}`"))
                         } else {
@@ -1578,7 +1582,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     call_expr,
                 );
             }
-            (false, Some(constraint)) if !multiple_constraints => {
+            (_, 1) => {
                 return error(
                     &self.context,
                     "A `TypeVar` cannot have exactly one constraint",

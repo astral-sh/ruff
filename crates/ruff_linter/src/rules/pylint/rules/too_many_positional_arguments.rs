@@ -87,7 +87,6 @@ pub(crate) fn too_many_positional_arguments(
     let num_positional_args = function_def_fields
         .parameters
         .posonlyargs()
-        .iter()
         .chain(function_def_fields.parameters.args())
         .filter(|param| {
             !checker

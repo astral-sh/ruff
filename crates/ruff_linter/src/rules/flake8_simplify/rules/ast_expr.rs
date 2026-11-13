@@ -270,15 +270,13 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, &expr: &Expr<'_>) {
     if attr != "get" {
         return;
     }
-    let mut items = arguments.iter_source_order();
-    let (Some(ast::ArgOrKeyword::Arg(key)), Some(ast::ArgOrKeyword::Arg(default))) =
-        (items.next(), items.next())
-    else {
+    let Some(key) = args.first() else {
         return;
     };
-    if !default.is_none_literal_expr()
-        || items.any(|item| matches!(item, ast::ArgOrKeyword::Keyword(_)))
-    {
+    let Some(default) = args.get(1) else {
+        return;
+    };
+    if !default.is_none_literal_expr() {
         return;
     }
 

@@ -25,7 +25,7 @@ impl FormatNodeRule<ruff_python_ast::kind::Arguments> for FormatArguments {
         //      # This call has a dangling comment.
         // )
         // ```
-        if items.is_empty() {
+        if args.is_empty() && keywords.is_empty() {
             let comments = f.context().comments().clone();
             let dangling = comments.dangling(item);
             return write!(f, [empty_parenthesized("(", dangling, ")")]);

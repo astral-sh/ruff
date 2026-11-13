@@ -82,7 +82,7 @@ fn function_has_deferred_annotations(function: ast::StmtFunctionDef<'_>) -> bool
         && (function.returns().is_some()
             || function
                 .parameters()
-                .iter()
+                .iter_source_order()
                 .any(|param| param.annotation().is_some()))
 }
 
@@ -876,8 +876,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let receiver = function
             .parameters()
             .posonlyargs()
-            .first()
-            .or_else(|| function.parameters().args().first())?;
+            .next()
+            .or_else(|| function.parameters().args().next())?;
         let annotation = receiver.parameter().annotation()?;
         let receiver_kind = MethodReceiverKind::from_function(self.db(), definition, function)?;
 
@@ -915,13 +915,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let kwarg = parameters.kwarg();
 
         self.context.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
-        let (vararg, kwarg) = parameters.split_variadic(|param| {
-            if first_annotation_already_inferred {
-                first_annotation_already_inferred = false;
-            } else {
-                self.infer_parameter_with_default(param);
-            }
-        });
+        for param_with_default in parameters
+            .iter_non_variadic_params()
+            .skip(usize::from(first_annotation_already_inferred))
+        {
+            self.infer_parameter_with_default(param_with_default);
+        }
         if let Some(vararg) = vararg {
             self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
             self.infer_parameter(vararg);
@@ -978,10 +977,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // accepted through `**kwargs`. The convention only applies to the leading
         // positional-or-keyword parameters that are actually converted to positional-only
         // parameters by `Parameters::from_parameters`.
-        let pep_484_positional_only_count = if parameters.posonlyargs().is_empty() {
+        let pep_484_positional_only_count = if parameters.posonlyargs().next().is_none() {
             parameters
                 .args()
-                .iter()
                 .take_while(|parameter| parameter.uses_pep_484_positional_only_convention())
                 .count()
         } else {
@@ -990,7 +988,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let overlapping = parameters
             .iter_non_variadic_params()
-            .skip(parameters.posonlyargs().len() + pep_484_positional_only_count)
+            .skip(parameters.posonlyargs().count() + pep_484_positional_only_count)
             .map(ast::ParameterWithDefault::parameter)
             .filter(|parameter| unpacked_keys.contains_key(parameter.name().id()))
             .collect::<Vec<_>>();

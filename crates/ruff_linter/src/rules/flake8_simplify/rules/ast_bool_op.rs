@@ -329,7 +329,10 @@ fn isinstance_target<'a>(call: Expr<'a>, semantic: &'a SemanticModel) -> Option<
     let keywords = arguments.keywords();
     if args.len() != 2 {
         return None;
-    };
+    }
+    if !keywords.is_empty() {
+        return None;
+    }
     if !semantic.match_builtin_expr(func, "isinstance") {
         return None;
     }

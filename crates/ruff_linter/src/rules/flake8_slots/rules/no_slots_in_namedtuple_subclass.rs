@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, ExprKind, NodeList, Stmt, identifier::Identifier};
+use ruff_python_ast::{self as ast, ExprKind, Stmt, identifier::Identifier};
 use ruff_python_semantic::SemanticModel;
 
 use crate::Violation;
@@ -84,11 +84,10 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
     if checker.source_type.is_stub() {
         return;
     }
-    let Some(ast::ArgumentsFields { args: bases, .. }) =
-        class.arguments.map(ruff_python_ast::Arguments::fields)
-    else {
+    let Some(arguments) = class.arguments else {
         return;
     };
+    let bases = arguments.args();
 
     if let Some(namedtuple_kind) = namedtuple_base(bases, checker.semantic()) {
         if !has_slots(class.body) {
@@ -103,7 +102,7 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
 /// If the class's bases consist solely of named tuples, return the kind of named tuple
 /// (either `collections.namedtuple()`, or `typing.NamedTuple()`). Otherwise, return `None`.
 fn namedtuple_base(
-    bases: NodeList<'_, ruff_python_ast::kind::Expr>,
+    bases: ast::FilteredNodes<'_, ruff_python_ast::kind::Expr>,
     semantic: &SemanticModel,
 ) -> Option<NamedTupleKind> {
     let mut kind = None;

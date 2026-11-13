@@ -248,18 +248,27 @@ fn annotated_parameters(
             default,
         })
     };
-    let posonlyargs = builder.map_list(parameters.posonlyargs(), &mut annotated);
-    let args = builder.map_list(parameters.args(), annotated);
-    let vararg = parameters.vararg().map(|arg| builder.copy_node(arg));
-    let kwonlyargs = builder.copy_nodes(parameters.kwonlyargs());
-    let kwarg = parameters.kwarg().map(|arg| builder.copy_node(arg));
+    let items: Vec<_> = parameters
+        .items()
+        .iter()
+        .map(|item| match item {
+            ast::ParameterItem::PositionalOnly(p) => {
+                ast::ParameterItem::PositionalOnly(annotated(builder, p))
+            }
+            ast::ParameterItem::PositionalOrKeyword(p) => {
+                ast::ParameterItem::PositionalOrKeyword(annotated(builder, p))
+            }
+            ast::ParameterItem::KeywordOnly(p) => {
+                ast::ParameterItem::KeywordOnly(builder.copy_node(p))
+            }
+            ast::ParameterItem::Vararg(p) => ast::ParameterItem::Vararg(builder.copy_node(p)),
+            ast::ParameterItem::Kwarg(p) => ast::ParameterItem::Kwarg(builder.copy_node(p)),
+        })
+        .collect();
+    let items = builder.parameter_items(items.iter().copied());
     builder.add(build::Parameters {
         range: parameters.range(),
-        posonlyargs,
-        args,
-        vararg,
-        kwonlyargs,
-        kwarg,
+        items,
     })
 }
 fn replace_trailing_ellipsis_with_original_expr(

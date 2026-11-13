@@ -9,7 +9,7 @@ use std::ops::Deref;
 
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
-    Alias, AnyStringFlags, AstNode, BoolOp, BytesLiteralFlags, CmpOp, ConversionFlag, DebugText,
+    Alias, AnyStringFlags, BoolOp, BytesLiteralFlags, CmpOp, ConversionFlag, DebugText,
     ExceptHandler, Expr, Identifier, InterpolatedStringElement, InterpolatedStringFormatSpec,
     MappingPatternItem, MatchCase, Number, Operator, Parameter, ParameterWithDefault, Parameters,
     Pattern, Singleton, Stmt, StringFlags, StringLiteral, TypeParam, TypeParams, WithItem,
@@ -830,14 +830,15 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(cls, precedence::MAX);
                 self.p("(");
                 let mut first = true;
-                for argument in arguments.children() {
+                for argument in arguments.items() {
                     self.p_delim(&mut first, ", ");
-                    if let Some(pattern) = argument.cast::<Pattern>() {
-                        self.unparse_pattern(pattern);
-                    } else if let Some(keyword) = argument.cast::<ast::PatternKeyword>() {
-                        self.p_id(keyword.attr());
-                        self.p("=");
-                        self.unparse_pattern(keyword.pattern());
+                    match argument {
+                        ast::PatternOrKeyword::Pattern(pattern) => self.unparse_pattern(pattern),
+                        ast::PatternOrKeyword::Keyword(keyword) => {
+                            self.p_id(keyword.attr());
+                            self.p("=");
+                            self.unparse_pattern(keyword.pattern());
+                        }
                     }
                 }
                 self.p(")");
@@ -1411,31 +1412,41 @@ impl<'a> Generator<'a> {
 
     fn unparse_parameters(&mut self, parameters: Parameters<'_>) {
         let mut first = true;
-        for (i, parameter_with_default) in parameters
-            .posonlyargs()
+        let slash_after = parameters
+            .items()
             .iter()
-            .chain(parameters.args())
-            .enumerate()
-        {
+            .rposition(|item| matches!(item, ast::ParameterItem::PositionalOnly(_)));
+        let mut seen_star = false;
+
+        for (index, item) in parameters.items().iter().enumerate() {
             self.p_delim(&mut first, ", ");
-            self.unparse_parameter_with_default(parameter_with_default);
-            self.p_if(i + 1 == parameters.posonlyargs().len(), ", /");
-        }
-        if parameters.vararg().is_some() || !parameters.kwonlyargs().is_empty() {
-            self.p_delim(&mut first, ", ");
-            self.p("*");
-        }
-        if let Some(vararg) = parameters.vararg() {
-            self.unparse_parameter(vararg);
-        }
-        for kwarg in parameters.kwonlyargs() {
-            self.p_delim(&mut first, ", ");
-            self.unparse_parameter_with_default(kwarg);
-        }
-        if let Some(kwarg) = parameters.kwarg() {
-            self.p_delim(&mut first, ", ");
-            self.p("**");
-            self.unparse_parameter(kwarg);
+            match item {
+                ast::ParameterItem::PositionalOnly(p) => {
+                    self.unparse_parameter_with_default(p);
+                    if slash_after == Some(index) {
+                        self.p(", /");
+                    }
+                }
+                ast::ParameterItem::PositionalOrKeyword(p) => {
+                    self.unparse_parameter_with_default(p);
+                }
+                ast::ParameterItem::Vararg(p) => {
+                    self.p("*");
+                    self.unparse_parameter(p);
+                    seen_star = true;
+                }
+                ast::ParameterItem::KeywordOnly(p) => {
+                    if !seen_star {
+                        self.p("*, ");
+                        seen_star = true;
+                    }
+                    self.unparse_parameter_with_default(p);
+                }
+                ast::ParameterItem::Kwarg(p) => {
+                    self.p("**");
+                    self.unparse_parameter(p);
+                }
+            }
         }
     }
 

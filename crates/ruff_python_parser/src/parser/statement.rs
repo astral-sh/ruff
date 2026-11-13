@@ -3383,10 +3383,10 @@ impl<'src> Parser<'src> {
         // the parser will drop the previous ones. Another thing is the vararg and kwarg
         // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
         // recover well from `*args=(1, 2)`.
-        let mut parameters = build::Parameters::default();
+        let mut seen_vararg = false;
+        let mut last_kwarg = None;
         let parameters_snapshot = self.parameter_scratch.snapshot();
-        let mut args_snapshot = None;
-        let mut kwonlyargs_snapshot = None;
+        let mut slash_index = None;
 
         let mut seen_default_param = false; // `a=10`
         let mut seen_positional_only_separator = false; // `/`
@@ -3444,10 +3444,12 @@ impl<'src> Parser<'src> {
                             );
                         }
 
-                        // TODO(dhruvmanila): The AST doesn't allow multiple `vararg`, so let's
-                        // choose to keep the first one so that the parameters remain in preorder.
-                        if parameters.vararg.is_none() {
-                            parameters.vararg = Some(param.id);
+                        // Keep the first variadic positional parameter when recovering from duplicates.
+                        if !seen_vararg {
+                            parser
+                                .parameter_scratch
+                                .push(ast::ParameterItem::Vararg(param.id));
+                            seen_vararg = true;
                         }
 
                         last_keyword_only_separator_range = None;
@@ -3523,14 +3525,20 @@ impl<'src> Parser<'src> {
                         );
                     }
 
-                    parameters.kwarg = Some(param.id);
+                    last_kwarg = Some(parser.parameter_scratch.len_since(&parameters_snapshot));
+                    parser
+                        .parameter_scratch
+                        .push(ast::ParameterItem::Kwarg(param.id));
                     last_keyword_only_separator_range = None;
                 }
                 TokenKind::Slash => {
                     let slash_range = parser.current_token_range();
                     parser.bump(TokenKind::Slash);
 
-                    if parser.parameter_scratch.is_empty(&snapshot) {
+                    if parser.parameter_scratch.is_empty(&parameters_snapshot)
+                        && !seen_vararg
+                        && last_kwarg.is_none()
+                    {
                         // test_err params_no_arg_before_slash
                         // def foo(/): ...
                         // def foo(/, a): ...
@@ -3572,7 +3580,8 @@ impl<'src> Parser<'src> {
                     if !seen_positional_only_separator {
                         // We should only split if we're seeing the separator for the
                         // first time, otherwise it's a user error.
-                        slash_index = Some(parser.parameter_scratch.len_since(&snapshot));
+                        slash_index =
+                            Some(parser.parameter_scratch.len_since(&parameters_snapshot));
                         seen_positional_only_separator = true;
 
                         // test_ok pos_only_py38
@@ -3618,7 +3627,13 @@ impl<'src> Parser<'src> {
                         seen_keyword_only_param_after_separator = true;
                     }
 
-                    parser.parameter_scratch.push(param.id);
+                    parser
+                        .parameter_scratch
+                        .push(if seen_vararg || seen_keyword_only_separator {
+                            ast::ParameterItem::KeywordOnly(param.id)
+                        } else {
+                            ast::ParameterItem::PositionalOrKeyword(param.id)
+                        });
                     last_keyword_only_separator_range = None;
                 }
                 _ => {
@@ -3642,31 +3657,28 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
-        if let Some(kwonlyargs_snapshot) = kwonlyargs_snapshot {
-            parameters.kwonlyargs = self
-                .parameter_scratch
-                .take_range(kwonlyargs_snapshot, &mut self.storage);
+        let range = self.node_range(start);
+        let items = self.parameter_scratch.take(parameters_snapshot, |items| {
+            self.storage
+                .parameter_items(items.iter().copied().enumerate().filter_map(
+                    |(i, item)| match item {
+                        ast::ParameterItem::PositionalOrKeyword(p)
+                            if slash_index.is_some_and(|slash| i < slash) =>
+                        {
+                            Some(ast::ParameterItem::PositionalOnly(p))
+                        }
+                        // Keep the last variadic keyword parameter when recovering from duplicates.
+                        ast::ParameterItem::Kwarg(_) if Some(i) != last_kwarg => None,
+                        item => Some(item),
+                    },
+                ))
+        });
+        let id = self.storage.add(build::Parameters { range, items });
+        id::Parameters {
+            id,
+            range,
+            kind: ast::NodeKind::Parameters,
         }
-        if let Some(args_snapshot) = args_snapshot {
-            parameters.args = self
-                .parameter_scratch
-                .take_range(args_snapshot, &mut self.storage);
-            parameters.posonlyargs = self
-                .parameter_scratch
-                .take_range(parameters_snapshot, &mut self.storage);
-        } else if seen_positional_only_separator {
-            parameters.posonlyargs = self
-                .parameter_scratch
-                .take_range(parameters_snapshot, &mut self.storage);
-        } else {
-            parameters.args = self
-                .parameter_scratch
-                .take_range(parameters_snapshot, &mut self.storage);
-        }
-
-        parameters.range = self.node_range(start);
-
-        parameters.parsed(&mut self.storage)
     }
 
     /// Try to parse a type parameter list. If the parser is not at the start of a

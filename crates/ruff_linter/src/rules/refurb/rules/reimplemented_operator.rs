@@ -282,7 +282,7 @@ fn itemgetter_op(
     params: Parameters<'_>,
     locator: &Locator,
 ) -> Option<Operator> {
-    let [arg] = params.args().as_array()?;
+    let (arg,) = params.args().collect_tuple()?;
 
     // The argument to the lambda must match the subscripted value, as in: `lambda x: x[1]`.
     if !is_same_expression(arg, expr.value()) {
@@ -306,7 +306,7 @@ fn itemgetter_op_tuple(
     params: Parameters<'_>,
     locator: &Locator,
 ) -> Option<Operator> {
-    let [arg] = params.args().as_array()?;
+    let (arg,) = params.args().collect_tuple()?;
     if expr.elts().len() <= 1 {
         return None;
     }
@@ -388,7 +388,7 @@ impl Display for FunctionLikeKind {
 
 /// Return the name of the `operator` implemented by the given unary expression.
 fn unary_op(expr: ast::ExprUnaryOp<'_>, params: Parameters<'_>) -> Option<&'static str> {
-    let [arg] = params.args().as_array()?;
+    let (arg,) = params.args().collect_tuple()?;
     if !is_same_expression(arg, expr.operand()) {
         return None;
     }
@@ -402,7 +402,7 @@ fn unary_op(expr: ast::ExprUnaryOp<'_>, params: Parameters<'_>) -> Option<&'stat
 
 /// Return the name of the `operator` implemented by the given binary expression.
 fn bin_op(expr: ast::ExprBinOp<'_>, params: Parameters<'_>) -> Option<&'static str> {
-    let [arg1, arg2] = params.args().as_array()?;
+    let (arg1, arg2) = params.args().collect_tuple()?;
     if !is_same_expression(arg1, expr.left()) || !is_same_expression(arg2, expr.right()) {
         return None;
     }
@@ -425,7 +425,7 @@ fn bin_op(expr: ast::ExprBinOp<'_>, params: Parameters<'_>) -> Option<&'static s
 
 /// Return the name of the `operator` implemented by the given comparison expression.
 fn cmp_op(expr: ast::ExprCompare<'_>, params: Parameters<'_>) -> Option<&'static str> {
-    let [arg1, arg2] = params.args().as_array()?;
+    let (arg1, arg2) = params.args().collect_tuple()?;
     let (left, op, right) = expr.as_single()?;
 
     match op {

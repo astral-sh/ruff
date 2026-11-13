@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::FilteredNodes;
 use ruff_python_ast::{Arguments, Expr, ExprKind, NodeList, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -133,7 +134,7 @@ fn match_fields_and_keywords(
     arguments: Arguments<'_>,
 ) -> Option<(
     Vec<ClassField<'_>>,
-    NodeList<'_, ruff_python_ast::kind::Keyword>,
+    FilteredNodes<'_, ruff_python_ast::kind::Keyword>,
 )> {
     let args = arguments.args();
     let keywords = arguments.keywords();
@@ -164,7 +165,10 @@ fn match_fields_and_keywords(
         Some((fields, keywords))
     } else if let Some([_typename]) = args.as_array() {
         // The keyword form was deprecated in Python 3.11 and removed in Python 3.13.
-        Some((ClassField::from_keywords(keywords)?, NodeList::default()))
+        Some((
+            ClassField::from_keywords(keywords)?,
+            ruff_python_ast::FilteredNodes::default(),
+        ))
     } else {
         None
     }

@@ -1785,6 +1785,7 @@ impl<'db> CollectionContext<'db> {
 fn extract_base_class_names(class_def: StmtClassDef<'_>) -> FxHashSet<CompactString> {
     class_def
         .bases()
+        .iter()
         .filter_map(UnqualifiedName::from_expr)
         .map(|name| name.segments().join_compact("."))
         .collect()

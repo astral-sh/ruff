@@ -1,6 +1,6 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, NodeList};
+use ruff_python_ast::Arguments;
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -60,8 +60,9 @@ pub(crate) fn type_of_primitive(
     checker: &Checker,
     &expr: &Expr<'_>,
     func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    arguments: Arguments<'_>,
 ) {
+    let args = arguments.args();
     let Some([arg]) = args.as_array() else {
         return;
     };

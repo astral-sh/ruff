@@ -64,7 +64,7 @@ pub(crate) fn raise_vanilla_args(checker: &Checker, expr: Expr<'_>) {
     let arguments = call.arguments();
     let args = arguments.args();
 
-    let Some(arg) = arguments.args().next() else {
+    let Some(arg) = args.first() else {
         return;
     };
 

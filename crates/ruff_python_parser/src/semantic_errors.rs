@@ -774,7 +774,11 @@ impl SemanticSyntaxChecker {
         ctx: &Ctx,
     ) {
         if parameters.len() < 2
-            || !names_may_repeat(parameters.iter().map(|param| param.name().name_id()))
+            || !names_may_repeat(
+                parameters
+                    .iter_source_order()
+                    .map(|param| param.name().name_id()),
+            )
         {
             return;
         }

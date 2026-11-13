@@ -157,7 +157,6 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &ast::StmtFunctio
 
     let non_self_positional_args: SmallVec<[ParameterWithDefault<'_>; 3]> = parameters
         .posonlyargs()
-        .iter()
         .chain(parameters.args())
         .skip(1)
         .collect();
@@ -226,7 +225,6 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &ast::StmtFunctio
     // ...as should all keyword-only arguments.
     for parameter in parameters
         .kwonlyargs()
-        .iter()
         .filter(|arg| arg.default().is_none())
     {
         checker.report_diagnostic(
@@ -382,28 +380,8 @@ fn check_positional_args_for_overloaded_method(
             return;
         }
 
-        // If any overloads have any variadic arguments, don't do any checking
-        let ast::ParametersFields {
-            range: _,
-            node: _,
-            posonlyargs,
-            args,
-            vararg: None,
-            kwonlyargs,
-            kwarg: None,
-        } = parameters.fields()
-        else {
-            return;
-        };
-
-        // If any overloads have any keyword-only arguments, don't do any checking
-        if !kwonlyargs.is_empty() {
-            return;
-        }
-
-        // If the number of non-keyword-only arguments is not exactly equal to 4
-        // for any overloads, don't do any checking
-        if posonlyargs.len() + args.len() != 4 {
+        // Each overload must have exactly four positional parameters, including self.
+        if parameters.len() != 4 || parameters.iter_positional_params().count() != 4 {
             return;
         }
     }

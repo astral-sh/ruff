@@ -1,5 +1,6 @@
 use anyhow::{Result, anyhow, bail};
-use ruff_python_ast::{Builder, CmpOp, Expr, NodeList, UnaryOp, build};
+use ruff_python_ast::FilteredNodes;
+use ruff_python_ast::{Builder, CmpOp, Expr, UnaryOp, build};
 use ruff_python_codegen::Generator;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
@@ -211,8 +212,8 @@ impl UnittestAssert {
     /// Create a map from argument name to value.
     fn args_map<'a>(
         &'a self,
-        args: NodeList<'a, ruff_python_ast::kind::Expr>,
-        keywords: NodeList<'a, ruff_python_ast::kind::Keyword>,
+        args: FilteredNodes<'a, ruff_python_ast::kind::Expr>,
+        keywords: FilteredNodes<'a, ruff_python_ast::kind::Keyword>,
     ) -> Result<FxHashMap<&'a str, Expr<'a>>> {
         // If we have variable-length arguments, abort.
         if args.iter().any(ruff_python_ast::Expr::is_starred_expr)
@@ -236,13 +237,13 @@ impl UnittestAssert {
             FxHashMap::with_capacity_and_hasher(args.len() + keywords.len(), FxBuildHasher);
 
         // Process positional arguments.
-        for (arg_name, value) in arg_spec.iter().zip(arguments.args()) {
+        for (arg_name, value) in arg_spec.iter().zip(args) {
             args_map.insert(arg_name, value);
         }
 
         // Process keyword arguments.
-        for arg_name in arg_spec.iter().skip(arguments.args().count()) {
-            if let Some(value) = arguments.keywords().find_map(|keyword| {
+        for arg_name in arg_spec.iter().skip(args.len()) {
+            if let Some(value) = keywords.iter().find_map(|keyword| {
                 if keyword
                     .arg()
                     .is_some_and(|kwarg_name| kwarg_name == *arg_name)
@@ -271,8 +272,8 @@ impl UnittestAssert {
 
     pub(crate) fn generate_assert(
         self,
-        args: NodeList<'_, ruff_python_ast::kind::Expr>,
-        keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
+        args: FilteredNodes<'_, ruff_python_ast::kind::Expr>,
+        keywords: FilteredNodes<'_, ruff_python_ast::kind::Keyword>,
         generator: Generator,
     ) -> Result<String> {
         let args = self.args_map(args, keywords)?;

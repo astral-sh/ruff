@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
@@ -110,7 +109,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call_fields: &ast::E
             };
             let parent_parameters = function_def.parameters();
 
-            let Some(parent_arg) = parent_parameters.args().first() else {
+            let Some(parent_arg) = parent_parameters.args().next() else {
                 return;
             };
 
@@ -128,7 +127,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call_fields: &ast::E
                 ..
             } = expr_lambda.fields() =>
         {
-            let Some(parent_arg) = parent_parameters.args().first() else {
+            let Some(parent_arg) = parent_parameters.args().next() else {
                 return;
             };
 

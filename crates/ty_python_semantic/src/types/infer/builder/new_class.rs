@@ -37,7 +37,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // `new_class(name, bases=(), kwds=None, exec_body=None)`
         // We need at least the `name` argument.
-        let no_positional_args = arguments.args().next().is_none();
+        let no_positional_args = args.is_empty();
         if no_positional_args {
             // Check if `name` is provided as a keyword argument.
             let name_keyword = keywords
@@ -162,7 +162,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     report_instance_layout_conflict(
                         &self.context,
                         dynamic_class.header_range(db),
-                        bases_arg.as_tuple_expr().map(ast::ExprTuple::elts),
+                        |index| {
+                            bases_arg
+                                .as_tuple_expr()
+                                .and_then(|tuple| tuple.elts().get(index))
+                        },
                         &disjoint_bases,
                     );
                 }

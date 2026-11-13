@@ -13,12 +13,30 @@ use crate::{NodeIndex, int, name::Name};
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum FStringPart {}
 
+/// One parameter in a function or lambda signature, in its written position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub enum ParameterItem<P, V> {
+    PositionalOnly(P),
+    PositionalOrKeyword(P),
+    Vararg(V),
+    KeywordOnly(P),
+    Kwarg(V),
+}
+
 /// A key and its pattern, or the `**name` capture in a mapping pattern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum MappingPatternItem<K, P, R> {
     Entry { key: K, pattern: P },
     Rest(R),
+}
+
+/// A positional or keyword argument in a class pattern.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PatternOrKeyword<P, K> {
+    Pattern(P),
+    Keyword(K),
 }
 
 /// Transforms a value prior to formatting it.

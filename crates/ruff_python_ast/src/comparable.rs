@@ -252,8 +252,10 @@ fn match_mapping_fields(node: ast::PatternMatchMapping<'_>) -> MatchMappingField
 type ComparablePatternOrKeyword<'a> =
     ast::PatternOrKeyword<ComparablePattern<'a>, ComparablePatternKeyword<'a>>;
 
-impl<'a> From<&'a ast::PatternOrKeyword> for ComparablePatternOrKeyword<'a> {
-    fn from(item: &'a ast::PatternOrKeyword) -> Self {
+impl<'a> From<ast::PatternOrKeyword<ast::Pattern<'a>, ast::PatternKeyword<'a>>>
+    for ComparablePatternOrKeyword<'a>
+{
+    fn from(item: ast::PatternOrKeyword<ast::Pattern<'a>, ast::PatternKeyword<'a>>) -> Self {
         match item {
             ast::PatternOrKeyword::Pattern(pattern) => Self::Pattern(pattern.into()),
             ast::PatternOrKeyword::Keyword(keyword) => Self::Keyword(keyword.into()),
@@ -264,18 +266,15 @@ impl<'a> From<&'a ast::PatternOrKeyword> for ComparablePatternOrKeyword<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct MatchClassFields<'a> {
     cls: ComparableExpr<'a>,
-    patterns: ComparablePatternSlice<'a>,
-    keywords: ComparableSlice<'a, ast::kind::PatternKeyword, ComparablePatternKeyword<'a>>,
+    items: ComparableItems<ast::List<'a, ast::PatternArgumentId>, ComparablePatternOrKeyword<'a>>,
 }
 
 fn match_class_fields(node: ast::PatternMatchClass<'_>) -> MatchClassFields<'_> {
     let ast::PatternMatchClassFields { cls, arguments, .. } = node.fields();
-    let ast::PatternArgumentsFields {
-        patterns, keywords, ..
-    } = arguments.fields();
+    let ast::PatternArgumentsFields { items, .. } = arguments.fields();
     MatchClassFields {
         cls: cls.into(),
-        items: ComparableSlice::new(items),
+        items: ComparableItems::new(items),
     }
 }
 
@@ -406,59 +405,65 @@ impl Hash for ComparableNumber<'_> {
 }
 
 /// Borrows a sequence and converts each element as it is visited.
-struct ComparableSlice<'a, T: ast::NodeType, C> {
-    items: ast::NodeList<'a, T>,
+struct ComparableItems<I, C> {
+    items: I,
     comparable: PhantomData<fn() -> C>,
 }
 
-impl<'a, T: ast::NodeType, C> ComparableSlice<'a, T, C> {
-    fn new(items: ast::NodeList<'a, T>) -> Self {
+impl<I, C> ComparableItems<I, C> {
+    fn new(items: I) -> Self {
         Self {
             items,
             comparable: PhantomData,
         }
     }
+}
 
-    fn iter(&self) -> impl Iterator<Item = C>
-    where
-        C: From<T::Borrowed<'a>>,
-    {
-        self.items.iter().map(C::from)
+impl<I: Copy + IntoIterator, C: From<I::Item>> ComparableItems<I, C> {
+    fn iter(&self) -> impl Iterator<Item = C> {
+        self.items.into_iter().map(C::from)
     }
 }
 
-impl<'a, T: ast::NodeType, C: From<T::Borrowed<'a>> + fmt::Debug> fmt::Debug
-    for ComparableSlice<'a, T, C>
-{
+impl<I: Copy + IntoIterator, C: From<I::Item> + fmt::Debug> fmt::Debug for ComparableItems<I, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.iter()).finish()
     }
 }
 
-impl<T: ast::NodeType, C> Default for ComparableSlice<'_, T, C> {
+impl<I: Default, C> Default for ComparableItems<I, C> {
     fn default() -> Self {
-        Self::new(ast::NodeList::default())
+        Self::new(I::default())
     }
 }
 
-impl<'a, T: ast::NodeType, C: From<T::Borrowed<'a>> + PartialEq> PartialEq
-    for ComparableSlice<'a, T, C>
-{
+impl<I: Copy + IntoIterator, C: From<I::Item> + PartialEq> PartialEq for ComparableItems<I, C> {
     fn eq(&self, other: &Self) -> bool {
-        self.items.len() == other.items.len() && self.iter().eq(other.iter())
+        let left = self.iter();
+        let right = other.iter();
+        match (left.size_hint(), right.size_hint()) {
+            ((l, _), (_, Some(r))) if l > r => false,
+            ((_, Some(l)), (r, _)) if r > l => false,
+            _ => left.eq(right),
+        }
     }
 }
 
-impl<'a, T: ast::NodeType, C: From<T::Borrowed<'a>> + Eq> Eq for ComparableSlice<'a, T, C> {}
+impl<I: Copy + IntoIterator, C: From<I::Item> + Eq> Eq for ComparableItems<I, C> {}
 
-impl<'a, T: ast::NodeType, C: From<T::Borrowed<'a>> + Hash> Hash for ComparableSlice<'a, T, C> {
+impl<I: Copy + IntoIterator, C: From<I::Item> + Hash> Hash for ComparableItems<I, C> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.items.len().hash(state);
+        let items = self.items.into_iter();
+        let (min, max) = items.size_hint();
+        let len = if Some(min) == max { min } else { items.count() };
+        len.hash(state);
         for item in self.iter() {
             item.hash(state);
         }
     }
 }
+
+type ComparableSlice<'a, T, C> = ComparableItems<ast::NodeList<'a, T>, C>;
 
 type ComparableStmtSlice<'a> = ComparableSlice<'a, ast::kind::Stmt, ComparableStmt<'a>>;
 type ComparablePatternSlice<'a> = ComparableSlice<'a, ast::kind::Pattern, ComparablePattern<'a>>;
@@ -466,23 +471,30 @@ type ComparableComprehensionSlice<'a> =
     ComparableSlice<'a, ast::kind::Comprehension, ComparableComprehension<'a>>;
 type ComparableExprSlice<'a> = ComparableSlice<'a, ast::kind::Expr, ComparableExpr<'a>>;
 
-#[derive(Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, PartialEq, Eq)]
 struct ComparableArguments<'a> {
-    args: ComparableExprSlice<'a>,
-    keywords: ComparableSlice<'a, ast::kind::Keyword, ComparableKeyword<'a>>,
+    args: ComparableItems<ast::FilteredNodes<'a, ast::kind::Expr>, ComparableExpr<'a>>,
+    keywords: ComparableItems<ast::FilteredNodes<'a, ast::kind::Keyword>, ComparableKeyword<'a>>,
+}
+
+impl Hash for ComparableArguments<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // Equality groups positional arguments and keywords in evaluation order.
+        // A terminator delimits each group without first scanning it for its length.
+        for arg in self.args.iter().map(Some).chain([None]) {
+            arg.hash(state);
+        }
+        for keyword in self.keywords.iter().map(Some).chain([None]) {
+            keyword.hash(state);
+        }
+    }
 }
 
 impl<'a> From<ast::Arguments<'a>> for ComparableArguments<'a> {
     fn from(arguments: ast::Arguments<'a>) -> Self {
-        let ast::ArgumentsFields {
-            args,
-            keywords,
-            range: _,
-            node: _,
-        } = arguments.fields();
         Self {
-            args: ComparableSlice::new(args),
-            keywords: ComparableSlice::new(keywords),
+            args: ComparableItems::new(arguments.args()),
+            keywords: ComparableItems::new(arguments.keywords()),
         }
     }
 }
@@ -510,34 +522,54 @@ impl Hash for ComparableParameters<'_> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct ComparableParametersFields<'a> {
-    posonlyargs:
-        ComparableSlice<'a, ast::kind::ParameterWithDefault, ComparableParameterWithDefault<'a>>,
-    args: ComparableSlice<'a, ast::kind::ParameterWithDefault, ComparableParameterWithDefault<'a>>,
-    vararg: Option<ComparableParameter<'a>>,
-    kwonlyargs:
-        ComparableSlice<'a, ast::kind::ParameterWithDefault, ComparableParameterWithDefault<'a>>,
-    kwarg: Option<ComparableParameter<'a>>,
+struct ComparableParametersFields<'a>(ast::ParameterItems<'a>);
+
+impl fmt::Debug for ComparableParametersFields<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.items()).finish()
+    }
 }
 
 impl<'a> From<ast::Parameters<'a>> for ComparableParametersFields<'a> {
     fn from(parameters: ast::Parameters<'a>) -> Self {
         let ast::ParametersFields {
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
+            items,
             range: _,
             node: _,
         } = parameters.fields();
-        Self {
-            posonlyargs: ComparableSlice::new(posonlyargs),
-            args: ComparableSlice::new(args),
-            vararg: vararg.map(Into::into),
-            kwonlyargs: ComparableSlice::new(kwonlyargs),
-            kwarg: kwarg.map(Into::into),
+        Self(items)
+    }
+}
+
+impl ComparableParametersFields<'_> {
+    fn items(
+        &self,
+    ) -> impl Iterator<
+        Item = ast::ParameterItem<ComparableParameterWithDefault<'_>, ComparableParameter<'_>>,
+    > {
+        self.0.iter().map(|item| match item {
+            ast::ParameterItem::PositionalOnly(p) => ast::ParameterItem::PositionalOnly(p.into()),
+            ast::ParameterItem::PositionalOrKeyword(p) => {
+                ast::ParameterItem::PositionalOrKeyword(p.into())
+            }
+            ast::ParameterItem::KeywordOnly(p) => ast::ParameterItem::KeywordOnly(p.into()),
+            ast::ParameterItem::Vararg(p) => ast::ParameterItem::Vararg(p.into()),
+            ast::ParameterItem::Kwarg(p) => ast::ParameterItem::Kwarg(p.into()),
+        })
+    }
+}
+
+impl PartialEq for ComparableParametersFields<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.len() == other.0.len() && self.items().eq(other.items())
+    }
+}
+impl Eq for ComparableParametersFields<'_> {}
+impl Hash for ComparableParametersFields<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.len().hash(state);
+        for item in self.items() {
+            item.hash(state);
         }
     }
 }

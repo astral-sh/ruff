@@ -90,8 +90,8 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         ..
     }) = parameters
         .posonlyargs()
-        .first()
-        .or_else(|| parameters.args().first())
+        .next()
+        .or_else(|| parameters.args().next())
         .map(ruff_python_ast::ParameterWithDefault::fields)
     else {
         return;

@@ -46,7 +46,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             args if let Some([single]) = args.as_array() => {
                 let arg_type = self.infer_expression(single, TypeContext::default());
 
-                return if arguments.keywords().next().is_none() {
+                return if keywords.is_empty() {
                     arg_type.dunder_class(db, env)
                 } else {
                     if keywords.iter().any(|keyword| keyword.arg().is_some())
@@ -94,7 +94,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             _ => {
-                for arg in arguments.args() {
+                for arg in args {
                     self.infer_expression(arg, TypeContext::default());
                 }
 
@@ -104,7 +104,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     diagnostic.help(format_args!(
                         "`builtins.type()` can either be called with one or three \
                         positional arguments (got {})",
-                        arguments.args().count()
+                        args.len()
                     ));
                 }
 
@@ -131,7 +131,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // If any argument is a starred expression, we can't know how many positional arguments
         // we're receiving, so fall back to `type[Unknown]` to avoid false-positive errors.
-        if arguments.args().any(ast::Expr::is_starred_expr) {
+        if args.iter().any(ast::Expr::is_starred_expr) {
             return SubclassOfType::subclass_of_unknown();
         }
 
@@ -274,7 +274,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     report_instance_layout_conflict(
                         &self.context,
                         dynamic_class.header_range(db),
-                        bases_arg.as_tuple_expr().map(ast::ExprTuple::elts),
+                        |index| {
+                            bases_arg
+                                .as_tuple_expr()
+                                .and_then(|tuple| tuple.elts().get(index))
+                        },
                         &disjoint_bases,
                     );
                 }

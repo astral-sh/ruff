@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
@@ -93,11 +92,10 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &ast::StmtClassDefField
         return;
     }
 
-    let Some(ast::ArgumentsFields { args: bases, .. }) =
-        class.arguments.map(ruff_python_ast::Arguments::fields)
-    else {
+    let Some(arguments) = class.arguments else {
         return;
     };
+    let bases = arguments.args();
 
     // Expect only one base class else return
     let Some([base]) = bases.as_array() else {

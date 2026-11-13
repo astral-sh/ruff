@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, NodeList, Operator};
+use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -67,10 +67,11 @@ impl Violation for PrintfInGetTextFuncCall {
 pub(crate) fn printf_in_gettext_func_call(
     checker: &Checker,
     func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    arguments: ast::Arguments<'_>,
 ) {
+    let args = arguments.args();
     // Check first argument (singular)
-    if let Some(first) = arguments.args().next() {
+    if let Some(first) = args.first() {
         if is_printf_format(first) {
             checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: false }, first.range());
         }
@@ -78,7 +79,7 @@ pub(crate) fn printf_in_gettext_func_call(
 
     // Check second argument (plural) for ngettext calls
     if is_ngettext_call(checker, func)
-        && let Some(second) = arguments.args().nth(1)
+        && let Some(second) = args.get(1)
         && is_printf_format(second)
     {
         checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: true }, second.range());

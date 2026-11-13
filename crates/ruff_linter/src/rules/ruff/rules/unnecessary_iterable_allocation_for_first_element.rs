@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use std::borrow::Cow;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};

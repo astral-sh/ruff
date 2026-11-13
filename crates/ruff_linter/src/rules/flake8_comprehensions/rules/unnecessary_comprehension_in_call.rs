@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Arguments;
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::{Expr, ExprKind, NodeList};
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::FixAvailability;
@@ -94,11 +95,14 @@ pub(crate) fn unnecessary_comprehension_in_call(
     checker: &Checker,
     &expr: &Expr<'_>,
     func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
-    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
+    arguments: Arguments<'_>,
 ) {
-    let mut items = arguments.iter_source_order();
-    let Some(ast::ArgOrKeyword::Arg(arg)) = items.next() else {
+    let args = arguments.args();
+    let keywords = arguments.keywords();
+    if !keywords.is_empty() {
+        return;
+    }
+    let Some(arg) = args.first() else {
         return;
     };
     let (elt, generators) = match arg.classify() {
@@ -154,7 +158,7 @@ pub(crate) fn unnecessary_comprehension_in_call(
             return;
         }
     };
-    if arguments.len() == 1 {
+    if args.len() == 1 {
         // If there's only one argument, remove the list or set brackets.
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_comprehension_in_call(expr, checker.locator(), checker.stylist())

@@ -50,9 +50,7 @@ use ruff_db::{
 use ruff_diagnostics::{Edit, Fix, IsolationLevel};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
-use ruff_python_ast::{
-    self as ast, AnyNode, AstNode, NodeList, PythonVersion, StringFlags, SyntaxNode,
-};
+use ruff_python_ast::{self as ast, AnyNode, AstNode, PythonVersion, StringFlags, SyntaxNode};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -3495,7 +3493,7 @@ pub(crate) fn report_invalid_exception_cause(
 pub(crate) fn report_instance_layout_conflict<'ast>(
     context: &InferContext,
     header_range: TextRange,
-    base_nodes: Option<NodeList<'_, ast::kind::Expr>>,
+    base_node_at: impl Fn(usize) -> Option<ast::Expr<'ast>>,
     disjoint_bases: &IncompatibleBases,
 ) {
     debug_assert!(disjoint_bases.len() > 1);
@@ -5060,7 +5058,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db, 'ast>(
     context: &InferContext<'db, '_>,
     header_range: TextRange,
     explicit_bases: &[Type<'db>],
-    base_nodes: Option<NodeList<'_, ast::kind::Expr>>,
+    base_node_at: impl Fn(usize) -> Option<ast::Expr<'ast>>,
 ) -> bool {
     let db = context.db();
     let env = &context.program_environment();

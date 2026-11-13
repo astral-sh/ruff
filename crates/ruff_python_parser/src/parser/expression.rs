@@ -730,14 +730,12 @@ impl<'src> Parser<'src> {
             return build::Arguments {
                 range: self.node_range(start),
 
-                args: ListId::default(),
-                keywords: ListId::default(),
+                items: ListId::default(),
             }
             .parsed(&mut self.storage);
         }
 
-        let snapshot = self.argument_scratch.snapshot();
-        let mut bare_generators = SmallVec::<[TextRange; 1]>::new();
+        let items_snapshot = self.argument_scratch.snapshot();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -843,24 +841,20 @@ impl<'src> Parser<'src> {
                                 );
                             }
                         }
-                        parser.expr_scratch.push(parsed_expr.expr.id);
+                        parser
+                            .argument_scratch
+                            .push(ast::ArgumentId::Positional(parsed_expr.expr.id));
                     }
                 }
             });
 
         self.expect(TokenKind::Rpar);
 
-        let keywords = self
-            .keyword_scratch
-            .take_range(keywords_snapshot, &mut self.storage);
         let arguments = build::Arguments {
             range: self.node_range(start),
-
-            args: self
-                .expr_scratch
-                .take_range(args_snapshot, &mut self.storage)
-                .into_list(&mut self.storage),
-            keywords: keywords.into_list(&mut self.storage),
+            items: self
+                .argument_scratch
+                .take_range(items_snapshot, &mut self.storage),
         }
         .parsed(&mut self.storage);
 
@@ -889,7 +883,7 @@ impl<'src> Parser<'src> {
 
     fn parse_keyword_argument(&mut self, start: TextSize, name: Option<id::Identifier>) {
         let value = self.parse_conditional_expression_or_higher();
-        self.keyword_scratch.push(
+        self.argument_scratch.push(ast::ArgumentId::Keyword(
             build::Keyword {
                 arg: name.map(|node| node.id),
                 value: value.expr.id,
@@ -897,7 +891,7 @@ impl<'src> Parser<'src> {
             }
             .parsed(&mut self.storage)
             .id,
-        );
+        ));
     }
 
     /// Parses a subscript expression.
@@ -3149,22 +3143,23 @@ impl<'src> Parser<'src> {
     ) {
         let arguments = arguments.view(&self.storage);
         let generator_must_be_parenthesized = match context {
-            ArgumentsContext::Call => {
-                has_trailing_comma || arguments.args().len() + arguments.keywords().len() > 1
-            }
+            ArgumentsContext::Call => has_trailing_comma || arguments.len() > 1,
             // CPython rejects an unparenthesized generator expression as a class base even though
             // this restriction isn't specified in the class definition grammar.
             ArgumentsContext::ClassDefinition => true,
         };
 
         if generator_must_be_parenthesized {
-            let args = arguments.args().id();
-            for index in 0..args.len() {
-                if let Some(generator) = self
-                    .storage
-                    .get_list(args)
-                    .get(index)
-                    .and_then(ast::AstNode::cast::<ast::ExprGenerator>)
+            let items = arguments.items().id();
+            for index in 0..items.len() {
+                if let Some(generator) =
+                    self.storage
+                        .get_list(items)
+                        .get(index)
+                        .and_then(|argument| match argument {
+                            ast::ArgOrKeyword::Arg(expr) => expr.cast::<ast::ExprGenerator>(),
+                            ast::ArgOrKeyword::Keyword(_) => None,
+                        })
                     && !generator.parenthesized()
                 {
                     let range = generator.range();

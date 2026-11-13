@@ -59,7 +59,7 @@ pub(crate) fn is_infinite_iterable(arg: Expr<'_>, semantic: &SemanticModel) -> b
             ["itertools", "cycle" | "count"] => true,
             ["itertools", "repeat"] => {
                 // Ex) `itertools.repeat(1)`
-                if matches!(arguments.items.as_slice(), [ast::Argument::Positional(_)]) {
+                if keywords.is_empty() && args.len() == 1 {
                     return true;
                 }
 

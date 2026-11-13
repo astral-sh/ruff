@@ -61,15 +61,14 @@ pub(crate) fn no_slots_in_tuple_subclass(
     if checker.source_type.is_stub() {
         return;
     }
-    let Some(ast::ArgumentsFields { args: bases, .. }) =
-        class.arguments.map(ruff_python_ast::Arguments::fields)
-    else {
+    let Some(arguments) = class.arguments else {
         return;
     };
+    let bases = arguments.args();
 
     let semantic = checker.semantic();
 
-    if arguments.args().any(|base| {
+    if bases.iter().any(|base| {
         let base = map_subscript(base);
         semantic.match_builtin_expr(base, "tuple") || semantic.match_typing_expr(base, "Tuple")
     }) {

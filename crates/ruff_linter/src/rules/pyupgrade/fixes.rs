@@ -1,7 +1,5 @@
 use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::{
-    self as ast, BuildId, Builder, Expr, ListId, NodeList, Stmt, StmtImportFrom, build,
-};
+use ruff_python_ast::{self as ast, BuildId, Builder, Expr, ListId, Stmt, StmtImportFrom, build};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -43,7 +41,9 @@ pub(super) struct ClassField<'a> {
 }
 
 impl<'a> ClassField<'a> {
-    pub(super) fn from_keywords(keywords: NodeList<'a, ast::kind::Keyword>) -> Option<Vec<Self>> {
+    pub(super) fn from_keywords(
+        keywords: ast::FilteredNodes<'a, ast::kind::Keyword>,
+    ) -> Option<Vec<Self>> {
         keywords
             .iter()
             .map(|keyword| {
@@ -76,7 +76,7 @@ pub(super) fn functional_to_class_fix(
     name: &str,
     base: Expr<'_>,
     fields: Vec<ClassField<'_>>,
-    keywords: NodeList<'_, ast::kind::Keyword>,
+    keywords: ast::FilteredNodes<'_, ast::kind::Keyword>,
 ) -> Fix {
     let mut builder = Builder::default();
     let body = if fields.is_empty() {
@@ -88,12 +88,17 @@ pub(super) fn functional_to_class_fix(
         builder.map_list(fields, |builder, field| field.into_statement(builder))
     };
     let name = syntax::identifier(&mut builder, name);
-    let args = builder.copy_nodes([base]);
-    let keywords = builder.copy_nodes(keywords);
+    let items = builder.map_list(
+        std::iter::once(ast::ArgOrKeyword::Arg(base))
+            .chain(keywords.iter().map(ast::ArgOrKeyword::Keyword)),
+        |b, item| match item {
+            ast::ArgOrKeyword::Arg(expr) => ast::ArgumentId::Positional(b.copy_node(expr)),
+            ast::ArgOrKeyword::Keyword(kw) => ast::ArgumentId::Keyword(b.copy_node(kw)),
+        },
+    );
     let arguments = builder.add(build::Arguments {
         range: TextRange::default(),
-        args,
-        keywords,
+        items,
     });
     let class = builder.add(build::StmtClassDef {
         range: TextRange::default(),

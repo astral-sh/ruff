@@ -1,8 +1,8 @@
-use ruff_python_ast::Arguments;
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Builder, Expr, ExprKind, NodeList};
+use ruff_python_ast::Arguments;
+use ruff_python_ast::{Builder, Expr, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -95,8 +95,9 @@ pub(crate) fn use_pep604_isinstance(
     checker: &Checker,
     &expr: &Expr<'_>,
     func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    arguments: Arguments<'_>,
 ) {
+    let args = arguments.args();
     let Some(types) = args.get(1) else {
         return;
     };

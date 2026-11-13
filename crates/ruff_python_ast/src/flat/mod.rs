@@ -40,8 +40,9 @@ pub mod visitor;
 pub use children::{Children, Descendants};
 pub use generated::*;
 pub use list::{
-    FStringPartId, FStringPartView, Iter as ListIter, List, ListId, ListItem, MappingPatternItemId,
-    MappingPatternItems, MappingPatternItemsId,
+    ArgumentId, FStringPartId, FStringPartView, FilteredNodes, Iter as ListIter, List, ListId,
+    ListItem, MappingPatternItemId, MappingPatternItems, MappingPatternItemsId, ParameterItemId,
+    ParameterItems, ParameterItemsId, PatternArgumentId,
 };
 pub use literal::LiteralWriter;
 pub use nodes::{

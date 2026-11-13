@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use std::{fmt, iter};
 
 use regex::Regex;

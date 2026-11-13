@@ -1,5 +1,6 @@
+use ruff_python_ast::Arguments;
 use ruff_python_ast::{
-    Builder, Expr, ExprContext, ExprFields, ExprStringLiteralFields, NodeList, StmtKind, build,
+    Builder, Expr, ExprContext, ExprFields, ExprStringLiteralFields, StmtKind, build,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -69,8 +70,9 @@ pub(crate) fn delattr_with_constant(
     checker: &Checker,
     &expr: &Expr<'_>,
     func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    arguments: Arguments<'_>,
 ) {
+    let args = arguments.args();
     if !checker.semantic().match_builtin_expr(func, "delattr") {
         return;
     }

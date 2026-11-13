@@ -1,4 +1,5 @@
-use ruff_python_ast::{BuildId, Builder, Expr, ExprKind, NodeList};
+use ruff_python_ast::{Arguments, FilteredNodes};
+use ruff_python_ast::{BuildId, Builder, Expr, ExprKind};
 use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -102,10 +103,10 @@ impl MinMax {
     /// Converts a function call [`Expr`] into a [`MinMax`] if it is a call to `min` or `max`.
     fn try_from_call(
         func: Expr<'_>,
-        keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
+        keywords: FilteredNodes<'_, ruff_python_ast::kind::Keyword>,
         semantic: &SemanticModel,
     ) -> Option<MinMax> {
-        if arguments.keywords().next().is_some() {
+        if !keywords.is_empty() {
             return None;
         }
         match semantic.resolve_builtin_symbol(func)? {
@@ -129,7 +130,7 @@ impl std::fmt::Display for MinMax {
 fn collect_nested_args(
     builder: &mut Builder,
     min_max: MinMax,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    args: FilteredNodes<'_, ruff_python_ast::kind::Expr>,
     semantic: &SemanticModel,
     flattened: &mut Vec<BuildId<ruff_python_ast::kind::Expr>>,
 ) {
@@ -157,9 +158,10 @@ pub(crate) fn nested_min_max(
     checker: &Checker,
     &expr: &Expr<'_>,
     func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
-    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
+    arguments: Arguments<'_>,
 ) {
+    let args = arguments.args();
+    let keywords = arguments.keywords();
     let Some(min_max) = MinMax::try_from_call(func, keywords, checker.semantic()) else {
         return;
     };
@@ -167,7 +169,7 @@ pub(crate) fn nested_min_max(
     // When the outer call has a single argument, flattening would change the semantics by
     // changing the shape of the call from treating the inner result as an iterable (or a scalar)
     // to passing multiple arguments directly, which can lead to behavioral changes.
-    if arguments.len() < 2 {
+    if args.len() < 2 {
         return;
     }
 
@@ -191,10 +193,9 @@ pub(crate) fn nested_min_max(
             checker.semantic(),
             &mut flattened,
         );
-        let args = builder.list(flattened);
-        let keywords = builder.copy_nodes(keywords);
+        let items = builder.list(flattened).into();
         let func = builder.copy_node(func);
-        let replacement = syntax::call_with_keywords(&mut builder, func, args, keywords);
+        let replacement = syntax::call(&mut builder, func, items);
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             checker.generator().expr(builder.get(replacement)),
             expr.range(),

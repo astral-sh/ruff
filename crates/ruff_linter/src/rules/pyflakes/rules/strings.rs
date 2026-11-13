@@ -7,7 +7,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, ExprKind, Identifier, NodeList};
+use ruff_python_ast::{self as ast, Expr, ExprKind, Identifier};
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -561,11 +561,11 @@ impl Violation for StringDotFormatMixingAutomatic {
     }
 }
 
-fn has_star_star_kwargs(keywords: NodeList<'_, ruff_python_ast::kind::Keyword>) -> bool {
+fn has_star_star_kwargs(keywords: ast::FilteredNodes<'_, ruff_python_ast::kind::Keyword>) -> bool {
     keywords.iter().any(|keyword| keyword.arg().is_none())
 }
 
-fn has_star_args(args: NodeList<'_, ruff_python_ast::kind::Expr>) -> bool {
+fn has_star_args(args: ast::FilteredNodes<'_, ruff_python_ast::kind::Expr>) -> bool {
     args.iter().any(ruff_python_ast::Expr::is_starred_expr)
 }
 
@@ -816,11 +816,11 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     checker: &Checker,
     call_fields: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
-    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
 ) {
+    let keywords = call_fields.arguments.keywords();
     let call = call_fields.node;
     // If there are any **kwargs, abort.
-    if has_star_star_kwargs(&call.arguments) {
+    if has_star_star_kwargs(keywords) {
         return;
     }
 
@@ -882,24 +882,42 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     checker: &Checker,
     call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
 ) {
     // We can only fix if the positional arguments we're removing don't require re-indexing
     // the format string itself. For example, we can't fix `"{1}{2}".format(0, 1, 2)"`, since
     // this requires changing the format string to `"{0}{1}"`. But we can fix
     // `"{0}{1}".format(0, 1, 2)`, since this only requires modifying the call arguments.
-    let mut missing = Vec::new();
-    let mut side_effects = false;
-    let mut can_fix = true;
-    for (index, arg) in call.arguments.args().enumerate() {
-        if arg.is_starred_expr()
-            || summary.autos.contains(&index)
-            || summary.indices.contains(&index)
-        {
-            if !missing.is_empty() {
-                can_fix = false;
+    fn is_contiguous_from_end(indexes: &[usize], target_len: usize) -> bool {
+        if indexes.is_empty() {
+            return true;
+        }
+
+        let mut expected_index = target_len - 1;
+        for &index in indexes.iter().rev() {
+            if index != expected_index {
+                return false;
             }
-        } else {
+
+            if expected_index == 0 {
+                break;
+            }
+
+            expected_index -= 1;
+        }
+
+        true
+    }
+
+    let args = call.arguments.args();
+
+    let mut side_effects = false;
+    let missing: Vec<usize> = args
+        .iter()
+        .enumerate()
+        .filter(|(i, arg)| {
+            !(arg.is_starred_expr() || summary.autos.contains(i) || summary.indices.contains(i))
+        })
+        .map(|(i, arg)| {
             side_effects |= contains_effect(arg, |id| checker.semantic().has_builtin_binding(id));
             missing.push(index);
         }
@@ -945,36 +963,26 @@ pub(crate) fn string_dot_format_missing_argument(
     checker: &Checker,
     call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
-    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
 ) {
-    let mut positional_count = 0;
-    let mut keywords = FxHashSet::default();
-    for argument in call.arguments.iter_source_order() {
-        match argument {
-            ast::ArgOrKeyword::Arg(arg) if !arg.is_starred_expr() => positional_count += 1,
-            ast::ArgOrKeyword::Keyword(keyword) if let Some(name) = &keyword.arg => {
-                keywords.insert(name.id());
-            }
-            _ => return,
-        }
+    let args = call.arguments.args();
+    let keywords = call.arguments.keywords();
+    if has_star_args(args) || has_star_star_kwargs(keywords) {
+        return;
     }
 
-    let keywords: FxHashSet<_> = call
-        .arguments
-        .keywords()
+    let keywords: FxHashSet<_> = keywords
+        .iter()
         .filter_map(|k| {
             let arg = k.arg();
             arg.map(Identifier::id)
         })
         .collect();
 
-    let positional_count = call.arguments.args().count();
     let missing: Vec<String> = summary
         .autos
         .iter()
         .chain(&summary.indices)
-        .filter(|&&i| i >= positional_count)
+        .filter(|&&i| i >= args.len())
         .map(ToString::to_string)
         .chain(
             summary

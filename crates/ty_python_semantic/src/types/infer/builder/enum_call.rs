@@ -334,12 +334,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let start_kw = call_expr.arguments().find_keyword("start");
         let type_kw = call_expr.arguments().find_keyword("type");
 
-        let mut positional = arguments.args();
-        let first = positional.next();
-        let second = positional.next();
         let has_positional_keyword_conflict =
-            (first.is_some() && value_kw.is_some()) || (second.is_some() && names_kw.is_some());
-        if first.is_some()
+            (!args.is_empty() && value_kw.is_some()) || (args.len() >= 2 && names_kw.is_some());
+        if !args.is_empty()
             && let Some(keyword) = value_kw
             && let Some(builder) = self
                 .context
@@ -350,7 +347,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 base_name = base_class.name(self.program_environment().python_version(db)),
             ));
         }
-        if second.is_some()
+        if args.len() >= 2
             && let Some(keyword) = names_kw
             && let Some(builder) = self
                 .context
@@ -369,7 +366,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let env = self.program_environment();
 
         let Some(names_arg) = names_arg else {
-            for arg in arguments.args() {
+            for arg in args {
                 self.infer_expression(arg, TypeContext::default());
             }
             for kw in keywords {
@@ -395,7 +392,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return Some(base_class.to_instance(db, env));
         };
 
-        for arg in arguments.args() {
+        for arg in args {
             self.infer_expression(arg, TypeContext::default());
         }
         for kw in keywords {
@@ -411,16 +408,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Only 1 extra positional arg is allowed (the `names` parameter).
         // `Enum("Color", "RED", "GREEN")` is invalid at runtime.
-        let first_extra_arg = positional.next();
-        let has_too_many_positional = first_extra_arg.is_some();
-        if let Some(extra_arg) = first_extra_arg
+        let has_too_many_positional = args.len() > 2;
+        if has_too_many_positional
             && let Some(builder) = self
                 .context
                 .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, args.at(2))
         {
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to function `{base_name}`: expected 2, got {}",
-                3 + positional.count(),
+                args.len(),
                 base_name = base_class.name(self.program_environment().python_version(db)),
             ));
         }

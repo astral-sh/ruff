@@ -63,7 +63,7 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: Stmt<'_>, body: Suite<
         return;
     };
 
-    if !parent.bases().any(|expr| {
+    if !parent.bases().iter().any(|expr| {
         semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "Enum"]))

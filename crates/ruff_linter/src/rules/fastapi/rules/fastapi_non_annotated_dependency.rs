@@ -121,7 +121,6 @@ pub(crate) fn fastapi_non_annotated_dependency(
     for parameter in function_def
         .parameters
         .args()
-        .iter()
         .chain(function_def.parameters.kwonlyargs())
     {
         let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default())

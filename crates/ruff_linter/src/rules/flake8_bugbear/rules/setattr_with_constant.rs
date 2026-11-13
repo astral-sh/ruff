@@ -1,4 +1,5 @@
-use ruff_python_ast::{Builder, Expr, ExprContext, ExprKind, NodeList, StmtKind, build};
+use ruff_python_ast::Arguments;
+use ruff_python_ast::{Builder, Expr, ExprContext, ExprKind, StmtKind, build};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -93,8 +94,9 @@ pub(crate) fn setattr_with_constant(
     checker: &Checker,
     &expr: &Expr<'_>,
     func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    arguments: Arguments<'_>,
 ) {
+    let args = arguments.args();
     let Some([obj, name, value]) = args.as_array() else {
         return;
     };

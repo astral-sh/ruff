@@ -149,20 +149,19 @@ pub(crate) fn unexpected_special_method_signature(
     }
 
     // Ignore methods with keyword-only parameters or variadic parameters.
-    if !parameters.kwonlyargs().is_empty() || parameters.kwarg().is_some() {
+    if parameters.kwonlyargs().next().is_some() || parameters.kwarg().is_some() {
         return;
     }
 
     // Method has no parameter, will be caught by no-method-argument (E0211/N805).
-    if parameters.args().is_empty() && parameters.vararg().is_none() {
+    if parameters.args().next().is_none() && parameters.vararg().is_none() {
         return;
     }
 
-    let actual_params = parameters.args().len() + parameters.posonlyargs().len();
+    let actual_params = parameters.args().count() + parameters.posonlyargs().count();
     let mandatory_params = parameters
         .args()
-        .iter()
-        .chain(parameters.posonlyargs().iter())
+        .chain(parameters.posonlyargs())
         .filter(|arg| arg.default().is_none())
         .count();
 

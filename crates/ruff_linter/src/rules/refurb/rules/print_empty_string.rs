@@ -274,36 +274,30 @@ impl EmptyStringFix {
         }
 
         let mut builder = Builder::default();
-        // Remove all empty string positional arguments.
-        let args = builder.copy_nodes(
-            call.arguments()
-                .args()
-                .iter()
-                .filter(|arg| !is_empty_string(*arg)),
-        );
-        // Remove the `sep` keyword argument if it exists.
-        let keywords = builder.copy_nodes(call.arguments().keywords().iter().filter(|keyword| {
-            if separator != Separator::Remove {
-                return true;
-            }
-            let Some(arg) = keyword.arg() else {
-                return true;
-            };
-
-            if arg.as_str() != "sep" {
-                return true;
-            }
-
-            if !is_known_valid_separator(keyword.value()) {
-                applicability = Applicability::Unsafe;
-            }
-
-            false
-        }));
+        let kept = call
+            .arguments()
+            .items()
+            .iter()
+            .filter(|argument| match argument {
+                ast::ArgOrKeyword::Arg(arg) => !is_empty_string(*arg),
+                ast::ArgOrKeyword::Keyword(keyword)
+                    if separator == Separator::Remove
+                        && keyword.arg().is_some_and(|name| name == "sep") =>
+                {
+                    if !is_known_valid_separator(keyword.value()) {
+                        applicability = Applicability::Unsafe;
+                    }
+                    false
+                }
+                ast::ArgOrKeyword::Keyword(_) => true,
+            });
+        let items = builder.map_list(kept, |b, argument| match argument {
+            ast::ArgOrKeyword::Arg(arg) => ast::ArgumentId::Positional(b.copy_node(arg)),
+            ast::ArgOrKeyword::Keyword(kw) => ast::ArgumentId::Keyword(b.copy_node(kw)),
+        });
         let arguments = builder.add(build::Arguments {
             range: call.arguments().range(),
-            args,
-            keywords,
+            items,
         });
         let func = builder.copy_node(call.func());
         let replacement = builder.add(build::ExprCall {

@@ -168,7 +168,7 @@ fn match_remove(if_stmt: ast::StmtIf<'_>) -> Option<(Expr<'_>, ast::ExprName<'_>
 
     let [arg] = args.as_array()?;
 
-    if func_name != "remove" || arguments.keywords().next().is_some() {
+    if func_name != "remove" || !keywords.is_empty() {
         return None;
     }
 

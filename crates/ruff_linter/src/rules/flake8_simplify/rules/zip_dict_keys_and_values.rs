@@ -69,7 +69,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCallFi
     let arguments = expr.arguments;
     let args = arguments.args();
     let keywords = arguments.keywords();
-    match keywords.slice(..) {
+    match keywords {
         keywords if keywords.is_empty() => {}
         keywords
             if let Some(
@@ -82,7 +82,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCallFi
                 && name.as_str() == "strict" => {}
         _ => return,
     }
-    let Some([arg1, arg2]) = args.slice(..).as_array() else {
+    let Some([arg1, arg2]) = args.as_array() else {
         return;
     };
     let Some((var1, attr1, args1)) = get_var_attr_args(arg1) else {

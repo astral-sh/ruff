@@ -2,16 +2,16 @@
 
 pub mod source_order;
 
-use itertools::Either;
+use super::AnyParameter;
 
 use super::{AstNode, AstNodeId, FStringPartView, List};
 use crate::flat;
 
 use crate::{
-    Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, DictItem,
-    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, InterpolatedStringElement, Keyword,
-    MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt,
-    StringLiteral, TString, TypeParam, TypeParams, UnaryOp, WithItem,
+    Alias, ArgOrKeyword, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
+    DictItem, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, InterpolatedStringElement,
+    Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword,
+    Stmt, StringLiteral, TString, TypeParam, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -529,13 +529,24 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
 }
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: Arguments<'a>) {
-    // Note that there might be keywords before the last arg, e.g. in
-    // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
-    // `keywords`. See also [Arguments::arguments_source_order`].
-    for arg in arguments.args() {
-        visitor.visit_expr(arg);
+    // In `f(first(), key=second(), *third())`, Python evaluates `first` and
+    // `third` before `second`. Only the suffix after the first keyword can
+    // still contain positional arguments that must move ahead of it.
+    let mut items = arguments.iter_source_order();
+    let first_keyword = loop {
+        match items.next() {
+            Some(ArgOrKeyword::Arg(arg)) => visitor.visit_expr(arg),
+            Some(ArgOrKeyword::Keyword(keyword)) => break keyword,
+            None => return,
+        }
+    };
+    for item in items.clone() {
+        if let ArgOrKeyword::Arg(arg) = item {
+            visitor.visit_expr(arg);
+        }
     }
-    for keyword in arguments.keywords() {
+    visitor.visit_keyword(first_keyword);
+    for keyword in items.filter_map(ArgOrKeyword::as_keyword) {
         visitor.visit_keyword(keyword);
     }
 }
@@ -744,40 +755,7 @@ pub fn walk_bytes_literal<'a, V: Visitor<'a> + ?Sized>(
 }
 
 impl<'a> Parameters<'a> {
-    pub fn iter_non_variadic_params(
-        self,
-    ) -> impl DoubleEndedIterator<Item = crate::ParameterWithDefault<'a>> {
-        if self.has_only_regular_args() {
-            return Either::Left(self.args().iter());
-        }
-        Either::Right(
-            self.posonlyargs()
-                .iter()
-                .chain(self.args())
-                .chain(self.kwonlyargs()),
-        )
-    }
-
     pub fn all_parameters(self) -> impl DoubleEndedIterator<Item = Parameter<'a>> {
-        if self.has_only_regular_args() {
-            return Either::Left(
-                self.args()
-                    .iter()
-                    .map(super::super::generated::ParameterWithDefault::parameter),
-            );
-        }
-        Either::Right(
-            self.posonlyargs()
-                .iter()
-                .chain(self.args())
-                .map(super::super::generated::ParameterWithDefault::parameter)
-                .chain(self.vararg())
-                .chain(
-                    self.kwonlyargs()
-                        .iter()
-                        .map(super::super::generated::ParameterWithDefault::parameter),
-                )
-                .chain(self.kwarg()),
-        )
+        self.iter().map(AnyParameter::as_parameter)
     }
 }

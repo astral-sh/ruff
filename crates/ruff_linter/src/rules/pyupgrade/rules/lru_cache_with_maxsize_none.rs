@@ -75,7 +75,8 @@ pub(crate) fn lru_cache_with_maxsize_none(
         let keywords = arguments.keywords();
 
         // Look for, e.g., `import functools; @functools.lru_cache(maxsize=None)`.
-        if let [ast::Argument::Keyword(keyword)] = arguments.items.as_slice()
+        if args.is_empty()
+            && keywords.len() == 1
             && checker
                 .semantic()
                 .resolve_qualified_name(func)

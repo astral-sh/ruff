@@ -271,7 +271,7 @@ pub(crate) fn unused_private_protocol(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        if !class_def.bases().any(|base| {
+        if !class_def.bases().iter().any(|base| {
             checker
                 .semantic()
                 .match_typing_expr(map_subscript(base), "Protocol")

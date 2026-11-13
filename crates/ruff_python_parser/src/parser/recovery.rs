@@ -103,28 +103,31 @@ impl Parser<'_> {
                 let arguments = node.arguments();
                 let arguments_range = arguments.range();
                 debug_assert_eq!(range.end(), arguments_range.end());
-                let patterns = arguments.patterns().id();
-                let keyword_patterns = arguments.keywords().id();
-                let args = self.patterns_to_exprs(patterns);
-                let mut keywords = Vec::with_capacity(keyword_patterns.len());
-                for index in 0..keyword_patterns.len() {
-                    let keyword = self.storage.get_list(keyword_patterns).at(index);
-                    let range = keyword.range();
-                    let arg = keyword.attr().build_id();
-                    let value = self.pattern_to_expr(keyword.pattern().build_id());
-                    keywords.push(
-                        build::Keyword {
-                            range,
-                            arg: Some(arg),
-                            value: value.id,
+                let items = arguments.items().id();
+                let mut converted = Vec::with_capacity(items.len());
+                for index in 0..items.len() {
+                    let argument = match self.storage.get_list(items).at(index) {
+                        ast::PatternOrKeyword::Pattern(pattern) => {
+                            ast::ArgumentId::Positional(self.pattern_to_expr(pattern.build_id()).id)
                         }
-                        .parsed(&mut self.storage),
-                    );
+                        ast::PatternOrKeyword::Keyword(keyword) => {
+                            let range = keyword.range();
+                            let arg = keyword.attr().build_id();
+                            let value = self.pattern_to_expr(keyword.pattern().build_id());
+                            let keyword = build::Keyword {
+                                range,
+                                arg: Some(arg),
+                                value: value.id,
+                            }
+                            .parsed(&mut self.storage);
+                            ast::ArgumentId::Keyword(keyword.id)
+                        }
+                    };
+                    converted.push(argument);
                 }
                 let arguments = build::Arguments {
                     range: arguments_range,
-                    args: self.storage.list(args),
-                    keywords: self.storage.list(keywords),
+                    items: self.storage.list(converted),
                 }
                 .parsed(&mut self.storage);
                 build::ExprCall {

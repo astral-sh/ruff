@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, NodeList};
+use ruff_python_ast::Arguments;
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -66,8 +67,9 @@ pub(crate) fn unnecessary_call_around_sorted(
     checker: &Checker,
     &expr: &Expr<'_>,
     outer_func: Expr<'_>,
-    args: NodeList<'_, ruff_python_ast::kind::Expr>,
+    arguments: Arguments<'_>,
 ) {
+    let args = arguments.args();
     let Some(inner_call) = args.first().and_then(ruff_python_ast::Expr::as_call_expr) else {
         return;
     };

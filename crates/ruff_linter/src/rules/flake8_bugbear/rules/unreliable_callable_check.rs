@@ -1,6 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprKind, NodeList};
+use ruff_python_ast::Arguments;
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -91,13 +92,15 @@ pub(crate) fn unreliable_callable_check(
     checker: &Checker,
     &expr: &Expr<'_>,
     func: Expr<'_>,
-    args: NodeList<'_, ast::kind::Expr>,
-    keywords: NodeList<'_, ast::kind::Keyword>,
+    arguments: Arguments<'_>,
 ) {
-    if arguments.keywords().next().is_some() {
+    let args = arguments.args();
+    let keywords = arguments.keywords();
+    if !keywords.is_empty() {
         return;
     }
-    let Some(([obj, attr], _)) = args.split_first_chunk() else {
+    let mut positional = args.iter();
+    let (Some(obj), Some(attr)) = (positional.next(), positional.next()) else {
         return;
     };
     let ExprKind::StringLiteral(string_literal) = attr.classify() else {
@@ -111,8 +114,20 @@ pub(crate) fn unreliable_callable_check(
         return;
     };
 
-    if !(builtins_function == "getattr" || (builtins_function == "hasattr" && arguments.len() == 2))
-    {
+    // Validate function arguments based on function name
+    let valid_args = match builtins_function {
+        "hasattr" => {
+            // hasattr should have exactly 2 positional arguments and no keywords
+            args.len() == 2
+        }
+        "getattr" => {
+            // getattr should have 2 or 3 positional arguments and no keywords
+            args.len() == 2 || args.len() == 3
+        }
+        _ => return,
+    };
+
+    if !valid_args {
         return;
     }
 

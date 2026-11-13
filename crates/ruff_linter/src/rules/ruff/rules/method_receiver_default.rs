@@ -109,8 +109,8 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
     // Get the first parameter (the receiver)
     let Some(first_param) = parameters
         .posonlyargs()
-        .first()
-        .or_else(|| parameters.args().first())
+        .next()
+        .or_else(|| parameters.args().next())
     else {
         return;
     };

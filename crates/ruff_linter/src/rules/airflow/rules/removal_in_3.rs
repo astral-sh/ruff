@@ -1138,7 +1138,7 @@ fn check_airflow_plugin_extension(
     class_def: StmtClassDef<'_>,
 ) {
     if matches!(name, "executors" | "operators" | "sensors" | "hooks") {
-        if class_def.bases().any(|class_base| {
+        if class_def.bases().iter().any(|class_base| {
             checker
                 .semantic()
                 .resolve_qualified_name(class_base)

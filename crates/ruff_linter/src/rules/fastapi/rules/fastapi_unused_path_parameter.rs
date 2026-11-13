@@ -183,7 +183,6 @@ pub(crate) fn fastapi_unused_path_parameter(
         let is_positional = function_def
             .parameters
             .posonlyargs()
-            .iter()
             .any(|param| param.name() == path_param);
 
         let mut diagnostic = checker.report_diagnostic(
@@ -216,7 +215,6 @@ fn non_posonly_non_variadic_parameters(
     function_def
         .parameters()
         .args()
-        .iter()
         .chain(function_def.parameters().kwonlyargs())
 }
 
@@ -395,6 +393,7 @@ impl<'a> Dependency<'a> {
 
         let parameter_names = if class_def
             .bases()
+            .iter()
             .any(|expr| is_pydantic_base_model(expr, semantic))
         {
             class_def

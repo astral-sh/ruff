@@ -2400,6 +2400,7 @@ impl<'a> SemanticModel<'a> {
         self.current_scopes().any(|scope| match scope.kind {
             ScopeKind::Class(class_def) => class_def
                 .bases()
+                .iter()
                 .any(|base| self.match_typing_expr(map_subscript(base), "Protocol")),
             ScopeKind::Function(function_def) => {
                 visibility::is_abstract(function_def.decorator_list(), self)

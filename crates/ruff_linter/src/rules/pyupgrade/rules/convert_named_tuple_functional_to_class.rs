@@ -126,7 +126,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
             typename,
             call.func(),
             fields,
-            NodeList::default(),
+            ruff_python_ast::FilteredNodes::default(),
         ));
     }
 }

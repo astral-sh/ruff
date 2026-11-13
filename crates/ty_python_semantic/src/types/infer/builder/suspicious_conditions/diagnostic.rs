@@ -861,9 +861,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && let (ExprKind::Call(call), other) | (other, ExprKind::Call(call)) =
                 (left.classify(), single_comparator.classify())
             && matches!(single_op, CmpOp::Eq | CmpOp::NotEq)
-            && let ast::ArgumentsFields { args, keywords, .. } = call.arguments().fields()
-            && keywords.is_empty()
-            && let Some([single_arg]) = args.as_array()
+            && let Some([ast::ArgOrKeyword::Arg(single_arg)]) = call.arguments().items().as_array()
             && let Type::FunctionLiteral(function) = self.expression_type(call.func())
             && function.is_known(db, KnownFunction::Len)
             && self.expression_type(other.view()).is_int_literal()

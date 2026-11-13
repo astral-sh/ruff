@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Builder, Expr, ExprKind, ListId, visitor};
+use ruff_python_ast::{self as ast, Builder, Expr, ExprKind, visitor};
 use ruff_python_codegen::Generator;
 use ruff_text_size::Ranged;
 
@@ -171,8 +171,10 @@ fn match_read_call(expr: Expr<'_>) -> Option<Expr<'_>> {
 fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
     let mut builder = Builder::default();
     let method = syntax::name(&mut builder, open.mode.pathlib_method());
-    let keywords = builder.copy_nodes(open.keywords.iter().copied());
-    let call = syntax::call_with_keywords(&mut builder, method, ListId::default(), keywords);
+    let items = builder.map_list(open.keywords.iter().copied(), |builder, kw| {
+        ast::ArgumentId::Keyword(builder.copy_node(kw))
+    });
+    let call = syntax::call(&mut builder, method, items);
     generator.expr(builder.get(call))
 }
 fn generate_fix(

@@ -2721,7 +2721,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             &OrderSet::new(),
         );
         validate_typed_dict_required_keys(context, typed_dict, &provided_keys, error_node);
-    } else if let Some(arg) = positional_arg {
+    } else if has_single_positional_arg {
         // Single positional argument: check if assignable to the target TypedDict.
         // This handles TypedDict, intersections, unions, and type aliases correctly.
         // Assignability already checks for required keys and type compatibility,

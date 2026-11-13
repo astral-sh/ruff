@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, ExprBooleanLiteral, ExprKind, Number, UnaryOp};

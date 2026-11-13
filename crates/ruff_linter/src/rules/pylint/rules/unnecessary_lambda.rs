@@ -93,7 +93,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: ExprLambda<'_>) {
     // defaults provided by the lambda are the same as the defaults provided by the inner
     // function.
     if parameters.is_some_and(|parameters| {
-        parameters.args().iter().any(|parameter_with_default| {
+        parameters.args().any(|parameter_with_default| {
             let default = parameter_with_default.default();
             default.is_some()
         })
@@ -185,7 +185,6 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: ExprLambda<'_>) {
             // Ex) `lambda x, y: func(x, y)`
             let lambda_posargs: Vec<Parameter<'_>> = parameters
                 .args()
-                .iter()
                 .map(ast::ParameterWithDefault::parameter)
                 .collect::<Vec<_>>();
             if call_posargs.len() != lambda_posargs.len() {

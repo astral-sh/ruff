@@ -101,11 +101,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let fields_arg = args
             .get(1)
             .or_else(|| fields_keyword.map(ast::Keyword::value));
-        let rest = args.slice(2.min(args.len())..);
+        let rest = args.skip_front(2);
 
         // Check if we have both required arguments.
         let (Some(name_arg), Some(fields_arg)) = (name_arg, fields_arg) else {
-            for arg in arguments.args() {
+            for arg in args {
                 self.infer_expression(arg, TypeContext::default());
             }
             for kw in keywords {
@@ -136,10 +136,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let name_type = self.infer_expression(name_arg, TypeContext::default());
 
-        if first_extra.is_some() {
-            for arg in arguments.args().skip(2) {
-                self.infer_expression(arg, TypeContext::default());
-            }
+        for arg in rest {
+            self.infer_expression(arg, TypeContext::default());
         }
 
         // If any argument is a starred expression or any keyword is a double-starred expression,
@@ -162,13 +160,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Check for excess positional arguments (only `typename` and `fields` are expected).
-        if let Some(first_extra_arg) = first_extra {
+        if !rest.is_empty() {
             if let Some(builder) = self
                 .context
                 .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, rest.at(0))
             {
                 builder.into_diagnostic(format_args!(
-                    "Too many positional arguments to function `{kind}`: expected 2, got {positional_count}"
+                    "Too many positional arguments to function `{kind}`: expected 2, got {}",
+                    args.len()
                 ));
             }
         }
@@ -178,7 +177,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut defaults_kw: Option<ast::Keyword<'_>> = None;
         let mut rename_type = None;
 
-        for kw in arguments.keywords() {
+        for kw in keywords {
             // `kw.arg` is `None` for double-starred kwargs (`**kwargs`), but we already
             // returned early above if there were any, so this should always be `Some`.
             let arg = kw
@@ -272,7 +271,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // `typename` is valid as a keyword argument only for `collections.namedtuple`.
                 // If it was already provided positionally, emit an error.
                 "typename" if kind.is_collections() => {
-                    if first.is_some() {
+                    if !args.is_empty() {
                         if let Some(builder) =
                             self.context.report_lint(&PARAMETER_ALREADY_ASSIGNED, kw)
                         {
@@ -285,7 +284,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // `field_names` is valid only for `collections.namedtuple`.
                 // If it was already provided positionally, emit an error.
                 "field_names" if kind.is_collections() => {
-                    if second.is_some() {
+                    if args.len() >= 2 {
                         if let Some(builder) =
                             self.context.report_lint(&PARAMETER_ALREADY_ASSIGNED, kw)
                         {

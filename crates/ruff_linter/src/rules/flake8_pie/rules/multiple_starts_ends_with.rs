@@ -92,7 +92,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, &expr: &Expr<'_>) {
         let args = arguments.args();
         let keywords = arguments.keywords();
 
-        if arguments.keywords().next().is_some() {
+        if !keywords.is_empty() {
             continue;
         }
 

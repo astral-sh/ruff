@@ -83,8 +83,7 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<A
     };
     let bases = arguments.args();
 
-    let mut seen: FxHashSet<&str> =
-        FxHashSet::with_capacity_and_hasher(arguments.len(), FxBuildHasher);
+    let mut seen: FxHashSet<&str> = FxHashSet::with_capacity_and_hasher(bases.len(), FxBuildHasher);
     for base in bases {
         if let ExprKind::Name(name_node) = base.classify() {
             let id = name_node.id();

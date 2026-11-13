@@ -1,7 +1,7 @@
 use std::assert_matches;
 
 use ruff_formatter::{FormatRuleWithOptions, format_args, write};
-use ruff_python_ast::{self as ast, Parameters, SyntaxNode};
+use ruff_python_ast::{Parameters, SyntaxNode};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -49,16 +49,6 @@ impl FormatRuleWithOptions<Parameters<'_>, PyFormatContext<'_>> for FormatParame
 
 impl FormatNodeRule<ruff_python_ast::kind::Parameters> for FormatParameters {
     fn fmt_fields(&self, item: Parameters<'_>, f: &mut PyFormatter) -> FormatResult<()> {
-        let ast::ParametersFields {
-            range: _,
-            node: _,
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-        } = item.fields();
-
         let (slash, star) = find_parameter_separators(f.context().source(), item);
 
         let comments = f.context().comments().clone();
@@ -171,7 +161,7 @@ impl FormatNodeRule<ruff_python_ast::kind::Parameters> for FormatParameters {
                     vararg.format()
                 ]);
                 last_node = Some(vararg.into());
-            } else if !kwonlyargs.is_empty() {
+            } else if item.kwonlyargs().next().is_some() {
                 // Given very strange comment placement, comments here may not actually have been
                 // marked as `StarLeading`/`StarTrailing`, but that's fine since we still produce
                 // a stable formatting in this case
@@ -358,44 +348,44 @@ pub(crate) fn find_parameter_separators(
 ) -> (Option<ParameterSeparator>, Option<ParameterSeparator>) {
     // We only compute preceding_end and token location here since following_start depends on the
     // star location, but the star location depends on slash's position
-    let slash = if let Some(preceding_end) = parameters.posonlyargs().last().map(|node| node.end())
-    {
-        // ```text
-        // def f(a1=1, a2=2, /, a3, a4): pass
-        //                 ^^^^^^^^^^^ the range (defaults)
-        // def f(a1, a2, /, a3, a4): pass
-        //             ^^^^^^^^^^^^ the range (no default)
-        // ```
-        let range = TextRange::new(preceding_end, parameters.end());
-        let mut tokens = SimpleTokenizer::new(contents, range).skip_trivia();
+    let slash =
+        if let Some(preceding_end) = parameters.posonlyargs().next_back().map(|node| node.end()) {
+            // ```text
+            // def f(a1=1, a2=2, /, a3, a4): pass
+            //                 ^^^^^^^^^^^ the range (defaults)
+            // def f(a1, a2, /, a3, a4): pass
+            //             ^^^^^^^^^^^^ the range (no default)
+            // ```
+            let range = TextRange::new(preceding_end, parameters.end());
+            let mut tokens = SimpleTokenizer::new(contents, range).skip_trivia();
 
-        let comma = tokens
-            .next()
-            .expect("The function definition can't end here");
-        debug_assert!(comma.kind() == SimpleTokenKind::Comma, "{comma:?}");
-        let slash = tokens
-            .next()
-            .expect("The function definition can't end here");
-        debug_assert!(slash.kind() == SimpleTokenKind::Slash, "{slash:?}");
+            let comma = tokens
+                .next()
+                .expect("The function definition can't end here");
+            debug_assert!(comma.kind() == SimpleTokenKind::Comma, "{comma:?}");
+            let slash = tokens
+                .next()
+                .expect("The function definition can't end here");
+            debug_assert!(slash.kind() == SimpleTokenKind::Slash, "{slash:?}");
 
-        Some((preceding_end, slash.range))
-    } else {
-        None
-    };
+            Some((preceding_end, slash.range))
+        } else {
+            None
+        };
 
     // If we have a vararg we have a node that the comments attach to
     let star = if parameters.vararg().is_some() {
         // When the vararg is present the comments attach there and we don't need to do manual
         // formatting
         None
-    } else if let Some(first_keyword_argument) = parameters.kwonlyargs().first() {
+    } else if let Some(first_keyword_argument) = parameters.kwonlyargs().next() {
         // Check in that order:
         // * `f(a, /, b, *, c)` and `f(a=1, /, b=2, *, c)`
         // * `f(a, /, *, b)`
         // * `f(*, b)` (else branch)
         let after_parameters = parameters
             .args()
-            .last()
+            .next_back()
             .map(|arg| arg.range().end())
             .or(slash.map(|(_, slash)| slash.end()));
         if let Some(preceding_end) = after_parameters {
@@ -453,7 +443,7 @@ pub(crate) fn find_parameter_separators(
     // * `f(a, /)`
     let slash_following_start = parameters
         .args()
-        .first()
+        .next()
         .map(|node| node.start())
         .or(parameters.vararg().map(|first| first.start()))
         .or(star.as_ref().map(|star| star.separator.start()))
@@ -678,10 +668,10 @@ fn has_trailing_comma(
         return false;
     };
 
-    let ends_with_pos_only_argument_separator = !parameters.posonlyargs().is_empty()
-        && parameters.args().is_empty()
+    let ends_with_pos_only_argument_separator = parameters.posonlyargs().next().is_some()
+        && parameters.args().next().is_none()
         && parameters.vararg().is_none()
-        && parameters.kwonlyargs().is_empty()
+        && parameters.kwonlyargs().next().is_none()
         && parameters.kwarg().is_none();
 
     let mut tokens = SimpleTokenizer::starts_at(last_node.end(), source).skip_trivia();

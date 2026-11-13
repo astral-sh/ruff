@@ -91,7 +91,7 @@ pub(crate) fn starmap_zip(
     match checker.target_version().cmp(&PythonVersion::PY314) {
         // Keyword arguments not supported for `map` before Python 3.14
         std::cmp::Ordering::Less => {
-            if keywords.next().is_some() {
+            if !keywords.is_empty() {
                 return;
             }
         }

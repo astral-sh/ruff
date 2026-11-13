@@ -70,6 +70,7 @@ pub(crate) fn non_slot_assignment(checker: &Checker, class_def: &ast::StmtClassD
     if !class_def
         .node
         .bases()
+        .iter()
         .all(|base| semantic.match_builtin_expr(base, "object"))
     {
         return;

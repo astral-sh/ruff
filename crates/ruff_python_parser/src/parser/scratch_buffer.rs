@@ -31,7 +31,6 @@ impl<T> ScratchBuffer<T> {
         self.buffer.len() == snapshot.len
     }
 
-    /// The number of items pushed by this frame, excluding nested frames already restored.
     #[inline]
     pub(super) fn len_since(&self, snapshot: &ScratchSnapshot) -> usize {
         self.buffer.len() - snapshot.len

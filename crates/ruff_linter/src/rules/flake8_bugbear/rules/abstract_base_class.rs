@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, ExprKind, NodeList, Stmt, StmtKind, Suite};
+use ruff_python_ast::{self as ast, Arguments, ExprKind, Stmt, StmtKind, Suite};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -116,23 +116,18 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
     }
 }
 
-fn is_abc_class(
-    bases: NodeList<'_, ruff_python_ast::kind::Expr>,
-    keywords: NodeList<'_, ruff_python_ast::kind::Keyword>,
-    semantic: &SemanticModel,
-) -> bool {
-    keywords.iter().any(|keyword| {
-        keyword.arg().is_some_and(|arg| arg == "metaclass")
-            && semantic
-                .resolve_qualified_name(keyword.value())
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["abc", "ABCMeta"])
-                })
-    }) || arguments.args().any(|base| {
-        semantic
+fn is_abc_class(argument: ast::ArgOrKeyword<'_>, semantic: &SemanticModel) -> bool {
+    match argument {
+        ast::ArgOrKeyword::Arg(base) => semantic
             .resolve_qualified_name(base)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["abc", "ABC"]))
-    })
+            .is_some_and(|name| matches!(name.segments(), ["abc", "ABC"])),
+        ast::ArgOrKeyword::Keyword(keyword) => {
+            keyword.arg().is_some_and(|arg| arg == "metaclass")
+                && semantic
+                    .resolve_qualified_name(keyword.value())
+                    .is_some_and(|name| matches!(name.segments(), ["abc", "ABCMeta"]))
+        }
+    }
 }
 
 fn is_empty_body(body: Suite<'_>) -> bool {
@@ -159,14 +154,10 @@ pub(crate) fn abstract_base_class(
     arguments: Option<Arguments<'_>>,
     body: Suite<'_>,
 ) {
-    let Some(ast::ArgumentsFields { args, keywords, .. }) = arguments.map(Arguments::fields) else {
+    let Some([argument]) = arguments.and_then(|args| args.items().as_array()) else {
         return;
     };
-
-    if arguments.len() != 1 {
-        return;
-    }
-    if !is_abc_class(arguments, checker.semantic()) {
+    if !is_abc_class(argument, checker.semantic()) {
         return;
     }
 
