@@ -65,5 +65,5 @@ jobs:
           GH_TOKEN: ${{ steps.vscode-token.outputs.token }}
           RUFF_VERSION: ${{ fromJson(inputs.plan).releases[0].app_version }}
         run: |
-          gh workflow run release-prepare.yml --repo astral-sh/ruff-vscode --ref main \
+          gh workflow run release-prepare.yml --repo astral-sh/ruff-vscode \
             -f ruff-version="$RUFF_VERSION" -f auto-promote=true
