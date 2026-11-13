@@ -63,3 +63,12 @@ kwargs = {x: x for x in range(10)}
 r"\d{{1,2}} {0}".format(42)
 
 "{{{0}}}".format(123)
+
+# Touching braces (#30345)
+"{0}{1}".format(1, 2)
+"{0}{1}{2}".format(1, 2, 3)
+r"{0}{1}".format(x, y)
+"{1}{0}".format(1, 2)
+"{0:10s}{1!r}".format("a", "b")
+r"\d{{1,2}} {0}{1}".format(42, 43)
+"{{{0}}}{{{1}}}".format(1, 2)

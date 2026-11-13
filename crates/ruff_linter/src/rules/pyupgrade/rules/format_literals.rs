@@ -126,41 +126,33 @@ fn is_sequential(indices: &[usize]) -> bool {
     indices.iter().enumerate().all(|(idx, value)| idx == *value)
 }
 
-static FORMAT_SPECIFIER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?x)
-            (?P<prefix>
-                ^|[^{]|(?:\{{2})+  # preceded by nothing, a non-brace, or an even number of braces
-            )
-            \{                     # opening curly brace
-                (?P<int>\d+)       # followed by any integer
-                (?P<fmt>.*?)       # followed by any text
-            }                      # followed by a closing brace
-        ",
-    )
-    .unwrap()
-});
+static FORMAT_SPECIFIER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?P<escaped>\{\{|\}\})|\{(?P<int>\d+)(?P<fmt>[^}]*)\}").unwrap());
+
+fn strip_specifiers(value: &str) -> String {
+    FORMAT_SPECIFIER
+        .replace_all(value, |caps: &regex::Captures| {
+            if let Some(escaped) = caps.name("escaped") {
+                escaped.as_str().to_string()
+            } else {
+                format!("{{{}}}", &caps["fmt"])
+            }
+        })
+        .into_owned()
+}
 
 /// Remove the explicit positional indices from a format string.
 fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Arena<String>) {
     match value {
         Expression::SimpleString(expr) => {
-            expr.value = arena.alloc(
-                FORMAT_SPECIFIER
-                    .replace_all(expr.value, "$prefix{$fmt}")
-                    .to_string(),
-            );
+            expr.value = arena.alloc(strip_specifiers(expr.value));
         }
         Expression::ConcatenatedString(expr) => {
             let mut stack = vec![&mut expr.left, &mut expr.right];
             while let Some(string) = stack.pop() {
                 match string.as_mut() {
                     libcst_native::String::Simple(string) => {
-                        string.value = arena.alloc(
-                            FORMAT_SPECIFIER
-                                .replace_all(string.value, "$prefix{$fmt}")
-                                .to_string(),
-                        );
+                        string.value = arena.alloc(strip_specifiers(string.value));
                     }
                     libcst_native::String::Concatenated(string) => {
                         stack.push(&mut string.left);

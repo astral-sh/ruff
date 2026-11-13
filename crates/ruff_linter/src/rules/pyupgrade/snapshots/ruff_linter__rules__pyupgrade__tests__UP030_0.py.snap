@@ -486,10 +486,141 @@ UP030 [*] Use implicit references for positional format fields
 64 |
 65 | "{{{0}}}".format(123)
    | ^^^^^^^^^^^^^^^^^^^^^
+66 |
+67 | # Touching braces (#30345)
+   |
 help: Remove explicit positional indices
    |
 64 |
    - "{{{0}}}".format(123)
 65 + "{{{}}}".format(123)
+66 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:68:1
+   |
+67 | # Touching braces (#30345)
+68 | "{0}{1}".format(1, 2)
+   | ^^^^^^^^^^^^^^^^^^^^^
+69 | "{0}{1}{2}".format(1, 2, 3)
+70 | r"{0}{1}".format(x, y)
+   |
+help: Remove explicit positional indices
+   |
+67 | # Touching braces (#30345)
+   - "{0}{1}".format(1, 2)
+68 + "{}{}".format(1, 2)
+69 | "{0}{1}{2}".format(1, 2, 3)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:69:1
+   |
+67 | # Touching braces (#30345)
+68 | "{0}{1}".format(1, 2)
+69 | "{0}{1}{2}".format(1, 2, 3)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+70 | r"{0}{1}".format(x, y)
+71 | "{1}{0}".format(1, 2)
+   |
+help: Remove explicit positional indices
+   |
+68 | "{0}{1}".format(1, 2)
+   - "{0}{1}{2}".format(1, 2, 3)
+69 + "{}{}{}".format(1, 2, 3)
+70 | r"{0}{1}".format(x, y)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:70:1
+   |
+68 | "{0}{1}".format(1, 2)
+69 | "{0}{1}{2}".format(1, 2, 3)
+70 | r"{0}{1}".format(x, y)
+   | ^^^^^^^^^^^^^^^^^^^^^^
+71 | "{1}{0}".format(1, 2)
+72 | "{0:10s}{1!r}".format("a", "b")
+   |
+help: Remove explicit positional indices
+   |
+69 | "{0}{1}{2}".format(1, 2, 3)
+   - r"{0}{1}".format(x, y)
+70 + r"{}{}".format(x, y)
+71 | "{1}{0}".format(1, 2)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:71:1
+   |
+69 | "{0}{1}{2}".format(1, 2, 3)
+70 | r"{0}{1}".format(x, y)
+71 | "{1}{0}".format(1, 2)
+   | ^^^^^^^^^^^^^^^^^^^^^
+72 | "{0:10s}{1!r}".format("a", "b")
+73 | r"\d{{1,2}} {0}{1}".format(42, 43)
+   |
+help: Remove explicit positional indices
+   |
+70 | r"{0}{1}".format(x, y)
+   - "{1}{0}".format(1, 2)
+71 + "{}{}".format(2, 1)
+72 | "{0:10s}{1!r}".format("a", "b")
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:72:1
+   |
+70 | r"{0}{1}".format(x, y)
+71 | "{1}{0}".format(1, 2)
+72 | "{0:10s}{1!r}".format("a", "b")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+73 | r"\d{{1,2}} {0}{1}".format(42, 43)
+74 | "{{{0}}}{{{1}}}".format(1, 2)
+   |
+help: Remove explicit positional indices
+   |
+71 | "{1}{0}".format(1, 2)
+   - "{0:10s}{1!r}".format("a", "b")
+72 + "{:10s}{!r}".format("a", "b")
+73 | r"\d{{1,2}} {0}{1}".format(42, 43)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:73:1
+   |
+71 | "{1}{0}".format(1, 2)
+72 | "{0:10s}{1!r}".format("a", "b")
+73 | r"\d{{1,2}} {0}{1}".format(42, 43)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+74 | "{{{0}}}{{{1}}}".format(1, 2)
+   |
+help: Remove explicit positional indices
+   |
+72 | "{0:10s}{1!r}".format("a", "b")
+   - r"\d{{1,2}} {0}{1}".format(42, 43)
+73 + r"\d{{1,2}} {}{}".format(42, 43)
+74 | "{{{0}}}{{{1}}}".format(1, 2)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:74:1
+   |
+72 | "{0:10s}{1!r}".format("a", "b")
+73 | r"\d{{1,2}} {0}{1}".format(42, 43)
+74 | "{{{0}}}{{{1}}}".format(1, 2)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove explicit positional indices
+   |
+73 | r"\d{{1,2}} {0}{1}".format(42, 43)
+   - "{{{0}}}{{{1}}}".format(1, 2)
+74 + "{{{}}}{{{}}}".format(1, 2)
    |
 note: This is an unsafe fix and may change runtime behavior
