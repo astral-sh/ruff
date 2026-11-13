@@ -1,0 +1,6 @@
+--- a/stdlib/types.pyi
++++ b/stdlib/types.pyi
+@@ -143,2 +143,2 @@ class FunctionType:
+-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
++    def __call__(self, *args: Any, **kwargs: Any) -> object:
+         """Call self as a function."""
