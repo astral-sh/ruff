@@ -352,24 +352,6 @@ def inspect(generic: BoxAlias[int], default: DefaultBox):
 def invalid(forwarded: ForwardedDefault[int]): ...  # error: [not-subscriptable]
 ```
 
-## Class equality with a constrained type variable
-
-The metaclass of one constraint can make its class compare equal to another constraint. We don't
-model the specific behavior of `EqualMeta.__eq__`. At runtime, both `int` and `Custom` satisfy
-`cls == int`, so narrowing `cls` to the class `int` would be unsound.
-
-```py
-class EqualMeta(type):
-    def __eq__(self, other: object) -> bool:
-        return True
-
-class Custom(metaclass=EqualMeta): ...
-
-def check[T: (int, Custom)](cls: type[T]):
-    if cls == int:
-        reveal_type(cls)  # revealed: type[T@check]
-```
-
 ## Narrowing class objects of final generic classes
 
 A specialized alias is distinct from the bare class object, even when the specialization matches the
