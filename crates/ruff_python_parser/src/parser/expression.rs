@@ -424,19 +424,11 @@ impl<'src> Parser<'src> {
         self.parse_primary_expression(context)
     }
 
-    /// Parses an expression with a minimum precedence of bitwise `or`.
-    ///
-    /// This methods actually parses the expression using the `expression` rule
-    /// of the [Python grammar] and then validates the parsed expression. In a
-    /// sense, it matches the `bitwise_or` rule of the [Python grammar].
-    ///
-    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
-        let parsed_expr = self.parse_conditional_expression_or_higher();
-
+    /// Validates that the parsed expression has a minimum precedence of bitwise `or`.
+    fn validate_bitwise_or_precedence(&mut self, parsed_expr: &ParsedExpr) {
         if parsed_expr.is_parenthesized {
             // Parentheses resets the precedence, so we don't need to validate it.
-            return parsed_expr;
+            return;
         }
 
         let expr_name = match parsed_expr.expr {
@@ -448,14 +440,25 @@ impl<'src> Parser<'src> {
             }) => "Boolean",
             Expr::If(_) => "Conditional",
             Expr::Lambda(_) => "Lambda",
-            _ => return parsed_expr,
+            _ => return,
         };
 
         self.add_error(
             ParseErrorType::OtherError(format!("{expr_name} expression cannot be used here")),
-            &parsed_expr,
+            parsed_expr,
         );
+    }
 
+    /// Parses an expression with a minimum precedence of bitwise `or`.
+    ///
+    /// This methods actually parses the expression using the `expression` rule
+    /// of the [Python grammar] and then validates the parsed expression. In a
+    /// sense, it matches the `bitwise_or` rule of the [Python grammar].
+    ///
+    /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
+    fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
+        let parsed_expr = self.parse_conditional_expression_or_higher();
+        self.validate_bitwise_or_precedence(&parsed_expr);
         parsed_expr
     }
 
@@ -2105,6 +2108,10 @@ impl<'src> Parser<'src> {
         // {*x async for x in y}
         // {**x async for x in y}
         // (*x async for x in y)
+        // {**x or {} for x in []}
+        // {**x and {} for x in []}
+        // {**not x for x in []}
+        // {**x if b else {} for x in []}
 
         // test_err pep_798_unpacking_comprehensions_py314
         // # parse_options: {"target-version": "3.14"}
@@ -2144,9 +2151,12 @@ impl<'src> Parser<'src> {
         let after_brace = self.node_start();
 
         if self.eat(TokenKind::DoubleStar) {
-            // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
-            // which requires limiting the expression.
-            let value = self.parse_expression_with_bitwise_or_precedence();
+            // Handle dictionary unpacking. For a dictionary comprehension,
+            // the grammar accepts any `expression` ('**' expression for_if_clauses),
+            // while a dictionary literal requires bitwise `or` precedence
+            // ('**' bitwise_or). Parse the general expression first and only validate
+            // the bitwise `or` precedence if it turns out to be a dictionary literal.
+            let value = self.parse_conditional_expression_or_higher();
             let unpack_range = TextRange::new(after_brace, value.range().end());
 
             if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
@@ -2161,6 +2171,8 @@ impl<'src> Parser<'src> {
                     self.parse_dictionary_comprehension_expression(None, value.expr, start),
                 );
             }
+
+            self.validate_bitwise_or_precedence(&value);
 
             if self.at(TokenKind::Colon) {
                 self.add_error(ParseErrorType::InvalidStarredExpressionUsage, unpack_range);
