@@ -179,7 +179,7 @@ impl UvEnvironments {
     /// pending until [`poll_sync`](Self::poll_sync) applies its result, even if uv has finished.
     ///
     /// Salsa does not track changes to the pending state.
-    pub fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
+    pub(crate) fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
         if !self.is_enabled() || script_tag(db, file).is_none() {
             return false;
         }
