@@ -171,10 +171,6 @@ pub(crate) fn airflow_3_0_suggested_update_reference(
     expr: &Expr,
     qualified_name: &QualifiedName,
 ) {
-    if !checker.semantic().seen_module(Modules::AIRFLOW) {
-        return;
-    }
-
     let replacement = match qualified_name.segments() {
         // airflow.datasets.metadata
         ["airflow", "datasets", "metadata", "Metadata"] => Replacement::SourceModuleMovedToSDK {

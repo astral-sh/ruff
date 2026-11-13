@@ -239,13 +239,46 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 node_index: _,
             },
         ) => {
-            name_or_attribute_with_qualified_name(checker, expr);
             match ctx {
                 ExprContext::Load => {
+                    typing_reference(checker, expr);
+                    numpy_reference(checker, expr);
+                    if checker.is_rule_enabled(Rule::CollectionsNamedTuple) {
+                        flake8_pyi::rules::collections_named_tuple(checker, expr);
+                    }
+                    if checker.is_rule_enabled(Rule::RegexFlagAlias) {
+                        refurb::rules::regex_flag_alias(checker, expr);
+                    }
+                    airflow_reference(checker, expr);
                     if checker.is_rule_enabled(Rule::LazyImportImmediatelyResolved) {
                         flake8_tidy_imports::rules::lazy_import_immediately_resolved(
                             checker, expr_name,
                         );
+                    }
+                    if checker.any_rule_enabled(&[
+                        Rule::SuspiciousPickleUsage,
+                        Rule::SuspiciousMarshalUsage,
+                        Rule::SuspiciousInsecureHashUsage,
+                        Rule::SuspiciousInsecureCipherUsage,
+                        Rule::SuspiciousInsecureCipherModeUsage,
+                        Rule::SuspiciousMktempUsage,
+                        Rule::SuspiciousEvalUsage,
+                        Rule::SuspiciousMarkSafeUsage,
+                        Rule::SuspiciousURLOpenUsage,
+                        Rule::SuspiciousNonCryptographicRandomUsage,
+                        Rule::SuspiciousTelnetUsage,
+                        Rule::SuspiciousXMLCElementTreeUsage,
+                        Rule::SuspiciousXMLElementTreeUsage,
+                        Rule::SuspiciousXMLExpatReaderUsage,
+                        Rule::SuspiciousXMLExpatBuilderUsage,
+                        Rule::SuspiciousXMLSaxUsage,
+                        Rule::SuspiciousXMLMiniDOMUsage,
+                        Rule::SuspiciousXMLPullDOMUsage,
+                        Rule::SuspiciousXMLETreeUsage,
+                        Rule::SuspiciousFTPLibUsage,
+                        Rule::SuspiciousUnverifiedContextUsage,
+                    ]) {
+                        flake8_bandit::rules::suspicious_function_reference(checker, expr);
                     }
                 }
                 ExprContext::Store => {
@@ -290,23 +323,85 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
                 _ => {}
             }
+            if checker.is_rule_enabled(Rule::SixPY3) {
+                flake8_2020::rules::name_or_attribute(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::UndocumentedWarn) {
+                flake8_logging::rules::undocumented_warn(checker, expr);
+            }
         }
         Expr::Attribute(attribute) => {
-            name_or_attribute_with_qualified_name(checker, expr);
             if checker.is_rule_enabled(Rule::SharedClockMock)
                 && matches!(attribute.ctx, ExprContext::Store | ExprContext::Del)
             {
                 ruff::rules::shared_clock_attribute(checker, attribute);
             }
+            if attribute.ctx == ExprContext::Load {
+                if checker.any_rule_enabled(&[
+                    Rule::SuspiciousPickleUsage,
+                    Rule::SuspiciousMarshalUsage,
+                    Rule::SuspiciousInsecureHashUsage,
+                    Rule::SuspiciousInsecureCipherUsage,
+                    Rule::SuspiciousInsecureCipherModeUsage,
+                    Rule::SuspiciousMktempUsage,
+                    Rule::SuspiciousEvalUsage,
+                    Rule::SuspiciousMarkSafeUsage,
+                    Rule::SuspiciousURLOpenUsage,
+                    Rule::SuspiciousNonCryptographicRandomUsage,
+                    Rule::SuspiciousTelnetUsage,
+                    Rule::SuspiciousXMLCElementTreeUsage,
+                    Rule::SuspiciousXMLElementTreeUsage,
+                    Rule::SuspiciousXMLExpatReaderUsage,
+                    Rule::SuspiciousXMLExpatBuilderUsage,
+                    Rule::SuspiciousXMLSaxUsage,
+                    Rule::SuspiciousXMLMiniDOMUsage,
+                    Rule::SuspiciousXMLPullDOMUsage,
+                    Rule::SuspiciousXMLETreeUsage,
+                    Rule::SuspiciousFTPLibUsage,
+                    Rule::SuspiciousUnverifiedContextUsage,
+                ]) {
+                    flake8_bandit::rules::suspicious_function_reference(checker, expr);
+                }
+            }
+
+            if checker.is_rule_enabled(Rule::RegexFlagAlias) {
+                refurb::rules::regex_flag_alias(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::DatetimeTimezoneUTC) {
+                if checker.target_version() >= PythonVersion::PY311 {
+                    pyupgrade::rules::datetime_utc_alias(checker, expr);
+                }
+            }
+            typing_reference(checker, expr);
+            numpy_reference(checker, expr);
             if checker.is_rule_enabled(Rule::DeprecatedMockImport) {
                 pyupgrade::rules::deprecated_mock_attribute(checker, attribute);
+            }
+            if checker.is_rule_enabled(Rule::SixPY3) {
+                flake8_2020::rules::name_or_attribute(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::DatetimeMinMax) {
+                flake8_datetimez::rules::datetime_min_max(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::BannedApi) {
+                flake8_tidy_imports::rules::banned_attribute_access(checker, expr);
             }
             if checker.is_rule_enabled(Rule::PrivateMemberAccess) {
                 flake8_self::rules::private_member_access(checker, expr);
             }
+            if checker.is_rule_enabled(Rule::CollectionsNamedTuple) {
+                flake8_pyi::rules::collections_named_tuple(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::UndocumentedWarn) {
+                flake8_logging::rules::undocumented_warn(checker, expr);
+            }
             if checker.is_rule_enabled(Rule::PandasUseOfDotValues) {
                 pandas_vet::rules::attr(checker, attribute);
             }
+            if checker.is_rule_enabled(Rule::ByteStringUsage) {
+                flake8_pyi::rules::bytestring_attribute(checker, expr);
+            }
+            airflow_reference(checker, expr);
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
             }
@@ -502,6 +597,31 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::PytestRaisesExceptionGroup) {
                 flake8_async::rules::pytest_raises_exception_group(checker, call);
+            }
+            if checker.any_rule_enabled(&[
+                Rule::SuspiciousPickleUsage,
+                Rule::SuspiciousMarshalUsage,
+                Rule::SuspiciousInsecureHashUsage,
+                Rule::SuspiciousInsecureCipherUsage,
+                Rule::SuspiciousInsecureCipherModeUsage,
+                Rule::SuspiciousMktempUsage,
+                Rule::SuspiciousEvalUsage,
+                Rule::SuspiciousMarkSafeUsage,
+                Rule::SuspiciousURLOpenUsage,
+                Rule::SuspiciousNonCryptographicRandomUsage,
+                Rule::SuspiciousXMLCElementTreeUsage,
+                Rule::SuspiciousXMLElementTreeUsage,
+                Rule::SuspiciousXMLExpatReaderUsage,
+                Rule::SuspiciousXMLExpatBuilderUsage,
+                Rule::SuspiciousXMLSaxUsage,
+                Rule::SuspiciousXMLMiniDOMUsage,
+                Rule::SuspiciousXMLPullDOMUsage,
+                Rule::SuspiciousXMLETreeUsage,
+                Rule::SuspiciousUnverifiedContextUsage,
+                Rule::SuspiciousTelnetUsage,
+                Rule::SuspiciousFTPLibUsage,
+            ]) {
+                flake8_bandit::rules::suspicious_function_call(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnreliableCallableCheck) {
                 flake8_bugbear::rules::unreliable_callable_check(
@@ -1466,112 +1586,20 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
     }
 }
 
-const SUSPICIOUS_FUNCTION_RULES: RuleSet = RuleSet::from_rules(&[
-    Rule::SuspiciousPickleUsage,
-    Rule::SuspiciousMarshalUsage,
-    Rule::SuspiciousInsecureHashUsage,
-    Rule::SuspiciousInsecureCipherUsage,
-    Rule::SuspiciousInsecureCipherModeUsage,
-    Rule::SuspiciousMktempUsage,
-    Rule::SuspiciousEvalUsage,
-    Rule::SuspiciousMarkSafeUsage,
-    Rule::SuspiciousURLOpenUsage,
-    Rule::SuspiciousNonCryptographicRandomUsage,
-    Rule::SuspiciousTelnetUsage,
-    Rule::SuspiciousXMLCElementTreeUsage,
-    Rule::SuspiciousXMLElementTreeUsage,
-    Rule::SuspiciousXMLExpatReaderUsage,
-    Rule::SuspiciousXMLExpatBuilderUsage,
-    Rule::SuspiciousXMLSaxUsage,
-    Rule::SuspiciousXMLMiniDOMUsage,
-    Rule::SuspiciousXMLPullDOMUsage,
-    Rule::SuspiciousXMLETreeUsage,
-    Rule::SuspiciousFTPLibUsage,
-    Rule::SuspiciousUnverifiedContextUsage,
-]);
-
-/// Run rules that resolve a name or attribute to the same imported symbol.
-fn name_or_attribute_with_qualified_name(checker: &Checker, expr: &Expr) {
-    const QUALIFIED_NAME_RULES: RuleSet = RuleSet::from_rules(&[
-        Rule::BannedApi,
-        Rule::DatetimeTimezoneUTC,
-        Rule::SixPY3,
-        Rule::UndocumentedWarn,
-        Rule::NumpyDeprecatedTypeAlias,
-        Rule::NumpyDeprecatedFunction,
-        Rule::Numpy2Deprecation,
-        Rule::TypingTextStrAlias,
-        Rule::FutureRewritableTypeAnnotation,
-        Rule::NonPEP585Annotation,
-        Rule::RegexFlagAlias,
-        Rule::DatetimeMinMax,
-        Rule::ByteStringUsage,
-        Rule::CollectionsNamedTuple,
-        Rule::Airflow3Removal,
-        Rule::Airflow31Moved,
-        Rule::Airflow3SuggestedUpdate,
-        Rule::Airflow3MovedToProvider,
-        Rule::Airflow3SuggestedToMoveToProvider,
-    ])
-    .union(&SUSPICIOUS_FUNCTION_RULES);
-
-    if !checker.context.rules.any_enabled_in(&QUALIFIED_NAME_RULES) {
+fn numpy_reference(checker: &Checker, expr: &Expr) {
+    let semantic = checker.semantic();
+    if !semantic.seen_module(Modules::NUMPY)
+        || !checker.any_rule_enabled(&[
+            Rule::NumpyDeprecatedTypeAlias,
+            Rule::NumpyDeprecatedFunction,
+            Rule::Numpy2Deprecation,
+        ])
+    {
         return;
     }
-    let semantic = checker.semantic();
     let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
         return;
     };
-    if checker.is_rule_enabled(Rule::SixPY3) {
-        flake8_2020::rules::name_or_attribute(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::UndocumentedWarn) {
-        flake8_logging::rules::undocumented_warn(checker, expr, &qualified_name);
-    }
-    if matches!(expr, Expr::Name(name) if !name.ctx.is_load()) {
-        return;
-    }
-
-    if checker.is_rule_enabled(Rule::CollectionsNamedTuple) {
-        flake8_pyi::rules::collections_named_tuple(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::DatetimeTimezoneUTC) {
-        pyupgrade::rules::datetime_utc_alias(checker, expr, &qualified_name);
-    }
-    if checker
-        .context
-        .rules
-        .any_enabled_in(&SUSPICIOUS_FUNCTION_RULES)
-    {
-        flake8_bandit::rules::suspicious_function_reference(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::RegexFlagAlias) {
-        refurb::rules::regex_flag_alias(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::DatetimeMinMax) {
-        flake8_datetimez::rules::datetime_min_max(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::ByteStringUsage) {
-        flake8_pyi::rules::bytestring_attribute(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::BannedApi) {
-        flake8_tidy_imports::rules::banned_attribute_access(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::Airflow3Removal) {
-        airflow::rules::airflow_3_removal_reference(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::Airflow31Moved) {
-        airflow::rules::airflow_3_1_moved_expr(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::Airflow3SuggestedUpdate) {
-        airflow::rules::airflow_3_0_suggested_update_reference(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::Airflow3MovedToProvider) {
-        airflow::rules::moved_to_provider_in_3(checker, expr, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::Airflow3SuggestedToMoveToProvider) {
-        airflow::rules::suggested_to_move_to_provider_in_3(checker, expr, &qualified_name);
-    }
     if checker.is_rule_enabled(Rule::NumpyDeprecatedTypeAlias) {
         numpy::rules::deprecated_type_alias(checker, expr, &qualified_name);
     }
@@ -1581,15 +1609,30 @@ fn name_or_attribute_with_qualified_name(checker: &Checker, expr: &Expr) {
     if checker.is_rule_enabled(Rule::Numpy2Deprecation) {
         numpy::rules::numpy_2_0_deprecation(checker, expr, &qualified_name);
     }
+}
 
+fn typing_reference(checker: &Checker, expr: &Expr) {
+    let semantic = checker.semantic();
+    if !semantic.seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)
+        || !checker.any_rule_enabled(&[
+            Rule::TypingTextStrAlias,
+            Rule::FutureRewritableTypeAnnotation,
+            Rule::NonPEP585Annotation,
+        ])
+    {
+        return;
+    }
+    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+        return;
+    };
     if checker.is_rule_enabled(Rule::TypingTextStrAlias) {
         pyupgrade::rules::typing_text_str_alias(checker, expr, &qualified_name);
     }
+    // Ex) typing.List[...]
     if checker.any_rule_enabled(&[
         Rule::FutureRewritableTypeAnnotation,
         Rule::NonPEP585Annotation,
-    ]) && semantic.seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)
-        && let Some(replacement) = typing::to_pep585_generic(&qualified_name)
+    ]) && let Some(replacement) = typing::to_pep585_generic(&qualified_name)
     {
         if checker.is_rule_enabled(Rule::FutureRewritableTypeAnnotation)
             && !semantic.future_annotations_or_stub()
@@ -1615,6 +1658,39 @@ fn name_or_attribute_with_qualified_name(checker: &Checker, expr: &Expr) {
         {
             pyupgrade::rules::use_pep585_annotation(checker, expr, &replacement);
         }
+    }
+}
+
+fn airflow_reference(checker: &Checker, expr: &Expr) {
+    let semantic = checker.semantic();
+    if !semantic.seen_module(Modules::AIRFLOW)
+        || !checker.any_rule_enabled(&[
+            Rule::Airflow3Removal,
+            Rule::Airflow31Moved,
+            Rule::Airflow3SuggestedUpdate,
+            Rule::Airflow3MovedToProvider,
+            Rule::Airflow3SuggestedToMoveToProvider,
+        ])
+    {
+        return;
+    }
+    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+        return;
+    };
+    if checker.is_rule_enabled(Rule::Airflow3Removal) {
+        airflow::rules::airflow_3_removal_reference(checker, expr, &qualified_name);
+    }
+    if checker.is_rule_enabled(Rule::Airflow31Moved) {
+        airflow::rules::airflow_3_1_moved_expr(checker, expr, &qualified_name);
+    }
+    if checker.is_rule_enabled(Rule::Airflow3SuggestedUpdate) {
+        airflow::rules::airflow_3_0_suggested_update_reference(checker, expr, &qualified_name);
+    }
+    if checker.is_rule_enabled(Rule::Airflow3MovedToProvider) {
+        airflow::rules::moved_to_provider_in_3(checker, expr, &qualified_name);
+    }
+    if checker.is_rule_enabled(Rule::Airflow3SuggestedToMoveToProvider) {
+        airflow::rules::suggested_to_move_to_provider_in_3(checker, expr, &qualified_name);
     }
 }
 
@@ -1708,8 +1784,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::PytestWarnsTooBroad,
         Rule::PytestFailWithoutMessage,
         Rule::PytestRaisesAmbiguousPattern,
-    ])
-    .union(&SUSPICIOUS_FUNCTION_RULES);
+    ]);
 
     if !checker.context.rules.any_enabled_in(&QUALIFIED_CALL_RULES) {
         return;
@@ -1717,13 +1792,6 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
         return;
     };
-    if checker
-        .context
-        .rules
-        .any_enabled_in(&SUSPICIOUS_FUNCTION_RULES)
-    {
-        flake8_bandit::rules::suspicious_function_call(checker, call, &qualified_name);
-    }
     if checker.is_rule_enabled(Rule::RedundantOpenModes) {
         pyupgrade::rules::redundant_open_modes(checker, call, &qualified_name);
     }

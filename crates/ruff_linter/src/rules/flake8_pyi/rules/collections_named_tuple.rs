@@ -1,5 +1,4 @@
 use ruff_python_ast::Expr;
-use ruff_python_ast::name::QualifiedName;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
@@ -53,16 +52,15 @@ impl Violation for CollectionsNamedTuple {
 }
 
 /// PYI024
-pub(crate) fn collections_named_tuple(
-    checker: &Checker,
-    expr: &Expr,
-    qualified_name: &QualifiedName,
-) {
+pub(crate) fn collections_named_tuple(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::COLLECTIONS) {
         return;
     }
 
-    if qualified_name.segments() == ["collections", "namedtuple"] {
+    if checker
+        .semantic()
+        .matches_qualified_name(expr, &["collections", "namedtuple"])
+    {
         checker.report_diagnostic(CollectionsNamedTuple, expr.range());
     }
 }

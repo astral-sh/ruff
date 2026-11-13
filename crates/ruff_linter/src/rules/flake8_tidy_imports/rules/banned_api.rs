@@ -58,19 +58,24 @@ pub(crate) fn banned_api<T: Ranged>(checker: &Checker, policy: &NameMatchPolicy,
 }
 
 /// TID251
-pub(crate) fn banned_attribute_access(
-    checker: &Checker,
-    expr: &Expr,
-    qualified_name: &QualifiedName,
-) {
+pub(crate) fn banned_attribute_access(checker: &Checker, expr: &Expr) {
     let banned_api = &checker.settings().flake8_tidy_imports.banned_api;
-    if !expr.is_attribute_expr() || banned_api.is_empty() {
+    if banned_api.is_empty() {
         return;
     }
-    // Preserve the empty leading segment for attributes of implicit builtins.
-    if let Some((banned_path, ban)) = banned_api
-        .get_key_value(&qualified_name.segments().join("."))
-        .filter(|(banned_path, ..)| *qualified_name == QualifiedName::from_dotted_name(banned_path))
+
+    if let Some((banned_path, ban)) =
+        checker
+            .semantic()
+            .resolve_qualified_name(expr)
+            .and_then(|qualified_name| {
+                // Preserve the empty leading segment for attributes of implicit builtins.
+                banned_api
+                    .get_key_value(&qualified_name.segments().join("."))
+                    .filter(|(banned_path, ..)| {
+                        qualified_name == QualifiedName::from_dotted_name(banned_path)
+                    })
+            })
     {
         checker.report_diagnostic(
             BannedApi {

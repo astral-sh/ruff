@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -65,12 +64,16 @@ impl Violation for DatetimeMinMax {
 }
 
 /// DTZ901
-pub(crate) fn datetime_min_max(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
+pub(crate) fn datetime_min_max(checker: &Checker, expr: &Expr) {
     let semantic = checker.semantic();
 
-    if !expr.is_attribute_expr() || !semantic.seen_module(Modules::DATETIME) {
+    if !semantic.seen_module(Modules::DATETIME) {
         return;
     }
+
+    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+        return;
+    };
 
     let min_max = match qualified_name.segments() {
         ["datetime", "datetime", "min"] => MinMax::Min,

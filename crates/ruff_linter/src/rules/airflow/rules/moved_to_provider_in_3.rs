@@ -7,7 +7,6 @@ use crate::rules::airflow::helpers::{
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_semantic::Modules;
 
 use crate::{FixAvailability, Violation};
 
@@ -98,10 +97,6 @@ pub(crate) fn moved_to_provider_in_3(
     expr: &Expr,
     qualified_name: &QualifiedName,
 ) {
-    if !checker.semantic().seen_module(Modules::AIRFLOW) {
-        return;
-    }
-
     let replacement = match qualified_name.segments() {
         // apache-airflow-providers-amazon
         [

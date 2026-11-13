@@ -8,7 +8,6 @@ use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -99,10 +98,6 @@ pub(crate) fn airflow_3_1_moved_expr(
     expr: &Expr,
     qualified_name: &QualifiedName,
 ) {
-    if !checker.semantic().seen_module(Modules::AIRFLOW) {
-        return;
-    }
-
     let range = expr.range();
     let replacement = match qualified_name.segments() {
         // airflow.utils.setup_teardown

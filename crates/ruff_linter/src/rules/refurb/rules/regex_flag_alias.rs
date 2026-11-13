@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
-use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -53,21 +52,27 @@ impl AlwaysFixableViolation for RegexFlagAlias {
 }
 
 /// FURB167
-pub(crate) fn regex_flag_alias(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
+pub(crate) fn regex_flag_alias(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::RE) {
         return;
     }
 
-    let flag = match qualified_name.segments() {
-        ["re", "A"] => RegexFlag::Ascii,
-        ["re", "I"] => RegexFlag::IgnoreCase,
-        ["re", "L"] => RegexFlag::Locale,
-        ["re", "M"] => RegexFlag::Multiline,
-        ["re", "S"] => RegexFlag::DotAll,
-        ["re", "T"] => RegexFlag::Template,
-        ["re", "U"] => RegexFlag::Unicode,
-        ["re", "X"] => RegexFlag::Verbose,
-        _ => return,
+    let Some(flag) = checker
+        .semantic()
+        .resolve_qualified_name(expr)
+        .and_then(|qualified_name| match qualified_name.segments() {
+            ["re", "A"] => Some(RegexFlag::Ascii),
+            ["re", "I"] => Some(RegexFlag::IgnoreCase),
+            ["re", "L"] => Some(RegexFlag::Locale),
+            ["re", "M"] => Some(RegexFlag::Multiline),
+            ["re", "S"] => Some(RegexFlag::DotAll),
+            ["re", "T"] => Some(RegexFlag::Template),
+            ["re", "U"] => Some(RegexFlag::Unicode),
+            ["re", "X"] => Some(RegexFlag::Verbose),
+            _ => None,
+        })
+    else {
+        return;
     };
 
     let mut diagnostic = checker.report_diagnostic(RegexFlagAlias { flag }, expr.range());

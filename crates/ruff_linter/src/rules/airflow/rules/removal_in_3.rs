@@ -655,10 +655,6 @@ pub(crate) fn airflow_3_removal_reference(
     expr: &Expr,
     qualified_name: &QualifiedName,
 ) {
-    if !checker.semantic().seen_module(Modules::AIRFLOW) {
-        return;
-    }
-
     let range = expr.range();
     let replacement = match qualified_name.segments() {
         // airflow.PY\d{1,2}

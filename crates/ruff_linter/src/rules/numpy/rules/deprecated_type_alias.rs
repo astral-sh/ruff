@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -59,10 +58,6 @@ pub(crate) fn deprecated_type_alias(
     expr: &Expr,
     qualified_name: &QualifiedName,
 ) {
-    if !checker.semantic().seen_module(Modules::NUMPY) {
-        return;
-    }
-
     let [
         "numpy",
         type_name @ ("int" | "float" | "complex" | "object" | "str" | "unicode"),

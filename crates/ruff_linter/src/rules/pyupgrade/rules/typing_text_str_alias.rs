@@ -1,6 +1,5 @@
 use ruff_python_ast::Expr;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_semantic::Modules;
 use std::fmt::{Display, Formatter};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -57,13 +56,6 @@ pub(crate) fn typing_text_str_alias(
     expr: &Expr,
     qualified_name: &QualifiedName,
 ) {
-    if !checker
-        .semantic()
-        .seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)
-    {
-        return;
-    }
-
     let segments = qualified_name.segments();
     let module = match segments {
         ["typing", "Text"] => TypingModule::Typing,

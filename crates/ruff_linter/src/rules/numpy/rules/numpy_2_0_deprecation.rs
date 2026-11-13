@@ -4,7 +4,6 @@ use ruff_python_ast::name::QualifiedNameBuilder;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::Modules;
 use ruff_python_semantic::{Exceptions, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -166,10 +165,6 @@ pub(crate) fn numpy_2_0_deprecation(
     expr: &Expr,
     qualified_name: &QualifiedName,
 ) {
-    if !checker.semantic().seen_module(Modules::NUMPY) {
-        return;
-    }
-
     let semantic = checker.semantic();
 
     let replacement = match qualified_name.segments() {

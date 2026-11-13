@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -59,10 +58,6 @@ impl Violation for NumpyDeprecatedFunction {
 
 /// NPY003
 pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
-    if !checker.semantic().seen_module(Modules::NUMPY) {
-        return;
-    }
-
     let (existing, replacement) = match qualified_name.segments() {
         ["numpy", "round_"] => ("round_", "round"),
         ["numpy", "product"] => ("product", "prod"),
