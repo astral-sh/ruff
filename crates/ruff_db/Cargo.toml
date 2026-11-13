@@ -74,3 +74,6 @@ serde = [
 ]
 # Exposes testing utilities.
 testing = ["tracing-subscriber"]
+
+[lints.cargo]
+redundant_homepage = "allow"

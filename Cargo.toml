@@ -317,6 +317,11 @@ unused_peekable = "warn"
 # `else`, then some might consider that harder to read.
 if_not_else = "allow"
 
+[workspace.lints.cargo]
+# This is needed for maturin to generate the correct PyPI metadata, for at least
+# the ruff and ty crates.
+redundant_homepage = "allow"
+
 [profile.release]
 lto = "fat"
 codegen-units = 16
