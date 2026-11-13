@@ -1309,8 +1309,9 @@ fn invalid_python_requirement_reports_configuration_error() -> anyhow::Result<()
     Ok(())
 }
 
+// TODO: Consider warning that the entire `.src` table is unused.
 #[test]
-fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
+fn invalid_inline_src_glob_does_not_prevent_checking_script() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
             "pyproject.toml",
@@ -1338,14 +1339,14 @@ fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    error[invalid-glob]: Invalid pattern
-     --> script.py:4:14
-      |
-    4 | # include = ["src/**test/"]
-      |              ^^^^^^^^^^^^^ Too many stars at position 5
+    info[revealed-type]: Revealed type
+      --> script.py:12:13
+       |
+    12 | reveal_type(sys.platform)
+       |             ^^^^^^^^^^^^ `Literal["win32"]`
 
     Found 1 diagnostic
 
