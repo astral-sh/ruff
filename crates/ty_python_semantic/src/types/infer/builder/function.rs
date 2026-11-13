@@ -808,7 +808,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let annotation = param_with_default
                 .annotation()
                 .map(|annotation| function_signature_expression_type(db, definition, annotation));
-            self.infer_expression(default, TypeContext::declared(annotation));
+            self.infer_expression(default, TypeContext::preference(annotation));
         }
 
         self.deferred_state = previous_deferred_state;
@@ -1809,7 +1809,7 @@ impl KnownFunction {
                                 .speculate_without_diagnostics()
                                 .infer_expression(
                                     value_expr,
-                                    TypeContext::declared(Some(casted_type)),
+                                    TypeContext::preference(Some(casted_type)),
                                 )
                                 .is_disjoint_from(db, env, casted_type)
                         })
