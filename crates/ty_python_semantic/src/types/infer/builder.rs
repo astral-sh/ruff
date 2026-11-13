@@ -7877,27 +7877,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return ty;
                 }
             } else if let Type::Union(union) = annotation {
-                let union_elements = union.elements(self.db());
-                let mut typed_dicts = Vec::new();
-                let mut has_dict_compatible_fallback = false;
+                let union_elements = union
+                    .elements(db)
+                    .iter()
+                    .map(|ty| ty.resolve_type_alias(db));
+                let typed_dicts = union_elements
+                    .clone()
+                    .filter_map(Type::as_typed_dict)
+                    .collect_vec();
 
-                for element in union_elements {
-                    let element = element.resolve_type_alias(db);
-
-                    if let Some(typed_dict) = element.as_typed_dict() {
-                        typed_dicts.push(typed_dict);
-                    } else if !has_dict_compatible_fallback {
-                        // Suppress `TypedDict` diagnostics only if this literal is assignable to
-                        // the non-`TypedDict` arm of the union.
-                        let mut speculative_builder = self.speculate();
-                        has_dict_compatible_fallback = speculative_builder
-                            .infer_dict_expression(dict, tcx.with_declared_type(Some(element)))
-                            .is_assignable_to(db, env, element);
-                    }
-                }
-
+                // Suppress eager `TypedDict` diagnostics only if the literal is assignable to a
+                // non-`TypedDict` arm of the union.
                 if let [typed_dict] = typed_dicts.as_slice()
-                    && !has_dict_compatible_fallback
+                    && !union_elements
+                        .filter(|element| element.as_typed_dict().is_none())
+                        .any(|element| {
+                            self.speculate()
+                                .infer_dict_expression(dict, tcx.with_declared_type(Some(element)))
+                                .is_assignable_to(db, env, element)
+                        })
                 {
                     if let Some(ty) =
                         self.infer_typed_dict_expression(dict, *typed_dict, &mut item_types)
