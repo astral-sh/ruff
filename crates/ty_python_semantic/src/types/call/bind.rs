@@ -5407,7 +5407,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
         if !is_variable {
             self.argument_matches[argument_index].matched = matched;
-            return matched.then_some(()).ok_or(());
+            return matched.ok_or(());
         }
 
         // For a union of fixed-length tuples, positions beyond the guaranteed minimum are only
