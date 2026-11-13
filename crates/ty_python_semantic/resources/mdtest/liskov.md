@@ -3095,6 +3095,78 @@ error[incompatible-attribute-override]: Invalid override of attribute `value`
   |     ^^^^^ Type `str` is not assignable to inherited type `int`
 ```
 
+## Nested class overrides
+
+A subclass of `Base` can override its read-only nested class `Inner` with a subclass of
+`Base.Inner`, but not with an unrelated class.
+
+```py
+class Base:
+    class Inner: ...
+
+class Compatible(Base):
+    class Inner(Base.Inner): ...  # ok
+
+class Incompatible(Base):
+    class Inner: ...  # error: [incompatible-attribute-override]
+```
+
+An override can add writes. Once an attribute is writable, a further override must preserve those
+writes.
+
+```py
+class Writable(Base):
+    Inner: type[Base.Inner] = Base.Inner  # ok
+
+class ReadOnly(Writable):
+    class Inner(Base.Inner): ...  # error: [incompatible-attribute-override]
+```
+
+The override also preserves class access. Accessing a property on the class returns the property
+object, even if its getter returns the right type on instances.
+
+```py
+class PropertyOverride(Base):
+    @property
+    def Inner(self) -> type[Base.Inner]:  # error: [incompatible-property-override]
+        return Base.Inner
+```
+
+## Overriding setter-only nested descriptors
+
+A nested class whose metaclass defines only `__set__` exposes the class object on reads. A
+replacement descriptor that returns the same class must still accept the inherited setter's values.
+
+```py
+class Setter(type):
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class Base:
+    class Inner(metaclass=Setter): ...
+
+class StrSetter(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> type[Base.Inner]:
+        return Base.Inner
+
+    def __set__(cls, instance: object, value: str) -> None: ...
+
+class Child(Base):
+    class Inner(metaclass=StrSetter): ...  # error: [incompatible-mutable-override]
+```
+
+A receiver annotation does not replace the setter contract of a descriptor stored on the class.
+
+```py
+class Annotated:
+    Inner: type[Base.Inner] = Base.Inner
+
+    def __init__(self):
+        self.Inner: type[Base.Inner]
+
+class AnnotatedChild(Annotated):
+    class Inner(metaclass=StrSetter): ...  # error: [incompatible-mutable-override]
+```
+
 ## Annotated attributes with class defaults
 
 A class-body default does not erase an annotation's contract. Both the default and a later instance

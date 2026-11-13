@@ -2242,12 +2242,13 @@ def _(answer: type[Answer]) -> None:
     reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
 ```
 
-## Reassigning enum members
+## Reassigning and deleting enum members
 
 ### Class attributes
 
-Enum members cannot be reassigned on the class, even to their original value or to the member
-itself. This also applies to aliases, including aliases declared with the same value.
+Enum members cannot be deleted or reassigned on the class, even if the assignment uses the original
+value or the member itself. This also applies to aliases, including aliases declared with the same
+value.
 
 ```py
 from enum import Enum
@@ -2263,6 +2264,7 @@ Answer.NO = 0  # error: [invalid-assignment]
 Answer.NO = Answer.NO  # error: [invalid-assignment]
 Answer.ALIAS = 0  # error: [invalid-assignment]
 Answer.SAME_VALUE = 0  # error: [invalid-assignment]
+del Answer.NO  # error: [invalid-assignment] "Cannot delete read-only attribute `NO`"
 ```
 
 The assigned expression is still checked when the target is read-only:

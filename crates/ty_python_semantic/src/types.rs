@@ -6069,23 +6069,34 @@ impl<'db> Type<'db> {
             key: MemberLookupKey<'db>,
             receiver: Option<Type<'db>>,
         ) -> MemberLookupResult<'db> {
-            fn promote_inferred_attribute_class_literals<'db>(
+            /// Widen a class literal `<class 'C'>` to `type[C]` when this attribute read can
+            /// produce a different class.
+            fn promote_attribute_class_literals<'db>(
                 db: &'db dyn Db,
                 env: &ProgramEnvironment<'db>,
+                lookup_ty: Type<'db>,
                 result: MemberLookupResult<'db>,
             ) -> MemberLookupResult<'db> {
                 let member = result
                     .unwrap_or_else(|error| error.fallback_member(db))
                     .member(db);
-                let should_promote = matches!(
-                    member.place,
-                    Place::Defined(DefinedPlace {
-                        origin: TypeOrigin::Inferred,
-                        ..
-                    })
-                ) && !member.qualifiers.contains(TypeQualifiers::FINAL);
+                let should_promote = if member.qualifiers.contains(TypeQualifiers::NESTED_CLASS) {
+                    // A final class fixes which nested class its instances see. A final protocol
+                    // can still have structural implementations with different nested classes.
+                    !lookup_ty
+                        .nominal_class(db, env)
+                        .is_some_and(|class| class.is_final(db) && !class.is_protocol(db))
+                } else {
+                    matches!(
+                        member.place,
+                        Place::Defined(DefinedPlace {
+                            origin: TypeOrigin::Inferred,
+                            ..
+                        })
+                    )
+                };
 
-                if should_promote {
+                if should_promote && !member.qualifiers.contains(TypeQualifiers::FINAL) {
                     map_member_lookup_type(db, result, |ty| ty.promote_class_literals(db, env))
                 } else {
                     result
@@ -6145,12 +6156,10 @@ impl<'db> Type<'db> {
                 }
 
                 let result = this.fallback_to_getattr(db, env, name, result, key.policy(db));
-                // An inferred attribute accessed through an instance can resolve to an override
-                // on a subclass, so an exact class object is not a safe public type here.
                 let result = map_member_lookup_type(db, result, |ty| {
                     ty.bind_self_typevars(db, env, receiver)
                 });
-                promote_inferred_attribute_class_literals(db, env, result)
+                promote_attribute_class_literals(db, env, this, result)
             }
 
             let program = key.program(db);
@@ -6855,7 +6864,7 @@ impl<'db> Type<'db> {
                     let result = if let Type::SubclassOf(subclass_of) = this
                         && subclass_of.exact_typevar_upper_bound(db, env).is_none()
                     {
-                        promote_inferred_attribute_class_literals(db, env, result)
+                        promote_attribute_class_literals(db, env, this, result)
                     } else {
                         result
                     };
@@ -12027,7 +12036,7 @@ impl std::fmt::Display for DynamicType<'_> {
 bitflags! {
     /// Type qualifiers from annotations or synthesized member metadata.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
-    pub struct TypeQualifiers: u8 {
+    pub struct TypeQualifiers: u16 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
@@ -12048,6 +12057,11 @@ bitflags! {
         /// `__getattr__` function. We need this in order to implement precedence of submodules
         /// over module-level `__getattr__`, for compatibility with other type checkers.
         const FROM_MODULE_GETATTR = 1 << 7;
+        /// A read-only attribute introduced by a nested `class` statement. Subclasses can override
+        /// it covariantly. The class object has type `<class 'C'>` when read through the defining
+        /// class and `type[C]` when read through a receiver that includes subclasses and could see
+        /// an override.
+        const NESTED_CLASS = 1 << 8;
     }
 }
 
@@ -12080,8 +12094,9 @@ impl TypeQualifiers {
     /// Non-standard qualifiers are internal implementation details like
     /// `IMPLICIT_INSTANCE_ATTRIBUTE` and `FROM_MODULE_GETATTR`.
     pub fn is_non_standard(self) -> bool {
-        const NON_STANDARD: TypeQualifiers =
-            TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE.union(TypeQualifiers::FROM_MODULE_GETATTR);
+        const NON_STANDARD: TypeQualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE
+            .union(TypeQualifiers::FROM_MODULE_GETATTR)
+            .union(TypeQualifiers::NESTED_CLASS);
         self.intersects(NON_STANDARD)
     }
 }

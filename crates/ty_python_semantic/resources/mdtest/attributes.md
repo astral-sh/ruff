@@ -1529,6 +1529,187 @@ reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
 ```
 
+## Nested class attributes
+
+We treat a nested class defined by a `class` statement in another class's body as a read-only
+attribute. Subclasses can override it with a narrower class. Some libraries use this pattern for
+metadata or configuration.
+
+### Attribute access types
+
+Access on the defining class retains the exact class object. Access through an instance or an
+unspecified subclass accounts for possible overrides.
+
+```py
+class Outer:
+    class Inner: ...
+
+reveal_type(Outer.Inner)  # revealed: <class 'Inner'>
+
+def read(cls: type[Outer], obj: Outer):
+    reveal_type(cls.Inner)  # revealed: type[Inner]
+    reveal_type(obj.Inner)  # revealed: type[Inner]
+```
+
+### Generic nested classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Outer:
+    class Inner[T]: ...
+
+reveal_type(Outer.Inner)  # revealed: <class 'Inner'>
+
+def inspect(obj: Outer, cls: type[Outer]) -> None:
+    reveal_type(obj.Inner)  # revealed: type[Inner[Unknown]]
+    reveal_type(cls.Inner)  # revealed: type[Inner[Unknown]]
+```
+
+The nested class can be used in annotations, explicit specializations, and base classes.
+
+```py
+class Integer(Outer.Inner[int]): ...  # ok
+
+value: Outer.Inner[int] = Integer()  # ok
+```
+
+### On final classes
+
+On (an instance of) a final class, even an inherited nested class is known exactly.
+
+```py
+from typing import final
+
+class Outer:
+    class Inner: ...
+
+@final
+class FinalOuter(Outer): ...
+
+def read(cls: type[FinalOuter], obj: FinalOuter):
+    reveal_type(cls.Inner)  # revealed: <class 'Inner'>
+    reveal_type(obj.Inner)  # revealed: <class 'Inner'>
+```
+
+### Writes are not allowed
+
+Rebinding or deleting the nested class could invalidate a subclass's narrower type.
+
+```py
+class Outer:
+    class Inner: ...
+
+def write(cls: type[Outer], obj: Outer):
+    Outer.Inner = Outer.Inner  # error: [invalid-assignment]
+    cls.Inner = Outer.Inner  # error: [invalid-assignment]
+    obj.Inner = Outer.Inner  # error: [invalid-assignment]
+    del Outer.Inner  # error: [invalid-assignment]
+    del cls.Inner  # error: [invalid-assignment]
+    del obj.Inner  # error: [invalid-assignment]
+```
+
+### Class statements only
+
+An unannotated attribute initialized by assigning a class object remains writable. Only nested
+`class` statements create an implicitly non-writable attribute. (It would be surprising to
+implicitly make an attribute non-writable just based on what type it happens to have; giving this
+special treatment to nested `class` statements seems more defensible, and matches the motivating
+real-world patterns.)
+
+```py
+class NotReallyInner: ...
+
+class Outer:
+    Inner = NotReallyInner
+
+Outer.Inner = NotReallyInner  # ok
+```
+
+### Redeclaring nested class attributes on instances
+
+A subclass can explicitly redeclare an inherited nested class as a writable instance attribute. The
+annotation governs writes on its instances and further subclasses.
+
+```py
+class Base:
+    class Inner: ...
+
+class Writable(Base):
+    def __init__(self):
+        self.Inner: type[Base.Inner] = Base.Inner  # ok
+
+class Inherited(Writable): ...
+
+def write(obj: Inherited):
+    obj.Inner = Base.Inner  # ok
+    obj.Inner = str  # error: [invalid-assignment]
+    del obj.Inner  # ok
+
+Writable.Inner = Base.Inner  # error: [invalid-assignment]
+```
+
+A new nested class takes precedence over receiver annotations on the same class and its ancestors.
+
+```py
+class ReadOnly(Writable):
+    class Inner(Base.Inner): ...  # error: [incompatible-attribute-override]
+
+    def __init__(self):
+        self.Inner: type[Base.Inner] = Base.Inner  # error: [invalid-assignment]
+
+del ReadOnly().Inner  # error: [invalid-assignment]
+```
+
+### On metaclasses
+
+A class object cannot rebind or delete a nested class inherited from its metaclass.
+
+```py
+class Meta(type):
+    class Inner: ...
+
+class Base(metaclass=Meta): ...
+
+def update(cls: type[Base]):
+    cls.Inner = Meta.Inner  # error: [invalid-assignment]
+    del cls.Inner  # error: [invalid-assignment]
+```
+
+An explicitly annotated attribute in the class namespace takes precedence over the nested class on
+the metaclass and permits writes and deletion.
+
+```py
+class Writable(metaclass=Meta):
+    Inner: type[Meta.Inner] = Meta.Inner
+
+Writable.Inner = Meta.Inner  # ok
+del Writable.Inner  # ok
+```
+
+A receiver annotation on a subclass of the metaclass can also make the attribute writable. It does
+not permit replacing a nested class defined on the receiver itself.
+
+```py
+class WritableMeta(Meta):
+    def __init__(self, *args):
+        self.Inner: type[Meta.Inner] = Meta.Inner
+
+class ReceiverWritable(metaclass=WritableMeta): ...
+
+ReceiverWritable.Inner = Meta.Inner  # ok
+del ReceiverWritable.Inner  # ok
+
+class Own(metaclass=WritableMeta):
+    class Inner(Meta.Inner): ...
+
+Own.Inner = Meta.Inner  # error: [invalid-assignment]
+del Own.Inner  # error: [invalid-assignment]
+```
+
 ## Allow replacing ordinary methods with compatible functions
 
 An ordinary method can be replaced directly on a class by another function with a compatible

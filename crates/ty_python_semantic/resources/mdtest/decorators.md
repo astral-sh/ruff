@@ -694,6 +694,49 @@ class DeprecatedThenUnannotated: ...
 DeprecatedThenUnannotated()  # error: [deprecated] "use OtherClass"
 ```
 
+## Decorated nested class attributes
+
+A decorator that replaces a nested class produces a normal writable attribute of the decorator's
+return type, even if that return type is a class object.
+
+```py
+def as_int(cls: type) -> int:
+    return 1
+
+def as_int_class(cls: type) -> type[int]:
+    return int
+
+class Outer:
+    @as_int
+    class Number: ...
+
+    @as_int_class
+    class NumberType: ...
+
+reveal_type(Outer().Number)  # revealed: int
+Outer().Number = 2  # ok
+reveal_type(Outer().NumberType)  # revealed: type[int]
+Outer().NumberType = int  # ok
+Outer().NumberType = str  # error: [invalid-assignment]
+```
+
+A decorator that preserves the original nested class also preserves its read-only binding.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(cls: type[T]) -> type[T]:
+    return cls
+
+class Preserved:
+    @identity
+    class Inner: ...
+
+Preserved().Inner = Preserved.Inner  # error: [invalid-assignment]
+```
+
 ## Unknown return annotations on class decorators
 
 An unresolved return annotation produces `Unknown`. This preserves the class binding and allows
@@ -729,6 +772,16 @@ def decorator(cls: type) -> Any:
 class C: ...
 
 reveal_type(C)  # revealed: Any
+```
+
+A nested class replaced with `Any` also permits instance writes.
+
+```py
+class Outer:
+    @decorator
+    class Inner: ...
+
+Outer().Inner = 1  # ok
 ```
 
 An explicit `type[Any]` return type also replaces the binding:

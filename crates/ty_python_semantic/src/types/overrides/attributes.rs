@@ -273,6 +273,7 @@ fn bind_attribute<'db>(
         is_method,
     } = *attribute;
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
+    let is_nested_class = qualifiers.contains(TypeQualifiers::NESTED_CLASS);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let is_method_wrapper = matches!(ty, Type::KnownInstance(KnownInstanceType::MethodWrapper(_)));
     let (instance_read, class_read, write) = if is_class_var {
@@ -283,7 +284,7 @@ fn bind_attribute<'db>(
         let read = |instance| stored.class_variable_read_type(db, env, instance, owner);
         (read(Some(receiver)), read(None), Some(stored))
     } else if is_descriptor {
-        let read = Type::resolve_descriptor_access(
+        let member = Type::resolve_descriptor_access(
             db,
             env,
             class_member,
@@ -292,13 +293,16 @@ fn bind_attribute<'db>(
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
         .ok()?
-        .member(db)
-        .place
-        .ignore_possibly_undefined()?
-        .bind_self_typevars(db, env, receiver);
-        // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
-        // signatures, just like decorated definitions; the function's identity can change.
-        let read = if is_method || is_method_wrapper {
+        .member(db);
+        let read = member
+            .place
+            .ignore_possibly_undefined()?
+            .bind_self_typevars(db, env, receiver);
+        let read = if member.qualifiers.contains(TypeQualifiers::NESTED_CLASS) {
+            read.promote_class_literals(db, env)
+        } else if is_method || is_method_wrapper {
+            // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
+            // signatures, just like decorated definitions; the function's identity can change.
             read.try_upcast_to_callable(db, env)?.to_type(db, env)
         } else {
             read
@@ -324,6 +328,11 @@ fn bind_attribute<'db>(
         // The selected declaration defines the contract, including inherited annotations.
         // Inferred instance assignments do not narrow a class-body declaration.
         let read = ty.bind_self_typevars(db, env, receiver);
+        let read = if is_nested_class {
+            read.promote_class_literals(db, env)
+        } else {
+            read
+        };
         (
             Some(read),
             None,
@@ -347,6 +356,7 @@ fn bind_attribute<'db>(
         // writability of these attributes.
         write: if owner.is_object(db)
             || qualifiers.contains(TypeQualifiers::FINAL)
+            || is_nested_class && !ty.is_data_descriptor(db, env)
             || !is_class_var && is_frozen
         {
             None
@@ -503,6 +513,22 @@ fn attribute_violation<'db>(
         // These two rules are unsound together. The assignment above is valid through a
         // `Base` reference, but it would break a subclass with a return type of `str`.
         return None;
+    }
+    // Nested class declarations also constrain class access. A property returning a compatible
+    // value on instances does not necessarily preserve the class-side operation.
+    let class_read = |instance: Type<'db>| {
+        instance
+            .to_meta_type(db, env)
+            .member(db, env, name)
+            .ignore_possibly_undefined()
+            .map(|ty| ty.promote_class_literals(db, env))
+    };
+    if target.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+        && let Some(source) = class_read(receiver)
+        && let Some(target) = class_read(target_receiver)
+        && !source.is_assignable_to(db, env, target)
+    {
+        return Some(AttributeViolation::Read { source, target });
     }
     let write = target.write?;
     // A neutral dataclass-transform base explicitly permits frozen subclasses. Its

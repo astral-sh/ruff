@@ -671,9 +671,9 @@ impl<'db> ProtocolInterfaceView<'db> {
 
     /// Looks up a member guaranteed to exist on every inhabitant of `type[Protocol]`.
     ///
-    /// Methods retain their unbound signatures and `ClassVar`s retain their class-side types.
-    /// Properties are only required on the constructed instance, so they are undefined even when
-    /// the nominal protocol origin provides a property descriptor.
+    /// Methods retain their unbound signatures, while `ClassVar`s and nested classes expose their
+    /// class-side types. Properties are only required on the constructed instance, so they are
+    /// undefined even when the nominal protocol origin provides a property descriptor.
     pub(super) fn meta_member(
         self,
         db: &'db dyn Db,
@@ -1482,13 +1482,18 @@ impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
     }
 
     fn read(self) -> Option<ProtocolMemberReadAccess<'a, 'db>> {
+        let is_instance = self.mode == ProtocolMemberAccessMode::Instance;
+        let is_nested_class = self
+            .declaration
+            .qualifiers
+            .contains(TypeQualifiers::NESTED_CLASS);
         let supported = match self.declaration.kind {
             ProtocolMemberKind::Method(..) => true,
             ProtocolMemberKind::Property { read, .. } => {
-                self.mode == ProtocolMemberAccessMode::Instance && read.is_some()
+                read.is_some() && (is_instance || is_nested_class)
             }
             ProtocolMemberKind::Attribute(_) => {
-                self.mode == ProtocolMemberAccessMode::Instance || self.declaration.is_class_var()
+                is_instance || is_nested_class || self.declaration.is_class_var()
             }
         };
         supported.then_some(ProtocolMemberReadAccess { access: self })
@@ -1526,8 +1531,11 @@ impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
             }
             ProtocolMemberKind::Attribute(annotation) => {
                 let is_class_var = self.declaration.is_class_var();
-                let is_final = self.declaration.qualifiers.contains(TypeQualifiers::FINAL);
-                if is_final || is_class_var != (self.mode == ProtocolMemberAccessMode::Class) {
+                let is_read_only = self
+                    .declaration
+                    .qualifiers
+                    .intersects(TypeQualifiers::FINAL | TypeQualifiers::NESTED_CLASS);
+                if is_read_only || is_class_var != (self.mode == ProtocolMemberAccessMode::Class) {
                     return None;
                 }
                 ProtocolMemberWrite::from_type(ProtocolPropertyType::Annotation(annotation))
@@ -1680,9 +1688,19 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
             ty: self.access.materialize_type(db, env, annotation.ty),
             ..annotation
         };
-        Some(self_type.map_or(annotation.ty, |self_type| {
+        let ty = self_type.map_or(annotation.ty, |self_type| {
             annotation.bind_self(db, env, self_type)
-        }))
+        });
+        if self
+            .access
+            .declaration
+            .qualifiers
+            .contains(TypeQualifiers::NESTED_CLASS)
+        {
+            Some(ty.promote_class_literals(db, env))
+        } else {
+            Some(ty)
+        }
     }
 }
 
@@ -2531,15 +2549,24 @@ fn property_set_member_type<'db>(
     })
 }
 
-/// Derive the observable instance capabilities of a descriptor-decorated protocol member.
-fn descriptor_decorated_protocol_member<'db>(
+/// Derive the observable capabilities of a descriptor bound on a protocol class.
+fn descriptor_protocol_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    descriptor_ty: Type<'db>,
     protocol: ClassType<'db>,
-    definition: Option<Definition<'db>>,
+    mut candidate: ProtocolMemberCandidate<'db>,
 ) -> Option<ProtocolMemberData<'db>> {
-    let descriptor_ty = descriptor_ty.resolve_type_alias(db);
+    let descriptor_ty = candidate.ty.resolve_type_alias(db);
+    let getter = descriptor_ty
+        .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+        .place;
+    if candidate.qualifiers.contains(TypeQualifiers::NESTED_CLASS) && !getter.is_undefined() {
+        // A nested descriptor's getter can return different types on instance and class access.
+        // Modeling just the instance read as a property would accept property-only implementations.
+        // Keep the unbound descriptor as an ordinary attribute until we can model both reads.
+        candidate.qualifiers.remove(TypeQualifiers::NESTED_CLASS);
+        return Some(ProtocolMemberData::attribute(candidate));
+    }
 
     // Applying a generic descriptor decorator to a method that refers to an enclosing type
     // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
@@ -2549,9 +2576,7 @@ fn descriptor_decorated_protocol_member<'db>(
         return None;
     }
 
-    let getter = descriptor_ty
-        .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
-        .place;
+    let definition = candidate.definition;
     let receiver_ty = Type::instance(db, env, protocol);
     let write = if descriptor_ty.is_data_descriptor(db, env) {
         match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
@@ -2587,7 +2612,11 @@ fn descriptor_decorated_protocol_member<'db>(
         return None;
     };
     let read = Some(ProtocolPropertyType::with_definition(read_ty, definition));
-    Some(ProtocolMemberData::property(read, write, definition))
+    let mut member = ProtocolMemberData::property(read, write, definition);
+    // Without `__get__`, a nested descriptor still exposes its class object on both the
+    // protocol instance and its class. Only instance writes invoke the descriptor setter.
+    member.qualifiers = candidate.qualifiers & TypeQualifiers::NESTED_CLASS;
+    Some(member)
 }
 
 fn is_class_object_type(ty: Type<'_>) -> bool {
@@ -3085,8 +3114,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ///
     /// Ordinary instance attributes and properties are deliberately absent from this check. They
     /// are requirements on the object produced by constructing the class, not on the class object
-    /// itself. `ClassVar`s and methods are checked through class access; unlike ordinary protocol
-    /// matching, method access compares the unbound signature instead of checking only presence.
+    /// itself. `ClassVar`s, nested classes, and methods are checked through class access; unlike
+    /// ordinary protocol matching, method access compares the unbound signature instead of checking
+    /// only presence.
     pub(super) fn check_meta_protocol_members(
         &self,
         db: &'db dyn Db,
@@ -3654,6 +3684,7 @@ fn cached_protocol_interface<'db>(
         let candidate = candidate.apply_specialization(db, &env, specialization);
         let ProtocolMemberCandidate {
             ty,
+            qualifiers,
             definition,
             bound_on_class,
             ..
@@ -3684,15 +3715,12 @@ fn cached_protocol_interface<'db>(
                 ProtocolMemberData::method(db, function.into_callable_type(db), definition)
             }
             _ if bound_on_class.is_yes()
-                && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
+                && (definition.is_some_and(|definition| definition.kind(db).is_function_def())
+                    || qualifiers.contains(TypeQualifiers::NESTED_CLASS))
+                && let Some(descriptor) =
+                    descriptor_protocol_member(db, &env, class, candidate) =>
             {
-                if let Some(descriptor) =
-                    descriptor_decorated_protocol_member(db, &env, ty, class, definition)
-                {
-                    descriptor
-                } else {
-                    ProtocolMemberData::attribute(candidate)
-                }
+                descriptor
             }
             _ => ProtocolMemberData::attribute(candidate),
         };
