@@ -249,13 +249,13 @@ impl ProjectDatabase {
         self.project().check(self, reporter);
     }
 
-    /// Checks `file` using its current settings and available environment. Returns an empty
-    /// vector while its first uv environment is pending.
+    /// Checks `file` using its current settings and available environment.
+    /// Reports no diagnostics for a script while its first uv sync is pending.
     ///
     /// Uses the same environment synchronization behavior as [`check`](Self::check).
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
-        crate::check_file_if_ready(self, file).unwrap_or_default()
+        crate::check_file(self, file)
     }
 
     /// Returns a program whose configured search paths contain `path`.
@@ -898,7 +898,7 @@ pub(crate) mod testing {
 
         #[inline]
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
-            crate::check_file_if_ready(self, file).unwrap_or_default()
+            crate::check_file(self, file)
         }
 
         fn rule_selection(&self, file: ruff_db::files::File) -> &RuleSelection {

@@ -26,10 +26,10 @@
 //! This avoids a rust-analyzer-like experience where editor operations wait for `cargo check` to
 //! complete before becoming available.
 //!
-//! While a script's initial environment is unavailable, the language server defers its semantic
-//! diagnostics to avoid incorrect missing-dependency errors. Document pull requests receive an
-//! empty diagnostic report, and workspace diagnostics continue checking other files. After applying the
-//! synchronization result, the server resumes suspended requests and refreshes diagnostics.
+//! While a script's first uv sync is pending, the language server reports empty diagnostics for
+//! that script to avoid incorrect missing-dependency errors. Workspace diagnostics continue
+//! checking other files. After applying the synchronization result, the server resumes suspended
+//! requests and refreshes diagnostics.
 //!
 //! Refreshing an available environment does not defer diagnostics. Projects and scripts continue
 //! using their most recently applied environments until the refresh results are applied.

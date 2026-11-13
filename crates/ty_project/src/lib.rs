@@ -549,6 +549,10 @@ impl Project {
                 db.unwind_if_revision_cancelled();
 
                 if db.uv_environments().is_initialization_pending(db, file) {
+                    tracing::debug!(
+                        "Deferring diagnostics for `{}` until its first uv sync completes",
+                        file.path(db)
+                    );
                     reporter.report_checked_file(db, file, &[]);
                     return;
                 }
@@ -896,20 +900,14 @@ impl ScriptFiles<'_> {
     }
 }
 
-/// Checks a file, returning `None` while its first uv environment is pending.
-pub fn check_file_if_ready(db: &dyn Db, file: File) -> Option<Vec<Diagnostic>> {
-    if db.uv_environments().is_initialization_pending(db, file) {
-        return None;
-    }
-    if !db.should_check_file(file) {
-        return Some(Vec::new());
+fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
+    if !db.should_check_file(file) || db.uv_environments().is_initialization_pending(db, file) {
+        return Vec::new();
     }
 
-    Some(
-        check_file_impl(db, db.program_file(file))
-            .map(<[Diagnostic]>::to_vec)
-            .unwrap_or_else(|diagnostic| vec![diagnostic.clone()]),
-    )
+    check_file_impl(db, db.program_file(file))
+        .map(<[Diagnostic]>::to_vec)
+        .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
 }
 
 /// Returns whether semantic checking and semantic diagnostics should run for `file`.

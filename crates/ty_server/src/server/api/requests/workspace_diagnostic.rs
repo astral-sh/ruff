@@ -98,8 +98,8 @@ use crate::system::file_to_uri;
 /// suspended workspace diagnostic request (if any) after every notification if the notification
 /// changed the [`Session`]'s state.
 ///
-/// Workspace diagnostics skip scripts awaiting their first uv environment. Applying the
-/// synchronization result wakes a long-polling request so it can check the script.
+/// A script contributes no diagnostics while its first uv sync is pending. Applying the
+/// result wakes a long-polling request so it can check the script.
 ///
 /// [workspace-diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic)
 pub(crate) struct WorkspaceDiagnosticRequestHandler;
@@ -261,9 +261,8 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
             state.report_progress(&self.work_done);
         }
 
-        // Don't report empty diagnostics. We clear previous diagnostics in `into_response`
-        // which also handles the case where a file no longer has diagnostics because
-        // it's no longer part of the project.
+        // `into_final_report` clears any previous diagnostics for files with empty results
+        // and for files that are no longer part of the project.
         if !diagnostics.is_empty() || !unnecessary_hints.is_empty() {
             state
                 .response
