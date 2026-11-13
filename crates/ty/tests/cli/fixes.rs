@@ -158,7 +158,7 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
     Added 5 ignore comments
 
     ----- stderr -----
-    WARN Skipping file `<temp_dir>/has_syntax_error.py` with syntax errors
+    WARN Skipping file `has_syntax_error.py` with syntax errors
     ");
 
     Ok(())
@@ -243,8 +243,23 @@ fn fix_unused_ignore_after_line_continuation() -> anyhow::Result<()> {
 
 #[test]
 fn fix_unfixable() -> anyhow::Result<()> {
+    // Only the Python file with a syntax error should trigger a warning about skipped fixes.
+    // The renamed rule in `pyproject.toml` should still be reported.
     let case = CliTest::with_files([
-        ("has_syntax_error.py", "x = (\n"),
+        (
+            "has_syntax_error.py",
+            "
+            x = 1  # ty: ignore[unresolved-reference]
+            x = (
+            ",
+        ),
+        (
+            "pyproject.toml",
+            "
+            [tool.ty.rules]
+            unsound-return-statement = 'ignore'
+            ",
+        ),
         (
             "unused_ignore.py",
             r#"
@@ -259,16 +274,35 @@ fn fix_unfixable() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-syntax]: unexpected EOF while parsing
-     --> has_syntax_error.py:2:1
+    warning[unused-ignore-comment]: Unused `ty: ignore` directive
+     --> has_syntax_error.py:2:8
       |
-    2 |
+    2 | x = 1  # ty: ignore[unresolved-reference]
+      |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    help: Remove the unused suppression comment
+      |
+    1 |
+      - x = 1  # ty: ignore[unresolved-reference]
+    2 + x = 1
+    3 | x = (
+      |
+
+    error[invalid-syntax]: unexpected EOF while parsing
+     --> has_syntax_error.py:4:1
+      |
+    4 |
       | ^
 
-    Found 2 diagnostics (1 fixed, 1 remaining).
+    warning[renamed-rule]: Rule `unsound-return-statement` has been renamed to `unsound-return`
+     --> pyproject.toml:3:1
+      |
+    3 | unsound-return-statement = 'ignore'
+      | ^^^^^^^^^^^^^^^^^^^^^^^^
+
+    Found 4 diagnostics (1 fixed, 3 remaining).
 
     ----- stderr -----
-    WARN Skipping file `<temp_dir>/has_syntax_error.py` with syntax errors
+    WARN Skipping file `has_syntax_error.py` with syntax errors
     "
     );
 
