@@ -548,6 +548,11 @@ impl Project {
             .for_each_with_project_db(db, |db, file| {
                 db.unwind_if_revision_cancelled();
 
+                if db.uv_environments().is_initialization_pending(db, file) {
+                    reporter.report_checked_file(db, file, &[]);
+                    return;
+                }
+
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
@@ -891,22 +896,29 @@ impl ScriptFiles<'_> {
     }
 }
 
-fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
+/// Checks a file, returning `None` while its first uv environment is pending.
+pub fn check_file_if_ready(db: &dyn Db, file: File) -> Option<Vec<Diagnostic>> {
+    if db.uv_environments().is_initialization_pending(db, file) {
+        return None;
+    }
     if !db.should_check_file(file) {
-        return Vec::new();
+        return Some(Vec::new());
     }
 
-    check_file_impl(db, db.program_file(file))
-        .map(<[Diagnostic]>::to_vec)
-        .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
+    Some(
+        check_file_impl(db, db.program_file(file))
+            .map(<[Diagnostic]>::to_vec)
+            .unwrap_or_else(|diagnostic| vec![diagnostic.clone()]),
+    )
 }
 
 /// Returns whether semantic checking and semantic diagnostics should run for `file`.
 ///
 /// Scripts with invalid configuration still produce configuration diagnostics and retain a program
 /// for editor operations, but their semantic diagnostics must not be reported.
+/// Call this outside Salsa queries because uv initialization progress is untracked.
 pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
-    if !db.should_check_file(file) {
+    if !db.should_check_file(file) || db.uv_environments().is_initialization_pending(db, file) {
         return false;
     }
 

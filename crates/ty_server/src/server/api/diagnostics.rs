@@ -387,14 +387,7 @@ pub(super) fn compute_diagnostics(
     encoding: PositionEncoding,
     global_settings: &GlobalSettings,
 ) -> Option<Diagnostics> {
-    // The first uv result supplies the module paths needed for correct diagnostics. Do not analyze
-    // the script until that result is available. Waiting would not help: publishing the environment
-    // advances the database revision and cancels this snapshot, so the request must retry anyway.
-    if db.uv_environments().is_initialization_pending(db, file) {
-        return None;
-    }
-
-    let mut diagnostics = db.check_file(file);
+    let mut diagnostics = ty_project::check_file_if_ready(db, file)?;
     diagnostics.retain(|diagnostic| global_settings.should_show_diagnostic(diagnostic));
     let unnecessary_hints = hints(db, file);
 
