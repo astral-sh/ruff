@@ -1858,23 +1858,36 @@ def _(flag: bool):
         reveal_type(C)  # revealed: <class 'A'>
 ```
 
-## Equality between class objects
+## Equality between class objects and `type[...]` types
 
-A class's own `__eq__` affects comparisons between its instances. With the ordinary metaclass,
-comparing `cls == Child` identifies the exact class and lets us pass `Child`'s constructor keyword.
+A `type[...]` type includes arbitrary subclasses, which could have metaclasses with `__eq__`
+implementing arbitrary behavior, so in general it is not sound to assume that `cls == SomeClass`
+(where `cls` has a `type[...]` type) narrows.
+
+In practice, though, metaclasses that override `__eq__` are uncommon, and people do rely on this
+type of narrowing. In non-strict mode, when both known metaclasses use the default equality
+implementation, we optimistically assume that subclasses retain it and permit this narrowing.
 
 ```py
 class Base: ...
+class Child(Base): ...
 
-class Child(Base):
-    def __init__(self, *, size: int): ...
+def _(cls: type[Base]):
+    if cls == Child:
+        reveal_type(cls)  # revealed: <class 'Child'>
+```
+
+A class's own `__eq__` affects comparisons between its instances, not between class objects; it has
+no effect here.
+
+```py
+class ChildWithEq(Base):
     def __eq__(self, other: object) -> bool:
         return True
 
-def construct(cls: type[Base]):
-    if cls == Child:
-        reveal_type(cls)  # revealed: <class 'Child'>
-        reveal_type(cls(size=1))  # revealed: Child
+def _(cls: type[Base]):
+    if cls == ChildWithEq:
+        reveal_type(cls)  # revealed: <class 'ChildWithEq'>
 ```
 
 Distinct classes can compare equal when either metaclass defines or inherits an `__eq__` override.
@@ -3393,8 +3406,7 @@ def tuple_union(value: Foo | None, other: tuple[int, ...]):
         reveal_type(value)  # revealed: Foo | None
 ```
 
-Strict mode accounts for a subclass that introduces a metaclass with custom equality. A union of
-exact class objects can still narrow because their metaclasses are known.
+Strict mode accounts for a subclass that introduces a metaclass with custom equality.
 
 ```py
 class Base: ...
@@ -3404,13 +3416,14 @@ def compare_classes(cls: type[Base], flag: bool):
     if cls == Child:
         reveal_type(cls)  # revealed: type[Base]
 
+    # A union of exact class objects can still narrow because their metaclasses are known.
     either = Base if flag else Child
     if either == Child:
         reveal_type(either)  # revealed: <class 'Child'>
 ```
 
 A final metaclass fixes the comparison method for every subclass. Equality on its own metaclass only
-affects comparisons with the metaclass itself.
+affects comparisons with the metaclass itself, not class equality.
 
 ```py
 from typing import final
