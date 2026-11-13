@@ -308,6 +308,11 @@ fn configuration_rule_alias_levels_with_override() {
       |
     9 | unresolved-import = "ignore"
       | ^^^^^^^^^^^^^^^^^
+      |
+    8 | [overrides.rules]
+      - unresolved-import = "ignore"
+    9 + import-not-found = "ignore"
+      |
 
     Found 2 diagnostics
 
@@ -317,6 +322,7 @@ fn configuration_rule_alias_levels_with_override() {
 
 #[test]
 fn discover_pyproject_with_conflicting_rule_alias_levels() -> anyhow::Result<()> {
+    // Renaming the alias would duplicate the canonical key, so `--fix` leaves both entries intact.
     let case = CliTest::with_files([
         ("test.py", "import missing"),
         (
@@ -332,16 +338,19 @@ fn discover_pyproject_with_conflicting_rule_alias_levels() -> anyhow::Result<()>
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @"
+    let config = case.root().join("pyproject.toml");
+    let before = std::fs::read_to_string(&config)?;
+    assert_cmd_snapshot!(case.command().args(["--fix", "--output-format", "concise"]), @"
     success: true
     exit_code: 0
     ----- stdout -----
     pyproject.toml:4:1: warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
     test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
-    Found 2 diagnostics
+    Found 2 diagnostics (0 fixed, 2 remaining).
 
     ----- stderr -----
     ");
+    assert_eq!(std::fs::read_to_string(config)?, before);
     Ok(())
 }
 

@@ -523,9 +523,12 @@ impl ProjectMetadata {
     }
 
     fn lint_options(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
-        self.options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
+        let mut diagnostics: Vec<_> = self
+            .options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
             .flat_map(|options| options.lint_unmerged(db))
-            .collect()
+            .collect();
+        OptionDiagnostic::remove_aliased_rule_renames(db, &mut diagnostics);
+        diagnostics
     }
 
     /// Returns all option layers merged according to their precedence.

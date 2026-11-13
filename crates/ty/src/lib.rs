@@ -23,17 +23,16 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Sev
 use ruff_db::files::File;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
-use ruff_diagnostics::Applicability;
 use ruff_python_ast::script::ScriptTag;
 use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
-    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UseUv,
-    UvSyncProgress, UvWorkspace, watch,
+    ChangeResult, CheckDiagnostics, CollectReporter, Db, Project, ScriptEnvironmentAvailability,
+    UseUv, UvSyncProgress, UvWorkspace, watch,
 };
 use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
-use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
+use ty_python_semantic::suppress_all_diagnostics;
 use ty_static::EnvVars;
 
 use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat};
@@ -401,7 +400,7 @@ impl MainLoop {
                         match salsa::Cancelled::catch(|| {
                             let mut reporter = IndicatifReporter::new(printer.progress_target());
                             db.check_with_reporter(&mut reporter);
-                            reporter.into_sorted_diagnostics(&db)
+                            reporter.into_diagnostics()
                         }) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
@@ -435,7 +434,7 @@ impl MainLoop {
 
                     let mut result = result;
                     if !matches!(self.mode, MainLoopMode::UpdateBaseline) {
-                        retain_visible_diagnostics(&mut result);
+                        result.retain(is_visible_diagnostic);
                     }
 
                     let result = match self.mode {
@@ -445,6 +444,7 @@ impl MainLoop {
                                 return Ok(ExitStatus::Success);
                             }
 
+                            let result = result.into_sorted(db);
                             self.write_diagnostics(db, &result, None)?;
 
                             if self.cancellation_token.is_cancelled() {
@@ -456,18 +456,20 @@ impl MainLoop {
                         MainLoopMode::Fix(mode) => {
                             let result = match mode {
                                 FixMode::AddIgnore => {
-                                    suppress_all_diagnostics(db, result, &self.cancellation_token)
+                                    let diagnostics = result.into_sorted(db);
+                                    suppress_all_diagnostics(
+                                        db,
+                                        diagnostics,
+                                        &self.cancellation_token,
+                                    )
                                 }
-                                FixMode::ApplyFixes => fix_all_diagnostics(
-                                    db,
-                                    result,
-                                    Applicability::Safe,
-                                    &self.cancellation_token,
-                                ),
+                                FixMode::ApplyFixes => {
+                                    db.fix_all_diagnostics(result, &self.cancellation_token)
+                                }
                             };
 
                             if let Ok(mut result) = result {
-                                retain_visible_diagnostics(&mut result.diagnostics);
+                                result.diagnostics.retain(is_visible_diagnostic);
                                 let fixed_diagnostics = match mode {
                                     FixMode::AddIgnore => None,
                                     FixMode::ApplyFixes => Some(result.count),
@@ -504,7 +506,11 @@ impl MainLoop {
                                     "`--update-baseline` requires a baseline path from `--baseline` or configuration"
                                 ));
                             };
-                            let result = ty_project::baseline::write(db, baseline_path, result)?;
+                            let result = ty_project::baseline::write(
+                                db,
+                                baseline_path,
+                                result.into_sorted(db),
+                            )?;
                             if !result.diagnostics.is_empty() {
                                 self.write_diagnostics(db, &result.diagnostics, None)?;
                             }
@@ -728,10 +734,8 @@ enum FixMode {
     ApplyFixes,
 }
 
-fn retain_visible_diagnostics(diagnostics: &mut Vec<Diagnostic>) {
-    diagnostics.retain(|diagnostic| {
-        !(diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint())
-    });
+fn is_visible_diagnostic(diagnostic: &Diagnostic) -> bool {
+    !(diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint())
 }
 
 fn exit_status_from_diagnostics(
@@ -784,8 +788,8 @@ impl IndicatifReporter {
         }
     }
 
-    fn into_sorted_diagnostics(mut self, db: &dyn Db) -> Vec<Diagnostic> {
-        std::mem::take(&mut self.collector).into_sorted(db)
+    fn into_diagnostics(mut self) -> CheckDiagnostics {
+        std::mem::take(&mut self.collector).into_diagnostics()
     }
 }
 
@@ -939,7 +943,7 @@ enum MainLoopMessage {
     CheckWorkspace,
     CheckCompleted {
         /// The diagnostics that were found during the check.
-        result: Vec<Diagnostic>,
+        result: CheckDiagnostics,
         revision: u64,
     },
     PollUvEnvironments,

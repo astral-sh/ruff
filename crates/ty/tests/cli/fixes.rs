@@ -243,8 +243,9 @@ fn fix_unused_ignore_after_line_continuation() -> anyhow::Result<()> {
 
 #[test]
 fn fix_unfixable() -> anyhow::Result<()> {
-    // Only the Python file with a syntax error should trigger a warning about skipped fixes.
-    // The renamed rule in `pyproject.toml` should still be reported.
+    // Rename the TOML key and remove the ignore from `unused_ignore.py`. Only the file with a
+    // syntax error should trigger a warning about skipped fixes. Shortening the key shifts the
+    // Python version setting's byte offset, and the note should still point to that setting.
     let case = CliTest::with_files([
         (
             "has_syntax_error.py",
@@ -255,11 +256,13 @@ fn fix_unfixable() -> anyhow::Result<()> {
         ),
         (
             "pyproject.toml",
-            "
-            [tool.ty.rules]
-            unsound-return-statement = 'ignore'
-            ",
+            r#"
+            [tool.ty]
+            rules = { "unsound-return-statement" = 'ignore' }  # Keep this comment.
+            environment.python-version = "3.12"
+            "#,
         ),
+        ("version_error.py", "PythonFinalizationError"),
         (
             "unused_ignore.py",
             r#"
@@ -270,7 +273,7 @@ fn fix_unfixable() -> anyhow::Result<()> {
 
     assert_cmd_snapshot!(
         case.command().arg("--fix").arg("--warn").arg("unused-ignore-comment"),
-        @"
+        @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -293,18 +296,31 @@ fn fix_unfixable() -> anyhow::Result<()> {
     4 |
       | ^
 
-    warning[renamed-rule]: Rule `unsound-return-statement` has been renamed to `unsound-return`
-     --> pyproject.toml:3:1
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+     --> version_error.py:1:1
       |
-    3 | unsound-return-statement = 'ignore'
-      | ^^^^^^^^^^^^^^^^^^^^^^^^
+    1 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types
+     --> pyproject.toml:4:30
+      |
+    4 | environment.python-version = "3.12"
+      |                              ^^^^^^ Python version configuration
 
-    Found 4 diagnostics (1 fixed, 3 remaining).
+    Found 5 diagnostics (2 fixed, 3 remaining).
 
     ----- stderr -----
     WARN Skipping file `has_syntax_error.py` with syntax errors
-    "
+    "#
     );
+
+    assert_snapshot!(fs::read_to_string(case.root().join("pyproject.toml"))?, @r#"
+
+    [tool.ty]
+    rules = { "unsound-return" = 'ignore' }  # Keep this comment.
+    environment.python-version = "3.12"
+    "#);
 
     assert_snapshot!(
         fs::read_to_string(case.root().join("unused_ignore.py"))?,
@@ -313,6 +329,67 @@ fn fix_unfixable() -> anyhow::Result<()> {
     "
     );
 
+    Ok(())
+}
+
+#[test]
+fn fix_rule_rename_in_user_config_also_used_as_project_config() -> anyhow::Result<()> {
+    // Explicit selection and user configuration discovery load the same path. Fix each key once.
+    let case = CliTest::with_file("test.py", "import missing")?;
+    let config = case.user_config_directory().join("ty/ty.toml");
+    case.write_file(&config, "[rules]\nunresolved-import = 'ignore'\n")?;
+
+    assert_cmd_snapshot!(case.command().args(["--fix", "--config-file"]).arg(&config), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Found 1 diagnostic (1 fixed, 0 remaining).
+
+    ----- stderr -----
+    ");
+    assert_snapshot!(fs::read_to_string(config)?, @"
+    [rules]
+    import-not-found = 'ignore'
+    ");
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn skip_rule_rename_when_project_config_links_to_user_config() -> anyhow::Result<()> {
+    // The symlink gives the same file two paths. Keep the warnings and skip the edit.
+    let case = CliTest::with_file("test.py", "import missing")?;
+    let user_config = case.user_config_directory();
+    let case = case.with_filter(
+        &regex::escape(&user_config.to_string_lossy()),
+        "<user_config>",
+    );
+    let config = user_config.join("ty/ty.toml");
+    let original = "[rules]\nunresolved-import = 'ignore'\n";
+    case.write_file(&config, original)?;
+    case.write_symlink(&config, "ty.toml")?;
+
+    assert_cmd_snapshot!(case.command().arg("--fix"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> <user_config>/ty/ty.toml:2:1
+      |
+    2 | unresolved-import = 'ignore'
+      | ^^^^^^^^^^^^^^^^^
+
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> ty.toml:2:1
+      |
+    2 | unresolved-import = 'ignore'
+      | ^^^^^^^^^^^^^^^^^
+
+    Found 2 diagnostics (0 fixed, 2 remaining).
+
+    ----- stderr -----
+    ");
+    assert_eq!(fs::read_to_string(config)?, original);
     Ok(())
 }
 
