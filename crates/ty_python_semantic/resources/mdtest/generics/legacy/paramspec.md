@@ -1955,6 +1955,19 @@ def construct(factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> 
 reveal_type(construct(Factory))  # revealed: Factory[object]
 ```
 
+Two arguments can capture the same generic constructor with different return bounds:
+
+```py
+Q = ParamSpec("Q")
+First = TypeVar("First", bound=Factory[int])
+Second = TypeVar("Second", bound=Factory[str])
+
+def pair(first: Callable[P, First], second: Callable[Q, Second]) -> tuple[First, Second]:
+    raise NotImplementedError
+
+reveal_type(pair(Factory, Factory))  # revealed: tuple[Factory[int], Factory[str]]
+```
+
 ### Class method with a generic callable receiver
 
 A class method's receiver can be a generic callable whose parameters are captured by a `ParamSpec`.
@@ -2009,6 +2022,25 @@ def word(f: Callable[P, str]) -> Word[P]:
 reveal_type(return_type_of(word))  # revealed: str
 ```
 
+### A fixed type variable in the callback's parameter and return types
+
+The callback can return `None`, but it only accepts `T` as an argument. Capturing its parameter list
+preserves that distinction.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+
+def keep(callback: Callable[P, R]) -> Callable[P, R]:
+    return callback
+
+def outer(callback: Callable[[T], T | None]) -> None:
+    reveal_type(keep(callback))  # revealed: (T@outer, /) -> T@outer | None
+```
+
 ### Captured and fixed variables in a return type
 
 Capturing a callable's type variable does not permit a second, enclosing variable in its return type
@@ -2031,15 +2063,13 @@ def unrestricted(fixed: S) -> None:
     def make(value: T) -> tuple[T, S]:
         return value, fixed
 
-    # TODO: Reject this call because `S` is not bounded by `str`.
-    forward(make, 1)  # ok
+    forward(make, 1)  # error: [invalid-argument-type]
 
 def non_generic(fixed: S) -> None:
     def make(value: int) -> tuple[int, S]:
         return value, fixed
 
-    # TODO: Reject this call because `S` is not bounded by `str`.
-    forward(make, 1)  # ok
+    forward(make, 1)  # error: [invalid-argument-type]
 
 def bounded(fixed: BoundedS) -> None:
     def make(value: T) -> tuple[T, BoundedS]:

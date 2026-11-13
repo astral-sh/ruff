@@ -759,8 +759,9 @@ while value:
 python-version = "3.12"
 ```
 
-A list passed to a generic function retains the type inferred from its elements, even when the
-call's return type supplies an incompatible context for that list.
+An unannotated list receives element types from both its initializer and its later uses. Here the
+return annotation supplies `T` through `keep`, but the list also contains an `int`. Returning it as
+`list[T]` would be unsafe.
 
 ```py
 def keep[U](values: list[U]) -> list[U]:
@@ -768,6 +769,6 @@ def keep[U](values: list[U]) -> list[U]:
 
 def make[T](arg: T) -> list[T]:
     values = [42]
-    reveal_type(values)  # revealed: list[int]
+    reveal_type(values)  # revealed: list[T@make | int]
     return keep(values)  # error: [invalid-explicit-return]
 ```
