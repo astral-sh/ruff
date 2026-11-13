@@ -1738,8 +1738,7 @@ def ab(a: int, *, c: int):
                     docs = signature
                         .documentation
                         .as_ref()
-                        .map(|docstring| docstring.render(MarkupKind::PlainText))
-                        .unwrap_or_default(),
+                        .map_or_default(|docstring| docstring.render(MarkupKind::PlainText)),
                 )
                 .unwrap();
                 if let Some(active_parameter) = signature.active_parameter {
@@ -1776,8 +1775,7 @@ def ab(a: int, *, c: int):
                     docs = signature
                         .documentation
                         .as_ref()
-                        .map(|docstring| docstring.render(MarkupKind::PlainText))
-                        .unwrap_or_default(),
+                        .map_or_default(|docstring| docstring.render(MarkupKind::PlainText)),
                 )
                 .unwrap();
                 if let Some(active_parameter) = signature.active_parameter {

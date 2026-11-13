@@ -26,24 +26,21 @@ impl<'a> PylintRenderer<'a> {
 impl Renderer for PylintRenderer<'_> {
     fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         for diagnostic in diagnostics {
-            let (filename, row) = diagnostic
-                .primary_span_ref()
-                .map(|span| {
-                    let file = span.file();
+            let (filename, row) = diagnostic.primary_span_ref().map_or_default(|span| {
+                let file = span.file();
 
-                    let row = span
-                        .range()
-                        .filter(|_| !self.resolver.is_notebook(file))
-                        .map(|range| {
-                            file.diagnostic_source(self.resolver)
-                                .as_source_code()
-                                .line_column(range.start())
-                                .line
-                        });
+                let row = span
+                    .range()
+                    .filter(|_| !self.resolver.is_notebook(file))
+                    .map(|range| {
+                        file.diagnostic_source(self.resolver)
+                            .as_source_code()
+                            .line_column(range.start())
+                            .line
+                    });
 
-                    (file.relative_path(self.resolver).to_string_lossy(), row)
-                })
-                .unwrap_or_default();
+                (file.relative_path(self.resolver).to_string_lossy(), row)
+            });
 
             let code = if self.config.preview && !self.config.prefer_rule_codes {
                 diagnostic.id().as_str()

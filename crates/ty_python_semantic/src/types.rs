@@ -6690,7 +6690,7 @@ impl<'db> Type<'db> {
                         _ => None,
                     };
 
-                    ty.map(Place::bound).unwrap_or_default().into()
+                    ty.map_or_default(Place::bound).into()
                 }
 
                 Type::TypeVar(typevar)
@@ -6723,7 +6723,7 @@ impl<'db> Type<'db> {
                         _ => None,
                     };
 
-                    ty.map(Place::bound).unwrap_or_default().into()
+                    ty.map_or_default(Place::bound).into()
                 }
 
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial))

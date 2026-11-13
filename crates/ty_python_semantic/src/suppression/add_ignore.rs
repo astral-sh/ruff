@@ -229,8 +229,7 @@ fn line_start(tokens: &ruff_python_ast::token::Tokens, offset: TextSize) -> Text
                 TokenKind::Newline | TokenKind::NonLogicalNewline
             )
         })
-        .map(Ranged::end)
-        .unwrap_or_default()
+        .map_or_default(Ranged::end)
 }
 
 fn add_end_of_line_suppression(source: &str, codes: &[LintName], line_end: TextSize) -> Fix {

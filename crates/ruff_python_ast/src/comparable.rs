@@ -1688,7 +1688,7 @@ fn stmt_class_def_fields(node: &ast::StmtClassDef) -> StmtClassDefFields<'_> {
     } = node;
     StmtClassDefFields {
         name: name.as_str(),
-        arguments: arguments.as_deref().map(Into::into).unwrap_or_default(),
+        arguments: arguments.as_deref().map_or_default(Into::into),
         body: ComparableSlice::new(body),
         decorator_list: ComparableSlice::new(decorator_list),
         type_params: type_params.as_deref().map(Into::into),

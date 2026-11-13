@@ -2859,8 +2859,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 // Write parameter with range tracking
                 let param_name = parameter
                     .display_name()
-                    .map(|name| name.to_string())
-                    .unwrap_or_default();
+                    .map_or_default(|name| name.to_string());
                 parameter
                     .display_with(db, display.env, display.settings.singleline())
                     .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;

@@ -5044,10 +5044,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 is_positive,
                 self.comparison_soundness_policy(),
             )
-            .map(|ty| {
+            .map_or_default(|ty| {
                 NarrowingConstraints::from_iter([(place, NarrowingConstraint::intersection(ty))])
-            })
-            .unwrap_or_default();
+            });
 
         // Narrow tagged unions of `TypedDict`s with `Literal` keys, for example:
         //

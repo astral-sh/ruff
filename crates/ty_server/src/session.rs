@@ -835,9 +835,8 @@ impl Session {
 
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);
-        let untracked = previous
-            .map(|state| state.untracked_files_with_pushed_diagnostics)
-            .unwrap_or_default();
+        let untracked =
+            previous.map_or_default(|state| state.untracked_files_with_pushed_diagnostics);
         let scripts = db.project().scripts_to_synchronize(&db);
         Self::synchronize_closed_scripts(
             &mut db,

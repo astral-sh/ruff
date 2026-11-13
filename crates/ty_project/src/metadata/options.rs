@@ -288,7 +288,7 @@ impl Options {
             }
         } else {
             tracing::debug!("No virtual environment found");
-            self_environment.map(|(paths, _)| paths).unwrap_or_default()
+            self_environment.map_or_default(|(paths, _)| paths)
         };
 
         let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {

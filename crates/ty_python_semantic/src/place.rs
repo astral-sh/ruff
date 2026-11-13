@@ -562,7 +562,7 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    file.map(|file| {
+    file.map_or_default(|file| {
         let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
             if file.file(db).is_stub(db) {
                 RequiresExplicitReExport::Yes
@@ -579,7 +579,6 @@ pub(crate) fn imported_symbol<'db>(
             ConsideredDefinitions::EndOfScope,
         )
     })
-    .unwrap_or_default()
     .or_fall_back_to(db, env, || {
         match name {
             "__file__" => {
@@ -622,8 +621,7 @@ pub(crate) fn builtins_symbol<'db>(
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     builtins_symbol_impl(db, env, symbol, BuiltinVisibility::All)
-        .map(|(_, symbol)| symbol)
-        .unwrap_or_default()
+        .map_or_default(|(_, symbol)| symbol)
 }
 
 /// Looks up `symbol` for implicit builtin fallback.
@@ -644,8 +642,7 @@ pub(crate) fn implicit_builtins_symbol<'db>(
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly)
-        .map(|(_, symbol)| symbol)
-        .unwrap_or_default()
+        .map_or_default(|(_, symbol)| symbol)
 }
 
 /// Returns the module scope that supplies `symbol` through implicit builtin fallback.
@@ -1595,7 +1592,7 @@ fn symbol_impl<'db>(
 
     place_table(db, scope)
         .symbol_id(name)
-        .map(|symbol| {
+        .map_or_default(|symbol| {
             place_by_id(
                 db,
                 scope,
@@ -1604,7 +1601,6 @@ fn symbol_impl<'db>(
                 considered_definitions,
             )
         })
-        .unwrap_or_default()
 }
 
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.

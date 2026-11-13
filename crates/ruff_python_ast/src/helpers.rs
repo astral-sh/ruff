@@ -1027,11 +1027,7 @@ pub fn collect_import_from_member<'a>(
     member: &'a str,
 ) -> QualifiedName<'a> {
     let mut qualified_name_builder = QualifiedNameBuilder::with_capacity(
-        level as usize
-            + module
-                .map(|module| module.split('.').count())
-                .unwrap_or_default()
-            + 1,
+        level as usize + module.map_or_default(|module| module.split('.').count()) + 1,
     );
 
     // Include the dots as standalone segments.

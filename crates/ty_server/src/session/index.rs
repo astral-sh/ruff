@@ -79,16 +79,14 @@ impl Index {
             anyhow::bail!("Notebook document path does not point to a notebook document");
         };
 
-        let (structure, data, text_content) = cells
-            .map(|cells| {
-                let lsp_types::NotebookDocumentCellChanges {
-                    structure,
-                    data,
-                    text_content,
-                } = cells;
-                (structure, data, text_content)
-            })
-            .unwrap_or_default();
+        let (structure, data, text_content) = cells.map_or_default(|cells| {
+            let lsp_types::NotebookDocumentCellChanges {
+                structure,
+                data,
+                text_content,
+            } = cells;
+            (structure, data, text_content)
+        });
 
         let (array, did_open, did_close) = structure
             .map(|structure| {

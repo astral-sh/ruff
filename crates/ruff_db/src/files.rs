@@ -139,7 +139,7 @@ impl Files {
 
                 let durability = self.input_durability(
                     self.root(db, &absolute)
-                        .map_or(Durability::default(), |root| root.durability(db)),
+                        .map_or_default(|root| root.durability(db)),
                 );
 
                 let builder = File::builder(FilePath::from(absolute))

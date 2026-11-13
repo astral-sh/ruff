@@ -2450,8 +2450,7 @@ impl<'db> Bindings<'db> {
                                             .module(db)
                                             .file(db)
                                             .map(|file| ProgramFile::new(db, file, env.program(db)))
-                                            .map(|file| dunder_all_names(db, file))
-                                            .unwrap_or_default();
+                                            .map_or_default(|file| dunder_all_names(db, file));
                                         match all_names {
                                             Some(names) => {
                                                 let mut names = names.iter().collect::<Vec<_>>();
@@ -2803,7 +2802,7 @@ impl<'db> Bindings<'db> {
                                 });
 
                             let field_specifiers: Box<[Type<'db>]> = field_specifiers_param
-                                .map(|tuple_type| {
+                                .map_or_default(|tuple_type| {
                                     tuple_type
                                         .exact_tuple_instance_spec(db)
                                         .iter()
@@ -2811,8 +2810,7 @@ impl<'db> Bindings<'db> {
                                         .copied()
                                         .collect::<Vec<_>>()
                                         .into_boxed_slice()
-                                })
-                                .unwrap_or_default();
+                                });
 
                             let params =
                                 DataclassTransformerParams::new(db, flags, field_specifiers);
@@ -4729,9 +4727,8 @@ impl<'db> CallableBinding<'db> {
             Type::BoundMethod(bound) => bound.function(db),
             _ => None,
         };
-        let (overloads, implementation) = function
-            .map(|function| function.overloads_and_implementation(db))
-            .unwrap_or_default();
+        let (overloads, implementation) =
+            function.map_or_default(|function| function.overloads_and_implementation(db));
         if let Some(implementation) =
             implementation.filter(|function| function.deprecated(db).is_some())
         {
@@ -4919,9 +4916,7 @@ impl<'db> CallableBinding<'db> {
                 let callable_description = CallableDescription::new(db, self.callable_type);
                 let mut diag = builder.into_diagnostic(format_args!(
                     "No overload{} matches arguments",
-                    callable_description
-                        .map(|description| format!(" of {description}"))
-                        .unwrap_or_default()
+                    callable_description.map_or_default(|description| format!(" of {description}"))
                 ));
 
                 if let Some(OverloadCallResult::ArgumentTypeExpansionLimitReached(index)) =
@@ -10669,9 +10664,7 @@ impl<'db> BindingError<'db> {
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    callable_description
-                        .map(|description| format!(" to {description}"))
-                        .unwrap_or_default()
+                    callable_description.map_or_default(|description| format!(" to {description}"))
                 ));
                 if matches!(
                     provenance,
@@ -10842,8 +10835,7 @@ impl<'db> BindingError<'db> {
                         "Too many positional arguments{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
                         describe_callable()
-                            .map(|description| format!(" to {description}"))
-                            .unwrap_or_default()
+                            .map_or_default(|description| format!(" to {description}"))
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -10868,8 +10860,7 @@ impl<'db> BindingError<'db> {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
                         describe_callable()
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                            .map_or_default(|description| format!(" of {description}"))
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -10912,8 +10903,7 @@ impl<'db> BindingError<'db> {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Argument `{argument_name}` does not match any known parameter{}",
                         describe_callable()
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                            .map_or_default(|description| format!(" of {description}"))
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -10934,8 +10924,7 @@ impl<'db> BindingError<'db> {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Unpacked argument may contain keyword arguments that do not match any known parameter{}",
                         describe_callable()
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                            .map_or_default(|description| format!(" of {description}"))
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -10961,8 +10950,7 @@ impl<'db> BindingError<'db> {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Positional-only parameter {parameter} passed as keyword argument{}",
                         describe_callable()
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                            .map_or_default(|description| format!(" of {description}"))
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -10986,8 +10974,7 @@ impl<'db> BindingError<'db> {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Multiple values provided for parameter {parameter}{}",
                         describe_callable()
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                            .map_or_default(|description| format!(" of {description}"))
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
@@ -11037,9 +11024,7 @@ impl<'db> BindingError<'db> {
                 );
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    callable_description
-                        .map(|description| format!(" to {description}"))
-                        .unwrap_or_default()
+                    callable_description.map_or_default(|description| format!(" to {description}"))
                 ));
 
                 match error {
@@ -11212,8 +11197,7 @@ impl<'db> BindingError<'db> {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Call{} failed: {reason}",
                         describe_callable()
-                            .map(|description| format!(" of {description}"))
-                            .unwrap_or_default()
+                            .map_or_default(|description| format!(" of {description}"))
                     ));
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);

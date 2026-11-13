@@ -586,12 +586,8 @@ impl<'db> ContextManagerError<'db> {
                 exit_error,
                 ..
             } => {
-                let enter_unbound_on = enter_error
-                    .as_deref()
-                    .map_or_else(FxOrderSet::default, unbound_on);
-                let exit_unbound_on = exit_error
-                    .as_deref()
-                    .map_or_else(FxOrderSet::default, unbound_on);
+                let enter_unbound_on = enter_error.as_deref().map_or_default(unbound_on);
+                let exit_unbound_on = exit_error.as_deref().map_or_default(unbound_on);
 
                 for ty in &enter_unbound_on {
                     if exit_unbound_on.contains(ty) {

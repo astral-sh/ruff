@@ -91,8 +91,7 @@ pub(crate) fn list_submodules<'db>(db: &'db dyn Db, module: Module<'db>) -> Modu
     };
 
     ModuleSearchCursor::at_module_name_prefix(&context, module.name(db), &paths)
-        .map(|search| search.list_modules())
-        .unwrap_or_default()
+        .map_or_default(|search| search.list_modules())
 }
 
 /// Lists immediate submodules of the given name without requiring that name to be resolvable.
@@ -819,9 +818,7 @@ impl<'db> TypingModeResolver<'db> {
                 .as_ref()
                 .map(Rc::clone),
             stub_override_candidates,
-            full_search_candidates: full_search_candidates
-                .map(OnceCell::from)
-                .unwrap_or_default(),
+            full_search_candidates: full_search_candidates.map_or_default(OnceCell::from),
         };
 
         // Stop if neither search phase has candidates for this module name prefix.
@@ -1026,9 +1023,7 @@ impl<'db> RootSearchPaths<'db> {
 
         // Runtime resolution ignores stub packages, so we can pass the default value for stub
         // package paths (i.e., no stub package paths at all).
-        let stub_paths = stub_packages
-            .as_ref()
-            .map_or_else(StubPackagePaths::default, |index| index.all());
+        let stub_paths = stub_packages.as_ref().map_or_default(|index| index.all());
 
         let candidates = discover_roots(
             context,

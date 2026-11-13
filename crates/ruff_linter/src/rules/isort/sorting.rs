@@ -107,9 +107,9 @@ impl<'a> ModuleKey<'a> {
         let maybe_length = (settings.length_sort
             || (settings.length_sort_straight && style == ImportStyle::Straight))
             .then_some(
-                name.map(|name| name.chars().map(|c| c.width().unwrap_or(0)).sum::<usize>())
-                    .unwrap_or_default()
-                    + level as usize,
+                name.map_or_default(|name| {
+                    name.chars().map(|c| c.width().unwrap_or(0)).sum::<usize>()
+                }) + level as usize,
             );
 
         let distance = match level {
