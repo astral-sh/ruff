@@ -645,6 +645,13 @@ impl SemanticDb for ProjectDatabase {
             .as_deref()
     }
 
+    fn unused_dependency_diagnostics(&self, file: File) -> &[Diagnostic] {
+        if Script::for_file(self, file).is_none() {
+            return &[];
+        }
+        crate::dependency::script_dependency_diagnostics(self, file)
+    }
+
     fn verbose(&self) -> bool {
         self.project().verbose(self)
     }
@@ -922,6 +929,13 @@ pub(crate) mod testing {
                 .as_ref()
                 .ok()?
                 .as_deref()
+        }
+
+        fn unused_dependency_diagnostics(&self, file: File) -> &[Diagnostic] {
+            if Script::for_file(self, file).is_none() {
+                return &[];
+            }
+            crate::dependency::script_dependency_diagnostics(self, file)
         }
 
         fn verbose(&self) -> bool {
