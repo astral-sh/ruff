@@ -111,18 +111,30 @@ type OptionalInt = int | None
 x: OptionalInt = "1"
 ```
 
-Attribute-assignment diagnostics retain the declared alias name, including aliases within a union:
+Attribute-assignment diagnostics retain the declared alias name, including aliases within a union.
+When a literal is redundant after expanding the alias, the diagnostic still shows both operands in
+their declared order.
 
 ```py
+from typing import Literal
+
 class C:
     value: OptionalInt = None
     combined: OptionalInt | bytes = None
+    literal_first: Literal[1] | OptionalInt = None
+    alias_first: OptionalInt | Literal[1] = None
 
 def assign(c: C) -> None:
     # error: [invalid-assignment] "attribute `value` of type `OptionalInt`"
     c.value = "incorrect"
     # error: [invalid-assignment] "attribute `combined` of type `OptionalInt | bytes`"
     c.combined = "incorrect"
+    reveal_type(c.literal_first)  # revealed: int | None
+    reveal_type(c.alias_first)  # revealed: int | None
+    # error: [invalid-assignment] "attribute `literal_first` of type `Literal[1] | OptionalInt`"
+    c.literal_first = "incorrect"
+    # error: [invalid-assignment] "attribute `alias_first` of type `OptionalInt | Literal[1]`"
+    c.alias_first = "incorrect"
 ```
 
 ## No type qualifiers

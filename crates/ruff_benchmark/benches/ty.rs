@@ -1666,6 +1666,44 @@ fn benchmark_union_construction(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[split_literal_union_1024]", &split);
 }
 
+fn benchmark_literal_union_aliases(criterion: &mut Criterion) {
+    let members = (1..=4000).join(", ");
+
+    // Keeping the single literal alongside Codes should not require negating all of Codes.
+    let codes = format!(
+        "
+        from typing import Literal
+
+        type Codes = Literal[{members}]
+
+        def zero() -> Literal[0] | Codes:
+            return 0
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[literal_union_alias_of_literals_4000]",
+        &codes,
+    );
+
+    // Integer covers every literal in the group. Returning an arbitrary int forces ty to check it.
+    let integer = format!(
+        "
+        from typing import Literal
+
+        type Integer = int
+
+        def identity(value: int) -> Literal[{members}] | Integer:
+            return value
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[literal_union_alias_of_int_4000]",
+        &integer,
+    );
+}
+
 /// Benchmark for narrowing a large union type through multiple match statements.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
@@ -2949,6 +2987,7 @@ criterion_group!(
     benchmark_very_large_tuple,
     benchmark_nested_tuple_comparison,
     benchmark_union_construction,
+    benchmark_literal_union_aliases,
     benchmark_large_union_narrowing,
     benchmark_class_or_pattern_captures,
     benchmark_large_isinstance_narrowing,

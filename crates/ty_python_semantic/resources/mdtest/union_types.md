@@ -117,9 +117,14 @@ def _(
 
 ## Enum literals
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from enum import Enum
-from typing import Literal, Any
+from typing import Any, Literal, Protocol
 from ty_extensions import Intersection
 
 class Color(Enum):
@@ -148,6 +153,73 @@ def _(
 ):
     reveal_type(u1)  # revealed: Literal[Color.RED]
     reveal_type(u2)  # revealed: Literal[Color.RED]
+```
+
+A protocol can distinguish enum members by their `name`. Only `Color.RED` is redundant in a union
+with `NamedRed`, in either operand order.
+
+```py
+class NamedRed(Protocol):
+    @property
+    def name(self) -> Literal["RED"]: ...
+
+def _(
+    literals_first: Literal[Color.RED, Color.GREEN] | NamedRed = Color.GREEN,
+    protocol_first: NamedRed | Literal[Color.RED, Color.GREEN] = Color.GREEN,
+):
+    reveal_type(literals_first)  # revealed: Literal[Color.GREEN] | NamedRed
+    reveal_type(protocol_first)  # revealed: NamedRed | Literal[Color.GREEN]
+```
+
+The same simplification applies through a type alias for the protocol.
+
+```py
+type Red = NamedRed
+
+def _(
+    literals_first: Literal[Color.RED, Color.GREEN] | Red = Color.GREEN,
+    alias_first: Red | Literal[Color.RED, Color.GREEN] = Color.GREEN,
+):
+    reveal_type(literals_first)  # revealed: Literal[Color.GREEN] | NamedRed
+    reveal_type(alias_first)  # revealed: NamedRed | Literal[Color.GREEN]
+```
+
+## Unions of integer literals with a numerator protocol
+
+An integer is its own numerator, so only `1` satisfies this protocol.
+
+```py
+from typing import Literal, Protocol
+
+class NumeratorOne(Protocol):
+    @property
+    def numerator(self) -> Literal[1]: ...
+
+def _(literals_first: Literal[1, 2] | NumeratorOne, protocol_first: NumeratorOne | Literal[1, 2]):
+    reveal_type(literals_first)  # revealed: Literal[2] | NumeratorOne
+    reveal_type(protocol_first)  # revealed: NumeratorOne | Literal[2]
+```
+
+## Unions of string and bytes literals with a length protocol
+
+For both strings and bytes, a protocol can distinguish literals by their length.
+
+```py
+from typing import Literal, Protocol
+
+class LengthOne(Protocol):
+    def __len__(self) -> Literal[1]: ...
+
+def _(
+    strings_first: Literal["a", "ab"] | LengthOne,
+    strings_last: LengthOne | Literal["a", "ab"],
+    bytes_first: Literal[b"a", b"ab"] | LengthOne,
+    bytes_last: LengthOne | Literal[b"a", b"ab"],
+):
+    reveal_type(strings_first)  # revealed: Literal["ab"] | LengthOne
+    reveal_type(strings_last)  # revealed: LengthOne | Literal["ab"]
+    reveal_type(bytes_first)  # revealed: Literal[b"ab"] | LengthOne
+    reveal_type(bytes_last)  # revealed: LengthOne | Literal[b"ab"]
 ```
 
 ## Do not erase `Unknown`
