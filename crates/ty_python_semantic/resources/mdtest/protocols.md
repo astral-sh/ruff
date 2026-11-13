@@ -1775,6 +1775,18 @@ static_assert(not is_assignable_to(list[str], Hashable))
 static_assert(not is_subtype_of(list[str], Hashable))
 ```
 
+An `object`-bounded type variable can specialize to an unhashable type such as `list[int]`, so
+excluding `Hashable` leaves a reachable return.
+
+```py
+from typing import Never
+
+def reject_hashable[U: object](value: U) -> Never:
+    if isinstance(value, Hashable):
+        raise ValueError
+    return value  # error: [invalid-explicit-return]
+```
+
 ## User-defined hash protocols
 
 A user-defined protocol that explicitly requires a callable `__hash__` method imposes the same

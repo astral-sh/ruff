@@ -1690,13 +1690,36 @@ def static_bound[U: object]() -> None:
     static_assert(not is_assignable_to(Intersection[U, Not[str]], str))
 ```
 
+Separate assignments can use different materializations of a gradual upper bound. When the excluded
+type is an intersection, the remainder is assignable to `Never` only if some single materialization
+of the bound is a subtype of every member of the intersection.
+
+```py
+from collections.abc import Sequence
+from typing import Never
+
+type Excluded = Intersection[list[str], Sequence[int]]
+
+def invariant_bound[U: list[Any]](value: U) -> None:
+    # The upper bound on `U` can materialize to `list[str]`, so this assignment is valid.
+    strings: list[str] = value  # ok
+
+    # The upper bound on `U` can also materialize to `list[int]`, which is a subtype of
+    # `Sequence[int]`, so this assignment is valid too.
+    integers: Sequence[int] = value  # ok
+
+    # Since `list` is invariant, matching `list[str]` fixes the element type to `str`,
+    # which rules out `Sequence[int]`.
+    static_assert(not is_assignable_to(Intersection[U, Not[Excluded]], Never))
+```
+
 Equivalence imposes the same upper bound. Choosing `U = int | str` satisfies `(U & ~str) = int`.
 
 ```py
 def equivalent[T, U]() -> None:
     equal = ConstraintSet.equality(T, Intersection[U, Not[str]]) & ConstraintSet.equality(T, int)
     candidate = equal & ConstraintSet.equality(U, int | str)
-    static_assert(candidate.solutions_for(U, inferable=tuple[T, U]) is not None)
+    static_assert(candidate.solutions(inferable=tuple[T, U]) is not None)
 ```
 
 A declared bound can already establish the relation. In that case there is no evidence to override
@@ -1736,7 +1759,25 @@ class GradualField(TypedDict):
 def gradual_exclusion[U]() -> None:
     when = is_constraint_set_subtype_of(Intersection[U, Not[GradualField]], int)
     candidate = when & ConstraintSet.equality(U, StringField)
-    static_assert(candidate.solutions_for(U, inferable=tuple[U]) is None)
+    static_assert(candidate.solutions(inferable=tuple[U]) is None)
+```
+
+One high bit and four octal digits give a target of `Literal[0, …, 8191]`. Adding the excluded
+literal `8192` widens that union to `int`. Using `int` as the upper bound for `U` would incorrectly
+admit `8193`.
+
+```py
+from collections.abc import Callable
+from typing import Literal
+from ty_extensions._internal import TypeOf
+
+type OctalDigit = Literal[0, 1, 2, 3, 4, 5, 6, 7]
+
+def literal_limit[U: int](high_bit: Literal[0, 1], digit: Callable[[], OctalDigit]) -> None:
+    allowed = 4096 * high_bit + 512 * digit() + 64 * digit() + 8 * digit() + digit()
+    when = is_constraint_set_assignable_to(Intersection[U, Not[Literal[8192]]], TypeOf[allowed])
+    as_int = when & ConstraintSet.equality(U, int)
+    static_assert(as_int.solutions(inferable=tuple[U]) is None)
 ```
 
 ### Substitution exceeding the derivation budget

@@ -15,6 +15,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::set_theoretic::builder::UnionBuilder;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::typevar::TypeVarDomain;
@@ -1744,18 +1745,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             })
     }
 
-    /// Check `(U & ~A) ≤ B` using the equivalent bound `U ≤ B | A` for static `A`
-    /// and `B`. Checking only the positive element would lose valid
-    /// specializations such as `U = A`.
+    /// Check `(U & ~A) ≤ B` for static `A` and `B`. When collecting constraints,
+    /// use the equivalent bound `U ≤ B | A` to retain specializations such as `U = A`.
     fn check_typevar_with_exclusions(
         &self,
         db: &'db dyn Db,
         intersection: IntersectionType<'db>,
         target: Type<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        let Type::TypeVar(typevar) = intersection.iter_positive(db).exactly_one().ok()? else {
-            return None;
-        };
+        let positive = intersection.iter_positive(db).exactly_one().ok()?;
+        let typevar = positive.as_typevar()?;
         // When specializing a generic callable, prefer the target as evidence for its local
         // type variable. For example, matching `(T) -> T & ~str` against `(U) -> int`
         // can infer `int` for both T and U.
@@ -1764,9 +1763,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         let env = self.env;
-        let upper_elements = || std::iter::once(target).chain(intersection.iter_negative(db));
+        let mut upper_elements = std::iter::once(target).chain(intersection.iter_negative(db));
         // Match other type variables in place so they receive their own inference evidence.
-        if upper_elements().any(|ty| {
+        if upper_elements.any(|ty| {
             any_over_type_expanding_aliases(db, env, ty, |nested| match nested {
                 Type::TypeVar(_) => true,
                 // Materializing a class-based TypedDict can leave its gradual fields intact.
@@ -1777,15 +1776,35 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return None;
         }
 
-        // The declared domain can establish the relation on its own, or supply evidence
-        // from a TypedDict field. Its top materialization covers every legal choice of U.
-        let expanded = intersection
-            .with_expanded_typevars_and_newtypes(db, env)
-            .top_materialization(db, env);
-        let when_expanded = self.check_type_pair(db, expanded, target);
+        let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
+        // For a fixed U, check what remains of its declared domain. For example,
+        // `object` is assignable to `Hashable`, but `object & ~Hashable` contains lists.
+        // Keeping a gradual bound intact also lets it materialize during assignability.
+        if self.typevar_evaluation == TypeVarEvaluation::Eager {
+            return Some(self.check_type_pair(db, expanded, target));
+        }
+
+        // The declared domain can establish the relation without constraining U, or
+        // supply evidence from a TypedDict field. Its top materialization covers every U.
+        let when_expanded = self.check_type_pair(db, expanded.top_materialization(db, env), target);
         Some(when_expanded.or(db, self.constraints, || {
-            let upper = UnionType::from_elements(db, env, upper_elements());
-            self.check_type_pair(db, Type::TypeVar(typevar), upper)
+            let check_upper = |upper| self.check_type_pair(db, positive, upper);
+            let with_exclusions = |builder| {
+                intersection
+                    .iter_negative(db)
+                    .fold(builder, UnionBuilder::add)
+                    .build_without_literal_widening()
+            };
+            if let Some(upper) = with_exclusions(UnionBuilder::new(db, env).add(target)) {
+                return check_upper(upper);
+            }
+
+            // Widening can admit values outside both operands. Checking them separately
+            // preserves specializations inside either operand, but misses ones spanning both.
+            check_upper(target).or(db, self.constraints, || {
+                let excluded = with_exclusions(UnionBuilder::new(db, env));
+                excluded.when_some_and(db, self.constraints, check_upper)
+            })
         }))
     }
 
