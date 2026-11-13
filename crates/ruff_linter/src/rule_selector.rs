@@ -385,11 +385,12 @@ mod schema {
                 // Filter out all test-only rules
                 cfg_select! {
                     any(feature = "test-rules", test) => {
-                    #[expect(clippy::used_underscore_binding)]
-                    !(_rule.starts_with("RUF9")
-                      || _rule == "PLW0101"
-                      || Rule::from_name(_rule)
-                      .is_ok_and(|rule| matches!(rule.category(), Category::Testing)))
+                        #[expect(clippy::used_underscore_binding)]
+                        let is_test_rule = _rule.starts_with("RUF9")
+                            || _rule == "PLW0101"
+                            || Rule::from_name(_rule)
+                                .is_ok_and(|rule| matches!(rule.category(), Category::Testing));
+                        !is_test_rule
                     }
                     _ => true,
                 }
