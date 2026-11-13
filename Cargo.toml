@@ -321,6 +321,9 @@ if_not_else = "allow"
 # This is needed for maturin to generate the correct PyPI metadata, for at least
 # the ruff and ty crates.
 redundant_homepage = "allow"
+# We already run shear, and this seems to have some false positives around our
+# benchmark dependencies.
+unused_dependencies = "allow"
 
 [profile.release]
 lto = "fat"
