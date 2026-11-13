@@ -158,8 +158,6 @@ pub(super) fn inherited_class_body_declaration<'db>(
     symbol: ScopedSymbolId,
 ) -> Option<ClassBodyDeclaration<'db>> {
     scope.node(db).as_class()?;
-    let table = place_table(db, scope);
-    let name = table.symbol(symbol).name();
     let use_def = use_def_map(db, scope);
     let env = ProgramEnvironment::from_scope(scope);
     if !place_from_declarations(db, &env, use_def.end_of_scope_symbol_declarations(symbol))
@@ -170,9 +168,19 @@ pub(super) fn inherited_class_body_declaration<'db>(
     }
 
     let class = nearest_enclosing_class(db, semantic_index(db, scope.program_file(db)), scope)?;
+    let table = place_table(db, scope);
+    class_body_declaration_from_bases(db, &env, class, table.symbol(symbol).name())
+}
+
+pub(super) fn class_body_declaration_from_bases<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+    name: &str,
+) -> Option<ClassBodyDeclaration<'db>> {
     let mut inherited = MroLookup::new(
         db,
-        &env,
+        env,
         class.identity_specialization(db).iter_mro(db).skip(1),
     )
     .class_body_declaration(name)?;

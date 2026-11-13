@@ -67,16 +67,16 @@ use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Soluti
 use crate::types::context::{InferContext, InferContextResult};
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
-    self, ABSTRACT_CLASS_INSTANTIATION, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
-    DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind, INEFFECTIVE_FINAL,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION,
-    INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
-    INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, MISMATCHED_SENTINEL_NAME,
-    MISSING_ATTRIBUTE, MISSING_UNION_ATTRIBUTE, NOT_CALLABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
-    POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
-    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    self, ABSTRACT_CLASS_INSTANTIATION, AssignmentDeclaration, CONFLICTING_DECLARATIONS,
+    CYCLIC_TYPE_ALIAS_DEFINITION, DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind,
+    INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
+    INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
+    INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    MISMATCHED_SENTINEL_NAME, MISSING_ATTRIBUTE, MISSING_UNION_ATTRIBUTE, NOT_CALLABLE,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind,
+    autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
@@ -98,7 +98,9 @@ use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral, report_revealed_type,
     same_module_uncached_raw_signature,
 };
-use crate::types::generics::{GenericContext, Specialization, SpecializationBuilder, bind_typevar};
+use crate::types::generics::{
+    GenericContext, Specialization, SpecializationBuilder, bind_typevar, typing_self,
+};
 use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -108,7 +110,7 @@ use crate::types::infer::{
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
-use crate::types::member::inherited_class_body_declaration;
+use crate::types::member::{class_body_declaration_from_bases, inherited_class_body_declaration};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
@@ -203,6 +205,11 @@ enum DeclaredAndInferredType<'db> {
     MightBeDifferent {
         declared_ty: DeclaredType<'db>,
         inferred_ty: Type<'db>,
+        /// `true` when the annotation specifies a value type, as in `x: ClassVar[Any]`.
+        /// `false` for a bare qualifier such as `x: ClassVar`, even if `declared_ty` contains
+        /// an inherited type. For example, if `x` inherits `Any`, assigning `1` to it binds
+        /// the name to `Literal[1]` in the class body. An explicit `ClassVar[Any]` binds it to `Any`.
+        has_explicit_type: bool,
     },
 }
 
@@ -1938,6 +1945,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
+                has_explicit_type,
             } if let Some(declared_type) = declared_ty.inner_type() => {
                 let env = self.program_environment();
                 let file_scope_id = self.scope().file_scope_id(self.db());
@@ -1976,7 +1984,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let binding_ty = if self.validate_assignment_type(
                     node,
                     definition,
-                    None,
+                    if has_explicit_type {
+                        AssignmentDeclaration::Ordinary(None)
+                    } else {
+                        AssignmentDeclaration::InheritedClassVar
+                    },
                     declared_type,
                     inferred_ty,
                 ) {
@@ -1984,7 +1996,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // iteration reject the annotation. Unqualified annotations that resolve to
                     // `Unknown` also recover with the inferred value. A type argument to
                     // `Final` or `ClassVar` supplies a declared type even if it is `Unknown`.
-                    if !should_preserve_inferred_binding_type(inferred_ty)
+                    if has_explicit_type
+                        && !should_preserve_inferred_binding_type(inferred_ty)
                         && !matches!(declared_type, Type::Divergent(_))
                         && (!matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
                             || declared_ty
@@ -2005,6 +2018,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
+                ..
             } => (declared_ty, inferred_ty),
         };
 
@@ -2024,7 +2038,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         target_node: AnyNodeRef,
         definition: Definition<'db>,
-        declaration: Option<Definition<'db>>,
+        declaration: AssignmentDeclaration<'db>,
         target_ty: Type<'db>,
         value_ty: Type<'db>,
     ) -> bool {
@@ -4697,6 +4711,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         declared
     }
 
+    /// Resolve the value type for a bare `ClassVar` that repeats an inherited qualifier.
+    fn inherited_class_var_type(&self, target: &ast::Expr) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let name = target.as_name_expr()?;
+        let scope = self.scope();
+        let class_node = scope.node(db).as_class()?;
+        let class = original_class_type(db, self.index.expect_single_definition(class_node))?
+            .as_static()?;
+        let inherited = class_body_declaration_from_bases(db, env, class, &name.id)?.member;
+        if !inherited.is_class_var() {
+            return None;
+        }
+        let ty = inherited.ignore_possibly_undefined()?;
+        // This type becomes a declaration in the subclass. In particular, a protocol
+        // must still bind `Self` to each structural implementation of that subclass.
+        if ty.supports_self_binding(db, env)
+            && let Some(child_self) = typing_self(db, scope, None, class.into())
+        {
+            Some(ty.bind_self_typevars(db, env, Type::TypeVar(child_self)))
+        } else {
+            Some(ty)
+        }
+    }
+
     /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
     pub(super) fn infer_annotated_assignment_cycle_initial(
         mut self,
@@ -4969,6 +5008,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // In this case, we can simply store types in `target` below, instead of calling `infer_expression` (which would return `Never`).
         debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
+        let has_explicit_type = declared.inner_type().is_some();
+        if !has_explicit_type && declared.qualifiers() == TypeQualifiers::CLASS_VAR {
+            declared.inner = self.inherited_class_var_type(target);
+        }
+
         if let Some(value) = value {
             self.setup_dataclass_field_specifiers();
 
@@ -5084,6 +5128,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &DeclaredAndInferredType::MightBeDifferent {
                         declared_ty: declared,
                         inferred_ty,
+                        has_explicit_type,
                     },
                 );
             }
@@ -13616,7 +13661,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         if !builder.validate_assignment_type(
             self.node,
             self.binding,
-            self.declaration,
+            AssignmentDeclaration::Ordinary(self.declaration),
             declared_ty,
             bound_ty,
         ) {
