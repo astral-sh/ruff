@@ -160,14 +160,25 @@ const SYNTHETIC_DATACLASS_ATTRIBUTES: &[&str] = &[
     "__dataclass_params__",
 ];
 
-struct AllMembers<'db> {
+struct AllMembers<'db, 'filter> {
     members: FxHashSet<Member<'db>>,
+    module_name_filter: Option<&'filter dyn Fn(&str) -> bool>,
 }
 
-impl<'db> AllMembers<'db> {
+impl<'db, 'filter> AllMembers<'db, 'filter> {
     fn of(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Self {
+        Self::with_module_name_filter(db, env, ty, None)
+    }
+
+    fn with_module_name_filter(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        module_name_filter: Option<&'filter dyn Fn(&str) -> bool>,
+    ) -> Self {
         let mut all_members = Self {
             members: FxHashSet::default(),
+            module_name_filter,
         };
         all_members.extend_with_type(db, env, ty);
         all_members
@@ -447,6 +458,12 @@ impl<'db> AllMembers<'db> {
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
+                    if self
+                        .module_name_filter
+                        .is_some_and(|filter| !filter(symbol_name.as_str()))
+                    {
+                        continue;
+                    }
                     let Place::Defined(defined) =
                         imported_symbol(db, env, Some(program_file), symbol_name, None).place
                     else {
@@ -933,4 +950,16 @@ pub(crate) fn all_members<'db>(
     ty: Type<'db>,
 ) -> FxHashSet<Member<'db>> {
     AllMembers::of(db, env, ty).members
+}
+
+/// List members whose names match the supplied predicate.
+pub(crate) fn all_members_matching<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    name_filter: &dyn Fn(&str) -> bool,
+) -> FxHashSet<Member<'db>> {
+    let mut members = AllMembers::with_module_name_filter(db, env, ty, Some(name_filter)).members;
+    members.retain(|member| name_filter(member.name.as_str()));
+    members
 }
