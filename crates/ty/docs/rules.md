@@ -3201,6 +3201,13 @@ def f(t: TypeVar("U")): ...  # ty: ignore[invalid-type-form]
 
 - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
 
+**Rule history**
+
+
+- v0.0.102: A `TypeVar` call with exactly one constraint now triggers
+    [`invalid-type-variable-constraints`](#invalid-type-variable-constraints). Use that selector in rule settings and ignore comments for
+    this error.
+
 ## `invalid-match-pattern`
 
 <small>
@@ -4112,8 +4119,8 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 **What it does**
 
 
-Checks for constrained [type variables] with only one constraint, or that those constraints
-reference type variables.
+Checks that constrained [type variables] have at least two constraints and that none of their
+constraints reference type variables.
 
 **Why is this bad?**
 
@@ -4135,8 +4142,10 @@ I = TypeVar("I", bound=int)
 # constraint references `I`
 S = TypeVar("S", list[I], int)  # error
 
-
 # a constrained type variable needs at least two constraints
+N = TypeVar("N", int)  # error
+
+
 def f[T: (int,)](): ...  # error
 ```
 
@@ -4153,6 +4162,12 @@ T = TypeVar("T", bound=str)  # valid bound TypeVar
 
 V = TypeVar("V", list[int], int)  # valid constrained Type
 ```
+
+**Rule history**
+
+
+- v0.0.102: This rule now also reports a `TypeVar` call with exactly one constraint. Previously,
+    [`invalid-legacy-type-variable`](#invalid-legacy-type-variable) reported this error.
 
 [type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar
 
