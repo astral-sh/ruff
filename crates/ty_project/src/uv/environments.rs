@@ -26,10 +26,10 @@
 //! This avoids a rust-analyzer-like experience where editor operations wait for `cargo check` to
 //! complete before becoming available.
 //!
-//! While a script's initial environment is unavailable, the language server defers its semantic
-//! diagnostics to avoid incorrect missing-dependency errors. Document pull requests receive an
-//! empty diagnostic report, while workspace diagnostic requests are suspended. After applying the
-//! synchronization result, the server resumes suspended requests and refreshes diagnostics.
+//! While a script's first uv sync is pending, the language server reports empty diagnostics for
+//! that script to avoid incorrect missing-dependency errors. Workspace diagnostics continue
+//! checking other files. After applying the synchronization result, the server resumes suspended
+//! requests and refreshes diagnostics.
 //!
 //! Refreshing an available environment does not defer diagnostics. Projects and scripts continue
 //! using their most recently applied environments until the refresh results are applied.
@@ -179,29 +179,12 @@ impl UvEnvironments {
     /// pending until [`poll_sync`](Self::poll_sync) applies its result, even if uv has finished.
     ///
     /// Salsa does not track changes to the pending state.
-    pub fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
+    pub(crate) fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
         if !self.is_enabled() || script_tag(db, file).is_none() {
             return false;
         }
 
         self.existing_entry(file).is_some_and(|entry| {
-            matches!(
-                *entry.lock(),
-                ScriptEnvironmentState::Synchronizing {
-                    availability: ScriptEnvironmentAvailability::Pending,
-                    ..
-                }
-            )
-        })
-    }
-
-    /// Returns whether any script's initial environment is unavailable.
-    ///
-    /// Like [`Self::is_initialization_pending`], this only covers requested synchronizations.
-    /// Refreshing an available environment does not make it unavailable again. Project
-    /// environments are initialized during discovery, before background requests are scheduled.
-    pub fn has_pending_initializations(&self) -> bool {
-        self.inner.scripts.iter().any(|entry| {
             matches!(
                 *entry.lock(),
                 ScriptEnvironmentState::Synchronizing {
@@ -1078,7 +1061,7 @@ mod tests {
             // Semantic analysis can reach a script before the host requests synchronization.
             // The missing-import diagnostic must clear when the environment becomes available.
             let _ = case.db.program_file(case.file);
-            let diagnostics = crate::check_file(&case.db, case.file);
+            let diagnostics = case.db.check_file(case.file);
             assert_eq!(diagnostics.len(), 1);
             assert_eq!(diagnostics[0].id().as_str(), "import-not-found");
 
@@ -1097,7 +1080,7 @@ mod tests {
             assert_eq!(case.wait_for_synchronizations()?.scripts, vec![case.file]);
             assert_eq!(script_environment(&case.db, case.file), Some(environment));
             case.assert_can_import("attrs")?;
-            assert!(crate::check_file(&case.db, case.file).is_empty());
+            assert!(case.db.check_file(case.file).is_empty());
 
             Ok(())
         }

@@ -226,8 +226,8 @@ impl ProjectDatabase {
 
     /// Checks the files in the project and its dependencies as per the project's check mode.
     ///
-    /// Uses current settings and environments without starting or waiting for uv. Callers that
-    /// require synchronized environments must request synchronization and apply its results first.
+    /// Uses current settings and environments without starting or waiting for uv. Returns no
+    /// diagnostics for a script while its initial environment synchronization is pending.
     ///
     /// Use [`set_check_mode`] to update the check mode.
     ///
@@ -250,6 +250,7 @@ impl ProjectDatabase {
     }
 
     /// Checks `file` using its current settings and available environment.
+    /// Reports no diagnostics for a script while its first uv sync is pending.
     ///
     /// Uses the same environment synchronization behavior as [`check`](Self::check).
     #[tracing::instrument(level = "debug", skip(self))]

@@ -17,7 +17,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use ty_ide::{Hint, hints};
-use ty_project::{Db as _, ProgressReporter, ProjectDatabase};
+use ty_project::{ProgressReporter, ProjectDatabase};
 
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
@@ -98,9 +98,8 @@ use crate::system::file_to_uri;
 /// suspended workspace diagnostic request (if any) after every notification if the notification
 /// changed the [`Session`]'s state.
 ///
-/// Workspace diagnostics also wait while a script's initial environment is unavailable.
-/// Refreshing an available project or script environment does not block diagnostics.
-/// The same long-polling mechanism resumes the request after the host applies the uv results.
+/// A script contributes no diagnostics while its first uv sync is pending. Applying the
+/// result wakes a long-polling request so it can check the script.
 ///
 /// [workspace-diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic)
 pub(crate) struct WorkspaceDiagnosticRequestHandler;
@@ -117,20 +116,6 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
     ) -> Result<WorkspaceDiagnosticReport> {
         if !snapshot.global_settings().diagnostic_mode().is_workspace() {
             tracing::debug!("Workspace diagnostics is disabled; returning empty report");
-            return Ok(WorkspaceDiagnosticReport { items: vec![] });
-        }
-
-        if snapshot
-            .projects()
-            .iter()
-            .any(|db| db.uv_environments().has_pending_initializations())
-        {
-            tracing::debug!(
-                "Deferring workspace diagnostics until script initialization completes"
-            );
-            // Returning an empty workspace report makes `handle_request` suspend the request.
-            // Skip the response writer: it would clear diagnostics for previous result IDs
-            // that we have not checked yet. Suspension retains the request, not this snapshot.
             return Ok(WorkspaceDiagnosticReport { items: vec![] });
         }
 
@@ -276,9 +261,8 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
             state.report_progress(&self.work_done);
         }
 
-        // Don't report empty diagnostics. We clear previous diagnostics in `into_response`
-        // which also handles the case where a file no longer has diagnostics because
-        // it's no longer part of the project.
+        // `into_final_report` clears any previous diagnostics for files with empty results
+        // and for files that are no longer part of the project.
         if !diagnostics.is_empty() || !unnecessary_hints.is_empty() {
             state
                 .response
