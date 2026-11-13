@@ -198,6 +198,13 @@ pub(crate) fn missing_whitespace_around_operator(line: &LogicalLine, context: &L
             _ => {}
         }
 
+        // Only operators can require surrounding whitespace. Delimiters still update the
+        // expression context above and act as the preceding token for unary operators.
+        let previous = prev_token;
+        prev_token = token;
+        if !is_whitespace_needed(kind) {
+            continue;
+        }
         let needs_space = if kind == TokenKind::Equal
             && (parens > 0 || fstrings > 0 || definition_state.in_type_params())
         {
@@ -220,7 +227,7 @@ pub(crate) fn missing_whitespace_around_operator(line: &LogicalLine, context: &L
             || matches!(kind, TokenKind::Star | TokenKind::DoubleStar)
         {
             let is_binary = {
-                let prev_kind = prev_token.kind();
+                let prev_kind = previous.kind();
 
                 // Check if the operator is used as a binary operator.
                 // Allow unary operators: -123, -x, +1.
@@ -256,15 +263,13 @@ pub(crate) fn missing_whitespace_around_operator(line: &LogicalLine, context: &L
             // However, allow it in order to prevent entering an infinite loop in which E225 adds a
             // space only for E202 to remove it.
             NeedsSpace::No
-        } else if is_whitespace_needed(kind) {
-            NeedsSpace::Yes
         } else {
-            NeedsSpace::No
+            NeedsSpace::Yes
         };
 
         if needs_space != NeedsSpace::No {
             let has_leading_trivia =
-                prev_token.end() < token.start() || is_non_logical_token(prev_token.kind());
+                previous.end() < token.start() || is_non_logical_token(previous.kind());
 
             let has_trailing_trivia = tokens
                 .peek()
@@ -311,8 +316,6 @@ pub(crate) fn missing_whitespace_around_operator(line: &LogicalLine, context: &L
                 }
             }
         }
-
-        prev_token = token;
     }
 }
 

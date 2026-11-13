@@ -9,7 +9,7 @@ pub(crate) use missing_whitespace::*;
 pub(crate) use missing_whitespace_after_keyword::*;
 pub(crate) use missing_whitespace_around_operator::*;
 pub(crate) use redundant_backslash::*;
-use ruff_python_ast::token::{TokenKind, Tokens};
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub(crate) use space_around_operator::*;
@@ -53,20 +53,34 @@ bitflags! {
 
 #[derive(Clone)]
 pub(crate) struct LogicalLines<'a> {
-    tokens: Vec<LogicalLineToken>,
+    tokens: &'a [Token],
     lines: Vec<Line>,
     locator: &'a Locator<'a>,
 }
 
 impl<'a> LogicalLines<'a> {
-    pub(crate) fn from_tokens(tokens: &Tokens, locator: &'a Locator<'a>) -> Self {
+    fn get_line(&'a self, line: &'a Line) -> Option<LogicalLine<'a>> {
+        let tokens = &self.tokens[line.tokens_start as usize..line.tokens_end as usize];
+        Some(LogicalLine {
+            tokens,
+            source: self.locator.contents(),
+            range: TextRange::new(tokens.first()?.start(), tokens.last()?.end()),
+            flags: line.flags,
+            is_start_of_file: line.tokens_start == 0,
+        })
+    }
+
+    pub(crate) fn from_tokens(tokens: &'a Tokens, locator: &'a Locator<'a>) -> Self {
         assert!(u32::try_from(tokens.len()).is_ok());
 
-        let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
+        let mut builder = LogicalLinesBuilder {
+            tokens,
+            ..LogicalLinesBuilder::default()
+        };
         let mut tokens_iter = tokens.iter_with_context();
 
         while let Some(token) = tokens_iter.next() {
-            builder.push_token(token.kind(), token.range());
+            builder.push_token(token.kind());
 
             if token.kind().is_any_newline() && !tokens_iter.in_parenthesized_context() {
                 builder.finish_line();
@@ -112,14 +126,17 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
 /// ```
 #[derive(Debug)]
 pub(crate) struct LogicalLine<'a> {
-    lines: &'a LogicalLines<'a>,
-    line: &'a Line,
+    tokens: &'a [Token],
+    source: &'a str,
+    range: TextRange,
+    flags: TokenFlags,
+    is_start_of_file: bool,
 }
 
 impl<'a> LogicalLine<'a> {
     /// Returns `true` if this line is positioned at the start of the file.
     const fn is_start_of_file(&self) -> bool {
-        self.line.tokens_start == 0
+        self.is_start_of_file
     }
 
     /// Returns `true` if this is a comment only line
@@ -129,14 +146,7 @@ impl<'a> LogicalLine<'a> {
 
     /// Returns logical line's text including comments, indents, dedent and trailing new lines.
     fn text(&self) -> &'a str {
-        let tokens = self.tokens();
-        match (tokens.first(), tokens.last()) {
-            (Some(first), Some(last)) => self
-                .lines
-                .locator
-                .slice(TextRange::new(first.start(), last.end())),
-            _ => "",
-        }
+        &self.source[self.range]
     }
 
     /// Returns the text without any leading or trailing newline, comment, indent, or dedent of this line
@@ -145,15 +155,12 @@ impl<'a> LogicalLine<'a> {
         let tokens = self.tokens_trimmed();
 
         match (tokens.first(), tokens.last()) {
-            (Some(first), Some(last)) => self
-                .lines
-                .locator
-                .slice(TextRange::new(first.start(), last.end())),
+            (Some(first), Some(last)) => &self.source[TextRange::new(first.start(), last.end())],
             _ => "",
         }
     }
 
-    fn tokens_trimmed(&self) -> &'a [LogicalLineToken] {
+    fn tokens_trimmed(&self) -> &'a [Token] {
         let tokens = self.tokens();
 
         let start = tokens
@@ -171,48 +178,48 @@ impl<'a> LogicalLine<'a> {
         &tokens[..end]
     }
 
-    /// Returns the text after `token`
+    /// Returns the text after `token` up to the end of this logical line.
     #[inline]
-    fn text_after(&self, token: &'a LogicalLineToken) -> &str {
-        // SAFETY: The line must have at least one token or `token` would not belong to this line.
-        let last_token = self.tokens().last().unwrap();
-        self.lines
-            .locator
-            .slice(TextRange::new(token.end(), last_token.end()))
+    fn text_after(&self, token: &'a Token) -> &str {
+        &self.source[TextRange::new(token.end(), self.range.end())]
     }
 
-    /// Returns the text before `token`
     #[inline]
-    fn text_before(&self, token: &'a LogicalLineToken) -> &str {
-        // SAFETY: The line must have at least one token or `token` would not belong to this line.
-        let first_token = self.tokens().first().unwrap();
-        self.lines
-            .locator
-            .slice(TextRange::new(first_token.start(), token.start()))
+    fn trailing_whitespace(&self, token: &'a Token) -> (Whitespace, TextSize) {
+        let after = self.text_after(token);
+        match after.as_bytes() {
+            [b' ', next, ..] if !matches!(next, b' ' | b'\t' | 0x0c | b'#') => {
+                (Whitespace::Single, TextSize::new(1))
+            }
+            [b' ' | b'\t' | 0x0c, ..] => Whitespace::leading(after),
+            _ => (Whitespace::None, TextSize::default()),
+        }
     }
 
-    /// Returns the whitespace *after* the `token` with the byte length
-    fn trailing_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
-        Whitespace::leading(self.text_after(token))
-    }
-
-    /// Returns the whitespace and whitespace byte-length *before* the `token`
-    fn leading_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
-        Whitespace::trailing(self.text_before(token))
+    #[inline]
+    fn leading_whitespace(&self, token: &'a Token) -> (Whitespace, TextSize) {
+        let before = &self.source[TextRange::new(self.range.start(), token.start())];
+        match before.as_bytes() {
+            [.., prev, b' '] if !matches!(prev, b' ' | b'\t' | 0x0c | b'\r' | b'\n') => {
+                (Whitespace::Single, TextSize::new(1))
+            }
+            [.., b' ' | b'\t' | 0x0c] => Whitespace::trailing(before),
+            _ => (Whitespace::None, TextSize::default()),
+        }
     }
 
     /// Returns all tokens of the line, including comments and trailing new lines.
-    fn tokens(&self) -> &'a [LogicalLineToken] {
-        &self.lines.tokens[self.line.tokens_start as usize..self.line.tokens_end as usize]
+    fn tokens(&self) -> &'a [Token] {
+        self.tokens
     }
 
-    pub(crate) fn first_token(&self) -> Option<&'a LogicalLineToken> {
+    pub(crate) fn first_token(&self) -> Option<&'a Token> {
         self.tokens().first()
     }
 
     /// Returns the line's flags
     pub(crate) const fn flags(&self) -> TokenFlags {
-        self.line.flags
+        self.flags
     }
 }
 
@@ -239,12 +246,7 @@ impl<'a> Iterator for LogicalLinesIter<'a> {
     type Item = LogicalLine<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let line = self.inner.next()?;
-
-        Some(LogicalLine {
-            lines: self.lines,
-            line,
-        })
+        self.lines.get_line(self.inner.next()?)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -254,40 +256,13 @@ impl<'a> Iterator for LogicalLinesIter<'a> {
 
 impl DoubleEndedIterator for LogicalLinesIter<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        let line = self.inner.next_back()?;
-
-        Some(LogicalLine {
-            lines: self.lines,
-            line,
-        })
+        self.lines.get_line(self.inner.next_back()?)
     }
 }
 
 impl ExactSizeIterator for LogicalLinesIter<'_> {}
 
 impl FusedIterator for LogicalLinesIter<'_> {}
-
-/// A token of a [`LogicalLine`]
-#[derive(Clone, Debug)]
-pub(crate) struct LogicalLineToken {
-    kind: TokenKind,
-    range: TextRange,
-}
-
-impl LogicalLineToken {
-    /// Returns the token's kind
-    #[inline]
-    pub(crate) const fn kind(&self) -> TokenKind {
-        self.kind
-    }
-}
-
-impl Ranged for LogicalLineToken {
-    /// Returns a tuple with the token's `(start, end)` locations
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub(crate) enum Whitespace {
@@ -374,22 +349,16 @@ struct CurrentLine {
 
 /// Builder for [`LogicalLines`]
 #[derive(Debug, Default)]
-struct LogicalLinesBuilder {
-    tokens: Vec<LogicalLineToken>,
+struct LogicalLinesBuilder<'a> {
+    tokens: &'a [Token],
+    tokens_end: u32,
     lines: Vec<Line>,
     current_line: CurrentLine,
 }
 
-impl LogicalLinesBuilder {
-    fn with_capacity(tokens: usize) -> Self {
-        Self {
-            tokens: Vec::with_capacity(tokens),
-            ..Self::default()
-        }
-    }
-
+impl<'a> LogicalLinesBuilder<'a> {
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
-    fn push_token(&mut self, kind: TokenKind, range: TextRange) {
+    fn push_token(&mut self, kind: TokenKind) {
         let line = &mut self.current_line;
 
         if matches!(kind, TokenKind::Comment) {
@@ -420,17 +389,16 @@ impl LogicalLinesBuilder {
             line.flags.insert(TokenFlags::NON_TRIVIA);
         }
 
-        self.tokens.push(LogicalLineToken { kind, range });
+        self.tokens_end += 1;
     }
 
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
-    #[expect(clippy::cast_possible_truncation)]
     fn finish_line(&mut self) {
-        let end = self.tokens.len() as u32;
+        let end = self.tokens_end;
         if self.current_line.tokens_start < end {
             let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
                 .iter()
-                .all(|token| token.kind.is_any_newline());
+                .all(|token| token.kind().is_any_newline());
             if !is_empty {
                 self.lines.push(Line {
                     flags: self.current_line.flags,
@@ -446,7 +414,7 @@ impl LogicalLinesBuilder {
         }
     }
 
-    fn finish<'a>(mut self, locator: &'a Locator<'a>) -> LogicalLines<'a> {
+    fn finish(mut self, locator: &'a Locator<'a>) -> LogicalLines<'a> {
         self.finish_line();
 
         LogicalLines {
@@ -469,7 +437,7 @@ struct Line {
 /// of the [type parameters] of the class/function.
 ///
 /// Call [`DefinitionState::visit_token_kind`] on the [`TokenKind`] of each
-/// successive [`LogicalLineToken`] to ensure the state remains up to date.
+/// successive [`Token`] to ensure the state remains up to date.
 ///
 /// [type parameters]: https://docs.python.org/3/reference/compound_stmts.html#type-params
 #[derive(Debug, Clone, Copy)]
@@ -481,8 +449,8 @@ enum DefinitionState {
 }
 
 impl DefinitionState {
-    fn from_tokens<'a>(tokens: impl IntoIterator<Item = &'a LogicalLineToken>) -> Self {
-        let mut token_kinds = tokens.into_iter().map(LogicalLineToken::kind);
+    fn from_tokens<'a>(tokens: impl IntoIterator<Item = &'a Token>) -> Self {
+        let mut token_kinds = tokens.into_iter().map(Token::kind);
         while let Some(token_kind) = token_kinds.next() {
             let state = match token_kind {
                 TokenKind::Indent | TokenKind::Dedent => continue,

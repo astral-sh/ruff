@@ -52,8 +52,11 @@ pub(crate) fn redundant_backslash(
     indexer: &Indexer,
     context: &LintContext,
 ) {
-    let mut parens = 0;
     let continuation_lines = indexer.continuation_line_starts();
+    if continuation_lines.is_empty() {
+        return;
+    }
+    let mut parens = 0;
     let mut start_index = 0;
 
     for token in line.tokens() {

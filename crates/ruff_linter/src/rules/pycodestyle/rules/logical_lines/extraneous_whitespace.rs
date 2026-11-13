@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
+use smallvec::SmallVec;
 
 use crate::AlwaysFixableViolation;
 use crate::Edit;
@@ -131,7 +132,7 @@ impl AlwaysFixableViolation for WhitespaceBeforePunctuation {
 /// E201, E202, E203
 pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
     let mut interpolated_strings = 0u32;
-    let mut brackets = vec![];
+    let mut brackets = SmallVec::<[TokenKind; 8]>::new();
     let mut prev_token = None;
     let mut iter = line.tokens().iter().peekable();
 

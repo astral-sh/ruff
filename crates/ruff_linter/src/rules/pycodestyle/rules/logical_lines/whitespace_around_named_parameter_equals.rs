@@ -95,13 +95,16 @@ pub(crate) fn whitespace_around_named_parameter_equals(line: &LogicalLine, conte
     let mut prev_end = TextSize::default();
 
     let mut definition_state = DefinitionState::from_tokens(line.tokens());
-    let mut iter = line.tokens().iter().peekable();
+    let mut iter = line
+        .tokens()
+        .iter()
+        .filter(|token| token.kind() != TokenKind::NonLogicalNewline)
+        .peekable();
 
     while let Some(token) = iter.next() {
         let kind = token.kind();
         definition_state.visit_token_kind(kind);
         match kind {
-            TokenKind::NonLogicalNewline => continue,
             TokenKind::FStringStart => fstrings += 1,
             TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
             TokenKind::Lpar | TokenKind::Lsqb => {
@@ -127,7 +130,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(line: &LogicalLine, conte
                     if start == prev_end && prev_end != TextSize::new(0) {
                         if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             MissingWhitespaceAroundParameterEquals,
-                            token.range,
+                            token.range(),
                         ) {
                             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                                 " ".to_string(),
@@ -136,24 +139,19 @@ pub(crate) fn whitespace_around_named_parameter_equals(line: &LogicalLine, conte
                         }
                     }
 
-                    while let Some(next) = iter.peek() {
-                        if next.kind() == TokenKind::NonLogicalNewline {
-                            iter.next();
-                        } else {
-                            let next_start = next.start();
+                    if let Some(next) = iter.peek() {
+                        let next_start = next.start();
 
-                            if next_start == token.end() {
-                                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
-                                    MissingWhitespaceAroundParameterEquals,
-                                    token.range,
-                                ) {
-                                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                                        " ".to_string(),
-                                        token.end(),
-                                    )));
-                                }
+                        if next_start == token.end() {
+                            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                                MissingWhitespaceAroundParameterEquals,
+                                token.range(),
+                            ) {
+                                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                                    " ".to_string(),
+                                    token.end(),
+                                )));
                             }
-                            break;
                         }
                     }
                 } else {
@@ -169,22 +167,17 @@ pub(crate) fn whitespace_around_named_parameter_equals(line: &LogicalLine, conte
                     }
 
                     // If there's space between the equals sign and the following token, report it.
-                    while let Some(next) = iter.peek() {
-                        if next.kind() == TokenKind::NonLogicalNewline {
-                            iter.next();
-                        } else {
-                            if next.start() != token.end() {
-                                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
-                                    UnexpectedSpacesAroundKeywordParameterEquals,
-                                    TextRange::new(token.end(), next.start()),
-                                ) {
-                                    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                                        token.end(),
-                                        next.start(),
-                                    )));
-                                }
+                    if let Some(next) = iter.peek() {
+                        if next.start() != token.end() {
+                            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                                UnexpectedSpacesAroundKeywordParameterEquals,
+                                TextRange::new(token.end(), next.start()),
+                            ) {
+                                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                                    token.end(),
+                                    next.start(),
+                                )));
                             }
-                            break;
                         }
                     }
                 }
