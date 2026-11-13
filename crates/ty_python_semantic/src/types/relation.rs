@@ -1495,6 +1495,30 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             })
     }
 
+    fn check_fixed_source_typevar(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        bound_or_constraints: TypeVarBoundOrConstraints<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        // Upcast the type variable directly rather than promoting it to its upper bound,
+        // such that `Self` in the callable signature refers back to the original type variable.
+        let source = Type::TypeVar(typevar);
+        if let Type::Callable(target_callable) = target
+            && let Some(callables) = source.try_upcast_to_callable_with_policy(
+                db,
+                self.env,
+                UpcastPolicy::from(self.relation),
+            )
+        {
+            return self.with_recursion_guard(db, source, target, || {
+                self.check_callables_vs_callable(db, &callables, target_callable)
+            });
+        }
+        self.check_source_typevar_bounds(db, bound_or_constraints, target)
+    }
+
     fn check_source_typevar_bounds(
         &self,
         db: &'db dyn Db,
@@ -2133,6 +2157,62 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Some(self.check_type_pair(db, Type::TypeVar(source), target))
     }
 
+    /// Collect a bound on the endpoint in scope. A caller-fixed variable on the other side
+    /// becomes part of that bound.
+    fn collect_typevar_bound(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        scope: ConstraintScope<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let env = self.env;
+        // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
+        // tautology! We're moving the caller's subtyping/assignability requirement into a
+        // constraint set. If the typevar has an upper bound or constraints, then the relation
+        // only has to hold when the typevar has a valid specialization (i.e., one that
+        // satisfies the upper bound/constraints).
+        if let Type::TypeVar(bound_typevar) = source
+            && scope.contains(db, bound_typevar)
+        {
+            let upper = if self.relation.is_subtyping() {
+                target.bottom_materialization(db, env)
+            } else {
+                target
+            };
+            return Some(self.constraints.in_scope(scope, || {
+                ConstraintSet::constrain_typevar_upper_bound(
+                    db,
+                    env,
+                    self.constraints,
+                    self.provenance,
+                    bound_typevar,
+                    upper,
+                )
+            }));
+        }
+        if let Type::TypeVar(bound_typevar) = target
+            && scope.contains(db, bound_typevar)
+        {
+            let lower = if self.relation.is_subtyping() {
+                source.top_materialization(db, env)
+            } else {
+                source
+            };
+            return Some(self.constraints.in_scope(scope, || {
+                ConstraintSet::constrain_typevar_lower_bound(
+                    db,
+                    env,
+                    self.constraints,
+                    self.provenance,
+                    bound_typevar,
+                    lower,
+                )
+            }));
+        }
+        None
+    }
+
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
         &self,
@@ -2162,52 +2242,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         let env = self.env;
 
-        // Collect a bound on the endpoint in scope. A caller-fixed variable on the other side
-        // becomes part of that bound. If both endpoints are fixed, check the relation below.
-        if let TypeVarEvaluation::Lazy(scope) = self.typevar_evaluation {
-            // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
-            // tautology! We're moving the caller's subtyping/assignability requirement into a
-            // constraint set. If the typevar has an upper bound or constraints, then the relation
-            // only has to hold when the typevar has a valid specialization (i.e., one that
-            // satisfies the upper bound/constraints).
-            if let Type::TypeVar(bound_typevar) = source
-                && scope.contains(db, bound_typevar)
-            {
-                let upper = if self.relation.is_subtyping() {
-                    target.bottom_materialization(db, env)
-                } else {
-                    target
-                };
-                return self.constraints.in_scope(scope, || {
-                    ConstraintSet::constrain_typevar_upper_bound(
-                        db,
-                        env,
-                        self.constraints,
-                        self.provenance,
-                        bound_typevar,
-                        upper,
-                    )
-                });
-            }
-            if let Type::TypeVar(bound_typevar) = target
-                && scope.contains(db, bound_typevar)
-            {
-                let lower = if self.relation.is_subtyping() {
-                    source.top_materialization(db, env)
-                } else {
-                    source
-                };
-                return self.constraints.in_scope(scope, || {
-                    ConstraintSet::constrain_typevar_lower_bound(
-                        db,
-                        env,
-                        self.constraints,
-                        self.provenance,
-                        bound_typevar,
-                        lower,
-                    )
-                });
-            }
+        if let TypeVarEvaluation::Lazy(scope) = self.typevar_evaluation
+            && let Some(bound) = self.collect_typevar_bound(db, source, target, scope)
+        {
+            return bound;
         }
 
         match (source, target) {
@@ -2806,21 +2844,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     && let Some(bound_or_constraints) =
                         bound_typevar.typevar(db).bound_or_constraints(db, env) =>
             {
-                // Upcast the type variable directly rather than promoting it to its upper bound,
-                // such that `Self` in the callable signature refers back to the original type variable.
-                if let Type::Callable(target_callable) = target
-                    && let Some(callables) = source.try_upcast_to_callable_with_policy(
-                        db,
-                        env,
-                        UpcastPolicy::from(self.relation),
-                    )
-                {
-                    self.with_recursion_guard(db, source, target, || {
-                        self.check_callables_vs_callable(db, &callables, target_callable)
-                    })
-                } else {
-                    self.check_source_typevar_bounds(db, bound_or_constraints, target)
-                }
+                self.check_fixed_source_typevar(db, bound_typevar, bound_or_constraints, target)
             }
 
             // `Never` is the bottom type, the empty set.
