@@ -10144,29 +10144,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
-        let cast_value = if let Type::FunctionLiteral(function) = callable_type
-            && function.is_known(db, KnownFunction::Cast)
+        // We ignore type context from the value parameter when inferring the value expression of
+        // calls to `cast` or `assert_never`, as the declared parameter type can unintentionally
+        // influence the type of nested generic calls, leading to misleading diagnostics.
+        let value_context = match callable_type
+            .as_function_literal()
+            .and_then(|function| function.known(db))
         {
-            arguments.find_argument_value("val", 1)
-        } else {
-            None
+            Some(KnownFunction::Cast) => arguments
+                .find_argument_value("val", 1)
+                // The outer context can make this cast redundant, but must not introduce errors in
+                // its value, such as missing keys in a partial `TypedDict` literal. Redundant casts
+                // inside the value are also an intended result of propagation.
+                .map(|value| (value, call_expression_tcx)),
+            Some(KnownFunction::AssertNever) => arguments
+                .find_positional(0)
+                .map(|value| (value, TypeContext::default())),
+            _ => None,
         };
 
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                if let Some(value) = cast_value
+                if let Some((value, value_tcx)) = value_context
                     && std::ptr::eq(expr, value)
                 {
-                    // The outer context can make this cast redundant, but must not introduce
-                    // errors in its value, such as missing keys in a partial `TypedDict` literal.
-                    // Redundant casts inside the value are also an intended result of propagation.
                     return builder.infer_with_type_context_fallback(
-                        call_expression_tcx,
-                        // The value parameter of `cast` is declared as `Any`. If provided as
-                        // type context to a nested generic call, it can incorrectly make the
-                        // cast appear redundant.
+                        value_tcx,
                         TypeContext::default(),
                         |builder, tcx| builder.infer_expression(value, tcx),
                     );
