@@ -1090,11 +1090,17 @@ pub(super) fn any_over_type_including_alias_arguments<'db>(
     any_over_type_impl(db, env, ty, TypeSearchMode::IncludeAliasArguments, query)
 }
 
-/// Searches through type aliases without forcing other lazily inferred type attributes.
+/// Searches through alias bodies without forcing other lazy type attributes.
 ///
-/// Revisiting a recursive alias counts as a match because its specialization can grow on each
-/// visit. Distinct specializations of a nonrecursive alias remain separate, so nested uses such as
-/// `Identity[Identity[int]]` are still considered finite.
+/// ```python
+/// type Pair[T] = tuple[T, T]
+/// type Shared = Pair[Pair[int]]
+/// type Growing[T] = tuple[T, Growing[list[T]]]
+/// ```
+///
+/// When searching `Shared` for `str`, both tuple elements share the search of `Pair[int]`.
+/// Searching `Growing[int]` reaches `Growing[list[int]]` while the same definition is
+/// active. Such a cycle counts as a match even if the predicate has found nothing yet.
 pub(super) fn any_over_type_expanding_aliases<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -1107,34 +1113,48 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
         ty: Type<'db>,
         query: &impl Fn(Type<'db>) -> bool,
         active_aliases: &ActiveRecursionDetector<TypeIdentity<'db>>,
+        seen_specializations: Option<&TypeCollector<'db>>,
     ) -> bool {
         any_over_type(db, env, ty, false, |nested| {
-            query(nested)
-                || match nested {
-                    Type::TypeAlias(alias) => active_aliases.visit(
-                        &nested.to_type_identity(db),
-                        || true,
-                        || search(db, env, alias.value_type(db), query, active_aliases),
-                    ),
-                    Type::Recursive(recursive) => active_aliases.visit(
-                        &nested.to_type_identity(db),
-                        || true,
-                        || {
-                            search(
-                                db,
-                                env,
-                                recursive.unfold(db, env).into_type(),
-                                query,
-                                active_aliases,
-                            )
-                        },
-                    ),
-                    _ => false,
-                }
+            if query(nested) {
+                return true;
+            }
+            if !nested.is_alias_like() {
+                return false;
+            }
+            let identity = nested.to_type_identity(db);
+            active_aliases.visit(
+                &identity,
+                || true,
+                || {
+                    // Below a growing alias, revisiting an active definition depends on the
+                    // path we took. Only share expansions outside such paths.
+                    let seen_specializations =
+                        seen_specializations.filter(|_| matches!(identity, TypeIdentity::Other(_)));
+                    if seen_specializations
+                        .is_some_and(|visited| visited.type_was_already_seen(nested))
+                    {
+                        return false;
+                    }
+                    let value = match nested {
+                        Type::TypeAlias(alias) => alias.value_type(db),
+                        Type::Recursive(recursive) => recursive.unfold(db, env).into_type(),
+                        _ => return false,
+                    };
+                    search(db, env, value, query, active_aliases, seen_specializations)
+                },
+            )
         })
     }
 
-    search(db, env, ty, &query, &ActiveRecursionDetector::default())
+    search(
+        db,
+        env,
+        ty,
+        &query,
+        &ActiveRecursionDetector::default(),
+        Some(&TypeCollector::default()),
+    )
 }
 
 /// Recurse into a type and calls the passed-in closure on every nested type
@@ -1170,15 +1190,60 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_python_core::ProgramFile;
 
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
-    use crate::types::{DynamicType, Parameter, Parameters, SpecialFormType, Type};
+    use crate::types::{DynamicType, KnownClass, Parameter, Parameters, SpecialFormType, Type};
 
-    use super::{CollectedTypes, DynamicContentMode, dynamic_content, dynamic_content_impl};
+    use super::{
+        CollectedTypes, DynamicContentMode, any_over_type_expanding_aliases, dynamic_content,
+        dynamic_content_impl,
+    };
+
+    #[test]
+    fn alias_search_reuses_shared_specializations() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            type Box[T] = tuple[T]
+            type Left = tuple[Box[int], Box[int]]
+            type Right = tuple[Box[int], Box[str]]
+            value: tuple[Left, Right]
+
+            type Growing[T] = tuple[T, Growing[list[T]]]
+            recursive: Growing[int]
+            "#,
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/a.py")?;
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let value = global_symbol(&db, module, "value").place.expect_type();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let str = KnownClass::Str.to_instance(&db, &env);
+        let int_visits = Cell::new(0);
+        assert!(any_over_type_expanding_aliases(&db, &env, value, |ty| {
+            if ty == int {
+                int_visits.set(int_visits.get() + 1);
+            }
+            ty == str
+        }));
+        assert_eq!(int_visits.get(), 1);
+
+        let recursive = global_symbol(&db, module, "recursive").place.expect_type();
+        assert!(any_over_type_expanding_aliases(
+            &db,
+            &env,
+            recursive,
+            |_| false
+        ));
+        Ok(())
+    }
 
     #[test]
     fn fully_static_paramspec_value_has_no_dynamic_content() {

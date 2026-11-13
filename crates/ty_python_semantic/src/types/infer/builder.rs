@@ -135,6 +135,7 @@ use crate::types::unpacker::{
     UnpackResult, fixed_sequence_elements, sequence_from_literal_elements,
     tuple_literal_needs_promotion,
 };
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     ClassType, DeclaredType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet,
@@ -8349,6 +8350,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        // Each dictionary entry contributes one bound for its key and another for its value.
+        // Unpacking, custom type parameters, and constraints from later uses need the solver.
+        let mut can_union_bounds = !has_dict_unpack
+            && !elts.is_empty()
+            && elt_tys.len() == N
+            && elt_tys.clone().all(|var| var.typevar(db).is_simple(db));
+        let mut deferred_bounds = Vec::new();
+
         if tcx.declared_type().is_none()
             && let Some(collection_expr) = collection_expr
             && let InferenceRegion::Expression(current_expr, _) = self.region
@@ -8377,6 +8386,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .repeat_specialization(self.db(), Type::Divergent(divergent))
                         });
 
+                    can_union_bounds = false;
                     builder
                         .infer(
                             identity_instance,
@@ -8391,6 +8401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
 
+                        can_union_bounds = false;
                         builder.infer(identity_instance, *constraint).ok()?;
                     }
                 }
@@ -8518,32 +8529,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_type_for_typevar,
                 );
 
-                if previous_evidence[i] != Some(inferred_type_for_typevar) {
+                if previous_evidence[i] == Some(inferred_type_for_typevar) {
+                    continue;
+                }
+                previous_evidence[i] = Some(inferred_type_for_typevar);
+
+                let bound = CollectionElementBound {
+                    position: i,
+                    variable: elt_ty,
+                    lower: inferred_type_for_typevar,
+                };
+                can_union_bounds = can_union_bounds
+                    && bound.is_independent(db, env, inferable)
+                    && elt_tcx.is_none_or(|_| elt_tcx_variance[&elt_ty_identity].is_covariant());
+
+                // Once a bound has been deferred, keep the rest in source order for replay.
+                if can_union_bounds || !deferred_bounds.is_empty() {
+                    deferred_bounds.push(bound);
+                } else {
                     builder
-                        .infer(Type::TypeVar(elt_ty), inferred_type_for_typevar)
+                        .infer(Type::TypeVar(bound.variable), bound.lower)
                         .ok()?;
-                    previous_evidence[i] = Some(inferred_type_for_typevar);
                 }
             }
         }
 
-        let class_type = collection_alias
-            .origin(self.db())
-            .apply_specialization(db, |_| {
-                builder.build_merged_with(|current_typevar, bounds| {
-                    let lower = bounds?.inference_lower()?;
-
-                    let lower = lower.promote_collection_element_type(
-                        db,
-                        env,
-                        tuple_size_promotion_constraints.allow(current_typevar.identity(self.db())),
-                        tcx.declared_type().is_none(),
-                    );
-
-                    Some(lower)
+        let promote = |variable: BoundTypeVarInstance<'db>, lower: Type<'db>| {
+            lower.promote_collection_element_type(
+                db,
+                env,
+                tuple_size_promotion_constraints.allow(variable.identity(db)),
+                tcx.declared_type().is_none(),
+            )
+        };
+        let origin = collection_alias.origin(db);
+        let class_type = if can_union_bounds
+            && let Some(arguments) = infer_independent_collection_arguments::<N>(
+                db,
+                env,
+                &deferred_bounds,
+                elt_tys,
+                &elt_tcx_constraints,
+                promote,
+            ) {
+            origin.apply_specialization(db, |context| {
+                context.specialize_recursive(db, arguments.into_iter().map(Some))
+            })
+        } else {
+            for bound in deferred_bounds {
+                builder
+                    .infer(Type::TypeVar(bound.variable), bound.lower)
+                    .ok()?;
+            }
+            origin.apply_specialization(db, |_| {
+                builder.build_merged_with(|variable, bounds| {
+                    Some(promote(variable, bounds?.inference_lower()?))
                 })
-            });
-
+            })
+        };
         Type::from(class_type).to_instance_approximation(db, env)
     }
 
@@ -13228,6 +13271,93 @@ impl CallArgumentInferenceMode {
 enum MatchingArgumentTypeContext<'db> {
     Unique(Option<ArgumentTypeContext<'db>>),
     Many(Vec<Option<ArgumentTypeContext<'db>>>),
+}
+
+/// A literal element supplies a lower bound for one type variable of its collection.
+struct CollectionElementBound<'db> {
+    /// Zero for list/set elements and dictionary keys, one for dictionary values.
+    position: usize,
+    variable: BoundTypeVarInstance<'db>,
+    lower: Type<'db>,
+}
+
+impl<'db> CollectionElementBound<'db> {
+    /// Returns whether this bound can be unioned with other bounds for the same variable.
+    /// A bound that refers to a variable we are solving for can change as inference proceeds.
+    /// The solver also handles recursive types and normalizes top-level aliases.
+    fn is_independent(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
+        if matches!(
+            self.lower,
+            Type::Never
+                | Type::Divergent(_)
+                | Type::TypeVar(_)
+                | Type::TypeAlias(_)
+                | Type::Intersection(_)
+        ) {
+            return false;
+        }
+        !any_over_type_expanding_aliases(db, env, self.lower, |part| {
+            part.is_provisional_marker()
+                || matches!(
+                    part,
+                    Type::Divergent(_) | Type::Recursive(_) | Type::RecursiveVar(_)
+                )
+                || part
+                    .as_typevar()
+                    .is_some_and(|var| var.is_inferable(db, inferable))
+        })
+    }
+}
+
+/// Infers each collection type argument from its own element bounds.
+///
+/// ```python
+/// from typing import reveal_type
+///
+/// def pairs(a: int, b: str):
+///     reveal_type({"first": a, "second": b})  # dict[str, int | str]
+/// ```
+///
+/// The keys contribute to the first type argument and the values to the second.
+/// Returns `None` if a variable has no bound or still needs normalization by the solver.
+fn infer_independent_collection_arguments<'db, const N: usize>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    elements: &[CollectionElementBound<'db>],
+    variables: impl Iterator<Item = BoundTypeVarInstance<'db>>,
+    contextual_bounds: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    promote: impl Fn(BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
+) -> Option<Vec<Type<'db>>> {
+    let mut bounds: [Option<UnionAccumulator<'db>>; N] = std::array::from_fn(|_| None);
+    for element in elements {
+        let bound = &mut bounds[element.position];
+        if let Some(union) = bound {
+            union.add(db, env, element.lower);
+        } else {
+            *bound = Some(UnionAccumulator::new(element.lower));
+        }
+    }
+    variables
+        .zip(bounds)
+        .map(|(variable, bound)| {
+            // A sole bound bypasses union simplification. Let the solver normalize
+            // unions such as `list[A] | list[int]` when `type A = int`.
+            if let Some(UnionAccumulator::One(ty @ Type::Union(_))) = &bound
+                && any_over_type(db, env, *ty, false, Type::is_alias_like)
+            {
+                return None;
+            }
+            let lower = bound
+                .map(|bound| bound.into_type(db, env))
+                .or_else(|| contextual_bounds.get(&variable.identity(db)).copied())?;
+            Some(promote(variable, lower))
+        })
+        .collect()
 }
 
 fn is_collection_literal(expression: &ast::Expr) -> bool {
