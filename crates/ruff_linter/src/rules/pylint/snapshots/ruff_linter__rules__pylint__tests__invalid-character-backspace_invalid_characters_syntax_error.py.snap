@@ -47,6 +47,17 @@ PLE2510 Invalid unescaped character backspace, use "\b" instead
    |
 help: Replace with escape sequence
 
+invalid-syntax: f-string: unterminated string
+  --> invalid_characters_syntax_error.py:10:7
+   |
+ 8 | b = '␈'
+ 9 | # Unterminated f-string
+10 | b = f'␈
+   |       ^
+11 | b = f'␈'
+12 | # Implicitly concatenated
+   |
+
 PLE2510 Invalid unescaped character backspace, use "\b" instead
   --> invalid_characters_syntax_error.py:10:7
    |
@@ -58,17 +69,6 @@ PLE2510 Invalid unescaped character backspace, use "\b" instead
 12 | # Implicitly concatenated
    |
 help: Replace with escape sequence
-
-invalid-syntax: f-string: unterminated string
-  --> invalid_characters_syntax_error.py:10:7
-   |
- 8 | b = '␈'
- 9 | # Unterminated f-string
-10 | b = f'␈
-   |       ^
-11 | b = f'␈'
-12 | # Implicitly concatenated
-   |
 
 invalid-syntax: Expected FStringEnd, found newline
   --> invalid_characters_syntax_error.py:10:8

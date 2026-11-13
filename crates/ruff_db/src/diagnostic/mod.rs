@@ -13,7 +13,7 @@ pub use self::render::{DummyFileResolver, FileResolver, Input};
 use self::render::{FullRenderer, Renderer};
 pub use self::stylesheet::{DiagnosticStylesheet, fmt_with_hyperlink};
 use crate::cancellation::CancellationToken;
-use crate::{Db, files::File};
+use crate::files::File;
 
 pub mod render;
 mod stylesheet;
@@ -342,9 +342,6 @@ impl Diagnostic {
 
     /// Returns the "primary" span of this diagnostic, panicking if it does not exist.
     ///
-    /// This should typically only be used when working with diagnostics in Ruff, where diagnostics
-    /// are currently required to have a primary span.
-    ///
     /// See [`Diagnostic::primary_span`] for more details.
     pub fn expect_primary_span(&self) -> Span {
         self.primary_span().expect("Expected a primary span")
@@ -352,9 +349,9 @@ impl Diagnostic {
 
     /// Returns a key that can be used to sort two diagnostics into the canonical order
     /// in which they should appear when rendered.
-    pub fn rendering_sort_key<'a>(&'a self, db: &'a dyn Db) -> impl Ord + 'a {
+    pub fn rendering_sort_key<'a>(&'a self, resolver: &'a dyn FileResolver) -> impl Ord + 'a {
         RenderingSortKey {
-            db,
+            resolver,
             diagnostic: self,
         }
     }
@@ -487,40 +484,9 @@ impl Diagnostic {
             .map(|sub| sub.inner.message.as_str())
     }
 
-    /// Returns the [`SourceFile`] which the message belongs to.
-    fn ruff_source_file(&self) -> Option<&SourceFile> {
-        self.primary_span_ref()?.as_ruff_file()
-    }
-
-    /// Returns the [`SourceFile`] which the message belongs to.
-    ///
-    /// Panics if the diagnostic has no primary span, or if its file is not a `SourceFile`.
-    fn expect_ruff_source_file(&self) -> &SourceFile {
-        self.ruff_source_file()
-            .expect("Expected a ruff source file")
-    }
-
     /// Returns the [`TextRange`] for the diagnostic.
     pub fn range(&self) -> Option<TextRange> {
         self.primary_span()?.range()
-    }
-
-    /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
-    ///
-    /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
-    pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
-        let a = (
-            self.severity().is_fatal(),
-            self.expect_ruff_source_file(),
-            self.range().map(|r| r.start()),
-        );
-        let b = (
-            other.severity().is_fatal(),
-            other.expect_ruff_source_file(),
-            other.range().map(|r| r.start()),
-        );
-
-        a.cmp(&b)
     }
 
     /// Add an offset for aligning the header sigil with the line number separators in a diff.
@@ -546,7 +512,7 @@ struct DiagnosticInner {
 }
 
 struct RenderingSortKey<'a> {
-    db: &'a dyn Db,
+    resolver: &'a dyn FileResolver,
     diagnostic: &'a Diagnostic,
 }
 
@@ -565,7 +531,9 @@ impl Ord for RenderingSortKey<'_> {
             let left_file = left_span.file();
             let right_file = right_span.file();
             if left_file != right_file {
-                let order = left_file.path(&self.db).cmp(right_file.path(&self.db));
+                let order = left_file
+                    .path(self.resolver)
+                    .cmp(right_file.path(self.resolver));
                 if order.is_ne() {
                     return order;
                 }

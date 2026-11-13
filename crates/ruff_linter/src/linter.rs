@@ -782,7 +782,7 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use test_case::test_case;
 
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::{Diagnostic, DummyFileResolver};
     use ruff_notebook::{Notebook, NotebookError};
 
     use crate::linter::{check_path, parse_unchecked_source};
@@ -980,7 +980,10 @@ mod tests {
             target_version,
             &suppressions,
         );
-        diagnostics.sort_by(Diagnostic::ruff_start_ordering);
+        diagnostics.sort_by(|a, b| {
+            a.rendering_sort_key(&DummyFileResolver)
+                .cmp(&b.rendering_sort_key(&DummyFileResolver))
+        });
         diagnostics
     }
 
