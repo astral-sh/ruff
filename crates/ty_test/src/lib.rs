@@ -514,7 +514,7 @@ fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleI
             },
         );
     }
-    if errs.is_empty() { Ok(()) } else { Err(errs) }
+    errs.is_empty().ok_or(errs)
 }
 
 impl std::fmt::Display for ModuleInconsistency<'_> {
