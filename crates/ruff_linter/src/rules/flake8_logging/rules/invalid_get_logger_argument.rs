@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
+
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -63,17 +64,20 @@ impl Violation for InvalidGetLoggerArgument {
 }
 
 /// LOG002
-pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
 
-    let Some(Expr::Name(expr @ ast::ExprName { id, .. })) =
-        call.arguments.find_argument_value("name", 0)
+    let Some(expr) = call
+        .arguments
+        .find_argument_value("name", 0)
+        .and_then(Expr::as_name_expr)
     else {
         return;
     };
 
+    let id = expr.id();
     if !matches!(id.as_ref(), "__file__" | "__cached__") {
         return;
     }
@@ -84,7 +88,7 @@ pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCal
 
     if !checker
         .semantic()
-        .resolve_qualified_name(call.func.as_ref())
+        .resolve_qualified_name(call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["logging", "getLogger"]))
     {
         return;

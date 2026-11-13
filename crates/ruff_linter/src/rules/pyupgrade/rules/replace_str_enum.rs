@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -102,8 +102,8 @@ impl Violation for ReplaceStrEnum {
 }
 
 /// UP042
-pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef) {
-    let Some(arguments) = class_def.arguments.as_deref() else {
+pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDefFields<'_>) {
+    let Some(arguments) = class_def.arguments else {
         // class does not inherit anything, exit early
         return;
     };
@@ -111,7 +111,7 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef)
     // Determine whether the class inherits from both `str` and `enum.Enum`.
     let mut inherits_str = false;
     let mut inherits_enum = false;
-    for base in &*arguments.args {
+    for base in arguments.args() {
         if let Some(qualified_name) = checker.semantic().resolve_qualified_name(base) {
             match qualified_name.segments() {
                 ["" | "builtins", "str"] => inherits_str = true,
@@ -135,7 +135,7 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef)
         ReplaceStrEnum {
             name: class_def.name.to_string(),
         },
-        class_def.identifier(),
+        class_def.node.identifier(),
     );
 
     // If the base classes are _exactly_ `str` and `enum.Enum`, apply a fix.
@@ -146,7 +146,7 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef)
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("enum", "StrEnum"),
-                class_def.start(),
+                class_def.range.start(),
                 checker.semantic(),
             )?;
             Ok(Fix::unsafe_edits(

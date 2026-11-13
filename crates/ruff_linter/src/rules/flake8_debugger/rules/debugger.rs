@@ -1,4 +1,4 @@
-use ruff_python_ast::{ExprCall, Stmt};
+use ruff_python_ast::{ExprCallFields, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
@@ -50,20 +50,24 @@ impl Violation for Debugger {
 
 /// T100
 /// Checks for the presence of a debugger call.
-pub(crate) fn debugger_call(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
+pub(crate) fn debugger_call(
+    checker: &Checker,
+    call: &ExprCallFields<'_>,
+    qualified_name: &QualifiedName,
+) {
     if is_debugger_call(qualified_name) {
         checker.report_diagnostic(
             Debugger {
                 using_type: DebuggerUsingType::Call(qualified_name.to_string()),
             },
-            call.range(),
+            call.range,
         );
     }
 }
 
 /// T100
 /// Checks for the presence of a debugger import.
-pub(crate) fn debugger_import(checker: &Checker, stmt: &Stmt, module: Option<&str>, name: &str) {
+pub(crate) fn debugger_import(checker: &Checker, stmt: Stmt<'_>, module: Option<&str>, name: &str) {
     if let Some(module) = module {
         let qualified_name = QualifiedName::user_defined(module).append_member(name);
 

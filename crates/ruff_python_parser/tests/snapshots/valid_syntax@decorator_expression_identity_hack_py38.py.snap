@@ -25,27 +25,25 @@ Module(
                     parameters: Parameters {
                         range: 50..53,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 51..52,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 51..52,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("x"),
+                                    parameter: Parameter {
                                         range: 51..52,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("x"),
+                                            range: 51..52,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [
@@ -92,57 +90,58 @@ Module(
                                     arguments: Arguments {
                                         range: 66..94,
                                         node_index: NodeIndex(None),
-                                        args: [
-                                            Attribute(
-                                                ExprAttribute {
-                                                    node_index: NodeIndex(None),
-                                                    range: 67..93,
-                                                    value: Attribute(
-                                                        ExprAttribute {
-                                                            node_index: NodeIndex(None),
-                                                            range: 67..85,
-                                                            value: Subscript(
-                                                                ExprSubscript {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 67..77,
-                                                                    value: Name(
-                                                                        ExprName {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 67..74,
-                                                                            id: Name("buttons"),
-                                                                            ctx: Load,
-                                                                        },
-                                                                    ),
-                                                                    slice: NumberLiteral(
-                                                                        ExprNumberLiteral {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 75..76,
-                                                                            value: Int(
-                                                                                0,
-                                                                            ),
-                                                                        },
-                                                                    ),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            attr: Identifier {
-                                                                id: Name("clicked"),
-                                                                range: 78..85,
-                                                                node_index: NodeIndex(None),
-                                                            },
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    attr: Identifier {
-                                                        id: Name("connect"),
-                                                        range: 86..93,
+                                        items: [
+                                            Positional(
+                                                Attribute(
+                                                    ExprAttribute {
                                                         node_index: NodeIndex(None),
+                                                        range: 67..93,
+                                                        value: Attribute(
+                                                            ExprAttribute {
+                                                                node_index: NodeIndex(None),
+                                                                range: 67..85,
+                                                                value: Subscript(
+                                                                    ExprSubscript {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 67..77,
+                                                                        value: Name(
+                                                                            ExprName {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 67..74,
+                                                                                id: Name("buttons"),
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
+                                                                        slice: NumberLiteral(
+                                                                            ExprNumberLiteral {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 75..76,
+                                                                                value: Int(
+                                                                                    0,
+                                                                                ),
+                                                                            },
+                                                                        ),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                attr: Identifier {
+                                                                    id: Name("clicked"),
+                                                                    range: 78..85,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        attr: Identifier {
+                                                            id: Name("connect"),
+                                                            range: 86..93,
+                                                            node_index: NodeIndex(None),
+                                                        },
+                                                        ctx: Load,
                                                     },
-                                                    ctx: Load,
-                                                },
+                                                ),
                                             ),
                                         ],
-                                        keywords: [],
                                     },
                                 },
                             ),
@@ -157,11 +156,7 @@ Module(
                     parameters: Parameters {
                         range: 103..105,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [

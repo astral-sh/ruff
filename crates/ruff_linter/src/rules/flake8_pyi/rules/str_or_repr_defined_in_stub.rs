@@ -1,5 +1,5 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::Stmt;
+use ruff_python_ast::ParameterRole;
+use ruff_python_ast::{Stmt, StmtKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -44,17 +44,14 @@ impl AlwaysFixableViolation for StrOrReprDefinedInStub {
 }
 
 /// PYI029
-pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
-    let Stmt::FunctionDef(ast::StmtFunctionDef {
-        name,
-        decorator_list,
-        returns,
-        parameters,
-        ..
-    }) = stmt
-    else {
+pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: Stmt<'_>) {
+    let StmtKind::FunctionDef(function_def) = stmt.classify() else {
         return;
     };
+    let name = function_def.name();
+    let decorator_list = function_def.decorator_list();
+    let returns = function_def.returns();
+    let parameters = function_def.parameters();
 
     let Some(returns) = returns else {
         return;
@@ -70,10 +67,18 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
 
     // It is a violation only if the method signature matches that of `object.__str__`
     // or `object.__repr__` exactly and the method is not decorated as abstract.
-    if !parameters.kwonlyargs.is_empty()
-        || (parameters.args.len() + parameters.posonlyargs.len()) > 1
-    {
-        return;
+    let mut seen_positional = false;
+    for role in parameters.roles() {
+        match role {
+            ParameterRole::KeywordOnly => return,
+            ParameterRole::PositionalOnly | ParameterRole::PositionalOrKeyword => {
+                if seen_positional {
+                    return;
+                }
+                seen_positional = true;
+            }
+            ParameterRole::Vararg | ParameterRole::Kwarg => {}
+        }
     }
 
     if is_abstract(decorator_list, checker.semantic()) {

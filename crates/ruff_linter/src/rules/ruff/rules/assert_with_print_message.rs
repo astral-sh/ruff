@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Builder, StmtAssert, build};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -57,257 +57,123 @@ impl AlwaysFixableViolation for AssertWithPrintMessage {
 ///
 /// Checks if the `msg` argument to an `assert` statement is a `print` call, and if so,
 /// replace the message with the arguments to the `print` call.
-pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAssert) {
-    if let Some(Expr::Call(call)) = stmt.msg.as_deref() {
-        // We have to check that the print call is a call to the built-in `print` function
-        let semantic = checker.semantic();
-
-        if semantic.match_builtin_expr(&call.func, "print") {
-            // This is the confirmed rule condition
-            let mut diagnostic = checker.report_diagnostic(AssertWithPrintMessage, call.range());
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().stmt(&Stmt::Assert(ast::StmtAssert {
-                    test: stmt.test.clone(),
-                    msg: print_arguments::to_expr(&call.arguments, checker).map(Box::new),
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                })),
-                // We have to replace the entire statement,
-                // as the `print` could be empty and thus `call.range()`
-                // will cease to exist.
-                stmt.range(),
-            )));
-        }
+pub(crate) fn assert_with_print_message(checker: &Checker, stmt: StmtAssert<'_>) {
+    let Some(call) = stmt.msg().and_then(ruff_python_ast::Expr::as_call_expr) else {
+        return;
+    };
+    if !checker.semantic().match_builtin_expr(call.func(), "print") {
+        return;
     }
+    let mut diagnostic = checker.report_diagnostic(AssertWithPrintMessage, call.range());
+    let mut builder = Builder::default();
+    let test = builder.copy_node(stmt.test());
+    let msg = print_arguments::to_expr(&mut builder, call.arguments(), checker);
+    let statement = builder.add(build::StmtAssert {
+        range: TextRange::default(),
+        test,
+        msg,
+    });
+    // An empty print call removes the message and its leading comma.
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        checker.generator().stmt(builder.get(statement).into()),
+        stmt.range(),
+    )));
 }
-
-/// Extracts the arguments from a `print` call and converts them to some kind of string
-/// expression.
-///
-/// Three cases are handled:
-/// - if there are no arguments, return `None` so that `diagnostic` can remove `msg` from `assert`;
-/// - if all of `print` arguments including `sep` are string literals, return a `Expr::StringLiteral`;
-/// - otherwise, return a `Expr::FString`.
+/// Builds an assertion message from the positional arguments and separator of a `print` call.
 mod print_arguments {
-    use itertools::Itertools;
     use ruff_python_ast::{
-        Arguments, ConversionFlag, Expr, ExprFString, FString, FStringFlags, FStringValue,
-        InterpolatedElement, InterpolatedStringElement, InterpolatedStringElements,
-        InterpolatedStringLiteralElement, StringLiteral, StringLiteralFlags,
+        Arguments, BuildId, Builder, Expr, InterpolatedStringElement, InterpolatedStringElementKind,
     };
     use ruff_text_size::TextRange;
 
     use crate::checkers::ast::Checker;
+    use crate::fix::syntax;
 
-    /// Converts an expression to a list of `FStringElement`s.
-    ///
-    /// Three cases are handled:
-    /// - if the expression is a string literal, each part of the string will be converted to a
-    ///   `FStringLiteralElement`.
-    /// - if the expression is an f-string, the elements will be returned as-is.
-    /// - otherwise, the expression will be wrapped in a `FStringExpressionElement`.
-    fn expr_to_fstring_elements(expr: &Expr) -> Vec<InterpolatedStringElement> {
-        match expr {
-            // If the expression is a string literal, convert each part to a `FStringLiteralElement`.
-            Expr::StringLiteral(string) => string
-                .value
-                .iter()
-                .map(|part| {
-                    InterpolatedStringElement::Literal(InterpolatedStringLiteralElement {
-                        value: part.value.clone(),
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    })
-                })
-                .collect(),
-
-            // If the expression is an f-string, return the elements.
-            Expr::FString(fstring) => fstring.value.elements().cloned().collect(),
-
-            // Otherwise, return the expression as a single `FStringExpressionElement` wrapping
-            // the expression.
-            expr => vec![InterpolatedStringElement::Interpolation(
-                InterpolatedElement {
-                    expression: Box::new(expr.clone()),
-                    debug_text: None,
-                    conversion: ConversionFlag::None,
-                    format_spec: None,
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                },
-            )],
-        }
+    #[derive(Clone, Copy)]
+    enum Part<'a> {
+        Text(&'a str),
+        Element(InterpolatedStringElement<'a>),
+        Expression(Expr<'a>),
     }
 
-    /// Converts a list of `FStringElement`s to a list of `StringLiteral`s.
-    ///
-    /// If any of the elements are not string literals, `None` is returned.
-    ///
-    /// This is useful (in combination with [`expr_to_fstring_elements`]) for
-    /// checking if the `sep` and `args` arguments to `print` are all string
-    /// literals.
-    fn fstring_elements_to_string_literals<'a>(
-        mut elements: impl ExactSizeIterator<Item = &'a InterpolatedStringElement>,
-        flags: StringLiteralFlags,
-    ) -> Option<Vec<StringLiteral>> {
-        elements.try_fold(Vec::with_capacity(elements.len()), |mut acc, element| {
-            if let InterpolatedStringElement::Literal(literal) = element {
-                acc.push(StringLiteral {
-                    value: literal.value.clone(),
-                    flags,
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                });
-                Some(acc)
-            } else {
-                None
+    impl<'a> Part<'a> {
+        fn text(self) -> Option<&'a str> {
+            match self {
+                Self::Text(text) => Some(text),
+                Self::Element(element)
+                    if let InterpolatedStringElementKind::Literal(literal) = element.classify() =>
+                {
+                    Some(literal.value())
+                }
+                _ => None,
             }
-        })
-    }
-
-    /// Converts the `sep` and `args` arguments to a [`Expr::StringLiteral`].
-    ///
-    /// This function will return [`None`] if any of the arguments are not string literals,
-    /// or if there are no arguments at all.
-    fn args_to_string_literal_expr<'a>(
-        args: impl ExactSizeIterator<Item = &'a Vec<InterpolatedStringElement>>,
-        sep: impl ExactSizeIterator<Item = &'a InterpolatedStringElement>,
-        flags: StringLiteralFlags,
-    ) -> Option<Expr> {
-        // If there are no arguments, short-circuit and return `None`
-        if args.len() == 0 {
-            return None;
         }
 
-        // Attempt to convert the `sep` and `args` arguments to string literals.
-        // We need to maintain `args` as a Vec of Vecs, as the first Vec represents
-        // the arguments to the `print` call, and the inner Vecs represent the elements
-        // of a concatenated string literal. (e.g. "text", "text" "text") The `sep` will
-        // be inserted only between the outer Vecs.
-        let (Some(sep), Some(args)) = (
-            fstring_elements_to_string_literals(sep, flags),
-            args.map(|arg| fstring_elements_to_string_literals(arg.iter(), flags))
-                .collect::<Option<Vec<_>>>(),
-        ) else {
-            // If any of the arguments are not string literals, return None
-            return None;
-        };
-
-        // Put the `sep` into a single Rust `String`
-        let sep_string = sep
-            .into_iter()
-            .map(|string_literal| string_literal.value)
-            .join("");
-
-        // Join the `args` with the `sep`
-        let combined_string = args
-            .into_iter()
-            .map(|string_literals| {
-                string_literals
-                    .into_iter()
-                    .map(|string_literal| string_literal.value)
-                    .join("")
-            })
-            .join(&sep_string);
-
-        Some(Expr::from(StringLiteral {
-            value: combined_string.into(),
-            flags,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        }))
+        fn build(
+            self,
+            builder: &mut Builder,
+        ) -> BuildId<ruff_python_ast::kind::InterpolatedStringElement> {
+            match self {
+                Self::Text(text) => syntax::literal_element(builder, text, TextRange::default()),
+                Self::Element(element) => builder.copy_node(element),
+                Self::Expression(expr) => syntax::interpolation(builder, expr),
+            }
+        }
     }
 
-    /// Converts the `sep` and `args` arguments to a [`Expr::FString`].
-    ///
-    /// This function will only return [`None`] if there are no arguments at all.
-    ///
-    /// ## Note
-    /// This function will always return an f-string, even if all arguments are string literals.
-    /// This can produce unnecessary f-strings.
-    ///
-    /// Also note that the iterator arguments of this function are consumed,
-    /// as opposed to the references taken by [`args_to_string_literal_expr`].
-    fn args_to_fstring_expr(
-        mut args: impl ExactSizeIterator<Item = Vec<InterpolatedStringElement>>,
-        sep: impl ExactSizeIterator<Item = InterpolatedStringElement>,
-        flags: FStringFlags,
-    ) -> Option<Expr> {
-        // If there are no arguments, short-circuit and return `None`
-        let first_arg = args.next()?;
-        let sep = sep.collect::<Vec<_>>();
-
-        let fstring_elements = args.fold(first_arg, |mut elements, arg| {
-            elements.extend(sep.clone());
-            elements.extend(arg);
-            elements
-        });
-
-        Some(Expr::FString(ExprFString {
-            value: FStringValue::single(FString {
-                elements: InterpolatedStringElements::from(fstring_elements),
-                flags,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            }),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        }))
+    fn append_parts<'a>(expr: Expr<'a>, parts: &mut Vec<Part<'a>>) {
+        match expr.classify() {
+            ruff_python_ast::ExprKind::StringLiteral(string) => {
+                parts.extend(string.value().iter().map(|part| Part::Text(part.value())));
+            }
+            ruff_python_ast::ExprKind::FString(string) => {
+                parts.extend(string.value().elements().map(Part::Element));
+            }
+            _ => parts.push(Part::Expression(expr)),
+        }
     }
 
-    /// Attempts to convert the `print` arguments to a suitable string expression.
-    ///
-    /// If the `sep` argument is provided, it will be used as the separator between
-    /// arguments. Otherwise, a space will be used.
-    ///
-    /// `end` and `file` keyword arguments are ignored, as they don't affect the
-    /// output of the `print` statement.
-    ///
-    /// ## Returns
-    ///
-    /// - [`Some`]<[`Expr::StringLiteral`]> if all arguments including `sep` are string literals.
-    /// - [`Some`]<[`Expr::FString`]> if any of the arguments are not string literals.
-    /// - [`None`] if the `print` contains no positional arguments at all.
-    pub(super) fn to_expr(arguments: &Arguments, checker: &Checker) -> Option<Expr> {
-        // Convert the `sep` argument into `FStringElement`s
-        let sep = arguments
-            .find_keyword("sep")
-            .and_then(
-                // If the `sep` argument is `None`, treat this as default behavior.
-                |keyword| {
-                    if let Expr::NoneLiteral(_) = keyword.value {
-                        None
-                    } else {
-                        Some(&keyword.value)
-                    }
-                },
-            )
-            .map(expr_to_fstring_elements)
-            .unwrap_or_else(|| {
-                vec![InterpolatedStringElement::Literal(
-                    InterpolatedStringLiteralElement {
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                        value: " ".into(),
-                    },
-                )]
-            });
+    pub(super) fn to_expr(
+        builder: &mut Builder,
+        arguments: Arguments<'_>,
+        checker: &Checker,
+    ) -> Option<BuildId<ruff_python_ast::kind::Expr>> {
+        let mut args = arguments.args().iter();
+        let first = args.next()?;
+        let mut separator = Vec::new();
+        if let Some(keyword) = arguments.find_keyword("sep")
+            && !keyword.value().is_none_literal_expr()
+        {
+            append_parts(keyword.value(), &mut separator);
+        } else {
+            separator.push(Part::Text(" "));
+        }
+        // Insert the separator between print arguments. Adjacent literal parts within one argument stay together.
+        let mut parts = Vec::new();
+        append_parts(first, &mut parts);
+        for arg in args {
+            parts.extend_from_slice(&separator);
+            append_parts(arg, &mut parts);
+        }
 
-        let args = arguments
-            .args
-            .iter()
-            .map(expr_to_fstring_elements)
-            .collect::<Vec<_>>();
-
-        // Attempt to convert the `sep` and `args` arguments to a string literal,
-        // falling back to an f-string if the arguments are not all string literals.
-        args_to_string_literal_expr(args.iter(), sep.iter(), checker.default_string_flags())
-            .or_else(|| {
-                args_to_fstring_expr(
-                    args.into_iter(),
-                    sep.into_iter(),
-                    checker.default_fstring_flags(),
-                )
-            })
+        if separator.iter().all(|part| part.text().is_some())
+            && let Some(text) = parts
+                .iter()
+                .copied()
+                .map(Part::text)
+                .collect::<Option<String>>()
+        {
+            return Some(syntax::string_literal(
+                builder,
+                &text,
+                checker.default_string_flags(),
+            ));
+        }
+        let elements = builder.map_list(parts, |builder, part| part.build(builder));
+        Some(syntax::f_string(
+            builder,
+            elements,
+            checker.default_fstring_flags(),
+        ))
     }
 }

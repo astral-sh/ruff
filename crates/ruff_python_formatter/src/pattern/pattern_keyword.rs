@@ -5,14 +5,10 @@ use ruff_python_ast::PatternKeyword;
 #[derive(Default)]
 pub struct FormatPatternKeyword;
 
-impl FormatNodeRule<PatternKeyword> for FormatPatternKeyword {
-    fn fmt_fields(&self, item: &PatternKeyword, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternKeyword {
-            range: _,
-            node_index: _,
-            attr,
-            pattern,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::PatternKeyword> for FormatPatternKeyword {
+    fn fmt_fields(&self, item: PatternKeyword<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let attr = item.attr();
+        let pattern = item.pattern();
         write!(f, [attr.format(), token("="), pattern.format()])
     }
 }

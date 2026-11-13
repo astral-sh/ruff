@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use ruff_python_ast::{ExprKind, StmtKind};
 
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -24,13 +25,15 @@ pub(super) fn is_acronym(name: &str, asname: &str) -> bool {
 }
 
 /// Returns `true` if the statement is an assignment to a named tuple.
-pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
-    let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
+pub(super) fn is_named_tuple_assignment(stmt: Stmt<'_>, semantic: &SemanticModel) -> bool {
+    let StmtKind::Assign(assign) = stmt.classify() else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+    let value = assign.value();
+    let ExprKind::Call(call) = value.classify() else {
         return false;
     };
+    let func = call.func();
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
@@ -40,32 +43,36 @@ pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -
 }
 
 /// Returns `true` if the statement is an assignment to a `TypedDict`.
-pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+pub(super) fn is_typed_dict_assignment(stmt: Stmt<'_>, semantic: &SemanticModel) -> bool {
     if !semantic.seen_typing() {
         return false;
     }
 
-    let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
+    let StmtKind::Assign(assign) = stmt.classify() else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+    let value = assign.value();
+    let ExprKind::Call(call) = value.classify() else {
         return false;
     };
+    let func = call.func();
     semantic.match_typing_expr(func, "TypedDict")
 }
 
 /// Returns `true` if the statement is an assignment to a `TypeVar` or `NewType`.
-pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
+pub(super) fn is_type_var_assignment(stmt: Stmt<'_>, semantic: &SemanticModel) -> bool {
     if !semantic.seen_typing() {
         return false;
     }
 
-    let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
+    let StmtKind::Assign(assign) = stmt.classify() else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+    let value = assign.value();
+    let ExprKind::Call(call) = value.classify() else {
         return false;
     };
+    let func = call.func();
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
@@ -75,18 +82,23 @@ pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> b
 }
 
 /// Returns `true` if the statement is an assignment to a `TypeAlias`.
-pub(super) fn is_type_alias_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
-    match stmt {
-        Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+pub(super) fn is_type_alias_assignment(stmt: Stmt<'_>, semantic: &SemanticModel) -> bool {
+    match stmt.classify() {
+        StmtKind::AnnAssign(stmt_ann_assign) => {
+            let annotation = stmt_ann_assign.annotation();
+
             semantic.match_typing_expr(annotation, "TypeAlias")
         }
-        Stmt::TypeAlias(_) => true,
+        StmtKind::TypeAlias(_) => true,
         _ => false,
     }
 }
 
 /// Returns `true` if the statement is an assignment to a `TypedDict`.
-pub(super) fn is_typed_dict_class(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+pub(super) fn is_typed_dict_class(
+    class_def: ast::StmtClassDef<'_>,
+    semantic: &SemanticModel,
+) -> bool {
     if !semantic.seen_typing() {
         return false;
     }
@@ -105,27 +117,46 @@ pub(super) fn is_typed_dict_class(class_def: &ast::StmtClassDef, semantic: &Sema
 /// ) -> None:
 ///     Attachment = apps.get_model("zerver", "Attachment")
 /// ```
-pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &SemanticModel) -> bool {
-    fn match_model_import(name: &str, expr: &Expr, semantic: &SemanticModel) -> bool {
-        let Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) = expr
-        else {
+pub(super) fn is_django_model_import(name: &str, stmt: Stmt<'_>, semantic: &SemanticModel) -> bool {
+    // Django accepts either a dotted label or two positional names. In both
+    // forms the last positional argument supplies the model name.
+    fn model_name(arguments: ast::Arguments<'_>) -> Option<Expr<'_>> {
+        let mut last = None;
+        let mut unpacked = false;
+        for item in arguments.iter_source_order() {
+            match item {
+                ast::ArgOrKeyword::Keyword(keyword)
+                    if keyword.arg().is_some_and(|name| name == "model_name") =>
+                {
+                    return Some(keyword.value());
+                }
+                ast::ArgOrKeyword::Arg(arg) => {
+                    unpacked |= arg.is_starred_expr();
+                    last = Some(arg);
+                }
+                ast::ArgOrKeyword::Keyword(_) => {}
+            }
+        }
+        if unpacked { None } else { last }
+    }
+
+    fn match_model_import(name: &str, expr: Expr<'_>, semantic: &SemanticModel) -> bool {
+        let ExprKind::Call(call) = expr.classify() else {
             return false;
         };
+        let func = call.func();
+        let arguments = call.arguments();
 
         if arguments.is_empty() {
             return false;
         }
 
         // Match against, e.g., `apps.get_model("zerver", "Attachment")`.
-        if let Some(unqualified_name) = UnqualifiedName::from_expr(func.as_ref()) {
+        if let Some(unqualified_name) = UnqualifiedName::from_expr(func) {
             if matches!(unqualified_name.segments(), [.., "get_model"]) {
-                if let Some(argument) = arguments
-                    .find_argument_value("model_name", arguments.args.len().saturating_sub(1))
-                {
+                if let Some(argument) = model_name(arguments) {
                     if let Some(string_literal) = argument.as_string_literal_expr() {
-                        if string_literal.value.to_str() == name {
+                        if string_literal.value().to_str() == name {
                             return true;
                         }
                     } else {
@@ -136,14 +167,15 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         }
 
         // Match against, e.g., `import_string("zerver.models.Attachment")`.
-        if let Some(qualified_name) = semantic.resolve_qualified_name(func.as_ref()) {
+        if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
             if matches!(
                 qualified_name.segments(),
                 ["django", "utils", "module_loading", "import_string"]
             ) {
                 if let Some(argument) = arguments.find_argument_value("dotted_path", 0) {
                     if let Some(string_literal) = argument.as_string_literal_expr() {
-                        if let Some((.., model)) = string_literal.value.to_str().rsplit_once('.') {
+                        if let Some((.., model)) = string_literal.value().to_str().rsplit_once('.')
+                        {
                             if model == name {
                                 return true;
                             }
@@ -156,12 +188,14 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         false
     }
 
-    match stmt {
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value), ..
-        }) => match_model_import(name, value.as_ref(), semantic),
-        Stmt::Assign(ast::StmtAssign { value, .. }) => {
-            match_model_import(name, value.as_ref(), semantic)
+    match stmt.classify() {
+        StmtKind::AnnAssign(stmt_ann_assign) if let Some(value) = stmt_ann_assign.value() => {
+            match_model_import(name, value, semantic)
+        }
+        StmtKind::Assign(stmt_assign) => {
+            let value = stmt_assign.value();
+
+            match_model_import(name, value, semantic)
         }
         _ => false,
     }

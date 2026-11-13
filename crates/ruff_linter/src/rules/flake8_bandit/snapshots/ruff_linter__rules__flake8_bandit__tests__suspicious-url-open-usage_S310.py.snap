@@ -252,3 +252,31 @@ S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom sch
 41 | urllib.request.urlopen(urllib.request.Request('file:///foo/bar/baz'))
 42 | urllib.request.urlopen(urllib.request.Request(url))
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+  --> S310.py:70:1
+   |
+68 | # An explicit url keyword wins when the call also contains a positional URL.
+69 | urllib.request.urlopen("file:///data", url="https://example.com")
+70 | urllib.request.urlopen("https://example.com", url="file:///data")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+71 |
+72 | # A later unpacking can still make a call ambiguous after an explicit URL.
+   |
+
+S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+  --> S310.py:73:1
+   |
+72 | # A later unpacking can still make a call ambiguous after an explicit URL.
+73 | urllib.request.Request(url="https://example.com", *args)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+74 | urllib.request.urlopen("https://example.com", *args, timeout=2)
+   |
+
+S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+  --> S310.py:74:1
+   |
+72 | # A later unpacking can still make a call ambiguous after an explicit URL.
+73 | urllib.request.Request(url="https://example.com", *args)
+74 | urllib.request.urlopen("https://example.com", *args, timeout=2)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

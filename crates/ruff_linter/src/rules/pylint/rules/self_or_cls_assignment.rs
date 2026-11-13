@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::analyze::function_type::{self as function_type, FunctionType};
 use ruff_text_size::Ranged;
@@ -74,16 +74,13 @@ impl Violation for SelfOrClsAssignment {
 }
 
 /// PLW0642
-pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
-    let ScopeKind::Function(ast::StmtFunctionDef {
-        name,
-        decorator_list,
-        parameters,
-        ..
-    }) = checker.semantic().current_scope().kind
-    else {
+pub(crate) fn self_or_cls_assignment(checker: &Checker, target: Expr<'_>) {
+    let ScopeKind::Function(stmt_function_def) = checker.semantic().current_scope().kind else {
         return;
     };
+    let name = stmt_function_def.name();
+    let decorator_list = stmt_function_def.decorator_list();
+    let parameters = stmt_function_def.parameters();
 
     let Some(parent) = &checker
         .semantic()
@@ -92,16 +89,12 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
         return;
     };
 
-    let Some(self_or_cls) = parameters
-        .posonlyargs
-        .first()
-        .or_else(|| parameters.args.first())
-    else {
+    let Some(self_or_cls) = parameters.iter_positional_params().next() else {
         return;
     };
 
     let function_type = function_type::classify(
-        name,
+        &name,
         decorator_list,
         parent,
         checker.semantic(),
@@ -119,22 +112,24 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     check_expr(checker, target, method_type);
 }
 
-fn check_expr(checker: &Checker, target: &Expr, method_type: MethodType) {
-    match target {
-        Expr::Name(_) => {
-            if let Expr::Name(ast::ExprName { id, .. }) = target {
-                if id.as_str() == method_type.arg_name() {
-                    checker.report_diagnostic(SelfOrClsAssignment { method_type }, target.range());
-                }
+fn check_expr(checker: &Checker, target: Expr<'_>, method_type: MethodType) {
+    let elts = match target.classify() {
+        ExprKind::Name(name) => {
+            if name.id().as_str() == method_type.arg_name() {
+                checker.report_diagnostic(SelfOrClsAssignment { method_type }, target.range());
             }
+            return;
         }
-        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
-            for element in elts {
-                check_expr(checker, element, method_type);
-            }
+        ExprKind::Starred(starred) => {
+            check_expr(checker, starred.value(), method_type);
+            return;
         }
-        Expr::Starred(ast::ExprStarred { value, .. }) => check_expr(checker, value, method_type),
-        _ => {}
+        ExprKind::List(list) => list.elts(),
+        ExprKind::Tuple(tuple) => tuple.elts(),
+        _ => return,
+    };
+    for element in elts {
+        check_expr(checker, element, method_type);
     }
 }
 

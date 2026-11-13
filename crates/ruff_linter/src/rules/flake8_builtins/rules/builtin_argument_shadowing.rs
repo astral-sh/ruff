@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, Parameter};
+use ruff_python_ast::Parameter;
 use ruff_python_semantic::analyze::visibility::{is_overload, is_override};
 use ruff_text_size::Ranged;
 
@@ -69,9 +69,9 @@ impl Violation for BuiltinArgumentShadowing {
 }
 
 /// A002
-pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Parameter) {
+pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: Parameter<'_>) {
     if shadows_builtin(
-        parameter.name(),
+        parameter.name().as_str(),
         checker.source_type,
         &checker.settings().flake8_builtins.ignorelist,
         checker.target_version(),
@@ -81,7 +81,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
         if checker
             .semantic()
             .current_expression()
-            .is_some_and(Expr::is_lambda_expr)
+            .is_some_and(ruff_python_ast::Expr::is_lambda_expr)
         {
             return;
         }
@@ -91,8 +91,8 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
             .current_statement()
             .as_function_def_stmt()
             .is_some_and(|function_def| {
-                is_override(&function_def.decorator_list, checker.semantic())
-                    || is_overload(&function_def.decorator_list, checker.semantic())
+                is_override(function_def.decorator_list(), checker.semantic())
+                    || is_overload(function_def.decorator_list(), checker.semantic())
             })
         {
             return;
@@ -100,9 +100,9 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
 
         checker.report_diagnostic(
             BuiltinArgumentShadowing {
-                name: parameter.name.to_string(),
+                name: parameter.name().to_string(),
             },
-            parameter.name.range(),
+            parameter.name().range(),
         );
     }
 }

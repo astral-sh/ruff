@@ -1,7 +1,7 @@
-use ast::{ExprContext, Operator};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::{
+    self as ast, Expr, ExprContext, ExprKind, ExprName, ExprStringLiteral, Operator, Stmt,
+};
 use ruff_python_semantic::{Binding, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_python_stdlib::typing::{is_pep_593_generic_type, is_standard_library_literal};
 use ruff_text_size::Ranged;
@@ -159,9 +159,9 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
         return;
     }
 
-    let Some(Stmt::AnnAssign(ast::StmtAnnAssign {
+    let Some(ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields {
         value: Some(expr), ..
-    })) = binding.statement(checker.semantic())
+    })) = binding.statement(checker.semantic()).map(Stmt::fields)
     else {
         return;
     };
@@ -193,28 +193,24 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
     }
 }
 
-/// Traverses the type expression and collects `[Expr::Name]` nodes that are
+/// Traverses the type expression and collects names that are
 /// not available at runtime and thus need to be quoted, unless they would
 /// become available through `[Rule::RuntimeImportInTypeCheckingBlock]`.
-fn collect_typing_references<'a>(
-    checker: &Checker,
-    expr: &'a Expr,
-    names: &mut Vec<&'a ast::ExprName>,
-) {
-    match expr {
-        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            collect_typing_references(checker, left, names);
-            collect_typing_references(checker, right, names);
+fn collect_typing_references<'a>(checker: &Checker, expr: Expr<'a>, names: &mut Vec<ExprName<'a>>) {
+    match expr.classify() {
+        ast::ExprKind::BinOp(binary) => {
+            collect_typing_references(checker, binary.left(), names);
+            collect_typing_references(checker, binary.right(), names);
         }
-        Expr::Starred(ast::ExprStarred {
-            value,
-            ctx: ExprContext::Load,
-            ..
-        })
-        | Expr::Attribute(ast::ExprAttribute { value, .. }) => {
-            collect_typing_references(checker, value, names);
+        ast::ExprKind::Starred(starred) if starred.ctx() == ExprContext::Load => {
+            collect_typing_references(checker, starred.value(), names);
         }
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+        ast::ExprKind::Attribute(attribute) => {
+            collect_typing_references(checker, attribute.value(), names);
+        }
+        ast::ExprKind::Subscript(subscript) => {
+            let value = subscript.value();
+            let slice = subscript.slice();
             collect_typing_references(checker, value, names);
             if let Some(qualified_name) = checker.semantic().resolve_qualified_name(value) {
                 if is_standard_library_literal(qualified_name.segments()) {
@@ -223,7 +219,8 @@ fn collect_typing_references<'a>(
                 if is_pep_593_generic_type(qualified_name.segments()) {
                     // First argument is a type (including forward references); the
                     // rest are arbitrary Python objects.
-                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                    if let ExprKind::Tuple(tuple) = slice.classify() {
+                        let elts = tuple.elts();
                         let mut iter = elts.iter();
                         if let Some(expr) = iter.next() {
                             collect_typing_references(checker, expr, names);
@@ -234,12 +231,12 @@ fn collect_typing_references<'a>(
             }
             collect_typing_references(checker, slice, names);
         }
-        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+        kind if let Some(elts) = kind.as_list_or_tuple_elements() => {
             for elt in elts {
                 collect_typing_references(checker, elt, names);
             }
         }
-        Expr::Name(name) => {
+        ast::ExprKind::Name(name) => {
             let Some(binding_id) = checker.semantic().resolve_name(name) else {
                 return;
             };
@@ -272,15 +269,18 @@ fn collect_typing_references<'a>(
 /// TC008
 pub(crate) fn quoted_type_alias(
     checker: &Checker,
-    expr: &Expr,
-    annotation_expr: &ast::ExprStringLiteral,
+    expr: Expr<'_>,
+    annotation_expr: ExprStringLiteral<'_>,
 ) {
     if checker.is_rule_enabled(Rule::RuntimeStringUnion) {
         // this should return a TC010 error instead
-        if let Some(Expr::BinOp(ast::ExprBinOp {
+        if let Some(ast::ExprFields::BinOp(ast::ExprBinOpFields {
             op: Operator::BitOr,
             ..
-        })) = checker.semantic().current_expression_parent()
+        })) = checker
+            .semantic()
+            .current_expression_parent()
+            .map(Expr::fields)
         {
             return;
         }
@@ -295,7 +295,7 @@ pub(crate) fn quoted_type_alias(
 
     let range = annotation_expr.range();
     let mut diagnostic = checker.report_diagnostic(QuotedTypeAlias, range);
-    let fix_string = annotation_expr.value.to_string();
+    let fix_string = annotation_expr.value().to_string();
 
     let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
         && parenthesized_range(
@@ -307,7 +307,7 @@ pub(crate) fn quoted_type_alias(
         .is_none()
         && parenthesized_range(
             // Check for parentheses inside the string """(...)"""
-            expr.into(),
+            expr,
             annotation_expr.into(),
             checker.tokens(),
         )
@@ -329,20 +329,18 @@ pub(crate) fn quoted_type_alias(
 /// be unquoted
 fn quotes_are_unremovable(
     semantic: &SemanticModel,
-    expr: &Expr,
+    expr: Expr<'_>,
     target_version: PythonVersion,
 ) -> bool {
-    match expr {
-        Expr::BinOp(ast::ExprBinOp {
-            left, right, op, ..
-        }) => {
-            match op {
+    match expr.classify() {
+        ast::ExprKind::BinOp(binary) => {
+            match binary.op() {
                 Operator::BitOr => {
                     if target_version < PythonVersion::PY310 {
                         return true;
                     }
-                    quotes_are_unremovable(semantic, left, target_version)
-                        || quotes_are_unremovable(semantic, right, target_version)
+                    quotes_are_unremovable(semantic, binary.left(), target_version)
+                        || quotes_are_unremovable(semantic, binary.right(), target_version)
                 }
                 // for now we'll treat uses of other operators as unremovable quotes
                 // since that would make it an invalid type expression anyways. We skip
@@ -351,12 +349,12 @@ fn quotes_are_unremovable(
                 _ => true,
             }
         }
-        Expr::Starred(ast::ExprStarred {
-            value,
-            ctx: ExprContext::Load,
-            ..
-        }) => quotes_are_unremovable(semantic, value, target_version),
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+        ast::ExprKind::Starred(starred) if starred.ctx() == ExprContext::Load => {
+            quotes_are_unremovable(semantic, starred.value(), target_version)
+        }
+        ast::ExprKind::Subscript(subscript) => {
+            let value = subscript.value();
+            let slice = subscript.slice();
             // for subscripts we don't know whether it's safe to do at runtime
             // since the operation may only be available at type checking time.
             // E.g. stubs only generics.
@@ -370,23 +368,25 @@ fn quotes_are_unremovable(
             // contain arbitrary expressions.
             if let Some(qualified_name) = semantic.resolve_qualified_name(value) {
                 if semantic.match_typing_qualified_name(&qualified_name, "Annotated") {
-                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                    if let ExprKind::Tuple(tuple) = slice.classify() {
+                        let elts = tuple.elts();
                         return !elts.is_empty()
-                            && quotes_are_unremovable(semantic, &elts[0], target_version);
+                            && quotes_are_unremovable(semantic, elts.at(0), target_version);
                     }
                     return false;
                 }
             }
             quotes_are_unremovable(semantic, slice, target_version)
         }
-        Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+        ast::ExprKind::Attribute(attribute) => {
+            let value = attribute.value();
             // for attributes we also don't know whether it's safe
             if !semantic.in_type_checking_block() {
                 return true;
             }
             quotes_are_unremovable(semantic, value, target_version)
         }
-        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+        kind if let Some(elts) = kind.as_list_or_tuple_elements() => {
             for elt in elts {
                 if quotes_are_unremovable(semantic, elt, target_version) {
                     return true;
@@ -394,7 +394,7 @@ fn quotes_are_unremovable(
             }
             false
         }
-        Expr::Name(name) => {
+        ast::ExprKind::Name(name) => {
             semantic.resolve_name(name).is_some()
                 && semantic
                     .simulate_runtime_load(name, semantic.in_type_checking_block().into())

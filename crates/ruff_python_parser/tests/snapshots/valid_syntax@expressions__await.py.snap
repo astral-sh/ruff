@@ -126,8 +126,7 @@ Module(
                                     arguments: Arguments {
                                         range: 41..43,
                                         node_index: NodeIndex(None),
-                                        args: [],
-                                        keywords: [],
+                                        items: [],
                                     },
                                 },
                             ),
@@ -468,27 +467,25 @@ Module(
                                         Parameters {
                                             range: 173..174,
                                             node_index: NodeIndex(None),
-                                            posonlyargs: [],
-                                            args: [
-                                                ParameterWithDefault {
-                                                    range: 173..174,
-                                                    node_index: NodeIndex(None),
-                                                    parameter: Parameter {
+                                            items: [
+                                                PositionalOrKeyword(
+                                                    ParameterWithDefault {
                                                         range: 173..174,
                                                         node_index: NodeIndex(None),
-                                                        name: Identifier {
-                                                            id: Name("x"),
+                                                        parameter: Parameter {
                                                             range: 173..174,
                                                             node_index: NodeIndex(None),
+                                                            name: Identifier {
+                                                                id: Name("x"),
+                                                                range: 173..174,
+                                                                node_index: NodeIndex(None),
+                                                            },
+                                                            annotation: None,
                                                         },
-                                                        annotation: None,
+                                                        default: None,
                                                     },
-                                                    default: None,
-                                                },
+                                                ),
                                             ],
-                                            vararg: None,
-                                            kwonlyargs: [],
-                                            kwarg: None,
                                         },
                                     ),
                                     body: Name(

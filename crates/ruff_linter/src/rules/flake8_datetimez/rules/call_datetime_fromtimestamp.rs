@@ -1,9 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-
+use ruff_python_ast::ExprKind;
 use ruff_python_ast::name::QualifiedName;
+
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
-use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -76,7 +76,7 @@ impl Violation for CallDatetimeFromtimestamp {
 /// DTZ006
 pub(crate) fn call_datetime_fromtimestamp(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: &ast::ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
@@ -94,11 +94,15 @@ pub(crate) fn call_datetime_fromtimestamp(
         return;
     }
 
-    let antipattern = match call.arguments.find_argument_value("tz", 1) {
-        Some(ast::Expr::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
+    let antipattern = match call
+        .arguments
+        .find_argument_value("tz", 1)
+        .map(ast::Expr::classify)
+    {
+        Some(ExprKind::NoneLiteral(_)) => DatetimeModuleAntipattern::NonePassedToTzArgument,
         Some(_) => return,
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.report_diagnostic(CallDatetimeFromtimestamp(antipattern), call.range());
+    checker.report_diagnostic(CallDatetimeFromtimestamp(antipattern), call.range);
 }

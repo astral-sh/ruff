@@ -1,30 +1,25 @@
+use crate::parser::syntax::{self as id, Construct};
+use ruff_python_ast::{BuildId, Builder, Checkpoint, NameId, build};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::str::FromStr;
 
 use bitflags::bitflags;
-use hashbrown::HashSet;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{
-    Alias, AtomicNodeIndex, ElifElseClause, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression,
-    ModModule, ParameterWithDefault, Stmt, StringFlags,
-};
+use ruff_python_ast::{self as ast, Int, IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::FxBuildHasher;
-use thin_vec::ThinVec;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
-use crate::parser::scratch_buffer::ScratchBuffer;
+use crate::parser::scratch_buffer::{ScratchBuffer, ScratchSnapshot};
 use crate::string::InterpolatedStringKind;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, UnsupportedSyntaxErrorKind};
-use crate::{Parsed, Tokens};
+use crate::{Parsed, ParsedDraft, Tokens};
 
 pub use crate::parser::options::ParseOptions;
 
@@ -36,36 +31,21 @@ mod progress;
 mod recovery;
 mod scratch_buffer;
 mod statement;
+pub(crate) mod syntax;
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, Default)]
-struct NameInterner {
-    names: HashSet<Name, FxBuildHasher>,
-}
-
-impl NameInterner {
-    /// Returns an inline name directly, or a shared clone of a heap-allocated name.
-    fn intern(&mut self, text: &str) -> Name {
-        if let Some(name) = Name::new_inline(text) {
-            return name;
-        }
-
-        self.names
-            .get_or_insert_with(text, |text| Name::new_heap(text))
-            .clone()
-    }
-}
+pub(crate) type ParserStorage = Builder;
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
     source: &'src str,
+    storage: ParserStorage,
 
     /// Token source for the parser that skips over any non-trivia token.
     tokens: TokenSource<'src>,
 
     /// Deduplicates the backing allocations for repeated names that do not fit inline.
-    name_interner: NameInterner,
 
     /// Reusable storage for names that need to be constructed by the parser.
     name_buffer: String,
@@ -97,22 +77,39 @@ pub(crate) struct Parser<'src> {
     recursion_depth: usize,
 
     /// Reusable, nesting-safe scratch storage for expression lists.
-    expr_scratch: ScratchBuffer<Expr>,
+    expr_scratch: ScratchBuffer<BuildId<ast::kind::Expr>>,
 
-    /// Reusable, nesting-safe scratch storage for call keywords.
-    keyword_scratch: ScratchBuffer<Keyword>,
+    /// Dictionary entries awaiting a contiguous list in the arena.
+    dict_item_scratch: ScratchBuffer<BuildId<ast::kind::DictItem>>,
+
+    /// Reusable, nesting-safe scratch storage for call arguments in source order.
+    argument_scratch: ScratchBuffer<ast::ArgumentId>,
 
     /// Reusable, nesting-safe scratch storage for function and lambda parameters.
-    parameter_scratch: ScratchBuffer<ParameterWithDefault>,
+    parameter_scratch: ScratchBuffer<ast::ParameterItemId>,
 
     /// Reusable, nesting-safe scratch storage for statement lists.
-    stmt_scratch: ScratchBuffer<Stmt>,
+    stmt_scratch: ScratchBuffer<BuildId<ast::kind::Stmt>>,
 
     /// Reusable scratch storage for import aliases.
-    alias_scratch: ScratchBuffer<Alias>,
+    alias_scratch: ScratchBuffer<BuildId<ast::kind::Alias>>,
 
     /// Reusable, nesting-safe scratch storage for `elif` and `else` clauses.
-    elif_else_scratch: ScratchBuffer<ElifElseClause>,
+    elif_else_scratch: ScratchBuffer<BuildId<ast::kind::ElifElseClause>>,
+}
+
+fn push_error(errors: &mut Vec<ParseError>, error: ParseErrorType, range: TextRange) {
+    // Avoid flagging multiple errors at the same location
+    let is_same_location = errors
+        .last()
+        .is_some_and(|last| last.location.start() == range.start());
+
+    if !is_same_location {
+        errors.push(ParseError {
+            error,
+            location: range,
+        });
+    }
 }
 
 impl<'src> Parser<'src> {
@@ -127,15 +124,25 @@ impl<'src> Parser<'src> {
         start_offset: TextSize,
         options: ParseOptions,
     ) -> Self {
+        let storage = ParserStorage::for_source(TextRange::new(start_offset, TextSize::of(source)));
+        Self::with_storage(source, start_offset, options, storage)
+    }
+
+    pub(crate) fn with_storage(
+        source: &'src str,
+        start_offset: TextSize,
+        options: ParseOptions,
+        storage: ParserStorage,
+    ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
 
         Parser {
+            storage,
             options,
             source,
             errors: Vec::new(),
             unsupported_syntax_errors: Vec::new(),
             tokens,
-            name_interner: NameInterner::default(),
             name_buffer: String::new(),
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
@@ -144,7 +151,8 @@ impl<'src> Parser<'src> {
             recursion_depth: 0,
             current_token_id: TokenId::default(),
             expr_scratch: ScratchBuffer::with_capacity(16),
-            keyword_scratch: ScratchBuffer::new(),
+            dict_item_scratch: ScratchBuffer::new(),
+            argument_scratch: ScratchBuffer::new(),
             parameter_scratch: ScratchBuffer::new(),
             stmt_scratch: ScratchBuffer::with_capacity(32),
             alias_scratch: ScratchBuffer::new(),
@@ -152,16 +160,28 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
-    pub(crate) fn parse(mut self) -> Parsed<Mod> {
-        let syntax = self.maybe_grow_stack(|parser| match parser.options.mode {
+    pub(crate) fn parse(mut self) -> Parsed<ast::kind::Mod> {
+        let root = self.maybe_grow_stack(|parser| match parser.options.mode {
             Mode::Expression | Mode::ParenthesizedExpression => {
-                Mod::Expression(parser.parse_single_expression())
+                id::Mod::from(parser.parse_single_expression())
             }
-            Mode::Module | Mode::Ipython => Mod::Module(parser.parse_module()),
+            Mode::Module | Mode::Ipython => id::Mod::from(parser.parse_module()),
         });
+        self.finish(root.id).freeze()
+    }
 
-        self.finish(syntax)
+    /// Appends top-level statements directly to the notebook's suite.
+    pub(crate) fn parse_cell(
+        mut self,
+        body: &mut Vec<BuildId<ast::kind::Stmt>>,
+    ) -> ParsedDraft<()> {
+        self.maybe_grow_stack(|parser| {
+            let snapshot = parser.parse_module_statements();
+            parser
+                .stmt_scratch
+                .take(snapshot, |statements| body.extend_from_slice(statements));
+        });
+        self.finish(())
     }
 
     /// Parses a single expression.
@@ -172,7 +192,7 @@ impl<'src> Parser<'src> {
     ///
     /// After parsing a single expression, an error is reported and all remaining tokens are
     /// dropped by the parser.
-    fn parse_single_expression(&mut self) -> ModExpression {
+    fn parse_single_expression(&mut self) -> id::ModExpression {
         let start = self.node_start();
         let parsed_expr = self.parse_expression_list(ExpressionContext::default());
 
@@ -198,31 +218,38 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::EndOfFile);
 
-        ModExpression {
-            body: Box::new(parsed_expr.expr),
+        build::ModExpression {
+            body: parsed_expr.expr.id,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .parsed(&mut self.storage)
     }
 
     /// Parses a Python module.
     ///
     /// This is to be used for [`Mode::Module`] and [`Mode::Ipython`].
-    fn parse_module(&mut self) -> ModModule {
-        let body = self.parse_list_into_thin_vec(RecoveryContextKind::ModuleStatements, |p| {
-            p.parse_statement()
+    fn parse_module_statements(&mut self) -> ScratchSnapshot {
+        let snapshot = self.stmt_scratch.snapshot();
+        self.parse_list(RecoveryContextKind::ModuleStatements, |parser| {
+            let statement = parser.parse_statement();
+            parser.stmt_scratch.push(statement.id);
         });
-
         self.bump(TokenKind::EndOfFile);
-
-        ModModule {
-            body,
-            range: TextRange::new(self.start_offset, self.current_token_range().end()),
-            node_index: AtomicNodeIndex::NONE,
-        }
+        snapshot
     }
 
-    fn finish(self, syntax: Mod) -> Parsed<Mod> {
+    fn parse_module(&mut self) -> id::ModModule {
+        let snapshot = self.parse_module_statements();
+        let body = self.stmt_scratch.take_range(snapshot, &mut self.storage);
+
+        build::ModModule {
+            body,
+            range: TextRange::new(self.start_offset, self.current_token_range().end()),
+        }
+        .parsed(&mut self.storage)
+    }
+
+    fn finish<R>(self, syntax: R) -> ParsedDraft<R> {
         assert_eq!(
             self.current_token_kind(),
             TokenKind::EndOfFile,
@@ -236,8 +263,9 @@ impl<'src> Parser<'src> {
         // There's no fast path for when there are no parse errors because a lex error
         // always results in a parse error.
         if lex_errors.is_empty() {
-            return Parsed {
+            return ParsedDraft {
                 syntax,
+                storage: self.storage,
                 tokens: Tokens::new(tokens),
                 errors: parse_errors,
                 unsupported_syntax_errors: self.unsupported_syntax_errors,
@@ -268,8 +296,9 @@ impl<'src> Parser<'src> {
         merged.extend(parse_errors);
         merged.extend(lex_errors.map(ParseError::from));
 
-        Parsed {
+        ParsedDraft {
             syntax,
+            storage: self.storage,
             tokens: Tokens::new(tokens),
             errors: merged,
             unsupported_syntax_errors: self.unsupported_syntax_errors,
@@ -415,7 +444,7 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    fn bump_identifier(&mut self) -> Name {
+    fn bump_identifier(&mut self) -> NameId {
         let text = self.current_token_text();
         let name = if !self.tokens.current_flags().is_non_ascii_identifier() {
             self.intern_name(text)
@@ -426,15 +455,15 @@ impl<'src> Parser<'src> {
         name
     }
 
-    fn intern_name(&mut self, text: &str) -> Name {
-        self.name_interner.intern(text)
+    fn intern_name(&mut self, text: &str) -> NameId {
+        self.storage.intern_name(text)
     }
 
-    fn intern_normalized_name(&mut self, text: &str) -> Name {
+    fn intern_normalized_name(&mut self, text: &str) -> NameId {
         let snapshot = self.name_buffer.len();
         self.name_buffer.extend(text.nfkc());
 
-        let name = self.name_interner.intern(&self.name_buffer[snapshot..]);
+        let name = self.storage.intern_name(&self.name_buffer[snapshot..]);
 
         self.name_buffer.truncate(snapshot);
         name
@@ -635,21 +664,7 @@ impl<'src> Parser<'src> {
     where
         T: Ranged,
     {
-        fn inner(errors: &mut Vec<ParseError>, error: ParseErrorType, range: TextRange) {
-            // Avoid flagging multiple errors at the same location
-            let is_same_location = errors
-                .last()
-                .is_some_and(|last| last.location.start() == range.start());
-
-            if !is_same_location {
-                errors.push(ParseError {
-                    error,
-                    location: range,
-                });
-            }
-        }
-
-        inner(&mut self.errors, error, ranged.range());
+        push_error(&mut self.errors, error, ranged.range());
     }
 
     /// Add an [`UnsupportedSyntaxError`] with the given [`UnsupportedSyntaxErrorKind`] and
@@ -679,19 +694,6 @@ impl<'src> Parser<'src> {
         T: Ranged,
     {
         &self.source[ranged.range()]
-    }
-
-    /// Parses a list of elements into a thin vector where each element is parsed using
-    /// the given `parse_element` function.
-    fn parse_list_into_thin_vec<T>(
-        &mut self,
-        recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
-    ) -> ThinVec<T> {
-        let mut elements = ThinVec::new();
-        self.parse_list(recovery_context_kind, |p| elements.push(parse_element(p)));
-        elements.shrink_to_fit();
-        elements
     }
 
     /// Parses a list of elements where each element is parsed using the given
@@ -750,36 +752,21 @@ impl<'src> Parser<'src> {
         self.recovery_context = saved_context;
     }
 
-    /// Parses a comma separated list of elements into a vector where each element
-    /// is parsed using the given `parse_element` function.
-    fn parse_comma_separated_list_into_vec<T>(
+    /// Parses a comma-separated list of nodes into the AST arena.
+    fn parse_comma_separated_node_list<T: ast::NodeType + 'static>(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
-    ) -> Vec<T> {
-        self.parse_comma_separated_list_into_vec_with_capacity(
-            recovery_context_kind,
-            parse_element,
-            0,
-        )
-    }
-
-    /// Parses a comma separated list of elements into a vector with an initial capacity.
-    fn parse_comma_separated_list_into_vec_with_capacity<T>(
-        &mut self,
-        recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
-        capacity: usize,
-    ) -> Vec<T> {
-        let mut elements = Vec::with_capacity(capacity);
+        parse_element: impl Fn(&mut Parser<'src>) -> BuildId<T>,
+    ) -> ast::ListId<ast::AstNodeId<T>> {
+        let mut elements = id::NodeListBuilder::new();
         self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
-        elements
+        elements.finish(&mut self.storage)
     }
 
     /// Parses a comma separated list of elements where each element is parsed
     /// using the given `parse_element` function.
     ///
-    /// The difference between this function and `parse_comma_separated_list_into_vec`
+    /// The difference between this function and `parse_comma_separated_node_list`
     /// is that this function does not return the parsed elements. Instead, it is the
     /// caller's responsibility to handle the parsed elements. This is the reason
     /// that the `parse_element` parameter is bound to [`FnMut`] instead of [`Fn`].
@@ -917,6 +904,7 @@ impl<'src> Parser<'src> {
     /// Creates a checkpoint to which the parser can later return to using [`Self::rewind`].
     fn checkpoint(&self) -> ParserCheckpoint {
         ParserCheckpoint {
+            storage: self.storage.checkpoint(),
             tokens: self.tokens.checkpoint(),
             errors_position: self.errors.len(),
             unsupported_syntax_errors_position: self.unsupported_syntax_errors.len(),
@@ -929,6 +917,7 @@ impl<'src> Parser<'src> {
     /// Restore the parser to the given checkpoint.
     fn rewind(&mut self, checkpoint: ParserCheckpoint) {
         let ParserCheckpoint {
+            storage,
             tokens,
             errors_position,
             unsupported_syntax_errors_position,
@@ -937,6 +926,7 @@ impl<'src> Parser<'src> {
             recovery_context,
         } = checkpoint;
 
+        self.storage.rewind(storage);
         self.tokens.rewind(tokens);
         self.errors.truncate(errors_position);
         self.unsupported_syntax_errors
@@ -1015,6 +1005,7 @@ impl IpyEscapeContext {
 }
 
 struct ParserCheckpoint {
+    storage: Checkpoint,
     tokens: TokenSourceCheckpoint,
     errors_position: usize,
     unsupported_syntax_errors_position: usize,

@@ -85,7 +85,11 @@ impl Violation for NonPEP585Annotation {
 }
 
 /// UP006
-pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement: &ModuleMember) {
+pub(crate) fn use_pep585_annotation(
+    checker: &Checker,
+    &expr: &Expr<'_>,
+    replacement: &ModuleMember,
+) {
     let Some(from) = UnqualifiedName::from_expr(expr) else {
         return;
     };

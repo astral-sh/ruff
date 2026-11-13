@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCallFields;
 
-use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -52,20 +52,20 @@ impl Violation for SubprocessPopenPreexecFn {
 }
 
 /// PLW1509
-pub(crate) fn subprocess_popen_preexec_fn(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn subprocess_popen_preexec_fn(checker: &Checker, call: &ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
+        .resolve_qualified_name(call.func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "Popen"]))
     {
         if let Some(keyword) = call
             .arguments
             .find_keyword("preexec_fn")
-            .filter(|keyword| !keyword.value.is_none_literal_expr())
+            .filter(|keyword| !keyword.value().is_none_literal_expr())
         {
             checker.report_diagnostic(SubprocessPopenPreexecFn, keyword.range());
         }

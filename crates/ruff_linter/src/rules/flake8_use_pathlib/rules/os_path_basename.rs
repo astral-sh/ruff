@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -71,7 +71,7 @@ impl Violation for OsPathBasename {
 }
 
 /// PTH119
-pub(crate) fn os_path_basename(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_basename(checker: &Checker, call: &ExprCallFields<'_>, segments: &[&str]) {
     if segments != ["os", "path", "basename"] {
         return;
     }

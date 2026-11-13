@@ -25,11 +25,7 @@ Module(
                     parameters: Parameters {
                         range: 55..57,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -81,17 +77,18 @@ Module(
                                                                     arguments: Arguments {
                                                                         range: 88..91,
                                                                         node_index: NodeIndex(None),
-                                                                        args: [
-                                                                            Name(
-                                                                                ExprName {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 89..90,
-                                                                                    id: Name("n"),
-                                                                                    ctx: Load,
-                                                                                },
+                                                                        items: [
+                                                                            Positional(
+                                                                                Name(
+                                                                                    ExprName {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 89..90,
+                                                                                        id: Name("n"),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
                                                                             ),
                                                                         ],
-                                                                        keywords: [],
                                                                     },
                                                                 },
                                                             ),
@@ -128,18 +125,19 @@ Module(
                                                             arguments: Arguments {
                                                                 range: 107..110,
                                                                 node_index: NodeIndex(None),
-                                                                args: [
-                                                                    NumberLiteral(
-                                                                        ExprNumberLiteral {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 108..109,
-                                                                            value: Int(
-                                                                                3,
-                                                                            ),
-                                                                        },
+                                                                items: [
+                                                                    Positional(
+                                                                        NumberLiteral(
+                                                                            ExprNumberLiteral {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 108..109,
+                                                                                value: Int(
+                                                                                    3,
+                                                                                ),
+                                                                            },
+                                                                        ),
                                                                     ),
                                                                 ],
-                                                                keywords: [],
                                                             },
                                                         },
                                                     ),
@@ -170,11 +168,7 @@ Module(
                     parameters: Parameters {
                         range: 133..135,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -237,17 +231,18 @@ Module(
                                                                     arguments: Arguments {
                                                                         range: 169..172,
                                                                         node_index: NodeIndex(None),
-                                                                        args: [
-                                                                            Name(
-                                                                                ExprName {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 170..171,
-                                                                                    id: Name("n"),
-                                                                                    ctx: Load,
-                                                                                },
+                                                                        items: [
+                                                                            Positional(
+                                                                                Name(
+                                                                                    ExprName {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 170..171,
+                                                                                        id: Name("n"),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
                                                                             ),
                                                                         ],
-                                                                        keywords: [],
                                                                     },
                                                                 },
                                                             ),
@@ -284,18 +279,19 @@ Module(
                                                             arguments: Arguments {
                                                                 range: 188..191,
                                                                 node_index: NodeIndex(None),
-                                                                args: [
-                                                                    NumberLiteral(
-                                                                        ExprNumberLiteral {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 189..190,
-                                                                            value: Int(
-                                                                                3,
-                                                                            ),
-                                                                        },
+                                                                items: [
+                                                                    Positional(
+                                                                        NumberLiteral(
+                                                                            ExprNumberLiteral {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 189..190,
+                                                                                value: Int(
+                                                                                    3,
+                                                                                ),
+                                                                            },
+                                                                        ),
                                                                     ),
                                                                 ],
-                                                                keywords: [],
                                                             },
                                                         },
                                                     ),
@@ -326,11 +322,7 @@ Module(
                     parameters: Parameters {
                         range: 211..213,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -382,17 +374,18 @@ Module(
                                                                     arguments: Arguments {
                                                                         range: 244..247,
                                                                         node_index: NodeIndex(None),
-                                                                        args: [
-                                                                            Name(
-                                                                                ExprName {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 245..246,
-                                                                                    id: Name("n"),
-                                                                                    ctx: Load,
-                                                                                },
+                                                                        items: [
+                                                                            Positional(
+                                                                                Name(
+                                                                                    ExprName {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 245..246,
+                                                                                        id: Name("n"),
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                ),
                                                                             ),
                                                                         ],
-                                                                        keywords: [],
                                                                     },
                                                                 },
                                                             ),
@@ -429,18 +422,19 @@ Module(
                                                             arguments: Arguments {
                                                                 range: 263..266,
                                                                 node_index: NodeIndex(None),
-                                                                args: [
-                                                                    NumberLiteral(
-                                                                        ExprNumberLiteral {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 264..265,
-                                                                            value: Int(
-                                                                                3,
-                                                                            ),
-                                                                        },
+                                                                items: [
+                                                                    Positional(
+                                                                        NumberLiteral(
+                                                                            ExprNumberLiteral {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 264..265,
+                                                                                value: Int(
+                                                                                    3,
+                                                                                ),
+                                                                            },
+                                                                        ),
                                                                     ),
                                                                 ],
-                                                                keywords: [],
                                                             },
                                                         },
                                                     ),
@@ -471,11 +465,7 @@ Module(
                     parameters: Parameters {
                         range: 288..290,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -532,18 +522,19 @@ Module(
                                                                                 arguments: Arguments {
                                                                                     range: 324..327,
                                                                                     node_index: NodeIndex(None),
-                                                                                    args: [
-                                                                                        NumberLiteral(
-                                                                                            ExprNumberLiteral {
-                                                                                                node_index: NodeIndex(None),
-                                                                                                range: 325..326,
-                                                                                                value: Int(
-                                                                                                    1,
-                                                                                                ),
-                                                                                            },
+                                                                                    items: [
+                                                                                        Positional(
+                                                                                            NumberLiteral(
+                                                                                                ExprNumberLiteral {
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                    range: 325..326,
+                                                                                                    value: Int(
+                                                                                                        1,
+                                                                                                    ),
+                                                                                                },
+                                                                                            ),
                                                                                         ),
                                                                                     ],
-                                                                                    keywords: [],
                                                                                 },
                                                                             },
                                                                         ),
@@ -592,18 +583,19 @@ Module(
                                                                                 arguments: Arguments {
                                                                                     range: 347..350,
                                                                                     node_index: NodeIndex(None),
-                                                                                    args: [
-                                                                                        NumberLiteral(
-                                                                                            ExprNumberLiteral {
-                                                                                                node_index: NodeIndex(None),
-                                                                                                range: 348..349,
-                                                                                                value: Int(
-                                                                                                    2,
-                                                                                                ),
-                                                                                            },
+                                                                                    items: [
+                                                                                        Positional(
+                                                                                            NumberLiteral(
+                                                                                                ExprNumberLiteral {
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                    range: 348..349,
+                                                                                                    value: Int(
+                                                                                                        2,
+                                                                                                    ),
+                                                                                                },
+                                                                                            ),
                                                                                         ),
                                                                                     ],
-                                                                                    keywords: [],
                                                                                 },
                                                                             },
                                                                         ),
@@ -645,18 +637,19 @@ Module(
                                                             arguments: Arguments {
                                                                 range: 367..370,
                                                                 node_index: NodeIndex(None),
-                                                                args: [
-                                                                    NumberLiteral(
-                                                                        ExprNumberLiteral {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 368..369,
-                                                                            value: Int(
-                                                                                5,
-                                                                            ),
-                                                                        },
+                                                                items: [
+                                                                    Positional(
+                                                                        NumberLiteral(
+                                                                            ExprNumberLiteral {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 368..369,
+                                                                                value: Int(
+                                                                                    5,
+                                                                                ),
+                                                                            },
+                                                                        ),
                                                                     ),
                                                                 ],
-                                                                keywords: [],
                                                             },
                                                         },
                                                     ),
@@ -687,11 +680,7 @@ Module(
                     parameters: Parameters {
                         range: 383..385,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -748,18 +737,19 @@ Module(
                                                                                 arguments: Arguments {
                                                                                     range: 413..416,
                                                                                     node_index: NodeIndex(None),
-                                                                                    args: [
-                                                                                        NumberLiteral(
-                                                                                            ExprNumberLiteral {
-                                                                                                node_index: NodeIndex(None),
-                                                                                                range: 414..415,
-                                                                                                value: Int(
-                                                                                                    1,
-                                                                                                ),
-                                                                                            },
+                                                                                    items: [
+                                                                                        Positional(
+                                                                                            NumberLiteral(
+                                                                                                ExprNumberLiteral {
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                    range: 414..415,
+                                                                                                    value: Int(
+                                                                                                        1,
+                                                                                                    ),
+                                                                                                },
+                                                                                            ),
                                                                                         ),
                                                                                     ],
-                                                                                    keywords: [],
                                                                                 },
                                                                             },
                                                                         ),
@@ -808,18 +798,19 @@ Module(
                                                                                 arguments: Arguments {
                                                                                     range: 442..445,
                                                                                     node_index: NodeIndex(None),
-                                                                                    args: [
-                                                                                        NumberLiteral(
-                                                                                            ExprNumberLiteral {
-                                                                                                node_index: NodeIndex(None),
-                                                                                                range: 443..444,
-                                                                                                value: Int(
-                                                                                                    2,
-                                                                                                ),
-                                                                                            },
+                                                                                    items: [
+                                                                                        Positional(
+                                                                                            NumberLiteral(
+                                                                                                ExprNumberLiteral {
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                    range: 443..444,
+                                                                                                    value: Int(
+                                                                                                        2,
+                                                                                                    ),
+                                                                                                },
+                                                                                            ),
                                                                                         ),
                                                                                     ],
-                                                                                    keywords: [],
                                                                                 },
                                                                             },
                                                                         ),
@@ -861,18 +852,19 @@ Module(
                                                             arguments: Arguments {
                                                                 range: 462..465,
                                                                 node_index: NodeIndex(None),
-                                                                args: [
-                                                                    NumberLiteral(
-                                                                        ExprNumberLiteral {
-                                                                            node_index: NodeIndex(None),
-                                                                            range: 463..464,
-                                                                            value: Int(
-                                                                                5,
-                                                                            ),
-                                                                        },
+                                                                items: [
+                                                                    Positional(
+                                                                        NumberLiteral(
+                                                                            ExprNumberLiteral {
+                                                                                node_index: NodeIndex(None),
+                                                                                range: 463..464,
+                                                                                value: Int(
+                                                                                    5,
+                                                                                ),
+                                                                            },
+                                                                        ),
                                                                     ),
                                                                 ],
-                                                                keywords: [],
                                                             },
                                                         },
                                                     ),

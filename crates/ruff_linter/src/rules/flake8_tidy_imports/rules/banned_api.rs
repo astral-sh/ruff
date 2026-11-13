@@ -58,7 +58,7 @@ pub(crate) fn banned_api<T: Ranged>(checker: &Checker, policy: &NameMatchPolicy,
 }
 
 /// TID251
-pub(crate) fn banned_attribute_access(checker: &Checker, expr: &Expr) {
+pub(crate) fn banned_attribute_access(checker: &Checker, &expr: &Expr<'_>) {
     let banned_api = &checker.settings().flake8_tidy_imports.banned_api;
     if banned_api.is_empty() {
         return;

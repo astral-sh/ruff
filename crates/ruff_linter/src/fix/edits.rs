@@ -1,11 +1,13 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
 use anyhow::{Context, Result};
+use ruff_python_ast::{
+    self as ast, AstNode, ExceptHandlerKind, ExprKind, NodeList, StmtKind, Suite,
+};
 
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::token::{self, Tokens, parenthesized_range};
-use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
+use ruff_python_ast::token::{Tokens, parenthesized_range};
+use ruff_python_ast::{Arguments, Expr, Parameters, Stmt, SyntaxNode, token};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_semantic::SemanticModel;
@@ -37,8 +39,8 @@ use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
 /// - If the [`Stmt`] is the last statement in its parent body, replace it with a
 ///   `pass` instead.
 pub(crate) fn delete_stmt(
-    stmt: &Stmt,
-    parent: Option<&Stmt>,
+    stmt: Stmt<'_>,
+    parent: Option<Stmt<'_>>,
     locator: &Locator,
     indexer: &Indexer,
 ) -> Edit {
@@ -111,8 +113,8 @@ pub(crate) fn delete_comment(range: TextRange, locator: &Locator) -> Edit {
 /// Generate a `Fix` to remove the specified imports from an `import` statement.
 pub(crate) fn remove_unused_imports<'a>(
     member_names: impl Iterator<Item = &'a str>,
-    stmt: &Stmt,
-    parent: Option<&Stmt>,
+    stmt: Stmt<'_>,
+    parent: Option<Stmt<'_>>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -126,11 +128,11 @@ pub(crate) fn remove_unused_imports<'a>(
 /// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
 pub(crate) fn make_redundant_alias<'a>(
     member_names: impl Iterator<Item = &'a str>,
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
 ) -> Vec<Edit> {
-    let aliases = match stmt {
-        Stmt::Import(ast::StmtImport { names, .. }) => names,
-        Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => names,
+    let aliases = match stmt.classify() {
+        StmtKind::Import(stmt_import) => stmt_import.names(),
+        StmtKind::ImportFrom(stmt_import_from) => stmt_import_from.names(),
         _ => {
             return Vec::new();
         }
@@ -139,8 +141,8 @@ pub(crate) fn make_redundant_alias<'a>(
         .filter_map(|name| {
             aliases
                 .iter()
-                .find(|alias| alias.asname.is_none() && *name == alias.name.id)
-                .map(|alias| Edit::range_replacement(format!("{name} as {name}"), alias.range))
+                .find(|alias| alias.asname().is_none() && *name == *alias.name().id())
+                .map(|alias| Edit::range_replacement(format!("{name} as {name}"), alias.range()))
         })
         .collect()
 }
@@ -148,27 +150,31 @@ pub(crate) fn make_redundant_alias<'a>(
 /// Fix to add the specified imports to the `__all__` export list.
 pub(crate) fn add_to_dunder_all<'a>(
     names: impl Iterator<Item = &'a str>,
-    expr: &Expr,
+    expr: Expr<'_>,
     stylist: &Stylist,
 ) -> Vec<Edit> {
-    let (insertion_point, export_prefix_length) = match expr {
-        Expr::List(ExprList { elts, .. }) => (
-            elts.last().map_or(expr.end() - "]".text_len(), Ranged::end),
-            elts.len(),
-        ),
-        Expr::Tuple(tup) if tup.parenthesized => (
-            tup.elts
+    let (insertion_point, export_prefix_length) = match expr.classify() {
+        ExprKind::List(expr_list) => {
+            let elts = expr_list.elts();
+            (
+                elts.last()
+                    .map_or(expr.end() - "]".text_len(), |node| node.end()),
+                elts.len(),
+            )
+        }
+        ExprKind::Tuple(tup) if tup.parenthesized() => (
+            tup.elts()
                 .last()
-                .map_or(tup.end() - ")".text_len(), Ranged::end),
-            tup.len(),
+                .map_or(tup.end() - ")".text_len(), |node| node.end()),
+            tup.elts().len(),
         ),
-        Expr::Tuple(tup) if !tup.parenthesized => (
-            tup.elts
+        ExprKind::Tuple(tup) if !tup.parenthesized() => (
+            tup.elts()
                 .last()
                 .expect("unparenthesized empty tuple is not possible")
                 .range()
                 .end(),
-            tup.len(),
+            tup.elts().len(),
         ),
         _ => {
             // we don't know how to insert into this expression
@@ -183,8 +189,8 @@ pub(crate) fn add_to_dunder_all<'a>(
             _ => Edit::insertion(format!(", {quote}{name}{quote}"), insertion_point),
         })
         .collect();
-    if let Expr::Tuple(tup) = expr {
-        if tup.parenthesized && export_prefix_length + edits.len() == 1 {
+    if let ExprKind::Tuple(tup) = expr.classify() {
+        if tup.parenthesized() && export_prefix_length + edits.len() == 1 {
             edits.push(Edit::insertion(",".to_string(), insertion_point));
         }
     }
@@ -207,32 +213,38 @@ pub(crate) enum Parentheses {
 /// For this behavior, set `parentheses` to `Parentheses::Remove`.
 pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
-    arguments: &Arguments,
+    arguments: Arguments<'_>,
     parentheses: Parentheses,
     source: &str,
     tokens: &Tokens,
 ) -> Result<Edit> {
-    // Partition into arguments before and after the argument to remove.
-    let (before, after): (Vec<_>, Vec<_>) = arguments
-        .iter_source_order()
-        .map(|arg| arg.range())
-        .filter(|range| argument.range() != *range)
-        .partition(|range| range.start() < argument.start());
-
-    let arg = arguments
-        .iter_source_order()
-        .find(|arg| arg.range() == argument.range())
-        .context("Unable to find argument")?;
+    let target = argument.range();
+    let mut previous = None;
+    let mut has_following = false;
+    let mut arg = None;
+    for item in arguments.iter_source_order() {
+        let range = item.range();
+        if range == target {
+            arg.get_or_insert(item);
+        } else if range.start() < target.start() {
+            previous = previous.max(Some(range.end()));
+        } else {
+            has_following = true;
+        }
+        if has_following && arg.is_some() {
+            break;
+        }
+    }
+    let arg = arg.context("Unable to find argument")?;
 
     let parenthesized_range = match arg {
         ast::ArgOrKeyword::Keyword(keyword) => keyword.range(),
         ast::ArgOrKeyword::Arg(expr) => {
-            token::parenthesized_range(expr.into(), arguments.into(), tokens)
-                .unwrap_or(expr.range())
+            token::parenthesized_range(expr, arguments.into(), tokens).unwrap_or(expr.range())
         }
     };
 
-    if !after.is_empty() {
+    if has_following {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
         // argument to the end of the subsequent comma.
         let mut tokenizer = SimpleTokenizer::starts_at(argument.end(), source);
@@ -250,7 +262,7 @@ pub(crate) fn remove_argument<T: Ranged>(
             .context("Unable to find next token")?;
 
         Ok(Edit::deletion(parenthesized_range.start(), next.start()))
-    } else if let Some(previous) = before.iter().map(Ranged::end).max() {
+    } else if let Some(previous) = previous {
         // Case 2: argument or keyword is the last node, so delete from the start of the
         // previous comma to the end of the argument.
         let mut tokenizer = SimpleTokenizer::starts_at(previous, source);
@@ -275,14 +287,14 @@ pub(crate) fn remove_argument<T: Ranged>(
 ///
 /// The new argument will be inserted before the first existing keyword argument in `arguments`, if
 /// there are any present. Otherwise, the new argument is added to the end of the argument list.
-pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Tokens) -> Edit {
-    if let Some(keyword) = arguments.keywords.first() {
+pub(crate) fn add_argument(argument: &str, arguments: Arguments<'_>, tokens: &Tokens) -> Edit {
+    if let Some(keyword) = arguments.keywords().first() {
         // The keyword's range starts at its name, even if its value is parenthesized.
         Edit::insertion(format!("{argument}, "), keyword.start())
-    } else if let Some(last) = arguments.iter_source_order().last() {
+    } else if let Some(last) = arguments.iter_source_order().next_back() {
         // Case 1: existing arguments, so append after the last argument.
-        let last = parenthesized_range(last.value().into(), arguments.into(), tokens)
-            .unwrap_or(last.range());
+        let last =
+            parenthesized_range(last.value(), arguments.into(), tokens).unwrap_or(last.range());
         Edit::insertion(format!(", {argument}"), last.end())
     } else {
         // Case 2: no arguments. Add argument, without any trailing comma.
@@ -291,12 +303,16 @@ pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Token
 }
 
 /// Remove the member at the given index from a sequence of expressions.
-pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> Result<Edit> {
+pub(crate) fn remove_member(
+    elts: NodeList<'_, ruff_python_ast::kind::Expr>,
+    index: usize,
+    source: &str,
+) -> Result<Edit> {
     if index < elts.len() - 1 {
         // Case 1: the expression is _not_ the last node, so delete from the start of the
         // expression to the end of the subsequent comma.
         // Ex) Delete `"a"` in `{"a", "b", "c"}`.
-        let mut tokenizer = SimpleTokenizer::starts_at(elts[index].end(), source);
+        let mut tokenizer = SimpleTokenizer::starts_at(elts.at(index).end(), source);
 
         // Find the trailing comma.
         tokenizer
@@ -310,23 +326,23 @@ pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> R
             })
             .context("Unable to find next token")?;
 
-        Ok(Edit::deletion(elts[index].start(), next.start()))
+        Ok(Edit::deletion(elts.at(index).start(), next.start()))
     } else if index > 0 {
         // Case 2: the expression is the last node, but not the _only_ node, so delete from the
         // start of the previous comma to the end of the expression.
         // Ex) Delete `"c"` in `{"a", "b", "c"}`.
-        let mut tokenizer = SimpleTokenizer::starts_at(elts[index - 1].end(), source);
+        let mut tokenizer = SimpleTokenizer::starts_at(elts.at(index - 1).end(), source);
 
         // Find the trailing comma.
         let comma = tokenizer
             .find(|token| token.kind == SimpleTokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
-        Ok(Edit::deletion(comma.start(), elts[index].end()))
+        Ok(Edit::deletion(comma.start(), elts.at(index).end()))
     } else {
         // Case 3: expression is the only node, so delete it.
         // Ex) Delete `"a"` in `{"a"}`.
-        Ok(Edit::range_deletion(elts[index].range()))
+        Ok(Edit::range_deletion(elts.at(index).range()))
     }
 }
 
@@ -336,32 +352,40 @@ pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> R
 /// non-default parameter would follow a positional-only parameter with a default value).
 pub(crate) fn add_parameter(
     parameter: &str,
-    parameters: &Parameters,
+    parameters: Parameters<'_>,
     source: &str,
 ) -> Option<Edit> {
-    if let Some(last) = parameters.args.iter().rfind(|arg| arg.default.is_none()) {
-        // Case 1: at least one regular parameter without a default, so append after the last one.
-        Some(Edit::insertion(format!(", {parameter}"), last.end()))
-    } else if let Some(first) = parameters.args.first() {
-        // Case 2: all regular parameters have defaults, so insert before the first one.
-        // However, if any positional-only parameter has a default, inserting a non-default
-        // parameter here would be a syntax error (the "default required" constraint carries
-        // through the `/` separator).
-        if parameters
-            .posonlyargs
-            .last()
-            .is_some_and(|p| p.default.is_some())
-        {
-            return None;
+    let mut first_regular = None;
+    let mut last_positional_only = None;
+    let mut separator = None;
+    for item in parameters.items().iter().rev() {
+        match item {
+            ast::ParameterItem::PositionalOrKeyword(arg) => {
+                if arg.default().is_none() {
+                    return Some(Edit::insertion(format!(", {parameter}"), arg.end()));
+                }
+                first_regular = Some(arg);
+            }
+            ast::ParameterItem::PositionalOnly(arg) => {
+                last_positional_only.get_or_insert(arg);
+            }
+            ast::ParameterItem::Vararg(_) | ast::ParameterItem::KeywordOnly(_) => {
+                separator = Some(SimpleTokenKind::Star);
+            }
+            ast::ParameterItem::Kwarg(_) => {
+                separator.get_or_insert(SimpleTokenKind::DoubleStar);
+            }
         }
+    }
+
+    // The default requirement carries through the `/` separator. If the last
+    // positional-only parameter has a default, a required parameter cannot follow it.
+    if last_positional_only.is_some_and(|arg| arg.default().is_some()) {
+        return None;
+    }
+    if let Some(first) = first_regular {
         Some(Edit::insertion(format!("{parameter}, "), first.start()))
-    } else if let Some(last) = parameters.posonlyargs.last() {
-        // Case 3: no regular parameters, but positional-only parameters exist.
-        // If any positional-only parameter has a default, we can't add a non-default parameter
-        // after the `/` separator — that would be a syntax error.
-        if last.default.is_some() {
-            return None;
-        }
+    } else if let Some(last) = last_positional_only {
         // Insert after the `/` separator.
         let mut tokenizer = SimpleTokenizer::starts_at(last.end(), source);
         let slash = tokenizer
@@ -374,28 +398,12 @@ pub(crate) fn add_parameter(
         } else {
             Some(Edit::insertion(format!(", {parameter}"), slash.end()))
         }
-    } else if parameters.vararg.is_some() || !parameters.kwonlyargs.is_empty() {
-        // Case 4: no regular or positional-only parameters, but a vararg (`*args`) or
-        // keyword-only parameters exist. Insert before the `*` separator.
-        let pos = parameters.start();
-        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
-        let star = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Star)
-            .expect("Unable to find `*` token");
-        Some(Edit::insertion(format!("{parameter}, "), star.start()))
-    } else if parameters.kwarg.is_some() {
-        // Case 5: only a `**kwargs` parameter exists. Insert before `**`.
-        let pos = parameters.start();
-        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
-        let double_star = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::DoubleStar)
-            .expect("Unable to find `**` token");
-        Some(Edit::insertion(
-            format!("{parameter}, "),
-            double_star.start(),
-        ))
+    } else if let Some(separator) = separator {
+        let token = SimpleTokenizer::starts_at(parameters.start(), source)
+            .find(|token| token.kind == separator)?;
+        Some(Edit::insertion(format!("{parameter}, "), token.start()))
     } else {
-        // Case 6: no parameters at all, so add parameter after the opening parenthesis.
+        // Insert after the opening parenthesis of an empty parameter list.
         Some(Edit::insertion(
             parameter.to_string(),
             parameters.start() + TextSize::from(1),
@@ -480,38 +488,40 @@ pub(crate) fn adjust_indentation(
 }
 
 /// Determine if a vector contains only one, specific element.
-fn is_only<T: PartialEq>(vec: &[T], value: &T) -> bool {
-    vec.len() == 1 && vec[0] == *value
+fn is_only(body: Suite<'_>, child: Stmt<'_>) -> bool {
+    body.as_array()
+        .is_some_and(|[stmt]| stmt.is_same_node(child))
 }
 
 /// Determine if a child is the only statement in its body.
-fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
-    match parent {
-        Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-        | Stmt::ClassDef(ast::StmtClassDef { body, .. })
-        | Stmt::With(ast::StmtWith { body, .. })
+fn is_lone_child(child: Stmt<'_>, parent: Stmt<'_>) -> bool {
+    match parent.fields() {
+        ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields { body, .. })
+        | ast::StmtFields::ClassDef(ast::StmtClassDefFields { body, .. })
+        | ast::StmtFields::With(ast::StmtWithFields { body, .. })
             if is_only(body, child) =>
         {
             return true;
         }
-        Stmt::For(ast::StmtFor { body, orelse, .. })
-        | Stmt::While(ast::StmtWhile { body, orelse, .. })
+        ast::StmtFields::For(ast::StmtForFields { body, orelse, .. })
+        | ast::StmtFields::While(ast::StmtWhileFields { body, orelse, .. })
             if (is_only(body, child) || is_only(orelse, child)) =>
         {
             return true;
         }
-        Stmt::If(ast::StmtIf {
+        ast::StmtFields::If(ast::StmtIfFields {
             body,
             elif_else_clauses,
             ..
         }) if (is_only(body, child)
-            || elif_else_clauses
-                .iter()
-                .any(|ast::ElifElseClause { body, .. }| is_only(body, child))) =>
+            || elif_else_clauses.iter().any(|elif_else_clause| {
+                let body = elif_else_clause.body();
+                is_only(body, child)
+            })) =>
         {
             return true;
         }
-        Stmt::Try(ast::StmtTry {
+        ast::StmtFields::Try(ast::StmtTryFields {
             body,
             handlers,
             orelse,
@@ -520,16 +530,17 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
         }) if (is_only(body, child)
             || is_only(orelse, child)
             || is_only(finalbody, child)
-            || handlers.iter().any(|handler| match handler {
-                ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) => {
+            || handlers.iter().any(|handler| match handler.classify() {
+                ExceptHandlerKind::ExceptHandler(except_handler_except_handler) => {
+                    let body = except_handler_except_handler.body();
                     is_only(body, child)
                 }
             })) =>
         {
             return true;
         }
-        Stmt::Match(ast::StmtMatch { cases, .. })
-            if cases.iter().any(|case| is_only(&case.body, child)) =>
+        ast::StmtFields::Match(ast::StmtMatchFields { cases, .. })
+            if cases.iter().any(|case| is_only(case.body(), child)) =>
         {
             return true;
         }
@@ -627,7 +638,7 @@ pub(crate) fn pad(content: String, range: TextRange, locator: &Locator) -> Strin
 /// Returns `true` if the fix fits within the maximum configured line length.
 pub(crate) fn fits(
     fix: &str,
-    node: AnyNodeRef,
+    node: SyntaxNode,
     locator: &Locator,
     line_length: LineLength,
     tab_size: IndentWidth,
@@ -638,7 +649,7 @@ pub(crate) fn fits(
 /// Returns `true` if all lines in the fix are shorter than the given line length.
 fn all_lines_fit(
     fix: &str,
-    node: AnyNodeRef,
+    node: SyntaxNode,
     locator: &Locator,
     line_length: usize,
     tab_size: IndentWidth,
@@ -676,7 +687,6 @@ mod tests {
     use ruff_source_file::SourceFileBuilder;
     use test_case::test_case;
 
-    use ruff_python_ast::Stmt;
     use ruff_python_codegen::Stylist;
     use ruff_python_parser::{parse_expression, parse_module};
     use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -687,46 +697,35 @@ mod tests {
     };
     use crate::{Edit, Fix, Locator, Violation};
 
-    /// Parse the given source using [`Mode::Module`] and return the first statement.
-    fn parse_first_stmt(source: &str) -> Result<Stmt> {
-        let suite = parse_module(source)?.into_suite();
-        Ok(suite.into_iter().next().unwrap())
+    fn first_stmt_end(source: &str) -> Result<TextSize> {
+        Ok(parse_module(source)?.suite().first().unwrap().end())
     }
 
     #[test]
     fn find_semicolon() -> Result<()> {
         let contents = "x = 1";
-        let stmt = parse_first_stmt(contents)?;
+        let end = first_stmt_end(contents)?;
         let locator = Locator::new(contents);
-        assert_eq!(trailing_semicolon(stmt.end(), &locator), None);
+        assert_eq!(trailing_semicolon(end, &locator), None);
 
         let contents = "x = 1; y = 1";
-        let stmt = parse_first_stmt(contents)?;
+        let end = first_stmt_end(contents)?;
         let locator = Locator::new(contents);
-        assert_eq!(
-            trailing_semicolon(stmt.end(), &locator),
-            Some(TextSize::from(5))
-        );
+        assert_eq!(trailing_semicolon(end, &locator), Some(TextSize::from(5)));
 
         let contents = "x = 1 ; y = 1";
-        let stmt = parse_first_stmt(contents)?;
+        let end = first_stmt_end(contents)?;
         let locator = Locator::new(contents);
-        assert_eq!(
-            trailing_semicolon(stmt.end(), &locator),
-            Some(TextSize::from(6))
-        );
+        assert_eq!(trailing_semicolon(end, &locator), Some(TextSize::from(6)));
 
         let contents = r"
 x = 1 \
   ; y = 1
 "
         .trim();
-        let stmt = parse_first_stmt(contents)?;
+        let end = first_stmt_end(contents)?;
         let locator = Locator::new(contents);
-        assert_eq!(
-            trailing_semicolon(stmt.end(), &locator),
-            Some(TextSize::from(10))
-        );
+        assert_eq!(trailing_semicolon(end, &locator), Some(TextSize::from(10)));
 
         Ok(())
     }
@@ -762,9 +761,10 @@ x = 1 \
     #[test]
     fn redundant_alias() -> Result<()> {
         let contents = "import x, y as y, z as bees";
-        let stmt = parse_first_stmt(contents)?;
+        let parsed = parse_module(contents)?;
+        let stmt = parsed.suite().at(0);
         assert_eq!(
-            make_redundant_alias(["x"].into_iter(), &stmt),
+            make_redundant_alias(["x"].into_iter(), stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -772,7 +772,7 @@ x = 1 \
             "make just one item redundant"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "y"].into_iter(), &stmt),
+            make_redundant_alias(vec!["x", "y"].into_iter(), stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),
@@ -780,7 +780,7 @@ x = 1 \
             "the second item is already a redundant alias"
         );
         assert_eq!(
-            make_redundant_alias(vec!["x", "z"].into_iter(), &stmt),
+            make_redundant_alias(vec!["x", "z"].into_iter(), stmt),
             vec![Edit::range_replacement(
                 String::from("x as x"),
                 TextRange::new(TextSize::new(7), TextSize::new(8)),

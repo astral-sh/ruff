@@ -1,13 +1,14 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtIf};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprKind, ExprName, NodeList, StmtIf, StmtKind};
 use ruff_python_semantic::analyze::typing;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
-type Key = Expr;
-type Dict = ExprName;
+type Key<'a> = Expr<'a>;
+type Dict<'a> = ExprName<'a>;
 
 /// ## What it does
 /// Checks for `if key in dictionary: del dictionary[key]`.
@@ -48,19 +49,22 @@ impl AlwaysFixableViolation for IfKeyInDictDel {
 }
 
 /// RUF051
-pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
+pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &ast::StmtIfFields<'_>) {
     if !stmt.elif_else_clauses.is_empty() {
         return;
     }
 
-    let [Stmt::Delete(delete)] = &stmt.body[..] else {
+    let Some([body_stmt]) = stmt.body.as_array() else {
+        return;
+    };
+    let StmtKind::Delete(delete) = body_stmt.classify() else {
         return;
     };
 
-    let Some((test_dict, test_key)) = extract_dict_and_key_from_test(&stmt.test) else {
+    let Some((test_dict, test_key)) = extract_dict_and_key_from_test(stmt.test) else {
         return;
     };
-    let Some((del_dict, del_key)) = extract_dict_and_key_from_del(&delete.targets) else {
+    let Some((del_dict, del_key)) = extract_dict_and_key_from_del(delete.targets()) else {
         return;
     };
 
@@ -72,79 +76,68 @@ pub(crate) fn if_key_in_dict_del(checker: &Checker, stmt: &StmtIf) {
         return;
     }
 
-    let fix = replace_with_dict_pop_fix(checker, stmt, test_dict, test_key);
+    let fix = replace_with_dict_pop_fix(checker, stmt.node, test_dict, test_key);
 
     checker
-        .report_diagnostic(IfKeyInDictDel, delete.range)
+        .report_diagnostic(IfKeyInDictDel, delete.range())
         .set_fix(fix);
 }
 
-fn extract_dict_and_key_from_test(test: &Expr) -> Option<(&Dict, &Key)> {
-    let Expr::Compare(comp) = test else {
+fn extract_dict_and_key_from_test(test: Expr<'_>) -> Option<(Dict<'_>, Key<'_>)> {
+    let (key, CmpOp::In, dict) = test.as_compare_expr()?.as_single()? else {
         return None;
     };
-
-    let [key, Expr::Name(dict)] = comp.operands.as_ref() else {
-        return None;
-    };
-
-    if !matches!(comp.ops.as_ref(), [CmpOp::In]) {
-        return None;
-    }
-
-    Some((dict, key))
+    Some((dict.as_name_expr()?, key))
 }
 
-fn extract_dict_and_key_from_del(targets: &[Expr]) -> Option<(&Dict, &Key)> {
-    let [Expr::Subscript(ExprSubscript { value, slice, .. })] = targets else {
-        return None;
-    };
-
-    let Expr::Name(dict) = value.as_ref() else {
-        return None;
-    };
-
-    Some((dict, slice))
+fn extract_dict_and_key_from_del(
+    targets: NodeList<'_, ruff_python_ast::kind::Expr>,
+) -> Option<(Dict<'_>, Key<'_>)> {
+    let [target] = targets.as_array()?;
+    let subscript = target.as_subscript_expr()?;
+    Some((subscript.value().as_name_expr()?, subscript.slice()))
 }
 
-fn is_same_key(test: &Key, del: &Key) -> bool {
-    match (test, del) {
-        (Expr::Name(ExprName { id: test, .. }), Expr::Name(ExprName { id: del, .. })) => {
-            test.as_str() == del.as_str()
+fn is_same_key(test: Key<'_>, del: Key<'_>) -> bool {
+    match (test.classify(), del.classify()) {
+        (ExprKind::Name(test), ExprKind::Name(del)) => test.name_id() == del.name_id(),
+        (ExprKind::NoneLiteral(_), ExprKind::NoneLiteral(_))
+        | (ExprKind::EllipsisLiteral(_), ExprKind::EllipsisLiteral(_)) => true,
+        (ExprKind::BooleanLiteral(test), ExprKind::BooleanLiteral(del)) => {
+            test.value() == del.value()
         }
-
-        (Expr::NoneLiteral(..), Expr::NoneLiteral(..)) => true,
-        (Expr::EllipsisLiteral(..), Expr::EllipsisLiteral(..)) => true,
-
-        (Expr::BooleanLiteral(test), Expr::BooleanLiteral(del)) => test.value == del.value,
-        (Expr::NumberLiteral(test), Expr::NumberLiteral(del)) => test.value == del.value,
-
-        (Expr::BytesLiteral(test), Expr::BytesLiteral(del)) => {
-            Iterator::eq(test.value.bytes(), del.value.bytes())
+        (ExprKind::NumberLiteral(test), ExprKind::NumberLiteral(del)) => {
+            test.value() == del.value()
         }
-
-        (Expr::StringLiteral(test), Expr::StringLiteral(del)) => {
-            Iterator::eq(test.value.chars(), del.value.chars())
+        (ExprKind::BytesLiteral(test), ExprKind::BytesLiteral(del)) => {
+            test.value().bytes().eq(del.value().bytes())
         }
-
+        (ExprKind::StringLiteral(test), ExprKind::StringLiteral(del)) => {
+            test.value().to_str() == del.value().to_str()
+        }
         _ => false,
     }
 }
 
-fn is_same_dict(test: &Dict, del: &Dict) -> bool {
-    test.id.as_str() == del.id.as_str()
+fn is_same_dict(test: Dict<'_>, del: Dict<'_>) -> bool {
+    test.name_id() == del.name_id()
 }
 
-fn replace_with_dict_pop_fix(checker: &Checker, stmt: &StmtIf, dict: &Dict, key: &Key) -> Fix {
+fn replace_with_dict_pop_fix(
+    checker: &Checker,
+    stmt: StmtIf<'_>,
+    dict: Dict<'_>,
+    key: Key<'_>,
+) -> Fix {
     let locator = checker.locator();
     let dict_expr = locator.slice(dict);
     let key_expr = locator.slice(key);
 
     let replacement = format!("{dict_expr}.pop({key_expr}, None)");
-    let edit = Edit::range_replacement(replacement, stmt.range);
+    let edit = Edit::range_replacement(replacement, stmt.range());
 
     let comment_ranges = checker.comment_ranges();
-    let applicability = if comment_ranges.intersects(stmt.range) {
+    let applicability = if comment_ranges.intersects(stmt.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe

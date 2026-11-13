@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
-use ruff_text_size::Ranged;
+use ruff_python_ast::ExprCallFields;
+use ruff_python_ast::ExprKind;
 
 use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -47,36 +47,38 @@ impl Violation for ImplicitCwd {
 }
 
 /// FURB177
-pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCall) {
+pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCallFields<'_>) {
     if !call.arguments.is_empty() {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if attr != "resolve" {
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let ExprKind::Call(call_node) = value.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     // Match on arguments, but ignore keyword arguments. `Path()` accepts keyword arguments, but
     // ignores them. See: https://github.com/python/cpython/issues/98094.
-    match &*arguments.args {
+    match arguments.args() {
         // Ex) `Path().resolve()`
-        [] => {}
+        args if args.is_empty() => {}
         // Ex) `Path(".").resolve()`
-        [arg] => {
-            let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg else {
+        args if let Some([arg]) = args.as_array() => {
+            let ExprKind::StringLiteral(string_literal) = arg.classify() else {
                 return;
             };
+            let value = string_literal.value();
             if !matches!(value.to_str(), "" | ".") {
                 return;
             }
@@ -93,16 +95,16 @@ pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(ImplicitCwd, call.range());
+    let mut diagnostic = checker.report_diagnostic(ImplicitCwd, call.range);
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
-            call.start(),
+            call.range.start(),
             checker.semantic(),
         )?;
         Ok(Fix::unsafe_edits(
-            Edit::range_replacement(format!("{binding}.cwd()"), call.range()),
+            Edit::range_replacement(format!("{binding}.cwd()"), call.range),
             [import_edit],
         ))
     });

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind, NodeList};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -61,25 +61,31 @@ impl Violation for UnprefixedTypeParam {
 }
 
 /// PYI001
-pub(crate) fn prefix_type_params(checker: &Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn prefix_type_params(
+    checker: &Checker,
+    value: Expr<'_>,
+    targets: NodeList<'_, ruff_python_ast::kind::Expr>,
+) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;
     }
 
-    let [target] = targets else {
+    let Some([target]) = targets.as_array() else {
         return;
     };
 
-    if let Expr::Name(ast::ExprName { id, .. }) = target {
+    if let ExprKind::Name(name) = target.classify() {
+        let id = name.id();
         if id.starts_with('_') {
             return;
         }
     }
 
-    let Expr::Call(ast::ExprCall { func, .. }) = value else {
+    let ExprKind::Call(call) = value.classify() else {
         return;
     };
+    let func = call.func();
 
     let Some(kind) = checker
         .semantic()

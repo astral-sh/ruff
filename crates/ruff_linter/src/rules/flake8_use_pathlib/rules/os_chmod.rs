@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ArgOrKeyword, ExprCall};
+use ruff_python_ast::ArgOrKeyword;
+use ruff_python_ast::ExprCallFields;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -69,7 +70,7 @@ impl Violation for OsChmod {
 }
 
 /// PTH101
-pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_chmod(checker: &Checker, call: &ExprCallFields<'_>, segments: &[&str]) {
     if segments != ["os", "chmod"] {
         return;
     }
@@ -83,12 +84,12 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     let path_arg = call.arguments.find_argument_value("path", 0);
 
     if path_arg.is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
-        || is_keyword_only_argument_non_default(&call.arguments, "dir_fd")
+        || is_keyword_only_argument_non_default(call.arguments, "dir_fd")
     {
         return;
     }
 
-    let range = call.range();
+    let range = call.range;
     let mut diagnostic = checker.report_diagnostic(OsChmod, call.func.range());
 
     if !is_fix_os_chmod_enabled(checker.settings()) {
@@ -100,7 +101,7 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     }
 
     if has_unknown_keywords_or_starred_expr(
-        &call.arguments,
+        call.arguments,
         &["path", "mode", "dir_fd", "follow_symlinks"],
     ) {
         return;
@@ -114,7 +115,7 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
-            call.start(),
+            call.range.start(),
             checker.semantic(),
         )?;
 
@@ -126,7 +127,10 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
                 Some(locator.slice(expr.range()))
             }
             ArgOrKeyword::Keyword(kw)
-                if matches!(kw.arg.as_deref(), Some("mode" | "follow_symlinks")) =>
+                if matches!(
+                    kw.arg().map(ruff_python_ast::Identifier::as_str),
+                    Some("mode" | "follow_symlinks")
+                ) =>
             {
                 Some(locator.slice(kw.range()))
             }

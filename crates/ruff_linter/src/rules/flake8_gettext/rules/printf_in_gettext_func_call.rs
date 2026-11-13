@@ -64,7 +64,12 @@ impl Violation for PrintfInGetTextFuncCall {
 }
 
 /// INT003
-pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn printf_in_gettext_func_call(
+    checker: &Checker,
+    func: Expr<'_>,
+    arguments: ast::Arguments<'_>,
+) {
+    let args = arguments.args();
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if is_printf_format(first) {
@@ -83,12 +88,12 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
 
 /// Return `true` if `expr` is a printf-style formatting expression, such as
 /// `"%s" % 123`.
-fn is_printf_format(expr: &Expr) -> bool {
-    let Expr::BinOp(ast::ExprBinOp {
+fn is_printf_format(expr: Expr<'_>) -> bool {
+    let ast::ExprFields::BinOp(ast::ExprBinOpFields {
         op: Operator::Mod,
         left,
         ..
-    }) = expr
+    }) = expr.fields()
     else {
         return false;
     };

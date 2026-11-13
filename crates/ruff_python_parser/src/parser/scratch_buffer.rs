@@ -1,7 +1,4 @@
-use std::vec::Drain;
-
 use drop_bomb::DebugDropBomb;
-use thin_vec::ThinVec;
 
 /// Reusable scratch storage that preserves entries belonging to outer parser frames.
 #[derive(Debug)]
@@ -35,6 +32,11 @@ impl<T> ScratchBuffer<T> {
     }
 
     #[inline]
+    pub(super) fn len_since(&self, snapshot: &ScratchSnapshot) -> usize {
+        self.buffer.len() - snapshot.len
+    }
+
+    #[inline]
     pub(super) fn snapshot(&self) -> ScratchSnapshot {
         ScratchSnapshot {
             len: self.buffer.len(),
@@ -43,31 +45,31 @@ impl<T> ScratchBuffer<T> {
     }
 
     #[inline]
-    pub(super) fn take<C: FromIterator<T>>(&mut self, snapshot: ScratchSnapshot) -> C {
-        self.drain_snapshot(snapshot).collect()
+    pub(super) fn take_range(
+        &mut self,
+        snapshot: ScratchSnapshot,
+        storage: &mut super::ParserStorage,
+    ) -> ruff_python_ast::ListId<T::Element>
+    where
+        T: ruff_python_ast::ListItem + Copy,
+    {
+        self.take(snapshot, |items| storage.list(items.iter().copied()))
     }
 
     #[inline]
-    pub(super) fn take_thin_vec(&mut self, mut snapshot: ScratchSnapshot) -> ThinVec<T> {
-        if self.is_empty(&snapshot) {
-            snapshot.bomb.defuse();
-            return ThinVec::new();
-        }
-
-        let drain = self.drain_snapshot(snapshot);
-        let mut result = ThinVec::with_capacity(drain.len());
-        result.extend(drain);
-        result
-    }
-
-    #[inline]
-    fn drain_snapshot(&mut self, mut snapshot: ScratchSnapshot) -> Drain<'_, T> {
+    pub(super) fn take<R>(
+        &mut self,
+        mut snapshot: ScratchSnapshot,
+        read: impl FnOnce(&[T]) -> R,
+    ) -> R {
         debug_assert!(
             self.buffer.len() >= snapshot.len,
             "Scratch buffer snapshots must be restored in reverse order of creation."
         );
         snapshot.bomb.defuse();
-        self.buffer.drain(snapshot.len..)
+        let result = read(&self.buffer[snapshot.len..]);
+        self.buffer.truncate(snapshot.len);
+        result
     }
 }
 
@@ -116,7 +118,7 @@ mod tests {
         let snapshot = buffer.snapshot();
         buffer.buffer.clear();
 
-        let _: Vec<_> = buffer.take(snapshot);
+        buffer.take(snapshot, |_| ());
     }
 
     #[test]
@@ -130,7 +132,7 @@ mod tests {
         buffer.push(2);
         assert!(!buffer.is_empty(&snapshot));
 
-        let _: Vec<_> = buffer.take(snapshot);
-        let _: Vec<_> = buffer.take(outer_snapshot);
+        buffer.take(snapshot, |_| ());
+        buffer.take(outer_snapshot, |_| ());
     }
 }

@@ -51,8 +51,8 @@ fn discover_pytest_tests<'db>(
         // Start from the outermost class so that each item's parent is added before the item itself.
         for class in test.enclosing_classes(db, &module).into_iter().rev() {
             parent = Some(collector.insert(
-                &class.name,
-                class.name.range(),
+                class.name().as_str(),
+                class.name().range(),
                 DiscoveredPytestTestKind::Class,
                 parent.as_deref(),
             ));

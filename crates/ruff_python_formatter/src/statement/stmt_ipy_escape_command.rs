@@ -6,8 +6,8 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtIpyEscapeCommand;
 
-impl FormatNodeRule<StmtIpyEscapeCommand> for FormatStmtIpyEscapeCommand {
-    fn fmt_fields(&self, item: &StmtIpyEscapeCommand, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ruff_python_ast::kind::StmtIpyEscapeCommand> for FormatStmtIpyEscapeCommand {
+    fn fmt_fields(&self, item: StmtIpyEscapeCommand<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         source_text_slice(item.range()).fmt(f)
     }
 }

@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StmtClassDefFields;
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::{Expr, ExprName, Stmt, StmtAssign, StmtClassDef};
+use ruff_python_ast::{ExprKind, StmtKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -68,26 +69,31 @@ impl Violation for ImplicitClassVarInDataclass {
 }
 
 /// RUF045
-pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: &StmtClassDef) {
-    let dataclass_kind = dataclass_kind(class_def, checker.semantic());
+pub(crate) fn implicit_class_var_in_dataclass(
+    checker: &mut Checker,
+    class_def: &StmtClassDefFields<'_>,
+) {
+    let dataclass_kind = dataclass_kind(class_def.node, checker.semantic());
 
     if !matches!(dataclass_kind, Some((DataclassKind::Stdlib, _))) {
         return;
     }
 
-    for statement in &class_def.body {
-        let Stmt::Assign(StmtAssign { targets, .. }) = statement else {
+    for statement in class_def.body {
+        let StmtKind::Assign(assign) = statement.classify() else {
             continue;
         };
+        let targets = assign.targets();
 
         if targets.len() > 1 {
             continue;
         }
 
         let target = targets.first().unwrap();
-        let Expr::Name(ExprName { id, .. }) = target else {
+        let ExprKind::Name(name) = target.classify() else {
             continue;
         };
+        let id = name.id();
 
         if checker.settings().dummy_variable_rgx.is_match(id.as_str()) {
             continue;

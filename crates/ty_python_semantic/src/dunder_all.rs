@@ -1,7 +1,11 @@
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{
+    self as ast, Arguments, Expr, ExprAttribute, ExprCall, ExprContext, Identifier, NodeList,
+    Operator, Stmt, StmtImportFrom,
+};
+
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
@@ -76,18 +80,18 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// either a list/tuple/set of string-literal names or a module's `__all__` variable.
     ///
     /// Returns `true` if the expression is a valid list/tuple/set or module `__all__`, `false` otherwise.
-    fn extend(&mut self, expr: &ast::Expr) -> bool {
+    fn extend(&mut self, expr: Expr<'_>) -> bool {
         let db = self.db;
-        match expr {
+        match expr.fields() {
             // `__all__ += [...]`
             // `__all__.extend([...])`
-            ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
-            | ast::Expr::Set(ast::ExprSet { elts, .. }) => self.add_names(elts),
+            ast::ExprFields::List(ast::ExprListFields { elts, .. })
+            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
+            | ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => self.add_names(elts),
 
             // `__all__ += module.__all__`
             // `__all__.extend(module.__all__)`
-            ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            ast::ExprFields::Attribute(ast::ExprAttributeFields { value, attr, .. }) => {
                 if attr != "__all__" {
                     return false;
                 }
@@ -118,8 +122,8 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// Returns `true` if the call idiom is recognized and valid, `false` otherwise.
     fn process_call_idiom(
         &mut self,
-        function_name: &ast::Identifier,
-        arguments: &ast::Arguments,
+        function_name: Identifier<'_>,
+        arguments: Arguments<'_>,
     ) -> bool {
         if arguments.len() != 1 {
             return false;
@@ -164,7 +168,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// a `__all__` variable.
     fn dunder_all_names_for_import_from(
         &self,
-        import_from: &ast::StmtImportFrom,
+        import_from: StmtImportFrom<'_>,
     ) -> Option<&'db FxHashSet<Name>> {
         let db = self.db;
 
@@ -182,7 +186,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// # Panics
     ///
     /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
-    fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
+    fn standalone_expression_type(&self, expr: Expr<'_>) -> Type<'db> {
         let db = self.db;
         infer_expression_types(db, self.index.expression(expr), TypeContext::default())
             .expression_type(expr)
@@ -191,7 +195,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// Evaluate the given expression and return its truthiness.
     ///
     /// Returns [`None`] if the expression type doesn't implement `__bool__` correctly.
-    fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
+    fn evaluate_test_expr(&self, expr: Expr<'_>) -> Option<Truthiness> {
         let db = self.db;
         self.standalone_expression_type(expr)
             .try_bool(db, &self.env)
@@ -201,7 +205,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// Add valid names to the set.
     ///
     /// Returns `false` if any of the names are invalid.
-    fn add_names(&mut self, exprs: &[ast::Expr]) -> bool {
+    fn add_names(&mut self, exprs: NodeList<'_, ruff_python_ast::kind::Expr>) -> bool {
         for expr in exprs {
             let Some(name) = create_name(expr) else {
                 return false;
@@ -230,17 +234,19 @@ impl<'db> DunderAllNamesCollector<'db> {
 }
 
 impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
-    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: Stmt<'db>) {
         if self.invalid {
             return;
         }
 
-        match stmt {
-            ast::Stmt::ImportFrom(import_from @ ast::StmtImportFrom { names, .. }) => {
-                for ast::Alias { name, asname, .. } in names {
+        match stmt.classify() {
+            ast::StmtKind::ImportFrom(import_from) => {
+                for alias in import_from.names() {
+                    let name = alias.name();
+                    let asname = alias.asname();
                     // `from module import *` where `module` is a module with a top-level `__all__`
                     // variable that contains the "__all__" element.
-                    if name == "*" {
+                    if *name == *"*" {
                         // Here, we need to use the `dunder_all_names` query instead of the
                         // `exported_names` query because a `*`-import does not import the
                         // `__all__` attribute unless it is explicitly included in the `__all__` of
@@ -258,8 +264,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                     } else {
                         // `from module import __all__`
                         // `from module import __all__ as __all__`
-                        if name != "__all__"
-                            || asname.as_ref().is_some_and(|asname| asname != "__all__")
+                        if *name != *"__all__" || asname.is_some_and(|asname| *asname != *"__all__")
                         {
                             continue;
                         }
@@ -276,18 +281,19 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                let [target] = targets.as_slice() else {
+            ast::StmtKind::Assign(assign) => {
+                let ast::StmtAssignFields { targets, value, .. } = assign.fields();
+                let Some([target]) = targets.as_array() else {
                     return;
                 };
                 if !is_dunder_all(target) {
                     return;
                 }
-                match &**value {
+                match value.fields() {
                     // `__all__ = [...]`
                     // `__all__ = (...)`
-                    ast::Expr::List(ast::ExprList { elts, .. })
-                    | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                    ast::ExprFields::List(ast::ExprListFields { elts, .. })
+                    | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
                         self.update_origin(DunderAllOrigin::CurrentModule);
                         if !self.add_names(elts) {
                             self.invalid = true;
@@ -299,37 +305,28 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::Stmt::AugAssign(ast::StmtAugAssign {
-                target,
-                op: ast::Operator::Add,
-                value,
-                ..
-            }) => {
+            ast::StmtKind::AugAssign(assign) if assign.op() == Operator::Add => {
                 if self.origin.is_none() {
                     // We can't update `__all__` if it doesn't already exist.
                     return;
                 }
-                if !is_dunder_all(target) {
+                if !is_dunder_all(assign.target()) {
                     return;
                 }
-                if !self.extend(value) {
+                if !self.extend(assign.value()) {
                     self.invalid = true;
                 }
             }
 
-            ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                if !is_dunder_all(target) {
+            ast::StmtKind::AnnAssign(assign) if let Some(value) = assign.value() => {
+                if !is_dunder_all(assign.target()) {
                     return;
                 }
-                match &**value {
+                match value.fields() {
                     // `__all__: list[str] = [...]`
                     // `__all__: tuple[str, ...] = (...)`
-                    ast::Expr::List(ast::ExprList { elts, .. })
-                    | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                    ast::ExprFields::List(ast::ExprListFields { elts, .. })
+                    | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
                         self.update_origin(DunderAllOrigin::CurrentModule);
                         if !self.add_names(elts) {
                             self.invalid = true;
@@ -341,23 +338,24 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::Stmt::Expr(ast::StmtExpr { value: expr, .. }) => {
+            ast::StmtKind::Expr(stmt) => {
+                let expr = stmt.value();
                 if self.origin.is_none() {
                     // We can't update `__all__` if it doesn't already exist.
                     return;
                 }
-                let Some(ast::ExprCall {
+                let Some(ast::ExprCallFields {
                     func, arguments, ..
-                }) = expr.as_call_expr()
+                }) = expr.as_call_expr().map(ExprCall::fields)
                 else {
                     return;
                 };
-                let Some(ast::ExprAttribute {
+                let Some(ast::ExprAttributeFields {
                     value,
                     attr,
-                    ctx: ast::ExprContext::Load,
+                    ctx: ExprContext::Load,
                     ..
-                }) = func.as_attribute_expr()
+                }) = func.as_attribute_expr().map(ExprAttribute::fields)
                 else {
                     return;
                 };
@@ -369,15 +367,12 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::Stmt::If(ast::StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                ..
-            }) => match self.evaluate_test_expr(test) {
-                Some(Truthiness::AlwaysTrue) => self.visit_body(body),
+            ast::StmtKind::If(stmt) => match self.evaluate_test_expr(stmt.test()) {
+                Some(Truthiness::AlwaysTrue) => self.visit_body(stmt.body()),
                 Some(Truthiness::AlwaysFalse) => {
-                    for ast::ElifElseClause { test, body, .. } in elif_else_clauses {
+                    for elif_else_clause in stmt.elif_else_clauses() {
+                        let test = elif_else_clause.test();
+                        let body = elif_else_clause.body();
                         if let Some(test) = test {
                             match self.evaluate_test_expr(test) {
                                 Some(Truthiness::AlwaysTrue) => {
@@ -397,33 +392,31 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 Some(Truthiness::Ambiguous | Truthiness::Uninhabited) | None => {}
             },
 
-            ast::Stmt::For(..)
-            | ast::Stmt::While(..)
-            | ast::Stmt::With(..)
-            | ast::Stmt::Match(..)
-            | ast::Stmt::Try(..) => {
-                walk_stmt(self, stmt);
-            }
+            kind @ (ast::StmtKind::For(..)
+            | ast::StmtKind::While(..)
+            | ast::StmtKind::With(..)
+            | ast::StmtKind::Match(..)
+            | ast::StmtKind::Try(..)) => walk_stmt(self, kind),
 
-            ast::Stmt::FunctionDef(..) | ast::Stmt::ClassDef(..) => {
+            ast::StmtKind::FunctionDef(..) | ast::StmtKind::ClassDef(..) => {
                 // Avoid recursing into any nested scopes as `__all__` is only valid at the module
                 // level.
             }
 
-            ast::Stmt::AugAssign(..)
-            | ast::Stmt::AnnAssign(..)
-            | ast::Stmt::Delete(..)
-            | ast::Stmt::Return(..)
-            | ast::Stmt::Raise(..)
-            | ast::Stmt::Assert(..)
-            | ast::Stmt::Import(..)
-            | ast::Stmt::Global(..)
-            | ast::Stmt::Nonlocal(..)
-            | ast::Stmt::TypeAlias(..)
-            | ast::Stmt::Pass(..)
-            | ast::Stmt::Break(..)
-            | ast::Stmt::Continue(..)
-            | ast::Stmt::IpyEscapeCommand(..) => {}
+            ast::StmtKind::AugAssign(..)
+            | ast::StmtKind::AnnAssign(..)
+            | ast::StmtKind::Delete(..)
+            | ast::StmtKind::Return(..)
+            | ast::StmtKind::Raise(..)
+            | ast::StmtKind::Assert(..)
+            | ast::StmtKind::Import(..)
+            | ast::StmtKind::Global(..)
+            | ast::StmtKind::Nonlocal(..)
+            | ast::StmtKind::TypeAlias(..)
+            | ast::StmtKind::Pass(..)
+            | ast::StmtKind::Break(..)
+            | ast::StmtKind::Continue(..)
+            | ast::StmtKind::IpyEscapeCommand(..) => {}
         }
     }
 }
@@ -441,12 +434,13 @@ enum DunderAllOrigin {
 }
 
 /// Checks if the given expression is a name expression for `__all__`.
-fn is_dunder_all(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
+fn is_dunder_all(expr: Expr<'_>) -> bool {
+    expr.as_name_expr()
+        .is_some_and(|name| name.id() == "__all__")
 }
 
 /// Create and return a [`Name`] from the given expression, [`None`] if it is an invalid expression
 /// for a `__all__` element.
-fn create_name(expr: &ast::Expr) -> Option<Name> {
-    Some(Name::new(expr.as_string_literal_expr()?.value.to_str()))
+fn create_name(expr: Expr<'_>) -> Option<Name> {
+    Some(Name::new(expr.as_string_literal_expr()?.value().to_str()))
 }

@@ -29,8 +29,7 @@ Module(
                             arguments: Arguments {
                                 range: 4..5,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -51,11 +50,7 @@ Module(
                     parameters: Parameters {
                         range: 14..16,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [

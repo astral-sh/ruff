@@ -1,5 +1,5 @@
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Keyword};
+use ruff_python_ast::{ExprKind, NodeList};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -61,27 +61,20 @@ impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {
 }
 
 /// UP033
-pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[Decorator]) {
+pub(crate) fn lru_cache_with_maxsize_none(
+    checker: &Checker,
+    decorator_list: NodeList<'_, ruff_python_ast::kind::Decorator>,
+) {
     for decorator in decorator_list {
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                    node_index: _,
-                },
-            range_start: _,
-            node_index: _,
-        }) = &decorator.expression
-        else {
+        let ExprKind::Call(call) = decorator.expression().classify() else {
             continue;
         };
+        let func = call.func();
+        let arguments = call.arguments();
 
         // Look for, e.g., `import functools; @functools.lru_cache(maxsize=None)`.
-        if args.is_empty()
-            && keywords.len() == 1
+        if let Some([ruff_python_ast::ArgOrKeyword::Keyword(keyword)]) =
+            arguments.items().as_array()
             && checker
                 .semantic()
                 .resolve_qualified_name(func)
@@ -89,13 +82,9 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[D
                     matches!(qualified_name.segments(), ["functools", "lru_cache"])
                 })
         {
-            let Keyword {
-                arg,
-                value,
-                range: _,
-                node_index: _,
-            } = &keywords[0];
-            if arg.as_ref().is_some_and(|arg| arg == "maxsize") && value.is_none_literal_expr() {
+            let arg = keyword.arg();
+            let value = keyword.value();
+            if arg.is_some_and(|arg| arg == "maxsize") && value.is_none_literal_expr() {
                 let mut diagnostic = checker.report_diagnostic(
                     LRUCacheWithMaxsizeNone,
                     TextRange::new(func.end(), decorator.end()),
@@ -107,11 +96,11 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[D
                         checker.semantic(),
                     )?;
                     let reference_edit =
-                        Edit::range_replacement(binding, decorator.expression.range());
+                        Edit::range_replacement(binding, decorator.expression().range());
 
                     let applicability = if checker
                         .comment_ranges()
-                        .intersects(decorator.expression.range())
+                        .intersects(decorator.expression().range())
                     {
                         Applicability::Unsafe
                     } else {

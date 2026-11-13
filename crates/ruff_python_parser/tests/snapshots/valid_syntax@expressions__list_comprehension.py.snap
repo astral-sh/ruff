@@ -136,18 +136,19 @@ Module(
                                             arguments: Arguments {
                                                 range: 45..48,
                                                 node_index: NodeIndex(None),
-                                                args: [
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 46..47,
-                                                            value: Int(
-                                                                5,
-                                                            ),
-                                                        },
+                                                items: [
+                                                    Positional(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 46..47,
+                                                                value: Int(
+                                                                    5,
+                                                                ),
+                                                            },
+                                                        ),
                                                     ),
                                                 ],
-                                                keywords: [],
                                             },
                                         },
                                     ),
@@ -1051,38 +1052,39 @@ Module(
                                             arguments: Arguments {
                                                 range: 437..456,
                                                 node_index: NodeIndex(None),
-                                                args: [
-                                                    If(
-                                                        ExprIf {
-                                                            node_index: NodeIndex(None),
-                                                            range: 438..455,
-                                                            test: BooleanLiteral(
-                                                                ExprBooleanLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 443..447,
-                                                                    value: true,
-                                                                },
-                                                            ),
-                                                            body: Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 438..439,
-                                                                    id: Name("x"),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            orelse: List(
-                                                                ExprList {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 453..455,
-                                                                    elts: [],
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                        },
+                                                items: [
+                                                    Positional(
+                                                        If(
+                                                            ExprIf {
+                                                                node_index: NodeIndex(None),
+                                                                range: 438..455,
+                                                                test: BooleanLiteral(
+                                                                    ExprBooleanLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 443..447,
+                                                                        value: true,
+                                                                    },
+                                                                ),
+                                                                body: Name(
+                                                                    ExprName {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 438..439,
+                                                                        id: Name("x"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                orelse: List(
+                                                                    ExprList {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 453..455,
+                                                                        elts: [],
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
                                                     ),
                                                 ],
-                                                keywords: [],
                                             },
                                         },
                                     ),
@@ -1232,27 +1234,25 @@ Module(
                                                 Parameters {
                                                     range: 667..668,
                                                     node_index: NodeIndex(None),
-                                                    posonlyargs: [],
-                                                    args: [
-                                                        ParameterWithDefault {
-                                                            range: 667..668,
-                                                            node_index: NodeIndex(None),
-                                                            parameter: Parameter {
+                                                    items: [
+                                                        PositionalOrKeyword(
+                                                            ParameterWithDefault {
                                                                 range: 667..668,
                                                                 node_index: NodeIndex(None),
-                                                                name: Identifier {
-                                                                    id: Name("y"),
+                                                                parameter: Parameter {
                                                                     range: 667..668,
                                                                     node_index: NodeIndex(None),
+                                                                    name: Identifier {
+                                                                        id: Name("y"),
+                                                                        range: 667..668,
+                                                                        node_index: NodeIndex(None),
+                                                                    },
+                                                                    annotation: None,
                                                                 },
-                                                                annotation: None,
+                                                                default: None,
                                                             },
-                                                            default: None,
-                                                        },
+                                                        ),
                                                     ],
-                                                    vararg: None,
-                                                    kwonlyargs: [],
-                                                    kwarg: None,
                                                 },
                                             ),
                                             body: Name(
@@ -1438,27 +1438,25 @@ Module(
                                                     Parameters {
                                                         range: 769..770,
                                                         node_index: NodeIndex(None),
-                                                        posonlyargs: [],
-                                                        args: [
-                                                            ParameterWithDefault {
-                                                                range: 769..770,
-                                                                node_index: NodeIndex(None),
-                                                                parameter: Parameter {
+                                                        items: [
+                                                            PositionalOrKeyword(
+                                                                ParameterWithDefault {
                                                                     range: 769..770,
                                                                     node_index: NodeIndex(None),
-                                                                    name: Identifier {
-                                                                        id: Name("y"),
+                                                                    parameter: Parameter {
                                                                         range: 769..770,
                                                                         node_index: NodeIndex(None),
+                                                                        name: Identifier {
+                                                                            id: Name("y"),
+                                                                            range: 769..770,
+                                                                            node_index: NodeIndex(None),
+                                                                        },
+                                                                        annotation: None,
                                                                     },
-                                                                    annotation: None,
+                                                                    default: None,
                                                                 },
-                                                                default: None,
-                                                            },
+                                                            ),
                                                         ],
-                                                        vararg: None,
-                                                        kwonlyargs: [],
-                                                        kwarg: None,
                                                     },
                                                 ),
                                                 body: Name(

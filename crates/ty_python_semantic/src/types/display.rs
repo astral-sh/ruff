@@ -888,14 +888,14 @@ pub(super) fn qualified_name_components_from_scope(
         match ancestor_scope.kind() {
             ScopeKind::Class => {
                 if let Some(class_def) = node.as_class() {
-                    name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
+                    name_parts.push(class_def.node(&module_ast).name().as_str().to_string());
                 }
             }
             ScopeKind::Function => {
                 if let Some(function_def) = node.as_function() {
                     name_parts.push(format!(
                         "<locals of function '{}'>",
-                        function_def.node(&module_ast).name.as_str()
+                        function_def.node(&module_ast).name().as_str()
                     ));
                 }
             }

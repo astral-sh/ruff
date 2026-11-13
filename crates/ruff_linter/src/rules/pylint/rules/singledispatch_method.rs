@@ -1,5 +1,4 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_semantic::Scope;
 use ruff_python_semantic::analyze::function_type;
 use ruff_text_size::Ranged;
@@ -74,18 +73,15 @@ pub(crate) fn singledispatch_method(checker: &Checker, scope: &Scope) {
         return;
     };
 
-    let ast::StmtFunctionDef {
-        name,
-        decorator_list,
-        ..
-    } = func;
+    let name = func.name();
+    let decorator_list = func.decorator_list();
 
     let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
 
     let type_ = function_type::classify(
-        name,
+        name.as_str(),
         decorator_list,
         parent,
         checker.semantic(),
@@ -104,7 +100,7 @@ pub(crate) fn singledispatch_method(checker: &Checker, scope: &Scope) {
     for decorator in decorator_list {
         if checker
             .semantic()
-            .resolve_qualified_name(&decorator.expression)
+            .resolve_qualified_name(decorator.expression())
             .is_some_and(|qualified_name| {
                 matches!(qualified_name.segments(), ["functools", "singledispatch"])
             })
@@ -117,7 +113,7 @@ pub(crate) fn singledispatch_method(checker: &Checker, scope: &Scope) {
                     checker.semantic(),
                 )?;
                 Ok(Fix::unsafe_edits(
-                    Edit::range_replacement(binding, decorator.expression.range()),
+                    Edit::range_replacement(binding, decorator.expression().range()),
                     [import_edit],
                 ))
             });

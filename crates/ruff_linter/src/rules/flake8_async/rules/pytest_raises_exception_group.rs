@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast::{Expr, ExprCallFields, Keyword};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -73,19 +73,19 @@ impl Violation for PytestRaisesExceptionGroup {
 }
 
 /// ASYNC401
-pub(crate) fn pytest_raises_exception_group(checker: &Checker, call: &ExprCall) {
+pub(crate) fn pytest_raises_exception_group(checker: &Checker, call: &ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::PYTEST) {
         return;
     }
 
     let Some(qualified_name) = checker
         .semantic()
-        .resolve_qualified_name(map_subscript(&call.func))
+        .resolve_qualified_name(map_subscript(call.func))
     else {
         return;
     };
 
-    let is_exception_group = |expr: &&Expr| contains_exception_group(expr, checker.semantic());
+    let is_exception_group = |expr: &Expr<'_>| contains_exception_group(*expr, checker.semantic());
     let (exception, nested) = match qualified_name.segments() {
         ["pytest", "raises"] => (
             call.arguments
@@ -94,14 +94,14 @@ pub(crate) fn pytest_raises_exception_group(checker: &Checker, call: &ExprCall) 
             false,
         ),
         ["pytest", "RaisesExc"] => (
-            call.arguments.args.first().filter(is_exception_group),
+            call.arguments.args().first().filter(is_exception_group),
             false,
         ),
-        ["pytest", "RaisesGroup"] => (call.arguments.args.iter().find(is_exception_group), true),
+        ["pytest", "RaisesGroup"] => (call.arguments.args().iter().find(is_exception_group), true),
         ["pytest", "mark", "xfail"] => (
             call.arguments
                 .find_keyword("raises")
-                .map(|keyword| &keyword.value)
+                .map(Keyword::value)
                 .filter(is_exception_group),
             false,
         ),
@@ -113,8 +113,8 @@ pub(crate) fn pytest_raises_exception_group(checker: &Checker, call: &ExprCall) 
     }
 }
 
-fn contains_exception_group(expr: &Expr, semantic: &SemanticModel) -> bool {
-    if let Expr::Tuple(tuple) = expr {
+fn contains_exception_group(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
+    if let Some(tuple) = expr.as_tuple_expr() {
         return tuple
             .iter()
             .any(|element| contains_exception_group(element, semantic));

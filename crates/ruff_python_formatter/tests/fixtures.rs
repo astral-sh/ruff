@@ -1,4 +1,4 @@
-use crate::normalizer::Normalizer;
+use crate::normalizer::normalize_module;
 use anyhow::anyhow;
 use datatest_stable::Utf8Path;
 use insta::assert_snapshot;
@@ -8,9 +8,8 @@ use ruff_db::diagnostic::{
     Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_formatter::FormatOptions;
-use ruff_python_ast::Mod;
+use ruff_python_ast::AstNode as _;
 use ruff_python_ast::comparable::ComparableMod;
-use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_source, format_range};
 use ruff_python_parser::{ParseOptions, Parsed, UnsupportedSyntaxError, parse};
 use ruff_source_file::{LineIndex, OneIndexed, SourceFileBuilder};
@@ -456,10 +455,8 @@ fn ensure_unchanged_ast(
 
     let unformatted_unsupported_syntax_errors =
         collect_unsupported_syntax_errors(&unformatted_parsed);
-    let mut unformatted_ast = unformatted_parsed.into_syntax();
-
-    Normalizer.visit_module(&mut unformatted_ast);
-    let unformatted_ast = ComparableMod::from(&unformatted_ast);
+    let unformatted_ast = normalize_module(unformatted_parsed.root());
+    let unformatted_ast = ComparableMod::from(unformatted_ast.root());
 
     // Parse the formatted code.
     let formatted_parsed = parse(
@@ -499,9 +496,8 @@ fn ensure_unchanged_ast(
         })
         .collect::<Vec<_>>();
 
-    let mut formatted_ast = formatted_parsed.into_syntax();
-    Normalizer.visit_module(&mut formatted_ast);
-    let formatted_ast = ComparableMod::from(&formatted_ast);
+    let formatted_ast = normalize_module(formatted_parsed.root());
+    let formatted_ast = ComparableMod::from(formatted_ast.root());
 
     if formatted_ast != unformatted_ast {
         let diff = TextDiff::from_lines(
@@ -593,44 +589,9 @@ nested-string-quote-style  = {nested_string_quote_style}"#,
     }
 }
 
-/// A visitor to collect a sequence of node IDs for fingerprinting [`UnsupportedSyntaxError`]s.
-///
-/// It visits each statement in the AST in source order and saves its range. The index of the node
-/// enclosing a syntax error's range can then be retrieved with the `node_id` method. This `node_id`
-/// should be stable across formatting runs since the formatter won't add or remove statements.
-struct StmtVisitor {
-    nodes: Vec<TextRange>,
-}
-
-impl StmtVisitor {
-    fn new(parsed: &Parsed<Mod>) -> Self {
-        let mut visitor = Self { nodes: Vec::new() };
-        visitor.visit_mod(parsed.syntax());
-        visitor
-    }
-
-    /// Return the index of the statement node that contains `range`.
-    fn node_id(&self, range: TextRange) -> usize {
-        self.nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, node)| node.contains_range(range))
-            .min_by_key(|(_, node)| node.len())
-            .expect("Expected an enclosing node in the AST")
-            .0
-    }
-}
-
-impl<'a> SourceOrderVisitor<'a> for StmtVisitor {
-    fn visit_stmt(&mut self, stmt: &'a ruff_python_ast::Stmt) {
-        self.nodes.push(stmt.range());
-        ruff_python_ast::visitor::source_order::walk_stmt(self, stmt);
-    }
-}
-
 /// Collects the unsupported syntax errors and assigns a unique hash to each error.
 fn collect_unsupported_syntax_errors(
-    parsed: &Parsed<Mod>,
+    parsed: &Parsed<ruff_python_ast::kind::Mod>,
 ) -> FxHashMap<u64, UnsupportedSyntaxError> {
     let mut collected = FxHashMap::default();
 
@@ -638,10 +599,21 @@ fn collect_unsupported_syntax_errors(
         return collected;
     }
 
-    let visitor = StmtVisitor::new(parsed);
+    // Statement indices stay stable across formatting, even when their source ranges change.
+    let statements: Vec<_> = parsed
+        .root()
+        .descendant_statements()
+        .map(|stmt| stmt.range())
+        .collect();
 
     for error in parsed.unsupported_syntax_errors() {
-        let node_id = visitor.node_id(error.range);
+        let node_id = statements
+            .iter()
+            .enumerate()
+            .filter(|(_, range)| range.contains_range(error.range))
+            .min_by_key(|(_, range)| range.len())
+            .expect("Expected an enclosing statement for an unsupported syntax error")
+            .0;
         let mut error_fingerprint = fingerprint_unsupported_syntax_error(error, node_id, 0);
 
         // Make sure that we do not get a fingerprint that is already in use

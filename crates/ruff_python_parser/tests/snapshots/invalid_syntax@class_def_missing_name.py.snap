@@ -53,8 +53,7 @@ Module(
                         Arguments {
                             range: 18..20,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [],
+                            items: [],
                         },
                     ),
                     body: [
@@ -88,27 +87,28 @@ Module(
                         Arguments {
                             range: 32..47,
                             node_index: NodeIndex(None),
-                            args: [],
-                            keywords: [
-                                Keyword {
-                                    range: 33..46,
-                                    node_index: NodeIndex(None),
-                                    arg: Some(
-                                        Identifier {
-                                            id: Name("metaclass"),
-                                            range: 33..42,
-                                            node_index: NodeIndex(None),
-                                        },
-                                    ),
-                                    value: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 43..46,
-                                            id: Name("ABC"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
+                            items: [
+                                Keyword(
+                                    Keyword {
+                                        range: 33..46,
+                                        node_index: NodeIndex(None),
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("metaclass"),
+                                                range: 33..42,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 43..46,
+                                                id: Name("ABC"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
                             ],
                         },
                     ),

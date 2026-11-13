@@ -13,5 +13,5 @@ match subject:
     case Foo(Bar()=1):
         pass
     # Positional pattern cannot follow keyword pattern
-    # case Foo(x, y=1, z):
-    #     pass
+    case Foo(x, y=1, z):
+        pass

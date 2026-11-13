@@ -1,12 +1,17 @@
 use std::borrow::Cow;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::{from_relative_import, map_subscript, resolve_imported_module_path};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Alias, Expr, ExprContext, PySourceType, PythonVersion, Stmt};
+use ruff_python_ast::{
+    self as ast, Alias, Ast, AstNode, Expr, ExprContext, ExprKind, PySourceType, PythonVersion,
+    Stmt, StmtKind, SyntaxNode,
+};
+use ruff_python_parser::Parsed;
 use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -20,7 +25,7 @@ use crate::branches::{BranchId, Branches};
 use crate::context::ExecutionContext;
 use crate::definition::{Definition, DefinitionId, Definitions, Member, Module};
 use crate::globals::{Globals, GlobalsArena};
-use crate::nodes::{NodeId, NodeRef, Nodes};
+use crate::nodes::{NodeId, Nodes};
 use crate::reference::{
     ResolvedReference, ResolvedReferenceId, ResolvedReferences, UnresolvedReference,
     UnresolvedReferenceFlags, UnresolvedReferences,
@@ -199,13 +204,13 @@ pub struct SemanticModel<'a> {
     /// ```
     pub handled_exceptions: Vec<Exceptions>,
 
-    /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
-    /// it resolved (represented as a [`BindingId`]).
-    resolved_names: FxHashMap<NameId, BindingId>,
+    /// The binding resolved at each use of a name.
+    resolved_names: ResolvedNames<'a>,
 }
 
 impl<'a> SemanticModel<'a> {
     pub fn new(
+        parsed: &'a Parsed<ast::kind::ModModule>,
         typing_modules: &'a [String],
         custom_builtins: &'a [String],
         target_version: PythonVersion,
@@ -238,7 +243,7 @@ impl<'a> SemanticModel<'a> {
             seen: Modules::empty(),
             lazy_modules: None,
             handled_exceptions: Vec::default(),
-            resolved_names: FxHashMap::default(),
+            resolved_names: ResolvedNames::new(parsed),
         };
 
         let builtin_count = python_builtins(target_version.minor, source_type.is_ipynb()).count()
@@ -267,7 +272,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
-    pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
+    pub fn match_typing_expr(&self, expr: Expr<'_>, target: &str) -> bool {
         self.seen_typing()
             && self
                 .resolve_qualified_name(expr)
@@ -406,13 +411,16 @@ impl<'a> SemanticModel<'a> {
     /// This method returns `true` both for "builtin bindings"
     /// (present even without any imports, e.g. `open()`), and for explicit lookups
     /// via the `builtins` module (e.g. `import builtins; builtins.open()`).
-    pub fn resolve_builtin_symbol<'expr>(&'a self, expr: &'expr Expr) -> Option<&'a str>
+    pub fn resolve_builtin_symbol<'name, 'expr: 'name>(
+        &self,
+        expr: Expr<'expr>,
+    ) -> Option<&'name str>
     where
-        'expr: 'a,
+        'a: 'name,
     {
         // Fast path: we only need to worry about name expressions
         if !self.seen_module(Modules::BUILTINS) {
-            let name = &expr.as_name_expr()?.id;
+            let name = expr.as_name_expr()?.id().as_str();
             return if self.has_builtin_binding(name) {
                 Some(name)
             } else {
@@ -431,13 +439,14 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if `expr` is a reference to `builtins.$target`,
     /// i.e. either `object` (where `object` is not overridden in the global scope),
     /// or `builtins.object` (where `builtins` is imported as a module at the top level)
-    pub fn match_builtin_expr(&self, expr: &Expr, symbol: &str) -> bool {
+    pub fn match_builtin_expr(&self, expr: Expr<'_>, symbol: &str) -> bool {
         debug_assert!(!symbol.contains('.'));
         // fast path with more short-circuiting
         if !self.seen_module(Modules::BUILTINS) {
-            let Expr::Name(ast::ExprName { id, .. }) = expr else {
+            let Some(name_node) = expr.as_name_expr() else {
                 return false;
             };
+            let id = name_node.id();
             return id == symbol && self.has_builtin_binding(symbol);
         }
 
@@ -487,11 +496,11 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Resolve a `load` reference to an [`ast::ExprName`].
-    pub fn resolve_load(&mut self, name: &'a ast::ExprName) -> ReadResult {
+    pub fn resolve_load(&mut self, name: ast::ExprName<'a>) -> ReadResult {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
-            if let Some(binding_id) = self.scopes.global().get(name.id.as_str()) {
+            if let Some(binding_id) = self.scopes.global().get(name.id().as_str()) {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
                     let reference_id = self.resolved_references.push(
@@ -499,25 +508,25 @@ impl<'a> SemanticModel<'a> {
                         self.node_id,
                         ExprContext::Load,
                         self.flags,
-                        name.range,
+                        name.range(),
                     );
                     self.bindings[binding_id].references.push(reference_id);
 
                     // Mark any submodule aliases as used.
                     if let Some(binding_id) =
-                        self.resolve_submodule(name.id.as_str(), ScopeId::global(), binding_id)
+                        self.resolve_submodule(name.id().as_str(), ScopeId::global(), binding_id)
                     {
                         let reference_id = self.resolved_references.push(
                             ScopeId::global(),
                             self.node_id,
                             ExprContext::Load,
                             self.flags,
-                            name.range,
+                            name.range(),
                         );
                         self.bindings[binding_id].references.push(reference_id);
                     }
 
-                    self.resolved_names.insert(name.into(), binding_id);
+                    self.resolved_names.insert(name, binding_id);
                     return ReadResult::Resolved(binding_id);
                 }
             }
@@ -558,27 +567,27 @@ impl<'a> SemanticModel<'a> {
                 (ScopeKind::Type, 0) | (ScopeKind::DunderClassCell, 1)
             );
 
-            if let Some(binding_id) = scope.get(name.id.as_str()) {
+            if let Some(binding_id) = scope.get(name.id().as_str()) {
                 // Mark the binding as used.
                 let reference_id = self.resolved_references.push(
                     self.scope_id,
                     self.node_id,
                     ExprContext::Load,
                     self.flags,
-                    name.range,
+                    name.range(),
                 );
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) =
-                    self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
+                    self.resolve_submodule(name.id().as_str(), scope_id, binding_id)
                 {
                     let reference_id = self.resolved_references.push(
                         self.scope_id,
                         self.node_id,
                         ExprContext::Load,
                         self.flags,
-                        name.range,
+                        name.range(),
                     );
                     self.bindings[binding_id].references.push(reference_id);
                 }
@@ -608,7 +617,7 @@ impl<'a> SemanticModel<'a> {
                             .is_function()
                         {
                             self.unresolved_references.push(
-                                name.range,
+                                name.range(),
                                 self.exceptions(),
                                 Some(binding_id),
                                 UnresolvedReferenceFlags::empty(),
@@ -660,24 +669,24 @@ impl<'a> SemanticModel<'a> {
                                 // should still fire.
                                 let deletion_range = self.bindings[binding_id].range;
                                 if !self.bindings[shadowed_id].is_unbound()
-                                    && name.range.start() < deletion_range.start()
+                                    && name.range().start() < deletion_range.start()
                                 {
                                     let reference_id = self.resolved_references.push(
                                         self.scope_id,
                                         self.node_id,
                                         ExprContext::Load,
                                         self.flags,
-                                        name.range,
+                                        name.range(),
                                     );
                                     self.bindings[shadowed_id].references.push(reference_id);
-                                    self.resolved_names.insert(name.into(), shadowed_id);
+                                    self.resolved_names.insert(name, shadowed_id);
                                     return ReadResult::Resolved(shadowed_id);
                                 }
                             }
                         }
 
                         self.unresolved_references.push(
-                            name.range,
+                            name.range(),
                             self.exceptions(),
                             None,
                             UnresolvedReferenceFlags::empty(),
@@ -687,7 +696,7 @@ impl<'a> SemanticModel<'a> {
 
                     BindingKind::UnboundException(None) => {
                         self.unresolved_references.push(
-                            name.range,
+                            name.range(),
                             self.exceptions(),
                             None,
                             UnresolvedReferenceFlags::empty(),
@@ -717,25 +726,25 @@ impl<'a> SemanticModel<'a> {
                             self.node_id,
                             ExprContext::Load,
                             self.flags,
-                            name.range,
+                            name.range(),
                         );
                         self.bindings[binding_id].references.push(reference_id);
 
                         // Mark any submodule aliases as used.
                         if let Some(binding_id) =
-                            self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
+                            self.resolve_submodule(name.id().as_str(), scope_id, binding_id)
                         {
                             let reference_id = self.resolved_references.push(
                                 self.scope_id,
                                 self.node_id,
                                 ExprContext::Load,
                                 self.flags,
-                                name.range,
+                                name.range(),
                             );
                             self.bindings[binding_id].references.push(reference_id);
                         }
 
-                        self.resolved_names.insert(name.into(), binding_id);
+                        self.resolved_names.insert(name, binding_id);
                         return ReadResult::Resolved(binding_id);
                     }
 
@@ -747,18 +756,18 @@ impl<'a> SemanticModel<'a> {
                             self.node_id,
                             ExprContext::Load,
                             self.flags,
-                            name.range,
+                            name.range(),
                         );
                         self.bindings[binding_id].references.push(reference_id);
 
                         // Treat it as resolved.
-                        self.resolved_names.insert(name.into(), binding_id);
+                        self.resolved_names.insert(name, binding_id);
                         return ReadResult::Resolved(binding_id);
                     }
 
                     _ => {
                         // Otherwise, treat it as resolved.
-                        self.resolved_names.insert(name.into(), binding_id);
+                        self.resolved_names.insert(name, binding_id);
                         return ReadResult::Resolved(binding_id);
                     }
                 }
@@ -780,7 +789,7 @@ impl<'a> SemanticModel<'a> {
             //     print(__qualname__)
             // ```
             if index == 0 && scope.kind.is_class() {
-                if matches!(name.id.as_str(), "__module__" | "__qualname__") {
+                if matches!(name.id().as_str(), "__module__" | "__qualname__") {
                     return ReadResult::ImplicitGlobal;
                 }
             }
@@ -788,22 +797,22 @@ impl<'a> SemanticModel<'a> {
             import_starred = import_starred || scope.uses_star_imports();
         }
 
-        if let Some(binding_id) = self.materialize_builtin_binding(name.id.as_str()) {
+        if let Some(binding_id) = self.materialize_builtin_binding(name.id().as_str()) {
             let reference_id = self.resolved_references.push(
                 self.scope_id,
                 self.node_id,
                 ExprContext::Load,
                 self.flags,
-                name.range,
+                name.range(),
             );
             self.bindings[binding_id].references.push(reference_id);
-            self.resolved_names.insert(name.into(), binding_id);
+            self.resolved_names.insert(name, binding_id);
             return ReadResult::Resolved(binding_id);
         }
 
         if import_starred {
             self.unresolved_references.push(
-                name.range,
+                name.range(),
                 self.exceptions(),
                 None,
                 UnresolvedReferenceFlags::WILDCARD_IMPORT,
@@ -811,7 +820,7 @@ impl<'a> SemanticModel<'a> {
             ReadResult::WildcardImport
         } else {
             self.unresolved_references.push(
-                name.range,
+                name.range(),
                 self.exceptions(),
                 None,
                 UnresolvedReferenceFlags::empty(),
@@ -942,12 +951,12 @@ impl<'a> SemanticModel<'a> {
     /// results when referring to a [`BindingKind::NamedExprAssignment`].
     pub fn simulate_runtime_load(
         &self,
-        name: &ast::ExprName,
+        name: ast::ExprName<'_>,
         typing_only_bindings_status: TypingOnlyBindingsStatus,
     ) -> Option<BindingId> {
         self.simulate_runtime_load_at_location_in_scope(
-            name.id.as_str(),
-            name.range,
+            name.id().as_str(),
+            name.range(),
             self.scope_id,
             typing_only_bindings_status,
         )
@@ -1041,10 +1050,10 @@ impl<'a> SemanticModel<'a> {
                         // since the ranges for these two types of bindings are trimmed
                         // to just the target, but the name is not available until the
                         // end of the entire statement
-                        let binding_range = match binding.statement(self) {
-                            Some(Stmt::Assign(stmt)) => stmt.range(),
-                            Some(Stmt::AnnAssign(stmt)) => stmt.range(),
-                            Some(Stmt::ClassDef(stmt)) => stmt.range(),
+                        let binding_range = match binding.statement(self).map(Stmt::classify) {
+                            Some(StmtKind::Assign(stmt)) => stmt.range(),
+                            Some(StmtKind::AnnAssign(stmt)) => stmt.range(),
+                            Some(StmtKind::ClassDef(stmt)) => stmt.range(),
                             _ => binding.range,
                         };
 
@@ -1085,12 +1094,16 @@ impl<'a> SemanticModel<'a> {
     /// For example, given `["Class", "method"`], resolve the `BindingKind::ClassDefinition`
     /// associated with `Class`, then the `BindingKind::FunctionDefinition` associated with
     /// `Class.method`.
-    pub fn lookup_attribute(&self, value: &Expr) -> Option<BindingId> {
+    pub fn lookup_attribute(&self, value: Expr<'_>) -> Option<BindingId> {
         self.lookup_attribute_in_scope(value, self.scope_id)
     }
 
     /// Lookup a qualified attribute in the certain scope.
-    pub fn lookup_attribute_in_scope(&self, value: &Expr, scope_id: ScopeId) -> Option<BindingId> {
+    pub fn lookup_attribute_in_scope(
+        &self,
+        value: Expr<'_>,
+        scope_id: ScopeId,
+    ) -> Option<BindingId> {
         let unqualified_name = UnqualifiedName::from_expr(value)?;
 
         // Find the symbol in the current scope.
@@ -1158,13 +1171,13 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if any.
-    pub fn resolve_name(&self, name: &ast::ExprName) -> Option<BindingId> {
-        self.resolved_names.get(&name.into()).copied()
+    pub fn resolve_name(&self, name: ast::ExprName<'_>) -> Option<BindingId> {
+        self.resolved_names.get(name)
     }
 
     /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if it's the
     /// only binding to that name in its scope.
-    pub fn only_binding(&self, name: &ast::ExprName) -> Option<BindingId> {
+    pub fn only_binding(&self, name: ast::ExprName<'_>) -> Option<BindingId> {
         self.resolve_name(name).filter(|id| {
             let binding = self.binding(*id);
             let scope = &self.scopes[binding.scope];
@@ -1186,17 +1199,18 @@ impl<'a> SemanticModel<'a> {
     /// ...then `resolve_qualified_name(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_qualified_name<'name, 'expr: 'name>(
         &self,
-        value: &'expr Expr,
+        value: Expr<'expr>,
     ) -> Option<QualifiedName<'name>>
     where
         'a: 'name,
     {
         /// Return the [`ast::ExprName`] at the head of the expression, if any.
-        const fn match_head(value: &Expr) -> Option<&ast::ExprName> {
-            match value {
-                Expr::Attribute(ast::ExprAttribute { value, .. }) => match_head(value),
-                Expr::Name(name) => Some(name),
-                _ => None,
+        fn match_head(mut value: Expr<'_>) -> Option<ast::ExprName<'_>> {
+            loop {
+                if let Some(name) = value.as_name_expr() {
+                    return Some(name);
+                }
+                value = value.as_attribute_expr()?.value();
             }
         }
 
@@ -1204,15 +1218,15 @@ impl<'a> SemanticModel<'a> {
         let head = match_head(value)?;
         let symbol = self
             .resolve_name(head)
-            .map_or_else(|| self.lookup_symbol(&head.id), Symbol::Binding);
+            .map_or_else(|| self.lookup_symbol(head.id()), Symbol::Binding);
         let binding = match symbol {
             Symbol::Binding(binding_id) => self.binding(binding_id),
             Symbol::Builtin => {
                 if value.is_name_expr() {
-                    return Some(QualifiedName::builtin(head.id.as_str()));
+                    return Some(QualifiedName::builtin(head.id().as_str()));
                 }
 
-                return QualifiedName::builtin(head.id.as_str()).qualify(value);
+                return QualifiedName::builtin(head.id().as_str()).qualify(value);
             }
             Symbol::Unbound => return None,
         };
@@ -1239,10 +1253,10 @@ impl<'a> SemanticModel<'a> {
             BindingKind::Builtin => {
                 if value.is_name_expr() {
                     // Ex) `dict`
-                    Some(QualifiedName::builtin(head.id.as_str()))
+                    Some(QualifiedName::builtin(head.id().as_str()))
                 } else {
                     // Ex) `dict.__dict__`
-                    QualifiedName::builtin(head.id.as_str()).qualify(value)
+                    QualifiedName::builtin(head.id().as_str()).qualify(value)
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
@@ -1318,7 +1332,7 @@ impl<'a> SemanticModel<'a> {
                                     return Some(ImportedName {
                                         name: format!("{name}.{member}"),
                                         source,
-                                        range: self.nodes[source].range(),
+                                        range: self.nodes.node(source).range(),
                                         context: binding.context,
                                     });
                                 }
@@ -1344,7 +1358,7 @@ impl<'a> SemanticModel<'a> {
                                             return Some(ImportedName {
                                                 name: name.to_string(),
                                                 source,
-                                                range: self.nodes[source].range(),
+                                                range: self.nodes.node(source).range(),
                                                 context: binding.context,
                                             });
                                         }
@@ -1369,7 +1383,7 @@ impl<'a> SemanticModel<'a> {
                                     return Some(ImportedName {
                                         name: format!("{module}.{member}"),
                                         source,
-                                        range: self.nodes[source].range(),
+                                        range: self.nodes.node(source).range(),
                                         context: binding.context,
                                     });
                                 }
@@ -1398,12 +1412,13 @@ impl<'a> SemanticModel<'a> {
             })
     }
 
-    /// Push an AST node [`NodeRef`] onto the stack.
-    pub fn push_node<T: Into<NodeRef<'a>>>(&mut self, node: T) {
-        self.node_id = Some(self.nodes.insert(node.into(), self.node_id, self.branch_id));
+    /// Push a statement or expression onto the stack.
+    pub fn push_node(&mut self, node: SyntaxNode<'a>) {
+        debug_assert!(node.is_statement() || node.is_expression());
+        self.node_id = Some(self.nodes.insert(node, self.node_id, self.branch_id));
     }
 
-    /// Pop the current AST node [`NodeRef`] off the stack.
+    /// Pop the current statement or expression off the stack.
     pub fn pop_node(&mut self) {
         let node_id = self.node_id.expect("Attempted to pop without node");
         self.node_id = self.nodes.parent_id(node_id);
@@ -1454,46 +1469,46 @@ impl<'a> SemanticModel<'a> {
 
     /// Returns an [`Iterator`] over the current statement hierarchy, from the current [`Stmt`]
     /// through to any parents.
-    pub fn current_statements(&self) -> impl Iterator<Item = &'a Stmt> + '_ {
+    pub fn current_statements(&self) -> impl Iterator<Item = Stmt<'a>> + '_ {
         let id = self.node_id.expect("No current node");
         self.nodes
             .ancestor_ids(id)
-            .filter_map(move |id| self.nodes[id].as_statement())
+            .filter_map(move |id| self.nodes.statement(id))
     }
 
     /// Return the current [`Stmt`].
-    pub fn current_statement(&self) -> &'a Stmt {
+    pub fn current_statement(&self) -> Stmt<'a> {
         self.current_statements()
             .next()
             .expect("No current statement")
     }
 
     /// Return the parent [`Stmt`] of the current [`Stmt`], if any.
-    pub fn current_statement_parent(&self) -> Option<&'a Stmt> {
+    pub fn current_statement_parent(&self) -> Option<Stmt<'a>> {
         self.current_statements().nth(1)
     }
 
     /// Returns an [`Iterator`] over the current expression hierarchy, from the current [`Expr`]
     /// through to any parents.
-    pub fn current_expressions(&self) -> impl Iterator<Item = &'a Expr> + '_ {
+    pub fn current_expressions(&self) -> impl Iterator<Item = Expr<'a>> + '_ {
         let id = self.node_id.expect("No current node");
         self.nodes
             .ancestor_ids(id)
-            .map_while(move |id| self.nodes[id].as_expression())
+            .map_while(move |id| self.nodes.expression(id))
     }
 
     /// Return the current [`Expr`].
-    pub fn current_expression(&self) -> Option<&'a Expr> {
+    pub fn current_expression(&self) -> Option<Expr<'a>> {
         self.current_expressions().next()
     }
 
     /// Return the parent [`Expr`] of the current [`Expr`], if any.
-    pub fn current_expression_parent(&self) -> Option<&'a Expr> {
+    pub fn current_expression_parent(&self) -> Option<Expr<'a>> {
         self.current_expressions().nth(1)
     }
 
     /// Return the grandparent [`Expr`] of the current [`Expr`], if any.
-    pub fn current_expression_grandparent(&self) -> Option<&'a Expr> {
+    pub fn current_expression_grandparent(&self) -> Option<Expr<'a>> {
         self.current_expressions().nth(2)
     }
 
@@ -1503,7 +1518,7 @@ impl<'a> SemanticModel<'a> {
         self.node_id
             .iter()
             .flat_map(|id| self.nodes.ancestor_ids(*id))
-            .filter(|id| self.nodes[*id].is_statement())
+            .filter(|id| self.nodes.is_statement(*id))
     }
 
     /// Return the [`NodeId`] of the current [`Stmt`], if any.
@@ -1589,48 +1604,46 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
     #[inline]
-    pub fn node(&self, node_id: NodeId) -> &NodeRef<'a> {
-        &self.nodes[node_id]
+    pub fn node(&self, node_id: NodeId) -> SyntaxNode<'a> {
+        self.nodes.node(node_id)
     }
 
     /// Given a [`NodeId`], return its parent, if any.
     #[inline]
-    pub(crate) fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+    pub(crate) fn parent_expression(&self, node_id: NodeId) -> Option<Expr<'a>> {
         let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
-        self.nodes[parent_node_id].as_expression()
+        self.nodes.expression(parent_node_id)
     }
 
     /// Given a [`NodeId`], return the [`NodeId`] of the parent expression, if any.
     pub fn parent_expression_id(&self, node_id: NodeId) -> Option<NodeId> {
         let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
-        self.nodes[parent_node_id]
-            .is_expression()
-            .then_some(parent_node_id)
+        (!self.nodes.is_statement(parent_node_id)).then_some(parent_node_id)
     }
 
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
     #[inline]
-    pub fn statement(&self, node_id: NodeId) -> &'a Stmt {
+    pub fn statement(&self, node_id: NodeId) -> Stmt<'a> {
         self.nodes
             .ancestor_ids(node_id)
-            .find_map(|id| self.nodes[id].as_statement())
+            .find_map(|id| self.nodes.statement(id))
             .expect("No statement found")
     }
 
     /// Returns an [`Iterator`] over the statements, starting from the given [`NodeId`].
     /// through to any parents.
-    pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = &'a Stmt> + '_ {
+    pub fn statements(&self, node_id: NodeId) -> impl Iterator<Item = Stmt<'a>> + '_ {
         self.nodes
             .ancestor_ids(node_id)
-            .filter_map(move |id| self.nodes[id].as_statement())
+            .filter_map(move |id| self.nodes.statement(id))
     }
 
     /// Given a [`Stmt`], return its parent, if any.
     #[inline]
-    pub fn parent_statement(&self, node_id: NodeId) -> Option<&'a Stmt> {
+    pub fn parent_statement(&self, node_id: NodeId) -> Option<Stmt<'a>> {
         self.nodes
             .ancestor_ids(node_id)
-            .filter_map(|id| self.nodes[id].as_statement())
+            .filter_map(|id| self.nodes.statement(id))
             .nth(1)
     }
 
@@ -1638,22 +1651,22 @@ impl<'a> SemanticModel<'a> {
     pub fn parent_statement_id(&self, node_id: NodeId) -> Option<NodeId> {
         self.nodes
             .ancestor_ids(node_id)
-            .filter(|id| self.nodes[*id].is_statement())
+            .filter(|id| self.nodes.is_statement(*id))
             .nth(1)
     }
 
     /// Return the [`Expr`] corresponding to the given [`NodeId`].
     #[inline]
-    pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr> {
-        self.nodes[node_id].as_expression()
+    pub fn expression(&self, node_id: NodeId) -> Option<Expr<'a>> {
+        self.nodes.expression(node_id)
     }
 
     /// Returns an [`Iterator`] over the expressions, starting from the given [`NodeId`].
     /// through to any parents.
-    pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = &'a Expr> + '_ {
+    pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = Expr<'a>> + '_ {
         self.nodes
             .ancestor_ids(node_id)
-            .map_while(move |id| self.nodes[id].as_expression())
+            .map_while(move |id| self.nodes.expression(id))
     }
 
     /// Mark a Python module as "seen" by the semantic model. Future callers can quickly discount
@@ -1805,7 +1818,7 @@ impl<'a> SemanticModel<'a> {
         for scope in self.current_scopes() {
             match scope.kind {
                 ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
-                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Function(function) => return function.is_async(),
                 ScopeKind::Generator { .. }
                 | ScopeKind::Module
                 | ScopeKind::Type
@@ -1820,22 +1833,22 @@ impl<'a> SemanticModel<'a> {
     pub fn in_nested_union(&self) -> bool {
         let mut parent_expressions = self.current_expressions().skip(1);
 
-        match parent_expressions.next() {
+        match parent_expressions.next().map(Expr::classify) {
             // The parent expression of the inner union is a single `typing.Union`.
             // Ex) `Union[Union[a, b]]`
-            Some(Expr::Subscript(parent)) => self.match_typing_expr(&parent.value, "Union"),
+            Some(ExprKind::Subscript(parent)) => self.match_typing_expr(parent.value(), "Union"),
             // The parent expression is of the inner union is a tuple with two or more
             // comma-separated elements and the parent of that tuple is a `typing.Union`.
             // Ex) `Union[Union[a, b], Union[c, d]]`
-            Some(Expr::Tuple(_)) => parent_expressions
+            Some(ExprKind::Tuple(_)) => parent_expressions
                 .next()
-                .and_then(Expr::as_subscript_expr)
-                .is_some_and(|grandparent| self.match_typing_expr(&grandparent.value, "Union")),
+                .and_then(ast::Expr::as_subscript_expr)
+                .is_some_and(|grandparent| self.match_typing_expr(grandparent.value(), "Union")),
             // The parent expression of the inner union is a PEP604-style union.
             // Ex) `a | b | c` or `Union[a, b] | c`
             // In contrast to `typing.Union`, PEP604-style unions are always binary operations, e.g.
             // the expression `a | b | c` is represented by two binary unions: `(a | b) | c`.
-            Some(Expr::BinOp(bin_op)) => bin_op.op.is_bit_or(),
+            Some(ExprKind::BinOp(bin_op)) => bin_op.op().is_bit_or(),
             // Not a nested union otherwise.
             _ => false,
         }
@@ -1846,10 +1859,10 @@ impl<'a> SemanticModel<'a> {
     pub fn inside_optional(&self) -> bool {
         let mut parent_expressions = self.current_expressions().skip(1);
         matches!(
-            parent_expressions.next(),
+            parent_expressions.next().map(Expr::classify),
             // The parent expression is a single `typing.Optional`.
             // Ex) `Optional[EXPR]`
-            Some(Expr::Subscript(parent)) if self.match_typing_expr(&parent.value, "Optional")
+            Some(ExprKind::Subscript(parent)) if self.match_typing_expr(parent.value(), "Optional")
         )
     }
 
@@ -1858,17 +1871,17 @@ impl<'a> SemanticModel<'a> {
     pub fn in_nested_literal(&self) -> bool {
         let mut parent_expressions = self.current_expressions().skip(1);
 
-        match parent_expressions.next() {
+        match parent_expressions.next().map(Expr::classify) {
             // The parent expression of the current `Literal` is a tuple, and the
             // grandparent is a `Literal`.
             // Ex) `Literal[Literal[str], Literal[int]]`
-            Some(Expr::Tuple(_)) => parent_expressions
+            Some(ExprKind::Tuple(_)) => parent_expressions
                 .next()
-                .and_then(Expr::as_subscript_expr)
-                .is_some_and(|grandparent| self.match_typing_expr(&grandparent.value, "Literal")),
+                .and_then(ast::Expr::as_subscript_expr)
+                .is_some_and(|grandparent| self.match_typing_expr(grandparent.value(), "Literal")),
             // The parent expression of the current `Literal` is also a `Literal`.
             // Ex) `Literal[Literal[str]]`
-            Some(Expr::Subscript(parent)) => self.match_typing_expr(&parent.value, "Literal"),
+            Some(ExprKind::Subscript(parent)) => self.match_typing_expr(parent.value(), "Literal"),
             // Not a nested literal otherwise
             _ => false,
         }
@@ -1943,10 +1956,12 @@ impl<'a> SemanticModel<'a> {
     /// Returns `true` if the given expression is an unused variable, or consists solely of
     /// references to other unused variables. This method is conservative in that it considers a
     /// variable to be "used" if it's shadowed by another variable with usages.
-    pub fn is_unused(&self, expr: &Expr) -> bool {
-        match expr {
-            Expr::Tuple(tuple) => tuple.iter().all(|expr| self.is_unused(expr)),
-            Expr::Name(ast::ExprName { id, .. }) => {
+    pub fn is_unused(&self, expr: Expr<'_>) -> bool {
+        match expr.classify() {
+            ExprKind::Tuple(tuple) => tuple.iter().all(|expr| self.is_unused(expr)),
+            ExprKind::Name(expr_name) => {
+                let id = expr_name.id();
+
                 // Treat a variable as used if it has any usages, _or_ it's shadowed by another variable
                 // with usages.
                 //
@@ -2366,16 +2381,12 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Finds and returns the [`Scope`] corresponding to a given [`ast::StmtFunctionDef`].
-    ///
-    /// This method searches all scopes created by a function definition, comparing the
-    /// [`TextRange`] of the provided `function_def` with the range of the function
-    /// associated with the scope.
-    pub fn function_scope(&self, function_def: &ast::StmtFunctionDef) -> Option<&Scope<'_>> {
+    pub fn function_scope(&self, function_def: ast::StmtFunctionDef<'_>) -> Option<&Scope<'_>> {
         self.scopes.iter().find(|scope| {
             let Some(function) = scope.kind.as_function() else {
                 return false;
             };
-            function.range() == function_def.range()
+            function.is_same_node(function_def)
         })
     }
 
@@ -2388,7 +2399,7 @@ impl<'a> SemanticModel<'a> {
                 .iter()
                 .any(|base| self.match_typing_expr(map_subscript(base), "Protocol")),
             ScopeKind::Function(function_def) => {
-                visibility::is_abstract(&function_def.decorator_list, self)
+                visibility::is_abstract(function_def.decorator_list(), self)
             }
             _ => false,
         })
@@ -2396,10 +2407,10 @@ impl<'a> SemanticModel<'a> {
 
     /// Classify an import using its syntax and the current `__lazy_modules__` declaration.
     /// The caller must check that the import occurs in a context where laziness is allowed.
-    pub fn import_laziness(&self, statement: &Stmt, alias: &Alias) -> ImportLaziness {
-        let explicit = match statement {
-            Stmt::Import(import) => import.is_lazy,
-            Stmt::ImportFrom(import) => import.is_lazy,
+    pub fn import_laziness(&self, statement: Stmt<'_>, alias: Alias<'_>) -> ImportLaziness {
+        let explicit = match statement.classify() {
+            StmtKind::Import(import) => import.is_lazy(),
+            StmtKind::ImportFrom(import) => import.is_lazy(),
             _ => return ImportLaziness::Unknown,
         };
         if explicit {
@@ -2428,16 +2439,16 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Extract literal module names, merging conditional assignments with the current state.
-    pub fn set_lazy_modules(&mut self, value: &'a Expr) {
-        let names = match value {
-            Expr::List(ast::ExprList { elts, .. })
-            | Expr::Tuple(ast::ExprTuple { elts, .. })
-            | Expr::Set(ast::ExprSet { elts, .. }) => elts
+    pub fn set_lazy_modules(&mut self, value: Expr<'a>) {
+        let names = match value.fields() {
+            ast::ExprFields::List(ast::ExprListFields { elts, .. })
+            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. })
+            | ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => elts
                 .iter()
                 .map(|element| {
                     element
                         .as_string_literal_expr()
-                        .map(|literal| (literal.value.to_str(), ImportLaziness::Lazy))
+                        .map(|literal| (literal.value().to_str(), ImportLaziness::Lazy))
                 })
                 .collect::<Option<FxHashMap<_, _>>>(),
             _ => None,
@@ -2478,15 +2489,18 @@ impl<'a> SemanticModel<'a> {
     /// A `from package import member` statement tests `package`, not `package.member`.
     fn import_module_name<'b>(
         &self,
-        statement: &'b Stmt,
-        alias: &'b Alias,
+        statement: Stmt<'b>,
+        alias: Alias<'b>,
     ) -> Option<Cow<'b, str>> {
-        match statement {
-            Stmt::Import(_) => Some(Cow::Borrowed(alias.name.as_str())),
-            Stmt::ImportFrom(ast::StmtImportFrom { level, module, .. }) => {
+        match statement.classify() {
+            StmtKind::Import(_) => Some(Cow::Borrowed(alias.name().as_str())),
+            StmtKind::ImportFrom(stmt_import_from) => {
+                let level = stmt_import_from.level();
+                let module = stmt_import_from.module();
+
                 resolve_imported_module_path(
-                    *level,
-                    module.as_deref(),
+                    level,
+                    module.map(ast::Identifier::as_str),
                     self.module.qualified_name(),
                 )
             }
@@ -3185,7 +3199,7 @@ impl ImportedName {
         self.context
     }
 
-    pub fn statement<'a>(&self, semantic: &SemanticModel<'a>) -> &'a Stmt {
+    pub fn statement<'a>(&self, semantic: &SemanticModel<'a>) -> Stmt<'a> {
         semantic.statement(self.source)
     }
 }
@@ -3196,13 +3210,200 @@ impl Ranged for ImportedName {
     }
 }
 
-/// A unique identifier for an [`ast::ExprName`]. No two names can even appear at the same location
-/// in the source code, so the starting offset is a cheap and sufficient unique identifier.
-#[derive(Debug, Hash, PartialEq, Eq)]
-struct NameId(TextSize);
+/// Bindings for names in the current module are indexed by their AST row. Each
+/// slot stores the binding index plus one, with zero reserved for unresolved names.
+/// Allocate the row table on the first recorded binding. Switch to source offsets
+/// if a binding outgrows its slot or a separately parsed node is accessed. Offsets
+/// identify the same name across syntax trees.
+struct ResolvedNames<'a> {
+    ast: &'a Ast,
+    by_row: Box<[u16]>,
+    by_offset: OnceLock<FxHashMap<TextSize, BindingId>>,
+}
 
-impl From<&ast::ExprName> for NameId {
-    fn from(name: &ast::ExprName) -> Self {
-        Self(name.start())
+impl<'a> ResolvedNames<'a> {
+    fn new(parsed: &'a Parsed<ast::kind::ModModule>) -> Self {
+        // Recovery can create distinct name expressions at the same source offset.
+        let by_offset = if parsed.has_invalid_syntax() {
+            OnceLock::from(FxHashMap::default())
+        } else {
+            OnceLock::new()
+        };
+        Self {
+            ast: parsed.ast(),
+            by_row: Box::default(),
+            by_offset,
+        }
+    }
+
+    fn decode(raw: u16) -> Option<BindingId> {
+        u32::from(raw).checked_sub(1).map(BindingId::from_u32)
+    }
+
+    fn offsets(&self) -> &FxHashMap<TextSize, BindingId> {
+        self.by_offset.get_or_init(|| {
+            (0u32..)
+                .zip(self.by_row.iter())
+                .filter_map(|(slot, id)| {
+                    let binding = Self::decode(*id)?;
+                    Some((self.ast.row(slot)?.start(), binding))
+                })
+                .collect()
+        })
+    }
+
+    #[inline]
+    fn get(&self, name: ast::ExprName<'_>) -> Option<BindingId> {
+        if std::ptr::eq(self.ast, name.ast()) && self.by_offset.get().is_none() {
+            self.by_row
+                .get(name.node_id().index())
+                .copied()
+                .and_then(Self::decode)
+        } else {
+            self.get_by_offset(name.start())
+        }
+    }
+
+    #[cold]
+    fn get_by_offset(&self, start: TextSize) -> Option<BindingId> {
+        self.offsets().get(&start).copied()
+    }
+
+    #[inline]
+    fn insert(&mut self, name: ast::ExprName<'_>, binding: BindingId) {
+        if std::ptr::eq(self.ast, name.ast())
+            && self.by_offset.get().is_none()
+            && let Ok(raw) = u16::try_from(binding.as_u32() + 1)
+        {
+            let row = name.node_id().index();
+            if let Some(slot) = self.by_row.get_mut(row) {
+                *slot = raw;
+            } else {
+                self.allocate_rows(row, raw);
+            }
+            return;
+        }
+
+        self.offsets();
+        if let Some(map) = self.by_offset.get_mut() {
+            // A foreign lookup can initialize the offset map through a shared reference.
+            // The next write can release the row table.
+            self.by_row = Box::default();
+            map.insert(name.start(), binding);
+        }
+    }
+
+    #[cold]
+    fn allocate_rows(&mut self, row: usize, raw: u16) {
+        self.by_row = vec![0; self.ast.len()].into_boxed_slice();
+        self.by_row[row] = raw;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_python_parser::typing::parse_type_annotation;
+    use ruff_python_parser::{Mode, parse_expression_range, parse_module, parse_unchecked};
+    use ruff_text_size::Ranged;
+
+    use super::{BindingId, ResolvedNames};
+
+    #[test]
+    fn reparsed_name_recovers_its_binding_at_the_same_offset() {
+        let source = "left; right";
+        let module = parse_module(source).unwrap();
+        let [left, right] = module.suite().as_array().unwrap();
+        let left = left.as_expr_stmt().unwrap().value().as_name_expr().unwrap();
+        let right = right
+            .as_expr_stmt()
+            .unwrap()
+            .value()
+            .as_name_expr()
+            .unwrap();
+        let reparsed = parse_expression_range(source, right.range()).unwrap();
+        let reparsed_right = reparsed.expr().as_name_expr().unwrap();
+
+        let mut names = ResolvedNames::new(&module);
+        assert_eq!(names.get(left), None);
+        assert!(names.by_row.is_empty());
+        let left_binding = BindingId::from_usize(0);
+        let right_binding = BindingId::from_usize(1);
+        names.insert(left, left_binding);
+        names.insert(right, right_binding);
+        assert_eq!(names.get(reparsed_right), Some(right_binding));
+
+        names.insert(right, left_binding);
+        assert!(names.by_row.is_empty());
+        assert_eq!(names.get(reparsed_right), Some(left_binding));
+        names.insert(reparsed_right, right_binding);
+        assert_eq!(names.get(right), Some(right_binding));
+        assert_eq!(names.get(left), Some(left_binding));
+    }
+
+    #[test]
+    fn quoted_annotation_bindings_survive_reparsing() {
+        let source = "keep; 'Some' 'Type'";
+        let module = parse_module(source).unwrap();
+        let [keep, string] = module.suite().as_array().unwrap();
+        let keep = keep.as_expr_stmt().unwrap().value().as_name_expr().unwrap();
+        let string = string
+            .as_expr_stmt()
+            .unwrap()
+            .value()
+            .as_string_literal_expr()
+            .unwrap();
+        let first_parse = parse_type_annotation(string, source).unwrap();
+        let second_parse = parse_type_annotation(string, source).unwrap();
+        let first = first_parse.expression().as_name_expr().unwrap();
+        let second = second_parse.expression().as_name_expr().unwrap();
+        assert_eq!(first.range(), string.range());
+
+        let mut names = ResolvedNames::new(&module);
+        let keep_binding = BindingId::from_usize(0);
+        let annotation_binding = BindingId::from_usize(1);
+        names.insert(keep, keep_binding);
+        names.insert(first, annotation_binding);
+        assert_eq!(names.get(second), Some(annotation_binding));
+        assert_eq!(names.get(keep), Some(keep_binding));
+    }
+
+    #[test]
+    fn binding_ids_beyond_the_compact_range_preserve_recorded_bindings() {
+        let module = parse_module("a; b").unwrap();
+        let [a, b] = module.suite().as_array().unwrap();
+        let a = a.as_expr_stmt().unwrap().value().as_name_expr().unwrap();
+        let b = b.as_expr_stmt().unwrap().value().as_name_expr().unwrap();
+        let max_compact = BindingId::from_u32(u32::from(u16::MAX) - 1);
+        let first_wide = max_compact + 1;
+
+        let mut names = ResolvedNames::new(&module);
+        assert_eq!(names.get(a), None);
+        names.insert(a, max_compact);
+        assert_eq!(names.get(a), Some(max_compact));
+        assert_eq!(names.get(b), None);
+        names.insert(b, first_wide);
+        assert_eq!(names.get(a), Some(max_compact));
+        assert_eq!(names.get(b), Some(first_wide));
+    }
+
+    #[test]
+    fn recovered_names_at_one_offset_share_the_latest_binding() {
+        let module = parse_unchecked("x if\n", Mode::Module.into())
+            .try_into_module()
+            .unwrap();
+        let [stmt] = module.suite().as_array().unwrap();
+        let conditional = stmt.as_expr_stmt().unwrap().value().as_if_expr().unwrap();
+        let test = conditional.test().as_name_expr().unwrap();
+        let otherwise = conditional.orelse().as_name_expr().unwrap();
+        assert!(module.has_invalid_syntax());
+        assert_eq!(test.range(), otherwise.range());
+
+        let mut names = ResolvedNames::new(&module);
+        let first = BindingId::from_usize(0);
+        let second = BindingId::from_usize(1);
+        names.insert(test, first);
+        assert_eq!(names.get(otherwise), Some(first));
+        names.insert(otherwise, second);
+        assert_eq!(names.get(test), Some(second));
     }
 }

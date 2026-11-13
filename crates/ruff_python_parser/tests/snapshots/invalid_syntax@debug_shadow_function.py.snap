@@ -25,11 +25,7 @@ Module(
                     parameters: Parameters {
                         range: 13..15,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -83,11 +79,7 @@ Module(
                     parameters: Parameters {
                         range: 54..56,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -121,27 +113,25 @@ Module(
                     parameters: Parameters {
                         range: 90..101,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 91..100,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 91..100,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("__debug__"),
+                                    parameter: Parameter {
                                         range: 91..100,
                                         node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("__debug__"),
+                                            range: 91..100,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
                                     },
-                                    annotation: None,
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [
@@ -172,27 +162,25 @@ Module(
                                 Parameters {
                                     range: 132..141,
                                     node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [
-                                        ParameterWithDefault {
-                                            range: 132..141,
-                                            node_index: NodeIndex(None),
-                                            parameter: Parameter {
+                                    items: [
+                                        PositionalOrKeyword(
+                                            ParameterWithDefault {
                                                 range: 132..141,
                                                 node_index: NodeIndex(None),
-                                                name: Identifier {
-                                                    id: Name("__debug__"),
+                                                parameter: Parameter {
                                                     range: 132..141,
                                                     node_index: NodeIndex(None),
+                                                    name: Identifier {
+                                                        id: Name("__debug__"),
+                                                        range: 132..141,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                    annotation: None,
                                                 },
-                                                annotation: None,
+                                                default: None,
                                             },
-                                            default: None,
-                                        },
+                                        ),
                                     ],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
                                 },
                             ),
                             body: NumberLiteral(

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{self as ast, CmpOp, Expr, Int};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprKind, Int};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -125,8 +125,8 @@ impl Violation for WrongTupleLengthVersionComparison {
 }
 
 /// PYI003, PYI004, PYI005
-pub(crate) fn unrecognized_version_info(checker: &Checker, test: &Expr) {
-    let Expr::Compare(compare) = test else {
+pub(crate) fn unrecognized_version_info(checker: &Checker, test: Expr<'_>) {
+    let ExprKind::Compare(compare) = test.classify() else {
         return;
     };
 
@@ -143,7 +143,7 @@ pub(crate) fn unrecognized_version_info(checker: &Checker, test: &Expr) {
     }
 
     if let Some(expected) = ExpectedComparator::try_from(left) {
-        version_check(checker, expected, test, *op, comparator);
+        version_check(checker, expected, test, op, comparator);
     } else {
         checker.report_diagnostic_if_enabled(UnrecognizedVersionInfoCheck, test.range());
     }
@@ -152,9 +152,9 @@ pub(crate) fn unrecognized_version_info(checker: &Checker, test: &Expr) {
 fn version_check(
     checker: &Checker,
     expected: ExpectedComparator,
-    test: &Expr,
+    test: Expr<'_>,
     op: CmpOp,
-    comparator: &Expr,
+    comparator: Expr<'_>,
 ) {
     // Single digit comparison, e.g., `sys.version_info[0] == 2`.
     if expected == ExpectedComparator::MajorDigit {
@@ -165,7 +165,7 @@ fn version_check(
     }
 
     // Tuple comparison, e.g., `sys.version_info == (3, 4)`.
-    let Expr::Tuple(tuple) = comparator else {
+    let ExprKind::Tuple(tuple) = comparator.classify() else {
         checker.report_diagnostic_if_enabled(UnrecognizedVersionInfoCheck, test.range());
         return;
     };
@@ -174,7 +174,7 @@ fn version_check(
         // All tuple elements must be integers, e.g., `sys.version_info == (3, 4)` instead of
         // `sys.version_info == (3.0, 4)`.
         checker.report_diagnostic_if_enabled(UnrecognizedVersionInfoCheck, test.range());
-    } else if tuple.len() > 2 {
+    } else if tuple.elts().len() > 2 {
         // Must compare against major and minor version only, e.g., `sys.version_info == (3, 4)`
         // instead of `sys.version_info == (3, 4, 0)`.
         checker.report_diagnostic_if_enabled(PatchVersionComparison, test.range());
@@ -188,7 +188,7 @@ fn version_check(
                 _ => return,
             };
 
-            if tuple.len() != expected_length {
+            if tuple.elts().len() != expected_length {
                 checker.report_diagnostic(
                     WrongTupleLengthVersionComparison { expected_length },
                     test.range(),
@@ -208,25 +208,22 @@ enum ExpectedComparator {
 
 impl ExpectedComparator {
     /// Returns the expected comparator for the given expression, if any.
-    fn try_from(expr: &Expr) -> Option<Self> {
-        let Expr::Subscript(ast::ExprSubscript { slice, .. }) = expr else {
+    fn try_from(expr: Expr<'_>) -> Option<Self> {
+        let ExprKind::Subscript(subscript) = expr.classify() else {
             return Some(ExpectedComparator::AnyTuple);
         };
+        let slice = subscript.slice();
 
         // Only allow: (1) simple slices of the form `[:n]`, or (2) explicit indexing into the first
         // element (major version) of the tuple.
-        match slice.as_ref() {
-            Expr::Slice(ast::ExprSlice {
+        match slice.fields() {
+            ast::ExprFields::Slice(ast::ExprSliceFields {
                 lower: None,
                 upper: Some(upper),
                 step: None,
                 ..
             }) => {
-                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(upper),
-                    ..
-                }) = upper.as_ref()
-                {
+                if let Some(upper) = upper.as_int_literal() {
                     if *upper == 1 {
                         return Some(ExpectedComparator::MajorTuple);
                     }
@@ -235,7 +232,7 @@ impl ExpectedComparator {
                     }
                 }
             }
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                 value: ast::Number::Int(Int::ZERO),
                 ..
             }) => {
@@ -249,12 +246,6 @@ impl ExpectedComparator {
 }
 
 /// Returns `true` if the given expression is an integer constant.
-fn is_int_constant(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(_),
-            ..
-        })
-    )
+fn is_int_constant(expr: Expr<'_>) -> bool {
+    expr.as_int_literal().is_some()
 }

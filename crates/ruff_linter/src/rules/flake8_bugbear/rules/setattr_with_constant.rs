@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
+use ruff_python_ast::Arguments;
+use ruff_python_ast::{Builder, Expr, ExprContext, ExprKind, StmtKind, build};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -8,6 +9,7 @@ use unicode_normalization::UnicodeNormalization;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::rules::flake8_bugbear::helpers::attribute_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -75,33 +77,36 @@ impl AlwaysFixableViolation for SetAttrWithConstant {
     }
 }
 
-fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> String {
-    let stmt = Stmt::Assign(ast::StmtAssign {
-        targets: vec![Expr::Attribute(ast::ExprAttribute {
-            value: Box::new(obj.clone()),
-            attr: Identifier::new(name.to_string(), TextRange::default()),
-            ctx: ExprContext::Store,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })],
-        value: Box::new(value.clone()),
+fn assignment(obj: Expr<'_>, name: &str, value: Expr<'_>, generator: Generator) -> String {
+    let mut builder = Builder::default();
+    let targets = attribute_target(&mut builder, obj, name, ExprContext::Store);
+    let value = builder.copy_node(value);
+    let stmt = builder.add(build::StmtAssign {
+        targets,
+        value,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
-    generator.stmt(&stmt)
+    generator.stmt(builder.get(stmt).into())
 }
 
 /// B010
-pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let [obj, name, value] = args else {
+pub(crate) fn setattr_with_constant(
+    checker: &Checker,
+    &expr: &Expr<'_>,
+    func: Expr<'_>,
+    arguments: Arguments<'_>,
+) {
+    let args = arguments.args();
+    let Some([obj, name, value]) = args.as_array() else {
         return;
     };
     if obj.is_starred_expr() {
         return;
     }
-    let Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }) = name else {
+    let ExprKind::StringLiteral(string_literal) = name.classify() else {
         return;
     };
+    let name = string_literal.value();
     if !is_identifier(name.to_str()) {
         return;
     }
@@ -125,28 +130,24 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `Stmt::Expr`).
-    if let Stmt::Expr(ast::StmtExpr {
-        value: child,
-        range: statement_range,
-        node_index: _,
-    }) = checker.semantic().current_statement()
+    if let StmtKind::Expr(expr_node) = checker.semantic().current_statement().classify()
+        && expr == expr_node.value()
     {
-        if expr == child.as_ref() {
-            // Replace the whole statement rather than just the call, so that any parentheses
-            // around the call are removed too: `(obj.attr = value)` is a syntax error.
-            let has_comments = checker.comment_ranges().intersects(*statement_range);
-            let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
-            let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
-            let edit = Edit::range_replacement(
-                assignment(obj, name.to_str(), value, checker.generator()),
-                *statement_range,
-            );
-            let fix = if is_unsafe {
-                Fix::unsafe_edit(edit)
-            } else {
-                Fix::safe_edit(edit)
-            };
-            diagnostic.set_fix(fix);
-        }
+        // Replace the whole statement rather than just the call, so that any parentheses
+        // around the call are removed too: `(obj.attr = value)` is a syntax error.
+        let statement_range = expr_node.range();
+        let has_comments = checker.comment_ranges().intersects(statement_range);
+        let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
+        let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
+        let edit = Edit::range_replacement(
+            assignment(obj, name.to_str(), value, checker.generator()),
+            statement_range,
+        );
+        let fix = if is_unsafe {
+            Fix::unsafe_edit(edit)
+        } else {
+            Fix::safe_edit(edit)
+        };
+        diagnostic.set_fix(fix);
     }
 }

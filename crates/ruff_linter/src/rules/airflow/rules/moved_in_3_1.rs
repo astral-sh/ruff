@@ -6,7 +6,7 @@ use crate::rules::airflow::helpers::{
 };
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprAttribute, ExprName};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
 use ruff_text_size::TextRange;
 
@@ -79,14 +79,15 @@ impl Violation for Airflow31Moved {
 }
 
 /// AIR321
-pub(crate) fn airflow_3_1_moved_expr(checker: &Checker, expr: &Expr) {
+pub(crate) fn airflow_3_1_moved_expr(checker: &Checker, &expr: &Expr<'_>) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    match expr {
-        Expr::Attribute(ExprAttribute { range, .. }) | Expr::Name(ExprName { range, .. }) => {
-            check_name(checker, expr, *range);
+    match expr.fields() {
+        ast::ExprFields::Attribute(ast::ExprAttributeFields { range, .. })
+        | ast::ExprFields::Name(ast::ExprNameFields { range, .. }) => {
+            check_name(checker, expr, range);
         }
         _ => {}
     }
@@ -107,7 +108,7 @@ pub(crate) fn airflow_3_1_moved_expr(checker: &Checker, expr: &Expr) {
 /// # Or, directly
 /// convert_to_utc(datetime.now())
 /// ```
-fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
+fn check_name(checker: &Checker, expr: Expr<'_>, range: TextRange) {
     let semantic = checker.semantic();
 
     let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {

@@ -29,42 +29,45 @@ Module(
                             arguments: Arguments {
                                 range: 7..18,
                                 node_index: NodeIndex(None),
-                                args: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 8..11,
-                                            id: Name("foo"),
-                                            ctx: Load,
-                                        },
+                                items: [
+                                    Positional(
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 8..11,
+                                                id: Name("foo"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                    List(
-                                        ExprList {
-                                            node_index: NodeIndex(None),
-                                            range: 13..18,
-                                            elts: [
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 14..15,
-                                                        id: Name("a"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 17..18,
-                                                        id: Name("b"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            ],
-                                            ctx: Load,
-                                        },
+                                    Positional(
+                                        List(
+                                            ExprList {
+                                                node_index: NodeIndex(None),
+                                                range: 13..18,
+                                                elts: [
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 14..15,
+                                                            id: Name("a"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 17..18,
+                                                            id: Name("b"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
                                 ],
-                                keywords: [],
                             },
                         },
                     ),
@@ -84,11 +87,7 @@ Module(
                                 parameters: Parameters {
                                     range: 31..33,
                                     node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
+                                    items: [],
                                 },
                                 returns: None,
                                 body: [

@@ -1,10 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyNodeRef, Expr, ExprContext, ExprSubscript, ExprTuple};
+use ruff_python_ast::{Builder, Expr, ExprKind, SyntaxNode};
 use ruff_python_semantic::analyze::typing::traverse_literal;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -77,14 +78,14 @@ impl Violation for UnnecessaryNestedLiteral {
 }
 
 /// RUF041
-pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
+pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, &literal_expr: &Expr<'a>) {
     let mut is_nested = false;
 
     // Traverse the type expressions in the `Literal`.
     traverse_literal(
-        &mut |_: &'a Expr, parent: &'a Expr| {
+        &mut |_: Expr<'a>, parent: Expr<'a>| {
             // If the parent is not equal to the `literal_expr` then we know we are traversing recursively.
-            if !AnyNodeRef::ptr_eq(parent.into(), literal_expr.into()) {
+            if !SyntaxNode::ptr_eq(parent.into(), literal_expr.into()) {
                 is_nested = true;
             }
         },
@@ -97,7 +98,7 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
     }
 
     // Collect the literal nodes for the fix
-    let mut nodes: Vec<&Expr> = Vec::new();
+    let mut nodes: Vec<Expr<'_>> = Vec::new();
 
     traverse_literal(
         &mut |expr, _| {
@@ -110,26 +111,15 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
     let mut diagnostic = checker.report_diagnostic(UnnecessaryNestedLiteral, literal_expr.range());
 
     // Create a [`Fix`] that flattens all nodes.
-    if let Expr::Subscript(subscript) = literal_expr {
-        let subscript = Expr::Subscript(ExprSubscript {
-            slice: Box::new(if let [elt] = nodes.as_slice() {
-                (*elt).clone()
-            } else {
-                Expr::Tuple(ExprTuple {
-                    elts: nodes.into_iter().cloned().collect(),
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    ctx: ExprContext::Load,
-                    parenthesized: false,
-                })
-            }),
-            value: subscript.value.clone(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            ctx: ExprContext::Load,
-        });
+    if let ExprKind::Subscript(subscript) = literal_expr.classify() {
+        let mut builder = Builder::default();
+        let value = builder.copy_node(subscript.value());
+        let replacement = syntax::subscript_members(&mut builder, value, nodes.into_iter());
         let fix = Fix::applicable_edit(
-            Edit::range_replacement(checker.generator().expr(&subscript), literal_expr.range()),
+            Edit::range_replacement(
+                checker.generator().expr(builder.get(replacement)),
+                literal_expr.range(),
+            ),
             if checker.comment_ranges().intersects(literal_expr.range()) {
                 Applicability::Unsafe
             } else {

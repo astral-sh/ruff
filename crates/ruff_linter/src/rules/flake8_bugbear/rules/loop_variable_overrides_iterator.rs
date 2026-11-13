@@ -52,7 +52,11 @@ impl Violation for LoopVariableOverridesIterator {
 }
 
 /// B020
-pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr, iter: &Expr) {
+pub(crate) fn loop_variable_overrides_iterator(
+    checker: &Checker,
+    target: Expr<'_>,
+    iter: Expr<'_>,
+) {
     let target_names = {
         let mut target_finder = NameFinder::default();
         target_finder.visit_expr(target);
@@ -68,13 +72,13 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr,
         clippy::iter_over_hash_type,
         reason = "iteration order does not affect the diagnostics produced"
     )]
-    for (name, expr) in target_names {
-        if iter_names.contains_key(name) {
+    for (id, name) in target_names {
+        if iter_names.contains_key(&id) {
             checker.report_diagnostic(
                 LoopVariableOverridesIterator {
-                    name: name.to_string(),
+                    name: name.id().to_string(),
                 },
-                expr.range(),
+                name.range(),
             );
         }
     }
@@ -82,42 +86,36 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr,
 
 #[derive(Default)]
 struct NameFinder<'a> {
-    names: FxHashMap<&'a str, &'a Expr>,
+    names: FxHashMap<ast::NameId, ast::ExprName<'a>>,
 }
 
 impl<'a> Visitor<'a> for NameFinder<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Name(ast::ExprName { id, .. }) => {
-                self.names.insert(id, expr);
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        let generators = match expr.classify() {
+            ast::ExprKind::Name(name) => {
+                self.names.insert(name.name_id(), name);
+                return;
             }
-            Expr::ListComp(ast::ExprListComp { generators, .. })
-            | Expr::SetComp(ast::ExprSetComp { generators, .. })
-            | Expr::Generator(ast::ExprGenerator { generators, .. }) => {
-                for comp in generators {
-                    self.visit_expr(&comp.iter);
-                }
-            }
-            Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
-                for comp in generators.as_ref() {
-                    self.visit_expr(&comp.iter);
-                }
-            }
-            Expr::Lambda(ast::ExprLambda {
-                parameters,
-                body,
-                range: _,
-                node_index: _,
-            }) => {
-                visitor::walk_expr(self, body);
-
-                if let Some(parameters) = parameters {
+            ast::ExprKind::ListComp(comp) => comp.generators(),
+            ast::ExprKind::SetComp(comp) => comp.generators(),
+            ast::ExprKind::DictComp(comp) => comp.generators(),
+            ast::ExprKind::Generator(comp) => comp.generators(),
+            ast::ExprKind::Lambda(lambda) => {
+                visitor::walk_expr(self, lambda.body().classify());
+                if let Some(parameters) = lambda.parameters() {
                     for parameter in parameters.iter_non_variadic_params() {
-                        self.names.remove(parameter.name().as_str());
+                        self.names.remove(&parameter.name().name_id());
                     }
                 }
+                return;
             }
-            _ => visitor::walk_expr(self, expr),
+            kind => {
+                visitor::walk_expr(self, kind);
+                return;
+            }
+        };
+        for comp in generators {
+            self.visit_expr(comp.iter());
         }
     }
 }

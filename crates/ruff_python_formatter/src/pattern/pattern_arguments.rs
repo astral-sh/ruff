@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Pattern, PatternArguments};
+use ruff_python_ast::{Pattern, PatternArguments, PatternOrKeyword};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -9,15 +9,15 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatPatternArguments;
 
-impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
-    fn fmt_fields(&self, item: &PatternArguments, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ruff_python_ast::kind::PatternArguments> for FormatPatternArguments {
+    fn fmt_fields(&self, item: PatternArguments<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         // If there are no arguments, all comments are dangling:
         // ```python
         // case Point2D(  # dangling
         //     # dangling
         // )
         // ```
-        if item.patterns.is_empty() && item.keywords.is_empty() {
+        if item.items().is_empty() {
             let comments = f.context().comments().clone();
             let dangling = comments.dangling(item);
             return write!(f, [empty_parenthesized("(", dangling, ")")]);
@@ -26,8 +26,8 @@ impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
             let mut joiner = f.join_comma_separated(item.end());
-            match item.patterns.as_slice() {
-                [pattern] if item.keywords.is_empty() => {
+            match item.items().as_array() {
+                Some([PatternOrKeyword::Pattern(pattern)]) => {
                     let parentheses =
                         if is_single_argument_parenthesized(pattern, item.end(), source) {
                             Parentheses::Always
@@ -37,17 +37,22 @@ impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
                             // parenthesized.
                             Parentheses::Never
                         };
-                    joiner.entry(pattern, &pattern.format().with_options(parentheses));
+                    joiner.entry(&pattern, &pattern.format().with_options(parentheses));
                 }
-                patterns => {
-                    joiner
-                        .entries(patterns.iter().map(|pattern| {
-                            (
-                                pattern,
-                                pattern.format().with_options(Parentheses::Preserve),
-                            )
-                        }))
-                        .nodes(&item.keywords);
+                _ => {
+                    for argument in item.items() {
+                        match argument {
+                            PatternOrKeyword::Pattern(pattern) => {
+                                joiner.entry(
+                                    &pattern,
+                                    &pattern.format().with_options(Parentheses::Preserve),
+                                );
+                            }
+                            PatternOrKeyword::Keyword(keyword) => {
+                                joiner.entry(&keyword, &keyword.format());
+                            }
+                        }
+                    }
                 }
             }
 
@@ -78,7 +83,11 @@ impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
 /// ```python
 /// case Point2D(x): ...
 /// ```
-fn is_single_argument_parenthesized(pattern: &Pattern, call_end: TextSize, source: &str) -> bool {
+fn is_single_argument_parenthesized(
+    pattern: Pattern<'_>,
+    call_end: TextSize,
+    source: &str,
+) -> bool {
     let mut has_seen_r_paren = false;
     for token in SimpleTokenizer::new(source, TextRange::new(pattern.end(), call_end)).skip_trivia()
     {

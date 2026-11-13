@@ -825,93 +825,94 @@ Module(
                                         arguments: Arguments {
                                             range: 341..382,
                                             node_index: NodeIndex(None),
-                                            args: [
-                                                Generator(
-                                                    ExprGenerator {
-                                                        node_index: NodeIndex(None),
-                                                        range: 342..381,
-                                                        elt: Call(
-                                                            ExprCall {
-                                                                node_index: NodeIndex(None),
-                                                                range: 342..361,
-                                                                func: Name(
-                                                                    ExprName {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 342..347,
-                                                                        id: Name("call2"),
-                                                                        ctx: Load,
-                                                                    },
-                                                                ),
-                                                                arguments: Arguments {
-                                                                    range: 347..361,
+                                            items: [
+                                                Positional(
+                                                    Generator(
+                                                        ExprGenerator {
+                                                            node_index: NodeIndex(None),
+                                                            range: 342..381,
+                                                            elt: Call(
+                                                                ExprCall {
                                                                     node_index: NodeIndex(None),
-                                                                    args: [
-                                                                        Call(
-                                                                            ExprCall {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 348..360,
-                                                                                func: Attribute(
-                                                                                    ExprAttribute {
+                                                                    range: 342..361,
+                                                                    func: Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 342..347,
+                                                                            id: Name("call2"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    arguments: Arguments {
+                                                                        range: 347..361,
+                                                                        node_index: NodeIndex(None),
+                                                                        items: [
+                                                                            Positional(
+                                                                                Call(
+                                                                                    ExprCall {
                                                                                         node_index: NodeIndex(None),
-                                                                                        range: 348..358,
-                                                                                        value: Name(
-                                                                                            ExprName {
+                                                                                        range: 348..360,
+                                                                                        func: Attribute(
+                                                                                            ExprAttribute {
                                                                                                 node_index: NodeIndex(None),
-                                                                                                range: 348..353,
-                                                                                                id: Name("value"),
+                                                                                                range: 348..358,
+                                                                                                value: Name(
+                                                                                                    ExprName {
+                                                                                                        node_index: NodeIndex(None),
+                                                                                                        range: 348..353,
+                                                                                                        id: Name("value"),
+                                                                                                        ctx: Load,
+                                                                                                    },
+                                                                                                ),
+                                                                                                attr: Identifier {
+                                                                                                    id: Name("attr"),
+                                                                                                    range: 354..358,
+                                                                                                    node_index: NodeIndex(None),
+                                                                                                },
                                                                                                 ctx: Load,
                                                                                             },
                                                                                         ),
-                                                                                        attr: Identifier {
-                                                                                            id: Name("attr"),
-                                                                                            range: 354..358,
+                                                                                        arguments: Arguments {
+                                                                                            range: 358..360,
                                                                                             node_index: NodeIndex(None),
+                                                                                            items: [],
                                                                                         },
-                                                                                        ctx: Load,
                                                                                     },
                                                                                 ),
-                                                                                arguments: Arguments {
-                                                                                    range: 358..360,
-                                                                                    node_index: NodeIndex(None),
-                                                                                    args: [],
-                                                                                    keywords: [],
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                    ],
-                                                                    keywords: [],
+                                                                            ),
+                                                                        ],
+                                                                    },
                                                                 },
-                                                            },
-                                                        ),
-                                                        generators: [
-                                                            Comprehension {
-                                                                range: 362..381,
-                                                                node_index: NodeIndex(None),
-                                                                target: Name(
-                                                                    ExprName {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 366..373,
-                                                                        id: Name("element"),
-                                                                        ctx: Store,
-                                                                    },
-                                                                ),
-                                                                iter: Name(
-                                                                    ExprName {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 377..381,
-                                                                        id: Name("iter"),
-                                                                        ctx: Load,
-                                                                    },
-                                                                ),
-                                                                ifs: [],
-                                                                is_async: false,
-                                                            },
-                                                        ],
-                                                        parenthesized: false,
-                                                    },
+                                                            ),
+                                                            generators: [
+                                                                Comprehension {
+                                                                    range: 362..381,
+                                                                    node_index: NodeIndex(None),
+                                                                    target: Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 366..373,
+                                                                            id: Name("element"),
+                                                                            ctx: Store,
+                                                                        },
+                                                                    ),
+                                                                    iter: Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 377..381,
+                                                                            id: Name("iter"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    ifs: [],
+                                                                    is_async: false,
+                                                                },
+                                                            ],
+                                                            parenthesized: false,
+                                                        },
+                                                    ),
                                                 ),
                                             ],
-                                            keywords: [],
                                         },
                                     },
                                 ),

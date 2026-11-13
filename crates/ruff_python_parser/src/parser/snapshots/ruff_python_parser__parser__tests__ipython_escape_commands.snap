@@ -155,11 +155,7 @@ Module(
                     parameters: Parameters {
                         range: 573..575,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -253,18 +249,19 @@ Module(
                             arguments: Arguments {
                                 range: 725..728,
                                 node_index: NodeIndex(None),
-                                args: [
-                                    NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 726..727,
-                                            value: Int(
-                                                5,
-                                            ),
-                                        },
+                                items: [
+                                    Positional(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 726..727,
+                                                value: Int(
+                                                    5,
+                                                ),
+                                            },
+                                        ),
                                     ),
                                 ],
-                                keywords: [],
                             },
                         },
                     ),

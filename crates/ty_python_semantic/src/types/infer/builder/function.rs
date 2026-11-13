@@ -59,6 +59,7 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
+use ruff_python_ast::{ArgOrKeyword, ExprKind, StmtKind, SyntaxNode, TypeParamKind};
 use ruff_python_edits::unwrapped_call_argument;
 use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_python_core::{
@@ -70,18 +71,18 @@ use ty_python_core::{
 use ruff_python_ast::{self as ast, find_node::covering_node};
 use ruff_text_size::Ranged;
 
-fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
+fn parameters_have_defaults(parameters: ast::Parameters<'_>) -> bool {
     parameters
         .iter_non_variadic_params()
-        .any(|param| param.default.is_some())
+        .any(|param| param.default().is_some())
 }
 
-fn function_has_deferred_annotations(function: &ast::StmtFunctionDef) -> bool {
-    function.type_params.is_none()
-        && (function.returns.is_some()
+fn function_has_deferred_annotations(function: ast::StmtFunctionDef<'_>) -> bool {
+    function.type_params().is_none()
+        && (function.returns().is_some()
             || function
-                .parameters
-                .iter()
+                .parameters()
+                .iter_source_order()
                 .any(|param| param.annotation().is_some()))
 }
 
@@ -108,24 +109,26 @@ impl MethodReceiverKind {
     fn from_function<'db>(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        function: &ast::StmtFunctionDef,
+        function: ast::StmtFunctionDef<'_>,
     ) -> Option<Self> {
         if !definition.scope(db).scope(db).kind().is_class() {
             return None;
         }
 
-        let decorators = if function.decorator_list.is_empty() {
+        let decorators = if function.decorator_list().is_empty() {
             FunctionDecorators::empty()
         } else {
             function_known_decorator_flags(db, definition)
         };
-        if decorators.contains(FunctionDecorators::STATICMETHOD) && function.name.id != "__new__" {
+        if decorators.contains(FunctionDecorators::STATICMETHOD)
+            && function.name().id() != "__new__"
+        {
             return None;
         }
 
         if decorators.contains(FunctionDecorators::CLASSMETHOD)
-            || is_implicit_classmethod(&function.name)
-            || function.name.id == "__new__"
+            || is_implicit_classmethod(function.name().as_str())
+            || function.name().id() == "__new__"
         {
             Some(Self::Class)
         } else {
@@ -161,25 +164,40 @@ fn expected_return_type<'db>(
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
-    pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+    pub(super) fn infer_function_body(&mut self, function: ast::StmtFunctionDef<'_>) {
         let env = self.program_environment();
         let db = self.db();
 
         // Parameters are odd: they are Definitions in the function body scope, but have no
         // constituent nodes that are part of the function body. In order to get diagnostics
         // merged/emitted for them, we need to explicitly infer their definitions here.
-        for parameter in &function.parameters {
-            self.infer_definition(parameter);
+        let parameters = function.parameters();
+        let mut vararg = None;
+        let mut kwarg = None;
+        for item in parameters.items_in_binding_order() {
+            self.infer_definition(item.into_parameter());
+            match item {
+                ast::ParameterItem::Vararg(p) => vararg = Some(p),
+                ast::ParameterItem::Kwarg(p) => kwarg = Some(p),
+                _ => {}
+            }
         }
 
-        validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
-            self.file_expression_type(expr)
-        });
-        self.validate_unpacked_typed_dict_kwargs(&function.parameters);
+        validate_paramspec_components(
+            &self.context,
+            self.index,
+            parameters,
+            vararg,
+            kwarg,
+            |expr| self.file_expression_type(expr),
+        );
+        if let Some(kwarg) = kwarg {
+            self.validate_unpacked_typed_dict_kwargs(parameters, kwarg);
+        }
 
-        self.infer_scope_body(&function.body);
+        self.infer_scope_body(function.body());
 
-        if let Some(returns) = function.returns.as_deref() {
+        if let Some(returns) = function.returns() {
             let has_empty_body = self.return_types_and_ranges.is_empty()
                 && function_body_kind(db, env, function, |expr| self.expression_type(expr))
                     == FunctionBodyKind::Stub;
@@ -248,7 +266,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // in the function to check that they are consistent with the type arguments
                 // provided. Once we do this, the `.to_instance_unknown` call below should
                 // be replaced with `.to_specialized_instance`.
-                let inferred_return = if function.is_async {
+                let inferred_return = if function.is_async() {
                     KnownClass::AsyncGeneratorType
                 } else {
                     KnownClass::GeneratorType
@@ -371,26 +389,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    pub(super) fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
+    pub(super) fn infer_function_definition_statement(
+        &mut self,
+        function: ast::StmtFunctionDef<'_>,
+    ) {
         self.infer_definition(function);
     }
 
     pub(super) fn infer_function_definition(
         &mut self,
-        function: &ast::StmtFunctionDef,
+        function: ast::StmtFunctionDef<'_>,
         definition: Definition<'db>,
     ) {
-        let ast::StmtFunctionDef {
-            range: _,
-            node_index: _,
-            is_async: _,
-            name,
-            type_params: _,
-            parameters,
-            returns: _,
-            body: _,
-            decorator_list,
-        } = function;
+        let name = function.name();
+        let parameters = function.parameters();
+        let decorator_list = function.decorator_list();
 
         let db = self.db();
 
@@ -419,7 +432,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let decorator_type = decorator_inference
                 .as_ref()
                 .and_then(|decorator_inference| {
-                    decorator_inference.expression_type(&decorator.expression)
+                    decorator_inference.expression_type(decorator.expression())
                 })
                 .unwrap_or_else(Type::unknown);
             let decorator_function_decorator =
@@ -503,7 +516,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.insert(definition);
         }
 
-        let known_function = KnownFunction::try_from_definition_and_name(db, definition, name);
+        let known_function =
+            KnownFunction::try_from_definition_and_name(db, definition, name.as_str());
 
         // `type_check_only` is itself not available at runtime
         if known_function == Some(KnownFunction::TypeCheckOnly) {
@@ -517,13 +531,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let overload_literal = OverloadLiteral::new(
             db,
-            &name.id,
+            name.id(),
             known_function,
             body_scope,
             function_decorators,
             None,
             dataclass_transformer_params,
-            function.returns.is_some(),
+            function.returns().is_some(),
         );
         let function_literal = FunctionLiteral::new(db, overload_literal);
         let function_type = FunctionType::new(db, function_literal, None);
@@ -552,23 +566,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Check that the function's own type parameters don't shadow
         // type variables from enclosing scopes (by name).
-        if let Some(type_params) = &function.type_params {
+        if let Some(type_params) = function.type_params() {
             let current_scope = self.scope().file_scope_id(db);
-            for type_param in type_params.iter() {
+            for type_param in type_params {
                 let param_name = type_param.name();
                 for enclosing in enclosing_generic_contexts(self.db(), self.index, current_scope) {
-                    if let Some(other_typevar) = enclosing.binds_named_typevar(db, &param_name.id) {
-                        let kind = match type_param {
-                            ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695TypeVar,
-                            ast::TypeParam::ParamSpec(_) => TypeVarKind::Pep695ParamSpec,
-                            ast::TypeParam::TypeVarTuple(_) => TypeVarKind::Pep695TypeVarTuple,
+                    if let Some(other_typevar) = enclosing.binds_named_typevar(db, param_name.id())
+                    {
+                        let kind = match type_param.classify() {
+                            TypeParamKind::TypeVar(_) => TypeVarKind::Pep695TypeVar,
+                            TypeParamKind::ParamSpec(_) => TypeVarKind::Pep695ParamSpec,
+                            TypeParamKind::TypeVarTuple(_) => TypeVarKind::Pep695TypeVarTuple,
                         };
                         report_shadowed_type_variable(
                             &self.context,
-                            &param_name.id,
+                            param_name.id(),
                             "function",
-                            &function.name.id,
-                            function.name.range(),
+                            function.name().id(),
+                            function.name().range(),
                             kind,
                             other_typevar,
                         );
@@ -637,7 +652,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inferred_ty = self.apply_decorator(
                 *decorator_ty,
                 inferred_ty,
-                decorator_node,
+                *decorator_node,
                 (!is_decorated_overload_implementation).then_some(function),
             );
             if let Type::PropertyInstance(property) = inferred_ty {
@@ -703,13 +718,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         if function_decorators.contains(FunctionDecorators::OVERLOAD) {
-            for stmt in &function.body {
-                match stmt {
-                    ast::Stmt::Pass(_) => continue,
-                    ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+            for stmt in function.body() {
+                match stmt.classify() {
+                    StmtKind::Pass(_) => continue,
+                    StmtKind::Expr(stmt_expr) => {
+                        let value = stmt_expr.value();
+
                         if matches!(
-                            &**value,
-                            ast::Expr::StringLiteral(_) | ast::Expr::EllipsisLiteral(_)
+                            value.classify(),
+                            ExprKind::StringLiteral(_) | ExprKind::EllipsisLiteral(_)
                         ) {
                             continue;
                         }
@@ -721,7 +738,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Useless body for `@overload`-decorated function `{}`",
-                    function.name
+                    function.name()
                 ));
                 diagnostic.set_primary_annotation_message("This statement will never be executed");
                 diagnostic.info(
@@ -737,13 +754,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn extend_function_deferred(
         &mut self,
         definition: Definition<'db>,
-        function: &ast::StmtFunctionDef,
+        function: ast::StmtFunctionDef<'_>,
     ) {
         let db = self.db();
         if function_has_deferred_annotations(function) {
             self.extend_definition(definition, infer_deferred_types(db, definition));
         }
-        if parameters_have_defaults(&function.parameters) {
+        if parameters_have_defaults(function.parameters()) {
             self.extend_definition(definition, infer_function_default_types(db, definition));
         }
     }
@@ -751,7 +768,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_annotations(
         &mut self,
         definition: Definition<'db>,
-        function: &ast::StmtFunctionDef,
+        function: ast::StmtFunctionDef<'_>,
     ) {
         // PEP 695 annotations are inferred in the function's type-parameter scope.
         if !function_has_deferred_annotations(function) {
@@ -767,10 +784,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_defaults(
         &mut self,
         definition: Definition<'db>,
-        function: &ast::StmtFunctionDef,
+        function: ast::StmtFunctionDef<'_>,
     ) {
         let db = self.db();
-        if !parameters_have_defaults(&function.parameters) {
+        if !parameters_have_defaults(function.parameters()) {
             return;
         }
 
@@ -782,7 +799,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Borrow annotation types from their own inference result instead of copying that result
         // into this query. Scope inference merges both regions when checking the whole function.
-        for param_with_default in function.parameters.iter_non_variadic_params() {
+        for param_with_default in function.parameters().iter_non_variadic_params() {
             let Some(default) = param_with_default.default() else {
                 continue;
             };
@@ -799,9 +816,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn suppress_errors_for_no_type_check(
         &mut self,
         definition: Definition<'db>,
-        function: &ast::StmtFunctionDef,
+        function: ast::StmtFunctionDef<'_>,
     ) {
-        if !function.decorator_list.is_empty()
+        if !function.decorator_list().is_empty()
             && function_known_decorator_flags(self.db(), definition)
                 .contains(FunctionDecorators::NO_TYPE_CHECK)
         {
@@ -811,7 +828,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_return_type_annotation(&mut self, returns: Option<&ast::Expr>) {
+    fn infer_return_type_annotation(&mut self, returns: Option<ast::Expr<'_>>) {
         if let Some(returns) = returns {
             self.context.inference_flags |= InferenceFlags::IN_RETURN_TYPE;
             self.infer_type_expression_with_state(
@@ -824,7 +841,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    pub(super) fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
+    pub(super) fn infer_function_type_params(&mut self, function: ast::StmtFunctionDef<'_>) {
         let binding_context = self.index.expect_single_definition(function);
         let previous_typevar_binding_context =
             self.typevar_binding_context.replace(binding_context);
@@ -841,7 +858,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// ```
     fn infer_function_signature_annotations(
         &mut self,
-        function: &ast::StmtFunctionDef,
+        function: ast::StmtFunctionDef<'_>,
         definition: Definition<'db>,
     ) {
         let receiver_is_incompatible = self.infer_method_receiver_annotation(function, definition);
@@ -850,11 +867,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             receiver_is_incompatible == Some(true),
         );
 
-        self.infer_return_type_annotation(function.returns.as_deref());
-        if let Some(type_params) = function.type_params.as_deref() {
+        self.infer_return_type_annotation(function.returns());
+        if let Some(type_params) = function.type_params() {
             self.infer_type_parameters(type_params);
         }
-        self.infer_parameters(&function.parameters, receiver_is_incompatible.is_some());
+        self.infer_parameters(function.parameters(), receiver_is_incompatible.is_some());
 
         self.context.inference_flags.set(
             InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER,
@@ -868,15 +885,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// an annotated instance or class receiver.
     fn infer_method_receiver_annotation(
         &mut self,
-        function: &ast::StmtFunctionDef,
+        function: ast::StmtFunctionDef<'_>,
         definition: Definition<'db>,
     ) -> Option<bool> {
-        let receiver = function
-            .parameters
-            .posonlyargs
-            .first()
-            .or_else(|| function.parameters.args.first())?;
-        let annotation = receiver.parameter.annotation.as_deref()?;
+        let receiver = function.parameters().iter_positional_params().next()?;
+        let annotation = receiver.parameter().annotation()?;
         let receiver_kind = MethodReceiverKind::from_function(self.db(), definition, function)?;
 
         let previously_in_parameter_annotation = self
@@ -885,7 +898,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .replace(InferenceFlags::IN_PARAMETER_ANNOTATION, true);
         let previously_in_init_receiver = self.context.inference_flags.replace(
             InferenceFlags::IN_INIT_RECEIVER_ANNOTATION,
-            function.name.id == "__init__" && receiver_kind == MethodReceiverKind::Instance,
+            function.name().id() == "__init__" && receiver_kind == MethodReceiverKind::Instance,
         );
         let annotation_type = self.infer_type_expression_with_state(
             annotation,
@@ -906,26 +919,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_parameters(
         &mut self,
-        parameters: &ast::Parameters,
-        first_annotation_already_inferred: bool,
+        parameters: ast::Parameters<'_>,
+        mut first_annotation_already_inferred: bool,
     ) {
-        let ast::Parameters {
-            range: _,
-            node_index: _,
-            posonlyargs: _,
-            args: _,
-            vararg,
-            kwonlyargs: _,
-            kwarg,
-        } = parameters;
-
         self.context.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
-        for param_with_default in parameters
-            .iter_non_variadic_params()
-            .skip(usize::from(first_annotation_already_inferred))
-        {
-            self.infer_parameter_with_default(param_with_default);
-        }
+        let (vararg, kwarg) = parameters.split_variadic(|param| {
+            if first_annotation_already_inferred {
+                first_annotation_already_inferred = false;
+            } else {
+                self.infer_parameter_with_default(param);
+            }
+        });
         if let Some(vararg) = vararg {
             self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
             self.infer_parameter(vararg);
@@ -945,13 +949,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);
     }
 
-    fn validate_unpacked_typed_dict_kwargs(&mut self, parameters: &ast::Parameters) {
+    fn validate_unpacked_typed_dict_kwargs(
+        &mut self,
+        parameters: ast::Parameters<'_>,
+        kwargs: ast::Parameter<'_>,
+    ) {
         let db = self.db();
         let env = self.program_environment();
-        let Some(kwargs) = parameters.kwarg.as_ref() else {
-            return;
-        };
-        let Some(annotation) = kwargs.annotation.as_deref() else {
+        let Some(annotation) = kwargs.annotation() else {
             return;
         };
         let annotation_flags = self.file_type_expression_flags(annotation);
@@ -982,21 +987,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // accepted through `**kwargs`. The convention only applies to the leading
         // positional-or-keyword parameters that are actually converted to positional-only
         // parameters by `Parameters::from_parameters`.
-        let pep_484_positional_only_count = if parameters.posonlyargs.is_empty() {
-            parameters
-                .args
-                .iter()
-                .take_while(|parameter| parameter.uses_pep_484_positional_only_convention())
-                .count()
-        } else {
-            0
-        };
-
+        let mut legacy_positional_prefix = true;
         let overlapping = parameters
-            .iter_non_variadic_params()
-            .skip(parameters.posonlyargs.len() + pep_484_positional_only_count)
-            .map(|parameter| &parameter.parameter)
-            .filter(|parameter| unpacked_keys.contains_key(&parameter.name.id))
+            .items()
+            .iter()
+            .filter_map(|item| match item {
+                ast::ParameterItem::PositionalOnly(_) => {
+                    legacy_positional_prefix = false;
+                    None
+                }
+                ast::ParameterItem::PositionalOrKeyword(p)
+                    if legacy_positional_prefix && p.uses_pep_484_positional_only_convention() =>
+                {
+                    None
+                }
+                ast::ParameterItem::PositionalOrKeyword(p) | ast::ParameterItem::KeywordOnly(p) => {
+                    legacy_positional_prefix = false;
+                    Some(p.parameter())
+                }
+                ast::ParameterItem::Vararg(_) | ast::ParameterItem::Kwarg(_) => None,
+            })
+            .filter(|parameter| unpacked_keys.contains_key(parameter.name().id()))
             .collect::<Vec<_>>();
 
         if overlapping.is_empty() {
@@ -1005,14 +1016,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let overlapping_names = overlapping
             .iter()
-            .map(|parameter| format!("`{}`", parameter.name.id))
+            .map(|parameter| format!("`{}`", parameter.name().id()))
             .collect::<Vec<_>>()
             .join(", ");
 
-        if let Some(builder) = self
-            .context
-            .report_lint(&INVALID_TYPE_FORM, kwargs.as_ref())
-        {
+        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, kwargs) {
             if overlapping.len() == 1 {
                 builder.into_diagnostic(format_args!(
                     "Parameter {overlapping_names} overlaps with unpacked TypedDict key in \
@@ -1027,15 +1035,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
-        let ast::ParameterWithDefault {
-            range: _,
-            node_index: _,
-            parameter,
-            default: _,
-        } = parameter_with_default;
+    fn infer_parameter_with_default(
+        &mut self,
+        parameter_with_default: ast::ParameterWithDefault<'_>,
+    ) {
+        let parameter = parameter_with_default.parameter();
 
-        if let Some(annotation) = parameter.annotation.as_deref() {
+        if let Some(annotation) = parameter.annotation() {
             self.infer_type_expression_with_state(
                 annotation,
                 DeferredExpressionState::from(self.defer_annotations()),
@@ -1043,15 +1049,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_parameter(&mut self, parameter: &ast::Parameter) {
-        let ast::Parameter {
-            range: _,
-            node_index: _,
-            name: _,
-            annotation,
-        } = parameter;
+    fn infer_parameter(&mut self, parameter: ast::Parameter<'_>) {
+        let annotation = parameter.annotation();
 
-        if let Some(annotation) = annotation.as_deref() {
+        if let Some(annotation) = annotation {
             self.infer_type_expression_with_state(
                 annotation,
                 DeferredExpressionState::from(self.defer_annotations()),
@@ -1080,21 +1081,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// shouldn't be in-process of inferring the outer scope here.
     pub(super) fn infer_parameter_definition(
         &mut self,
-        parameter_with_default: &'ast ast::ParameterWithDefault,
+        parameter_with_default: ast::ParameterWithDefault<'ast>,
         definition: Definition<'db>,
     ) {
         let env = self.program_environment();
-        let ast::ParameterWithDefault {
-            parameter,
-            default,
-            range: _,
-            node_index: _,
-        } = parameter_with_default;
+        let parameter = parameter_with_default.parameter();
+        let default = parameter_with_default.default();
 
         let db = self.db();
 
-        let default_expr = default.as_ref();
-        if let Some(annotation) = parameter.annotation.as_ref() {
+        let default_expr = default;
+        if let Some(annotation) = parameter.annotation() {
             let declared_ty = self.file_expression_type(annotation);
 
             // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
@@ -1108,10 +1105,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ParamSpecAttrKind::Args => ("args", "*args"),
                     ParamSpecAttrKind::Kwargs => ("kwargs", "**kwargs"),
                 };
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
-                {
+                if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
                     builder.into_diagnostic(format_args!(
                         "`{name}.{attr_name}` is only valid for annotating `{variadic}`",
                     ));
@@ -1119,7 +1113,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             if let Some(default_expr) = default_expr {
-                let default_expr = default_expr.as_ref();
                 let default_ty = self.file_expression_type(default_expr);
 
                 // Avoid duplicate diagnostics: invalid TypedDict literals already emit specific errors.
@@ -1133,9 +1126,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         || self
                             .class_context_of_current_method()
                             .is_some_and(|class| class.is_protocol(db)))
-                        && default
-                            .as_ref()
-                            .is_some_and(|d| d.is_ellipsis_literal_expr()))
+                        && default.is_some_and(ast::Expr::is_ellipsis_literal_expr))
                 {
                     if let Some(builder) = self
                         .context
@@ -1180,7 +1171,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// [`infer_parameter_definition`]: Self::infer_parameter_definition
     pub(super) fn infer_variadic_positional_parameter_definition(
         &mut self,
-        parameter: &'ast ast::Parameter,
+        parameter: ast::Parameter<'ast>,
         definition: Definition<'db>,
     ) {
         let db = self.db();
@@ -1253,7 +1244,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
     fn special_first_method_parameter_type(
         &mut self,
-        parameter: &ast::Parameter,
+        parameter: ast::Parameter<'_>,
     ) -> Option<Type<'db>> {
         let env = self.program_environment();
         let db = self.db();
@@ -1282,8 +1273,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if function_definition
             .node(self.module())
-            .parameters
-            .index(parameter.name())
+            .parameters()
+            .index(parameter.name().as_str())
             .is_none_or(|index| index != 0)
         {
             return None;
@@ -1313,7 +1304,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// [`infer_parameter_definition`]: Self::infer_parameter_definition
     pub(super) fn infer_variadic_keyword_parameter_definition(
         &mut self,
-        parameter: &'ast ast::Parameter,
+        parameter: ast::Parameter<'ast>,
         definition: Definition<'db>,
     ) {
         let env = self.program_environment();
@@ -1397,17 +1388,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_lambda_parameter_definition(
         &mut self,
         index: u32,
-        parameter_with_default: &'ast ast::ParameterWithDefault,
-        lambda: &'ast ast::ExprLambda,
+        parameter_with_default: ast::ParameterWithDefault<'ast>,
+        lambda: ast::ExprLambda<'ast>,
         definition: Definition<'db>,
     ) {
         let db = self.db();
-        let ast::ParameterWithDefault {
-            parameter,
-            default,
-            range: _,
-            node_index: _,
-        } = parameter_with_default;
+        let parameter = parameter_with_default.parameter();
+        let default = parameter_with_default.default();
 
         let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
             parameter_type
@@ -1432,8 +1419,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_variadic_positional_lambda_parameter_definition(
         &mut self,
         index: u32,
-        parameter: &'ast ast::Parameter,
-        lambda: &'ast ast::ExprLambda,
+        parameter: ast::Parameter<'ast>,
+        lambda: ast::ExprLambda<'ast>,
         definition: Definition<'db>,
     ) {
         let db = self.db();
@@ -1456,7 +1443,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// in a lambda expression.
     pub(super) fn infer_variadic_keyword_lambda_parameter_definition(
         &mut self,
-        parameter: &'ast ast::Parameter,
+        parameter: ast::Parameter<'ast>,
         definition: Definition<'db>,
     ) {
         let db = self.db();
@@ -1479,7 +1466,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn annotated_lambda_parameter_type(
         &mut self,
         index: u32,
-        lambda: &'ast ast::ExprLambda,
+        lambda: ast::ExprLambda<'ast>,
     ) -> Option<Type<'db>> {
         let db = self.db();
         let enclosing_stmt = infer_statement_types(
@@ -1501,14 +1488,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         bindings: &Bindings<'db>,
         revealed_type: Option<Type<'db>>,
-        call_expression: &ast::ExprCall,
+        call_expression: ast::ExprCall<'_>,
     ) {
         if let Some(revealed_type) = revealed_type {
             report_revealed_type(
                 &self.context,
                 revealed_type,
                 call_argument_node(call_expression, "obj", 0)
-                    .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                    .unwrap_or_else(|| SyntaxNode::from(call_expression)),
             );
         }
 
@@ -1544,7 +1531,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         revealed_type.map(UnionBuilder::build)
     }
 
-    fn check_assert_type(&self, bindings: &Bindings<'db>, call_expression: &ast::ExprCall) {
+    fn check_assert_type(&self, bindings: &Bindings<'db>, call_expression: ast::ExprCall<'_>) {
         let db = self.db();
         let env = self.program_environment();
 
@@ -1594,7 +1581,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Annotation::secondary(
                     self.context.span(
                         call_argument_node(call_expression, "val", 0)
-                            .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                            .unwrap_or_else(|| SyntaxNode::from(call_expression)),
                     ),
                 )
                 .message(format_args!(
@@ -1633,7 +1620,7 @@ impl KnownFunction {
         self,
         builder: &TypeInferenceBuilder<'db, '_>,
         overload: &mut Binding<'db>,
-        call_expression: &ast::ExprCall,
+        call_expression: ast::ExprCall<'_>,
     ) {
         let db = builder.db();
         let parameter_types = overload.parameter_types();
@@ -1671,7 +1658,7 @@ impl KnownFunction {
                         Annotation::secondary(
                             builder.context.span(
                                 call_argument_node(call_expression, "arg", 0)
-                                    .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                                    .unwrap_or_else(|| SyntaxNode::from(call_expression)),
                             ),
                         )
                         .message(format_args!(
@@ -1702,7 +1689,7 @@ impl KnownFunction {
                         err.report_diagnostic(
                             &builder.context,
                             call_argument_node(call_expression, "condition", 0)
-                                .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                                .unwrap_or_else(|| SyntaxNode::from(call_expression)),
                         );
 
                         return;
@@ -1776,7 +1763,8 @@ impl KnownFunction {
                                 "`{casted_display}` is equivalent to `{source_display}`",
                             ));
                         }
-                        if let Some(value) = call_expression.arguments.find_argument_value("val", 1)
+                        if let Some(value) =
+                            call_expression.arguments().find_argument_value("val", 1)
                         {
                             let source = source_text(db, builder.file());
                             let covering = covering_node(
@@ -1807,7 +1795,7 @@ impl KnownFunction {
                     && !casted_type.is_equivalent_to(db, env, Type::Never)
                     && !source_type.is_equivalent_to(db, env, Type::Never)
                     && call_expression
-                        .arguments
+                        .arguments()
                         .find_argument_value("val", 1)
                         .is_none_or(|value_expr| {
                             builder
@@ -1829,7 +1817,7 @@ impl KnownFunction {
                     diagnostic.set_concise_message(format_args!(
                         "Cast from `{source_display}` to disjoint type `{casted_display}`",
                     ));
-                    if let Some(arg) = call_expression.arguments.find_argument_value("typ", 0) {
+                    if let Some(arg) = call_expression.arguments().find_argument_value("typ", 0) {
                         diagnostic.annotate(
                             builder
                                 .context
@@ -1837,7 +1825,7 @@ impl KnownFunction {
                                 .message("Disjoint from the inferred type"),
                         );
                     }
-                    if let Some(arg) = call_expression.arguments.find_argument_value("val", 1) {
+                    if let Some(arg) = call_expression.arguments().find_argument_value("val", 1) {
                         diagnostic.annotate(
                             builder
                                 .context
@@ -1862,10 +1850,13 @@ impl KnownFunction {
                         let mut range = definition.focus_range(db, &module);
                         if let DefinitionKind::Class(class) = definition.kind(db) {
                             let definition_types = infer_definition_types(db, definition);
-                            if let Some(decorator) =
-                                class.node(&module).decorator_list.iter().find(|decorator| {
+                            if let Some(decorator) = class
+                                .node(&module)
+                                .decorator_list()
+                                .iter()
+                                .find(|decorator| {
                                     definition_types
-                                        .expression_type(&decorator.expression)
+                                        .expression_type(decorator.expression())
                                         .as_function_literal()
                                         .is_some_and(|func| func.is_known(db, KnownFunction::Final))
                                 })
@@ -1953,7 +1944,7 @@ impl KnownFunction {
                     let mut diag = diagnostic.into_diagnostic("Revealed protocol interface");
                     let span = builder.context.span(
                         call_argument_node(call_expression, "protocol", 0)
-                            .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                            .unwrap_or_else(|| SyntaxNode::from(call_expression)),
                     );
                     diag.annotate(Annotation::primary(span).message(format_args!(
                         "`{}`",
@@ -2016,7 +2007,7 @@ impl KnownFunction {
                     let mut diag = diagnostic.into_diagnostic("Revealed MRO");
                     let span = builder.context.span(
                         call_argument_node(call_expression, "cls", 0)
-                            .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                            .unwrap_or_else(|| SyntaxNode::from(call_expression)),
                     );
                     let mut message = String::new();
                     let display_settings = DisplaySettings::from_possibly_ambiguous_types(
@@ -2070,7 +2061,7 @@ impl KnownFunction {
                     call_expression,
                     self,
                     *second_argument,
-                    call_expression.arguments.args.get(1),
+                    call_expression.arguments().args().get(1),
                 );
 
                 if self == KnownFunction::IsInstance {
@@ -2169,16 +2160,16 @@ impl KnownFunction {
 }
 
 fn call_argument_node<'a>(
-    call_expression: &'a ast::ExprCall,
+    call_expression: ast::ExprCall<'a>,
     name: &str,
     position: usize,
-) -> Option<ast::AnyNodeRef<'a>> {
+) -> Option<SyntaxNode<'a>> {
     call_expression
-        .arguments
+        .arguments()
         .find_argument(name, position)
         .map(|argument| match argument {
-            ast::ArgOrKeyword::Arg(expr) => ast::AnyNodeRef::from(expr),
-            ast::ArgOrKeyword::Keyword(keyword) => ast::AnyNodeRef::from(keyword),
+            ArgOrKeyword::Arg(expr) => SyntaxNode::from(expr),
+            ArgOrKeyword::Keyword(keyword) => SyntaxNode::from(keyword),
         })
 }
 
@@ -2194,10 +2185,10 @@ fn call_argument_node<'a>(
 fn check_classinfo_in_isinstance<'db>(
     db: &'db dyn Db,
     context: &InferContext<'db, '_>,
-    call_expression: &ast::ExprCall,
+    call_expression: ast::ExprCall<'_>,
     function: KnownFunction,
     classinfo: Type<'db>,
-    classinfo_expr: Option<&ast::Expr>,
+    classinfo_expr: Option<ast::Expr<'_>>,
 ) {
     match classinfo {
         Type::ClassLiteral(class) => {
@@ -2247,8 +2238,8 @@ fn check_classinfo_in_isinstance<'db>(
         Type::NominalInstance(nominal)
             if let Some(tuple_spec) = nominal.tuple_spec(db, context.program_environment()) =>
         {
-            let element_exprs = match classinfo_expr {
-                Some(ast::Expr::Tuple(tuple_expr)) => Some(&tuple_expr.elts),
+            let element_exprs = match classinfo_expr.map(ast::Expr::classify) {
+                Some(ExprKind::Tuple(tuple_expr)) => Some(tuple_expr.elts()),
                 _ => None,
             };
             for (index, element) in tuple_spec.iter_element_types(db).enumerate() {
@@ -2493,10 +2484,10 @@ fn is_instance_truthiness<'db>(
 fn report_invalid_union_type_elements<'db>(
     db: &'db dyn Db,
     context: &InferContext<'db, '_>,
-    call_expression: &ast::ExprCall,
+    call_expression: ast::ExprCall<'_>,
     function: KnownFunction,
     union: UnionTypeInstance<'db>,
-    union_type_expr: Option<&ast::Expr>,
+    union_type_expr: Option<ast::Expr<'_>>,
 ) {
     let env = context.program_environment();
     let invalid_elements: Vec<_> = union

@@ -68,38 +68,32 @@ impl<'db> Field<'db> {
             return field;
         };
 
-        if let Some(name) = call.arguments.find_keyword("name")
+        let [name, primary_key, choices, null, to_field] =
+            call.arguments()
+                .find_keywords(["name", "primary_key", "choices", "null", "to_field"]);
+        if let Some(name) = name
             && let Some(name) =
-                definition_expression_type(db, definition, &name.value).as_string_literal()
+                definition_expression_type(db, definition, name.value()).as_string_literal()
             && !name.value(db).is_empty()
         {
             field.name = Name::new(name.value(db));
         }
 
-        field.metadata.primary_key =
-            call.arguments
-                .find_keyword("primary_key")
-                .is_some_and(|primary_key| {
-                    definition_expression_type(db, definition, &primary_key.value)
-                        == Type::bool_literal(true)
-                });
-        field.metadata.has_choices =
-            call.arguments
-                .find_keyword("choices")
-                .is_some_and(|choices| {
-                    !definition_expression_type(db, definition, &choices.value).is_none(db)
-                });
-        field.metadata.null = call.arguments.find_keyword("null").is_some_and(|null| {
-            definition_expression_type(db, definition, &null.value) == Type::bool_literal(true)
+        field.metadata.primary_key = primary_key.is_some_and(|primary_key| {
+            definition_expression_type(db, definition, primary_key.value())
+                == Type::bool_literal(true)
         });
-        field.metadata.to_field = call
-            .arguments
-            .find_keyword("to_field")
-            .and_then(|to_field| {
-                definition_expression_type(db, definition, &to_field.value)
-                    .as_string_literal()
-                    .map(|name| Name::new(name.value(db)))
-            });
+        field.metadata.has_choices = choices.is_some_and(|choices| {
+            !definition_expression_type(db, definition, choices.value()).is_none(db)
+        });
+        field.metadata.null = null.is_some_and(|null| {
+            definition_expression_type(db, definition, null.value()) == Type::bool_literal(true)
+        });
+        field.metadata.to_field = to_field.and_then(|to_field| {
+            definition_expression_type(db, definition, to_field.value())
+                .as_string_literal()
+                .map(|name| Name::new(name.value(db)))
+        });
         field
     }
 }

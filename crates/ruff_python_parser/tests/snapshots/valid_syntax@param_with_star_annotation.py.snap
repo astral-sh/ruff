@@ -25,53 +25,51 @@ Module(
                     parameters: Parameters {
                         range: 7..26,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: Some(
-                            Parameter {
-                                range: 8..25,
-                                node_index: NodeIndex(None),
-                                name: Identifier {
-                                    id: Name("args"),
-                                    range: 9..13,
+                        items: [
+                            Vararg(
+                                Parameter {
+                                    range: 8..25,
                                     node_index: NodeIndex(None),
-                                },
-                                annotation: Some(
-                                    Starred(
-                                        ExprStarred {
-                                            node_index: NodeIndex(None),
-                                            range: 15..25,
-                                            value: BinOp(
-                                                ExprBinOp {
-                                                    node_index: NodeIndex(None),
-                                                    range: 16..25,
-                                                    left: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 16..19,
-                                                            id: Name("int"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    op: BitOr,
-                                                    right: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 22..25,
-                                                            id: Name("str"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                },
-                                            ),
-                                            ctx: Load,
-                                        },
+                                    name: Identifier {
+                                        id: Name("args"),
+                                        range: 9..13,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: Some(
+                                        Starred(
+                                            ExprStarred {
+                                                node_index: NodeIndex(None),
+                                                range: 15..25,
+                                                value: BinOp(
+                                                    ExprBinOp {
+                                                        node_index: NodeIndex(None),
+                                                        range: 16..25,
+                                                        left: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 16..19,
+                                                                id: Name("int"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        op: BitOr,
+                                                        right: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 22..25,
+                                                                id: Name("str"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                ),
-                            },
-                        ),
-                        kwonlyargs: [],
-                        kwarg: None,
+                                },
+                            ),
+                        ],
                     },
                     returns: None,
                     body: [
@@ -105,55 +103,53 @@ Module(
                     parameters: Parameters {
                         range: 39..61,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: Some(
-                            Parameter {
-                                range: 40..60,
-                                node_index: NodeIndex(None),
-                                name: Identifier {
-                                    id: Name("args"),
-                                    range: 41..45,
+                        items: [
+                            Vararg(
+                                Parameter {
+                                    range: 40..60,
                                     node_index: NodeIndex(None),
-                                },
-                                annotation: Some(
-                                    Starred(
-                                        ExprStarred {
-                                            node_index: NodeIndex(None),
-                                            range: 47..60,
-                                            value: BoolOp(
-                                                ExprBoolOp {
-                                                    node_index: NodeIndex(None),
-                                                    range: 49..59,
-                                                    op: Or,
-                                                    values: [
-                                                        Name(
-                                                            ExprName {
-                                                                node_index: NodeIndex(None),
-                                                                range: 49..52,
-                                                                id: Name("int"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        Name(
-                                                            ExprName {
-                                                                node_index: NodeIndex(None),
-                                                                range: 56..59,
-                                                                id: Name("str"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ],
-                                                },
-                                            ),
-                                            ctx: Load,
-                                        },
+                                    name: Identifier {
+                                        id: Name("args"),
+                                        range: 41..45,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: Some(
+                                        Starred(
+                                            ExprStarred {
+                                                node_index: NodeIndex(None),
+                                                range: 47..60,
+                                                value: BoolOp(
+                                                    ExprBoolOp {
+                                                        node_index: NodeIndex(None),
+                                                        range: 49..59,
+                                                        op: Or,
+                                                        values: [
+                                                            Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 49..52,
+                                                                    id: Name("int"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            Name(
+                                                                ExprName {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 56..59,
+                                                                    id: Name("str"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                ),
-                            },
-                        ),
-                        kwonlyargs: [],
-                        kwarg: None,
+                                },
+                            ),
+                        ],
                     },
                     returns: None,
                     body: [

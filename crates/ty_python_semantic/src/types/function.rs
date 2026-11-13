@@ -49,6 +49,7 @@
 //! the public type of `f` is resolved at position 3, correctly giving you all of the overloads
 //! (and the implementation).
 
+use ruff_python_ast::StmtKind;
 use std::{borrow::Cow, str::FromStr};
 
 use bitflags::bitflags;
@@ -57,7 +58,7 @@ use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast::{self as ast, ParameterWithDefault};
+use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
 use ty_module_resolver::{KnownModule, file_to_module};
@@ -88,7 +89,6 @@ use crate::types::{
     definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
-use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{FileScopeId, ProgramFile, SemanticIndex, semantic_index};
@@ -388,7 +388,7 @@ impl<'db> OverloadLiteral<'db> {
         db: &dyn Db,
         file: File,
         module: &'ast ParsedModuleRef,
-    ) -> &'ast ast::StmtFunctionDef {
+    ) -> ast::StmtFunctionDef<'ast> {
         debug_assert_eq!(
             file,
             self.file(db),
@@ -413,16 +413,16 @@ impl<'db> OverloadLiteral<'db> {
             file,
             &parsed_module(db, definition.python_file(db)).load(db),
         )
-        .decorator_list
+        .decorator_list()
         .iter()
         .find(|decorator| {
             predicate(definition_expression_type(
                 db,
                 definition,
-                &decorator.expression,
+                decorator.expression(),
             ))
         })
-        .map(|decorator| Span::from(file).with_range(decorator.range))
+        .map(|decorator| Span::from(file).with_range(decorator.range()))
     }
 
     /// Iterate through the decorators on this function, returning the span of the first one
@@ -446,8 +446,8 @@ impl<'db> OverloadLiteral<'db> {
                 .node(db)
                 .expect_function()
                 .node(module)
-                .name
-                .range,
+                .name()
+                .range(),
         )
     }
 
@@ -487,17 +487,17 @@ impl<'db> OverloadLiteral<'db> {
         let node = self.body_scope(db).node(db).expect_function().node(&module);
         // A loop can reach this same def from a previous iteration. An undecorated
         // def cannot be its own overload, and there is no other local binding.
-        if node.decorator_list.is_empty()
+        if node.decorator_list().is_empty()
             && index.scope(local_scope).kind().is_function_like()
             && index
                 .place_table(local_scope)
-                .symbol_by_name(node.name.as_str())
+                .symbol_by_name(node.name().as_str())
                 .is_some_and(|symbol| symbol.is_local() && !symbol.is_reassigned())
         {
             return None;
         }
         let use_def = index.use_def_map(local_scope);
-        let use_id = node.name.scoped_use_id(db, self.program_file(db));
+        let use_id = index.scoped_use_id(node.name());
 
         let env = ProgramEnvironment::from_scope(scope);
         let Place::Defined(DefinedPlace {
@@ -563,7 +563,7 @@ impl<'db> OverloadLiteral<'db> {
         let file_scope_id = scope.file_scope_id(db);
         let is_generator = file_scope_id.is_generator_function(index);
 
-        if function_node.is_async && !is_generator {
+        if function_node.is_async() && !is_generator {
             let env = ProgramEnvironment::from_file(program_file);
             signature.return_ty = KnownClass::CoroutineType.to_specialized_instance(
                 db,
@@ -626,17 +626,22 @@ impl<'db> OverloadLiteral<'db> {
         fn has_implicitly_positional_only_first_param<'db>(
             db: &'db dyn Db,
             literal: OverloadLiteral<'db>,
-            node: &ast::StmtFunctionDef,
+            node: ast::StmtFunctionDef<'_>,
             scope: FileScopeId,
             index: &SemanticIndex,
         ) -> bool {
-            let parameters = &node.parameters;
+            let parameters = node.parameters();
 
-            if !parameters.posonlyargs.is_empty() {
-                return false;
-            }
-
-            let Some(first_param) = parameters.args.first() else {
+            let mut positional = parameters.items().iter().filter(|item| {
+                matches!(
+                    item,
+                    ast::ParameterItem::PositionalOnly(_)
+                        | ast::ParameterItem::PositionalOrKeyword(_)
+                )
+            });
+            // An explicit `/` makes the first positional parameter positional-only.
+            let Some(ast::ParameterItem::PositionalOrKeyword(first_param)) = positional.next()
+            else {
                 return false;
             };
 
@@ -654,10 +659,8 @@ impl<'db> OverloadLiteral<'db> {
 
             // `self` and `cls` are always positional-only if the next parameter uses the
             // PEP-484 convention.
-            if parameters
-                .args
-                .get(1)
-                .is_some_and(ParameterWithDefault::uses_pep_484_positional_only_convention)
+            if let Some(ast::ParameterItem::PositionalOrKeyword(next)) = positional.next()
+                && next.uses_pep_484_positional_only_convention()
             {
                 return true;
             }
@@ -679,12 +682,9 @@ impl<'db> OverloadLiteral<'db> {
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
         let index = semantic_index(db, program_file);
-        let pep695_ctx = function_stmt_node
-            .type_params
-            .as_ref()
-            .and_then(|type_params| {
-                GenericContext::from_type_params(db, index, definition, type_params)
-            });
+        let pep695_ctx = function_stmt_node.type_params().and_then(|type_params| {
+            GenericContext::from_type_params(db, index, definition, type_params)
+        });
         let file_scope_id = scope.file_scope_id(db);
 
         let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
@@ -748,7 +748,7 @@ impl<'db> OverloadLiteral<'db> {
             // We cannot skip creating `Self` if return type inference is active. Otherwise, a function
             // like `def method(self): return self`, that has an inferred return type of `Self`, would
             // not be generic.
-            let return_type_inference_is_active = function_stmt_node.returns.is_none()
+            let return_type_inference_is_active = function_stmt_node.returns().is_none()
                 && db
                     .analysis_settings(self.file(db))
                     .return_type_inference
@@ -810,13 +810,13 @@ impl<'db> OverloadLiteral<'db> {
         let range = parameter_index
             .and_then(|parameter_index| {
                 func_def
-                    .parameters
+                    .parameters()
                     .iter()
                     .nth(parameter_index)
                     .map(|param| param.range())
             })
-            .unwrap_or(func_def.parameters.range);
-        let name_span = span.clone().with_range(func_def.name.range);
+            .unwrap_or(func_def.parameters().range());
+        let name_span = span.clone().with_range(func_def.name().range());
         let parameter_span = span.with_range(range);
         (name_span, parameter_span)
     }
@@ -826,15 +826,15 @@ impl<'db> OverloadLiteral<'db> {
         let span = Span::from(file);
         let module = parsed_module(db, self.python_file(db)).load(db);
         let func_def = self.node(db, file, &module);
-        let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
-        let mut signature = func_def.name.range.cover(func_def.parameters.range);
+        let return_type_range = func_def.returns().map(|returns| returns.range());
+        let mut signature = func_def.name().range().cover(func_def.parameters().range());
         if let Some(return_type_range) = return_type_range {
             signature = signature.cover(return_type_range);
         }
         FunctionSpans {
             signature: span.clone().with_range(signature),
-            name: span.clone().with_range(func_def.name.range),
-            parameters: span.clone().with_range(func_def.parameters.range),
+            name: span.clone().with_range(func_def.name().range()),
+            parameters: span.clone().with_range(func_def.parameters().range()),
             return_type: return_type_range.map(|range| span.clone().with_range(range)),
             decorators_and_header: span.with_range(signature.cover_offset(func_def.start())),
         }
@@ -1551,7 +1551,7 @@ impl<'db> FunctionType<'db> {
         db: &dyn Db,
         file: File,
         module: &'ast ParsedModuleRef,
-    ) -> &'ast ast::StmtFunctionDef {
+    ) -> ast::StmtFunctionDef<'ast> {
         self.literal(db).last_definition.node(db, file, module)
     }
 
@@ -1840,7 +1840,8 @@ impl<'db> FunctionType<'db> {
         }
 
         // TODO: Infer return types for async functions and generator functions
-        if function.node(&module).is_async || scope.file_scope_id(db).is_generator_function(index) {
+        if function.node(&module).is_async() || scope.file_scope_id(db).is_generator_function(index)
+        {
             return Type::unknown();
         }
 
@@ -2188,12 +2189,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 }
 
 /// Returns `true` if the function body is stub-like, ignoring a leading docstring.
-pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
-    let suite = ast::helpers::body_without_leading_docstring(&node.body);
+pub(crate) fn function_has_stub_body(node: ast::StmtFunctionDef<'_>) -> bool {
+    let suite = ast::helpers::body_without_leading_docstring(node.body());
 
-    suite.iter().all(|stmt| match stmt {
-        ast::Stmt::Pass(_) => true,
-        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
+    suite.iter().all(|stmt| match stmt.classify() {
+        StmtKind::Pass(_) => true,
+        StmtKind::Expr(stmt_expr) => {
+            let value = stmt_expr.value();
+
+            value.is_ellipsis_literal_expr()
+        }
         _ => false,
     })
 }
@@ -2209,23 +2214,24 @@ pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
 pub(super) fn function_body_kind<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    node: &ast::StmtFunctionDef,
-    infer_type: impl Fn(&ast::Expr) -> Type<'db>,
+    node: ast::StmtFunctionDef<'_>,
+    infer_type: impl Fn(ast::Expr<'_>) -> Type<'db>,
 ) -> FunctionBodyKind {
     // Allow docstrings, but only as the first statement.
-    let suite = ast::helpers::body_without_leading_docstring(&node.body);
+    let suite = ast::helpers::body_without_leading_docstring(node.body());
 
     if function_has_stub_body(node) {
         return FunctionBodyKind::Stub;
     }
 
-    if let [ast::Stmt::Raise(raise)] = suite
-        && let ast::StmtRaise {
+    if let Some([stmt]) = suite.as_array()
+        && let Some(raise) = stmt.as_raise_stmt()
+        && let ast::StmtRaiseFields {
             exc: Some(exc),
             cause: None,
-            node_index: _,
+            node: _,
             range: _,
-        } = raise
+        } = raise.fields()
     {
         if infer_type(exc).is_subtype_of(
             db,

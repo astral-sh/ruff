@@ -64,7 +64,7 @@ pub(crate) fn no_method_argument(checker: &Checker, scope: &Scope) {
         return;
     };
 
-    if !function.parameters.is_empty() || !function.decorator_list.is_empty() {
+    if !function.parameters().is_empty() || !function.decorator_list().is_empty() {
         return;
     }
 
@@ -78,7 +78,7 @@ pub(crate) fn no_method_argument(checker: &Checker, scope: &Scope) {
 
     checker.report_diagnostic(
         NoMethodArgument {
-            method_name: function.name.to_string(),
+            method_name: function.name().to_string(),
         },
         function.identifier(),
     );

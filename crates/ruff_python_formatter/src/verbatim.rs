@@ -2,11 +2,9 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::slice::Iter;
 
-use itertools::PeekingNext;
 use ruff_formatter::{FormatError, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::Stmt;
 use ruff_python_ast::token::{Token as AstToken, TokenKind};
+use ruff_python_ast::{AstNodeId, ListIter, Stmt, SyntaxNode};
 use ruff_python_trivia::lines_before;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -63,9 +61,9 @@ pub(crate) fn ends_suppression(
 pub(crate) fn write_suppressed_statements_starting_with_leading_comment<'a>(
     // The first suppressed statement
     first_suppressed: SuiteChildStatement<'a>,
-    statements: &mut std::slice::Iter<'a, Stmt>,
+    statements: &mut ListIter<'a, AstNodeId<ruff_python_ast::kind::Stmt>>,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<Stmt<'a>> {
     let comments = f.context().comments().clone();
     let source = f.context().source();
 
@@ -115,9 +113,9 @@ pub(crate) fn write_suppressed_statements_starting_with_leading_comment<'a>(
 #[cold]
 pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
     last_formatted: SuiteChildStatement<'a>,
-    statements: &mut std::slice::Iter<'a, Stmt>,
+    statements: &mut ListIter<'a, AstNodeId<ruff_python_ast::kind::Stmt>>,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<Stmt<'a>> {
     let comments = f.context().comments().clone();
     let source = f.context().source();
     let indentation = Indentation::from_stmt(last_formatted.statement(), source);
@@ -268,9 +266,9 @@ fn write_suppressed_statements<'a>(
     // The leading comments of `first_suppressed` that come after the `format_off_comment`
     first_suppressed_leading_comments: &[SourceComment],
     // The remaining statements
-    statements: &mut std::slice::Iter<'a, Stmt>,
+    statements: &mut ListIter<'a, AstNodeId<ruff_python_ast::kind::Stmt>>,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<Stmt<'a>> {
     let comments = f.context().comments().clone();
     let source = f.context().source();
 
@@ -357,7 +355,7 @@ fn write_suppressed_statements<'a>(
             }
         }
 
-        comments.mark_verbatim_node_comments_formatted(AnyNodeRef::from(statement));
+        comments.mark_verbatim_node_comments_formatted(SyntaxNode::from(statement));
 
         for range in CommentRangeIter::in_suppression(comments.trailing(statement), source) {
             match range {
@@ -428,7 +426,7 @@ fn write_suppressed_statements<'a>(
             statement = SuiteChildStatement::Other(next_statement);
             leading_node_comments = comments.leading(next_statement);
         } else {
-            let mut current = AnyNodeRef::from(statement.statement());
+            let mut current = SyntaxNode::from(statement.statement());
             // Expand the range of the statement to include any trailing comments or semicolons.
             let end = loop {
                 if let Some(comment) = comments.trailing(current).last() {
@@ -454,17 +452,17 @@ fn write_suppressed_statements<'a>(
 
 #[cold]
 pub(crate) fn write_skipped_statements<'a>(
-    first_skipped: &'a Stmt,
-    statements: &mut std::slice::Iter<'a, Stmt>,
+    first_skipped: Stmt<'a>,
+    statements: &mut ListIter<'a, AstNodeId<ruff_python_ast::kind::Stmt>>,
     verbatim_range: TextRange,
     f: &mut PyFormatter,
-) -> FormatResult<&'a Stmt> {
+) -> FormatResult<Stmt<'a>> {
     let comments = f.context().comments().clone();
     comments.mark_verbatim_node_comments_formatted(first_skipped.into());
 
     let mut preceding = first_skipped;
 
-    while let Some(prec) = statements.peeking_next(|next| next.end() <= verbatim_range.end()) {
+    while let Some(prec) = statements.next_if(|next| next.end() <= verbatim_range.end()) {
         comments.mark_verbatim_node_comments_formatted(prec.into());
         preceding = prec;
     }
@@ -681,7 +679,7 @@ impl Format<PyFormatContext<'_>> for TrailingFormatOffComment<'_> {
 struct Indentation(u32);
 
 impl Indentation {
-    fn from_stmt(stmt: &Stmt, source: &str) -> Indentation {
+    fn from_stmt(stmt: Stmt<'_>, source: &str) -> Indentation {
         let line_start = source.line_start(stmt.start());
 
         let mut indentation = 0u32;

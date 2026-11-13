@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::StmtClassDef;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
@@ -72,41 +72,33 @@ impl Violation for MutableDataclassDefault {
 }
 
 /// RUF008
-pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: StmtClassDef<'_>) {
     let semantic = checker.semantic();
 
     let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 
-    for statement in &class_def.body {
-        let Stmt::AnnAssign(ast::StmtAnnAssign {
-            annotation,
-            value: Some(value),
-            ..
-        }) = statement
-        else {
+    for statement in class_def.body() {
+        let Some(assignment) = statement.as_ann_assign_stmt() else {
             continue;
         };
-
-        let value = match &**value {
-            Expr::Call(ast::ExprCall {
-                func, arguments, ..
-            }) if is_mutable_default_in_dataclass_field_enabled(checker.settings())
-                && is_dataclass_field(func, checker.semantic(), dataclass_kind) =>
-            {
-                arguments.find_argument_value("default", 0)
-            }
-            value => Some(value),
-        };
-
-        let Some(value) = value else {
+        let Some(mut value) = assignment.value() else {
             continue;
         };
+        if is_mutable_default_in_dataclass_field_enabled(checker.settings())
+            && let Some(call) = value.as_call_expr()
+            && is_dataclass_field(call.func(), semantic, dataclass_kind)
+        {
+            let Some(default) = call.arguments().find_argument_value("default", 0) else {
+                continue;
+            };
+            value = default;
+        }
 
         if is_mutable_expr(value, checker.semantic())
-            && !is_class_var_annotation(annotation, checker.semantic())
-            && !is_immutable_annotation(annotation, checker.semantic(), &[])
+            && !is_class_var_annotation(assignment.annotation(), checker.semantic())
+            && !is_immutable_annotation(assignment.annotation(), checker.semantic(), &[])
         {
             checker.report_diagnostic(MutableDataclassDefault, value.range());
         }

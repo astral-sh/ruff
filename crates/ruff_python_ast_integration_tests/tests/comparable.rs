@@ -1,12 +1,14 @@
 use std::collections::HashSet;
 use std::hash::{BuildHasher, RandomState};
 
+use ruff_python_ast::HasNodeIndex;
 use ruff_python_ast::comparable::{
     ComparableExpr, ComparableLiteral, ComparableMod, ComparablePattern, ComparableStmt,
     HashableExpr,
 };
-use ruff_python_ast::{HasNodeIndex, Mod, NodeIndex};
-use ruff_python_parser::{ParseError, parse_expression, parse_module};
+use ruff_python_parser::{
+    Mode, ParseError, ParseOptions, parse_expression, parse_module, parse_unchecked,
+};
 
 #[track_caller]
 fn assert_comparable(left: &str, right: &str) -> Result<(), ParseError> {
@@ -76,10 +78,10 @@ fn call_arguments() -> Result<(), ParseError> {
 fn names_ignore_context_and_location() -> Result<(), ParseError> {
     let parsed = parse_expression("[item for item in items]")?;
     let comprehension = parsed.expr().as_list_comp_expr().unwrap();
-    let target = &comprehension.generators[0].target;
+    let target = comprehension.generators().at(0).target();
     let name = target.as_name_expr().unwrap();
 
-    let seen = HashSet::from([ComparableExpr::from(&comprehension.elt)]);
+    let seen = HashSet::from([ComparableExpr::from(comprehension.elt())]);
     assert!(seen.contains(&ComparableExpr::from(target)));
     assert!(seen.contains(&ComparableExpr::from(name)));
     Ok(())
@@ -87,23 +89,29 @@ fn names_ignore_context_and_location() -> Result<(), ParseError> {
 
 #[test]
 fn assigned_node_index_preserves_hash_lookup() -> Result<(), ParseError> {
-    let parsed = parse_expression("name")?;
-    let other = parse_expression("name")?;
-    let key = ComparableExpr::from(parsed.expr());
+    let unindexed = parse_module("name")?;
+    let mut indexed = parse_module("name")?;
+    let unindexed = unindexed.suite().at(0);
+    let before_index = indexed.suite().at(0).node_index();
+    let key = ComparableStmt::from(unindexed);
     let seen = HashSet::from([key]);
-    let hash = seen.hasher().hash_one(key);
+    let hash = seen
+        .hasher()
+        .hash_one(ComparableStmt::from(indexed.suite().at(0)));
 
-    parsed.expr().node_index().set(NodeIndex::from(7));
-    assert_eq!(seen.hasher().hash_one(key), hash);
-    assert!(seen.contains(&ComparableExpr::from(other.expr())));
+    indexed.index_module();
+    let indexed = indexed.suite().at(0);
+    assert_ne!(indexed.node_index(), before_index);
+    assert_eq!(seen.hasher().hash_one(ComparableStmt::from(indexed)), hash);
+    assert!(seen.contains(&ComparableStmt::from(indexed)));
     Ok(())
 }
 
 #[test]
 fn formatter_ast_diff_shows_only_structural_changes() -> Result<(), ParseError> {
     fn debug_module(source: &str) -> Result<String, ParseError> {
-        let module = Mod::Module(parse_module(source)?.into_syntax());
-        Ok(format!("{:#?}", ComparableMod::from(&module)))
+        let module = parse_module(source)?;
+        Ok(format!("{:#?}", ComparableMod::from(module.syntax())))
     }
 
     let before = debug_module("x=1")?;
@@ -126,13 +134,13 @@ fn compound_statements() -> Result<(), ParseError> {
     let different_test = parse_module("if ready: send('ab')\nelif later: pass")?;
     let different_body = parse_module("if ready: send('ab')\nelif retry: send('ab')")?;
 
-    let left = ComparableStmt::from(&left.syntax().body[0]);
-    let right = ComparableStmt::from(&right.syntax().body[0]);
+    let left = ComparableStmt::from(left.suite().at(0));
+    let right = ComparableStmt::from(right.suite().at(0));
     assert_eq!(left, right);
     let hasher = RandomState::new();
     assert_eq!(hasher.hash_one(left), hasher.hash_one(right));
     for different in [&different_test, &different_body] {
-        assert_ne!(left, ComparableStmt::from(&different.syntax().body[0]));
+        assert_ne!(left, ComparableStmt::from(different.suite().at(0)));
     }
     Ok(())
 }
@@ -153,8 +161,8 @@ fn different_kinds_with_the_same_fields() -> Result<(), ParseError> {
         let left = parse_module(left)?;
         let right = parse_module(right)?;
         assert_ne!(
-            ComparableStmt::from(&left.syntax().body[0]),
-            ComparableStmt::from(&right.syntax().body[0]),
+            ComparableStmt::from(left.suite().at(0)),
+            ComparableStmt::from(right.suite().at(0)),
         );
     }
     Ok(())
@@ -162,25 +170,25 @@ fn different_kinds_with_the_same_fields() -> Result<(), ParseError> {
 
 #[test]
 fn match_patterns() -> Result<(), ParseError> {
-    fn pattern(stmt: &ruff_python_ast::Stmt) -> ComparablePattern<'_> {
-        ComparablePattern::from(&stmt.as_match_stmt().unwrap().cases[0].pattern)
+    fn pattern(stmt: ruff_python_ast::Stmt<'_>) -> ComparablePattern<'_> {
+        ComparablePattern::from(stmt.as_match_stmt().unwrap().cases().at(0).pattern())
     }
 
     let left = parse_module("match x:\n    case Point(x=[1, *rest]): pass")?;
     let right = parse_module("match other:\n    case Point(x = [0x1, *rest]): pass")?;
     let different = parse_module("match x:\n    case Point(y=[1, *rest]): pass")?;
-    let left = pattern(&left.syntax().body[0]);
-    let right = pattern(&right.syntax().body[0]);
+    let left = pattern(left.suite().at(0));
+    let right = pattern(right.suite().at(0));
     assert_eq!(left, right);
     let hasher = RandomState::new();
     assert_eq!(hasher.hash_one(left), hasher.hash_one(right));
-    assert_ne!(left, pattern(&different.syntax().body[0]));
+    assert_ne!(left, pattern(different.suite().at(0)));
     Ok(())
 }
 
 #[test]
 fn literal_keys_preserve_part_boundaries() -> Result<(), ParseError> {
-    fn key(expr: &ruff_python_ast::Expr) -> ComparableLiteral<'_> {
+    fn key(expr: ruff_python_ast::Expr<'_>) -> ComparableLiteral<'_> {
         ComparableLiteral::from(expr.as_literal_expr().unwrap())
     }
 
@@ -275,4 +283,26 @@ fn large_integers_fall_back_to_structural_comparison() -> Result<(), ParseError>
 #[test]
 fn dynamic_tuple_elements_do_not_compare_by_value() -> Result<(), ParseError> {
     assert_hashable_unequal("(f(), 2)", "(f(), 2.0)")
+}
+
+// The current flat schema retains the positions of every **rest in recovered source.
+#[test]
+fn recovered_mapping_pattern_order() {
+    let sources = [
+        "match x:\n    case {'a': a, **rest}: pass",
+        "match x:\n    case {**rest, 'a': a}: pass",
+        "match x:\n    case {**rest, 'a': a, **rest}: pass",
+        "match x:\n    case {**other, 'a': a, **rest}: pass",
+    ];
+    let parses: Vec<_> = sources
+        .iter()
+        .map(|s| parse_unchecked(s, ParseOptions::from(Mode::Module)))
+        .collect();
+    for (i, left) in parses.iter().enumerate() {
+        for (j, right) in parses.iter().enumerate() {
+            let left = ruff_python_ast::comparable::ComparableMod::from(left.syntax());
+            let right = ruff_python_ast::comparable::ComparableMod::from(right.syntax());
+            assert_eq!(left == right, i == j);
+        }
+    }
 }

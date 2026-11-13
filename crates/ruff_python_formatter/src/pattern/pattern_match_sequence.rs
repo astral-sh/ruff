@@ -1,6 +1,5 @@
 use ruff_formatter::{Format, FormatResult, format_args};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::PatternMatchSequence;
+use ruff_python_ast::{PatternMatchSequence, SyntaxNode};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -12,30 +11,31 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatPatternMatchSequence;
 
-impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
-    fn fmt_fields(&self, item: &PatternMatchSequence, f: &mut PyFormatter) -> FormatResult<()> {
-        let PatternMatchSequence {
-            patterns,
-            range,
-            node_index: _,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::PatternMatchSequence> for FormatPatternMatchSequence {
+    fn fmt_fields(&self, item: PatternMatchSequence<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let patterns = item.patterns();
+        let range = item.range();
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
         let sequence_type = SequenceType::from_pattern(item, f.context().source());
 
-        match (patterns.as_slice(), sequence_type) {
+        match (patterns, sequence_type) {
             // If the sequence is empty, format the empty parentheses, along with any dangling
             // comments.
-            ([], SequenceType::Tuple | SequenceType::TupleNoParens) => {
+            (items, SequenceType::Tuple | SequenceType::TupleNoParens) if items.is_empty() => {
                 return empty_parenthesized("(", dangling, ")").fmt(f);
             }
-            ([], SequenceType::List) => return empty_parenthesized("[", dangling, "]").fmt(f),
+            (items, SequenceType::List) if items.is_empty() => {
+                return empty_parenthesized("[", dangling, "]").fmt(f);
+            }
 
             // A single-element tuple should always be parenthesized, and the trailing comma
             // should never cause it to expand.
-            ([elt], SequenceType::Tuple | SequenceType::TupleNoParens) => {
+            (items, SequenceType::Tuple | SequenceType::TupleNoParens)
+                if let Some([elt]) = items.as_array() =>
+            {
                 return parenthesized("(", &format_args![elt.format(), token(",")], ")")
                     .with_dangling_comments(dangling)
                     .fmt(f);
@@ -61,10 +61,10 @@ impl FormatNodeRule<PatternMatchSequence> for FormatPatternMatchSequence {
     }
 }
 
-impl NeedsParentheses for PatternMatchSequence {
+impl NeedsParentheses for PatternMatchSequence<'_> {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        _parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::Never
@@ -82,21 +82,21 @@ pub(crate) enum SequenceType {
 }
 
 impl SequenceType {
-    pub(crate) fn from_pattern(pattern: &PatternMatchSequence, source: &str) -> SequenceType {
+    pub(crate) fn from_pattern(pattern: PatternMatchSequence<'_>, source: &str) -> SequenceType {
         let before_first_pattern = &source[TextRange::new(
             pattern.start(),
             pattern
-                .patterns
+                .patterns()
                 .first()
-                .map(Ranged::start)
+                .map(|node| node.start())
                 .unwrap_or(pattern.end()),
         )];
         let after_last_pattern = &source[TextRange::new(
             pattern.start(),
             pattern
-                .patterns
+                .patterns()
                 .first()
-                .map(Ranged::end)
+                .map(|node| node.end())
                 .unwrap_or(pattern.end()),
         )];
 
@@ -106,7 +106,7 @@ impl SequenceType {
             // If the pattern is empty, it must be a parenthesized tuple with no members. (This
             // branch exists to differentiate between a tuple with and without its own parentheses,
             // but a tuple without its own parentheses must have at least one member.)
-            let Some(elt) = pattern.patterns.first() else {
+            let Some(elt) = pattern.patterns().first() else {
                 return SequenceType::Tuple;
             };
 

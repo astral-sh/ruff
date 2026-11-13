@@ -1,7 +1,7 @@
 use std::assert_matches;
 
 use ruff_formatter::{FormatRuleWithOptions, format_args, write};
-use ruff_python_ast::{AnyNodeRef, Parameters};
+use ruff_python_ast::{ParameterItem, ParameterRole, Parameters, SyntaxNode};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -38,7 +38,7 @@ pub struct FormatParameters {
     parentheses: ParametersParentheses,
 }
 
-impl FormatRuleWithOptions<Parameters, PyFormatContext<'_>> for FormatParameters {
+impl FormatRuleWithOptions<Parameters<'_>, PyFormatContext<'_>> for FormatParameters {
     type Options = ParametersParentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -47,20 +47,8 @@ impl FormatRuleWithOptions<Parameters, PyFormatContext<'_>> for FormatParameters
     }
 }
 
-impl FormatNodeRule<Parameters> for FormatParameters {
-    fn fmt_fields(&self, item: &Parameters, f: &mut PyFormatter) -> FormatResult<()> {
-        let Parameters {
-            range: _,
-            node_index: _,
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-        } = item;
-
-        let (slash, star) = find_parameter_separators(f.context().source(), item);
-
+impl FormatNodeRule<ruff_python_ast::kind::Parameters> for FormatParameters {
+    fn fmt_fields(&self, item: Parameters<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
@@ -111,99 +99,99 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                     space().fmt(f)
                 }
             });
+            let source = f.context().source();
             let mut joiner = f.join_with(separator);
-            let mut last_node: Option<AnyNodeRef> = None;
+            let mut last_node: Option<SyntaxNode> = None;
 
-            for parameter_with_default in posonlyargs {
-                joiner.entry(&parameter_with_default.format());
+            let mut items = item.items_in_binding_order().peekable();
+            let mut need_star = true;
+            let mut slash_comments_end = 0;
+            let mut ends_with_slash = false;
 
-                last_node = Some(parameter_with_default.into());
-            }
-
-            // Second dangling comment: trailing the slash, e.g.:
-            // ```python
-            // def f(
-            //     x,
-            //     /,  # comment
-            //     y,
-            //     z,
-            // ): ...
-            let slash_comments_end = if posonlyargs.is_empty() {
-                0
-            } else {
-                let slash_comments_end = parameters_dangling.partition_point(|comment| {
-                    let assignment = assign_argument_separator_comment_placement(
-                        slash.as_ref(),
-                        star.as_ref(),
-                        comment.range(),
-                        comment.line_position(),
-                    )
-                    .expect("Unexpected dangling comment type in function parameters");
-                    matches!(
-                        assignment,
-                        ArgumentSeparatorCommentLocation::SlashLeading
-                            | ArgumentSeparatorCommentLocation::SlashTrailing
-                    )
-                });
-                joiner.entry(&CommentsAroundText {
-                    text: "/",
-                    comments: &parameters_dangling[..slash_comments_end],
-                });
-                slash_comments_end
-            };
-
-            for parameter_with_default in args {
-                joiner.entry(&parameter_with_default.format());
-
-                last_node = Some(parameter_with_default.into());
-            }
-
-            // kw only args need either a `*args` ahead of them capturing all var args or a `*`
-            // pseudo-argument capturing all fields. We can also have `*args` without any kwargs
-            // afterwards.
-            if let Some(vararg) = vararg {
-                joiner.entry(&format_args![
-                    leading_node_comments(vararg.as_ref()),
-                    token("*"),
-                    vararg.format()
-                ]);
-                last_node = Some(vararg.as_ref().into());
-            } else if !kwonlyargs.is_empty() {
-                // Given very strange comment placement, comments here may not actually have been
-                // marked as `StarLeading`/`StarTrailing`, but that's fine since we still produce
-                // a stable formatting in this case
-                // ```python
-                // def f42(
-                //     a,
-                //     / # 1
-                //     # 2
-                //     , # 3
-                //     # 4
-                //     * # 5
-                //     , # 6
-                //     c,
-                // ):
-                //     pass
-                // ```
-                joiner.entry(&CommentsAroundText {
-                    text: "*",
-                    comments: &parameters_dangling[slash_comments_end..],
-                });
-            }
-
-            for parameter_with_default in kwonlyargs {
-                joiner.entry(&parameter_with_default.format());
-
-                last_node = Some(parameter_with_default.into());
-            }
-
-            if let Some(kwarg) = kwarg {
-                joiner.entry(&format_args![
-                    leading_node_comments(kwarg.as_ref()),
-                    token("**"),
-                    kwarg.format()
-                ]);
-                last_node = Some(kwarg.as_ref().into());
+            while let Some(parameter) = items.next() {
+                ends_with_slash = false;
+                let node = match parameter {
+                    ParameterItem::PositionalOnly(p) => {
+                        joiner.entry(&p.format());
+                        if !matches!(items.peek(), Some(ParameterItem::PositionalOnly(_))) {
+                            ends_with_slash = true;
+                            if !parameters_dangling.is_empty() {
+                                let following_start = items
+                                    .peek()
+                                    .map_or(item.end(), |p| p.into_parameter().start());
+                                // A bare star can share this gap, as in `def f(a, /, *, b)`.
+                                let (slash, _) = find_parameter_separators(
+                                    source,
+                                    TextRange::new(p.end(), following_start),
+                                );
+                                slash_comments_end =
+                                    parameters_dangling.partition_point(|comment| {
+                                        assign_argument_separator_comment_placement(
+                                            slash.as_ref(),
+                                            None,
+                                            comment.range(),
+                                            comment.line_position(),
+                                        )
+                                        .is_some()
+                                    });
+                            }
+                            joiner.entry(&CommentsAroundText {
+                                text: "/",
+                                comments: &parameters_dangling[..slash_comments_end],
+                            });
+                        }
+                        p.into()
+                    }
+                    ParameterItem::PositionalOrKeyword(p) => {
+                        joiner.entry(&p.format());
+                        p.into()
+                    }
+                    ParameterItem::Vararg(p) => {
+                        need_star = false;
+                        joiner.entry(&format_args![
+                            leading_node_comments(p),
+                            token("*"),
+                            p.format()
+                        ]);
+                        p.into()
+                    }
+                    ParameterItem::KeywordOnly(p) => {
+                        if need_star {
+                            need_star = false;
+                            // Given very strange comment placement, comments here may not actually have been
+                            // marked as `StarLeading`/`StarTrailing`, but that's fine since we still produce
+                            // a stable formatting in this case
+                            // ```python
+                            // def f42(
+                            //     a,
+                            //     / # 1
+                            //     # 2
+                            //     , # 3
+                            //     # 4
+                            //     * # 5
+                            //     , # 6
+                            //     c,
+                            // ):
+                            //     pass
+                            // ```
+                            joiner.entry(&CommentsAroundText {
+                                text: "*",
+                                comments: &parameters_dangling[slash_comments_end..],
+                            });
+                        }
+                        joiner.entry(&p.format());
+                        p.into()
+                    }
+                    ParameterItem::Kwarg(p) => {
+                        joiner.entry(&format_args![
+                            leading_node_comments(p),
+                            token("**"),
+                            p.format()
+                        ]);
+                        p.into()
+                    }
+                };
+                last_node = Some(node);
             }
 
             joiner.finish()?;
@@ -223,14 +211,14 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             if self.parentheses == ParametersParentheses::Never {
                 // For lambdas (no parentheses), preserve the trailing comma. It doesn't
                 // behave like a magic trailing comma, it's just preserved
-                if has_trailing_comma(item, last_node, f.context().source()) {
+                if has_trailing_comma(last_node, ends_with_slash, source) {
                     write!(f, [token(",")])?;
                 }
             } else {
                 write!(f, [if_group_breaks(&token(","))])?;
 
                 if f.options().magic_trailing_comma().is_respect()
-                    && has_trailing_comma(item, last_node, f.context().source())
+                    && has_trailing_comma(last_node, ends_with_slash, source)
                 {
                     // Make the magic trailing comma expand the group
                     write!(f, [hard_line_break()])?;
@@ -248,7 +236,16 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
             // No parameters, format any dangling comments between `()`
             write!(f, [empty_parenthesized("(", dangling, ")")])
-        } else if num_parameters == 1 && posonlyargs.is_empty() && kwonlyargs.is_empty() {
+        } else if num_parameters == 1
+            && matches!(
+                item.roles().next(),
+                Some(
+                    ParameterRole::PositionalOrKeyword
+                        | ParameterRole::Vararg
+                        | ParameterRole::Kwarg
+                )
+            )
+        {
             // If we have a single argument, avoid the inner group, to ensure that we insert a
             // trailing comma if the outer group breaks.
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
@@ -338,122 +335,32 @@ pub(crate) struct ParameterSeparator {
     following_start: TextSize,
 }
 
-/// Finds slash and star in `f(a, /, b, *, c)` or `lambda a, /, b, *, c: 1`.
-///
-/// Returns the location of the slash and star separators, if any.
+/// Finds a bare slash or star in the gap between parameter nodes. An unpacked
+/// parameter includes its own stars, so `*args` and `**kwargs` are outside this gap.
 pub(crate) fn find_parameter_separators(
     contents: &str,
-    parameters: &Parameters,
+    gap: TextRange,
 ) -> (Option<ParameterSeparator>, Option<ParameterSeparator>) {
-    // We only compute preceding_end and token location here since following_start depends on the
-    // star location, but the star location depends on slash's position
-    let slash = if let Some(preceding_end) = parameters.posonlyargs.last().map(Ranged::end) {
-        // ```text
-        // def f(a1=1, a2=2, /, a3, a4): pass
-        //                 ^^^^^^^^^^^ the range (defaults)
-        // def f(a1, a2, /, a3, a4): pass
-        //             ^^^^^^^^^^^^ the range (no default)
-        // ```
-        let range = TextRange::new(preceding_end, parameters.end());
-        let mut tokens = SimpleTokenizer::new(contents, range).skip_trivia();
-
-        let comma = tokens
-            .next()
-            .expect("The function definition can't end here");
-        debug_assert!(comma.kind() == SimpleTokenKind::Comma, "{comma:?}");
-        let slash = tokens
-            .next()
-            .expect("The function definition can't end here");
-        debug_assert!(slash.kind() == SimpleTokenKind::Slash, "{slash:?}");
-
-        Some((preceding_end, slash.range))
-    } else {
-        None
-    };
-
-    // If we have a vararg we have a node that the comments attach to
-    let star = if parameters.vararg.is_some() {
-        // When the vararg is present the comments attach there and we don't need to do manual
-        // formatting
-        None
-    } else if let Some(first_keyword_argument) = parameters.kwonlyargs.first() {
-        // Check in that order:
-        // * `f(a, /, b, *, c)` and `f(a=1, /, b=2, *, c)`
-        // * `f(a, /, *, b)`
-        // * `f(*, b)` (else branch)
-        let after_parameters = parameters
-            .args
-            .last()
-            .map(|arg| arg.range.end())
-            .or(slash.map(|(_, slash)| slash.end()));
-        if let Some(preceding_end) = after_parameters {
-            let range = TextRange::new(preceding_end, parameters.end());
-            let mut tokens = SimpleTokenizer::new(contents, range).skip_trivia();
-
-            let comma = tokens
-                .next()
-                .expect("The function definition can't end here");
-            debug_assert!(comma.kind() == SimpleTokenKind::Comma, "{comma:?}");
-            let star = tokens
-                .next()
-                .expect("The function definition can't end here");
-            debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
-
-            Some(ParameterSeparator {
-                preceding_end,
-                separator: star.range,
-                following_start: first_keyword_argument.start(),
-            })
-        } else {
-            let mut tokens = SimpleTokenizer::new(contents, parameters.range).skip_trivia();
-
-            let lparen_or_star = tokens
-                .next()
-                .expect("The function definition can't end here");
-
-            // In a function definition, the first token should always be a `(`; in a lambda
-            // definition, it _can't_ be a `(`.
-            let star = if lparen_or_star.kind == SimpleTokenKind::LParen {
-                tokens
-                    .next()
-                    .expect("The function definition can't end here")
-            } else {
-                lparen_or_star
-            };
-            debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
-
-            Some(ParameterSeparator {
-                preceding_end: parameters.start(),
-                separator: star.range,
-                following_start: first_keyword_argument.start(),
-            })
+    let mut slash = None;
+    let mut star = None;
+    for token in SimpleTokenizer::new(contents, gap).skip_trivia() {
+        match token.kind {
+            SimpleTokenKind::Slash => slash = Some(token.range),
+            SimpleTokenKind::Star => star = Some(token.range),
+            _ => {}
         }
-    } else {
-        None
-    };
-
-    // Now that we have star, compute how long slash trailing comments can go
-    // Check in that order:
-    // * `f(a, /, b)`
-    // * `f(a, /, *b)`
-    // * `f(a, /, *, b)`
-    // * `f(a, /, *, **b)`
-    // * `f(a, /)`
-    let slash_following_start = parameters
-        .args
-        .first()
-        .map(Ranged::start)
-        .or(parameters.vararg.as_ref().map(|first| first.start()))
-        .or(star.as_ref().map(|star| star.separator.start()))
-        .or(parameters.kwarg.as_deref().map(Ranged::start))
-        .unwrap_or(parameters.end());
-    let slash = slash.map(|(preceding_end, slash)| ParameterSeparator {
-        preceding_end,
-        separator: slash,
-        following_start: slash_following_start,
+    }
+    let slash_separator = slash.map(|separator| ParameterSeparator {
+        preceding_end: gap.start(),
+        separator,
+        following_start: star.map_or(gap.end(), TextRange::start),
     });
-
-    (slash, star)
+    let star_separator = star.map(|separator| ParameterSeparator {
+        preceding_end: slash.map_or(gap.start(), TextRange::end),
+        separator,
+        following_start: gap.end(),
+    });
+    (slash_separator, star_separator)
 }
 
 /// Locates positional only parameters separator `/` or the keywords only parameters
@@ -653,25 +560,18 @@ pub(crate) enum ArgumentSeparatorCommentLocation {
 }
 
 fn has_trailing_comma(
-    parameters: &Parameters,
-    last_node: Option<AnyNodeRef>,
+    last_node: Option<SyntaxNode<'_>>,
+    ends_with_slash: bool,
     source: &str,
 ) -> bool {
-    // No nodes, no trailing comma
     let Some(last_node) = last_node else {
         return false;
     };
 
-    let ends_with_pos_only_argument_separator = !parameters.posonlyargs.is_empty()
-        && parameters.args.is_empty()
-        && parameters.vararg.is_none()
-        && parameters.kwonlyargs.is_empty()
-        && parameters.kwarg.is_none();
-
     let mut tokens = SimpleTokenizer::starts_at(last_node.end(), source).skip_trivia();
     // `def a(b, c, /): ... `
     // The slash lacks its own node
-    if ends_with_pos_only_argument_separator {
+    if ends_with_slash {
         let comma = tokens.next();
         assert_matches!(
             comma,

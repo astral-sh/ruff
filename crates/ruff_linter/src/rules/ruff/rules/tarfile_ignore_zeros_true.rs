@@ -57,7 +57,7 @@ impl Violation for TarfileIgnoreZerosTrue {
 /// `tarfile-ignore-zeros-true`
 pub(crate) fn tarfile_ignore_zeros_true(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: &ast::ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     // Keyword-only on the openers, but the `TarFile` constructor also takes it
@@ -67,7 +67,7 @@ pub(crate) fn tarfile_ignore_zeros_true(
         ["tarfile", "open"] | ["tarfile", "TarFile", "open"] => call
             .arguments
             .find_keyword("ignore_zeros")
-            .map(ArgOrKeyword::from),
+            .map(ArgOrKeyword::Keyword),
         _ => None,
     };
 

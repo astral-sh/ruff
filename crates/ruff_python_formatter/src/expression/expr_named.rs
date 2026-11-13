@@ -1,6 +1,5 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprNamed;
+use ruff_python_ast::{ExprNamed, SyntaxNode};
 
 use crate::comments::dangling_comments;
 use crate::expression::parentheses::{
@@ -11,14 +10,10 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprNamed;
 
-impl FormatNodeRule<ExprNamed> for FormatExprNamed {
-    fn fmt_fields(&self, item: &ExprNamed, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprNamed {
-            target,
-            value,
-            range: _,
-            node_index: _,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::ExprNamed> for FormatExprNamed {
+    fn fmt_fields(&self, item: ExprNamed<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let target = item.target();
+        let value = item.value();
 
         // This context, a dangling comment is a comment between the `:=` and the value.
         let comments = f.context().comments().clone();
@@ -45,10 +40,10 @@ impl FormatNodeRule<ExprNamed> for FormatExprNamed {
     }
 }
 
-impl NeedsParentheses for ExprNamed {
+impl NeedsParentheses for ExprNamed<'_> {
     fn needs_parentheses(
         &self,
-        parent: AnyNodeRef,
+        parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         // Unlike tuples, named expression parentheses are not part of the range even when

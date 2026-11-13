@@ -1,8 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::types::Node;
-use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Comprehension, Expr, ExprContext, Stmt};
+use ruff_python_ast::{
+    Comprehension, Expr, ExprContext, ExprKind, ExprName, Stmt, StmtKind, visitor,
+};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -58,38 +59,40 @@ impl Violation for FunctionUsesLoopVariable {
 
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
-    loaded: Vec<&'a ast::ExprName>,
-    stored: Vec<&'a ast::ExprName>,
+    loaded: Vec<ExprName<'a>>,
+    stored: Vec<ExprName<'a>>,
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Name(name) => match &name.ctx {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        match expr.classify() {
+            ExprKind::Name(name) => match &name.ctx() {
                 ExprContext::Load => self.loaded.push(name),
                 ExprContext::Store => self.stored.push(name),
                 _ => {}
             },
-            _ => visitor::walk_expr(self, expr),
+            kind => visitor::walk_expr(self, kind),
         }
     }
 }
 
 #[derive(Default)]
 struct SuspiciousVariablesVisitor<'a> {
-    names: Vec<&'a ast::ExprName>,
-    safe_functions: Vec<&'a Expr>,
+    names: Vec<ExprName<'a>>,
+    safe_functions: Vec<Expr<'a>>,
 }
 
 /// `Visitor` to collect all suspicious variables (those referenced in
 /// functions, but not bound as arguments).
 impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                parameters, body, ..
-            }) => {
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        let kind = stmt.classify();
+        match kind {
+            StmtKind::FunctionDef(stmt_function_def) => {
+                let parameters = stmt_function_def.parameters();
+                let body = stmt_function_def.body();
+
                 // Collect all loaded variable names.
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_body(body);
@@ -97,11 +100,15 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 // Treat any non-arguments as "suspicious".
                 self.names
                     .extend(visitor.loaded.into_iter().filter(|loaded| {
-                        if visitor.stored.iter().any(|stored| stored.id == loaded.id) {
+                        if visitor
+                            .stored
+                            .iter()
+                            .any(|stored| stored.name_id() == loaded.name_id())
+                        {
                             return false;
                         }
 
-                        if parameters.includes(&loaded.id) {
+                        if parameters.includes(loaded.id()) {
                             return false;
                         }
 
@@ -111,46 +118,49 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 return;
             }
             // Mark `return lambda: x` as safe.
-            Stmt::Return(ast::StmtReturn {
-                value: Some(value),
-                range: _,
-                node_index: _,
-            }) if value.is_lambda_expr() => {
+            StmtKind::Return(stmt_return)
+                if let Some(value) = stmt_return.value()
+                    && value.is_lambda_expr() =>
+            {
                 self.safe_functions.push(value);
             }
             _ => {}
         }
-        visitor::walk_stmt(self, stmt);
+        visitor::walk_stmt(self, kind);
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Call(ast::ExprCall {
-                func,
-                arguments,
-                range_start: _,
-                node_index: _,
-            }) => {
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        let kind = expr.classify();
+        match kind {
+            ExprKind::Call(expr_call) => {
+                let func = expr_call.func();
+                let arguments = expr_call.arguments();
+
                 // Mark immediately-invoked lambdas as safe — the closure
                 // is consumed right away, so late-binding is not a concern.
                 if func.is_lambda_expr() {
                     self.safe_functions.push(func);
                 }
 
-                match func.as_ref() {
-                    Expr::Name(ast::ExprName { id, .. }) => {
+                match func.classify() {
+                    ExprKind::Name(expr_name) => {
+                        let id = expr_name.id();
+
                         if matches!(id.as_str(), "filter" | "reduce" | "map") {
-                            for arg in &*arguments.args {
+                            for arg in arguments.args() {
                                 if arg.is_lambda_expr() {
                                     self.safe_functions.push(arg);
                                 }
                             }
                         }
                     }
-                    Expr::Attribute(ast::ExprAttribute { value, attr, .. }) if attr == "reduce" => {
-                        if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
+                    ExprKind::Attribute(expr_attribute) if expr_attribute.attr() == "reduce" => {
+                        let value = expr_attribute.value();
+
+                        if let ExprKind::Name(name_node) = value.classify() {
+                            let id = name_node.id();
                             if id == "functools" {
-                                for arg in &*arguments.args {
+                                for arg in arguments.args() {
                                     if arg.is_lambda_expr() {
                                         self.safe_functions.push(arg);
                                     }
@@ -161,20 +171,18 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                     _ => {}
                 }
 
-                for keyword in &*arguments.keywords {
-                    if keyword.arg.as_ref().is_some_and(|arg| arg == "key")
-                        && keyword.value.is_lambda_expr()
+                for keyword in arguments.keywords() {
+                    if keyword.arg().is_some_and(|arg| arg == "key")
+                        && keyword.value().is_lambda_expr()
                     {
-                        self.safe_functions.push(&keyword.value);
+                        self.safe_functions.push(keyword.value());
                     }
                 }
             }
-            Expr::Lambda(ast::ExprLambda {
-                parameters,
-                body,
-                range: _,
-                node_index: _,
-            }) if !self.safe_functions.contains(&expr) => {
+            ExprKind::Lambda(expr_lambda) if !self.safe_functions.contains(&expr) => {
+                let parameters = expr_lambda.parameters();
+                let body = expr_lambda.body();
+
                 // Collect all loaded variable names.
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_expr(body);
@@ -182,14 +190,15 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 // Treat any non-arguments as "suspicious".
                 self.names
                     .extend(visitor.loaded.into_iter().filter(|loaded| {
-                        if visitor.stored.iter().any(|stored| stored.id == loaded.id) {
+                        if visitor
+                            .stored
+                            .iter()
+                            .any(|stored| stored.name_id() == loaded.name_id())
+                        {
                             return false;
                         }
 
-                        if parameters
-                            .as_ref()
-                            .is_some_and(|parameters| parameters.includes(&loaded.id))
-                        {
+                        if parameters.is_some_and(|parameters| parameters.includes(loaded.id())) {
                             return false;
                         }
 
@@ -200,7 +209,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             }
             _ => {}
         }
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, kind);
     }
 }
 
@@ -211,20 +220,22 @@ struct NamesFromAssignmentsVisitor<'a> {
 
 /// `Visitor` to collect all names used in an assignment expression.
 impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Name(ast::ExprName { id, .. }) => {
-                self.names.push(id.as_str());
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        let elts = match expr.classify() {
+            ExprKind::Name(name) => {
+                self.names.push(name.id().as_str());
+                return;
             }
-            Expr::Starred(ast::ExprStarred { value, .. }) => {
-                self.visit_expr(value);
+            ExprKind::Starred(starred) => {
+                self.visit_expr(starred.value());
+                return;
             }
-            Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                for expr in elts {
-                    self.visit_expr(expr);
-                }
-            }
-            _ => {}
+            ExprKind::List(list) => list.elts(),
+            ExprKind::Tuple(tuple) => tuple.elts(),
+            _ => return,
+        };
+        for expr in elts {
+            self.visit_expr(expr);
         }
     }
 }
@@ -236,45 +247,41 @@ struct AssignedNamesVisitor<'a> {
 
 /// `Visitor` to collect all used identifiers in a statement.
 impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        if stmt.is_function_def_stmt() {
-            // Don't recurse.
-            return;
-        }
-
-        match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+    fn visit_stmt(&mut self, stmt: Stmt<'a>) {
+        let kind = stmt.classify();
+        let target = match kind {
+            StmtKind::FunctionDef(_) => return,
+            StmtKind::Assign(assign) => {
                 let mut visitor = NamesFromAssignmentsVisitor::default();
-                for expr in targets {
+                for expr in assign.targets() {
                     visitor.visit_expr(expr);
                 }
                 self.names.extend(visitor.names);
+                None
             }
-            Stmt::AugAssign(ast::StmtAugAssign { target, .. })
-            | Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
-            | Stmt::For(ast::StmtFor { target, .. }) => {
-                let mut visitor = NamesFromAssignmentsVisitor::default();
-                visitor.visit_expr(target);
-                self.names.extend(visitor.names);
-            }
-            _ => {}
+            StmtKind::AugAssign(assign) => Some(assign.target()),
+            StmtKind::AnnAssign(assign) => Some(assign.target()),
+            StmtKind::For(for_stmt) => Some(for_stmt.target()),
+            _ => None,
+        };
+        if let Some(target) = target {
+            let mut visitor = NamesFromAssignmentsVisitor::default();
+            visitor.visit_expr(target);
+            self.names.extend(visitor.names);
         }
-
-        visitor::walk_stmt(self, stmt);
+        visitor::walk_stmt(self, kind);
     }
 
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        if expr.is_lambda_expr() {
-            // Don't recurse.
-            return;
+    fn visit_expr(&mut self, expr: Expr<'a>) {
+        match expr.classify() {
+            ExprKind::Lambda(_) => {}
+            kind => visitor::walk_expr(self, kind),
         }
-
-        visitor::walk_expr(self, expr);
     }
 
-    fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
+    fn visit_comprehension(&mut self, comprehension: Comprehension<'a>) {
         let mut visitor = NamesFromAssignmentsVisitor::default();
-        visitor.visit_expr(&comprehension.target);
+        visitor.visit_expr(comprehension.target());
         self.names.extend(visitor.names);
 
         visitor::walk_comprehension(self, comprehension);
@@ -288,8 +295,8 @@ pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
     let suspicious_variables = {
         let mut visitor = SuspiciousVariablesVisitor::default();
         match node {
-            Node::Stmt(stmt) => visitor.visit_stmt(stmt),
-            Node::Expr(expr) => visitor.visit_expr(expr),
+            Node::Stmt(stmt) => visitor.visit_stmt(*stmt),
+            Node::Expr(expr) => visitor.visit_expr(*expr),
         }
         visitor.names
     };
@@ -299,8 +306,8 @@ pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
         let reassigned_in_loop = {
             let mut visitor = AssignedNamesVisitor::default();
             match node {
-                Node::Stmt(stmt) => visitor.visit_stmt(stmt),
-                Node::Expr(expr) => visitor.visit_expr(expr),
+                Node::Stmt(stmt) => visitor.visit_stmt(*stmt),
+                Node::Expr(expr) => visitor.visit_expr(*expr),
             }
             visitor.names
         };
@@ -308,11 +315,11 @@ pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
         // If a variable was used in a function or lambda body, and assigned in the
         // loop, flag it.
         for name in suspicious_variables {
-            if reassigned_in_loop.contains(&name.id.as_str()) {
+            if reassigned_in_loop.contains(&name.id().as_str()) {
                 if checker.insert_flake8_bugbear_range(name.range()) {
                     checker.report_diagnostic(
                         FunctionUsesLoopVariable {
-                            name: name.id.to_string(),
+                            name: name.id().to_string(),
                         },
                         name.range(),
                     );

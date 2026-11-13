@@ -14,8 +14,9 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
-    PythonVersion,
+    self as ast, ArgOrKeyword, ArgumentsSourceOrder, AstNode, ExceptHandlerKind, ExprContext,
+    ExprKind, InterpolatedStringElementKind, NodeList, PatternKind, PythonVersion, StmtKind, Suite,
+    SyntaxNode, TypeParamKind,
 };
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::typing::as_pep_585_generic;
@@ -24,7 +25,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
-use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
@@ -1040,7 +1040,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Return the node key of the given AST node, or the key of the outermost enclosing string
     /// literal, if the node originates from inside a stringified annotation.
-    fn enclosing_node_key(&self, node: AnyNodeRef<'_>) -> NodeKey {
+    fn enclosing_node_key(&self, node: SyntaxNode<'_>) -> NodeKey {
         match self.deferred_state {
             DeferredExpressionState::InStringAnnotation(enclosing_node_key) => enclosing_node_key,
             _ => NodeKey::from_node(node),
@@ -1071,11 +1071,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Get the already-inferred type of an expression node, or Unknown.
-    fn expression_type(&self, expr: &ast::Expr) -> Type<'db> {
+    fn expression_type(&self, expr: ast::Expr<'_>) -> Type<'db> {
         self.try_expression_type(expr).unwrap_or_else(Type::unknown)
     }
 
-    fn try_expression_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
+    fn try_expression_type(&self, expr: ast::Expr<'_>) -> Option<Type<'db>> {
         self.expressions
             .get(&expr.into())
             .copied()
@@ -1087,13 +1087,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// This is used in places where an expression may already have been inferred earlier with a
     /// more specific type context, and re-inferring it would be redundant or would duplicate
     /// diagnostics.
-    fn get_or_infer_expression(&mut self, expr: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
+    fn get_or_infer_expression(&mut self, expr: ast::Expr<'_>, tcx: TypeContext<'db>) -> Type<'db> {
         self.try_expression_type(expr)
             .unwrap_or_else(|| self.infer_expression(expr, tcx))
     }
 
     /// Store qualifiers for an annotation expression.
-    fn store_qualifiers(&mut self, expr: &ast::Expr, qualifiers: TypeQualifiers) {
+    fn store_qualifiers(&mut self, expr: ast::Expr<'_>, qualifiers: TypeQualifiers) {
         if !qualifiers.is_empty() {
             self.qualifiers.insert(expr.into(), qualifiers);
         }
@@ -1135,8 +1135,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// Can cause query cycles if the expression is from a different scope and type inference is
     /// already in progress for that scope (further up the stack).
-    fn file_expression_type(&self, expression: &ast::Expr) -> Type<'db> {
-        let file_scope = self.index.expression_scope_id(expression);
+    fn file_expression_type(&self, expression: ast::Expr<'_>) -> Type<'db> {
+        let file_scope = self.index.expression_scope_id(&expression);
         let expr_scope = file_scope.to_scope_id(self.db(), self.program_file());
         match self.region {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
@@ -1147,8 +1147,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Get metadata for a type expression from any scope in the same file.
-    fn file_type_expression_flags(&self, expression: &ast::Expr) -> TypeExpressionFlags {
-        let file_scope = self.index.expression_scope_id(expression);
+    fn file_type_expression_flags(&self, expression: ast::Expr<'_>) -> TypeExpressionFlags {
+        let file_scope = self.index.expression_scope_id(&expression);
         let expr_scope = file_scope.to_scope_id(self.db(), self.program_file());
         match self.region {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
@@ -1255,7 +1255,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         post_inference::decorator::check_decorator_calls(
                             &self.context,
                             definition,
-                            &function.node(self.module()).decorator_list,
+                            function.node(self.module()).decorator_list(),
                         );
                         post_inference::function::check_function_definition(
                             &self.context,
@@ -1281,7 +1281,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         post_inference::decorator::check_decorator_calls(
                             &self.context,
                             definition,
-                            &class_node.node(self.module()).decorator_list,
+                            class_node.node(self.module()).decorator_list(),
                         );
                         let original_ty = match self.region {
                             InferenceRegion::Definition(current) if current == definition => {
@@ -1496,7 +1496,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        for decorator in &function.node(self.module()).decorator_list {
+        for decorator in function.node(self.module()).decorator_list() {
             let decorator_type = self.infer_decorator(decorator);
             if let Type::FunctionLiteral(function) = decorator_type
                 && let Some(KnownFunction::NoTypeCheck) = function.known(self.db())
@@ -1567,7 +1567,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// as type context.
     fn add_binding<'a>(
         &mut self,
-        node: AnyNodeRef<'a>,
+        node: SyntaxNode<'a>,
         binding: Definition<'db>,
     ) -> AddBinding<'db, 'a> {
         let db = self.db();
@@ -1718,39 +1718,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// For a member binding without a live place declaration, obtain its declared type from
     /// normal attribute or subscript lookup on its receiver.
-    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
+    fn fallback_member_declared_type(&mut self, node: SyntaxNode<'_>) -> Option<Type<'db>> {
         let db = self.db();
-        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-            let value_type = self.try_expression_type(value).unwrap_or_else(|| {
-                self.infer_maybe_standalone_expression(value, TypeContext::default())
-            });
-            if let Place::Defined(DefinedPlace {
-                ty,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) = value_type
-                .member(db, self.program_environment(), attr)
-                .place
-            {
-                // TODO: also consider qualifiers on the attribute
-                Some(ty)
-            } else {
-                None
+        match node.classify() {
+            ast::AnyNode::ExprAttribute(attribute) => {
+                let value = attribute.value();
+                let value_type = self.try_expression_type(value).unwrap_or_else(|| {
+                    self.infer_maybe_standalone_expression(value, TypeContext::default())
+                });
+                if let Place::Defined(DefinedPlace {
+                    ty,
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) = value_type
+                    .member(db, self.program_environment(), attribute.attr().as_str())
+                    .place
+                {
+                    // TODO: also consider qualifiers on the attribute
+                    Some(ty)
+                } else {
+                    None
+                }
             }
-        } else if let AnyNodeRef::ExprSubscript(
-            subscript @ ast::ExprSubscript {
-                value, slice, ctx, ..
-            },
-        ) = node
-        {
-            let value_ty = self.get_or_infer_expression(value, TypeContext::default());
-            let slice_ty = self.get_or_infer_expression(slice, TypeContext::default());
-            Some(
-                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
+            ast::AnyNode::ExprSubscript(subscript) => {
+                let value_ty =
+                    self.get_or_infer_expression(subscript.value(), TypeContext::default());
+                let slice_ty =
+                    self.get_or_infer_expression(subscript.slice(), TypeContext::default());
+                Some(
+                    self.infer_subscript_expression_types(
+                        subscript,
+                        value_ty,
+                        slice_ty,
+                        subscript.ctx(),
+                    )
                     .unwrap_or_else(|recovery_ty| recovery_ty),
-            )
-        } else {
-            None
+                )
+            }
+            _ => None,
         }
     }
 
@@ -1846,7 +1851,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn add_declaration(
         &mut self,
-        node: AnyNodeRef,
+        node: SyntaxNode,
         declaration: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) {
@@ -1905,7 +1910,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn add_declaration_with_binding(
         &mut self,
-        node: AnyNodeRef,
+        node: SyntaxNode,
         definition: Definition<'db>,
         declared_and_inferred_ty: &DeclaredAndInferredType<'db>,
     ) {
@@ -2015,7 +2020,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// attributes and subscripts are outside its scope.
     fn validate_assignment_type(
         &self,
-        target_node: AnyNodeRef,
+        target_node: SyntaxNode,
         definition: Definition<'db>,
         declaration: Option<Definition<'db>>,
         target_ty: Type<'db>,
@@ -2063,14 +2068,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .push(TypeAndRange { ty, range });
     }
 
-    fn infer_module(&mut self, module: &ast::ModModule) {
-        self.infer_scope_body(&module.body);
+    fn infer_module(&mut self, module: ast::ModModule<'_>) {
+        self.infer_scope_body(module.body());
     }
 
-    fn infer_type_alias_type_params(&mut self, type_alias: &ast::StmtTypeAlias) {
+    fn infer_type_alias_type_params(&mut self, type_alias: ast::StmtTypeAlias<'_>) {
         let type_params = type_alias
-            .type_params
-            .as_ref()
+            .type_params()
             .expect("type alias type params scope without type params");
 
         let binding_context = self.index.expect_single_definition(type_alias);
@@ -2080,13 +2084,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
-    fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
+    fn infer_type_alias(&mut self, type_alias: ast::StmtTypeAlias<'_>) {
         let previous_check_unbound_typevars = self
             .context
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
-        self.infer_type_expression(&type_alias.value);
+        self.infer_type_expression(type_alias.value());
         self.context
             .inference_flags
             .remove(InferenceFlags::IN_TYPE_ALIAS);
@@ -2095,13 +2099,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             previous_check_unbound_typevars,
         );
 
-        if let Some(name) = type_alias.name.as_name_expr() {
-            self.check_type_alias_cycle(&name.id, &type_alias.value);
+        if let Some(name) = type_alias.name().as_name_expr() {
+            self.check_type_alias_cycle(name.id(), type_alias.value());
         }
     }
 
     /// Check both alias syntaxes, including union members that disappear during expansion.
-    fn check_type_alias_cycle(&mut self, name: &str, value: &ast::Expr) {
+    fn check_type_alias_cycle(&mut self, name: &str, value: ast::Expr<'_>) {
         let db = self.db();
         let value_ty = self.expression_type(value);
         let expanded = value_ty.expand_eagerly(db, self.program_environment());
@@ -2142,9 +2146,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// The instance or class receiver may be referenced directly, from an eager nested scope, or
     /// through a capture in a nested function.
-    fn report_undeclared_protocol_attribute(&self, target: &ast::ExprAttribute) {
+    fn report_undeclared_protocol_attribute(&self, target: ast::ExprAttribute<'_>) {
         let db = self.db();
-        let Some(receiver) = target.value.as_name_expr() else {
+        let Some(receiver) = target.value().as_name_expr() else {
             return;
         };
         let Some(method_scope_id) = receiver_method_scope(db, self.index, self.scope(), receiver)
@@ -2160,8 +2164,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return;
         };
-        if protocol.interface(db).includes_member(db, target.attr.id())
-            || protocol.has_member_declaration(db, target.attr.id())
+        if protocol
+            .interface(db)
+            .includes_member(db, target.attr().id())
+            || protocol.has_member_declaration(db, target.attr().id())
         {
             return;
         }
@@ -2172,7 +2178,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// If the current scope is a (non-lambda) function, return that function's AST node.
     ///
     /// If the current scope is not a function (or it is a lambda function), return `None`.
-    fn current_function_definition(&self) -> Option<&ast::StmtFunctionDef> {
+    fn current_function_definition(&self) -> Option<ast::StmtFunctionDef<'_>> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
         if !current_scope.kind().is_non_lambda_function() {
@@ -2184,7 +2190,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|node_ref| node_ref.node(self.module()))
     }
 
-    fn function_type(&self, function: &ast::StmtFunctionDef) -> Option<FunctionType<'db>> {
+    fn function_type(&self, function: ast::StmtFunctionDef<'_>) -> Option<FunctionType<'db>> {
         let definition = self.index.expect_single_definition(function);
         infer_definition_types(self.db(), definition).function_type(definition)
     }
@@ -2195,16 +2201,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn function_decorator_types<'a>(
         &'a self,
-        function: &'a ast::StmtFunctionDef,
+        function: ast::StmtFunctionDef<'a>,
     ) -> impl Iterator<Item = Type<'db>> + 'a {
         let definition = self.index.expect_single_definition(function);
 
         let definition_types = infer_definition_types(self.db(), definition);
 
         function
-            .decorator_list
+            .decorator_list()
             .iter()
-            .map(move |decorator| definition_types.expression_type(&decorator.expression))
+            .map(move |decorator| definition_types.expression_type(decorator.expression()))
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -2239,27 +2245,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// As a memory optimization, store `LiteralString` for a leading docstring instead of
     /// interning its exact contents. Type inference does not currently use the docstring's type;
     /// if it needs the exact type in the future, infer the docstring normally instead.
-    fn infer_scope_body(&mut self, suite: &[ast::Stmt]) {
-        if let Some((ast::Stmt::Expr(statement), body)) = suite.split_first()
-            && statement.value.is_string_literal_expr()
+    fn infer_scope_body(&mut self, suite: Suite<'_>) {
+        if let Some((first, body)) = suite.split_first()
+            && let Some(statement) = first.as_expr_stmt()
+            && statement.value().is_string_literal_expr()
         {
-            self.store_expression_type(&statement.value, Type::literal_string());
+            self.store_expression_type(statement.value(), Type::literal_string());
             self.infer_body(body);
         } else {
             self.infer_body(suite);
         }
     }
 
-    fn infer_body(&mut self, suite: &[ast::Stmt]) {
+    fn infer_body(&mut self, suite: Suite<'_>) {
         for statement in suite {
             self.infer_maybe_standalone_statement(statement);
 
-            if let ast::Stmt::Expr(ast::StmtExpr {
-                range: _,
-                node_index: _,
-                value,
-            }) = statement
-            {
+            if let StmtKind::Expr(expr_node) = statement.classify() {
+                let value = expr_node.value();
                 self.check_unused_awaitable(value);
             }
         }
@@ -2267,43 +2270,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.check_suite_for_redundant_conditions(suite);
     }
 
-    fn infer_statement(&mut self, statement: &ast::Stmt) {
-        match statement {
-            ast::Stmt::FunctionDef(function) => self.infer_function_definition_statement(function),
-            ast::Stmt::ClassDef(class) => self.infer_class_definition_statement(class),
-            ast::Stmt::Expr(ast::StmtExpr {
-                range: _,
-                node_index: _,
-                value,
-            }) => {
+    fn infer_statement(&mut self, statement: ast::Stmt<'_>) {
+        match statement.classify() {
+            StmtKind::FunctionDef(function) => {
+                self.infer_function_definition_statement(function);
+            }
+            StmtKind::ClassDef(class) => self.infer_class_definition_statement(class),
+            StmtKind::Expr(stmt_expr) => {
+                let value = stmt_expr.value();
+
                 // If this is a call expression, we would have added an `IsNonTerminalCall`
                 // constraint, meaning this will be a standalone expression.
                 self.infer_maybe_standalone_expression(value, TypeContext::default());
             }
-            ast::Stmt::If(if_statement) => self.infer_if_statement(if_statement),
-            ast::Stmt::Try(try_statement) => self.infer_try_statement(try_statement),
-            ast::Stmt::With(with_statement) => self.infer_with_statement(with_statement),
-            ast::Stmt::Match(match_statement) => self.infer_match_statement(match_statement),
-            ast::Stmt::Assign(assign) => self.infer_assignment_statement(assign),
-            ast::Stmt::AnnAssign(assign) => self.infer_annotated_assignment_statement(assign),
-            ast::Stmt::AugAssign(aug_assign) => {
+            StmtKind::If(if_statement) => self.infer_if_statement(if_statement),
+            StmtKind::Try(try_statement) => self.infer_try_statement(try_statement),
+            StmtKind::With(with_statement) => self.infer_with_statement(with_statement),
+            StmtKind::Match(match_statement) => self.infer_match_statement(match_statement),
+            StmtKind::Assign(assign) => self.infer_assignment_statement(assign),
+            StmtKind::AnnAssign(assign) => self.infer_annotated_assignment_statement(assign),
+            StmtKind::AugAssign(aug_assign) => {
                 self.infer_augmented_assignment_statement(aug_assign);
             }
-            ast::Stmt::TypeAlias(type_statement) => self.infer_type_alias_statement(type_statement),
-            ast::Stmt::For(for_statement) => self.infer_for_statement(for_statement),
-            ast::Stmt::While(while_statement) => self.infer_while_statement(while_statement),
-            ast::Stmt::Import(import) => self.infer_import_statement(import),
-            ast::Stmt::ImportFrom(import) => self.infer_import_from_statement(import),
-            ast::Stmt::Assert(assert_statement) => self.infer_assert_statement(assert_statement),
-            ast::Stmt::Raise(raise) => self.infer_raise_statement(raise),
-            ast::Stmt::Return(ret) => self.infer_return_statement(ret),
-            ast::Stmt::Delete(delete) => self.infer_delete_statement(delete),
-            ast::Stmt::Global(global) => self.infer_global_statement(global),
-            ast::Stmt::Nonlocal(_)
-            | ast::Stmt::Break(_)
-            | ast::Stmt::Continue(_)
-            | ast::Stmt::Pass(_)
-            | ast::Stmt::IpyEscapeCommand(_) => {
+            StmtKind::TypeAlias(type_statement) => {
+                self.infer_type_alias_statement(type_statement);
+            }
+            StmtKind::For(for_statement) => self.infer_for_statement(for_statement),
+            StmtKind::While(while_statement) => self.infer_while_statement(while_statement),
+            StmtKind::Import(import) => self.infer_import_statement(import),
+            StmtKind::ImportFrom(import) => self.infer_import_from_statement(import),
+            StmtKind::Assert(assert_statement) => {
+                self.infer_assert_statement(assert_statement);
+            }
+            StmtKind::Raise(raise) => self.infer_raise_statement(raise),
+            StmtKind::Return(ret) => self.infer_return_statement(ret),
+            StmtKind::Delete(delete) => self.infer_delete_statement(delete),
+            StmtKind::Global(global) => self.infer_global_statement(global),
+            StmtKind::Nonlocal(_)
+            | StmtKind::Break(_)
+            | StmtKind::Continue(_)
+            | StmtKind::Pass(_)
+            | StmtKind::IpyEscapeCommand(_) => {
                 // No-op
             }
         }
@@ -2317,14 +2324,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_type_alias_definition(
         &mut self,
-        type_alias: &ast::StmtTypeAlias,
+        type_alias: ast::StmtTypeAlias<'_>,
         definition: Definition<'db>,
     ) {
-        let alias_name = &type_alias.name.as_name_expr().unwrap().id;
+        let alias_name = type_alias.name().as_name_expr().unwrap().id();
 
         // Check that no type parameter with a default follows a TypeVarTuple
         // in the type alias's PEP 695 type parameter list.
-        if let Some(type_params) = type_alias.type_params.as_deref() {
+        if let Some(type_params) = type_alias.type_params() {
             post_inference::type_param_validation::check_single_typevar_tuple_pep695(
                 &self.context,
                 type_params,
@@ -2346,7 +2353,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None, None),
             )));
 
-        self.store_expression_type(&type_alias.name, type_alias_ty);
+        self.store_expression_type(type_alias.name(), type_alias_ty);
 
         self.add_declaration_with_binding(
             type_alias.into(),
@@ -2355,34 +2362,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
     }
 
-    fn infer_if_statement(&mut self, if_statement: &ast::StmtIf) {
+    fn infer_if_statement(&mut self, if_statement: ast::StmtIf<'_>) {
         let db = self.db();
         let env = self.program_environment();
-        let ast::StmtIf {
-            range: _,
-            node_index: _,
-            test,
-            body,
-            elif_else_clauses,
-        } = if_statement;
+        let test = if_statement.test();
+        let body = if_statement.body();
+        let elif_else_clauses = if_statement.elif_else_clauses();
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
         if let Err(err) = test_ty.try_bool(db, env) {
-            err.report_diagnostic(&self.context, &**test);
+            err.report_diagnostic(&self.context, test);
         }
 
         self.infer_body(body);
 
         for clause in elif_else_clauses {
-            let ast::ElifElseClause {
-                range: _,
-                node_index: _,
-                test,
-                body,
-            } = clause;
+            let test = clause.test();
+            let body = clause.body();
 
-            if let Some(test) = &test {
+            if let Some(test) = test {
                 let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
                 if let Err(err) = test_ty.try_bool(db, env) {
@@ -2394,28 +2393,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_try_statement(&mut self, try_statement: &ast::StmtTry) {
-        let ast::StmtTry {
-            range: _,
-            node_index: _,
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            is_star: _,
-        } = try_statement;
+    fn infer_try_statement(&mut self, try_statement: ast::StmtTry<'_>) {
+        let body = try_statement.body();
+        let handlers = try_statement.handlers();
+        let orelse = try_statement.orelse();
+        let finalbody = try_statement.finalbody();
 
         self.infer_body(body);
 
         for handler in handlers {
-            let ast::ExceptHandler::ExceptHandler(handler) = handler;
-            let ast::ExceptHandlerExceptHandler {
-                type_: handled_exceptions,
-                name: symbol_name,
-                body,
-                range: _,
-                node_index: _,
-            } = handler;
+            let ExceptHandlerKind::ExceptHandler(handler) = handler.classify();
+            let handled_exceptions = handler.type_();
+            let symbol_name = handler.name();
+            let body = handler.body();
 
             // If `symbol_name` is `Some()` and `handled_exceptions` is `None`,
             // it's invalid syntax (something like `except as e:`).
@@ -2424,7 +2414,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if symbol_name.is_some() {
                 self.infer_definition(handler);
             } else {
-                self.infer_exception(handled_exceptions.as_deref(), try_statement.is_star);
+                self.infer_exception(handled_exceptions, try_statement.is_star());
             }
 
             self.infer_body(body);
@@ -2434,32 +2424,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_body(finalbody);
     }
 
-    fn infer_with_statement(&mut self, with_statement: &ast::StmtWith) {
+    fn infer_with_statement(&mut self, with_statement: ast::StmtWith<'_>) {
         let db = self.db();
-        let ast::StmtWith {
-            range: _,
-            node_index: _,
-            is_async,
-            items,
-            body,
-        } = with_statement;
+        let is_async = with_statement.is_async();
+        let items = with_statement.items();
+        let body = with_statement.body();
         for item in items {
-            let target = item.optional_vars.as_deref();
+            let target = item.optional_vars();
             if let Some(target) = target {
-                self.infer_target(target, &item.context_expr, &|builder, tcx| {
+                self.infer_target(target, item.context_expr(), &|builder, tcx| {
                     // TODO: `infer_with_statement_definition` reports a diagnostic if `ctx_manager_ty` isn't a context manager
                     //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
                     //  `with not_context_manager as a.x: ...
                     builder
-                        .infer_standalone_expression(&item.context_expr, tcx)
+                        .infer_standalone_expression(item.context_expr(), tcx)
                         .enter(db, builder.program_environment())
                 });
             } else {
                 // Call into the context expression inference to validate that it evaluates
                 // to a valid context manager.
                 let context_expression_ty = self
-                    .infer_maybe_standalone_expression(&item.context_expr, TypeContext::default());
-                self.infer_context_expression(&item.context_expr, context_expression_ty, *is_async);
+                    .infer_maybe_standalone_expression(item.context_expr(), TypeContext::default());
+                self.infer_context_expression(item.context_expr(), context_expression_ty, is_async);
                 self.infer_optional_expression(target, TypeContext::default());
             }
         }
@@ -2503,7 +2489,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// See [PEP343](https://peps.python.org/pep-0343/#standard-terminology).
     fn infer_context_expression(
         &mut self,
-        context_expression: &ast::Expr,
+        context_expression: ast::Expr<'_>,
         context_expression_type: Type<'db>,
         is_async: bool,
     ) -> Type<'db> {
@@ -2527,7 +2513,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
     }
 
-    fn infer_exception(&mut self, node: Option<&ast::Expr>, is_star: bool) -> Type<'db> {
+    fn infer_exception(&mut self, node: Option<ast::Expr<'_>>, is_star: bool) -> Type<'db> {
         let db = self.db();
         // If there is no handled exception, it's invalid syntax;
         // a diagnostic will have already been emitted
@@ -2558,13 +2544,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if !invalid_elements.is_empty()
                 && let Some(node) = node
             {
-                if let ast::Expr::Tuple(tuple) = node
+                if let ExprKind::Tuple(tuple) = node.classify()
                     && let Some(tuple_length) = tuple_spec.len().into_fixed_length()
                     && let Some(elements) = fixed_sequence_elements(node, tuple_length)
                 {
                     let invalid_elements = invalid_elements
                         .iter()
-                        .map(|(index, ty)| (&elements[*index], *ty));
+                        .map(|(index, ty)| (elements.at(*index), *ty));
 
                     report_invalid_exception_tuple_caught(
                         &self.context,
@@ -2808,28 +2794,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.bindings.insert(definition, ty);
     }
 
-    fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
+    fn infer_match_statement(&mut self, match_statement: ast::StmtMatch<'_>) {
         let db = self.db();
-        let ast::StmtMatch {
-            range: _,
-            node_index: _,
-            subject,
-            cases,
-        } = match_statement;
+        let subject = match_statement.subject();
+        let cases = match_statement.cases();
 
         self.infer_standalone_expression(subject, TypeContext::default());
 
         for case in cases {
-            let ast::MatchCase {
-                range: _,
-                node_index: _,
-                body,
-                pattern,
-                guard,
-            } = case;
+            let body = case.body();
+            let pattern = case.pattern();
+            let guard = case.guard();
             self.infer_match_pattern(pattern);
 
-            if let Some(guard) = guard.as_deref() {
+            if let Some(guard) = guard {
                 let guard_ty = self.infer_standalone_expression(guard, TypeContext::default());
 
                 if let Err(err) = guard_ty.try_bool(db, self.program_environment()) {
@@ -2843,7 +2821,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_match_pattern_definition(
         &mut self,
-        pattern: &'ast ast::Pattern,
+        pattern: ast::Pattern<'ast>,
         predicate: PatternPredicate<'db>,
         definition: Definition<'db>,
     ) {
@@ -2853,16 +2831,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .insert(self, ty);
     }
 
-    fn validate_class_pattern(&mut self, pattern: &ast::PatternMatchClass, cls_ty: Type<'db>) {
+    fn validate_class_pattern(&mut self, pattern: ast::PatternMatchClass<'_>, cls_ty: Type<'db>) {
         let db = self.db();
         let env = self.program_environment();
         if let Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) = cls_ty {
-            if let Some(first_excess_pattern) = pattern.arguments.patterns.first() {
+            let mut positional = pattern.arguments().patterns().iter();
+            if let Some(first_excess_pattern) = positional.next() {
                 report_too_many_positional_patterns_for_class_pattern(
                     &self.context,
                     first_excess_pattern,
                     0,
-                    pattern.arguments.patterns.len(),
+                    1 + positional.count(),
                     "collections.abc.Callable",
                 );
             }
@@ -2871,7 +2850,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Type::ClassLiteral(class) = cls_ty {
             if class.is_typed_dict(self.db()) {
-                report_match_pattern_against_typed_dict(&self.context, &*pattern.cls, class);
+                report_match_pattern_against_typed_dict(&self.context, pattern.cls(), class);
                 return;
             }
             if let Some(protocol_class) = class.into_protocol_class(self.db())
@@ -2879,24 +2858,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 report_match_pattern_against_non_runtime_checkable_protocol(
                     &self.context,
-                    &*pattern.cls,
+                    pattern.cls(),
                     protocol_class,
                 );
                 return;
             }
 
-            let positional_patterns = &pattern.arguments.patterns;
-            if let [first_positional_pattern, ..] = positional_patterns.as_slice()
+            let mut positional = pattern.arguments().patterns().iter().peekable();
+            if let Some(&first_positional_pattern) = positional.peek()
                 && let Some(result) = class_pattern_positional_result(db, env, class)
             {
                 match result {
                     ClassPatternPositionalResult::Limit(limit) => {
-                        if let Some(first_excess_pattern) = positional_patterns.get(limit) {
+                        if let Some(first_excess_pattern) = positional.nth(limit) {
                             report_too_many_positional_patterns_for_class_pattern(
                                 &self.context,
                                 first_excess_pattern,
                                 limit,
-                                positional_patterns.len(),
+                                limit + 1 + positional.count(),
                                 cls_ty.display(db, env),
                             );
                         }
@@ -2912,11 +2891,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         } else if !cls_ty.is_assignable_to(db, env, KnownClass::Type.to_instance(db, env)) {
-            report_invalid_class_match_pattern(&self.context, &*pattern.cls, cls_ty);
+            report_invalid_class_match_pattern(&self.context, pattern.cls(), cls_ty);
         }
     }
 
-    fn infer_match_pattern(&mut self, pattern: &ast::Pattern) {
+    fn infer_match_pattern(&mut self, pattern: ast::Pattern<'_>) {
         // We need to create a standalone expression for each arm of a match statement, since they
         // can introduce constraints on the match subject. (Or more accurately, for the match arm's
         // pattern, since its the pattern that introduces any constraints, not the body.) Ideally,
@@ -2934,28 +2913,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // then hands off to `infer_nested_match_pattern` for any subexpressions and subpatterns,
         // where we do NOT have any additional standalone expressions to infer through.
         //
-        match pattern {
-            ast::Pattern::MatchValue(match_value) => {
-                self.infer_standalone_expression(&match_value.value, TypeContext::default());
+        match pattern.classify() {
+            PatternKind::MatchValue(match_value) => {
+                self.infer_standalone_expression(match_value.value(), TypeContext::default());
             }
-            ast::Pattern::MatchClass(match_class) => {
-                let ast::PatternMatchClass {
-                    range: _,
-                    node_index: _,
-                    cls,
-                    arguments,
-                } = match_class;
-                for pattern in &arguments.patterns {
+            PatternKind::MatchClass(match_class) => {
+                let cls = match_class.cls();
+                let arguments = match_class.arguments();
+                for pattern in arguments.patterns() {
                     self.infer_nested_match_pattern(pattern);
                 }
-                for keyword in &arguments.keywords {
-                    self.infer_nested_match_pattern(&keyword.pattern);
+                for keyword in arguments.keywords() {
+                    self.infer_nested_match_pattern(keyword.pattern());
                 }
                 let cls_ty = self.infer_standalone_expression(cls, TypeContext::default());
                 self.validate_class_pattern(match_class, cls_ty);
             }
-            ast::Pattern::MatchOr(match_or) => {
-                for pattern in &match_or.patterns {
+            PatternKind::MatchOr(match_or) => {
+                for pattern in match_or.patterns() {
                     self.infer_match_pattern(pattern);
                 }
             }
@@ -2965,22 +2940,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_nested_match_pattern(&mut self, pattern: &ast::Pattern) {
-        match pattern {
-            ast::Pattern::MatchValue(match_value) => {
-                self.infer_maybe_standalone_expression(&match_value.value, TypeContext::default());
+    fn infer_nested_match_pattern(&mut self, pattern: ast::Pattern<'_>) {
+        match pattern.classify() {
+            PatternKind::MatchValue(match_value) => {
+                self.infer_maybe_standalone_expression(match_value.value(), TypeContext::default());
             }
-            ast::Pattern::MatchSequence(match_sequence) => {
-                for pattern in &match_sequence.patterns {
+            PatternKind::MatchSequence(match_sequence) => {
+                for pattern in match_sequence.patterns() {
                     self.infer_nested_match_pattern(pattern);
                 }
             }
-            ast::Pattern::MatchMapping(match_mapping) => {
-                for (key, _) in match_mapping.entries() {
+            PatternKind::MatchMapping(match_mapping) => {
+                let items = match_mapping.items();
+                for key in items.keys() {
                     self.infer_maybe_standalone_expression(key, TypeContext::default());
                 }
                 let mut rest = None;
-                for item in &match_mapping.items {
+                for item in items {
                     match item {
                         ast::MappingPatternItem::Entry { pattern, .. } => {
                             self.infer_nested_match_pattern(pattern);
@@ -2992,58 +2968,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.infer_definition(rest);
                 }
             }
-            ast::Pattern::MatchClass(match_class) => {
-                let ast::PatternMatchClass {
-                    range: _,
-                    node_index: _,
-                    cls,
-                    arguments,
-                } = match_class;
-                for pattern in &arguments.patterns {
+            PatternKind::MatchClass(match_class) => {
+                let cls = match_class.cls();
+                let arguments = match_class.arguments();
+                for pattern in arguments.patterns() {
                     self.infer_nested_match_pattern(pattern);
                 }
-                for keyword in &arguments.keywords {
-                    self.infer_nested_match_pattern(&keyword.pattern);
+                for keyword in arguments.keywords() {
+                    self.infer_nested_match_pattern(keyword.pattern());
                 }
                 let cls_ty = self.infer_maybe_standalone_expression(cls, TypeContext::default());
                 self.validate_class_pattern(match_class, cls_ty);
             }
-            ast::Pattern::MatchAs(match_as) => {
-                if let Some(pattern) = &match_as.pattern {
+            PatternKind::MatchAs(match_as) => {
+                if let Some(pattern) = match_as.pattern() {
                     self.infer_nested_match_pattern(pattern);
                 }
-                if let Some(name) = &match_as.name {
+                if let Some(name) = match_as.name() {
                     self.infer_definition(name);
                 }
             }
-            ast::Pattern::MatchOr(match_or) => {
-                for pattern in &match_or.patterns {
+            PatternKind::MatchOr(match_or) => {
+                for pattern in match_or.patterns() {
                     self.infer_nested_match_pattern(pattern);
                 }
             }
-            ast::Pattern::MatchStar(match_star) => {
-                if let Some(name) = &match_star.name {
+            PatternKind::MatchStar(match_star) => {
+                if let Some(name) = match_star.name() {
                     self.infer_definition(name);
                 }
             }
-            ast::Pattern::MatchSingleton(_) => {}
+            PatternKind::MatchSingleton(_) => {}
         }
     }
 
-    fn infer_assignment_statement(&mut self, assignment: &ast::StmtAssign) {
-        let ast::StmtAssign {
-            range: _,
-            node_index: _,
-            targets,
-            value,
-        } = assignment;
+    fn infer_assignment_statement(&mut self, assignment: ast::StmtAssign<'_>) {
+        let targets = assignment.targets();
+        let value = assignment.value();
 
-        if let [ast::Expr::Name(name)] = targets.as_slice() {
+        if let Some([ExprKind::Name(name)]) = targets
+            .as_array()
+            .map(|items| items.map(ast::Expr::classify))
+        {
             self.infer_definition(name);
             return;
         }
 
-        let shared_value = self.index.expression(value.as_ref());
+        let shared_value = self.index.expression(value);
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             // The statement owns every binding created while evaluating its shared value,
@@ -3067,7 +3038,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_target(target, value, &|builder, tcx| {
                     let inference = infer_expression_types(builder.db(), shared_value, tcx);
                     builder.extend_expression_without_bindings(inference);
-                    inference.expression_type(value.as_ref())
+                    inference.expression_type(value)
                 });
             }
         }
@@ -3075,16 +3046,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_unpacked_assignment_target(
         &mut self,
-        target: &ast::Expr,
-        value: &ast::Expr,
+        target: ast::Expr<'_>,
+        value: ast::Expr<'_>,
         unpacked: &UnpackResult<'db>,
     ) {
-        match target {
-            ast::Expr::Starred(ast::ExprStarred { value: target, .. }) => {
+        match target.fields() {
+            ast::ExprFields::Starred(ast::ExprStarredFields { value: target, .. }) => {
                 self.infer_unpacked_assignment_target(target, value, unpacked);
             }
-            ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            ast::ExprFields::List(ast::ExprListFields { elts, .. })
+            | ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
                 for target in elts {
                     self.infer_unpacked_assignment_target(target, value, unpacked);
                 }
@@ -3107,16 +3078,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// `target`.
     fn infer_target(
         &mut self,
-        target: &ast::Expr,
-        value: &ast::Expr,
+        target: ast::Expr<'_>,
+        value: ast::Expr<'_>,
         infer_value_expr: &dyn Fn(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) {
-        match target {
-            ast::Expr::Name(_) => {
+        match target.classify() {
+            ExprKind::Name(_) => {
                 self.infer_target_impl(target, value, None);
             }
 
-            _ => self.infer_target_impl(target, value, Some(&infer_value_expr)),
+            _ => self.infer_target_impl(target, value, Some(infer_value_expr)),
         }
     }
 
@@ -3137,7 +3108,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn validate_attribute_deletion(
         &mut self,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         object_ty: Type<'db>,
         attribute: &str,
         emit_diagnostics: bool,
@@ -3444,27 +3415,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     #[expect(clippy::type_complexity)]
     fn infer_target_impl(
         &mut self,
-        target: &ast::Expr,
-        value: &ast::Expr,
+        target: ast::Expr<'_>,
+        value: ast::Expr<'_>,
         infer_assigned_ty: Option<&dyn Fn(&mut Self, TypeContext<'db>) -> Type<'db>>,
     ) {
         let db = self.db();
-        match target {
-            ast::Expr::Name(name) => {
+        match target.classify() {
+            ast::ExprKind::Name(name) => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
                     infer_assigned_ty(self, TypeContext::default());
                 }
 
                 self.infer_definition(name);
             }
-            ast::Expr::Starred(ast::ExprStarred {
-                value: starred_value,
-                ..
-            }) => {
+            ast::ExprKind::Starred(starred) => {
+                let starred_value = starred.value();
                 self.infer_target_impl(starred_value, value, infer_assigned_ty);
             }
-            ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            kind if let Some(elts) = kind.as_list_or_tuple_elements() => {
                 let assigned_ty = infer_assigned_ty.map(|f| f(self, TypeContext::default()));
 
                 if let Some(tuple_spec) = assigned_ty
@@ -3484,14 +3452,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
-            ast::Expr::Attribute(
-                attr_expr @ ast::ExprAttribute {
-                    value: object,
-                    ctx: ExprContext::Store,
-                    attr,
-                    ..
-                },
-            ) => {
+            ast::ExprKind::Attribute(attr_expr) if attr_expr.ctx() == ExprContext::Store => {
+                let object = attr_expr.value();
+                let attr = attr_expr.attr();
                 let object_ty = self.infer_expression(object, TypeContext::default());
                 self.report_undeclared_protocol_attribute(attr_expr);
 
@@ -3512,12 +3475,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
-            ast::Expr::Subscript(subscript_expr) => {
+            ast::ExprKind::Subscript(subscript_expr) => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
                     let object_ty =
-                        self.infer_expression(&subscript_expr.value, TypeContext::default());
+                        self.infer_expression(subscript_expr.value(), TypeContext::default());
                     let mut infer_slice_ty = |builder: &mut Self, tcx| {
-                        builder.infer_expression(&subscript_expr.slice, tcx)
+                        builder.infer_expression(subscript_expr.slice(), tcx)
                     };
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
                         let assigned_ty = infer_assigned_ty(builder, tcx);
@@ -3560,7 +3523,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         add.insert(self, target_ty);
     }
 
-    fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
+    fn stub_placeholder_binding_type(&self, value: ast::Expr<'_>) -> Option<Type<'db>> {
         if self.in_stub() && value.is_ellipsis_literal_expr() {
             Some(Type::unknown())
         } else {
@@ -3603,11 +3566,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                     inference.expression_type(value)
-                } else if let ast::Expr::Call(call_expr) = value {
+                } else if let ExprKind::Call(call_expr) = value.classify() {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
                     // for a legacy TypeVar creation; check for that.
-                    let callable_type = self.infer_callee(&call_expr.func);
+                    let callable_type = self.infer_callee(call_expr.func());
 
                     let ty = if let Some(namedtuple_kind) =
                         NamedTupleKind::from_type(self.db(), callable_type)
@@ -3721,10 +3684,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
-                if target.as_name_expr().map(|name| name.id.as_str()) == Some("TYPE_CHECKING") {
+                if target.as_name_expr().map(|name| name.id().as_str()) == Some("TYPE_CHECKING") {
                     if !matches!(
-                        value.as_boolean_literal_expr(),
-                        Some(ast::ExprBooleanLiteral { value: false, .. })
+                        value
+                            .as_boolean_literal_expr()
+                            .map(ast::ExprBooleanLiteral::fields),
+                        Some(ast::ExprBooleanLiteralFields { value: false, .. })
                     ) {
                         report_invalid_type_checking_constant(&self.context, target.into());
                     }
@@ -3742,7 +3707,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.file(),
                 self.program_environment().resolver_environment(db),
             );
-            SpecialFormType::try_from_file_and_name(db, importing_file, &name.id)
+            SpecialFormType::try_from_file_and_name(db, importing_file, name.id())
         }) {
             target_ty = Type::SpecialForm(special_form);
         }
@@ -3752,8 +3717,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_newtype_expression(
         &mut self,
-        target: &ast::Expr,
-        call_expr: &ast::ExprCall,
+        target: ast::Expr<'_>,
+        call_expr: ast::ExprCall<'_>,
         definition: Definition<'db>,
     ) -> Type<'db> {
         fn error<'db>(
@@ -3768,36 +3733,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
-        let arguments = &call_expr.arguments;
+        let arguments = call_expr.arguments();
 
-        if !arguments.keywords.is_empty() {
-            return error(
-                &self.context,
-                "Keyword arguments are not supported in `NewType` creation",
-                call_expr,
-            );
+        let mut name_arg = None;
+        let mut first_starred = None;
+        for item in arguments.iter_source_order() {
+            match item {
+                ast::ArgOrKeyword::Keyword(_) => {
+                    return error(
+                        &self.context,
+                        "Keyword arguments are not supported in `NewType` creation",
+                        call_expr,
+                    );
+                }
+                ast::ArgOrKeyword::Arg(arg) => {
+                    name_arg.get_or_insert(arg);
+                    if first_starred.is_none() && arg.is_starred_expr() {
+                        first_starred = Some(arg);
+                    }
+                }
+            }
         }
-
-        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = first_starred {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `NewType` creation",
                 starred,
             );
         }
-
-        if arguments.args.len() != 2 {
+        let Some(name_arg) = name_arg.filter(|_| arguments.len() == 2) else {
             return error(
                 &self.context,
                 format!(
                     "Wrong number of arguments in `NewType` creation: expected 2, found {}",
-                    arguments.args.len()
+                    arguments.len()
                 ),
                 call_expr,
             );
-        }
+        };
 
-        let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
+        let name_param_ty = self.infer_expression(name_arg, TypeContext::default());
 
         let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
             return error(
@@ -3807,21 +3782,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let ast::Expr::Name(ast::ExprName {
-            id: target_name, ..
-        }) = target
-        else {
+        let ExprKind::Name(name_node_view) = target.classify() else {
             return error(
                 &self.context,
                 "A `NewType` definition must be a simple variable assignment",
                 target,
             );
         };
+        let target_name = name_node_view.id();
 
         if name != target_name {
             report_mismatched_type_name(
                 &self.context,
-                &arguments.args[0],
+                name_arg,
                 "NewType",
                 target_name,
                 Some(name),
@@ -3839,61 +3812,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_sentinel_expression(
         &mut self,
-        target: &ast::Expr,
-        call_expr: &ast::ExprCall,
+        target: ast::Expr<'_>,
+        call_expr: ast::ExprCall<'_>,
         definition: Definition<'db>,
     ) -> Option<Type<'db>> {
         if !self.sentinel_definition_scope_is_supported() {
             return None;
         }
 
-        let ast::Expr::Name(ast::ExprName {
-            id: target_name, ..
-        }) = target
-        else {
+        let ExprKind::Name(name_node_view) = target.classify() else {
             return None;
         };
+        let target_name = name_node_view.id();
 
-        let ast::Arguments {
-            args,
-            keywords,
-            range: _,
-            node_index: _,
-        } = &call_expr.arguments;
-
-        if args.iter().any(ast::Expr::is_starred_expr) {
+        let arguments = call_expr.arguments();
+        if !(1..=2).contains(&arguments.len()) {
             return None;
         }
-
-        let (name_arg, mut repr_arg) = match &**args {
-            [name_arg] => (name_arg, None),
-            [name_arg, repr_arg] => (name_arg, Some(repr_arg)),
-            _ => return None,
-        };
-
-        for keyword in keywords {
-            let Some(keyword_name) = &keyword.arg else {
-                return None;
-            };
-
-            if keyword_name.as_str() != "repr" || repr_arg.is_some() {
-                return None;
+        let mut name_arg = None;
+        let mut repr_arg = None;
+        for item in arguments.iter_source_order() {
+            match item {
+                ast::ArgOrKeyword::Arg(arg) if arg.is_starred_expr() => return None,
+                ast::ArgOrKeyword::Arg(arg) if name_arg.is_none() => name_arg = Some(arg),
+                ast::ArgOrKeyword::Arg(arg) => repr_arg = Some(arg),
+                ast::ArgOrKeyword::Keyword(kw) if kw.arg().is_some_and(|name| name == "repr") => {
+                    repr_arg = Some(kw.value());
+                }
+                ast::ArgOrKeyword::Keyword(_) => return None,
             }
-
-            repr_arg = Some(&keyword.value);
         }
+        let name_arg = name_arg?;
 
-        let ast::Expr::StringLiteral(name_arg) = name_arg else {
+        let ExprKind::StringLiteral(name_arg) = name_arg.classify() else {
             return None;
         };
 
         if repr_arg.is_some_and(|repr_arg| {
-            !matches!(repr_arg, ast::Expr::StringLiteral(_)) && !repr_arg.is_none_literal_expr()
+            !matches!(repr_arg.classify(), ExprKind::StringLiteral(_))
+                && !repr_arg.is_none_literal_expr()
         }) {
             return None;
         }
 
-        let name = name_arg.value.to_str();
+        let name = name_arg.value().to_str();
 
         if !self.sentinel_name_matches_target(name, target_name)
             && let Some(builder) = self
@@ -3932,7 +3894,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             match scope.node() {
                 NodeWithScopeKind::Class(class) => {
-                    if name_components.next() != Some(class.node(self.module()).name.as_str()) {
+                    if name_components.next() != Some(class.node(self.module()).name().as_str()) {
                         return false;
                     }
                 }
@@ -3967,24 +3929,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_assignment_deferred(&mut self, target: &ast::Expr, value: &'ast ast::Expr) {
+    fn infer_assignment_deferred(&mut self, target: ast::Expr<'_>, value: ast::Expr<'ast>) {
         let db = self.db();
         let env = self.program_environment();
         // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType,
         // and field types for functional TypedDict.
-        let ast::Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) = value
-        else {
+        let ExprKind::Call(call_node) = value.classify() else {
             return;
         };
+        let func = call_node.func();
+        let arguments = call_node.arguments();
         let func_ty = self
             .try_expression_type(func)
             .unwrap_or_else(|| self.infer_expression(func, TypeContext::default()));
         if func_ty == Type::SpecialForm(SpecialFormType::NamedTuple) {
             // Only the `fields` argument is deferred for `NamedTuple`;
             // other arguments are inferred eagerly.
-            self.infer_typing_namedtuple_fields(&arguments.args[1]);
+            self.infer_typing_namedtuple_fields(arguments.args().at(1));
             return;
         }
         let known_class = func_ty
@@ -4000,19 +3961,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 InferenceRegion::Deferred(definition),
             ) => {
                 self.infer_typealiastype_assignment_deferred(definition, target, arguments);
-                if !arguments.keywords.is_empty() {
+                if !arguments.keywords().is_empty() {
                     let mut call_arguments = self.prepare_call_arguments(arguments);
                     // Leave the types of `name`, `value`, and `type_params` unset because
                     // these parameters have their own validation rules.
                     for (index, argument) in arguments.iter_source_order().enumerate() {
                         if let ArgOrKeyword::Keyword(keyword) = argument
-                            && let Some(name) = keyword.arg.as_deref()
-                            && !matches!(name, "name" | "value" | "type_params")
+                            && let Some(name) = keyword.arg()
+                            && !matches!(name.as_str(), "name" | "value" | "type_params")
                         {
                             call_arguments.insert_type(
                                 index,
                                 TypeContext::default(),
-                                self.expression_type(&keyword.value),
+                                self.expression_type(keyword.value()),
                             );
                         }
                     }
@@ -4041,7 +4002,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
         let mut constraint_tys = Vec::new();
-        for arg in arguments.args.iter().skip(1) {
+        for arg in arguments.args().iter().skip(1) {
             let constraint = self.infer_type_expression(arg);
             constraint_tys.push(constraint);
 
@@ -4053,6 +4014,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 builder.into_diagnostic("TypeVar constraint cannot be generic");
             }
         }
+        let has_multiple_constraints = constraint_tys.len() >= 2;
         let mut bound_or_constraints = if !constraint_tys.is_empty() {
             Some(TypeVarBoundOrConstraints::Constraints(
                 TypeVarConstraints::new(self.db(), constraint_tys.into_boxed_slice()),
@@ -4060,8 +4022,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             None
         };
-        if let Some(bound) = arguments.find_keyword("bound") {
-            let bound_type = self.infer_type_expression(&bound.value);
+        let [bound, default] = arguments.find_keywords(["bound", "default"]);
+        if let Some(bound) = bound {
+            let bound_type = self.infer_type_expression(bound.value());
             bound_or_constraints = Some(TypeVarBoundOrConstraints::UpperBound(bound_type));
 
             if bound_type.has_typevar_or_typevar_instance(db, env)
@@ -4072,12 +4035,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 builder.into_diagnostic("TypeVar upper bound cannot be generic");
             }
         }
-        if let Some(default) = arguments.find_keyword("default") {
+        if let Some(default) = default {
             if matches!(
                 known_class,
                 Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
             ) {
-                self.infer_typevartuple_default(&default.value, None);
+                self.infer_typevartuple_default(default.value(), None);
             } else if matches!(
                 known_class,
                 Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
@@ -4089,23 +4052,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // typevars are instead validated by `check_legacy_typevar_defaults`
                 // (for functions) and `report_invalid_typevar_default_reference`
                 // (for classes).
-                self.infer_paramspec_default(&default.value, None);
+                self.infer_paramspec_default(default.value(), None);
             } else {
-                let default_ty = self.infer_type_expression(&default.value);
-                let bound_or_constraints_node = arguments
-                    .find_keyword("bound")
-                    .map(|kw| BoundOrConstraintsNodes::Bound(&kw.value))
+                let default_ty = self.infer_type_expression(default.value());
+                let bound_or_constraints_node = bound
+                    .map(|kw| BoundOrConstraintsNodes::Bound(kw.value()))
                     .or_else(|| {
-                        if arguments.args.len() < 3 {
+                        if !has_multiple_constraints {
                             return None;
                         }
-                        Some(BoundOrConstraintsNodes::Constraints(&arguments.args[1..]))
+                        Some(BoundOrConstraintsNodes::Constraints(
+                            arguments.args().skip_front(1),
+                        ))
                     });
                 self.validate_typevar_default(
-                    target.as_name_expr().map(|name| &*name.id),
+                    target.as_name_expr().map(|name| name.id().as_str()),
                     bound_or_constraints,
                     default_ty,
-                    &default.value,
+                    default.value(),
                     bound_or_constraints_node,
                 );
             }
@@ -4113,15 +4077,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     // Infer the deferred base type of a NewType.
-    fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
+    fn infer_newtype_assignment_deferred(&mut self, arguments: ast::Arguments<'_>) {
         let db = self.db();
         let env = self.program_environment();
-        let inferred = self.infer_type_expression(&arguments.args[1]);
+        let inferred = self.infer_type_expression(arguments.args().at(1));
 
         if inferred.has_typevar_or_typevar_instance(db, env) {
             if let Some(builder) = self
                 .context
-                .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
+                .report_lint(&INVALID_NEWTYPE, arguments.args().at(1))
             {
                 let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
                 diag.set_primary_annotation_message("A `NewType` base cannot be generic");
@@ -4147,7 +4111,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         if let Some(builder) = self
             .context
-            .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
+            .report_lint(&INVALID_NEWTYPE, arguments.args().at(1))
         {
             let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
             diag.set_primary_annotation_message(format!("type `{}`", inferred.display(db, env)));
@@ -4168,8 +4132,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// the value argument.
     fn infer_typealiastype_call(
         &mut self,
-        target: &ast::Expr,
-        call_expr: &ast::ExprCall,
+        target: ast::Expr<'_>,
+        call_expr: ast::ExprCall<'_>,
         definition: Definition<'db>,
         typing_module: TypingModule,
     ) -> Type<'db> {
@@ -4185,9 +4149,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
-        let arguments = &call_expr.arguments;
+        let arguments = call_expr.arguments();
 
-        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = arguments.args().iter().find(|arg| arg.is_starred_expr()) {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `TypeAliasType` creation",
@@ -4195,12 +4159,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if arguments.args.len() > 2 {
+        if arguments.args().len() > 2 {
             return error(
                 &self.context,
                 format_args!(
                     "Expected at most 2 positional arguments to `TypeAliasType`, got {}",
-                    arguments.args.len()
+                    arguments.args().len()
                 ),
                 call_expr,
             );
@@ -4224,16 +4188,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let ast::Expr::Name(ast::ExprName {
-            id: target_name, ..
-        }) = target
-        else {
+        let ExprKind::Name(name_node_view) = target.classify() else {
             return error(
                 &self.context,
                 "A `TypeAliasType` definition must be a simple variable assignment",
                 target,
             );
         };
+        let target_name = name_node_view.id();
 
         if name != target_name {
             report_mismatched_type_name(
@@ -4265,8 +4227,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_typealiastype_assignment_deferred(
         &mut self,
         definition: Definition<'db>,
-        target: &ast::Expr,
-        arguments: &ast::Arguments,
+        target: ast::Expr<'_>,
+        arguments: ast::Arguments<'_>,
     ) {
         let db = self.db();
         let Some((name_arg, value_arg)) = type_alias_arguments(arguments) else {
@@ -4280,13 +4242,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut type_params = FxHashSet::default();
         let mut valid_type_params = true;
         // Infer keyword arguments (e.g. `type_params`) so their types are stored.
-        for ast::Keyword { arg, value, .. } in &arguments.keywords {
-            if std::ptr::eq(value, name_arg) || std::ptr::eq(value, value_arg) {
+        for keyword in arguments.keywords() {
+            let arg = keyword.arg();
+            let value = keyword.value();
+            if value.is_same_node(name_arg) || value.is_same_node(value_arg) {
                 continue;
             }
             self.infer_expression(value, TypeContext::default());
 
-            if arg.as_deref() != Some("type_params") {
+            if arg.map(ast::Identifier::as_str) != Some("type_params") {
                 continue;
             }
 
@@ -4305,7 +4269,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut typevar_tuple: Option<TypeVarInstance> = None;
             let mut reported_default_order_error = false;
 
-            for element in &tuple.elts {
+            for element in tuple.elts() {
                 let bound_typevar = match self.expression_type(element) {
                     Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => bind_typevar(
                         self.db(),
@@ -4435,25 +4399,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.typevar_binding_context = previous_context;
         if let Some(name) = target.as_name_expr() {
-            self.check_type_alias_cycle(&name.id, value_arg);
+            self.check_type_alias_cycle(name.id(), value_arg);
         }
     }
 
-    fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
+    fn infer_annotated_assignment_statement(&mut self, assignment: ast::StmtAnnAssign<'_>) {
         let db = self.db();
         let env = self.program_environment();
-        if assignment.target.is_name_expr() {
+        if assignment.target().is_name_expr() {
             self.infer_definition(assignment);
         } else {
             // Non-name assignment targets are inferred as ordinary expressions, not definitions.
-            let ast::StmtAnnAssign {
-                range: _,
-                node_index: _,
-                annotation,
-                value,
-                target,
-                simple: _,
-            } = assignment;
+            let annotation = assignment.annotation();
+            let value = assignment.value();
+            let target = assignment.target();
             let annotated = self.infer_annotation_expression(
                 annotation,
                 DeferredExpressionState::from(self.defer_annotations()),
@@ -4465,9 +4424,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && annotated
                             .qualifiers
                             .contains(TypeQualifiers::from(qualifier))
-                        && let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, annotation)
                     {
                         builder.into_diagnostic(format_args!(
                             "`{name}` annotations are not allowed for non-name targets",
@@ -4487,32 +4445,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ParamSpecAttrKind::Args => ("args", "*args"),
                     ParamSpecAttrKind::Kwargs => ("kwargs", "**kwargs"),
                 };
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
-                {
+                if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
                     builder.into_diagnostic(format_args!(
                         "`{name}.{attr_name}` is only valid \
                         for annotating `{variadic}` function parameters",
                     ));
                 }
-            } else if let ast::Expr::Attribute(attr_expr) = annotation.as_ref()
-                && matches!(attr_expr.attr.as_str(), "args" | "kwargs")
+            } else if let ExprKind::Attribute(attr_expr) = annotation.classify()
+                && matches!(attr_expr.attr().as_str(), "args" | "kwargs")
             {
-                let value_ty = self.expression_type(&attr_expr.value);
+                let value_ty = self.expression_type(attr_expr.value());
                 if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_ty
                     && typevar.is_paramspec(self.db())
                 {
                     let name = typevar.name(self.db());
-                    let attr_name = &attr_expr.attr;
+                    let attr_name = attr_expr.attr();
                     let variadic = if attr_name == "args" {
                         "*args"
                     } else {
                         "**kwargs"
                     };
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
+                    if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation)
                     {
                         builder.into_diagnostic(format_args!(
                             "`{name}.{attr_name}` is only valid \
@@ -4525,11 +4478,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Disallow annotations on non-name targets unless they are valid receivers (e.g.
             // `self.x: int` or `cls.x: int`).
             if !is_valid_annotation_target(db, self.program_file(), target) {
-                let message = match target.as_ref() {
-                    ast::Expr::Attribute(_) => {
+                let message = match target.classify() {
+                    ExprKind::Attribute(_) => {
                         "Type annotations are not allowed on this attribute expression"
                     }
-                    ast::Expr::Subscript(_) => {
+                    ExprKind::Subscript(_) => {
                         "Type annotations are not allowed on subscripted expressions"
                     }
                     _ => {
@@ -4545,10 +4498,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // For syntactically valid non-name targets, reject the annotation and validate
                 // any accompanying assignment.
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
-                {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation) {
                     builder.into_diagnostic(message);
                 }
 
@@ -4562,7 +4512,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
 
-            let value_ty = value.as_ref().map(|value| {
+            let value_ty = value.map(|value| {
                 self.infer_maybe_standalone_expression(
                     value,
                     TypeContext::declared(Some(annotated.inner_type())),
@@ -4572,7 +4522,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
             // do type inference on the `self.attr` target to get types for all sub-expressions.
             self.infer_expression(target, TypeContext::default());
-            if let ast::Expr::Attribute(target) = target.as_ref() {
+            if let ExprKind::Attribute(target) = target.classify() {
                 self.report_undeclared_protocol_attribute(target);
             }
 
@@ -4582,13 +4532,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // does for augmented assignments).
             if value.is_some()
                 && annotated.qualifiers.contains(TypeQualifiers::FINAL)
-                && let ast::Expr::Attribute(attr_expr) = target.as_ref()
+                && let ExprKind::Attribute(attr_expr) = target.classify()
             {
-                let object_ty = self.expression_type(&attr_expr.value);
+                let object_ty = self.expression_type(attr_expr.value());
                 self.invalid_assignment_to_final_attribute(
                     object_ty,
                     attr_expr,
-                    attr_expr.attr.id(),
+                    attr_expr.attr().id(),
                     annotated.qualifiers,
                 );
             }
@@ -4606,18 +4556,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     if let Some(builder) = self
                         .context
-                        .report_lint(&INVALID_ASSIGNMENT, value.as_deref().unwrap())
+                        .report_lint(&INVALID_ASSIGNMENT, value.unwrap())
                     {
                         let mut diag = builder.into_diagnostic(format_args!(
                             "Object of type `{}` is not assignable to `{}`",
                             value_ty.display(db, env),
                             declared_ty.display(db, env),
                         ));
-                        diag.annotate(
-                            self.context
-                                .secondary(annotation.as_ref())
-                                .message("Declared type"),
-                        );
+                        diag.annotate(self.context.secondary(annotation).message("Declared type"));
                         diag.set_primary_annotation_message(format_args!(
                             "Incompatible value of type `{}`",
                             value_ty.display(db, env),
@@ -4628,7 +4574,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 annotated.inner_type()
             };
-            self.expressions.insert((&**target).into(), target_ty);
+            self.expressions.insert((target).into(), target_ty);
         }
     }
 
@@ -4731,17 +4677,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     for annotating `{variadic}` function parameters",
                 ));
             }
-        } else if let ast::Expr::Attribute(attr_expr) = annotation
-            && matches!(attr_expr.attr.as_str(), "args" | "kwargs")
+        } else if let ExprKind::Attribute(attr_expr) = annotation.classify()
+            && matches!(attr_expr.attr().as_str(), "args" | "kwargs")
         {
             // Also check the AST form for cases where P isn't bound (e.g., class body
             // annotations). In this case, the type might not resolve to a TypeVar.
-            let value_ty = self.expression_type(&attr_expr.value);
+            let value_ty = self.expression_type(attr_expr.value());
             if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_ty
                 && typevar.is_paramspec(self.db())
             {
                 let name = typevar.name(self.db());
-                let attr_name = &attr_expr.attr;
+                let attr_name = attr_expr.attr();
                 let variadic = if attr_name == "args" {
                     "*args"
                 } else {
@@ -4874,7 +4820,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if target
             .as_name_expr()
-            .is_some_and(|name| &name.id == "TYPE_CHECKING")
+            .is_some_and(|name| name.id() == "TYPE_CHECKING")
         {
             if !KnownClass::Bool.to_instance(db, env).is_assignable_to(
                 db,
@@ -4883,17 +4829,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) {
                 // annotation not assignable from `bool` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
-            } else if self.in_stub()
-                && value
-                    .as_ref()
-                    .is_none_or(|value| value.is_ellipsis_literal_expr())
-            {
+            } else if self.in_stub() && value.is_none_or(ast::Expr::is_ellipsis_literal_expr) {
                 // stub file assigning nothing or `...` is fine
             } else if !matches!(
                 value
-                    .as_ref()
-                    .and_then(|value| value.as_boolean_literal_expr()),
-                Some(ast::ExprBooleanLiteral { value: false, .. })
+                    .and_then(ast::Expr::as_boolean_literal_expr)
+                    .map(ast::ExprBooleanLiteral::fields),
+                Some(ast::ExprBooleanLiteralFields { value: false, .. })
             ) {
                 // otherwise, assigning something other than `False` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
@@ -4909,7 +4851,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.file(),
                     self.program_environment().resolver_environment(self.db()),
                 ),
-                &name_expr.id,
+                name_expr.id(),
             )
         {
             declared.inner = Type::SpecialForm(special_form);
@@ -4966,7 +4908,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let inferred_ty = if target
                 .as_name_expr()
-                .is_some_and(|name| &name.id == "TYPE_CHECKING")
+                .is_some_and(|name| name.id() == "TYPE_CHECKING")
             {
                 Type::bool_literal(true)
             } else if self.in_stub() && value.is_ellipsis_literal_expr() {
@@ -4999,8 +4941,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Check for annotated enum members. The typing spec states that enum
                 // members should not have explicit type annotations.
                 if let Some(name_expr) = target.as_name_expr()
-                    && !name_expr.id.starts_with("__")
-                    && !matches!(name_expr.id.as_str(), "_ignore_" | "_value_" | "_name_")
+                    && !name_expr.id().starts_with("__")
+                    && !matches!(name_expr.id().as_str(), "_ignore_" | "_value_" | "_name_")
                     && (
                         // Not bare Final (bare Final is allowed on enum members)
                         !(declared.qualifiers.contains(TypeQualifiers::FINAL)
@@ -5017,14 +4959,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if current_scope.kind() == ScopeKind::Class
                         && let Some(class) = nearest_enclosing_class(db, self.index, self.scope())
                         && is_enum_class_by_inheritance(db, env, class)
-                        && !enum_ignored_names(self.db(), self.scope()).contains(&name_expr.id)
+                        && !enum_ignored_names(self.db(), self.scope()).contains(name_expr.id())
                         && let Some(builder) = self
                             .context
                             .report_lint(&INVALID_ENUM_MEMBER_ANNOTATION, annotation)
                     {
                         let mut diag = builder.into_diagnostic(format_args!(
                             "Type annotation on enum member `{}` is not allowed",
-                            name_expr.id
+                            name_expr.id()
                         ));
                         diag.info(
                             "See: https://typing.python.org/en/latest/spec/enums.html#enum-members",
@@ -5066,28 +5008,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_augmented_assignment_statement(&mut self, assignment: &ast::StmtAugAssign) {
-        if assignment.target.is_name_expr() {
+    fn infer_augmented_assignment_statement(&mut self, assignment: ast::StmtAugAssign<'_>) {
+        if assignment.target().is_name_expr() {
             self.infer_definition(assignment);
         } else {
             // Non-name assignment targets are inferred as ordinary expressions, not definitions.
             if let Ok(result_ty) = self.infer_augment_assignment(assignment) {
-                let target = assignment.target.as_ref();
-                match target {
-                    ast::Expr::Attribute(attribute) => {
-                        let object_ty = self.expression_type(&attribute.value);
+                let target = assignment.target();
+                match target.classify() {
+                    ExprKind::Attribute(attribute) => {
+                        let object_ty = self.expression_type(attribute.value());
                         self.validate_attribute_assignment(
                             attribute,
                             target,
                             object_ty,
-                            attribute.attr.id(),
+                            attribute.attr().id(),
                             &mut |_, _| result_ty,
                             true,
                         );
                     }
-                    ast::Expr::Subscript(subscript) => {
-                        let object_ty = self.expression_type(&subscript.value);
-                        let slice_ty = self.expression_type(&subscript.slice);
+                    ExprKind::Subscript(subscript) => {
+                        let object_ty = self.expression_type(subscript.value());
+                        let slice_ty = self.expression_type(subscript.slice());
                         self.validate_subscript_assignment(
                             subscript,
                             target,
@@ -5100,7 +5042,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            if let ast::Expr::Attribute(attr_expr) = assignment.target.as_ref() {
+            if let ExprKind::Attribute(attr_expr) = assignment.target().classify() {
                 self.report_undeclared_protocol_attribute(attr_expr);
             }
         }
@@ -5109,9 +5051,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Infer an augmented operator, returning its recovery type if the operation fails.
     fn infer_augmented_op(
         &mut self,
-        assignment: &ast::StmtAugAssign,
+        assignment: ast::StmtAugAssign<'_>,
         target_type: Type<'db>,
-        value_expr: &ast::Expr,
+        value_expr: ast::Expr<'_>,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         state: &mut BinaryInferenceState<'db>,
     ) -> Result<Type<'db>, Type<'db>> {
@@ -5119,7 +5061,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
         // dunder.
-        let op = assignment.op;
+        let op = assignment.op();
 
         // Fall back to non-augmented binary operator inference.
         let binary_return_ty =
@@ -5254,36 +5196,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_augment_assignment_definition(
         &mut self,
-        assignment: &'ast ast::StmtAugAssign,
+        assignment: ast::StmtAugAssign<'ast>,
         definition: Definition<'db>,
     ) {
         let target_ty = self
             .infer_augment_assignment(assignment)
             .unwrap_or_else(|recovery_ty| recovery_ty);
-        self.add_binding(assignment.target.as_ref().into(), definition)
+        self.add_binding(assignment.target().into(), definition)
             .insert(self, target_ty);
     }
 
     fn infer_augment_assignment(
         &mut self,
-        assignment: &ast::StmtAugAssign,
+        assignment: ast::StmtAugAssign<'_>,
     ) -> Result<Type<'db>, Type<'db>> {
-        let ast::StmtAugAssign {
-            range: _,
-            node_index: _,
-            target,
-            op: _,
-            value,
-        } = assignment;
+        let target = assignment.target();
+        let value = assignment.value();
 
         // Resolve the target type, assuming a load context.
-        let target_result = match &**target {
-            ast::Expr::Name(name) => {
+        let target_result = match target.classify() {
+            ExprKind::Name(name) => {
                 let previous_value = self.infer_name_load(name);
                 self.store_expression_type(target, previous_value);
                 Ok(previous_value)
             }
-            ast::Expr::Attribute(attr) => {
+            ExprKind::Attribute(attr) => {
                 let result = self
                     .infer_attribute_load(attr)
                     .map(|ty| ty.inner_type())
@@ -5292,7 +5229,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.store_expression_type(target, previous_value);
                 result
             }
-            ast::Expr::Subscript(subscript) => {
+            ExprKind::Subscript(subscript) => {
                 let result = self.infer_subscript_load(subscript);
                 let previous_value = result.unwrap_or_else(|recovery_ty| recovery_ty);
                 self.store_expression_type(target, previous_value);
@@ -5320,8 +5257,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_dict_key_assignment_definition(
         &mut self,
-        key: &'ast ast::Expr,
-        value: &'ast ast::Expr,
+        key: ast::Expr<'ast>,
+        value: ast::Expr<'ast>,
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
@@ -5330,18 +5267,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .insert(self, value_ty);
     }
 
-    fn infer_type_alias_statement(&mut self, node: &ast::StmtTypeAlias) {
+    fn infer_type_alias_statement(&mut self, node: ast::StmtTypeAlias<'_>) {
         self.infer_definition(node);
     }
 
     fn precise_iterable_element_type(
         &self,
-        iterable: &ast::Expr,
-        expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+        iterable: ast::Expr<'_>,
+        expression_type: impl FnMut(ast::Expr<'_>) -> Type<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
-        if let ast::Expr::Dict(dict) = iterable {
+        if let ExprKind::Dict(dict) = iterable.classify() {
             return dict_literal_key_value_types(db, env, dict, expression_type)
                 .map(|(keys, _)| keys);
         }
@@ -5359,24 +5296,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_for_statement(&mut self, for_statement: &ast::StmtFor) {
+    fn infer_for_statement(&mut self, for_statement: ast::StmtFor<'_>) {
         let db = self.db();
-        let ast::StmtFor {
+        let ast::StmtForFields {
             range: _,
-            node_index: _,
+            node: _,
             target,
             iter,
             body,
             orelse,
             is_async,
-        } = for_statement;
+        } = for_statement.fields();
 
         self.infer_target(target, iter, &|builder, tcx| {
             // TODO: `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `for a.x in not_iterable: ...
             let iterable_type = builder.infer_standalone_expression(iter, tcx);
-            if !*is_async
+            if !is_async
                 && let Some(element_type) = builder
                     .precise_iterable_element_type(iter, |expr| builder.expression_type(expr))
             {
@@ -5442,52 +5379,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .insert(self, loop_var_value_type);
     }
 
-    fn infer_while_statement(&mut self, while_statement: &ast::StmtWhile) {
+    fn infer_while_statement(&mut self, while_statement: ast::StmtWhile<'_>) {
         let db = self.db();
-        let ast::StmtWhile {
-            range: _,
-            node_index: _,
-            test,
-            body,
-            orelse,
-        } = while_statement;
+        let test = while_statement.test();
+        let body = while_statement.body();
+        let orelse = while_statement.orelse();
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
         if let Err(err) = test_ty.try_bool(db, self.program_environment()) {
-            err.report_diagnostic(&self.context, &**test);
+            err.report_diagnostic(&self.context, test);
         }
 
         self.infer_body(body);
         self.infer_body(orelse);
     }
 
-    fn infer_assert_statement(&mut self, assert: &ast::StmtAssert) {
+    fn infer_assert_statement(&mut self, assert: ast::StmtAssert<'_>) {
         let db = self.db();
-        let ast::StmtAssert {
-            range: _,
-            node_index: _,
-            test,
-            msg,
-        } = assert;
+        let test = assert.test();
+        let msg = assert.msg();
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
         if let Err(err) = test_ty.try_bool(db, self.program_environment()) {
-            err.report_diagnostic(&self.context, &**test);
+            err.report_diagnostic(&self.context, test);
         }
 
-        self.infer_optional_expression(msg.as_deref(), TypeContext::default());
+        self.infer_optional_expression(msg, TypeContext::default());
     }
 
-    fn infer_raise_statement(&mut self, raise: &ast::StmtRaise) {
+    fn infer_raise_statement(&mut self, raise: ast::StmtRaise<'_>) {
         let db = self.db();
-        let ast::StmtRaise {
-            range: _,
-            node_index: _,
-            exc,
-            cause,
-        } = raise;
+        let exc = raise.exc();
+        let cause = raise.cause();
 
         let env = self.program_environment();
         let base_exception_type = KnownClass::BaseException.to_subclass_of(db, env);
@@ -5515,10 +5440,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
+    fn infer_return_statement(&mut self, ret: ast::StmtReturn<'_>) {
         let db = self.db();
         let env = self.program_environment();
-        let tcx = if ret.value.is_some() {
+        let tcx = if ret.value().is_some() {
             nearest_enclosing_function(db, self.index, self.scope())
                 .map(|func| {
                     // When inferring expressions within a function body,
@@ -5551,29 +5476,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             TypeContext::default()
         };
-        if let Some(ty) = self.infer_optional_expression(ret.value.as_deref(), tcx) {
-            let range = ret
-                .value
-                .as_ref()
-                .map_or(ret.range(), |value| value.range());
+        if let Some(ty) = self.infer_optional_expression(ret.value(), tcx) {
+            let range = ret.value().map_or(ret.range(), |value| value.range());
             self.record_return_type(ty, range);
         } else {
             self.record_return_type(Type::none(db, env), ret.range());
         }
     }
 
-    fn infer_delete_statement(&mut self, delete: &ast::StmtDelete) {
-        let ast::StmtDelete {
-            range: _,
-            node_index: _,
-            targets,
-        } = delete;
+    fn infer_delete_statement(&mut self, delete: ast::StmtDelete<'_>) {
+        let targets = delete.targets();
         for target in targets {
             self.infer_expression(target, TypeContext::default());
         }
     }
 
-    fn infer_global_statement(&mut self, global: &ast::StmtGlobal) {
+    fn infer_global_statement(&mut self, global: ast::StmtGlobal<'_>) {
         // CPython allows examples like this, where a global variable is never explicitly defined
         // in the global scope:
         //
@@ -5589,14 +5507,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // accurate analysis about the types and boundness of global-scope symbols,
         // so we require the variable to be explicitly defined (either bound or declared)
         // in the global scope.
-        let ast::StmtGlobal {
-            node_index: _,
-            range: _,
-            names,
-        } = global;
+        let names = global.names();
         let global_place_table = self.index.place_table(FileScopeId::global());
         for name in names {
-            if let Some(symbol_id) = global_place_table.symbol_id(name) {
+            if let Some(symbol_id) = global_place_table.symbol_id(name.as_str()) {
                 let symbol = global_place_table.symbol(symbol_id);
                 if symbol.is_bound() || symbol.is_declared() {
                     // This name is explicitly defined in the global scope (not just in function
@@ -5604,7 +5518,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
             }
-            if !module_type_implicit_global_symbol(self.db(), self.program_file(), name)
+            if !module_type_implicit_global_symbol(self.db(), self.program_file(), name.as_str())
                 .place
                 .is_undefined()
             {
@@ -5641,12 +5555,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|module| Type::module_literal(self.db(), self.program_file(), module))
     }
 
-    fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {
-        let ast::Decorator {
-            range: _,
-            node_index: _,
-            expression,
-        } = decorator;
+    fn infer_decorator(&mut self, decorator: ast::Decorator<'_>) -> Type<'db> {
+        let expression = decorator.expression();
 
         self.infer_expression(expression, TypeContext::default())
     }
@@ -5656,16 +5566,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn apply_desugared_decorator(
         &mut self,
         decorator_ty: Type<'db>,
-        call_expression: &ast::ExprCall,
+        call_expression: ast::ExprCall<'_>,
         return_ty: Type<'db>,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let arguments = &call_expression.arguments;
-        let [decorated_expression] = &arguments.args[..] else {
+        let arguments = call_expression.arguments();
+        let Some(decorated_expression) = arguments.as_single_positional() else {
             return return_ty;
         };
-        if !arguments.keywords.is_empty() || decorated_expression.is_starred_expr() {
+        if decorated_expression.is_starred_expr() {
             return return_ty;
         }
 
@@ -5687,8 +5597,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         decorator_ty: Type<'db>,
         decorated_ty: Type<'db>,
-        decorator_node: &ast::Decorator,
-        decorated_function: Option<&ast::StmtFunctionDef>,
+        decorator_node: ast::Decorator<'_>,
+        decorated_function: Option<ast::StmtFunctionDef<'_>>,
     ) -> Type<'db> {
         fn propagate_callable_kind<'d>(
             db: &'d dyn Db,
@@ -5779,7 +5689,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             Ok(bindings) => {
                 self.report_deprecated_functions(
-                    &decorator_node.expression,
+                    decorator_node.expression(),
                     bindings.deprecated_decorator_functions(db),
                 );
                 (bindings.return_type(db, env), Some(bindings))
@@ -5829,7 +5739,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         inferred_ty
     }
 
-    fn defer_decorator_call(&mut self, decorator: &ast::Decorator, input_ty: Type<'db>) {
+    fn defer_decorator_call(&mut self, decorator: ast::Decorator<'_>, input_ty: Type<'db>) {
         // We validate deferred decorator applications after inference only to report call errors,
         // such as incompatible argument types or missing arguments. `@no_type_check` suppresses
         // these errors. Skip recording the calls here because the enclosing scope's post-inference
@@ -5839,7 +5749,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .contains(InferenceFlags::IN_NO_TYPE_CHECK)
         {
             self.deferred_decorator_calls
-                .push(((&decorator.expression).into(), input_ty));
+                .push(((decorator.expression()).into(), input_ty));
         }
     }
 
@@ -6687,7 +6597,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_maybe_standalone_statement(&mut self, statement: &ast::Stmt) {
+    fn infer_maybe_standalone_statement(&mut self, statement: ast::Stmt<'_>) {
         if let Some(standalone_statement) = self.index.try_statement(statement) {
             self.infer_standalone_statement_impl(standalone_statement);
         } else {
@@ -6702,14 +6612,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_optional_expression(
         &mut self,
-        expression: Option<&ast::Expr>,
+        expression: Option<ast::Expr<'_>>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         expression.map(|expr| self.infer_expression(expr, tcx))
     }
 
     #[track_caller]
-    fn infer_expression(&mut self, expression: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
+    fn infer_expression(&mut self, expression: ast::Expr<'_>, tcx: TypeContext<'db>) -> Type<'db> {
         debug_assert!(
             !self.index.is_standalone_expression(expression),
             "Calling `self.infer_expression` on a standalone-expression \
@@ -6722,7 +6632,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_expression_with_state(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         tcx: TypeContext<'db>,
         state: DeferredExpressionState,
     ) -> Type<'db> {
@@ -6734,7 +6644,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_maybe_standalone_expression(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         if let Some(standalone_expression) = self.index.try_expression(expression) {
@@ -6746,7 +6656,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_expression_with_collection_literal_peer_context(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         tcx: TypeContext<'db>,
         peer_ty: Option<Type<'db>>,
     ) -> Type<'db> {
@@ -6757,7 +6667,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_maybe_standalone_expression_with_collection_literal_peer_context(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         tcx: TypeContext<'db>,
         peer_ty: Option<Type<'db>>,
     ) -> Type<'db> {
@@ -6768,7 +6678,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_with_collection_literal_peer_context(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         tcx: TypeContext<'db>,
         peer_ty: Option<Type<'db>>,
         mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
@@ -6841,7 +6751,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     #[track_caller]
     fn infer_standalone_expression(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let standalone_expression = self.index.expression(expression);
@@ -6850,7 +6760,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_standalone_expression_impl(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
@@ -6867,7 +6777,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Infer the type of an expression.
     fn infer_expression_impl(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let Some(expression_cache) = &self.expression_cache else {
@@ -6917,7 +6827,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_expression_uncached(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         if let Some(target) = tcx.declared_type()
@@ -6936,67 +6846,58 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// expression's existing bidirectional behavior is preserved.
     fn infer_value_expression_impl(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
-        let ty = match expression {
-            ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
-                range: _,
-                node_index: _,
-            }) => Type::none(db, self.program_environment()),
-            ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
-            ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
-            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal, tcx),
-            ast::Expr::BytesLiteral(bytes_literal) => {
+        let ty = match expression.classify() {
+            ExprKind::NoneLiteral(_) => Type::none(db, self.program_environment()),
+            ExprKind::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
+            ExprKind::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
+            ExprKind::StringLiteral(literal) => self.infer_string_literal_expression(literal, tcx),
+            ExprKind::BytesLiteral(bytes_literal) => {
                 self.infer_bytes_literal_expression(bytes_literal)
             }
-            ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
-            ast::Expr::TString(tstring) => self.infer_tstring_expression(tstring),
-            ast::Expr::EllipsisLiteral(literal) => self.infer_ellipsis_literal_expression(literal),
-            ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple, tcx),
-            ast::Expr::List(list) => self.infer_list_expression(list, tcx),
-            ast::Expr::Set(set) => self.infer_set_expression(set, tcx),
-            ast::Expr::Dict(dict) => self.infer_dict_expression(dict, tcx),
-            ast::Expr::Generator(generator) => self.infer_generator_expression(generator, tcx),
-            ast::Expr::ListComp(listcomp) => {
-                self.infer_list_comprehension_expression(listcomp, tcx)
-            }
-            ast::Expr::DictComp(dictcomp) => {
-                self.infer_dict_comprehension_expression(dictcomp, tcx)
-            }
-            ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
-            ast::Expr::Name(name) => {
+            ExprKind::FString(fstring) => self.infer_fstring_expression(fstring),
+            ExprKind::TString(tstring) => self.infer_tstring_expression(tstring),
+            ExprKind::EllipsisLiteral(literal) => self.infer_ellipsis_literal_expression(literal),
+            ExprKind::Tuple(tuple) => self.infer_tuple_expression(tuple, tcx),
+            ExprKind::List(list) => self.infer_list_expression(list, tcx),
+            ExprKind::Set(set) => self.infer_set_expression(set, tcx),
+            ExprKind::Dict(dict) => self.infer_dict_expression(dict, tcx),
+            ExprKind::Generator(generator) => self.infer_generator_expression(generator, tcx),
+            ExprKind::ListComp(listcomp) => self.infer_list_comprehension_expression(listcomp, tcx),
+            ExprKind::DictComp(dictcomp) => self.infer_dict_comprehension_expression(dictcomp, tcx),
+            ExprKind::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
+            ExprKind::Name(name) => {
                 let ty = self.infer_name_expression(name);
                 tcx.declared_type().map_or(ty, |target| {
                     self.specialize_generic_class_from_context(ty, target)
                 })
             }
-            ast::Expr::Attribute(attribute) => {
+            ExprKind::Attribute(attribute) => {
                 let ty = self.infer_attribute_expression(attribute);
                 tcx.declared_type().map_or(ty, |target| {
                     self.specialize_generic_class_from_context(ty, target)
                 })
             }
-            ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
-            ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
-            ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
-            ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
-            ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
-            ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
-            ast::Expr::If(if_expression) => self.infer_if_expression(if_expression, tcx),
-            ast::Expr::Lambda(lambda_expression) => {
+            ExprKind::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
+            ExprKind::BinOp(binary) => self.infer_binary_expression(binary, tcx),
+            ExprKind::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
+            ExprKind::Compare(compare) => self.infer_compare_expression(compare),
+            ExprKind::Subscript(subscript) => self.infer_subscript_expression(subscript),
+            ExprKind::Slice(slice) => self.infer_slice_expression(slice),
+            ExprKind::If(if_expression) => self.infer_if_expression(if_expression, tcx),
+            ExprKind::Lambda(lambda_expression) => {
                 self.infer_lambda_expression(lambda_expression, tcx)
             }
-            ast::Expr::Call(call_expression) => self.infer_call_expression(call_expression, tcx),
-            ast::Expr::Starred(starred) => self.infer_starred_expression(starred, tcx),
-            ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
-            ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
-            ast::Expr::Await(await_expression) => {
-                self.infer_await_expression(await_expression, tcx)
-            }
-            ast::Expr::Named(named) => self.infer_named_expression(named),
-            ast::Expr::IpyEscapeCommand(_) => {
+            ExprKind::Call(call_expression) => self.infer_call_expression(call_expression, tcx),
+            ExprKind::Starred(starred) => self.infer_starred_expression(starred, tcx),
+            ExprKind::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
+            ExprKind::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
+            ExprKind::Await(await_expression) => self.infer_await_expression(await_expression, tcx),
+            ExprKind::Named(named) => self.infer_named_expression(named),
+            ExprKind::IpyEscapeCommand(_) => {
                 todo_type!("Ipy escape command support")
             }
         };
@@ -7007,7 +6908,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Apply context before recording an inferred expression type.
     fn finish_expression_type(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         ty: Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
@@ -7019,7 +6920,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Applies the provided type context to an already inferred type.
     fn apply_type_context(
         &mut self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         mut ty: Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
@@ -7239,7 +7140,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[track_caller]
-    fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
+    fn store_expression_type(&mut self, expression: ast::Expr<'_>, ty: Type<'db>) {
         let previous = self.expressions.insert(expression.into(), ty);
         assert_eq!(previous, None);
     }
@@ -7319,14 +7220,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
-    fn infer_number_literal_expression(&self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
+    fn infer_number_literal_expression(&self, literal: ast::ExprNumberLiteral<'_>) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprNumberLiteral {
-            range: _,
-            node_index: _,
-            value,
-        } = literal;
+        let value = literal.value();
         match value {
             ast::Number::Int(n) => n
                 .as_i64()
@@ -7338,23 +7235,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[expect(clippy::unused_self)]
-    fn infer_boolean_literal_expression(&self, literal: &ast::ExprBooleanLiteral) -> Type<'db> {
-        let ast::ExprBooleanLiteral {
-            range: _,
-            node_index: _,
-            value,
-        } = literal;
+    fn infer_boolean_literal_expression(&self, literal: ast::ExprBooleanLiteral<'_>) -> Type<'db> {
+        let value = literal.value();
 
-        Type::bool_literal(*value)
+        Type::bool_literal(value)
     }
 
     fn infer_string_literal_expression(
         &mut self,
-        literal: &ast::ExprStringLiteral,
+        literal: ast::ExprStringLiteral<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         if let Some(expected) = tcx.declared_type() {
-            self.store_maybe_expected_type(ast::ExprRef::from(literal), expected);
+            self.store_maybe_expected_type(ast::Expr::from(literal), expected);
         }
 
         if tcx.is_typealias() {
@@ -7364,54 +7257,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 aliased_type,
             )));
         }
-        if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-            Type::string_literal(self.db(), literal.value.to_str())
+        let value = literal.value().to_str();
+        if value.len() <= Self::MAX_STRING_LITERAL_SIZE {
+            Type::string_literal(self.db(), value)
         } else {
             Type::literal_string()
         }
     }
 
-    fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
+    fn infer_bytes_literal_expression(&mut self, literal: ast::ExprBytesLiteral<'_>) -> Type<'db> {
         // TODO: ignoring r/R prefixes for now, should normalize bytes values
-        let bytes: Vec<u8> = literal.value.bytes().collect();
+        let bytes = Cow::<[u8]>::from(literal.value());
         Type::bytes_literal(self.db(), &bytes)
     }
 
-    fn infer_fstring_expression(&mut self, fstring: &ast::ExprFString) -> Type<'db> {
+    fn infer_fstring_expression(&mut self, fstring: ast::ExprFString<'_>) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprFString {
-            range: _,
-            node_index: _,
-            value,
-        } = fstring;
+        let value = fstring.value();
 
         let mut collector = StringPartsCollector::new();
         for part in value {
             // Make sure we iter through every parts to infer all sub-expressions. The `collector`
             // struct ensures we don't allocate unnecessary strings.
             match part {
-                ast::FStringPartRef::Literal(literal) => {
-                    collector.push_str(&literal.value);
+                ast::FStringPartView::Literal(literal) => {
+                    collector.push_str(literal.value());
                 }
-                ast::FStringPartRef::FString(fstring) => {
-                    for element in &fstring.elements {
-                        match element {
-                            ast::InterpolatedStringElement::Interpolation(expression) => {
-                                let ast::InterpolatedElement {
+                ast::FStringPartView::FString(fstring) => {
+                    for element in fstring.elements() {
+                        match element.classify() {
+                            InterpolatedStringElementKind::Interpolation(expression) => {
+                                let ast::InterpolatedElementFields {
                                     range: _,
-                                    node_index: _,
+                                    node: _,
                                     expression,
                                     debug_text,
                                     conversion,
                                     format_spec,
-                                } = expression;
+                                } = expression.fields();
                                 let ty = self.infer_expression(expression, TypeContext::default());
 
                                 if let Some(format_spec) = format_spec {
-                                    for element in format_spec.elements.interpolations() {
+                                    for element in format_spec.elements().interpolations() {
                                         self.infer_expression(
-                                            &element.expression,
+                                            element.expression(),
                                             TypeContext::default(),
                                         );
                                     }
@@ -7438,8 +7328,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     }
                                 }
                             }
-                            ast::InterpolatedStringElement::Literal(literal) => {
-                                collector.push_str(&literal.value);
+                            InterpolatedStringElementKind::Literal(literal) => {
+                                collector.push_str(literal.value());
                             }
                         }
                     }
@@ -7449,28 +7339,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         collector.string_type(&self.context)
     }
 
-    fn infer_tstring_expression(&mut self, tstring: &ast::ExprTString) -> Type<'db> {
+    fn infer_tstring_expression(&mut self, tstring: ast::ExprTString<'_>) -> Type<'db> {
         let db = self.db();
-        let ast::ExprTString { value, .. } = tstring;
+        let value = tstring.value();
         for tstring in value {
-            for element in &tstring.elements {
-                match element {
-                    ast::InterpolatedStringElement::Interpolation(
-                        tstring_interpolation_element,
-                    ) => {
-                        let ast::InterpolatedElement {
-                            expression,
-                            format_spec,
-                            ..
-                        } = tstring_interpolation_element;
+            for element in tstring.elements() {
+                match element.classify() {
+                    InterpolatedStringElementKind::Interpolation(tstring_interpolation_element) => {
+                        let expression = tstring_interpolation_element.expression();
+                        let format_spec = tstring_interpolation_element.format_spec();
                         self.infer_expression(expression, TypeContext::default());
                         if let Some(format_spec) = format_spec {
-                            for element in format_spec.elements.interpolations() {
-                                self.infer_expression(&element.expression, TypeContext::default());
+                            for element in format_spec.elements().interpolations() {
+                                self.infer_expression(element.expression(), TypeContext::default());
                             }
                         }
                     }
-                    ast::InterpolatedStringElement::Literal(_) => {}
+                    InterpolatedStringElementKind::Literal(_) => {}
                 }
             }
         }
@@ -7479,7 +7364,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_ellipsis_literal_expression(
         &mut self,
-        _literal: &ast::ExprEllipsisLiteral,
+        _literal: ast::ExprEllipsisLiteral<'_>,
     ) -> Type<'db> {
         let db = self.db();
         KnownClass::EllipsisType.to_instance(db, self.program_environment())
@@ -7487,7 +7372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_tuple_expression(
         &mut self,
-        tuple: &ast::ExprTuple,
+        tuple: ast::ExprTuple<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
@@ -7545,7 +7430,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// still need whole-tuple inference.
     fn infer_tuple_for_union_member(
         &mut self,
-        tuple: &ast::ExprTuple,
+        tuple: ast::ExprTuple<'_>,
         tcx: TypeContext<'db>,
         candidate: Type<'db>,
         mode: TupleInferenceMode,
@@ -7556,15 +7441,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(spec) = candidate.exact_tuple_instance_spec(db)
             && let Tuple::Fixed(expected) = spec.as_ref()
         {
-            if expected.len() != tuple.elts.len() {
+            if expected.len() != tuple.elts().len() {
                 return None;
             }
             let mut elements = Vec::with_capacity(expected.len());
-            for (index, (elt, expected_ty)) in tuple
-                .elts
-                .iter()
-                .zip(expected.iter_all_elements())
-                .enumerate()
+            for (index, (elt, expected_ty)) in
+                tuple.iter().zip(expected.iter_all_elements()).enumerate()
             {
                 let ty = self.infer_expression(elt, tcx.with_declared_type(Some(expected_ty)));
                 // The whole-tuple check below already checks the last element.
@@ -7584,18 +7466,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_tuple_expression_impl(
         &mut self,
-        tuple: &ast::ExprTuple,
+        tuple: ast::ExprTuple<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprTuple {
-            range: _,
-            node_index: _,
-            elts,
-            ctx: _,
-            parenthesized: _,
-        } = tuple;
+        let elts = tuple.elts();
 
         // Remove any union elements of the annotation that are unrelated to the tuple type.
         let tcx = tcx.map(|annotation| {
@@ -7667,7 +7543,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer expressions once, in evaluation order and with their type context, before
         // recovering literal positions. For `(*[(item := 1), item],)`, both list elements
         // must be inferred before the traversal reads their types.
-        let inferred_type = |expression: &ast::Expr, promote| {
+        let inferred_type = |expression: ast::Expr<'_>, promote| {
             let ty = self.expression_type(expression);
             if promote { ty.promote(db, env) } else { ty }
         };
@@ -7689,14 +7565,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::tuple(TupleType::new(db, env, &spec))
     }
 
-    fn infer_list_expression(&mut self, list: &ast::ExprList, tcx: TypeContext<'db>) -> Type<'db> {
+    fn infer_list_expression(
+        &mut self,
+        list: ast::ExprList<'_>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let db = self.db();
-        let ast::ExprList {
-            range: _,
-            node_index: _,
-            elts,
-            ctx: _,
-        } = list;
+        let elts = list.elts();
 
         let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
         let mut infer_elt_ty =
@@ -7718,13 +7593,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    fn infer_set_expression(&mut self, set: &ast::ExprSet, tcx: TypeContext<'db>) -> Type<'db> {
+    fn infer_set_expression(&mut self, set: ast::ExprSet<'_>, tcx: TypeContext<'db>) -> Type<'db> {
         let db = self.db();
-        let ast::ExprSet {
-            range: _,
-            node_index: _,
-            elts,
-        } = set;
+        let elts = set.elts();
 
         let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
         let fallback_tcx = self.incomplete_typed_dict_key_context(set, tcx);
@@ -7756,7 +7627,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// by IDE string-literal completions.
     fn infer_set_element(
         &mut self,
-        elt: &ast::Expr,
+        elt: ast::Expr<'_>,
         elt_tcx: TypeContext<'db>,
         fallback_tcx: TypeContext<'db>,
     ) -> Type<'db> {
@@ -7789,10 +7660,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// until the colon is typed. This preserves key completions in that transient state.
     fn incomplete_typed_dict_key_context(
         &self,
-        set: &ast::ExprSet,
+        set: ast::ExprSet<'_>,
         tcx: TypeContext<'db>,
     ) -> TypeContext<'db> {
-        let [elt] = set.elts.as_slice() else {
+        let Some([elt]) = set.elts().as_array() else {
             return TypeContext::default();
         };
 
@@ -7806,14 +7677,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
-    fn infer_dict_expression(&mut self, dict: &ast::ExprDict, tcx: TypeContext<'db>) -> Type<'db> {
+    fn infer_dict_expression(
+        &mut self,
+        dict: ast::ExprDict<'_>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprDict {
-            range: _,
-            node_index: _,
-            items,
-        } = dict;
+        let items = dict.items();
 
         let mut item_types = FxHashMap::default();
 
@@ -7879,11 +7750,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // If there are multiple applicable type contexts, infer the elements without
                         // type context as the default inference.
                         for item in items {
-                            if let Some(key) = item.key.as_ref() {
+                            if let Some(key) = item.key() {
                                 self.infer_expression(key, TypeContext::default());
                             }
 
-                            self.infer_expression(&item.value, TypeContext::default());
+                            self.infer_expression(item.value(), TypeContext::default());
                         }
 
                         Some(self.union_narrowed_types(narrowed))
@@ -7907,7 +7778,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let items = items
             .iter()
-            .map(|item| [item.key.as_ref(), Some(&item.value)])
+            .map(|item| [item.key(), Some(item.value())])
             .collect_vec();
 
         // Avoid inferring the items multiple times if we already attempted to infer the
@@ -7915,7 +7786,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // type context of the expected `TypedDict` field.
         let mut infer_elt_ty = |builder: &mut Self, (_, elt, tcx): ArgExpr<'db, '_>| {
             item_types
-                .get(&elt.node_index().load())
+                .get(&elt.node_index())
                 .copied()
                 .or_else(|| builder.try_expression_type(elt))
                 .unwrap_or_else(|| builder.infer_expression(elt, tcx))
@@ -7937,8 +7808,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_collection_literal<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        collection_expr: Option<ast::ExprRef<'_>>,
-        elts: &[[Option<&'expr ast::Expr>; N]],
+        collection_expr: Option<ast::Expr<'_>>,
+        elts: &[[Option<ast::Expr<'expr>>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
@@ -8013,8 +7884,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_collection_literal_impl<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        collection_expr: Option<ast::ExprRef<'_>>,
-        elts: &[[Option<&'expr ast::Expr>; N]],
+        collection_expr: Option<ast::Expr<'_>>,
+        elts: &[[Option<ast::Expr<'expr>>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
@@ -8045,7 +7916,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for elts in elts {
                 for (i, elt) in elts.iter().enumerate() {
                     let Some(elt) = elt else { continue };
-                    infer_elt_expression(self, (i, elt, TypeContext::default()));
+                    infer_elt_expression(self, (i, *elt, TypeContext::default()));
                 }
             }
 
@@ -8239,8 +8110,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } else {
                         elt_tcx
                     };
-                    let inferred_elt_ty =
-                        infer_elt_expression(self, (i, elt, tcx.with_declared_type(Some(elt_tcx))));
+                    let inferred_elt_ty = infer_elt_expression(
+                        self,
+                        (i, *elt, tcx.with_declared_type(Some(elt_tcx))),
+                    );
                     inferred_elt_tys[i] = Some(inferred_elt_ty);
 
                     if !inferred_elt_ty.is_assignable_to(db, env, elt_tcx) {
@@ -8307,7 +8180,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if tcx.declared_type().is_none()
             && let Some(collection_expr) = collection_expr
             && let InferenceRegion::Expression(current_expr, _) = self.region
-            && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
+            && current_expr.node_ref(self.db()).index() == collection_expr.node_index()
             && let Some(assignment) = current_expr.assigned_to(self.db())
             && let Ok(collection_def) =
                 DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
@@ -8431,7 +8304,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .as_ref()
                     .and_then(|inferred_elts| inferred_elts[elts_index][i])
                     .unwrap_or_else(|| {
-                        infer_elt_expression(self, (i, elt, tcx.with_declared_type(elt_tcx)))
+                        infer_elt_expression(self, (i, *elt, tcx.with_declared_type(elt_tcx)))
                     });
 
                 // Simplify the inference based on a non-covariant declared type.
@@ -8469,7 +8342,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     env,
                     elt_ty_identity,
-                    elt,
+                    *elt,
                     inferred_type_for_typevar,
                 );
 
@@ -8503,12 +8376,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
-    fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) {
+    fn infer_first_comprehension_iter(
+        &mut self,
+        comprehensions: NodeList<'_, ast::kind::Comprehension>,
+    ) {
         let mut comprehensions_iter = comprehensions.iter();
         let Some(first_comprehension) = comprehensions_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
         };
-        self.infer_maybe_standalone_expression(&first_comprehension.iter, TypeContext::default());
+        self.infer_maybe_standalone_expression(first_comprehension.iter(), TypeContext::default());
     }
 
     /// Derive the type context for a generator expression's yielded element from the expected type
@@ -8573,18 +8449,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_generator_expression(
         &mut self,
-        generator: &ast::ExprGenerator,
+        generator: ast::ExprGenerator<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprGenerator {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-            parenthesized: _,
-        } = generator;
+        let elt = generator.elt();
+        let generators = generator.generators();
 
         self.infer_first_comprehension_iter(generators);
 
@@ -8619,7 +8490,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn comprehension_element_type(
         &self,
-        element: &ast::Expr,
+        element: ast::Expr<'_>,
         inference: &ScopeInference<'db>,
     ) -> Type<'db> {
         let db = self.db();
@@ -8639,8 +8510,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_comprehension_specialization<const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        collection_expr: ast::ExprRef<'_>,
-        elements: [Option<&ast::Expr>; N],
+        collection_expr: ast::Expr<'_>,
+        elements: [Option<ast::Expr<'_>>; N],
         scope: ScopeId<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
@@ -8660,16 +8531,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_list_comprehension_expression(
         &mut self,
-        listcomp: &ast::ExprListComp,
+        listcomp: ast::ExprListComp<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
-        let ast::ExprListComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = listcomp;
+        let elt = listcomp.elt();
+        let generators = listcomp.generators();
 
         self.infer_first_comprehension_iter(generators);
 
@@ -8699,16 +8566,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_set_comprehension_expression(
         &mut self,
-        setcomp: &ast::ExprSetComp,
+        setcomp: ast::ExprSetComp<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
-        let ast::ExprSetComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = setcomp;
+        let elt = setcomp.elt();
+        let generators = setcomp.generators();
 
         self.infer_first_comprehension_iter(generators);
 
@@ -8738,17 +8601,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_dict_comprehension_expression(
         &mut self,
-        dictcomp: &ast::ExprDictComp,
+        dictcomp: ast::ExprDictComp<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
-        let ast::ExprDictComp {
-            range: _,
-            node_index: _,
-            key,
-            value,
-            generators,
-        } = dictcomp;
+        let key = dictcomp.key();
+        let value = dictcomp.value();
+        let generators = dictcomp.generators();
 
         self.infer_first_comprehension_iter(generators);
 
@@ -8763,7 +8622,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_comprehension_specialization(
             KnownClass::Dict,
             dictcomp.into(),
-            [key.as_deref(), Some(value)],
+            [key, Some(value)],
             scope,
             tcx,
         )
@@ -8778,17 +8637,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_generator_expression_scope(
         &mut self,
-        generator: &ast::ExprGenerator,
+        generator: ast::ExprGenerator<'_>,
         tcx: TypeContext<'db>,
     ) {
         let db = self.db();
-        let ast::ExprGenerator {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-            parenthesized: _,
-        } = generator;
+        let elt = generator.elt();
+        let generators = generator.generators();
 
         let elt_tcx = if elt.is_starred_expr() {
             tcx.map(|yield_ty| {
@@ -8807,18 +8661,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_list_comprehension_expression_scope(
         &mut self,
-        listcomp: &ast::ExprListComp,
+        listcomp: ast::ExprListComp<'_>,
         tcx: TypeContext<'db>,
     ) {
-        let ast::ExprListComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = listcomp;
+        let elt = listcomp.elt();
+        let generators = listcomp.generators();
 
         // Infer the element type using the outer type context.
-        let elts = [[Some(elt.as_ref())]];
+        let elts = [[Some(elt)]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
@@ -8835,18 +8685,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_set_comprehension_expression_scope(
         &mut self,
-        setcomp: &ast::ExprSetComp,
+        setcomp: ast::ExprSetComp<'_>,
         tcx: TypeContext<'db>,
     ) {
-        let ast::ExprSetComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = setcomp;
+        let elt = setcomp.elt();
+        let generators = setcomp.generators();
 
         // Infer the element type using the outer type context.
-        let elts = [[Some(elt.as_ref())]];
+        let elts = [[Some(elt)]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
@@ -8863,20 +8709,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_dict_comprehension_expression_scope(
         &mut self,
-        dictcomp: &ast::ExprDictComp,
+        dictcomp: ast::ExprDictComp<'_>,
         tcx: TypeContext<'db>,
     ) {
-        let ast::ExprDictComp {
-            range: _,
-            node_index: _,
-            key,
-            value,
-            generators,
-        } = dictcomp;
+        let key = dictcomp.key();
+        let value = dictcomp.value();
+        let generators = dictcomp.generators();
 
         if key.is_some() {
             // Infer the key and value types using the outer type context.
-            let elts = [[key.as_deref(), Some(value.as_ref())]];
+            let elts = [[key, Some(value)]];
             let mut infer_elt_ty =
                 |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
@@ -8897,7 +8739,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_comprehensions(generators);
     }
 
-    fn infer_comprehensions(&mut self, comprehensions: &[ast::Comprehension]) {
+    fn infer_comprehensions(&mut self, comprehensions: NodeList<'_, ast::kind::Comprehension>) {
         let mut comprehensions_iter = comprehensions.iter();
         let Some(first_comprehension) = comprehensions_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
@@ -8908,17 +8750,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_comprehension(&mut self, comprehension: &ast::Comprehension, is_first: bool) {
+    fn infer_comprehension(&mut self, comprehension: ast::Comprehension<'_>, is_first: bool) {
         let db = self.db();
         let env = self.program_environment();
-        let ast::Comprehension {
-            range: _,
-            node_index: _,
-            target,
-            iter,
-            ifs,
-            is_async,
-        } = comprehension;
+        let target = comprehension.target();
+        let iter = comprehension.iter();
+        let ifs = comprehension.ifs();
+        let is_async = comprehension.is_async();
 
         self.infer_target(target, iter, &|builder, tcx| {
             // TODO: `infer_comprehension_definition` reports a diagnostic if `iter_ty` isn't iterable
@@ -8940,7 +8778,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .precise_iterable_element_type(iter, |expr| builder.expression_type(expr)),
                 )
             };
-            if !*is_async && let Some(element_type) = element_type {
+            if !is_async && let Some(element_type) = element_type {
                 element_type
             } else {
                 iterable_type
@@ -9028,9 +8866,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .insert(self, target_type);
     }
 
-    fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
+    fn infer_named_expression(&mut self, named: ast::ExprNamed<'_>) -> Type<'db> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
-        if named.target.is_name_expr() && !self.in_string_annotation() {
+        if named.target().is_name_expr() && !self.in_string_annotation() {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(definition, result);
@@ -9038,25 +8876,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             // String annotations have no indexed definitions, and syntactically invalid targets
             // cannot define a name. Both sides still need inference to preserve their diagnostics.
-            self.infer_expression(&named.target, TypeContext::default());
-            self.infer_expression(&named.value, TypeContext::default());
+            self.infer_expression(named.target(), TypeContext::default());
+            self.infer_expression(named.value(), TypeContext::default());
             Type::unknown()
         }
     }
 
     fn infer_named_expression_definition(
         &mut self,
-        named: &'ast ast::ExprNamed,
+        named: ast::ExprNamed<'ast>,
         definition: Definition<'db>,
     ) -> Type<'db> {
-        let ast::ExprNamed {
-            range: _,
-            node_index: _,
-            target,
-            value,
-        } = named;
+        let target = named.target();
+        let value = named.value();
 
-        let add = self.add_binding(named.target.as_ref().into(), definition);
+        let add = self.add_binding(named.target().into(), definition);
 
         let ty = self.infer_expression(value, add.type_context());
         self.store_expression_type(target, ty);
@@ -9066,7 +8900,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Evaluate an already-inferred expression, preserving the absence of a result.
     fn expression_truthiness(
         &self,
-        expression: &ast::Expr,
+        expression: ast::Expr<'_>,
         context: ExpressionContext,
     ) -> Truthiness {
         TruthinessAnalyzer::new(
@@ -9080,18 +8914,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_if_expression(
         &mut self,
-        if_expression: &ast::ExprIf,
+        if_expression: ast::ExprIf<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprIf {
-            range: _,
-            node_index: _,
-            test,
-            body,
-            orelse,
-        } = if_expression;
+        let test = if_expression.test();
+        let body = if_expression.body();
+        let orelse = if_expression.orelse();
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
         let (body_ty, orelse_ty) = if is_collection_literal(body)
@@ -9119,7 +8949,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let test_truthiness = match test_ty.try_bool(db, env) {
             Ok(_) => self.expression_truthiness(test, ExpressionContext::Condition),
             Err(err) => {
-                err.report_diagnostic(&self.context, &**test);
+                err.report_diagnostic(&self.context, test);
                 err.fallback_truthiness()
             }
         };
@@ -9134,23 +8964,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda, tcx: TypeContext<'db>) {
-        self.infer_expression(&lambda_expression.body, tcx);
+    fn infer_lambda_body(&mut self, lambda_expression: ast::ExprLambda<'_>, tcx: TypeContext<'db>) {
+        self.infer_expression(lambda_expression.body(), tcx);
     }
 
     fn infer_lambda_expression(
         &mut self,
-        lambda_expression: &ast::ExprLambda,
+        lambda_expression: ast::ExprLambda<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprLambda {
-            range: _,
-            node_index: _,
-            parameters,
-            body: _,
-        } = lambda_expression;
+        let parameters = lambda_expression.parameters();
 
         // In stub files, default values may reference names that are defined later in the file.
         let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
@@ -9185,70 +9010,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         let parameters = if let Some(parameters) = parameters {
-            let positional_only = parameters
-                .posonlyargs
-                .iter()
-                .map(|param| {
-                    let parameter = Parameter::positional_only(Some(param.name().id.clone()))
-                        .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
-                        }));
-
-                    if let Some(annotated_type) = parameter_types.next().flatten() {
-                        parameter.with_annotated_type(annotated_type)
-                    } else {
-                        parameter
+            let parameters = parameters.items_in_binding_order().map(|item| {
+                let (parameter, default, positional) = match item {
+                    ast::ParameterItem::PositionalOnly(p) => (
+                        Parameter::positional_only(Some(p.name().id().clone())),
+                        p.default(),
+                        true,
+                    ),
+                    ast::ParameterItem::PositionalOrKeyword(p) => (
+                        Parameter::positional_or_keyword(p.name().id().clone()),
+                        p.default(),
+                        true,
+                    ),
+                    ast::ParameterItem::KeywordOnly(p) => (
+                        Parameter::keyword_only(p.name().id().clone()),
+                        p.default(),
+                        false,
+                    ),
+                    ast::ParameterItem::Vararg(p) => {
+                        (Parameter::variadic(p.name().id().clone()), None, false)
                     }
-                })
-                .collect::<Vec<_>>();
-            let positional_or_keyword = parameters
-                .args
-                .iter()
-                .map(|param| {
-                    let parameter = Parameter::positional_or_keyword(param.name().id.clone())
-                        .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
-                        }));
-
-                    if let Some(annotated_type) = parameter_types.next().flatten() {
-                        parameter.with_annotated_type(annotated_type)
-                    } else {
-                        parameter
-                    }
-                })
-                .collect::<Vec<_>>();
-            let variadic = parameters.vararg.as_ref().map(|param| {
-                Parameter::variadic(param.name().id.clone())
+                    ast::ParameterItem::Kwarg(p) => (
+                        Parameter::keyword_variadic(p.name().id().clone()),
+                        None,
+                        false,
+                    ),
+                };
+                let parameter = parameter
                     .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
+                    .with_optional_default_type(default.map(|expr| {
+                        self.infer_expression(expr, TypeContext::default())
+                            .replace_parameter_defaults(db, env)
+                    }));
+                if positional && let Some(annotated_type) = parameter_types.next().flatten() {
+                    parameter.with_annotated_type(annotated_type)
+                } else {
+                    parameter
+                }
             });
-            let keyword_only = parameters
-                .kwonlyargs
-                .iter()
-                .map(|param| {
-                    Parameter::keyword_only(param.name().id.clone())
-                        .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
-                        }))
-                })
-                .collect::<Vec<_>>();
-            let keyword_variadic = parameters.kwarg.as_ref().map(|param| {
-                Parameter::keyword_variadic(param.name().id.clone())
-                    .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-            });
-
-            let parameters = positional_only
-                .into_iter()
-                .chain(positional_or_keyword)
-                .chain(variadic)
-                .chain(keyword_only)
-                .chain(keyword_variadic);
-
             Parameters::from_annotation(db, parameters)
         } else {
             Parameters::empty()
@@ -9282,7 +9081,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, return_tcx);
         self.extend_scope(inference);
 
-        let return_ty = inference.expression_type(lambda_expression.body.as_ref());
+        let return_ty = inference.expression_type(lambda_expression.body());
         Type::Callable(CallableType::new(
             self.db(),
             CallableSignature::single(Signature::new(parameters, return_ty)),
@@ -9323,23 +9122,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let definition_key = |definition: Definition<'_>| {
             let key = match definition.kind(db) {
                 DefinitionKind::DictKeyAssignment(assignment) => assignment.key(self.module()),
-                DefinitionKind::Assignment(assignment) => {
-                    &assignment.target(self.module()).as_subscript_expr()?.slice
-                }
-                DefinitionKind::AnnotatedAssignment(assignment) => {
-                    &assignment.target(self.module()).as_subscript_expr()?.slice
-                }
+                DefinitionKind::Assignment(assignment) => assignment
+                    .target(self.module())
+                    .as_subscript_expr()?
+                    .slice(),
+                DefinitionKind::AnnotatedAssignment(assignment) => assignment
+                    .target(self.module())
+                    .as_subscript_expr()?
+                    .slice(),
                 _ => return None,
             };
 
-            Some(key.as_string_literal_expr()?.value.to_str())
+            Some(key.as_string_literal_expr()?.value().to_str())
         };
 
         // Collect the types of each distinct key.
         let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
-        for bindings in
-            use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.program_file()))
-        {
+        for bindings in use_def.multi_bindings_at_use(self.index.scoped_use_id(keyword)) {
             let place = place_from_bindings_with_reachability_cache(
                 db,
                 env,
@@ -9402,7 +9201,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// for invalid `*args` and `**kwargs` inputs.
     fn prepare_call_arguments<'a>(
         &mut self,
-        arguments: &'a ast::Arguments,
+        arguments: ast::Arguments<'a>,
     ) -> CallArguments<'a, 'db> {
         let db = self.db();
         let env = self.program_environment();
@@ -9412,7 +9211,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
                     && argument.is_starred_expr()
                 {
-                    self.store_expression_type(argument, ty);
+                    self.store_expression_type(*argument, ty);
                 } else if let Some(ty) = self.try_narrow_dict_kwargs(ty, arg_or_keyword) {
                     return ty;
                 }
@@ -9421,21 +9220,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
             .with_known_unpacking(arguments, |expression| self.try_expression_type(expression));
 
-        for arg in &arguments.args {
-            if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
+        for arg in arguments.args() {
+            if let ExprKind::Starred(starred_node) = arg.classify() {
+                let value = starred_node.value();
                 let iterable_type = self.expression_type(value);
                 if let Err(err) = iterable_type.try_iterate(db, env) {
-                    err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
+                    err.report_diagnostic(&self.context, iterable_type, value.into());
                 }
             }
         }
 
         for keyword in arguments
-            .keywords
+            .keywords()
             .iter()
-            .filter(|keyword| keyword.arg.is_none())
+            .filter(|keyword| keyword.is_variadic())
         {
-            let mapping_type = self.expression_type(&keyword.value);
+            let mapping_type = self.expression_type(keyword.value());
 
             if mapping_type.as_paramspec_typevar(self.db()).is_some()
                 || mapping_type.unpack_keys_and_items(db, env).is_some()
@@ -9445,7 +9245,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let Some(builder) = self
                 .context
-                .report_lint(&INVALID_ARGUMENT_TYPE, &keyword.value)
+                .report_lint(&INVALID_ARGUMENT_TYPE, keyword.value())
             else {
                 continue;
             };
@@ -9494,10 +9294,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_call_expression(
         &mut self,
-        call_expression: &ast::ExprCall,
+        call_expression: ast::ExprCall<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let callable_type = self.infer_callee(&call_expression.func);
+        let callable_type = self.infer_callee(call_expression.func());
 
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
     }
@@ -9506,7 +9306,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// An assignment such as `items = list[T]()` creates an instance, not a generic alias.
     /// Unlike `Items = list[T]`, it requires `T` to be bound in an enclosing generic scope.
-    fn infer_callee(&mut self, expression: &ast::Expr) -> Type<'db> {
+    fn infer_callee(&mut self, expression: ast::Expr<'_>) -> Type<'db> {
         let previous_binding_context = self.typevar_binding_context.take();
         let previous_check_unbound = self
             .context
@@ -9525,10 +9325,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_empty_list_or_set_constructor(
         &mut self,
         collection_class: KnownClass,
-        call_expression: &ast::ExprCall,
+        call_expression: ast::ExprCall<'_>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
-        let elements: [[Option<&ast::Expr>; 1]; 0] = [];
+        let elements: [[Option<ast::Expr<'_>>; 1]; 0] = [];
         let mut infer_element_ty = |_: &mut Self, _| Type::unknown();
 
         self.infer_collection_literal(
@@ -9557,15 +9357,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_builtin_range_instance_type(
         &self,
         callable_type: Type<'db>,
-        arguments: &ast::Arguments,
+        arguments: ast::Arguments<'_>,
         call_arguments: &CallArguments<'_, 'db>,
     ) -> Option<Type<'db>> {
         let Type::ClassLiteral(class) = callable_type else {
             return None;
         };
         if !class.is_known(self.db(), KnownClass::Range)
-            || !arguments.keywords.is_empty()
-            || arguments.args.iter().any(ast::Expr::is_starred_expr)
+            || !matches!(arguments.len(), 1..=3)
+            || arguments.iter_source_order().any(|item| match item {
+                ast::ArgOrKeyword::Arg(arg) => arg.is_starred_expr(),
+                ast::ArgOrKeyword::Keyword(_) => true,
+            })
         {
             return None;
         }
@@ -9577,7 +9380,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_int_literal()
         };
 
-        let is_non_empty = match arguments.args.len() {
+        let is_non_empty = match arguments.len() {
             1 => int_literal(0)? > 0,
             2 => int_literal(0)? < int_literal(1)?,
             3 => {
@@ -9601,14 +9404,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_call_expression_impl(
         &mut self,
-        call_expression: &ast::ExprCall,
+        call_expression: ast::ExprCall<'_>,
         mut callable_type: Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Type<'db> {
         fn report_missing_implicit_constructor_call<'db>(
             context: &InferContext<'db, '_>,
             callable_type: Type<'db>,
-            call_expression: &ast::ExprCall,
+            call_expression: ast::ExprCall<'_>,
             bindings: &Bindings<'db>,
         ) {
             let db = context.db();
@@ -9638,24 +9441,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprCall {
-            range_start: _,
-            node_index: _,
-            func,
-            arguments,
-        } = call_expression;
+        let func = call_expression.func();
+        let arguments = call_expression.arguments();
 
         // A saved bound method exposes its mutable receiver through `__self__`. Preserve literal
         // elements only when the view method is called directly on the dictionary literal.
-        if let ast::Expr::Attribute(attribute) = func.as_ref()
-            && matches!(attribute.attr.as_str(), "keys" | "values" | "items")
-            && let ast::Expr::Dict(dict) = attribute.value.as_ref()
+        if let ExprKind::Attribute(attribute) = func.classify()
+            && matches!(attribute.attr().as_str(), "keys" | "values" | "items")
+            && let ExprKind::Dict(dict) = attribute.value().classify()
             && let Some((keys, values)) =
                 dict_literal_key_value_types(db, env, dict, |expr| self.expression_type(expr))
         {
             let receiver = KnownClass::Dict.to_specialized_instance(db, env, &[keys, values]);
             callable_type = receiver
-                .member(db, env, attribute.attr.as_str())
+                .member(db, env, attribute.attr().as_str())
                 .place
                 .ignore_possibly_undefined()
                 .unwrap_or(callable_type);
@@ -9674,7 +9473,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_class_literal()
                 .and_then(|class| class.known(self.db()))
             && matches!(
-                (name.id.as_str(), known_class),
+                (name.id().as_str(), known_class),
                 ("list", KnownClass::List) | ("set", KnownClass::Set) | ("dict", KnownClass::Dict)
             ) {
             Some(known_class)
@@ -9740,7 +9539,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut diagnostic = builder.into_diagnostic("`NotImplemented` is not callable");
                 diagnostic.annotate(
                     self.context
-                        .secondary(&**func)
+                        .secondary(func)
                         .message("Did you mean `NotImplementedError`?"),
                 );
                 diagnostic.set_concise_message(
@@ -9775,21 +9574,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut call_arguments = self.prepare_call_arguments(arguments);
 
         // Special handling for `TypedDict` method calls
-        if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
+        if let ExprKind::Attribute(attribute_node) = func.classify() {
+            let value = attribute_node.value();
+            let attr = attribute_node.attr();
             let value_type = self.expression_type(value);
-            let method_name = attr.id.as_str();
+            let method_name = attr.id().as_str();
 
             if let Type::TypedDict(typed_dict_ty) = value_type
                 && matches!(method_name, "get" | "pop" | "setdefault")
-                && !arguments.args.is_empty()
                 && let Some(first_arg) = (
                     // Validate the key argument for `TypedDict` methods
-                    arguments.args.first()
+                    arguments.args().first()
                 )
-                && let Some(key) = (match first_arg {
-                    ast::Expr::StringLiteral(ast::ExprStringLiteral {
-                        value: key_literal, ..
-                    }) => Some(key_literal.to_str()),
+                && let Some(key) = (match first_arg.classify() {
+                    ExprKind::StringLiteral(expr_string_literal) => {
+                        let key_literal = expr_string_literal.value();
+                        Some(key_literal.to_str())
+                    }
                     _ => self
                         .speculate()
                         .get_or_infer_expression(first_arg, TypeContext::default())
@@ -9811,12 +9612,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return Type::unknown();
                     }
 
-                    if !is_declared
-                        && method_name == "get"
-                        && arguments.keywords.is_empty()
-                        && matches!(arguments.args.len(), 1 | 2)
-                    {
-                        let default_ty = if let Some(default) = arguments.args.get(1) {
+                    let default = arguments
+                        .as_positional_array::<2>()
+                        .map(|[_, default]| default);
+                    // The key is already known to be a positional argument.
+                    let takes_key_and_optional_default = arguments.len() == 1 || default.is_some();
+                    if !is_declared && method_name == "get" && takes_key_and_optional_default {
+                        let default_ty = if let Some(default) = default {
                             self.get_or_infer_expression(
                                 default,
                                 TypeContext::declared(Some(field.declared_ty)),
@@ -9834,22 +9636,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     if field.is_read_only() {
                         let mutation = match method_name {
-                            "pop"
-                                if arguments.keywords.is_empty()
-                                    && matches!(arguments.args.len(), 1 | 2) =>
-                            {
-                                Some(("pop", "from"))
-                            }
-                            "setdefault"
-                                if arguments.keywords.is_empty() && arguments.args.len() == 2 =>
-                            {
-                                Some(("set default for", "on"))
-                            }
+                            "pop" if takes_key_and_optional_default => Some(("pop", "from")),
+                            "setdefault" if default.is_some() => Some(("set default for", "on")),
                             _ => None,
                         };
                         if let Some((action, preposition)) = mutation {
                             // Report errors within the arguments even though this mutation is invalid.
-                            for argument in &arguments.args {
+                            for argument in std::iter::once(first_arg).chain(default) {
                                 self.get_or_infer_expression(argument, TypeContext::default());
                             }
                             if let Some(builder) =
@@ -9870,29 +9663,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // use their extra-items type even when arbitrary `str` keys are unsafe.
                     if !is_declared && !field.is_read_only() {
                         match method_name {
-                            "pop"
-                                if arguments.keywords.is_empty()
-                                    && matches!(arguments.args.len(), 1 | 2) =>
-                            {
-                                return arguments.args.get(1).map_or(
-                                    field.declared_ty,
-                                    |default| {
-                                        UnionType::from_two_elements(
-                                            db,
-                                            env,
-                                            field.declared_ty,
-                                            self.get_or_infer_expression(
-                                                default,
-                                                TypeContext::declared(Some(field.declared_ty)),
-                                            ),
-                                        )
-                                    },
-                                );
+                            "pop" if takes_key_and_optional_default => {
+                                return default.map_or(field.declared_ty, |default| {
+                                    UnionType::from_two_elements(
+                                        db,
+                                        env,
+                                        field.declared_ty,
+                                        self.get_or_infer_expression(
+                                            default,
+                                            TypeContext::declared(Some(field.declared_ty)),
+                                        ),
+                                    )
+                                });
                             }
-                            "setdefault"
-                                if arguments.keywords.is_empty() && arguments.args.len() == 2 =>
-                            {
-                                let default = &arguments.args[1];
+                            "setdefault" if let Some(default) = default => {
                                 let default_ty = self.get_or_infer_expression(
                                     default,
                                     TypeContext::declared(Some(field.declared_ty)),
@@ -9903,7 +9687,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     full_object_ty: None,
                                     key,
                                     value_ty: default_ty,
-                                    typed_dict_node: value.as_ref().into(),
+                                    typed_dict_node: value.into(),
                                     key_node: first_arg.into(),
                                     value_node: default.into(),
                                     assignment_kind: TypedDictAssignmentKind::Constructor,
@@ -9978,7 +9762,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             Type::FunctionLiteral(function) if function.has_staticmethod_declaration(self.db()) => {
-                if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
+                if let ExprKind::Attribute(attribute_node) = func.classify() {
+                    let value = attribute_node.value();
                     let value_type = self.expression_type(value);
                     if let Some(class) = value_type.to_class_type(db) {
                         if function.as_abstract_method(self.db(), class).is_some()
@@ -10110,7 +9895,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
                 if let Some(value) = cast_value
-                    && std::ptr::eq(expr, value)
+                    && expr.is_same_node(value)
                 {
                     // The outer context can make this cast redundant, but must not introduce
                     // errors in its value, such as missing keys in a partial `TypedDict` literal.
@@ -10166,7 +9951,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut bindings = inferred.into_bindings();
 
         self.report_deprecated_call(
-            func.as_ref(),
+            func,
             callable_type,
             bindings
                 .deprecated_functions(db)
@@ -10203,14 +9988,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // defined outside the unreachable part. We still want to emit revealed-type
                         // diagnostics in these sections, so check on the name of the callable here
                         // and assume that it's actually `typing.reveal_type`.
-                        let is_reveal_type = match func.as_ref() {
-                            ast::Expr::Name(name) => name.id == "reveal_type",
-                            ast::Expr::Attribute(attr) => {
-                                attr.attr.id == "reveal_type" && is_dotted_name(func)
+                        let is_reveal_type = match func.classify() {
+                            ExprKind::Name(name) => name.id() == "reveal_type",
+                            ExprKind::Attribute(attr) => {
+                                attr.attr().id() == "reveal_type" && is_dotted_name(func)
                             }
                             _ => false,
                         };
-                        if is_reveal_type && let Some(first_arg) = arguments.args.first() {
+                        if is_reveal_type && let Some(first_arg) = arguments.args().first() {
                             let revealed_ty = self.expression_type(first_arg);
                             report_revealed_type(&self.context, revealed_ty, first_arg);
                         }
@@ -10222,7 +10007,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Record the constraints for the receiver of a bound method call, if the receiver is an
         // unannotated collection initializer.
-        if let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) = func.as_ref() {
+        if let ExprKind::Attribute(attribute) = func.classify() {
+            let value = attribute.value();
             let value_type = self.expression_type(value);
 
             if let Some(collection_def) = self.index.unannotated_collection_initializer(value)
@@ -10316,16 +10102,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_starred_expression(
         &mut self,
-        starred: &ast::ExprStarred,
+        starred: ast::ExprStarred<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let env = self.program_environment();
-        let ast::ExprStarred {
-            range: _,
-            node_index: _,
-            value,
-            ctx: _,
-        } = starred;
+        let value = starred.value();
 
         let db = self.db();
         let iterable_type = self.infer_expression(value, tcx);
@@ -10357,22 +10138,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .try_iterate(db, env)
             .map(|spec| Type::tuple(TupleType::new(db, env, &spec)))
             .unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
+                err.report_diagnostic(&self.context, iterable_type, value.into());
                 Type::homogeneous_tuple(db, env, err.fallback_element_type(db, env))
             })
     }
 
-    fn infer_yield_expression(&mut self, yield_expression: &ast::ExprYield) -> Type<'db> {
+    fn infer_yield_expression(&mut self, yield_expression: ast::ExprYield<'_>) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprYield {
-            range: _,
-            node_index: _,
-            value,
-        } = yield_expression;
+        let value = yield_expression.value();
         let Some(enclosing_function) = nearest_enclosing_function(db, self.index, self.scope())
         else {
-            let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
+            let _ = self.infer_optional_expression(value, TypeContext::default());
             return Type::unknown();
         };
         let declared_return_ty = same_module_uncached_raw_signature(
@@ -10386,18 +10163,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(generator_type_params) =
             declared_return_ty.generator_types(db, env, GeneratorTypeMode::IteratorDefaults)
         else {
-            let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
+            let _ = self.infer_optional_expression(value, TypeContext::default());
             return Type::unknown();
         };
 
         let expected_yield_ty = generator_type_params.yield_ty;
         let tcx = TypeContext::declared(expected_yield_ty);
         let yielded_ty = self
-            .infer_optional_expression(value.as_deref(), tcx)
+            .infer_optional_expression(value, tcx)
             .unwrap_or_else(|| Type::none(db, env));
-        let diagnostic_node: AnyNodeRef = value
-            .as_deref()
-            .map_or_else(|| yield_expression.into(), AnyNodeRef::from);
+        let diagnostic_node: SyntaxNode =
+            value.map_or_else(|| yield_expression.into(), SyntaxNode::from);
 
         if let Some(expected_yield_ty) = expected_yield_ty {
             self.validate_generator_yield_type(
@@ -10412,14 +10188,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         generator_type_params.send_ty.unwrap_or_else(Type::unknown)
     }
 
-    fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
+    fn infer_yield_from_expression(&mut self, yield_from: ast::ExprYieldFrom<'_>) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprYieldFrom {
-            range: _,
-            node_index: _,
-            value,
-        } = yield_from;
+        let value = yield_from.value();
 
         let Some(enclosing_function) = nearest_enclosing_function(db, self.index, self.scope())
         else {
@@ -10449,7 +10221,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let known_inner_yield_type = match iterable_type.try_iterate(db, env) {
             Ok(tuple) => Some(tuple.homogeneous_element_type(db, env)),
             Err(err) => {
-                err.report_diagnostic(&self.context, iterable_type, AnyNodeRef::from(&**value));
+                err.report_diagnostic(&self.context, iterable_type, SyntaxNode::from(value));
                 err.element_type(db, env)
             }
         };
@@ -10458,7 +10230,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(known_inner_yield_type) = known_inner_yield_type
         {
             self.validate_generator_yield_type(
-                &**value,
+                value,
                 YieldKind::YieldFrom,
                 return_type_span.clone(),
                 outer_yield_ty,
@@ -10509,7 +10281,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(inner_send_ty) = incompatible_send_ty {
                 report_invalid_generator_yield_type(
                     &self.context,
-                    value.as_ref(),
+                    value,
                     return_type_span,
                     outer_send_ty,
                     inner_send_ty,
@@ -10918,18 +10690,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// ```
     fn check_deprecated_property(
         &self,
-        attribute: &ast::ExprAttribute,
+        attribute: ast::ExprAttribute<'_>,
         properties: PropertyDeprecations<'db>,
         access: ExprContext,
     ) {
         self.report_deprecated_functions(
-            &attribute.attr,
+            attribute.attr(),
             properties.functions(self.db(), access).iter().copied(),
         );
     }
 
     /// Retrieve the lexical operand produced for this expression in the current scope.
-    fn indexed_source_place(&self, expr: ast::ExprRef<'_>) -> Option<SourcePlace<'db>> {
+    fn indexed_source_place(&self, expr: ast::Expr<'_>) -> Option<SourcePlace<'db>> {
         if !self.in_string_annotation()
             && let Some(operand) = self.index.expression_place_use(expr)
             && self.index.scope_id(operand.scope) == self.scope()
@@ -10942,22 +10714,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Separately parsed annotations and synthetic references resolve from their syntax.
-    fn source_place(&self, expr: ast::ExprRef<'_>) -> Option<SourcePlace<'db>> {
+    fn source_place(&self, expr: ast::Expr<'_>) -> Option<SourcePlace<'db>> {
         self.indexed_source_place(expr)
             .or_else(|| PlaceExpr::try_from_expr(expr).map(SourcePlace::Syntax))
     }
 
-    fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
+    fn infer_name_load(&mut self, name_node: ast::ExprName<'_>) -> Type<'db> {
         self.infer_name_load_with_definition(name_node).0
     }
 
     /// Resolve a name once, retaining its definition for type-alias interpretation.
     fn infer_name_load_with_definition(
         &mut self,
-        name_node: &ast::ExprName,
+        name_node: ast::ExprName<'_>,
     ) -> (Type<'db>, Option<Definition<'db>>) {
         let db = self.db();
-        let expr = ast::ExprRef::Name(name_node);
+        let expr = ast::Expr::from(name_node);
         let place_expr = self
             .indexed_source_place(expr)
             .unwrap_or_else(|| SourcePlace::Syntax(PlaceExpr::from_expr_name(name_node)));
@@ -10989,17 +10761,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_place_load(
         &mut self,
         source_place: &SourcePlace,
-        expr_ref: ast::ExprRef,
+        expr: ast::Expr<'_>,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let mode = if self.is_deferred() && self.in_string_annotation() {
             PlaceLoadMode::StringAnnotation
         } else if self.is_deferred() {
             PlaceLoadMode::Deferred
         } else {
-            PlaceLoadMode::AtExpression(expr_ref)
+            PlaceLoadMode::AtExpression(expr)
         };
-        if matches!(mode, PlaceLoadMode::Deferred) && expr_ref.is_name_expr() {
-            self.deferred_name_loads.insert(expr_ref.into());
+        if matches!(mode, PlaceLoadMode::Deferred) && expr.is_name_expr() {
+            self.deferred_name_loads.insert(expr.into());
         }
 
         let resolver = PlaceLoadResolver::from_source(
@@ -11017,7 +10789,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if matches!(
                 source.kind(),
                 PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::UnimportedRevealType)
-            ) && let Some(name) = expr_ref.as_name_expr()
+            ) && let Some(name) = expr.as_name_expr()
                 && !self.in_stub()
                 && !self.is_in_type_checking_block(self.scope(), name)
             {
@@ -11028,7 +10800,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         if let Some(ty) = resolved_load.deprecation_target.ignore_possibly_undefined() {
-            self.check_deprecated(expr_ref, ty);
+            self.check_deprecated(expr, ty);
         }
 
         (resolved_load.place, resolved_load.constraint_keys)
@@ -11053,7 +10825,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
+    fn report_unresolved_reference(&self, expr_name_node: ast::ExprName<'_>) {
         let db = self.db();
         let env = self.program_environment();
         let Some(builder) = self
@@ -11063,7 +10835,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let ast::ExprName { id, .. } = expr_name_node;
+        let id = expr_name_node.id();
         let mut diagnostic =
             builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
 
@@ -11112,14 +10884,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let function_parameters = &*current_function.parameters;
+        let function_parameters = current_function.parameters();
 
         // `self`/`cls` can't be a keyword-only parameter.
-        if function_parameters.posonlyargs.is_empty() && function_parameters.args.is_empty() {
-            return;
-        }
-
-        let Some(first_parameter) = function_parameters.iter_non_variadic_params().next() else {
+        let Some(first_parameter) = function_parameters.iter_positional_params().next() else {
             return;
         };
 
@@ -11152,8 +10920,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
-        match name.ctx {
+    fn infer_name_expression(&mut self, name: ast::ExprName<'_>) -> Type<'db> {
+        match name.ctx() {
             ExprContext::Load => self.infer_name_load(name),
             ExprContext::Store => Type::Never,
             ExprContext::Del => {
@@ -11183,10 +10951,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Infer an attribute load, returning its recovery type if lookup fails.
     fn infer_attribute_load(
         &mut self,
-        attribute: &ast::ExprAttribute,
+        attribute: ast::ExprAttribute<'_>,
     ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
         let value_type =
-            self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
+            self.infer_maybe_standalone_expression(attribute.value(), TypeContext::default());
         self.infer_attribute_load_impl(attribute, value_type)
     }
 
@@ -11194,14 +10962,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// attribute type for recovery. Reads and writes use the same restriction.
     fn validate_generic_class_attribute_access(
         &self,
-        attribute: &ast::ExprAttribute,
+        attribute: ast::ExprAttribute<'_>,
         object_ty: Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
         if !object_ty.has_generic_instance_attribute(
             self.db(),
             self.program_environment(),
-            &attribute.attr.id,
+            attribute.attr().id(),
         ) {
             return true;
         }
@@ -11212,7 +10980,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             builder.into_diagnostic(format_args!(
                 "Cannot access generic instance attribute `{}` through a class",
-                attribute.attr.id,
+                attribute.attr().id(),
             ));
         }
         false
@@ -11221,7 +10989,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Infer an attribute load on a known receiver, returning its recovery type if lookup fails.
     fn infer_attribute_load_impl(
         &mut self,
-        attribute: &ast::ExprAttribute,
+        attribute: ast::ExprAttribute<'_>,
         mut value_type: Type<'db>,
     ) -> Result<TypeAndQualifiers<'db>, TypeAndQualifiers<'db>> {
         fn union_elements_missing_attribute<'db>(
@@ -11241,7 +11009,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let env = self.program_environment();
-        let ast::ExprAttribute { value, attr, .. } = attribute;
+        let value = attribute.value();
+        let attr = attribute.attr();
 
         let db = self.db();
         let mut constraint_keys = vec![];
@@ -11260,10 +11029,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut assigned_type = None;
-        let place_expr = self.source_place(ast::ExprRef::Attribute(attribute));
+        let place_expr = self.source_place(attribute.into());
         if let Some(place_expr) = &place_expr {
-            let (resolved, keys) =
-                self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
+            let (resolved, keys) = self.infer_place_load(place_expr, attribute.into());
             constraint_keys.extend(keys);
             if let Place::Defined(
                 place @ DefinedPlace {
@@ -11279,7 +11047,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         let member_lookup = value_type
-            .try_member_lookup(db, env, &attr.id)
+            .try_member_lookup(db, env, attr.id())
             .unwrap_or_else(|error| {
                 error.report_diagnostic(
                     &self.context,
@@ -11295,11 +11063,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // An augmented assignment also loads its target, but its write validation reports this
         // error. Avoid reporting the same invalid access twice.
-        if !attribute.ctx.is_store() {
+        if !attribute.ctx().is_store() {
             self.validate_generic_class_attribute_access(attribute, value_type, true);
         }
 
-        let attr_name = &attr.id;
+        let attr_name = attr.id();
         let lookup_result = fallback_place.into_lookup_result(db, env);
         let resolved_type = lookup_result.unwrap_or_else(|lookup_err| {
             match lookup_err {
@@ -11313,13 +11081,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
 
                     let bound_on_instance = match value_type {
-                        Type::ClassLiteral(class) => {
-                            !class.instance_member(db, env, None, attr).is_undefined()
-                        }
+                        Type::ClassLiteral(class) => !class
+                            .instance_member(db, env, None, attr.as_str())
+                            .is_undefined(),
                         Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                             match subclass_of.subclass_of() {
                                 SubclassOfInner::Class(class) => {
-                                    !class.instance_member(db, env, attr).is_undefined()
+                                    !class.instance_member(db, env, attr.as_str()).is_undefined()
                                 }
                                 SubclassOfInner::Dynamic(_) => unreachable!(
                                     "Attribute lookup on a dynamic `SubclassOf` type \
@@ -11552,7 +11320,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     report_possibly_missing_attribute(
                         &self.context,
                         attribute,
-                        &attr.id,
+                        attr.id(),
                         value_type,
                     );
 
@@ -11569,7 +11337,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.check_deprecated_property(
                 attribute,
                 properties,
-                if attribute.ctx == ExprContext::Del {
+                if attribute.ctx() == ExprContext::Del {
                     ExprContext::Del
                 } else {
                     ExprContext::Load
@@ -11585,14 +11353,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map_err(|_| inferred_type)
     }
 
-    fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
-        let ast::ExprAttribute {
-            value,
-            attr,
-            range: _,
-            node_index: _,
-            ctx,
-        } = attribute;
+    fn infer_attribute_expression(&mut self, attribute: ast::ExprAttribute<'_>) -> Type<'db> {
+        let value = attribute.value();
+        let attr = attribute.attr();
+        let ctx = attribute.ctx();
 
         match ctx {
             ExprContext::Load => self
@@ -11622,7 +11386,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn report_unsupported_unary_operator(
         &self,
-        unary: &ast::ExprUnaryOp,
+        unary: ast::ExprUnaryOp<'_>,
         op: ast::UnaryOp,
         operand_type: Type<'db>,
         unary_dunder_method: &str,
@@ -11653,24 +11417,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_unary_expression(&mut self, unary: &ast::ExprUnaryOp) -> Type<'db> {
-        let ast::ExprUnaryOp {
-            range: _,
-            node_index: _,
-            op,
-            operand,
-        } = unary;
+    fn infer_unary_expression(&mut self, unary: ast::ExprUnaryOp<'_>) -> Type<'db> {
+        let op = unary.op();
+        let operand = unary.operand();
 
         let operand_type = self.infer_expression(operand, TypeContext::default());
 
-        self.infer_unary_expression_type(*op, operand_type, unary)
+        self.infer_unary_expression_type(op, operand_type, unary)
     }
 
     fn infer_unary_expression_type(
         &mut self,
         op: ast::UnaryOp,
         operand_type: Type<'db>,
-        unary: &ast::ExprUnaryOp,
+        unary: ast::ExprUnaryOp<'_>,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
@@ -11692,7 +11452,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypeContext::default(),
             ) {
                 Ok(outcome) => {
-                    self.check_deprecated_bindings(unary, &outcome);
+                    self.check_deprecated_bindings(&unary, &outcome);
                     outcome.return_type(db, env)
                 }
                 Err(e) => {
@@ -11702,7 +11462,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         CallDunderError::MethodNotAvailable => None,
                     };
                     if let Some(bindings) = bindings {
-                        self.check_deprecated_bindings(unary, bindings);
+                        self.check_deprecated_bindings(&unary, bindings);
                     }
                     self.report_unsupported_unary_operator(
                         unary,
@@ -11947,24 +11707,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_boolean_expression(
         &mut self,
-        bool_op: &ast::ExprBoolOp,
+        bool_op: ast::ExprBoolOp<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let ast::ExprBoolOp {
-            range: _,
-            node_index: _,
-            op,
-            values,
-        } = bool_op;
+        let op = bool_op.op();
+        let values = bool_op.values();
         // The first operand has no peers. If no later operand is a collection literal,
         // accumulating prior types cannot affect inference.
         let track_peer_types = values.iter().skip(1).any(is_collection_literal)
             && prefer_collection_literal_peer_context(self.db(), self.program_environment(), tcx);
         self.infer_chained_boolean_types(
-            *op,
+            op,
             track_peer_types,
             values.iter().enumerate(),
-            |(_, value)| is_collection_literal(value),
+            |(_, value)| is_collection_literal(*value),
             |builder, (index, value), peer_ty| {
                 let ty = if index == values.len() - 1 {
                     builder
@@ -12082,7 +11838,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_compare_expression(&mut self, compare: &ast::ExprCompare) -> Type<'db> {
+    fn infer_compare_expression(&mut self, compare: ast::ExprCompare<'_>) -> Type<'db> {
         let db = self.db();
         self.infer_expression(compare.first_operand(), TypeContext::default());
         let mut last_comparison_ty = Type::unknown();
@@ -12111,7 +11867,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let literal_membership = comparisons::infer_literal_membership_comparison(
                     &builder.context,
                     left_ty,
-                    *op,
+                    op,
                     right,
                     |element| builder.expression_type(element),
                 );
@@ -12121,7 +11877,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     None => comparisons::infer_binary_type_comparison(
                         &builder.context,
                         left_ty,
-                        *op,
+                        op,
                         right_ty,
                         range,
                     ),
@@ -12152,7 +11908,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
         );
 
-        if compare.ops.len() > 1 {
+        if compare.ops().len() > 1 {
             // Individual comparisons within a chain have no expression nodes whose result types
             // reachability can look up later. Retain their combined condition truthiness here;
             // `and`/`or` conditions can instead be reconstructed by walking their operand nodes.
@@ -12164,7 +11920,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // already always false.
             let truthiness = preceding_truthiness
                 .and_then(|| last_comparison_ty.bool(db, self.program_environment()));
-            let expression = ast::ExprRef::Compare(compare).into();
+            let expression = ast::Expr::from(compare).into();
             if truthiness != ty.bool(db, self.program_environment()) {
                 self.comparison_truthiness.insert(expression, truthiness);
             } else {
@@ -12175,17 +11931,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty
     }
 
-    fn infer_type_parameters(&mut self, type_parameters: &ast::TypeParams) {
-        let ast::TypeParams {
-            range: _,
-            node_index: _,
-            type_params,
-        } = type_parameters;
+    fn infer_type_parameters(&mut self, type_parameters: ast::TypeParams<'_>) {
+        let type_params = type_parameters.type_params();
         for type_param in type_params {
-            match type_param {
-                ast::TypeParam::TypeVar(node) => self.infer_definition(node),
-                ast::TypeParam::ParamSpec(node) => self.infer_definition(node),
-                ast::TypeParam::TypeVarTuple(node) => self.infer_definition(node),
+            match type_param.classify() {
+                TypeParamKind::TypeVar(node) => self.infer_definition(node),
+                TypeParamKind::ParamSpec(node) => self.infer_definition(node),
+                TypeParamKind::TypeVarTuple(node) => self.infer_definition(node),
             }
         }
     }
@@ -12396,9 +12148,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let DefinitionKind::Function(function) = definition.kind(self.db())
         {
             may_produce_abstract_method = false;
-            let decorators = &function.node(self.module()).decorator_list;
+            let decorators = function.node(self.module()).decorator_list();
             for decorator in decorators {
-                let ty = self.expression_type(&decorator.expression);
+                let ty = self.expression_type(decorator.expression());
                 let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
                 known_decorators |= flags;
                 if flags.is_empty()
@@ -12630,12 +12382,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function = self.scope().node(db).as_function()?.node(self.module());
 
         // We never infer types for functions with an explicit return type annotation
-        if function.returns.is_some() {
+        if function.returns().is_some() {
             return None;
         }
 
         // TODO: Support return type inference for async functions and generators
-        if function.is_async
+        if function.is_async()
             || self
                 .scope()
                 .file_scope_id(db)
@@ -13161,7 +12913,7 @@ impl Drop for MultiInferenceGuard<'_, '_, '_> {
 
 /// An expression representing the function argument at the given index, along with its type
 /// context.
-type ArgExpr<'db, 'ast> = (usize, &'ast ast::Expr, TypeContext<'db>);
+type ArgExpr<'db, 'ast> = (usize, ast::Expr<'ast>, TypeContext<'db>);
 
 type CallAttempt<'args, 'call, 'db> = (Bindings<'db>, Cow<'args, CallArguments<'call, 'db>>);
 
@@ -13213,9 +12965,9 @@ enum TupleInferenceMode {
 impl TupleInferenceMode {
     /// Selects whole-tuple inference when unpacking can change element positions or
     /// when the tuple is large enough to require literal promotion.
-    fn for_literal(tuple: &ast::ExprTuple) -> Self {
-        if tuple.elts.iter().any(ast::Expr::is_starred_expr)
-            || tuple_literal_needs_promotion(&tuple.elts)
+    fn for_literal(tuple: ast::ExprTuple<'_>) -> Self {
+        if tuple.iter().any(ast::Expr::is_starred_expr)
+            || tuple_literal_needs_promotion(tuple.elts())
         {
             Self::WholeTuple
         } else {
@@ -13247,25 +12999,25 @@ enum MatchingArgumentTypeContext<'db> {
     Many(Vec<Option<ArgumentTypeContext<'db>>>),
 }
 
-fn is_collection_literal(expression: &ast::Expr) -> bool {
+fn is_collection_literal(expression: ast::Expr<'_>) -> bool {
     matches!(
-        expression,
-        ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_)
+        expression.classify(),
+        ExprKind::List(_) | ExprKind::Set(_) | ExprKind::Dict(_)
     )
 }
 
 // An empty literal cannot provide element types for the other branch. Infer the
 // nonempty branch first so the empty branch can use those types as context.
 fn is_nonempty_collection_literal_with_empty_peer(
-    expression: &ast::Expr,
-    peer: &ast::Expr,
+    expression: ast::Expr<'_>,
+    peer: ast::Expr<'_>,
 ) -> bool {
-    match (expression, peer) {
-        (ast::Expr::List(expression), ast::Expr::List(peer)) => {
-            !expression.elts.is_empty() && peer.elts.is_empty()
+    match (expression.classify(), peer.classify()) {
+        (ExprKind::List(expression), ExprKind::List(peer)) => {
+            !expression.elts().is_empty() && peer.elts().is_empty()
         }
-        (ast::Expr::Dict(expression), ast::Expr::Dict(peer)) => {
-            !expression.items.is_empty() && peer.items.is_empty()
+        (ExprKind::Dict(expression), ExprKind::Dict(peer)) => {
+            !expression.items().is_empty() && peer.items().is_empty()
         }
         _ => false,
     }
@@ -13298,7 +13050,7 @@ enum ArgumentsIter<'a> {
 }
 
 impl<'a> ArgumentsIter<'a> {
-    fn from_ast(arguments: &'a ast::Arguments) -> Self {
+    fn from_ast(arguments: ast::Arguments<'a>) -> Self {
         Self::FromAst(arguments.iter_source_order())
     }
 
@@ -13602,7 +13354,7 @@ struct AddBinding<'db, 'ast> {
     declared_ty: Option<Type<'db>>,
     declaration: Option<Definition<'db>>,
     binding: Definition<'db>,
-    node: AnyNodeRef<'ast>,
+    node: SyntaxNode<'ast>,
     qualifiers: TypeQualifiers,
     is_local: bool,
     /// Whether `Final` comes from an actual declaration, rather than an import.
@@ -13686,7 +13438,9 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             bound_ty = declared_ty;
         }
         // In the following cases, the bound type may not be the same as the RHS value type.
-        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = self.node {
+        if let Some(attribute) = self.node.cast::<ast::ExprAttribute>() {
+            let value = attribute.value();
+            let attr = attribute.attr();
             let value_ty = builder.try_expression_type(value).unwrap_or_else(|| {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
@@ -13704,7 +13458,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                         .member_lookup_with_policy(
                             db,
                             env,
-                            &attr.id,
+                            attr.id(),
                             MemberLookupPolicy::NO_GETATTR_LOOKUP,
                         )
                         .place
@@ -13727,7 +13481,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             // Arbitrary data descriptors can transform the assigned value, but slot descriptors
             // write it directly into instance storage.
             if uses_getattr
-                || assignment_attribute_members(db, env, value_ty, &attr.id)
+                || assignment_attribute_members(db, env, value_ty, attr.id())
                     .and_then(AssignmentAttributeMembers::type_member)
                     .and_then(|member| member.place.ignore_possibly_undefined())
                     .is_some_and(|ty| {
@@ -13737,7 +13491,8 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
-        } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. }) = self.node {
+        } else if let Some(subscript) = self.node.cast::<ast::ExprSubscript>() {
+            let value = subscript.value();
             let value_ty = builder
                 .try_expression_type(value)
                 .unwrap_or_else(|| builder.infer_expression(value, TypeContext::default()));
@@ -13793,6 +13548,6 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 
 #[derive(Copy, Clone, Debug)]
 enum BoundOrConstraintsNodes<'ast> {
-    Bound(&'ast ast::Expr),
-    Constraints(&'ast [ast::Expr]),
+    Bound(ast::Expr<'ast>),
+    Constraints(ruff_python_ast::FilteredNodes<'ast, ast::kind::Expr>),
 }

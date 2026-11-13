@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -16,7 +16,7 @@ use crate::{Edit, Fix};
 
 pub(crate) fn replaceable_by_pathlib(
     checker: &Checker,
-    call: &ExprCall,
+    call: &ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     let range = call.func.range();
@@ -26,7 +26,12 @@ pub(crate) fn replaceable_by_pathlib(
             checker.report_diagnostic_if_enabled(
                 OsPathJoin {
                     module: module.to_string(),
-                    joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
+                    joiner: if call
+                        .arguments
+                        .args()
+                        .iter()
+                        .any(ruff_python_ast::Expr::is_starred_expr)
+                    {
                         Joiner::Joinpath
                     } else {
                         Joiner::Slash
@@ -51,7 +56,7 @@ pub(crate) fn replaceable_by_pathlib(
             //               0           1              2            3                 4
             // glob.glob(pathname, *, root_dir=None, dir_fd=None, recursive=False, include_hidden=False)
             // ```
-            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
+            if is_keyword_only_argument_non_default(call.arguments, "dir_fd") {
                 return;
             }
 
@@ -74,14 +79,14 @@ pub(crate) fn replaceable_by_pathlib(
                     diagnostic.try_set_fix(|| {
                         let (import_edit, binding) = checker.importer().get_or_import_symbol(
                             &ImportRequest::import("pathlib", "Path"),
-                            call.start(),
+                            call.range.start(),
                             checker.semantic(),
                         )?;
 
                         Ok(Fix::applicable_edits(
                             Edit::range_replacement(
                                 format!("{binding}({}).iterdir()", checker.locator().slice(path)),
-                                call.range(),
+                                call.range,
                             ),
                             [import_edit],
                             Applicability::DisplayOnly,

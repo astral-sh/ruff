@@ -3,7 +3,7 @@ use crate::codes::Category;
 use crate::rules::flake8_pytest_style::helpers::is_likely_pytest_test;
 use crate::{Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::StmtFunctionDef;
+use ruff_python_ast::StmtFunctionDefFields;
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -52,8 +52,11 @@ impl Violation for PytestParameterWithDefaultArgument {
 }
 
 /// PT028
-pub(crate) fn parameter_with_default_argument(checker: &Checker, function_def: &StmtFunctionDef) {
-    if !is_likely_pytest_test(function_def, checker) {
+pub(crate) fn parameter_with_default_argument(
+    checker: &Checker,
+    function_def: &StmtFunctionDefFields<'_>,
+) {
+    if !is_likely_pytest_test(function_def.node, checker) {
         return;
     }
 
@@ -63,7 +66,7 @@ pub(crate) fn parameter_with_default_argument(checker: &Checker, function_def: &
         };
         let parameter_name = parameter.name().to_string();
         let kind = PytestParameterWithDefaultArgument { parameter_name };
-        let edit = Edit::deletion(parameter.parameter.end(), parameter.end());
+        let edit = Edit::deletion(parameter.parameter().end(), parameter.end());
         let fix = Fix::display_only_edit(edit);
         checker
             .report_diagnostic(kind, default.range())

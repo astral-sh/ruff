@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -61,64 +61,70 @@ impl AlwaysFixableViolation for UnnecessaryCollectionCall {
 /// C408
 pub(crate) fn unnecessary_collection_call(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call_fields: &ast::ExprCallFields<'_>,
     settings: &Settings,
 ) {
-    if !call.arguments.args.is_empty() {
+    let call = call_fields.node;
+    let empty = call_fields.arguments.is_empty();
+    if !empty
+        && (settings.allow_dict_calls_with_keyword_arguments
+            || call_fields
+                .arguments
+                .iter_source_order()
+                .any(|item| match item {
+                    ast::ArgOrKeyword::Arg(_) => true,
+                    ast::ArgOrKeyword::Keyword(keyword) => keyword.is_variadic(),
+                }))
+    {
         return;
     }
-    let Some(builtin) = checker.semantic().resolve_builtin_symbol(&call.func) else {
+    let Some(builtin) = checker.semantic().resolve_builtin_symbol(call_fields.func) else {
         return;
     };
     let collection = match builtin {
-        "dict"
-            if call.arguments.keywords.is_empty()
-                || (!settings.allow_dict_calls_with_keyword_arguments
-                    && call.arguments.keywords.iter().all(|kw| kw.arg.is_some())) =>
-        {
-            // `dict()` or `dict(a=1)` (as opposed to `dict(**a)`)
-            Collection::Dict
-        }
-        "list" if call.arguments.keywords.is_empty() => {
-            // `list()
-            Collection::List
-        }
-        "tuple" if call.arguments.keywords.is_empty() => {
-            // `tuple()`
-            Collection::Tuple
-        }
+        "dict" => Collection::Dict,
+        "list" if empty => Collection::List,
+        "tuple" if empty => Collection::Tuple,
         _ => return,
     };
 
-    let mut diagnostic =
-        checker.report_diagnostic(UnnecessaryCollectionCall { kind: collection }, call.range());
+    let mut diagnostic = checker.report_diagnostic(
+        UnnecessaryCollectionCall { kind: collection },
+        call_fields.range,
+    );
 
     // Convert `dict()` to `{}`.
-    if call.arguments.keywords.is_empty() {
+    if empty {
         diagnostic.set_fix({
             // Replace from the start of the call to the start of the argument.
             let call_start = Edit::replacement(
                 match collection {
-                    Collection::Dict => {
-                        pad_start("{", call.range(), checker.locator(), checker.semantic())
-                    }
+                    Collection::Dict => pad_start(
+                        "{",
+                        call_fields.range,
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     Collection::List => "[".to_string(),
                     Collection::Tuple => "(".to_string(),
                 },
                 call.start(),
-                call.arguments.start() + TextSize::from(1),
+                call_fields.arguments.start() + TextSize::from(1),
             );
 
             // Replace from the end of the inner list or tuple to the end of the call with `}`.
             let call_end = Edit::replacement(
                 match collection {
-                    Collection::Dict => {
-                        pad_end("}", call.range(), checker.locator(), checker.semantic())
-                    }
+                    Collection::Dict => pad_end(
+                        "}",
+                        call_fields.range,
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     Collection::List => "]".to_string(),
                     Collection::Tuple => ")".to_string(),
                 },
-                call.arguments.end() - TextSize::from(1),
+                call_fields.arguments.end() - TextSize::from(1),
                 call.end(),
             );
 

@@ -10,8 +10,8 @@ use crate::statement::suite::SuiteKind;
 #[derive(Default)]
 pub struct FormatElifElseClause;
 
-impl FormatNodeRule<ElifElseClause> for FormatElifElseClause {
-    fn fmt_fields(&self, item: &ElifElseClause, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ruff_python_ast::kind::ElifElseClause> for FormatElifElseClause {
+    fn fmt_fields(&self, item: ElifElseClause<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         format_elif_else_clause(
             item,
             f,

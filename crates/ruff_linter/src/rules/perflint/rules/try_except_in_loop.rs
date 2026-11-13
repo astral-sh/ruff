@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast, PythonVersion, Stmt};
+use ruff_python_ast::{PythonVersion, Stmt, StmtKind, Suite};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -89,22 +89,21 @@ impl Violation for TryExceptInLoop {
 }
 
 /// PERF203
-pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
+pub(crate) fn try_except_in_loop(checker: &Checker, body: Suite<'_>) {
     if checker.target_version() >= PythonVersion::PY311 {
         return;
     }
 
-    let [Stmt::Try(ast::StmtTry { handlers, body, .. })] = body else {
+    let Some(try_stmt) = body.as_array().and_then(|[stmt]| stmt.as_try_stmt()) else {
         return;
     };
-
-    let Some(handler) = handlers.first() else {
+    let Some(handler) = try_stmt.handlers().first() else {
         return;
     };
 
     // Avoid flagging `try`-`except` blocks that contain `break` or `continue`,
     // which rely on the exception handling mechanism.
-    if has_break_or_continue(body) {
+    if has_break_or_continue(try_stmt.body()) {
         return;
     }
 
@@ -112,7 +111,7 @@ pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
 }
 
 /// Returns `true` if a `break` or `continue` statement is present in `body`.
-fn has_break_or_continue(body: &[Stmt]) -> bool {
+fn has_break_or_continue(body: Suite<'_>) -> bool {
     let mut visitor = LoopControlFlowVisitor::default();
     visitor.visit_body(body);
     visitor.has_break_or_continue
@@ -124,13 +123,15 @@ struct LoopControlFlowVisitor {
 }
 
 impl StatementVisitor<'_> for LoopControlFlowVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        match stmt {
-            Stmt::Break(_) | Stmt::Continue(_) => self.has_break_or_continue = true,
-            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
+    fn visit_stmt(&mut self, stmt: Stmt<'_>) {
+        match stmt.classify() {
+            StmtKind::Break(_) | StmtKind::Continue(_) => {
+                self.has_break_or_continue = true;
+            }
+            StmtKind::FunctionDef(_) | StmtKind::ClassDef(_) => {
                 // Don't recurse.
             }
-            _ => walk_stmt(self, stmt),
+            kind => walk_stmt(self, kind),
         }
     }
 }

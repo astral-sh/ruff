@@ -1,9 +1,8 @@
 use anyhow::{Error, bail};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers;
 use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::{CmpOp, ExprCompare};
+use ruff_python_ast::{CmpOp, ExprCompare, helpers};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -76,7 +75,7 @@ impl AlwaysFixableViolation for IsLiteral {
 }
 
 /// F632
-pub(crate) fn invalid_literal_comparison(checker: &Checker, compare: &ExprCompare) {
+pub(crate) fn invalid_literal_comparison(checker: &Checker, compare: ExprCompare<'_>) {
     let mut lazy_located = None;
     for (index, (left, op, right)) in compare.iter().enumerate() {
         if matches!(op, CmpOp::Is | CmpOp::IsNot)
@@ -85,8 +84,12 @@ pub(crate) fn invalid_literal_comparison(checker: &Checker, compare: &ExprCompar
                 || helpers::is_mutable_iterable_initializer(left)
                 || helpers::is_mutable_iterable_initializer(right))
         {
-            let mut diagnostic =
-                checker.report_diagnostic(IsLiteral { cmp_op: op.into() }, compare.range());
+            let mut diagnostic = checker.report_diagnostic(
+                IsLiteral {
+                    cmp_op: (&op).into(),
+                },
+                compare.range(),
+            );
             if lazy_located.is_none() {
                 lazy_located = Some(locate_cmp_ops(compare.range(), checker.tokens()));
             }
@@ -94,7 +97,7 @@ pub(crate) fn invalid_literal_comparison(checker: &Checker, compare: &ExprCompar
                 if let Some(located_op) =
                     lazy_located.as_ref().and_then(|located| located.get(index))
                 {
-                    assert_eq!(located_op.op, *op);
+                    assert_eq!(located_op.op, op);
                     if let Ok(content) = match located_op.op {
                         CmpOp::Is => Ok::<String, Error>("==".to_string()),
                         CmpOp::IsNot => Ok("!=".to_string()),

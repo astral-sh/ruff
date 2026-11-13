@@ -29,31 +29,33 @@ Module(
                             arguments: Arguments {
                                 range: 4..14,
                                 node_index: NodeIndex(None),
-                                args: [
-                                    NumberLiteral(
-                                        ExprNumberLiteral {
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 5..8,
                                             node_index: NodeIndex(None),
-                                            range: 12..13,
-                                            value: Int(
-                                                1,
+                                            arg: None,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 7..8,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
                                             ),
                                         },
                                     ),
-                                ],
-                                keywords: [
-                                    Keyword {
-                                        range: 5..8,
-                                        node_index: NodeIndex(None),
-                                        arg: None,
-                                        value: Name(
-                                            ExprName {
+                                    Positional(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 7..8,
-                                                id: Name("x"),
-                                                ctx: Load,
+                                                range: 12..13,
+                                                value: Int(
+                                                    1,
+                                                ),
                                             },
                                         ),
-                                    },
+                                    ),
                                 ],
                             },
                         },

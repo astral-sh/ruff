@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, Number, Operator};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -72,7 +72,7 @@ enum Reason {
 /// S103
 pub(crate) fn bad_file_permissions(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: &ast::ExprCallFields<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !checker.semantic().seen_module(Modules::OS) {
@@ -205,22 +205,22 @@ fn py_stat(qualified_name: &QualifiedName) -> Option<u64> {
 /// Partially evaluate `expr` as a mask expression, tracking which bits are
 /// statically known to be 0 or 1. Sub-expressions that cannot be analyzed
 /// contribute no information (all bits unknown).
-fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> KnownBits {
-    match expr {
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(int),
+fn parse_mask(expr: Expr<'_>, semantic: &SemanticModel) -> KnownBits {
+    match expr.fields() {
+        ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+            value: Number::Int(int),
             ..
         }) => int
             .as_u64()
             .map(KnownBits::exact)
             .unwrap_or_else(KnownBits::invalid),
-        Expr::Attribute(_) => semantic
+        ast::ExprFields::Attribute(_) => semantic
             .resolve_qualified_name(expr)
             .as_ref()
             .and_then(py_stat)
             .map(KnownBits::exact)
             .unwrap_or_else(KnownBits::unknown),
-        Expr::BinOp(ast::ExprBinOp {
+        ast::ExprFields::BinOp(ast::ExprBinOpFields {
             left, op, right, ..
         }) => {
             let left_bits = parse_mask(left, semantic);
@@ -238,8 +238,7 @@ fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> KnownBits {
                 },
                 Operator::BitXor => {
                     if left_bits == right_bits
-                        && ComparableExpr::from(left.as_ref())
-                            == ComparableExpr::from(right.as_ref())
+                        && ComparableExpr::from(left) == ComparableExpr::from(right)
                     {
                         KnownBits::exact(0)
                     } else {

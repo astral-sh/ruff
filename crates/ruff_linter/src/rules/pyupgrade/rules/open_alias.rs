@@ -1,5 +1,5 @@
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::name::QualifiedName;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -52,13 +52,17 @@ impl Violation for OpenAlias {
 }
 
 /// UP020
-pub(crate) fn open_alias(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
+pub(crate) fn open_alias(
+    checker: &Checker,
+    call: &ExprCallFields<'_>,
+    qualified_name: &QualifiedName,
+) {
     if matches!(qualified_name.segments(), ["io", "open"]) {
-        let mut diagnostic = checker.report_diagnostic(OpenAlias, call.range());
+        let mut diagnostic = checker.report_diagnostic(OpenAlias, call.node.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
                 "open",
-                call.start(),
+                call.node.start(),
                 checker.semantic(),
             )?;
 
