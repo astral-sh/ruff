@@ -1860,7 +1860,7 @@ impl AnalysisOptions {
         }
     }
 
-    pub(super) fn to_settings(
+    pub(crate) fn to_settings(
         &self,
         db: &dyn Db,
         context: AnalysisOptionsContext,
@@ -1931,7 +1931,7 @@ impl AnalysisOptions {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum AnalysisOptionsContext {
+pub(crate) enum AnalysisOptionsContext {
     TopLevel,
     Override,
 }
