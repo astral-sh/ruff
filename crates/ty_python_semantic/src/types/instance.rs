@@ -310,6 +310,10 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    pub(super) const fn is_exact_tuple(self) -> bool {
+        matches!(self.0, NominalInstanceInner::ExactTuple(_))
+    }
+
     pub(super) const fn is_sys_version_info(self) -> bool {
         matches!(self.0, NominalInstanceInner::SysVersionInfo)
     }

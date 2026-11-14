@@ -1039,6 +1039,15 @@ where
                     return;
                 }
             }
+            // An ordinary nominal instance visits only its class. Class literals have no
+            // children, and generic aliases have their own recursion guard. An exact tuple
+            // visits its elements directly, so it still needs the guard on the instance.
+            if let Type::NominalInstance(instance) = ty
+                && !instance.is_exact_tuple()
+            {
+                walk_nominal_instance_type(db, instance, self);
+                return;
+            }
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
     }
