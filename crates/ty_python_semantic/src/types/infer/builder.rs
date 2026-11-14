@@ -7909,16 +7909,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Reuse nested expressions that receive the same field context across candidates.
                     let teardown_expression_cache = self.setup_expression_cache();
                     for typed_dict in typed_dicts {
-                        // Suppress diagnostics for discarded candidates. A mixed union like
-                        // `TypedDict | dict[str, Any]` should remain quiet when the dict arm accepts
-                        // the literal.
                         let mut builder = self.speculate();
-                        if let Some(inferred_ty) = builder.infer_typed_dict_expression(
-                            dict,
-                            typed_dict,
-                            tcx,
-                            &mut item_types,
-                        ) {
+                        builder.infer_typed_dict_items(dict, typed_dict, tcx, &mut item_types);
+
+                        // Keep diagnostics from the keys and values (such as an unresolved name).
+                        // Literal validation only reports errors for invalid candidates, whose
+                        // results we discard.
+                        builder.context.suppress_diagnostics();
+                        if let Some(inferred_ty) =
+                            builder.validate_typed_dict_items(dict, typed_dict, &item_types)
+                        {
                             narrowed.push((inferred_ty, builder));
                         }
 
