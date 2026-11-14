@@ -109,15 +109,15 @@ impl RequestHandler for WorkspaceDiagnosticRequestHandler {
     type RequestType = WorkspaceDiagnosticRequest;
 }
 
-impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
-    fn run(
+impl WorkspaceDiagnosticRequestHandler {
+    fn workspace_diagnostics(
         snapshot: &SessionSnapshot,
         client: &Client,
         params: WorkspaceDiagnosticParams,
-    ) -> Result<WorkspaceDiagnosticReport> {
+    ) -> WorkspaceDiagnosticReportResult {
         if !snapshot.global_settings().diagnostic_mode().is_workspace() {
             tracing::debug!("Workspace diagnostics is disabled; returning empty report");
-            return Ok(WorkspaceDiagnosticReport { items: vec![] });
+            return WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport::default());
         }
 
         if snapshot
@@ -131,7 +131,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
             // Returning an empty workspace report makes `handle_request` suspend the request.
             // Skip the response writer: it would clear diagnostics for previous result IDs
             // that we have not checked yet. Suspension retains the request, not this snapshot.
-            return Ok(WorkspaceDiagnosticReport { items: vec![] });
+            return WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport::default());
         }
 
         let writer = ResponseWriter::new(
@@ -157,7 +157,17 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
             db.check_with_reporter(&mut reporter);
         }
 
-        Ok(reporter.into_final_report())
+        reporter.into_final_report()
+    }
+}
+
+impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
+    fn run(
+        snapshot: &SessionSnapshot,
+        client: &Client,
+        params: WorkspaceDiagnosticParams,
+    ) -> Result<WorkspaceDiagnosticReport> {
+        Ok(Self::workspace_diagnostics(snapshot, client, params).into_report())
     }
 
     fn handle_request(
@@ -166,7 +176,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         client: &Client,
         params: WorkspaceDiagnosticParams,
     ) {
-        let result = Self::run(&snapshot, client, params.clone());
+        let result = Self::workspace_diagnostics(&snapshot, client, params.clone());
 
         // Test if this is a no-op result, in which case we should long-poll the request and
         // only respond once some diagnostics have changed to get the latest result ids.
@@ -177,7 +187,9 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         //   case we shouldn't do any long polling because some diagnostics changed).
         // * If this is a full report, then check if all items are unchanged (or empty), the same as for
         //   the non-streaming case.
-        if let Ok(WorkspaceDiagnosticReport { items }) = &result {
+        if let WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items }) =
+            &result
+        {
             let all_unchanged = items.iter().all(|item| {
                 matches!(
                     item,
@@ -205,7 +217,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
             }
         }
 
-        client.respond(id, result);
+        client.respond(id, Ok(result.into_report()));
     }
 }
 
@@ -243,7 +255,7 @@ impl<'a> WorkspaceDiagnosticsProgressReporter<'a> {
         }
     }
 
-    fn into_final_report(self) -> WorkspaceDiagnosticReport {
+    fn into_final_report(self) -> WorkspaceDiagnosticReportResult {
         let state = self.state.into_inner().unwrap();
         state.response.into_final_report()
     }
@@ -504,7 +516,7 @@ impl<'a> ResponseWriter<'a> {
     ///
     /// The result can be a partial or full report depending on whether the server's streaming
     /// diagnostics and if it already sent some diagnostics.
-    fn into_final_report(mut self) -> WorkspaceDiagnosticReport {
+    fn into_final_report(mut self) -> WorkspaceDiagnosticReportResult {
         let mut items = Vec::new();
 
         // Handle files that had diagnostics in previous request but no longer have any
@@ -570,15 +582,12 @@ impl ReportingMode {
     fn create_result(
         &mut self,
         items: Vec<WorkspaceDocumentDiagnosticReport>,
-    ) -> WorkspaceDiagnosticReport {
+    ) -> WorkspaceDiagnosticReportResult {
         match self {
-            ReportingMode::Streaming(streaming) => match streaming.create_result(items) {
-                WorkspaceDiagnosticReportResult::Report(report) => report,
-                WorkspaceDiagnosticReportResult::PartialReport(
-                    WorkspaceDiagnosticReportPartialResult { items },
-                ) => WorkspaceDiagnosticReport { items },
-            },
-            ReportingMode::Bulk(..) => WorkspaceDiagnosticReport { items },
+            ReportingMode::Streaming(streaming) => streaming.create_result(items),
+            ReportingMode::Bulk(..) => {
+                WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items })
+            }
         }
     }
 }
@@ -607,6 +616,17 @@ struct Streaming {
 enum WorkspaceDiagnosticReportResult {
     Report(WorkspaceDiagnosticReport),
     PartialReport(WorkspaceDiagnosticReportPartialResult),
+}
+
+impl WorkspaceDiagnosticReportResult {
+    fn into_report(self) -> WorkspaceDiagnosticReport {
+        match self {
+            Self::Report(report) => report,
+            Self::PartialReport(WorkspaceDiagnosticReportPartialResult { items }) => {
+                WorkspaceDiagnosticReport { items }
+            }
+        }
+    }
 }
 
 impl Streaming {
