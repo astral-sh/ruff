@@ -648,14 +648,21 @@ where
 
 impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
     fn visit(&mut self, result: std::result::Result<DirEntry, Error>) -> WalkState {
+        let mut inclusion = None;
         // Respect our own exclusion behavior.
         if let Ok(entry) = &result {
             if entry.depth() > 0 {
                 let path = entry.path();
                 let resolver = self.global.resolver.read().unwrap();
                 let settings = resolver.resolve(path);
+                let file_path = Candidate::new(path);
+                if entry.file_type().is_some_and(|ft| !ft.is_dir()) {
+                    inclusion = match_candidate_inclusion(&file_path, &settings.file_resolver);
+                    if inclusion.is_none() {
+                        return WalkState::Continue;
+                    }
+                }
                 if let Some(file_name) = path.file_name() {
-                    let file_path = Candidate::new(path);
                     let file_basename = Candidate::new(file_name);
                     if match_candidate_exclusion(
                         &file_path,
@@ -725,19 +732,10 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                     // Accept all files that are passed-in directly.
                     Some(ResolvedFile::Root(entry.into_path()))
                 } else {
-                    // Otherwise, check if the file is included.
-                    let path = entry.path();
-                    let resolver = self.global.resolver.read().unwrap();
-                    let settings = resolver.resolve(path);
-                    if settings.file_resolver.include.is_match(path) {
-                        debug!("Included path via `include`: {path:?}");
-                        Some(ResolvedFile::Nested(entry.into_path()))
-                    } else if settings.file_resolver.extend_include.is_match(path) {
-                        debug!("Included path via `extend-include`: {path:?}");
-                        Some(ResolvedFile::Nested(entry.into_path()))
-                    } else {
-                        None
-                    }
+                    inclusion.map(|kind| {
+                        debug!("Included path via `{kind}`: {:?}", entry.path());
+                        ResolvedFile::Nested(entry.into_path())
+                    })
                 };
 
                 if let Some(resolved) = resolved {
@@ -980,9 +978,16 @@ pub fn match_any_inclusion(
     path: &Path,
     resolver_settings: &FileResolverSettings,
 ) -> Option<InclusionKind> {
-    if resolver_settings.include.is_match(path) {
+    match_candidate_inclusion(&Candidate::new(path), resolver_settings)
+}
+
+fn match_candidate_inclusion(
+    path: &Candidate,
+    resolver_settings: &FileResolverSettings,
+) -> Option<InclusionKind> {
+    if resolver_settings.include.is_match_candidate(path) {
         Some(InclusionKind::Include)
-    } else if resolver_settings.extend_include.is_match(path) {
+    } else if resolver_settings.extend_include.is_match_candidate(path) {
         Some(InclusionKind::ExtendInclude)
     } else {
         None
