@@ -6921,9 +6921,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_expression_uncached(expression, tcx);
         };
 
-        // See if we already have a cached entry for this expression.
+        // For `record.get("name")`, a different literal key cannot affect the expression's
+        // inferred type. Reuse the unconstrained inference in that case. An exact match can
+        // suppress literal promotion, and completions in open files need every expected key.
+        let cache_tcx = if let ast::Expr::StringLiteral(literal) = expression
+            && let Some(expected) = tcx.expected_type().and_then(Type::as_string_literal)
+            && literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE
+            && expected.value(self.db()) != literal.value.to_str()
+            && !self.collects_expected_types()
+        {
+            TypeContext::default()
+        } else {
+            tcx
+        };
         let expression_key = expression.into();
-        let cache_entry = expression_cache.borrow().get(expression_key, tcx).cloned();
+        let cache_entry = expression_cache
+            .borrow()
+            .get(expression_key, cache_tcx)
+            .cloned();
 
         match cache_entry {
             Some(ExpressionCacheEntry::Small(ty)) => {
@@ -6954,7 +6969,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(expression_cache) = &self.expression_cache {
                     expression_cache
                         .borrow_mut()
-                        .insert(expression_key, tcx, cached);
+                        .insert(expression_key, cache_tcx, cached);
                 }
 
                 ty
