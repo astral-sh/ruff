@@ -4129,35 +4129,39 @@ impl<'db> CallableBinding<'db> {
 
         // Step 2: check the candidates in declaration order. Step 5 can discard every
         // later overload as soon as the first match covers all argument materializations.
-        let mut can_prune_after_first_match = !mode.needs_all_overload_specializations()
+        let can_prune_after_first_match = !mode.needs_all_overload_specializations()
             && !should_retry_after_provisional_arity
             && !call_arguments.iter().any(CallArgument::is_variadic)
             && self
                 .matching_overloads()
                 .all(|(_, overload)| overload.supports_first_match_pruning());
-        {
-            let mut overloads = self.matching_overloads_mut().peekable();
-            while let Some((_, overload)) = overloads.next() {
-                overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
-                if !can_prune_after_first_match
-                    || overload.has_errors_affecting_overload_resolution()
-                {
-                    continue;
-                }
-                can_prune_after_first_match = false;
-                if overloads.peek().is_some()
+        let defer_literal_mismatches =
+            mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity;
+        let check_types = |overload: &mut Binding<'db>| {
+            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+        };
+        if can_prune_after_first_match || defer_literal_mismatches {
+            let first_match_covers_rest = |overload: &Binding<'db>| {
+                can_prune_after_first_match
                     && overload.accepts_all_argument_materializations(
                         db,
                         env,
                         constraints,
                         call_arguments.as_ref(),
                     )
-                {
-                    for (_, later) in overloads {
-                        later.mark_as_unmatched_overload();
-                    }
-                    return;
-                }
+            };
+            if self.check_overloads_in_order(
+                db,
+                call_arguments.as_ref(),
+                defer_literal_mismatches,
+                check_types,
+                first_match_covers_rest,
+            ) {
+                return;
+            }
+        } else {
+            for (_, overload) in self.matching_overloads_mut() {
+                check_types(overload);
             }
         }
 
@@ -4396,23 +4400,40 @@ impl<'db> CallableBinding<'db> {
         snapshotter.restore(self, post_evaluation_snapshot);
     }
 
-    /// Defer type checking for overloads ruled out by a literal argument. If another candidate
-    /// matches, we can skip inference for those overloads entirely.
-    fn check_overloads_deferring_literal_mismatches(
+    /// Checks candidates in declaration order. Returns true when the first match covers every
+    /// materialization and wins outright. A literal mismatch can be deferred until we know
+    /// whether the call failed and needs that candidate's diagnostics.
+    fn check_overloads_in_order(
         &mut self,
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
+        defer_literal_mismatches: bool,
         check_types: impl Fn(&mut Binding<'db>),
-    ) {
+        first_match_covers_rest: impl Fn(&Binding<'db>) -> bool,
+    ) -> bool {
         let mut literal_mismatches = SmallVec::<[_; 4]>::new();
         let mut found_match = false;
-        for (_, overload) in self.matching_overloads_mut() {
-            if overload.has_disjoint_literal_argument(db, arguments) {
+        let mut overloads = self.matching_overloads_mut().peekable();
+        while let Some((_, overload)) = overloads.next() {
+            if defer_literal_mismatches && overload.has_disjoint_literal_argument(db, arguments) {
                 literal_mismatches.push(overload);
-            } else {
-                check_types(overload);
-                found_match = found_match || !overload.has_errors_affecting_overload_resolution();
+                continue;
             }
+
+            check_types(overload);
+            if overload.has_errors_affecting_overload_resolution() {
+                continue;
+            }
+            if !found_match && overloads.peek().is_some() && first_match_covers_rest(overload) {
+                for unmatched in literal_mismatches
+                    .into_iter()
+                    .chain(overloads.map(|(_, later)| later))
+                {
+                    unmatched.mark_as_unmatched_overload();
+                }
+                return true;
+            }
+            found_match = true;
         }
 
         if found_match {
@@ -4425,6 +4446,7 @@ impl<'db> CallableBinding<'db> {
                 check_types(overload);
             }
         }
+        false
     }
 
     /// Returns the set of overload candidates that may contribute to the call evaluation.
