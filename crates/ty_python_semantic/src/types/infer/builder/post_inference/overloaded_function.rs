@@ -57,11 +57,14 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     }
 
-    if !function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+    let place = definition.place(db);
+    if seen_overloaded_places.contains(&place) {
         return;
     }
 
-    let place = definition.place(db);
+    if !function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+        return;
+    }
 
     let use_def = index.use_def_map(context.scope().file_scope_id(db));
 
@@ -86,10 +89,8 @@ pub(crate) fn check_overloaded_function<'db>(
         return;
     }
 
-    if !seen_overloaded_places.insert(place) {
-        // We have already checked this overloaded function in this scope, so we can skip it.
-        return;
-    }
+    // Only mark the place as checked once we know this definition belongs to the public function.
+    seen_overloaded_places.insert(place);
 
     if !seen_public_functions.insert(function) {
         // We have already checked this overloaded function as a public function, so we can skip it.
