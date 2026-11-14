@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.97"
+rust-version = "1.98"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -42,7 +42,6 @@ ruff_python_stdlib = { version = "0.0.22", path = "crates/ruff_python_stdlib" }
 ruff_python_trivia = { version = "0.0.22", path = "crates/ruff_python_trivia" }
 ruff_server = { version = "0.0.22", path = "crates/ruff_server" }
 ruff_source_file = { version = "0.0.22", path = "crates/ruff_source_file" }
-ruff_mdtest = { path = "crates/ruff_mdtest" }
 ruff_ranged_value = { version = "0.0.22", path = "crates/ruff_ranged_value" }
 ruff_text_size = { version = "0.0.22", path = "crates/ruff_text_size" }
 ruff_unicode_names2 = { version = "0.0.22", path = "crates/ruff_unicode_names2" }
@@ -51,8 +50,6 @@ ruff_workspace = { version = "0.0.22", path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
 ty_combine = { version = "0.0.22", path = "crates/ty_combine" }
-ty_completion_bench = { path = "crates/ty_completion_bench" }
-ty_completion_eval = { path = "crates/ty_completion_eval" }
 ty_ide = { path = "crates/ty_ide" }
 ty_module_resolver = { version = "0.0.22", path = "crates/ty_module_resolver" }
 ty_project = { path = "crates/ty_project", default-features = false }
@@ -260,13 +257,6 @@ which = { version = "8.0.0", default-features = false, features = ["real-sys"] }
 wild = { version = "2", default-features = false }
 zip = { version = "9.0.5", default-features = false }
 
-[workspace.metadata.cargo-shear]
-ignored = [
-    "ruff_mdtest",
-    "ty_completion_bench",
-    "ty_completion_eval",
-]
-
 [workspace.lints.rust]
 unsafe_code = "warn"
 unreachable_pub = "warn"
@@ -326,6 +316,11 @@ unused_peekable = "warn"
 # in the `if` being an order of magnitude bigger than the
 # `else`, then some might consider that harder to read.
 if_not_else = "allow"
+
+[workspace.lints.cargo]
+# This is needed for maturin to generate the correct PyPI metadata, for at least
+# the ruff and ty crates.
+redundant_homepage = "allow"
 
 [profile.release]
 lto = "fat"

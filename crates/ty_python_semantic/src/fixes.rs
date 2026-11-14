@@ -182,7 +182,7 @@ where
             } = apply_fixes(&staged_source, fixes);
 
             let fixed_source = staged_source.with_text(source, &source_map);
-            source_texts.set_unstaged(db, file.file, fixed_source.clone());
+            source_texts.set_unstaged(db, file.file, fixed_source);
 
             unstaged_fixes.push((file, applied_fixes));
         }

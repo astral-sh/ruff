@@ -131,9 +131,5 @@ fn is_abstract_true_assignment(target: &Expr, value: Option<&Expr>) -> bool {
         return false;
     };
 
-    if !is_const_true(value) {
-        return false;
-    }
-
-    true
+    is_const_true(value)
 }
