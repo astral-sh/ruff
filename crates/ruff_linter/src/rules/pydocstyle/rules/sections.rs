@@ -1443,14 +1443,76 @@ impl Violation for IncorrectSectionOrder {
     }
 }
 
+/// ## What it does
+/// Checks for docstrings that contain the same section more than once.
+///
+/// ## Why is this bad?
+/// Each section should appear at most once in a docstring. A repeated section
+/// is usually a copy-paste mistake or two sections that should be merged.
+/// Tools like numpydoc reject docstrings with duplicate sections, while
+/// others, like Sphinx's napoleon extension, render both copies.
+///
+/// This rule is enabled when using the `google` and `numpy` conventions, and
+/// disabled when using the `pep257` convention.
+///
+/// ## Example
+/// ```python
+/// def func(x: int) -> int:
+///     """Summary.
+///
+///     Notes
+///     -----
+///     First notes.
+///
+///     Notes
+///     -----
+///     Second notes.
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def func(x: int) -> int:
+///     """Summary.
+///
+///     Notes
+///     -----
+///     First notes.
+///
+///     Second notes.
+///     """
+/// ```
+///
+/// ## Options
+/// - `lint.pydocstyle.convention`
+///
+/// ## References
+/// - [NumPy docstring standard](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods)
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
+pub(crate) struct DuplicateDocstringSection {
+    name: String,
+}
+
+impl Violation for DuplicateDocstringSection {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DuplicateDocstringSection { name } = self;
+        format!(r#"Section "{name}" appears more than once"#)
+    }
+}
+
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
-/// D414, D416, D417, D420
+/// D414, D416, D417, D420, D422
 pub(crate) fn sections(
     checker: &Checker,
     docstring: &Docstring,
     section_contexts: &SectionContexts,
     convention: Option<Convention>,
 ) {
+    check_duplicate_sections(checker, section_contexts);
+
     match convention {
         Some(Convention::Google) => {
             check_section_order(checker, section_contexts, google_section_order);
@@ -2291,5 +2353,24 @@ fn check_section_order<P: PartialOrd>(
         }
 
         max_order = Some((position, context.section_name()));
+    }
+}
+
+/// D422
+fn check_duplicate_sections(checker: &Checker, section_contexts: &SectionContexts) {
+    if !checker.is_rule_enabled(Rule::DuplicateDocstringSection) {
+        return;
+    }
+
+    let mut seen = FxHashSet::default();
+    for context in section_contexts {
+        if !seen.insert(context.kind()) {
+            checker.report_diagnostic(
+                DuplicateDocstringSection {
+                    name: context.section_name().to_string(),
+                },
+                context.section_name_range(),
+            );
+        }
     }
 }

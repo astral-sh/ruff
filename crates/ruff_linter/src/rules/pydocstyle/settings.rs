@@ -71,6 +71,7 @@ impl Convention {
                 Rule::MissingSectionNameColon,
                 Rule::UndocumentedParam,
                 Rule::IncorrectSectionOrder,
+                Rule::DuplicateDocstringSection,
             ],
         }
     }

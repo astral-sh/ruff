@@ -11,7 +11,7 @@ use ruff_source_file::{Line, NewlineWithTrailingNewline, UniversalNewlines};
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::{Docstring, DocstringBody};
 
-#[derive(EnumIter, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(EnumIter, PartialEq, Eq, Hash, Debug, Clone, Copy)]
 pub(crate) enum SectionKind {
     Args,
     Arguments,
