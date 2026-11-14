@@ -9577,6 +9577,99 @@ impl<'db> Binding<'db> {
         &self.parameter_tys
     }
 
+    /// Infers the return of a forwarding callable from its positionally bound callback, even if
+    /// an unpacking leaves the remaining parameters of the partial unknown.
+    fn partial_forwarded_return_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut wrapped: Type<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> Option<Type<'db>> {
+        let mut arguments = arguments.iter().skip(1);
+        let mut wrappers = SmallVec::<[_; 2]>::new();
+        let result = loop {
+            let callable = wrapped.try_upcast_to_callable(db, env)?.exactly_one()?;
+            let [signature] = callable.signatures(db).overloads.as_slice() else {
+                return None;
+            };
+            // A predicate can narrow an argument already bound by the partial.
+            if matches!(
+                signature.return_ty.resolve_type_alias(db),
+                Type::TypeIs(_) | Type::TypeGuard(_)
+            ) {
+                return None;
+            }
+            let Some(context) = signature.generic_context else {
+                if wrappers.is_empty() {
+                    return None;
+                }
+                break signature.return_ty;
+            };
+
+            // The wrapped signature ends in `f: Callable[P, R], *args: P.args, **kwargs: P.kwargs`.
+            // Only a positional binding fixes `f`: a later call can override any bound keyword.
+            let (prefix, paramspec) = signature.parameters().as_paramspec_with_prefix()?;
+            let (callback, preceding) = prefix.split_last()?;
+            let (callback_paramspec, callback_signature) = callback
+                .annotated_type()
+                .as_callable()?
+                .signatures(db)
+                .is_single_paramspec()?;
+            let result_var = callback_signature.return_ty.as_typevar()?;
+            if callback_paramspec != paramspec
+                || !callback.is_positional()
+                || context.variables(db).count() != 2
+                || !context.contains(db, paramspec.identity(db))
+                || !context.contains(db, result_var.identity(db))
+                || result_var
+                    .typevar(db)
+                    .bound_or_constraints(db, env)
+                    .is_some()
+                || paramspec
+                    .typevar(db)
+                    .bound_or_constraints(db, env)
+                    .is_some()
+            {
+                return None;
+            }
+            // Another bound argument could contribute a different specialization. The return
+            // type may wrap R (e.g. Future[R]), but must be independent of P.
+            let locals = context.inferable_typevars(db);
+            for parameter in preceding {
+                let (free, skipped) = parameter.annotated_type().free_typevars(db, env);
+                if skipped
+                    || free.iter(db).any(|var| var.is_inferable(db, locals))
+                    || !parameter.is_positional()
+                    || !matches!(arguments.next()?, CallArgument::Positional(_))
+                {
+                    return None;
+                }
+            }
+            let (free, skipped) = signature.return_ty.free_typevars(db, env);
+            if skipped || paramspec.is_inferable(db, free) || !result_var.is_inferable(db, free) {
+                return None;
+            }
+            let CallArgument::Positional(argument) = arguments.next()? else {
+                return None;
+            };
+
+            // TODO: `evaluate_paramspec_sub_call` checks the forwarded arguments but loses the
+            // callback's specialization when inferring the outer return type. Once it preserves
+            // that result for `submit(ctx.run, f, *args)`, use it here for nested callbacks.
+            wrappers.push((signature.return_ty, result_var));
+            wrapped = argument.get_for_declared_type(callback.annotated_type());
+        };
+
+        Some(
+            wrappers
+                .into_iter()
+                .rev()
+                .fold(result, |result, (return_ty, variable)| {
+                    return_ty.substitute_one_typevar(db, env, variable, result)
+                }),
+        )
+    }
+
     /// Returns the reduced callable type exposed by this `functools.partial(...)` overload.
     fn functools_partial_return_type<'a>(
         &mut self,
@@ -9590,12 +9683,15 @@ impl<'db> Binding<'db> {
             [Some(func_ty), ..] => *func_ty,
             _ => return None,
         };
-        let imprecise_return_type = self.return_ty;
-        let failed_synthesis_return_type =
-            KnownClass::FunctoolsPartial.to_specialized_instance(db, env, &[Type::unknown()]);
-
-        let (bound_call_arguments, partial_bindings, can_synthesize_signature) =
-            Bindings::functools_partial_matched_bindings(db, env, func_ty, call_arguments)?;
+        let imprecise_return_type = || {
+            let result = Self::partial_forwarded_return_type(db, env, func_ty, call_arguments)?;
+            Some(KnownClass::FunctoolsPartial.to_specialized_instance(db, env, &[result]))
+        };
+        let Some((bound_call_arguments, partial_bindings, can_synthesize_signature)) =
+            Bindings::functools_partial_matched_bindings(db, env, func_ty, call_arguments)
+        else {
+            return imprecise_return_type();
+        };
 
         // Reuse call-binding machinery to resolve which wrapped overloads are compatible with
         // bound arguments and to surface binding diagnostics.
@@ -9613,10 +9709,11 @@ impl<'db> Binding<'db> {
         let new_return_type =
             partial_bindings.functools_partial_type(db, env, func_ty, self, &bound_call_arguments);
 
-        Some(if !can_synthesize_signature {
-            imprecise_return_type
-        } else if new_return_type.is_never() {
-            failed_synthesis_return_type
+        if !can_synthesize_signature {
+            return imprecise_return_type();
+        }
+        Some(if new_return_type.is_never() {
+            KnownClass::FunctoolsPartial.to_specialized_instance(db, env, &[Type::unknown()])
         } else {
             new_return_type
         })
