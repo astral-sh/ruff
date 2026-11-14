@@ -64,7 +64,7 @@ enum RegistrationMode {
 }
 
 impl LspFileWatcher {
-    pub(super) fn new(capabilities: ResolvedClientCapabilities) -> Option<Self> {
+    pub(super) fn new(capabilities: &ResolvedClientCapabilities) -> Option<Self> {
         if !capabilities.supports_file_watcher() {
             tracing::warn!(
                 "Your LSP client doesn't support file watching: \
