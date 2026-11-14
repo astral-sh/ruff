@@ -86,6 +86,11 @@ pub(crate) struct CheckCommand {
     #[arg(long, conflicts_with_all = ["watch", "fix", "add_ignore"])]
     pub(crate) update_baseline: bool,
 
+    /// Write an HTML report of how precisely ty infers the types on each line to the given
+    /// directory (preview).
+    #[arg(long, value_name = "DIR", conflicts_with_all = ["fix", "add_ignore", "update_baseline"])]
+    pub(crate) html_report: Option<SystemPathBuf>,
+
     /// Run the command within the given project directory.
     ///
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,

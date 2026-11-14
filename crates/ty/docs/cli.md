@@ -67,6 +67,7 @@ over all configuration files.</p>
 </dd><dt id="ty-check--fix"><a href="#ty-check--fix"><code>--fix</code></a></dt><dd><p>Apply fixes to resolve errors</p>
 </dd><dt id="ty-check--force-exclude"><a href="#ty-check--force-exclude"><code>--force-exclude</code></a></dt><dd><p>Enforce exclusions, even for paths passed to ty directly on the command-line. Use <code>--no-force-exclude</code> to disable</p>
 </dd><dt id="ty-check--help"><a href="#ty-check--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help (see a summary with '-h')</p>
+</dd><dt id="ty-check--html-report"><a href="#ty-check--html-report"><code>--html-report</code></a> <i>dir</i></dt><dd><p>Write an HTML report of how precisely ty infers the types on each line to the given directory (preview)</p>
 </dd><dt id="ty-check--ignore"><a href="#ty-check--ignore"><code>--ignore</code></a> <i>rule</i></dt><dd><p>Disables the rule. Can be specified multiple times. Use 'all' to apply to all rules.</p>
 </dd><dt id="ty-check--no-progress"><a href="#ty-check--no-progress"><code>--no-progress</code></a></dt><dd><p>Hide all progress outputs.</p>
 <p>For example, spinners or progress bars.</p>

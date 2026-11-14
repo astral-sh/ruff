@@ -1,4 +1,5 @@
 mod args;
+mod coverage;
 mod logging;
 mod printer;
 mod python_version;
@@ -157,6 +158,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .as_ref()
         .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
+    let html_report = args
+        .html_report
+        .as_ref()
+        .map(|path| SystemPath::absolute(path, &cwd));
 
     let mut project_metadata = match &config_file {
         Some(config_file) => {
@@ -218,7 +223,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.freeze();
     }
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer, html_report);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -306,6 +311,9 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
+    /// The directory to write the HTML coverage report to after each check, if any.
+    html_report: Option<SystemPathBuf>,
+
     /// Progress for the current synchronization batch, cleared before checking starts.
     sync_progress: Option<SyncProgress>,
 
@@ -319,7 +327,11 @@ struct MainLoop {
 }
 
 impl MainLoop {
-    fn new(mode: MainLoopMode, printer: Printer) -> (Self, MainLoopCancellationToken) {
+    fn new(
+        mode: MainLoopMode,
+        printer: Printer,
+        html_report: Option<SystemPathBuf>,
+    ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         let cancellation_token_source = CancellationTokenSource::new();
@@ -331,6 +343,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
+                html_report,
                 sync_progress: None,
                 printer,
                 cancellation_token,
@@ -446,6 +459,18 @@ impl MainLoop {
                             }
 
                             self.write_diagnostics(db, &result, None)?;
+
+                            if let Some(output_dir) = &self.html_report
+                                && !self.cancellation_token.is_cancelled()
+                            {
+                                let total = coverage::write_html_report(db, output_dir)?;
+                                writeln!(
+                                    self.printer.stream_for_success_summary(),
+                                    "Wrote coverage report to {output_dir}/index.html \
+                                    ({:.2}% imprecise)",
+                                    total.imprecision() * 100.0,
+                                )?;
+                            }
 
                             if self.cancellation_token.is_cancelled() {
                                 Err(Canceled)
