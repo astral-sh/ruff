@@ -37,6 +37,10 @@ pub(crate) struct MarkdownTestConfig {
 
     pub(crate) log: Option<Log>,
 
+    /// Check this section's files concurrently in the same Salsa database.
+    #[serde(default)]
+    pub(crate) parallel: bool,
+
     pub(crate) rules: Option<Rules>,
 
     pub(crate) analysis: Option<Analysis>,
