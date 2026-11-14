@@ -411,6 +411,32 @@ pub(super) fn walk_bound_super_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> BoundSuperType<'db> {
+    /// Widen the receiver, its MRO lookup anchor, and the pivot. Both classes must remain
+    /// representable to look up members on the resulting `super` object.
+    pub(super) fn widen(
+        self,
+        db: &'db dyn Db,
+        widen: impl Fn(Type<'db>) -> Type<'db>,
+    ) -> Option<Self> {
+        let widen_class = |class| match class {
+            ClassType::NonGeneric(_) => Some(class),
+            ClassType::Generic(alias) => widen(alias.into()).to_class_type(db),
+        };
+        let pivot = match self.pivot_class(db) {
+            ClassBase::Class(class) => ClassBase::Class(widen_class(class)?),
+            pivot => pivot,
+        };
+        let owner = match self.owner(db) {
+            SuperOwnerKind::Resolved(resolved) => SuperOwnerKind::Resolved(ResolvedSuperOwner {
+                lookup_anchor: widen_class(resolved.lookup_anchor)?,
+                owner_type: widen(resolved.owner_type),
+                ..resolved
+            }),
+            owner => owner,
+        };
+        Some(Self::new(db, pivot, owner))
+    }
+
     fn mro_contains_pivot(
         db: &'db dyn Db,
         class: ClassType<'db>,

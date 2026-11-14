@@ -601,7 +601,8 @@ impl<'db> RecursiveType<'db> {
                     ),
                 }
             }
-            TypeMapping::ApplySpecialization(_)
+            TypeMapping::WidenRecursiveInference(_)
+            | TypeMapping::ApplySpecialization(_)
             | TypeMapping::ApplySpecializationWithMaterialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }

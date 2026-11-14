@@ -76,11 +76,33 @@ def alternate(flag: bool):
     reveal_type(value)  # revealed: tuple[Literal[1]] | tuple[Literal["a"], Literal["b"]]
 ```
 
+## Swapping two deeply nested types
+
+Swapping the values adds a second alternative to each variable's type. Neither alternative gets
+deeper, so their innermost element types stay distinct.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_type
+
+type Nest[T] = list[list[list[list[list[T] | bytes] | bytes] | bytes] | bytes]
+
+def swap(ints: Nest[int], strs: Nest[str], again: bool):
+    x, y = ints, strs
+    while again:
+        x, y = y, x
+    assert_type(x, Nest[int] | Nest[str])
+    assert_type(y, Nest[int] | Nest[str])
+```
+
 ## Unpacking a value with a growing type argument
 
-Each time through the loop, the first unpacked value has another callable nested in its type.
-Inference falls back to `Unknown` for that value. The initial `Box[int]` also reaches the read after
-the loop.
+Each update wraps the boxed item in another callable. The first unpacked value remains a `Box`, and
+the second remains a `bool`. If the loop never runs, the box still contains the original integer.
 
 ```toml
 [environment]
@@ -91,13 +113,62 @@ python-version = "3.14"
 from collections.abc import Callable
 
 class Box[T]:
+    item: T
     next: tuple[Box[Callable[[], T]], bool]
 
 def read(more: bool):
     value = Box[int]()
     while more:
         value, more = value.next
-    reveal_type(value)  # revealed: Box[int] | Unknown
+        reveal_type(more)  # revealed: bool
+    value.missing  # error: [missing-attribute]
+    value.item()  # error: [call-non-callable] "Object of type `int` is not callable"
+```
+
+## Repeatedly specializing a type alias object
+
+The alias object retains its type arguments, so each specialization nests the previous one.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Alias[T] = tuple[T]
+
+def wrap(more: bool):
+    value = Alias[int]
+    while more:
+        value = Alias[value]
+    return value
+```
+
+## Looking up an inherited method through `super`
+
+Each update wraps the receiver's type argument in a tuple. The `super` object also stores the
+specialized class where method lookup starts. Widening preserves the `super` object.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never
+
+class Base[T]:
+    def grow(self) -> "Child[tuple[T]]":
+        raise NotImplementedError
+
+class Child[T](Base[T]): ...
+
+def wrap(more: bool):
+    value = super(Child, Child[int]())
+    while more:
+        value = super(Child, value.grow())
+    if not isinstance(value, super):
+        assert_never(value)
 ```
 
 ## Generic `NamedTuple` with recursive fields

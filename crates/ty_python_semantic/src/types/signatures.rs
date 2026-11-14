@@ -892,10 +892,8 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     for ty in signature.receiver_constraint_types() {
         visitor.visit_type(db, ty);
     }
-    // By default we usually don't visit the type of the default value,
-    // as it isn't relevant to most things
     for parameter in &signature.parameters {
-        visitor.visit_type(db, parameter.annotated_type());
+        visitor.visit_parameter(db, parameter);
     }
     if !signature.is_paramspec_value() {
         visitor.visit_type(db, signature.return_ty);

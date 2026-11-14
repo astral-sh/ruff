@@ -788,7 +788,8 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::UnspecializedTypeVar
                     | DynamicType::UnknownLambdaParameter
                     | DynamicType::InvalidConcatenateUnknown
-                    | DynamicType::AmbiguousOverload => Parameters::unknown(),
+                    | DynamicType::AmbiguousOverload
+                    | DynamicType::Widened(_) => Parameters::unknown(),
                 },
                 Type::Divergent(_) => Parameters::unknown(),
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
@@ -1498,7 +1499,8 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
             | TypeMapping::RescopeReturnCallables(_)
-            | TypeMapping::ApplyRecursiveSubstitution(_) => Type::TypeVar(self),
+            | TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::WidenRecursiveInference(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 if visitor.materialize_typevar_bounds_and_defaults {
                     Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
