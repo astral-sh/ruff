@@ -5107,7 +5107,7 @@ struct ArgumentMatcher<'a, 'db> {
     ///
     /// This is used to prevent variadic arguments from greedily matching parameters that will be
     /// explicitly provided via keyword arguments.
-    explicit_keyword_parameters: FxHashSet<usize>,
+    explicit_keyword_parameters: OnceCell<FxHashSet<usize>>,
 }
 
 impl<'a, 'db> ArgumentMatcher<'a, 'db> {
@@ -5116,27 +5116,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         parameters: &'a Parameters<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
-        let mut explicit_keyword_parameters: FxHashSet<usize> = arguments
-            .iter()
-            .filter_map(|argument| {
-                let argument = argument.kind();
-                if let Argument::Keyword(name) = argument {
-                    parameters.keyword_by_name(name).map(|(idx, _)| idx)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        for argument in arguments.iter() {
-            if let CallArgument::Keywords(keywords) = argument {
-                explicit_keyword_parameters.extend(
-                    keywords.explicit_keyword_names().filter_map(|name| {
-                        parameters.keyword_by_name(name).map(|(index, _)| index)
-                    }),
-                );
-            }
-        }
-
         Self {
             arguments,
             parameters,
@@ -5148,8 +5127,32 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             num_synthetic_args: 0,
             variable_length_positional_arguments: SmallVec::new(),
             variadic_argument_matched_to_variadic_parameter: false,
-            explicit_keyword_parameters,
+            explicit_keyword_parameters: OnceCell::new(),
         }
+    }
+
+    /// Only variable-length starred arguments need to know which positional slots to leave free.
+    fn explicit_keyword_parameters(&self) -> &FxHashSet<usize> {
+        self.explicit_keyword_parameters.get_or_init(|| {
+            let mut indices = FxHashSet::default();
+            let mut record = |name: &str| {
+                if let Some((index, _)) = self.parameters.keyword_by_name(name) {
+                    indices.insert(index);
+                }
+            };
+            for argument in self.arguments.iter() {
+                match argument {
+                    CallArgument::Keyword { name, .. } => record(name),
+                    CallArgument::Keywords(keywords) => {
+                        for name in keywords.explicit_keyword_names() {
+                            record(name);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            indices
+        })
     }
 
     fn has_later_positional_input(&self, argument_index: usize) -> bool {
@@ -5196,7 +5199,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         (self.next_positional..self.parameters.len())
             .take_while(|index| {
                 self.parameters.get_positional(*index).is_some()
-                    && !self.explicit_keyword_parameters.contains(index)
+                    && !self.explicit_keyword_parameters().contains(index)
             })
             .count()
     }
@@ -5427,7 +5430,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         if has_fixed_union_tail {
             while let Some(parameter) = self.parameters.get_positional(self.next_positional) {
                 if self
-                    .explicit_keyword_parameters
+                    .explicit_keyword_parameters()
                     .contains(&self.next_positional)
                 {
                     break;
