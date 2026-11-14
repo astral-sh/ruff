@@ -5407,7 +5407,7 @@ def make_sink(mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> Callabl
     return lambda value: None
 
 def wrapped_returns(mapping: V | Invariant[V] | Covariant[V]) -> None:
-    # revealed: list[Invariant[V@wrapped_returns] | V@wrapped_returns | Covariant[V@wrapped_returns]]
+    # revealed: list[Invariant[V@wrapped_returns] | Covariant[V@wrapped_returns] | V@wrapped_returns]
     reveal_type(make_list(lambda: mapping))
     reveal_type(make_sink(lambda: mapping))  # revealed: (Invariant[V@wrapped_returns] | V@wrapped_returns, /) -> None
 ```
