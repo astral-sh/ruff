@@ -128,10 +128,6 @@ pub struct ModuleLocation<'db> {
     package_directories: Option<Box<[SystemPathBuf]>>,
 }
 
-#[allow(
-    dead_code,
-    reason = "Package directory renames use these accessors in the next change."
-)]
 impl<'db> ModuleLocation<'db> {
     /// Returns the selected module.
     pub fn module(&self) -> Module<'db> {
