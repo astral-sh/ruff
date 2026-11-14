@@ -1293,6 +1293,126 @@ with Child().create() as child:
     reveal_type(child)  # revealed: Child
 ```
 
+### Classmethods without a positional receiver parameter
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A classmethod always passes the class as the first positional argument, so the function it wraps
+must accept one. We report an error on the `@classmethod` decorator if the function cannot:
+
+```py
+class C:
+    # snapshot: invalid-argument-type
+    @classmethod
+    def no_parameters() -> None: ...
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to class `classmethod` is incorrect
+ --> src/mdtest_snippet.py:3:5
+  |
+3 |     @classmethod
+  |     ^^^^^^^^^^^^ Expected `(Any, /, *args: Any, **kwargs: Any) -> object`, found `def no_parameters() -> None`
+```
+
+A keyword-only or keyword-variadic parameter cannot receive the class either:
+
+```py
+class C:
+    @classmethod  # error: [invalid-argument-type]
+    def keyword_only(*, x: int) -> None: ...
+    @classmethod  # error: [invalid-argument-type]
+    def keyword_variadic(**kwargs: int) -> None: ...
+```
+
+A positional-only parameter, a parameter with a default value, or a variadic parameter can:
+
+```py
+class C:
+    @classmethod
+    def positional_only(cls, /) -> None: ...  # ok
+    @classmethod
+    def with_default(cls=None) -> None: ...  # ok
+    @classmethod
+    def variadic(*args: object) -> None: ...  # ok
+```
+
+The check also applies when `@classmethod` is combined with other decorators, including decorators
+that replace the function with another callable:
+
+```py
+from abc import abstractmethod
+from collections.abc import Callable
+from typing import final
+
+def does_nothing[T](f: T) -> T:
+    return f
+
+def takes_no_arguments(f: Callable[..., None]) -> Callable[[], None]:
+    return lambda: None
+
+class C:
+    @final
+    @classmethod  # error: [invalid-argument-type]
+    def final_method() -> None: ...
+    @classmethod  # error: [invalid-argument-type]
+    @abstractmethod
+    def abstract_method() -> None: ...
+    @does_nothing
+    @classmethod  # error: [invalid-argument-type]
+    def outer_decorator() -> None: ...
+    @classmethod  # error: [invalid-argument-type]
+    @does_nothing
+    def inner_decorator() -> None: ...
+    @classmethod  # error: [invalid-argument-type]
+    @takes_no_arguments
+    def replaced(cls) -> None: ...
+```
+
+Each overload and the implementation of an overloaded classmethod is checked separately:
+
+```py
+from typing import overload
+
+class C:
+    @overload
+    @classmethod
+    def f(cls, x: int) -> int: ...
+    @overload
+    @classmethod  # error: [invalid-argument-type]
+    def f(*, x: str) -> str: ...
+    @classmethod
+    def f(*args: object, **kwargs: object) -> int | str:
+        return 0
+```
+
+The same check applies when `classmethod` is called directly:
+
+```py
+def no_parameters() -> None: ...
+def one_parameter(cls) -> None: ...
+
+class C:
+    a = classmethod(no_parameters)  # error: [invalid-argument-type]
+    b = classmethod(lambda: None)  # error: [invalid-argument-type]
+    c = classmethod(one_parameter)  # ok
+    d = classmethod(lambda cls: None)  # ok
+```
+
+`@no_type_check` suppresses the error:
+
+```py
+from typing import no_type_check
+
+class C:
+    @no_type_check
+    @classmethod
+    def f() -> None: ...
+```
+
 ### `__init_subclass__`
 
 #### Basics
