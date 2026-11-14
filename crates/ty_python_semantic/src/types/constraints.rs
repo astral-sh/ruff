@@ -108,9 +108,7 @@ use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::generics::Specialization;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarSet};
-use crate::types::visitor::{
-    NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases, walk_non_atomic_type,
-};
+use crate::types::visitor::{NonAtomicType, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
     TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
@@ -3895,11 +3893,9 @@ impl<'db> CandidateSolutions<'db> {
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         report_diagnostics: ReportDiagnostics,
     ) -> ControlFlow<L::Break, Option<Self>> {
-        let mentions_typevar =
-            |bound| any_over_type_expanding_aliases(db, env, bound, Type::is_type_var);
-        let bound_is_eligible = |constraint: AtomicConstraint<'db>, bound| {
+        let bound_is_eligible = |constraint: AtomicConstraint<'db>, bound: Type<'db>| {
             constraint.provides_candidate_bound(db, env, Some(bound), unspecialized_type_var_policy)
-                && !mentions_typevar(bound)
+                && !bound.has_typevar_expanding_aliases(db, env)
         };
 
         let mut constraints = Vec::default();
@@ -3998,7 +3994,7 @@ impl<'db> CandidateSolutions<'db> {
                 None => continue,
             };
 
-            if mentions_typevar(bound) {
+            if bound.has_typevar_expanding_aliases(db, env) {
                 // If this declared upper bound mentions other typevars, we don't have a simple
                 // conjunction that's eligible for this fast path.
                 return ControlFlow::Continue(None);

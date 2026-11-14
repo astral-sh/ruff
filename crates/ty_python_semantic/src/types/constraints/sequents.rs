@@ -20,9 +20,7 @@ use crate::types::constraints::{
 use crate::types::signatures::CallableSignature;
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
-};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplySpecialization, ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type,
     TypeContext, TypeMapping, TypeVarVariance, UnionType,
@@ -1699,7 +1697,7 @@ impl<'db> ConcreteUpperBound<'db> {
             // `U & ~T ≤ V`, which cannot independently select solutions for T and V.
             if other_elements
                 .clone()
-                .any(|other| any_over_type_expanding_aliases(db, env, *other, Type::is_type_var))
+                .any(|other| other.has_typevar_expanding_aliases(db, env))
             {
                 continue;
             }

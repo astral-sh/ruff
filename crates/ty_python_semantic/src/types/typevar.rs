@@ -48,6 +48,69 @@ pub(super) struct TypeVarMarkers {
     unspecialized: bool,
 }
 
+/// A type and its environment shared by searches for nested type variables. Only non-leaf
+/// types are interned, since leaves can answer both queries without walking their contents.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct TypeVarSearch<'db> {
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(copy)]
+    ty: Type<'db>,
+}
+
+#[salsa::tracked]
+impl<'db> TypeVarSearch<'db> {
+    /// Return a shared key only when the type might have subterms of interest. A nominal
+    /// instance without type arguments visits at most its class literal, which is atomic.
+    fn for_composite(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
+        match TypeKind::from(ty) {
+            TypeKind::Atomic => None,
+            TypeKind::NonAtomic(NonAtomicType::NominalInstance(instance))
+                if !instance.is_definition_generic(db) =>
+            {
+                None
+            }
+            TypeKind::NonAtomic(_) => Some(Self::new(db, env.program(db), ty)),
+        }
+    }
+
+    /// Constraints must inspect alias bodies: a type variable may occur only after expansion.
+    /// As in the underlying search, a recursive alias conservatively counts as a possible match.
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+    fn mentions_typevar_including_aliases(self, db: &'db dyn Db) -> bool {
+        let env = ProgramEnvironment::from_program(self.program(db));
+        visitor::any_over_type_expanding_aliases(db, &env, self.ty(db), Type::is_type_var)
+    }
+
+    /// Receiver binding and contextual inference inspect alias arguments, even those not used
+    /// in the alias body (e.g. `type Placeholder[T] = int` used as `Placeholder[Self]`).
+    /// Keep this walk separate from the alias-expanding search above.
+    #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa returns None if collecting markers encounters a cycle"
+    )]
+    fn markers(self, db: &'db dyn Db) -> Option<TypeVarMarkers> {
+        let markers = Cell::new(TypeVarMarkers::default());
+        let env = ProgramEnvironment::from_program(self.program(db));
+        any_over_type_including_alias_arguments(db, &env, self.ty(db), |nested| {
+            let mut found = markers.get();
+            match nested {
+                Type::TypeVar(typevar) => found.typing_self |= typevar.typevar(db).is_self(db),
+                Type::Dynamic(DynamicType::UnspecializedTypeVar) => found.unspecialized = true,
+                _ => return false,
+            }
+            markers.set(found);
+            found.typing_self && found.unspecialized
+        });
+        Some(markers.get())
+    }
+}
+
 impl<'db> Type<'db> {
     pub(crate) const fn is_type_var(self) -> bool {
         matches!(self, Type::TypeVar(_))
@@ -73,6 +136,18 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         any_over_type(db, env, self, false, |ty| matches!(ty, Type::TypeVar(_)))
+    }
+
+    /// Searches a constraint bound for type variables, following aliases but leaving other
+    /// lazy attributes alone. A recursive alias conservatively counts as containing a variable.
+    pub(super) fn has_typevar_expanding_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        self.is_type_var()
+            || TypeVarSearch::for_composite(db, env, self)
+                .is_some_and(|search| search.mentions_typevar_including_aliases(db))
     }
 
     pub(crate) fn references_typevar(
@@ -169,42 +244,12 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<TypeVarMarkers> {
-        #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-        #[expect(
-            clippy::unnecessary_wraps,
-            reason = "return None if the search encounters a Salsa cycle"
-        )]
-        fn collect<'db>(
-            db: &'db dyn Db,
-            program: Program<'db>,
-            ty: Type<'db>,
-        ) -> Option<TypeVarMarkers> {
-            let markers = Cell::new(TypeVarMarkers::default());
-            let env = ProgramEnvironment::from_program(program);
-            any_over_type_including_alias_arguments(db, &env, ty, |nested| {
-                let mut found = markers.get();
-                match nested {
-                    Type::TypeVar(typevar) => found.typing_self |= typevar.typevar(db).is_self(db),
-                    Type::Dynamic(DynamicType::UnspecializedTypeVar) => found.unspecialized = true,
-                    _ => return false,
-                }
-                markers.set(found);
-                found.typing_self && found.unspecialized
-            });
-            Some(markers.get())
-        }
-
-        match TypeKind::from(self) {
-            TypeKind::Atomic => Some(TypeVarMarkers {
+        match TypeVarSearch::for_composite(db, env, self) {
+            Some(search) => search.markers(db),
+            None => Some(TypeVarMarkers {
                 typing_self: false,
                 unspecialized: matches!(self, Self::Dynamic(DynamicType::UnspecializedTypeVar)),
             }),
-            TypeKind::NonAtomic(NonAtomicType::NominalInstance(instance))
-                if !instance.is_definition_generic(db) =>
-            {
-                Some(TypeVarMarkers::default())
-            }
-            TypeKind::NonAtomic(_) => collect(db, env.program(db), self),
         }
     }
 
