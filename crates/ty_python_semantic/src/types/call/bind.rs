@@ -48,6 +48,7 @@ use crate::types::constraints::{
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::cyclic::PairVisitor;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
+use crate::types::dedicated::re;
 use crate::types::diagnostic::{
     CALL_TO_FUNCTION_WITH_UNKNOWN_SIGNATURE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
     MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_CALLABLE, PARAMETER_ALREADY_ASSIGNED,
@@ -1994,6 +1995,25 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::BoundMethod(bound_method)
+                        if let Type::KnownInstance(KnownInstanceType::Regex(regex)) =
+                            bound_method.self_instance(db)
+                            && let Some(function) = bound_method.function(db)
+                            && re::is_re_function(db, function) =>
+                    {
+                        let arguments =
+                            call_arguments.with_self(Some(bound_method.self_instance(db)));
+                        if let Some(return_type) = regex.infer_method_call(
+                            db,
+                            env,
+                            function.name(db),
+                            overload,
+                            &arguments,
+                        ) {
+                            overload.set_return_type(return_type);
+                        }
+                    }
+
+                    Type::BoundMethod(bound_method)
                         if let Type::PropertyInstance(property) =
                             bound_method.self_instance(db)
                             && let Some(function) = bound_method.function(db)
@@ -2824,6 +2844,23 @@ impl<'db> Bindings<'db> {
                                 DataclassTransformerParams::new(db, flags, field_specifiers);
 
                             overload.set_return_type(Type::DataclassTransformer(params));
+                        }
+
+                        Some(
+                            function @ (KnownFunction::ReCompile
+                            | KnownFunction::ReSearch
+                            | KnownFunction::ReMatch
+                            | KnownFunction::ReFullmatch
+                            | KnownFunction::ReFinditer),
+                        ) => {
+                            if let Some(return_type) = re::infer_function_call(
+                                db,
+                                env,
+                                function,
+                                overload.parameter_types(),
+                            ) {
+                                overload.set_return_type(return_type);
+                            }
                         }
 
                         Some(KnownFunction::Unpack) => {
