@@ -249,6 +249,47 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Can neither instance be redundant with the other in a union, regardless of
+    /// their type arguments? Only ordinary instances are decided by class ancestry.
+    ///
+    /// For a pair of ordinary nominal instances, [`TypeRelationChecker::check_class_pair`]
+    /// requires the target class to appear in the source MRO before it compares type
+    /// arguments or tries alternate inheritance paths. This is not an assignability
+    /// check: an unknown base does not make an instance redundant in a union.
+    /// Object and exact tuples have dedicated rules and are excluded here.
+    pub(super) fn has_unrelated_class(self, db: &'db dyn Db, other: Self) -> bool {
+        let (NominalInstanceInner::NonTuple(left), NominalInstanceInner::NonTuple(right)) =
+            (self.0, other.0)
+        else {
+            return false;
+        };
+        let (Some(left), Some(right)) = (
+            left.class(db).class_literal(db).as_static(),
+            right.class(db).class_literal(db).as_static(),
+        ) else {
+            return false;
+        };
+        if left == right {
+            return false;
+        }
+
+        // Specialization changes the arguments of a base, never its class identity.
+        // C3 already compares origins when merging the MRO. If the unspecialized
+        // MRO is invalid or incomplete, leave the decision to the full relation.
+        let excludes = |source: super::StaticClassLiteral<'db>, target| {
+            source.try_mro_ancestors(db, None).is_ok_and(|bases| {
+                bases.iter().all(|base| match base {
+                    ClassBase::Class(class) => {
+                        class.class_literal(db) != ClassLiteral::Static(target)
+                    }
+                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => false,
+                    ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => true,
+                })
+            })
+        };
+        excludes(left, right) && excludes(right, left)
+    }
+
     /// Returns the class literal for this instance.
     pub(super) fn class_literal(
         &self,

@@ -1312,6 +1312,13 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if should_simplify_full && !element_type.is_alias_like() {
+                if let (Type::NominalInstance(left), Type::NominalInstance(right)) =
+                    (ty, element_type)
+                    && left.has_unrelated_class(db, right)
+                {
+                    continue;
+                }
+
                 // Preserving aliases also excludes comparisons that expand aliases nested in
                 // type arguments. A recursive alias can rebuild this union during specialization.
                 if !self.unpack_aliases
