@@ -108,22 +108,20 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
             check_method(checker, call_expr);
             check_context_key_usage_in_call(checker, call_expr);
         }
-        Expr::Attribute(attribute_expr @ ExprAttribute { range, .. }) => {
-            check_name(checker, expr, *range);
+        Expr::Attribute(attribute_expr) => {
             check_class_attribute(checker, attribute_expr);
             check_removed_attribute_access_on_context_key(checker, attribute_expr);
         }
         Expr::Name(ExprName {
             id,
-            ctx,
-            range,
-            node_index: _,
+            ctx: ExprContext::Store,
+            ..
         }) => {
-            check_name(checker, expr, *range);
-            if matches!(ctx, ExprContext::Store) {
-                if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
-                    check_airflow_plugin_extension(checker, expr, id, class_def);
-                }
+            if let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) {
+                airflow_3_removal_reference(checker, expr, &qualified_name);
+            }
+            if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
+                check_airflow_plugin_extension(checker, expr, id, class_def);
             }
         }
         Expr::Subscript(subscript_expr) => {
@@ -652,13 +650,12 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
 /// # Or, directly
 /// SubDagOperator()
 /// ```
-fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
-    let semantic = checker.semantic();
-
-    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
-        return;
-    };
-
+pub(crate) fn airflow_3_removal_reference(
+    checker: &Checker,
+    expr: &Expr,
+    qualified_name: &QualifiedName,
+) {
+    let range = expr.range();
     let replacement = match qualified_name.segments() {
         // airflow.PY\d{1,2}
         [

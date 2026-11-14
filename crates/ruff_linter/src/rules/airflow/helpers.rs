@@ -203,6 +203,14 @@ pub(crate) fn is_airflow_builtin_or_provider(
     }
 }
 
+/// Return the range of the final identifier in a name or attribute reference.
+pub(super) fn member_range(expr: &Expr) -> TextRange {
+    match expr {
+        Expr::Attribute(attribute) => attribute.attr.range(),
+        _ => expr.range(),
+    }
+}
+
 /// Return the [`ast::ExprName`] at the head of the expression, if any.
 fn match_head(value: &Expr) -> Option<&ExprName> {
     match value {

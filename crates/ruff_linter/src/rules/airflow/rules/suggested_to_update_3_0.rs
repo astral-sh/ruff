@@ -1,15 +1,14 @@
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::rules::airflow::helpers::{Replacement, is_airflow_builtin_or_provider};
+use crate::rules::airflow::helpers::{Replacement, is_airflow_builtin_or_provider, member_range};
 use crate::rules::airflow::helpers::{
     generate_import_edit, generate_remove_and_runtime_import_edit, is_guarded_by_try_except,
 };
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, ExprName, name::QualifiedName};
+use ruff_python_ast::{Arguments, Expr, ExprCall, name::QualifiedName};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
-use ruff_text_size::TextRange;
 
 /// ## What it does
 /// Checks for uses of deprecated Airflow functions and values that still have
@@ -87,31 +86,11 @@ impl Violation for Airflow3SuggestedUpdate {
 }
 
 /// AIR311
-pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, expr: &Expr) {
-    if !checker.semantic().seen_module(Modules::AIRFLOW) {
-        return;
-    }
-
-    match expr {
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
-            if let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) {
-                check_call_arguments(checker, &qualified_name, arguments);
-            }
-        }
-        Expr::Attribute(ExprAttribute { attr, .. }) => {
-            check_name(checker, expr, attr.range());
-        }
-        Expr::Name(ExprName {
-            id: _,
-            ctx: _,
-            range,
-            node_index: _,
-        }) => {
-            check_name(checker, expr, *range);
-        }
-        _ => {}
+pub(crate) fn airflow_3_0_suggested_update_call(checker: &Checker, call: &ExprCall) {
+    if checker.semantic().seen_module(Modules::AIRFLOW)
+        && let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func)
+    {
+        check_call_arguments(checker, &qualified_name, &call.arguments);
     }
 }
 
@@ -187,13 +166,11 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
 /// # Or, directly
 /// Dataset()
 /// ```
-fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
-    let semantic = checker.semantic();
-
-    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
-        return;
-    };
-
+pub(crate) fn airflow_3_0_suggested_update_reference(
+    checker: &Checker,
+    expr: &Expr,
+    qualified_name: &QualifiedName,
+) {
     let replacement = match qualified_name.segments() {
         // airflow.datasets.metadata
         ["airflow", "datasets", "metadata", "Metadata"] => Replacement::SourceModuleMovedToSDK {
@@ -356,6 +333,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
+    let range = member_range(expr);
     let (module, name) = match &replacement {
         Replacement::Rename { module, name } => (module, *name),
         Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
