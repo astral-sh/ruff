@@ -21,7 +21,11 @@ use crate::types::diagnostic::{
 use crate::types::dict::dict_literal_key_value_types;
 use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
-use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
+use crate::types::infer::legacy_type_alias::referenced_name_definition;
+use crate::types::infer::{
+    InferenceFlags, TypeExpressionFlags, infer_legacy_type_alias, legacy_type_alias_definition,
+    legacy_type_alias_parameters,
+};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
@@ -37,7 +41,7 @@ use crate::types::{
     UnionType, UnionTypeInstance,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{SemanticIndex, place_table};
 
@@ -124,6 +128,76 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(expected_key_ty) = self.typed_dict_key_expected_type(value_ty) {
             self.store_expected_type(slice, expected_key_ty);
         }
+    }
+
+    /// Find a union assignment such as `State = Union[DictState, ListState]` where
+    /// two distinct container aliases have `"State"` as a type argument. Inferring
+    /// their runtime values can unfold both branches again at each recursive lookup.
+    fn branching_union_alias(
+        &self,
+        subscript: &ast::ExprSubscript,
+        operands: &ast::ExprTuple,
+    ) -> Option<Definition<'db>> {
+        let db = self.db();
+        let definition = self.typevar_binding_context?;
+        let scope = self.scope();
+        if definition.scope(db) != scope {
+            return None;
+        }
+        let kind = definition.kind(db);
+        let rhs = kind.value(self.module())?.as_subscript_expr()?;
+        if !std::ptr::eq(rhs, subscript) {
+            return None;
+        }
+        let name = match kind {
+            DefinitionKind::Assignment(assignment) => assignment.target(self.module()),
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.target(self.module()),
+            _ => return None,
+        }
+        .as_name_expr()?;
+
+        let refers_back = |arg: &ast::Expr| {
+            arg.as_string_literal_expr()
+                .is_some_and(|string| string.value.to_str() == name.id.as_str())
+        };
+        let mut branches = operands.iter().filter_map(|operand| {
+            let target =
+                referenced_name_definition(db, self.program_file(), operand.as_name_expr()?, None)?;
+            if target.scope(db) != scope {
+                return None;
+            }
+            let container = target.kind(db).value(self.module())?.as_subscript_expr()?;
+            let mentions_name = match container.slice.as_ref() {
+                ast::Expr::Tuple(args) => args.iter().any(refers_back),
+                arg => refers_back(arg),
+            };
+            if !mentions_name || !is_dotted_name(&container.value) {
+                return None;
+            }
+            // A string in `Literal["State"]` is a value, whereas a generic class
+            // interprets its arguments as types.
+            let (base, _) = TypeInferenceBuilder::for_definition(
+                db,
+                self.program_environment(),
+                target,
+                self.module(),
+            )
+            .finish_implicit_alias_reference(target, &container.value);
+            let class = base.as_class_literal()?;
+            (class.is_tuple(db) || class.generic_context(db).is_some()).then_some(target)
+        });
+        let first = branches.next()?;
+        if !branches.any(|target| target != first)
+            || referenced_name_definition(
+                db,
+                self.program_file(),
+                name,
+                Some(scope.file_scope_id(db)),
+            ) != Some(definition)
+        {
+            return None;
+        }
+        Some(legacy_type_alias_definition(db, definition)?.definition)
     }
 
     pub(super) fn infer_subscript_expression(
@@ -354,6 +428,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 SpecialFormType::Union => match **slice {
                     ast::Expr::Tuple(ref tuple) => {
+                        if let Some(alias) = self.branching_union_alias(subscript, tuple) {
+                            // Let alias inference bind the recursive references before runtime
+                            // inference loads the same containers to check their arguments.
+                            infer_legacy_type_alias(
+                                db,
+                                alias,
+                                legacy_type_alias_parameters(db, alias),
+                            );
+                        }
                         let elements = tuple.iter().map(|elt| self.infer_type_expression(elt));
 
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
