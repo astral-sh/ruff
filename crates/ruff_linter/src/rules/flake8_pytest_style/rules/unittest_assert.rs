@@ -1,10 +1,12 @@
 use anyhow::{Result, anyhow, bail};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
-};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Arguments, CmpOp, Expr, ExprContext, Keyword, Stmt, UnaryOp};
+use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxBuildHasher, FxHashMap};
+
+use crate::Edit;
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain
@@ -277,9 +279,16 @@ impl UnittestAssert {
         Ok(args_map)
     }
 
-    pub(crate) fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
+    pub(crate) fn generate_assert(
+        self,
+        checker: &Checker,
+        args: &[Expr],
+        keywords: &[Keyword],
+        at: TextSize,
+    ) -> Result<(Stmt, Option<Edit>)> {
         let args = self.args_map(args, keywords)?;
-        match self {
+        let mut import_edit = None;
+        let stmt: Result<Stmt> = match self {
             UnittestAssert::True
             | UnittestAssert::False
             | UnittestAssert::FailUnless
@@ -424,21 +433,20 @@ impl UnittestAssert {
                     .get("regex")
                     .ok_or_else(|| anyhow!("Missing argument `regex`"))?;
                 let msg = args.get("msg").copied();
+                let (edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import("re", "search"),
+                    at,
+                    checker.semantic(),
+                )?;
+                import_edit = Some(edit);
                 let node = ast::ExprName {
-                    id: Name::new_static("re"),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                };
-                let node1 = ast::ExprAttribute {
-                    value: Box::new(node.into()),
-                    attr: Identifier::new("search".to_string(), TextRange::default()),
+                    id: Name::from(binding),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let node2 = ast::ExprCall {
-                    func: Box::new(node1.into()),
+                    func: Box::new(node.into()),
                     arguments: Arguments {
                         args: [(**regex).clone(), (**text).clone()].into(),
                         keywords: std::iter::empty().collect(),
@@ -462,6 +470,7 @@ impl UnittestAssert {
                 }
             }
             _ => bail!("Cannot fix `{self}`"),
-        }
+        };
+        Ok((stmt?, import_edit))
     }
 }
