@@ -15,9 +15,9 @@ use crate::{
     },
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, ClassLiteral, CycleDetector, DynamicType,
-        GenericAlias, GenericContext, InstanceProjection, IntersectionType, KnownClass,
-        KnownInstanceType, MaterializationKind, Parameter, Parameters, RecursiveType, Signature,
-        Specialization, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
+        GenericAlias, GenericContext, InstanceProjection, InternedType, IntersectionType,
+        KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, RecursiveType,
+        Signature, Specialization, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
         UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
         binding_type,
         cyclic::TypeIdentity,
@@ -648,6 +648,32 @@ impl<'db> TypeVarInstance<'db> {
         type_is_self_referential_impl(state, ty, self.identity(db))
     }
 
+    /// A bound or constraint cannot itself contain a type variable. Check the inferred
+    /// type, rather than the declaration, so inference and cycle recovery can finish
+    /// before we validate their result.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None if checking the bound encounters a cycle"
+    )]
+    fn invalid_typevar_bound(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> bool {
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn check_bound<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: InternedType<'db>,
+        ) -> Option<bool> {
+            let env = ProgramEnvironment::from_program(program);
+            Some(ty.inner(db).has_typevar_or_typevar_instance(db, &env))
+        }
+
+        check_bound(db, env.program(db), InternedType::new(db, ty))
+            .unwrap_or_else(|| ty.has_typevar_or_typevar_instance(db, env))
+    }
+
     /// Returns the "unchecked" upper bound of a type variable instance.
     /// `lazy_bound` checks if the upper bound type is generic (generic upper bound is not allowed).
     #[salsa::tracked(
@@ -682,7 +708,7 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_bound(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
         let bound = self.lazy_bound_unchecked(db)?;
 
-        if bound.has_typevar_or_typevar_instance(db, env) {
+        if Self::invalid_typevar_bound(db, env, bound) {
             return None;
         }
 
@@ -747,7 +773,7 @@ impl<'db> TypeVarInstance<'db> {
         if constraints
             .elements(db)
             .iter()
-            .any(|ty| ty.has_typevar_or_typevar_instance(db, env))
+            .any(|ty| Self::invalid_typevar_bound(db, env, *ty))
         {
             return None;
         }
