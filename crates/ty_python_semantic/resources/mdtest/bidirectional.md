@@ -1715,6 +1715,179 @@ def _(a: int | None):
     x1: Callable[[str], bool] = reveal_type(make_callable(a))
 ```
 
+## Overload resolution declared type preference
+
+The declared type preference is not applied during overload resolution, even if a given argument and
+parameter type are mutually assignable. As such, an ambiguous overload call remains ambiguous
+despite a nested generic call receiving concrete type context:
+
+```py
+from typing import Any, overload, reveal_type
+
+def identity[T](value: T) -> T:
+    return value
+
+@overload
+def pick(x: int) -> int: ...
+@overload
+def pick(x: str) -> str: ...
+def pick(x: object) -> int | str:
+    raise NotImplementedError
+
+def _(dynamic: Any):
+    reveal_type(pick(dynamic))  # revealed: Unknown
+    reveal_type(pick(identity(dynamic)))  # revealed: Unknown
+```
+
+On the other hand, an unambiguous overload call remains unambiguous even if a concrete declared type
+restricts a gradual argument:
+
+```py
+@overload
+def f[T](xs: list[T]) -> list[T]: ...
+@overload
+def f(xs: list[str]) -> list[str]: ...
+def f(xs: list[Any]) -> list[Any]:
+    return xs
+
+def _(xs: list[Any]):
+    reveal_type(f(xs))  # revealed: list[Any]
+    result: list[int] = reveal_type(f(xs))  # revealed: list[int]
+```
+
+Similarly, gradual constraints introduced by a structural protocol comparison do not widen a generic
+argument during overload resolution.
+
+```py
+from typing import Protocol
+
+class FloatSequence(Protocol):
+    def __getitem__(self, index: int, /) -> float: ...
+    def count(self, value: Any, /) -> int: ...
+
+@overload
+def pick_sequence(x: FloatSequence) -> tuple[float]: ...
+@overload
+def pick_sequence(x: list[complex]) -> tuple[complex]: ...
+def pick_sequence(x: object) -> tuple[complex]:
+    raise NotImplementedError
+
+items = list(range(2))
+reveal_type(pick_sequence(items))  # revealed: tuple[float]
+reveal_type(pick_sequence(list(range(2))))  # revealed: tuple[float]
+```
+
+After overload resolution, however, the selected overloads provide declared type preference to any
+arguments:
+
+```py
+def pair[T](value: T) -> tuple[list[T], T]:
+    return [value], value
+
+@overload
+def second[T](pair: tuple[list[Any], T]) -> T: ...
+@overload
+def second(pair: tuple[list[Any], str]) -> str: ...
+def second(pair: object) -> object:
+    raise NotImplementedError
+
+def _(number: int):
+    result = second(reveal_type(pair(number)))  # revealed: tuple[list[Any], Any]
+    reveal_type(result)  # revealed: Any
+```
+
+If multiple matching overloads remain after union expansion, the declared type preference is applied
+to each signature:
+
+```py
+@overload
+def lookup(key: int | bytes, arg: int) -> tuple[int]: ...
+@overload
+def lookup(key: int, arg: object) -> tuple[object]: ...
+@overload
+def lookup[T](key: int | str, arg: T) -> list[T]: ...
+def lookup(key: object, arg: object) -> object:
+    raise NotImplementedError
+
+def _(key: int | str | bytes, arg: Any):
+    reveal_type(lookup(key, arg))  # revealed: tuple[Unknown] | list[Any] | tuple[int]
+
+    # revealed: tuple[Unknown] | list[str] | tuple[int]
+    result: tuple[object] | list[str] = reveal_type(lookup(key, arg))
+```
+
+If the declared type preference causes the selected `__new__` overload to return the class type, the
+class initializer is also checked after overload resolution:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class C:
+    @overload
+    def __new__(cls, value: T, *args: object) -> T: ...
+    @overload
+    def __new__(cls, value: bytes, *args: object) -> int: ...
+    def __new__(cls, value: object, *args: object) -> object:
+        raise NotImplementedError
+
+    def __init__(self, value: object, items: list[object]) -> None: ...
+
+def _(value: Any):
+    reveal_type(C(value))  # revealed: Any
+    instance: C = C(value)  # error: [missing-argument]
+    # TODO: The initializer should allow us to infer the literal as `list[object]` once it is activated.
+    instance: C = C(value, [1])  # error: [invalid-argument-type]
+```
+
+The chosen overload is inferred under fixpoint iteration, allowing a preferred declared type to be
+propagated to sibling arguments:
+
+```py
+from collections.abc import Callable
+
+@overload
+def pipe[A, B](seed: A, make: Callable[[A], B], use: Callable[[B], None]) -> list[A]: ...
+@overload
+def pipe(seed: bytes, make: int, use: int) -> bytes: ...
+def pipe(seed: object, make: object, use: object) -> object:
+    raise NotImplementedError
+
+def _(seed: int):
+    result: list[Any] = pipe(seed, lambda a: [a], lambda b: print(reveal_type(b)))  # revealed: list[Any]
+```
+
+A selected overload continues to participate in fixpoint iteration even if it fails in an
+intermediate round:
+
+```py
+@overload
+def append(items: str, item: object) -> str: ...
+@overload
+def append[T](items: list[T], item: T) -> list[T]: ...
+def append(items: object, item: object) -> object:
+    raise NotImplementedError
+
+reveal_type(append([True], 1))  # revealed: list[int]
+```
+
+The unsolved specialization of a failed overload does not prevent another overload from matching in
+a later iteration.
+
+```py
+class Box[T = object]: ...
+
+class Group[T]:
+    @overload
+    def __init__[A: int](self: "Group[A]", box: Box[A]) -> None: ...
+    @overload
+    def __init__[B](self: "Group[B]", box: Box[B]) -> None: ...
+    def __init__(self, box: object) -> None: ...
+
+reveal_type(Group(Box()))  # revealed: Group[object]
+```
+
 ## Declared type preference sees through subtyping
 
 The same declared type heuristic applies across subtyping relationships. This behavior applies to

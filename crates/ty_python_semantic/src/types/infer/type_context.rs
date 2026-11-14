@@ -78,6 +78,16 @@ impl<'db> TypeContext<'db> {
         Self::new(expected_type, TypeContextKind::Expected { prefer: false })
     }
 
+    /// Returns the expected type without providing a declared type preference.
+    pub(crate) fn without_preference(self) -> Self {
+        match self.kind {
+            TypeContextKind::Expected { prefer: true } if self.expected_type.is_some() => {
+                Self::expected(self.expected_type)
+            }
+            _ => self,
+        }
+    }
+
     pub(super) fn from_origin(ty: Type<'db>, origin: TypeOrigin) -> Self {
         match origin {
             TypeOrigin::Declared => Self::preference(Some(ty)),

@@ -1496,6 +1496,18 @@ def _(value: Any):
     reveal_type(Person.__init__)  # revealed: (self: Person, id: int, name: str) -> None
 ```
 
+As both overloads match the same field, only the first overload's parameter is used as type context
+for the field value:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+def _(value: Any):
+    class Person(Model):
+        id: int = field(reveal_type(identity(value)))  # revealed: int
+```
+
 When matching overloads disagree about field options, we treat the field-specifier as providing a
 default value:
 
