@@ -274,19 +274,36 @@ impl std::fmt::Debug for SymbolTable {
 #[derive(Debug, Default)]
 pub(super) struct SymbolTableBuilder {
     table: SymbolTable,
-    reverse: SymbolReverseTable,
 }
 
 impl SymbolTableBuilder {
-    pub(super) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
-        self.reverse.symbol_id(&self.table.symbols, name)
-    }
-
     /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
     pub(super) fn add(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
-        let entry = self.reverse.entry(&self.table.symbols, &symbol);
+        let Some(reverse) = self.table.reverse.as_deref_mut() else {
+            if let Some(id) = self.table.symbol_id(symbol.name()) {
+                self.table.symbols[id].flags.insert(symbol.flags);
+                return (id, false);
+            }
 
-        match entry {
+            let id = self.table.symbols.push(symbol);
+            // As long as the table would be searched linearly after construction, it needs no
+            // hash table while we build it either. Seed the lookup with all prior symbols once.
+            if self.table.symbols.len() > LINEAR_SEARCH_THRESHOLD {
+                let mut reverse = SymbolReverseTable(hashbrown::HashTable::with_capacity(
+                    self.table.symbols.len(),
+                ));
+                let hash = |id: &ScopedSymbolId| {
+                    SymbolReverseTable::hash_name(self.table.symbols[*id].name())
+                };
+                for symbol_id in self.table.symbols.indices() {
+                    reverse.0.insert_unique(hash(&symbol_id), symbol_id, hash);
+                }
+                self.table.reverse = Some(Box::new(reverse));
+            }
+            return (id, true);
+        };
+
+        match reverse.entry(&self.table.symbols, &symbol) {
             Entry::Occupied(entry) => {
                 let id = *entry.get();
 
@@ -304,19 +321,12 @@ impl SymbolTableBuilder {
         }
     }
 
-    pub(super) fn build(self) -> SymbolTable {
-        let Self {
-            mut table,
-            mut reverse,
-        } = self;
-        table.symbols.shrink_to_fit();
-
-        if table.symbols.len() > LINEAR_SEARCH_THRESHOLD {
-            reverse.shrink_to_fit(&table.symbols);
-            table.reverse = Some(Box::new(reverse));
+    pub(super) fn build(mut self) -> SymbolTable {
+        self.table.symbols.shrink_to_fit();
+        if let Some(reverse) = self.table.reverse.as_deref_mut() {
+            reverse.shrink_to_fit(&self.table.symbols);
         }
-
-        table
+        self.table
     }
 }
 
