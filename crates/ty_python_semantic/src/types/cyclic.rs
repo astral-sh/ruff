@@ -798,8 +798,14 @@ impl<'db> ProtocolInstanceType<'db> {
 }
 
 /// An item that provides the identity used to detect active recursive cycles.
-pub trait HasIdentity<'db> {
+pub trait HasIdentity<'db>: PartialEq {
     type Id: PartialEq;
+
+    /// Returns whether revisiting this item should use the detector's recursion fallback.
+    /// Completed visits are cached using the full item.
+    fn is_same_active_visit(&self, other: &Self) -> bool {
+        self == other
+    }
 
     /// Returns `false` if `self` and `other` cannot have the same identity.
     ///
@@ -910,7 +916,8 @@ where
     /// Visits `item`, returning it in `Err` if another active item has the same identity.
     ///
     /// The caller must convert `Err(item)` into an operation-specific conservative result. An
-    /// exact recursive reentry uses the detector's configured fallback and is returned as `Ok`.
+    /// active visit matching [`HasIdentity::is_same_active_visit`] uses the detector's configured
+    /// fallback and is returned as `Ok`.
     ///
     /// Completed results are reused only when `reuse_cached` accepts them. Otherwise, the visit
     /// recomputes the result using the same active recursion guards, without replacing the cached
@@ -956,7 +963,10 @@ where
 
     fn begin_active_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
         let seen = self.seen.borrow();
-        if seen.iter().any(|active| active.item == item) {
+        if seen
+            .iter()
+            .any(|active| item.is_same_active_visit(&active.item))
+        {
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 

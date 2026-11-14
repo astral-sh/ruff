@@ -1256,9 +1256,16 @@ pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
 >;
 
 impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation<'db>) {
-    // Scope distinguishes cached results. Recursive generic methods can introduce a new local
-    // variable on each visit, so the guard for active recursive specializations omits the scope.
     type Id = (TypeIdentity<'db>, TypeIdentity<'db>, TypeRelation, bool);
+
+    fn is_same_active_visit(&self, other: &Self) -> bool {
+        // Comparing a generic method can add its type variables to the inference scope before
+        // its return type leads back to the same pair of types.
+        self.0 == other.0
+            && self.1 == other.1
+            && self.2 == other.2
+            && self.3.is_lazy() == other.3.is_lazy()
+    }
 
     fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
         self.0.may_share_type_identity(db, other.0)

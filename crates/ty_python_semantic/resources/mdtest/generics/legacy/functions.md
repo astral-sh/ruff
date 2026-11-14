@@ -577,6 +577,31 @@ def narrowed(value: Source[S]) -> None:
         reveal_type(require_text(value))  # revealed: str
 ```
 
+## Recursive protocol bounds
+
+`Tree.label` accepts a `str` and returns another `Tree`, so `Tree` satisfies the recursive bound on
+`keep`.
+
+```py
+from typing import Protocol, TypeVar
+
+V = TypeVar("V")
+
+class Node(Protocol):
+    def label(self, value: str) -> "Node": ...
+
+class Tree:
+    def label(self, value: V) -> "Tree":
+        return self
+
+T = TypeVar("T", bound=Node)
+
+def keep(node: T) -> T:
+    return node
+
+reveal_type(keep(Tree()))  # revealed: Tree
+```
+
 ## Inferring a constrained typevar
 
 ```py
