@@ -2549,13 +2549,12 @@ impl<'t> CompletionTargetTokens<'t> {
                 let covering_node = cursor
                     .covering_node(object.range())
                     .find_last(|node| {
-                        // We require that the end of the node range not
-                        // exceed the cursor offset. This avoids selecting
-                        // a node "too high" in the AST in cases where
-                        // completions are requested in the middle of an
-                        // expression. e.g., `foo.<CURSOR>.bar`.
-                        if node.is_expr_attribute() {
-                            return node.range().end() <= cursor.offset;
+                        // The cursor can be inside an existing attribute name,
+                        // so only the receiver must end before it. The strict
+                        // boundary excludes later attributes in a chain such
+                        // as `foo.bar<CURSOR>.baz`.
+                        if let ast::AnyNodeRef::ExprAttribute(expr) = node {
+                            return expr.value.end() < cursor.offset;
                         }
                         // For import statements though, they can't be
                         // nested, so we don't care as much about the
@@ -5910,6 +5909,62 @@ Re<CURSOR>
             .build()
             .contains("isdisjoint")
             .not_contains("isinstance");
+    }
+
+    #[test]
+    fn attribute_access_cursor_inside_existing_name() {
+        for expression in [
+            "service.client.c<CURSOR>all()",
+            "service.client.<CURSOR>call()",
+            "service.client.ca<CURSOR>ll()",
+            "service.client.cal<CURSOR>l()",
+            "service.client.call<CURSOR>()",
+            "service.client. c<CURSOR>all()",
+            "(service.client).c<CURSOR>all()",
+            "service.client.c<CURSOR>all().upper()",
+        ] {
+            let builder = completion_test_builder(&format!(
+                "\
+class Client:
+    def call(self) -> str: ...
+
+class Service:
+    client: Client
+    cancel: int
+
+service = Service()
+{expression}
+",
+            ));
+
+            builder
+                .skip_auto_import()
+                .build()
+                .contains("call")
+                .not_contains("cancel");
+        }
+    }
+
+    #[test]
+    fn attribute_access_cursor_before_following_dot() {
+        let builder = completion_test_builder(
+            "\
+class Client:
+    client_only: int
+
+class Service:
+    client: Client
+
+service = Service()
+service.client<CURSOR>.client_only
+",
+        );
+
+        builder
+            .skip_auto_import()
+            .build()
+            .contains("client")
+            .not_contains("client_only");
     }
 
     #[test]
