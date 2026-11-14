@@ -21,6 +21,7 @@ use ty_module_resolver::{
 use ty_python_core::{ProgramFile, semantic_index};
 use ty_python_semantic::HasType;
 use ty_python_semantic::importer::{ImportRequest, Importer};
+use ty_python_semantic::types::ide_support::is_enum_class;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
@@ -529,7 +530,7 @@ impl<'db> CompletionBuilder<'db> {
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(db, program_file, collection_context, query, &self);
         let (label, insert, insert_text_format, command) =
-            if collection_context.should_complete_callable_parentheses(kind) {
+            if collection_context.should_complete_callable_parentheses(db, kind, self.ty) {
                 let label = self.insert.unwrap_or_else(|| self.name.clone());
                 if collection_context.capabilities.snippets {
                     let insert = compact_str::format_compact!("{label}($0)");
@@ -1766,12 +1767,19 @@ impl<'db> CollectionContext<'db> {
         false
     }
 
-    fn should_complete_callable_parentheses(&self, kind: Option<CompletionKind>) -> bool {
+    fn should_complete_callable_parentheses(
+        &self,
+        db: &'db dyn Db,
+        kind: Option<CompletionKind>,
+        ty: Option<Type<'db>>,
+    ) -> bool {
         match kind {
             Some(CompletionKind::Function | CompletionKind::Method) => {
                 self.complete_function_and_method_parentheses
             }
-            Some(CompletionKind::Class) => self.complete_class_parentheses,
+            Some(CompletionKind::Class) => {
+                self.complete_class_parentheses && !ty.is_some_and(|ty| is_enum_class(db, ty))
+            }
             _ => false,
         }
     }
@@ -10883,6 +10891,130 @@ value = Call<CURSOR>
         assert_snapshot!(
             builder.skip_auto_import().skip_builtins().build().snapshot(),
             @"CallableType",
+        );
+    }
+
+    #[test]
+    fn complete_class_parentheses_enum() {
+        let builder = completion_test_builder(
+            "\
+from enum import Enum
+
+class Foo(Enum):
+    A = 'A'
+
+value = Fo<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .complete_function_parentheses()
+                .filter(|completion| completion.name == "Foo")
+                .build()
+                .snapshot(),
+            @"Foo",
+        );
+    }
+
+    #[test]
+    fn complete_class_parentheses_enum_subclass() {
+        let builder = completion_test_builder(
+            "\
+from enum import Enum
+
+class Base(Enum):
+    A = 'A'
+
+class Foo(Base):
+    B = 'B'
+
+value = Fo<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .complete_function_parentheses()
+                .filter(|completion| completion.name == "Foo")
+                .build()
+                .snapshot(),
+            @"Foo",
+        );
+    }
+
+    #[test]
+    fn complete_class_parentheses_enum_subclass_of_subclass() {
+        let builder = completion_test_builder(
+            "\
+from enum import Enum
+
+class Base(Enum):
+    A = 'A'
+
+class Mid(Base):
+    B = 'B'
+
+class Foo(Mid):
+    C = 'C'
+
+value = Fo<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .complete_function_parentheses()
+                .filter(|completion| completion.name == "Foo")
+                .build()
+                .snapshot(),
+            @"Foo",
+        );
+    }
+
+    #[test]
+    fn complete_class_parentheses_str_enum() {
+        let builder = completion_test_builder(
+            "\
+from enum import StrEnum
+
+class Foo(StrEnum):
+    A = 'A'
+
+value = Fo<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .complete_function_parentheses()
+                .filter(|completion| completion.name == "Foo")
+                .build()
+                .snapshot(),
+            @"Foo",
+        );
+    }
+
+    #[test]
+    fn complete_class_parentheses_int_enum() {
+        let builder = completion_test_builder(
+            "\
+from enum import IntEnum
+
+class Foo(IntEnum):
+    A = 1
+
+value = Fo<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .complete_function_parentheses()
+                .filter(|completion| completion.name == "Foo")
+                .build()
+                .snapshot(),
+            @"Foo",
         );
     }
 
