@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/pep_798_unpacking_comp
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..215,
+        range: 0..317,
         body: [
             Expr(
                 StmtExpr {
@@ -477,6 +477,246 @@ Module(
                                 },
                             ],
                             parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 215..238,
+                    value: DictComp(
+                        ExprDictComp {
+                            node_index: NodeIndex(None),
+                            range: 215..238,
+                            key: None,
+                            value: BoolOp(
+                                ExprBoolOp {
+                                    node_index: NodeIndex(None),
+                                    range: 218..225,
+                                    op: Or,
+                                    values: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 218..219,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Dict(
+                                            ExprDict {
+                                                node_index: NodeIndex(None),
+                                                range: 223..225,
+                                                items: [],
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 226..237,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 230..231,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: List(
+                                        ExprList {
+                                            node_index: NodeIndex(None),
+                                            range: 235..237,
+                                            elts: [],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 239..263,
+                    value: DictComp(
+                        ExprDictComp {
+                            node_index: NodeIndex(None),
+                            range: 239..263,
+                            key: None,
+                            value: BoolOp(
+                                ExprBoolOp {
+                                    node_index: NodeIndex(None),
+                                    range: 242..250,
+                                    op: And,
+                                    values: [
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 242..243,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Dict(
+                                            ExprDict {
+                                                node_index: NodeIndex(None),
+                                                range: 248..250,
+                                                items: [],
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 251..262,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 255..256,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: List(
+                                        ExprList {
+                                            node_index: NodeIndex(None),
+                                            range: 260..262,
+                                            elts: [],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 264..285,
+                    value: DictComp(
+                        ExprDictComp {
+                            node_index: NodeIndex(None),
+                            range: 264..285,
+                            key: None,
+                            value: UnaryOp(
+                                ExprUnaryOp {
+                                    node_index: NodeIndex(None),
+                                    range: 267..272,
+                                    op: Not,
+                                    operand: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 271..272,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 273..284,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 277..278,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: List(
+                                        ExprList {
+                                            node_index: NodeIndex(None),
+                                            range: 282..284,
+                                            elts: [],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 286..316,
+                    value: DictComp(
+                        ExprDictComp {
+                            node_index: NodeIndex(None),
+                            range: 286..316,
+                            key: None,
+                            value: If(
+                                ExprIf {
+                                    node_index: NodeIndex(None),
+                                    range: 289..303,
+                                    test: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 294..295,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 289..290,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    orelse: Dict(
+                                        ExprDict {
+                                            node_index: NodeIndex(None),
+                                            range: 301..303,
+                                            items: [],
+                                        },
+                                    ),
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 304..315,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 308..309,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: List(
+                                        ExprList {
+                                            node_index: NodeIndex(None),
+                                            range: 313..315,
+                                            elts: [],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
                         },
                     ),
                 },
