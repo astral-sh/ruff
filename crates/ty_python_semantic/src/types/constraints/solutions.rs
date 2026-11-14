@@ -295,7 +295,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         if !atoms.iter().all(|&atom| {
             matches!(storage.atomic_constraint_data(atom), AtomicConstraint::ConcreteLower(lower)
                 if lower.typevar == *typevar
-                    && !any_over_type_expanding_aliases(db, env, lower.bound, Type::is_type_var))
+                    && !lower.bound.has_typevar_expanding_aliases(db, env))
         }) {
             return None;
         }
@@ -833,8 +833,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             let data = storage.atomic_constraint_data(constraint);
             if let Some(lower) = data.lower_bound_for(db, bound_typevar) {
                 has_lower_inference |= data.provenance() != ConstraintProvenance::VALIDITY;
-                has_symbolic_lower |=
-                    any_over_type_expanding_aliases(db, env, lower, Type::is_type_var);
+                has_symbolic_lower |= lower.has_typevar_expanding_aliases(db, env);
                 let source_order = self
                     .source_orders
                     .get_index_of(&source)
@@ -848,7 +847,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         lower_bounds.sort_by_key(|(source_order, _)| *source_order);
         let lower = UnionType::from_elements(db, env, lower_bounds.into_iter().map(|(_, ty)| ty));
         // Normalization can remove all type variables, as in `S | object`.
-        if !any_over_type_expanding_aliases(db, env, lower, Type::is_type_var) {
+        if !lower.has_typevar_expanding_aliases(db, env) {
             return ControlFlow::Continue(true);
         }
 

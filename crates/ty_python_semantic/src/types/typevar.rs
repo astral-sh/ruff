@@ -40,6 +40,87 @@ use ty_python_core::{
     semantic_index,
 };
 
+/// Two properties used while binding receivers and checking arguments. Both inspect alias
+/// arguments without expanding alias bodies or other lazy attributes.
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct TypeVarMarkers {
+    pub(super) typing_self: bool,
+    unspecialized: bool,
+}
+
+/// A type and its environment shared by searches for nested type variables. Only non-leaf
+/// types are interned, since leaves can answer both queries without walking their contents.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct TypeVarSearch<'db> {
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(copy)]
+    ty: Type<'db>,
+}
+
+#[salsa::tracked]
+impl<'db> TypeVarSearch<'db> {
+    /// Return a shared key only when the type might have subterms of interest. A nominal
+    /// instance without type arguments visits at most its class literal, which is atomic.
+    fn for_composite(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
+        match TypeKind::from(ty) {
+            TypeKind::Atomic => None,
+            TypeKind::NonAtomic(NonAtomicType::NominalInstance(instance))
+                if !instance.is_definition_generic(db) =>
+            {
+                None
+            }
+            TypeKind::NonAtomic(_) => Some(Self::new(db, env.program(db), ty)),
+        }
+    }
+
+    /// Constraints must inspect alias bodies: a type variable may occur only after expansion.
+    /// Defer to the uncached search if the query itself is recursive, leaving the existing
+    /// alias recursion guard responsible for distinguishing recursive aliases.
+    #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None on recursive lookup"
+    )]
+    fn mentions_typevar_including_aliases(self, db: &'db dyn Db) -> Option<bool> {
+        let env = ProgramEnvironment::from_program(self.program(db));
+        Some(visitor::any_over_type_expanding_aliases(
+            db,
+            &env,
+            self.ty(db),
+            Type::is_type_var,
+        ))
+    }
+
+    /// Receiver binding and contextual inference inspect alias arguments, even those not used
+    /// in the alias body (e.g. `type Placeholder[T] = int` used as `Placeholder[Self]`).
+    /// Keep this walk separate from the alias-expanding search above.
+    #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa returns None if collecting markers encounters a cycle"
+    )]
+    fn markers(self, db: &'db dyn Db) -> Option<TypeVarMarkers> {
+        let markers = Cell::new(TypeVarMarkers::default());
+        let env = ProgramEnvironment::from_program(self.program(db));
+        any_over_type_including_alias_arguments(db, &env, self.ty(db), |nested| {
+            let mut found = markers.get();
+            match nested {
+                Type::TypeVar(typevar) => found.typing_self |= typevar.typevar(db).is_self(db),
+                Type::Dynamic(DynamicType::UnspecializedTypeVar) => found.unspecialized = true,
+                _ => return false,
+            }
+            markers.set(found);
+            found.typing_self && found.unspecialized
+        });
+        Some(markers.get())
+    }
+}
+
 impl<'db> Type<'db> {
     pub(crate) const fn is_type_var(self) -> bool {
         matches!(self, Type::TypeVar(_))
@@ -65,6 +146,26 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         any_over_type(db, env, self, false, |ty| matches!(ty, Type::TypeVar(_)))
+    }
+
+    /// Searches a constraint bound for type variables, following aliases but leaving other
+    /// lazy attributes alone. A recursive alias conservatively counts as containing a variable.
+    pub(super) fn has_typevar_expanding_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        if self.is_type_var() {
+            return true;
+        }
+        let Some(search) = TypeVarSearch::for_composite(db, env, self) else {
+            return false;
+        };
+        search
+            .mentions_typevar_including_aliases(db)
+            .unwrap_or_else(|| {
+                visitor::any_over_type_expanding_aliases(db, env, self, Type::is_type_var)
+            })
     }
 
     pub(crate) fn references_typevar(
@@ -144,11 +245,30 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        // Contextual inference must not adopt an alias whose arguments still
-        // contain placeholders from an enclosing generic call.
-        any_over_type_including_alias_arguments(db, env, self, |ty| {
-            matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
-        })
+        self.typevar_markers(db, env).map_or_else(
+            || {
+                any_over_type_including_alias_arguments(db, env, self, |ty| {
+                    matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
+                })
+            },
+            |markers| markers.unspecialized,
+        )
+    }
+
+    /// Collect the markers in a single pass. If inference reaches this search recursively,
+    /// let the caller fall back to its original short-circuiting search.
+    pub(super) fn typevar_markers(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<TypeVarMarkers> {
+        match TypeVarSearch::for_composite(db, env, self) {
+            Some(search) => search.markers(db),
+            None => Some(TypeVarMarkers {
+                typing_self: false,
+                unspecialized: matches!(self, Self::Dynamic(DynamicType::UnspecializedTypeVar)),
+            }),
+        }
     }
 
     pub(crate) fn has_provisional_marker(

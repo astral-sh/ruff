@@ -2579,17 +2579,14 @@ impl<'db> Type<'db> {
 
     /// Returns `true` if this type contains a `Self` type variable.
     fn contains_self(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        if let Type::NominalInstance(instance) = self
-            && !instance.is_definition_generic(db)
-        {
-            return false;
-        }
-
-        // Type alias bodies cannot declare `Self`, but their explicit type arguments can
-        // contain the `Self` from an enclosing method or class.
-        any_over_type_including_alias_arguments(db, env, self, |ty| {
-            ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
-        })
+        self.typevar_markers(db, env).map_or_else(
+            || {
+                any_over_type_including_alias_arguments(db, env, self, |ty| {
+                    ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
+                })
+            },
+            |markers| markers.typing_self,
+        )
     }
 
     /// Returns `true` if this type supports eager `Self` binding via `bind_self_typevars`.
