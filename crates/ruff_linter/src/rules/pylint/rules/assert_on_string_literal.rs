@@ -50,6 +50,17 @@ impl Violation for AssertOnStringLiteral {
 /// PLW0129
 pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
     match test {
+        Expr::If(ast::ExprIf { body, orelse, .. }) => {
+            for branch in [body.as_ref(), orelse.as_ref()] {
+                check_string_literal(checker, branch);
+            }
+        }
+        _ => check_string_literal(checker, test),
+    }
+}
+
+fn check_string_literal(checker: &Checker, test: &Expr) {
+    match test {
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             checker.report_diagnostic(
                 AssertOnStringLiteral {
