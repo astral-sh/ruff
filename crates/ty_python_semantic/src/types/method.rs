@@ -198,22 +198,30 @@ impl<'db> BoundMethodType<'db> {
     /// The unbound signatures stored directly on an actual or synthesized function.
     /// Note that this function returns `None` for unions or intersections
     /// of callables. These need to be handled by the caller.
-    pub(crate) fn unbound_signatures(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
+    pub(crate) fn unbound_signatures_without_inferred_return_type(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<&'db CallableSignature<'db>> {
         match self.func(db) {
-            Type::FunctionLiteral(function) => Some(function.signature(db)),
+            Type::FunctionLiteral(function) => {
+                Some(function.signature_without_inferred_return_type(db))
+            }
             Type::Callable(callable) => Some(callable.signatures(db)),
             _ => None,
         }
     }
 
     /// The unbound signatures, including an inferred return type for Python functions.
-    pub(super) fn unbound_signatures_with_inferred_return_type(
+    pub(super) fn unbound_signatures(
         self,
         db: &'db dyn Db,
     ) -> Option<Cow<'db, CallableSignature<'db>>> {
         self.function(db)
-            .map(|function| function.signature_with_inferred_return_type(db))
-            .or_else(|| self.unbound_signatures(db).map(Cow::Borrowed))
+            .map(|function| function.signature(db))
+            .or_else(|| {
+                self.unbound_signatures_without_inferred_return_type(db)
+                    .map(Cow::Borrowed)
+            })
     }
 
     /// Returns the type that replaces any `typing.Self` annotations in the bound method signature.

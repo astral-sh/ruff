@@ -7198,8 +7198,7 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let Some(signature) = bound_method.unbound_signatures_with_inferred_return_type(db)
-                else {
+                let Some(signature) = bound_method.unbound_signatures(db) else {
                     return bound_method
                         .func(db)
                         .try_upcast_to_callable(db, env)
@@ -7449,11 +7448,7 @@ impl<'db> Type<'db> {
 
                 _ => CallableBinding::from_overloads(
                     self,
-                    function_type
-                        .signature_with_inferred_return_type(db)
-                        .overloads
-                        .iter()
-                        .cloned(),
+                    function_type.signature(db).overloads.iter().cloned(),
                 )
                 .into(),
             },
@@ -9974,9 +9969,7 @@ impl<'db> Type<'db> {
                 return visitor.visit(db, self, type_mapping, || {
                     Type::Callable(CallableType::new(
                         db,
-                        function
-                            .signature_with_inferred_return_type(db)
-                            .into_owned(),
+                        function.signature(db).into_owned(),
                         function.callable_type_kind(db),
                     ))
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -10022,7 +10015,7 @@ impl<'db> Type<'db> {
                 if specialization.preserves_lazy_signatures() {
                     function.updated_signature(db)
                 } else {
-                    Some(function.signature(db))
+                    Some(function.signature_without_inferred_return_type(db))
                 }
             };
 
