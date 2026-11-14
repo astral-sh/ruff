@@ -1,8 +1,5 @@
-use std::sync::LazyLock;
-
 use anyhow::{Result, anyhow};
 use libcst_native::{Arg, Expression};
-use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
@@ -126,41 +123,38 @@ fn is_sequential(indices: &[usize]) -> bool {
     indices.iter().enumerate().all(|(idx, value)| idx == *value)
 }
 
-static FORMAT_SPECIFIER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?x)
-            (?P<prefix>
-                ^|[^{]|(?:\{{2})+  # preceded by nothing, a non-brace, or an even number of braces
-            )
-            \{                     # opening curly brace
-                (?P<int>\d+)       # followed by any integer
-                (?P<fmt>.*?)       # followed by any text
-            }                      # followed by a closing brace
-        ",
-    )
-    .unwrap()
-});
+/// Remove the explicit positional indices from the source text of a format string, e.g., turn
+/// `"{0}{1:>3}"` into `"{}{:>3}"`.
+fn remove_indices(source: &str) -> String {
+    let mut output = String::with_capacity(source.len());
+    let mut rest = source;
+    while let Some(brace) = rest.find('{') {
+        let (before, after) = rest.split_at(brace + 1);
+        output.push_str(before);
+        if let Some(after) = after.strip_prefix('{') {
+            // An escaped brace (`{{`) is literal text, not the start of a replacement field.
+            output.push('{');
+            rest = after;
+        } else {
+            rest = after.trim_start_matches(|c: char| c.is_ascii_digit());
+        }
+    }
+    output.push_str(rest);
+    output
+}
 
 /// Remove the explicit positional indices from a format string.
 fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Arena<String>) {
     match value {
         Expression::SimpleString(expr) => {
-            expr.value = arena.alloc(
-                FORMAT_SPECIFIER
-                    .replace_all(expr.value, "$prefix{$fmt}")
-                    .to_string(),
-            );
+            expr.value = arena.alloc(remove_indices(expr.value));
         }
         Expression::ConcatenatedString(expr) => {
             let mut stack = vec![&mut expr.left, &mut expr.right];
             while let Some(string) = stack.pop() {
                 match string.as_mut() {
                     libcst_native::String::Simple(string) => {
-                        string.value = arena.alloc(
-                            FORMAT_SPECIFIER
-                                .replace_all(string.value, "$prefix{$fmt}")
-                                .to_string(),
-                        );
+                        string.value = arena.alloc(remove_indices(string.value));
                     }
                     libcst_native::String::Concatenated(string) => {
                         stack.push(&mut string.left);
