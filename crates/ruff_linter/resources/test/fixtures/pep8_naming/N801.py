@@ -41,3 +41,19 @@ class GOOD:
 
 class __GoodClass:
     pass
+
+class Fine_:
+    pass
+
+
+class Fine__:
+    pass
+
+
+class _Fine_:
+    pass
+
+
+class still_bad_:
+    pass
+
