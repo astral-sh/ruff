@@ -3373,6 +3373,12 @@ impl<'db> Type<'db> {
             .is_some_and(literal::LiteralValueType::is_string)
     }
 
+    /// Returns `true` if this is a single `Literal[…]` type with a known constant value.
+    pub(crate) fn is_literal_type(&self) -> bool {
+        self.as_literal_value()
+            .is_some_and(|literal| !literal.is_literal_string())
+    }
+
     /// Detects types which are valid to appear inside a `Literal[…]` type annotation.
     fn is_literal_or_union_of_literals(
         &self,

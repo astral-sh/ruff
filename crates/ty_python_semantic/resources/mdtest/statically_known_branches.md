@@ -150,6 +150,126 @@ if sys.platform not in ["linux", "win32"]:
 reveal_type(present)  # revealed: Literal[0]
 ```
 
+### `Final` constants initialized from a static condition
+
+A `Final` symbol in a module scope uses its inferred type when it is read from another scope, so a
+platform check stored in a `Final` constant prunes dead branches just like the inline comparison.
+This holds for annotated and bare `Final` declarations, and for negated conditions. A non-`Final`
+annotation still widens the value to `bool`, because the symbol could be assigned a different value:
+
+```toml
+[environment]
+python-platform = "linux"
+```
+
+```py
+import sys
+from typing import Final
+
+IS_WIN: Final[bool] = sys.platform == "win32"
+IS_WIN_INFERRED: Final = sys.platform == "win32"
+MAYBE_WIN: bool = sys.platform == "win32"
+
+if IS_WIN:
+    sys.getwindowsversion()
+else:
+    pass
+
+if IS_WIN_INFERRED:
+    sys.getwindowsversion()
+else:
+    pass
+
+def annotated() -> None:
+    if IS_WIN:
+        sys.getwindowsversion()
+    else:
+        pass
+
+    if sys.platform != "win32":
+        pass
+    else:
+        sys.getwindowsversion()
+
+def inferred() -> None:
+    if IS_WIN_INFERRED:
+        sys.getwindowsversion()
+
+def negated() -> None:
+    if not IS_WIN:
+        pass
+    else:
+        sys.getwindowsversion()
+
+def not_final() -> None:
+    if MAYBE_WIN:
+        # error: [missing-attribute]
+        sys.getwindowsversion()
+
+def revealed_types() -> None:
+    reveal_type(IS_WIN)  # revealed: Literal[False]
+    reveal_type(IS_WIN_INFERRED)  # revealed: Literal[False]
+    reveal_type(MAYBE_WIN)  # revealed: bool
+```
+
+### `Final` constants imported from another module
+
+`flags.py`:
+
+```py
+import sys
+from typing import Final
+
+IS_WIN: Final[bool] = sys.platform == "win32"
+```
+
+`main.py`:
+
+```py
+import sys
+
+from flags import IS_WIN
+
+if IS_WIN:
+    sys.getwindowsversion()
+
+def check() -> None:
+    if IS_WIN:
+        sys.getwindowsversion()
+    reveal_type(IS_WIN)  # revealed: Literal[False]
+```
+
+### `Final` constants initialized from a runtime value
+
+Only literal values are exposed, so a `Final` symbol initialized from a runtime value keeps the
+declared type and its guarded branch is still checked. `Final` does not make a value statically
+known by itself:
+
+```toml
+[environment]
+python-platform = "linux"
+```
+
+```py
+import os
+import sys
+from typing import Final
+
+ENV_FLAG: Final[bool] = os.getenv("FLAG") is not None
+ENV_MODE: Final[str] = os.getenv("MODE", "dev")
+ENV_MODE_INFERRED: Final = os.getenv("MODE", "dev")
+
+def runtime_value() -> None:
+    if ENV_FLAG:
+        # error: [missing-attribute]
+        sys.getwindowsversion()
+
+def revealed_types() -> None:
+    reveal_type(ENV_FLAG)  # revealed: bool
+    reveal_type(ENV_MODE)  # revealed: str
+    reveal_type(ENV_MODE_INFERRED)  # revealed: str
+```
+
 ### `typing.TYPE_CHECKING`
 
 ```py

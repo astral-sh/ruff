@@ -1333,6 +1333,30 @@ pub(crate) fn place_by_id<'db>(
     };
 
     let qualifiers = declared.qualifiers();
+
+    // A `Final` symbol in a module scope can't be rebound, so a `Literal[…]` value it is initialized
+    // with can be exposed as its public type, just like a bare `Final`. Exposing the declared type
+    // instead would drop statically known values, e.g. reading a `Final[bool]` platform check from a
+    // nested scope would lose the literal and the guarded branch could not be pruned anymore.
+    //
+    // Other inferred types are deliberately *not* exposed: narrowing them would leak a subclass into
+    // every downstream variable that is inferred from such a read, which breaks code that widens a
+    // sentinel with an annotation, like `NO_INFO: Final[Base] = Sentinel()`.
+    if scope.file_scope_id(db).is_global()
+        && qualifiers.contains(TypeQualifiers::FINAL)
+        && let Some(DefinedPlace { ty: Some(ty), .. }) = declared.place
+        && !ty.is_unknown()
+    {
+        let bindings = all_considered_bindings();
+        let inferred =
+            place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None).place;
+        if let Place::Defined(defined) = inferred
+            && defined.ty.is_literal_type()
+        {
+            return Place::Defined(defined).with_qualifiers(qualifiers);
+        }
+    }
+
     match declared.place {
         Some(
             declaration @ DefinedPlace {

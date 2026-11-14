@@ -4992,10 +4992,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int (Final)
+        Literal[1] (Final)
         ---------------------------------------------
         ```python
-        int (Final)
+        Literal[1] (Final)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
