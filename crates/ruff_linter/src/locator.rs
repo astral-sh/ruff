@@ -188,3 +188,26 @@ impl LineRanges for Locator<'_> {
         self.contents.full_lines_str(range)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ruff_text_size::TextSize;
+
+    use super::Locator;
+
+    #[test]
+    fn floor_char_boundary() {
+        for (text, offset, expected) in [
+            ("Hello", 0, 0),
+            ("Hello", 5, 5),
+            ("α", 0, 0),
+            ("α", 1, 0),
+            ("α", 2, 2),
+        ] {
+            assert_eq!(
+                Locator::new(text).floor_char_boundary(TextSize::new(offset)),
+                TextSize::new(expected)
+            );
+        }
+    }
+}

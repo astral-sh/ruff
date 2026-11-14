@@ -14,6 +14,9 @@ license = { workspace = true }
 # Used via `CacheKey` macro expansion.
 ignored = ["ruff_cache"]
 
+[lib]
+doctest = false
+
 [dependencies]
 ruff_cache = { workspace = true }
 ruff_macros = { workspace = true }

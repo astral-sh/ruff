@@ -1,7 +1,10 @@
-use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
+use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{Mode, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_module};
+use crate::{
+    Mode, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_expression_range,
+    parse_module, parse_parenthesized_expression_range, parse_string_annotation,
+};
 
 #[test]
 fn test_modes() {
@@ -9,6 +12,32 @@ fn test_modes() {
 
     assert!(parse(source, ParseOptions::from(Mode::Expression)).is_ok());
     assert!(parse(source, ParseOptions::from(Mode::Module)).is_ok());
+    assert!(parse(source, ParseOptions::from(PySourceType::Python)).is_ok());
+}
+
+#[test]
+fn expression_ranges() {
+    let range = TextRange::new(5.into(), 7.into());
+    let parsed = parse_expression_range("11 + 22 + 33", range).unwrap();
+    assert_eq!(parsed.expr().range(), range);
+
+    let source = "\"\"\"\n int | str\"\"\"";
+    let range = TextRange::new(3.into(), 14.into());
+    let parsed = parse_parenthesized_expression_range(source, range).unwrap();
+    assert_eq!(&source[parsed.expr().range()], "int | str");
+}
+
+#[test]
+fn invalid_string_annotation() {
+    let source = "'int +'";
+    let parsed = parse_expression(source).unwrap();
+    let string = parsed
+        .expr()
+        .as_string_literal_expr()
+        .unwrap()
+        .as_single_part_string()
+        .unwrap();
+    assert!(parse_string_annotation(source, string).is_err());
 }
 
 #[test]

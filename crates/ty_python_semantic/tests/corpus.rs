@@ -7,15 +7,31 @@ use ruff_db::vendored::VendoredFileSystem;
 
 use ty_python_core::program::ProgramSettings;
 use ty_python_semantic::dependency::DependencyMetadata;
-use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::lint::{Level, LintRegistry, LintStatus, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::{
-    AnalysisSettings, Db as _, PythonVersionWithSource, check_file_unwrap, default_lint_registry,
+    AnalysisSettings, Db as _, PythonVersionWithSource, check_file_unwrap, declare_lint,
+    default_lint_registry,
 };
 
 use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
 use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
+
+#[test]
+fn declare_lint_from_another_crate() {
+    declare_lint! {
+        /// Checks for references to names that are not defined.
+        pub(crate) static UNRESOLVED_REFERENCE = {
+            summary: "detects references to names that are not defined",
+            status: LintStatus::stable("1.0.0"),
+            default_level: Level::Warn,
+        }
+    }
+
+    assert_eq!(UNRESOLVED_REFERENCE.name().as_str(), "unresolved-reference");
+    assert_eq!(UNRESOLVED_REFERENCE.default_level(), Level::Warn);
+}
 
 fn get_cargo_workspace_root() -> anyhow::Result<&'static SystemPath> {
     SystemPath::new(env!("CARGO_MANIFEST_DIR"))
