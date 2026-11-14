@@ -294,26 +294,98 @@ help: Replace with `.hexdigest()`
    |
 
 FURB181 [*] Use of hashlib's `.digest().hex()`
-  --> FURB181.py:61:5
+  --> FURB181.py:46:1
    |
-60 |   hashed = (
-61 | /     sha512(b"some data")
-62 | |     .digest(
-63 | |         # text
-64 | |     )
-65 | |     .hex()
-   | |__________^
-66 |   )
+45 | # Parenthesized `.digest()` call: keep the parentheses balanced
+46 | (sha256().digest()).hex()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+47 |
+48 | digest = (
    |
 help: Replace with `.hexdigest()`
    |
-60 | hashed = (
-   -     sha512(b"some data")
-   -     .digest(
-   -         # text
-   -     )
-   -     .hex()
-61 +     sha512(b"some data").hexdigest()
-62 | )
+45 | # Parenthesized `.digest()` call: keep the parentheses balanced
+   - (sha256().digest()).hex()
+46 + (sha256().hexdigest())
+47 |
    |
-note: This is an unsafe fix and may change runtime behavior
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:48:10
+   |
+46 |   (sha256().digest()).hex()
+47 |
+48 |   digest = (
+   |  __________^
+49 | |     sha256(b"data")
+50 | |     .digest()
+51 | | ).hex()
+   | |_______^
+52 |
+53 |   (sha256().digest)().hex()
+   |
+help: Replace with `.hexdigest()`
+   |
+49 |     sha256(b"data")
+   -     .digest()
+   - ).hex()
+50 +     .hexdigest()
+51 + )
+52 |
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:53:1
+   |
+51 | ).hex()
+52 |
+53 | (sha256().digest)().hex()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+54 |
+55 | ((sha256().digest()).hex)()
+   |
+help: Replace with `.hexdigest()`
+   |
+52 |
+   - (sha256().digest)().hex()
+53 + (sha256().hexdigest)()
+54 |
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:55:1
+   |
+53 | (sha256().digest)().hex()
+54 |
+55 | ((sha256().digest()).hex)()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace with `.hexdigest()`
+   |
+54 |
+   - ((sha256().digest()).hex)()
+55 + ((sha256().hexdigest()))
+56 |
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:74:5
+   |
+73 |   hashed = (
+74 | /     sha512(b"some data")
+75 | |     .digest(
+76 | |         # text
+77 | |     )
+78 | |     .hex()
+   | |__________^
+79 |   )
+   |
+help: Replace with `.hexdigest()`
+   |
+74 |     sha512(b"some data")
+   -     .digest(
+75 +     .hexdigest(
+76 |         # text
+77 |     )
+   -     .hex()
+78 | )
+   |
