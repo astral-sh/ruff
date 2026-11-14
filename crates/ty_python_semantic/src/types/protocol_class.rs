@@ -2684,7 +2684,7 @@ fn protocol_member_read_type<'db>(
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             ),
             ty,
-            Place::Undefined.into(),
+            || Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
     } else {

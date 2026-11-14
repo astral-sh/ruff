@@ -5712,7 +5712,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         key: MemberLookupKey<'db>,
         receiver: Type<'db>,
-        fallback: MemberLookupResult<'db>,
+        fallback: impl FnOnce() -> MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
         let meta_attr_plain =
@@ -5729,7 +5729,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         meta_attr_plain: PlaceAndQualifiers<'db>,
         receiver: Type<'db>,
-        fallback: MemberLookupResult<'db>,
+        fallback: impl FnOnce() -> MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
         let meta_attr_ty = meta_attr_plain.place.ignore_possibly_undefined();
@@ -5746,6 +5746,21 @@ impl<'db> Type<'db> {
 
         let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
         let meta_properties = meta_attr_ty.and_then(|ty| ty.property_deprecations(db));
+        // A definitely bound data descriptor wins without reading the instance's storage.
+        // Slot descriptors are the exception: that storage can provide a more precise type.
+        if meta_attr_kind.is_data()
+            && meta_attr.is_definitely_bound()
+            && !matches!(meta_attr_ty, Some(Type::SlotDescriptor(_)))
+        {
+            return member_lookup_result(
+                db,
+                meta_attr.with_qualifiers(meta_attr_qualifiers),
+                meta_attr_error,
+                meta_properties,
+            );
+        }
+
+        let fallback = fallback();
         let fallback_error = fallback.err().map(|error| error.kind(db));
         let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
         let fallback_properties = fallback_member.deprecated_properties(db);
@@ -6156,14 +6171,12 @@ impl<'db> Type<'db> {
                     .into();
                 }
 
-                let fallback = this.instance_member(db, env, name_str);
-
                 let result = Type::invoke_descriptor_protocol(
                     db,
                     env,
                     key,
                     receiver,
-                    fallback.into(),
+                    || this.instance_member(db, env, name_str).into(),
                     InstanceFallbackShadowsNonDataDescriptor::No,
                 );
 
@@ -6679,7 +6692,7 @@ impl<'db> Type<'db> {
                         env,
                         key,
                         receiver,
-                        Place::Undefined.into(),
+                        || Place::Undefined.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
                     );
                     map_member_lookup_type(db, result, |ty| {
@@ -6861,17 +6874,18 @@ impl<'db> Type<'db> {
                             receiver,
                         );
 
+                    let fallback = member_lookup_result(
+                        db,
+                        class_attr_fallback,
+                        class_attr_error.map(MemberLookupErrorKind::DescriptorGet),
+                        None,
+                    );
                     let result = Type::invoke_descriptor_protocol(
                         db,
                         env,
                         key,
                         receiver,
-                        member_lookup_result(
-                            db,
-                            class_attr_fallback,
-                            class_attr_error.map(MemberLookupErrorKind::DescriptorGet),
-                            None,
-                        ),
+                        || fallback,
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
                     );
 
