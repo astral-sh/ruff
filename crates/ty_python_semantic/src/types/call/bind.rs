@@ -8066,6 +8066,31 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
+    /// A captured parameter list omits the callback's return type. Restore it for the forwarded
+    /// call when the inferred `R` still refers to one of the callback's own type variables.
+    fn paramspec_call_with_result(
+        &self,
+        callable: Type<'db>,
+        outer: Specialization<'db>,
+    ) -> Option<(Type<'db>, BoundTypeVarInstance<'db>)> {
+        let db = self.db;
+        let callable = callable.as_callable()?;
+        let [signature] = callable.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        let locals = signature.generic_context?;
+        let (_, variable) = self.signature.forwarded_callback_result(db, self.env)?;
+        let result = outer.get(db, variable)?;
+        let (free, _) = result.free_typevars(db, self.env);
+        if !locals.variables(db).any(|var| var.is_inferable(db, free))
+            || self.signature.return_ty.apply_specialization(db, outer) != self.return_ty
+        {
+            return None;
+        }
+        let signature = signature.clone().with_return_type(result);
+        Some((Type::single_callable(db, signature), variable))
+    }
+
     /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
     ///
     /// The forwarded arguments are those matched to the `ParamSpec` components if provided,
@@ -8090,9 +8115,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
         let db = self.db;
-        let Some(callable) = self
-            .merged_specialization()
-            .and_then(|specialization| specialization.get(db, paramspec))
+        let Some(inference) = self.inference else {
+            return false;
+        };
+        let outer = inference.merged_specialization(db);
+        let Some(callable) = outer
+            .get(db, paramspec)
             .and_then(|value| value.as_paramspec_value(db))
             .and_then(|value| value.to_callable_type(db, self.env))
         else {
@@ -8117,6 +8145,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
         let error_argument_indices = error_argument_indices.as_deref();
 
+        let forwarded = self.paramspec_call_with_result(callable, outer);
+        let return_context =
+            if forwarded.is_some_and(|(_, var)| self.signature.return_ty != Type::TypeVar(var)) {
+                // TODO: Combine the callback result with the expected type during outer inference.
+                // For a wrapper returning list[R], the context here describes the list as a whole.
+                TypeContext::default()
+            } else {
+                self.call_expression_tcx
+            };
+        let callable = forwarded.map_or(callable, |(callable, _)| callable);
         let bindings = match callable
             .bindings(db, self.env)
             .match_parameters(db, self.env, &sub_arguments)
@@ -8125,10 +8163,40 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 self.env,
                 constraints,
                 &sub_arguments,
-                self.call_expression_tcx,
+                return_context,
                 &[],
             ) {
-            Ok(bindings) => bindings,
+            Ok(bindings) => {
+                if let Some((_, variable)) = forwarded {
+                    let result = bindings.return_type(db, self.env);
+                    let result = match result.resolve_type_alias(db) {
+                        // A predicate narrows an argument of the callback. Its boolean result
+                        // says nothing about the wrapper's first argument.
+                        Type::TypeGuard(_) | Type::TypeIs(_) => {
+                            KnownClass::Bool.to_instance(db, self.env)
+                        }
+                        _ => result,
+                    };
+                    // Another parameter can receive the same generic function independently.
+                    // Keep its inferred type and let defaults such as S = R see the new R.
+                    let context = outer.generic_context(db);
+                    let types = context
+                        .variables(db)
+                        .zip(outer.types(db))
+                        .map(|(var, &ty)| {
+                            if var == variable {
+                                Some(result)
+                            } else {
+                                inference
+                                    .has_inferred_type(db, var.identity(db))
+                                    .then_some(ty)
+                            }
+                        });
+                    let refined = context.specialize_partial(db, types);
+                    self.return_ty = self.signature.return_ty.apply_specialization(db, refined);
+                }
+                bindings
+            }
             Err(CallError(_, bindings)) => *bindings,
         };
 
@@ -9610,52 +9678,26 @@ impl<'db> Binding<'db> {
             // Only a positional binding fixes `f`: a later call can override any bound keyword.
             let (prefix, paramspec) = signature.parameters().as_paramspec_with_prefix()?;
             let (callback, preceding) = prefix.split_last()?;
-            let (callback_paramspec, callback_signature) = callback
-                .annotated_type()
-                .as_callable()?
-                .signatures(db)
-                .is_single_paramspec()?;
-            let result_var = callback_signature.return_ty.as_typevar()?;
-            if callback_paramspec != paramspec
-                || !callback.is_positional()
+            let (index, result_var) = signature.forwarded_callback_result(db, env)?;
+            if index != preceding.len()
                 || context.variables(db).count() != 2
-                || !context.contains(db, paramspec.identity(db))
-                || !context.contains(db, result_var.identity(db))
-                || result_var
-                    .typevar(db)
-                    .bound_or_constraints(db, env)
-                    .is_some()
                 || paramspec
                     .typevar(db)
                     .bound_or_constraints(db, env)
                     .is_some()
+                || !prefix.iter().all(Parameter::is_positional)
+                || !preceding
+                    .iter()
+                    .all(|_| matches!(arguments.next(), Some(CallArgument::Positional(_))))
             {
-                return None;
-            }
-            // Another bound argument could contribute a different specialization. The return
-            // type may wrap R (e.g. Future[R]), but must be independent of P.
-            let locals = context.inferable_typevars(db);
-            for parameter in preceding {
-                let (free, skipped) = parameter.annotated_type().free_typevars(db, env);
-                if skipped
-                    || free.iter(db).any(|var| var.is_inferable(db, locals))
-                    || !parameter.is_positional()
-                    || !matches!(arguments.next()?, CallArgument::Positional(_))
-                {
-                    return None;
-                }
-            }
-            let (free, skipped) = signature.return_ty.free_typevars(db, env);
-            if skipped || paramspec.is_inferable(db, free) || !result_var.is_inferable(db, free) {
                 return None;
             }
             let CallArgument::Positional(argument) = arguments.next()? else {
                 return None;
             };
 
-            // TODO: `evaluate_paramspec_sub_call` checks the forwarded arguments but loses the
-            // callback's specialization when inferring the outer return type. Once it preserves
-            // that result for `submit(ctx.run, f, *args)`, use it here for nested callbacks.
+            // TODO: Teach partial binding which type variables are fixed by positional arguments
+            // even when an unpacking prevents us from building the remaining signature.
             wrappers.push((signature.return_ty, result_var));
             wrapped = argument.get_for_declared_type(callback.annotated_type());
         };
