@@ -25,9 +25,9 @@ const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 /// If set to a value other than "0", updates the content of inline snapshots.
 const MDTEST_UPDATE_SNAPSHOTS: &str = "MDTEST_UPDATE_SNAPSHOTS";
 
-/// Switch mdtest output format to GitHub Actions annotations.
+/// Add GitHub Actions annotations to mdtest failure output.
 ///
-/// If set (to any value), mdtest will output errors in GitHub Actions format.
+/// If set (to any value), mdtest also emits errors as GitHub Actions workflow commands.
 const MDTEST_GITHUB_ANNOTATIONS_FORMAT: &str = "MDTEST_GITHUB_ANNOTATIONS_FORMAT";
 
 mod assertion;
@@ -80,7 +80,7 @@ pub fn run<C>(
         let this_test_failed = result.is_err();
         any_failures = any_failures || this_test_failed;
 
-        if this_test_failed && output_format.is_cli() {
+        if this_test_failed {
             let _ = writeln!(assertion, "\n\n{}\n", test.name().bold().underline());
         }
 
@@ -128,7 +128,7 @@ pub fn run<C>(
             }
         }
 
-        if this_test_failed && output_format.is_cli() {
+        if this_test_failed {
             assertion.push_str(&test_assertion);
 
             let escaped_test_name = test.name().replace('\'', "\\'");
@@ -170,25 +170,17 @@ fn output_format() -> OutputFormat {
 pub enum OutputFormat {
     /// The format `cargo test` should use by default.
     Cli,
-    /// A format that will provide annotations from GitHub Actions
-    /// if mdtest fails on a PR.
+    /// CLI failure details with GitHub Actions annotations.
     /// See <https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#setting-an-error-message>
     GitHub,
 }
 
 impl OutputFormat {
-    const fn is_cli(self) -> bool {
-        matches!(self, OutputFormat::Cli)
-    }
-
     /// Write a test error in the appropriate format.
     ///
-    /// For CLI format, errors are appended to `assertion_buf` so they appear
-    /// in the assertion-failure message.
-    ///
-    /// For GitHub format, errors are printed directly to stdout so that GitHub
-    /// Actions can detect them as workflow commands. Workflow commands must
-    /// appear at the beginning of a line in stdout to be parsed by GitHub.
+    /// Errors are appended to `assertion_buf` so they appear in the panic message.
+    /// GitHub annotations are also printed on separate lines so the runner can
+    /// recognize them when the test runner displays captured output.
     #[expect(clippy::print_stdout)]
     fn write_error(
         self,
@@ -197,31 +189,27 @@ impl OutputFormat {
         line: OneIndexed,
         failure: &Failure,
     ) {
-        match self {
-            OutputFormat::Cli => {
-                let _ = writeln!(
-                    assertion_buf,
-                    "{file_line} {message}",
-                    file_line = format!("{file}:{line}").cyan(),
-                    message = Indented(failure.message()),
-                );
-                if let Some((expected, actual)) = failure.diff() {
-                    let _ = render_diff(assertion_buf, actual, expected);
-                }
-            }
-            OutputFormat::GitHub => {
-                println!(
-                    "::error file={file},line={line}::{message}",
-                    message = failure.message()
-                );
-            }
+        let _ = writeln!(
+            assertion_buf,
+            "{file_line} {message}",
+            file_line = format!("{file}:{line}").cyan(),
+            message = Indented(failure.message()),
+        );
+        if let Some((expected, actual)) = failure.diff() {
+            let _ = render_diff(assertion_buf, actual, expected);
+        }
+        if matches!(self, Self::GitHub) {
+            println!(
+                "::error file={file},line={line}::{message}",
+                message = failure.message()
+            );
         }
     }
 
     /// Write a module-resolution inconsistency in the appropriate format.
     ///
-    /// See `write_error` for details on why GitHub-format
-    /// messages must be printed directly to stdout.
+    /// Include CLI details in the panic message and emit a GitHub annotation
+    /// when requested.
     #[expect(clippy::print_stdout)]
     pub fn write_inconsistency(
         self,
@@ -229,14 +217,10 @@ impl OutputFormat {
         fixture_path: &Utf8Path,
         inconsistency: &impl Display,
     ) {
-        match self {
-            OutputFormat::Cli => {
-                let info = fixture_path.to_string().cyan();
-                let _ = writeln!(assertion_buf, "  {info} {inconsistency}");
-            }
-            OutputFormat::GitHub => {
-                println!("::error file={fixture_path}::{inconsistency}");
-            }
+        let info = fixture_path.to_string().cyan();
+        let _ = writeln!(assertion_buf, "  {info} {inconsistency}");
+        if matches!(self, Self::GitHub) {
+            println!("::error file={fixture_path}::{inconsistency}");
         }
     }
 }
@@ -742,11 +726,14 @@ pub fn snapshot_diagnostics<C>(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::apply_snapshot_filters;
+    use super::{OutputFormat, apply_snapshot_filters};
+    use crate::matcher::Failure;
+    use camino::Utf8Path;
     use ruff_db::Db;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
+    use ruff_source_file::OneIndexed;
 
     /// Database that can be used for testing.
     ///
@@ -794,6 +781,39 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
+
+    #[test]
+    fn github_format_retains_cli_failure_details() {
+        let failure = Failure::new("Snapshot mismatch")
+            .with_diff("expected diagnostic\n".into(), "actual diagnostic\n".into());
+        let mut cli = String::new();
+        let mut github = String::new();
+        OutputFormat::Cli.write_error(&mut cli, "fixture.md", OneIndexed::MIN, &failure);
+        OutputFormat::GitHub.write_error(&mut github, "fixture.md", OneIndexed::MIN, &failure);
+
+        assert_eq!(github, cli);
+        assert!(github.contains("fixture.md:1"));
+        assert!(github.contains("Snapshot mismatch"));
+        assert!(github.contains("expected diagnostic"));
+        assert!(github.contains("actual diagnostic"));
+    }
+
+    #[test]
+    fn github_format_retains_cli_inconsistency_details() {
+        let mut cli = String::new();
+        let mut github = String::new();
+        let path = Utf8Path::new("fixture.md");
+        OutputFormat::Cli.write_inconsistency(&mut cli, path, &"Inconsistent module resolution");
+        OutputFormat::GitHub.write_inconsistency(
+            &mut github,
+            path,
+            &"Inconsistent module resolution",
+        );
+
+        assert_eq!(github, cli);
+        assert!(github.contains("fixture.md"));
+        assert!(github.contains("Inconsistent module resolution"));
+    }
 
     #[test]
     fn preserves_site_packages_paths_in_inline_snapshots() {
