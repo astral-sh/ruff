@@ -455,7 +455,9 @@ impl<'db> Type<'db> {
 
 #[derive(Clone, Debug)]
 enum UnionElement<'db> {
-    Type(Type<'db>),
+    /// Cache whether the type contains an alias when preserving aliases. Each retained element
+    /// can take part in many comparisons before the union is built.
+    Type(Type<'db>, Option<bool>),
     // A map from integer literals to their promotability.
     //
     // Note that an unpromotable literal takes higher precedence than the identical literal
@@ -472,7 +474,7 @@ enum UnionElement<'db> {
 impl<'db> UnionElement<'db> {
     fn type_count(&self) -> usize {
         match self {
-            UnionElement::Type(_) => 1,
+            UnionElement::Type(..) => 1,
             UnionElement::IntLiterals(literals) => literals.len(),
             UnionElement::StringLiterals(literals) => literals.len(),
             UnionElement::BytesLiterals(literals) => literals.len(),
@@ -489,7 +491,7 @@ impl<'db> UnionElement<'db> {
         cycle_recovery: bool,
         unpack_aliases: bool,
     ) -> ReduceResult<'db> {
-        if let UnionElement::Type(existing) = self {
+        if let UnionElement::Type(existing, _) = self {
             return ReduceResult::Type(*existing);
         }
 
@@ -513,7 +515,9 @@ impl<'db> UnionElement<'db> {
                         .as_nominal_instance()
                         .is_none_or(|instance| instance.class_literal(db, env) != *enum_class),
                 ),
-                UnionElement::Type(_) => unreachable!("ordinary types are handled before recovery"),
+                UnionElement::Type(..) => {
+                    unreachable!("ordinary types are handled before recovery")
+                }
             };
         }
 
@@ -620,7 +624,7 @@ impl<'db> UnionElement<'db> {
                         .is_redundant_with(db, env, other_type)
                 }
             }
-            UnionElement::Type(_) => unreachable!("ordinary types are handled before reduction"),
+            UnionElement::Type(..) => unreachable!("ordinary types are handled before reduction"),
         };
 
         if ignore {
@@ -768,7 +772,7 @@ impl<'db> UnionBuilder<'db> {
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(&mut self) {
         self.elements.clear();
-        self.elements.push(UnionElement::Type(Type::object()));
+        self.elements.push(UnionElement::Type(Type::object(), None));
     }
 
     fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
@@ -789,7 +793,7 @@ impl<'db> UnionBuilder<'db> {
                     let (enum_literal, _) = literals.first().unwrap();
                     replace_with.push(enum_literal.enum_class_instance(db, &self.env));
                 }
-                UnionElement::Type(_) => {}
+                UnionElement::Type(..) => {}
             }
         }
         for ty in replace_with {
@@ -842,7 +846,7 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::StringLiterals(literals) => acc + literals.len(),
                         UnionElement::BytesLiterals(literals) => acc + literals.len(),
                         UnionElement::EnumLiterals { literals, .. } => acc + literals.len(),
-                        UnionElement::Type(_) => acc,
+                        UnionElement::Type(..) => acc,
                     });
                     if should_widen(literals, self.recursively_defined) {
                         self.widen_literal_types(seen_aliases);
@@ -883,14 +887,14 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(existing)
+                                UnionElement::Type(existing, _)
                                     if cycle_recovery
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing)
+                                UnionElement::Type(existing, _)
                                     if can_compare_with_literals(*existing) =>
                                 {
                                     // e.g. `existing` could be `Literal[""] & Any`,
@@ -940,14 +944,14 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(existing)
+                                UnionElement::Type(existing, _)
                                     if cycle_recovery
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing)
+                                UnionElement::Type(existing, _)
                                     if can_compare_with_literals(*existing) =>
                                 {
                                     if ty.is_redundant_with(db, &self.env, *existing) {
@@ -999,14 +1003,14 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(existing)
+                                UnionElement::Type(existing, _)
                                     if cycle_recovery
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing)
+                                UnionElement::Type(existing, _)
                                     if can_compare_with_literals(*existing) =>
                                 {
                                     if ty.is_redundant_with(db, &self.env, *existing) {
@@ -1078,14 +1082,14 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(existing)
+                                UnionElement::Type(existing, _)
                                     if cycle_recovery
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing)
+                                UnionElement::Type(existing, _)
                                     if can_compare_with_literals(*existing) =>
                                 {
                                     if ty.is_redundant_with(db, &self.env, *existing) {
@@ -1198,6 +1202,7 @@ impl<'db> UnionBuilder<'db> {
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let db = self.db;
         let mut ty = ty;
+        let mut ty_contains_alias = None;
         let bool_pair = |ty: Type<'db>| {
             if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
                 Some(LiteralValueTypeKind::Bool(!b))
@@ -1269,6 +1274,7 @@ impl<'db> UnionBuilder<'db> {
             {
                 to_remove.push(i);
                 ty = KnownClass::Range.to_instance(db, &self.env);
+                ty_contains_alias = None;
                 continue;
             }
 
@@ -1282,6 +1288,7 @@ impl<'db> UnionBuilder<'db> {
                 // need to be reconsidered.
                 if i == 0 && merged_type.is_nominal_instance() && !merged_type.is_object() {
                     ty = merged_type;
+                    ty_contains_alias = None;
                     continue;
                 }
                 for index in to_remove.into_iter().rev() {
@@ -1314,12 +1321,18 @@ impl<'db> UnionBuilder<'db> {
             if should_simplify_full && !element_type.is_alias_like() {
                 // Preserving aliases also excludes comparisons that expand aliases nested in
                 // type arguments. A recursive alias can rebuild this union during specialization.
-                if !self.unpack_aliases
-                    && [ty, element_type]
-                        .into_iter()
-                        .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
-                {
-                    continue;
+                if !self.unpack_aliases {
+                    let contains_alias =
+                        |ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like);
+                    let UnionElement::Type(_, element_contains_alias) = element else {
+                        unreachable!("only ordinary types can reduce to a type");
+                    };
+                    if *ty_contains_alias.get_or_insert_with(|| contains_alias(ty))
+                        || *element_contains_alias
+                            .get_or_insert_with(|| contains_alias(element_type))
+                    {
+                        continue;
+                    }
                 }
                 if let Some(merged) = merge_disjoint_exclusions(db, &self.env, ty, element_type) {
                     to_remove.push(i);
@@ -1412,13 +1425,14 @@ impl<'db> UnionBuilder<'db> {
 
         let mut to_remove = to_remove.into_iter();
         if let Some(first) = to_remove.next() {
-            self.elements[first] = UnionElement::Type(ty);
+            self.elements[first] = UnionElement::Type(ty, ty_contains_alias);
             // We iterate in descending order to keep remaining indices valid after `swap_remove`.
             for index in to_remove.rev() {
                 self.elements.swap_remove(index);
             }
         } else {
-            self.elements.push(UnionElement::Type(ty));
+            self.elements
+                .push(UnionElement::Type(ty, ty_contains_alias));
         }
     }
 
@@ -1469,7 +1483,7 @@ impl<'db> UnionBuilder<'db> {
                         )
                     }));
                 }
-                UnionElement::Type(ty) => types.push(ty),
+                UnionElement::Type(ty, _) => types.push(ty),
             }
         }
 
