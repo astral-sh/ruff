@@ -3696,6 +3696,7 @@ dependencies = [
 name = "ruff_python_trivia"
 version = "0.0.22"
 dependencies = [
+ "bstr",
  "itertools 0.15.0",
  "memchr",
  "ruff_source_file",
