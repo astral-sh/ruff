@@ -1,3 +1,4 @@
+use ruff_db::diagnostic::Diagnostic;
 use toml::Spanned;
 use toml::de::{DeArray, DeTable, DeValue};
 
@@ -8,7 +9,7 @@ use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::preview::is_human_readable_names_enabled;
 use crate::rule_redirects::get_redirect;
-use crate::rules::ruff::rules::{renamed_rule, rule_codes_in_selectors};
+use crate::rules::ruff::rules::{renamed_rule, renamed_rule_on_cli, rule_codes_in_selectors};
 
 pub(super) fn check_rule_selectors(
     context: &LintContext,
@@ -28,11 +29,9 @@ pub(super) fn check_rule_selectors(
         return;
     };
 
-    check_selectors(context, ruff, false);
-
-    if let Some(lint) = ruff.get("lint").and_then(|lint| lint.get_ref().as_table()) {
-        check_selectors(context, lint, true);
-    }
+    visit_selector_arrays(ruff, |values, setting, in_lint_table| {
+        check_selector_array(context, values, setting, in_lint_table);
+    });
 }
 
 /// Selectors that are themselves arrays.
@@ -64,31 +63,52 @@ const ARRAY_SELECTORS: &[&str] = &[
 /// ```
 const TABLE_SELECTORS: &[&str] = &["per-file-ignores", "extend-per-file-ignores"];
 
-fn check_selectors(context: &LintContext, table: &DeTable<'_>, in_lint_table: bool) {
-    for &selector in ARRAY_SELECTORS {
-        let Some(value) = table.get(selector) else {
-            continue;
-        };
-
-        if let DeValue::Array(values) = value.get_ref() {
-            check_selector_array(context, values, selector, in_lint_table);
+fn visit_selector_arrays(
+    ruff: &DeTable<'_>,
+    mut visit: impl FnMut(&DeArray<'_>, &'static str, bool),
+) {
+    let lint = ruff
+        .get("lint")
+        .and_then(|value| value.get_ref().as_table());
+    for (table, in_lint_table) in [(Some(ruff), false), (lint, true)] {
+        let Some(table) = table else { continue };
+        for &setting in ARRAY_SELECTORS {
+            if let Some(values) = table
+                .get(setting)
+                .and_then(|value| value.get_ref().as_array())
+            {
+                visit(values, setting, in_lint_table);
+            }
         }
-    }
-
-    for &selector in TABLE_SELECTORS {
-        let Some(value) = table.get(selector) else {
-            continue;
-        };
-
-        if let DeValue::Table(per_file) = value.get_ref() {
-            for value in per_file.values() {
-                let Some(values) = value.get_ref().as_array() else {
-                    continue;
-                };
-                check_selector_array(context, values, selector, in_lint_table);
+        for &setting in TABLE_SELECTORS {
+            let Some(patterns) = table
+                .get(setting)
+                .and_then(|value| value.get_ref().as_table())
+            else {
+                continue;
+            };
+            for value in patterns.values() {
+                if let Some(values) = value.get_ref().as_array() {
+                    visit(values, setting, in_lint_table);
+                }
             }
         }
     }
+}
+
+/// Check selectors in an inline TOML override supplied with `--config`.
+pub fn renamed_rules_in_cli_config(table: &DeTable<'_>) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+    visit_selector_arrays(table, |values, _, _| {
+        for value in values {
+            if let Some(selector) = value.get_ref().as_str()
+                && let Some(diagnostic) = renamed_rule_on_cli(selector, "config")
+            {
+                diagnostics.push(diagnostic);
+            }
+        }
+    });
+    diagnostics
 }
 
 fn check_selector_array(

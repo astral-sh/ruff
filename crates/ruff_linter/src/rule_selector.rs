@@ -10,9 +10,9 @@ use ruff_ranged_value::{RangedValue, ValueSource};
 use crate::codes::{Category, NoqaCode, RuleCodePrefix, RuleIter, RuleStatus};
 use crate::preview::{is_human_readable_names_enabled, is_rule_categories_enabled};
 use crate::registry::{Linter, Rule, RuleNamespace};
-use crate::rule_redirects::{get_redirect, get_redirect_target};
+use crate::rule_redirects::get_redirect_target;
 use crate::settings::types::PreviewMode;
-use crate::{warn_user_once_by_id, warn_user_once_by_message};
+use crate::warn_user_once_by_message;
 
 /// A potential rule selector that has not yet been validated and tracks its source.
 ///
@@ -24,10 +24,9 @@ pub struct UnresolvedRuleSelector(RangedValue<String>);
 
 impl UnresolvedRuleSelector {
     pub fn resolve(&self, preview: PreviewMode) -> Result<RuleSelector, RuleResolutionError> {
-        let redirect = get_redirect(&self.0);
-        let selector = redirect.map_or(self.0.as_str(), |(_, target)| target);
+        let selector = get_redirect_target(&self.0).unwrap_or(&self.0);
 
-        let resolved = RuleSelector::parse_no_redirect(selector).or_else(|_| {
+        RuleSelector::parse_no_redirect(selector).or_else(|_| {
             let kind = if let Ok(category) = Category::from_str(selector) {
                 if is_rule_categories_enabled(preview) {
                     return Ok(RuleSelector::Category(category));
@@ -44,14 +43,11 @@ impl UnresolvedRuleSelector {
                 RuleResolutionErrorKind::Unknown
             };
             Err(RuleResolutionError::from_selector(self, kind))
-        })?;
+        })
+    }
 
-        if let Some((from, target)) = redirect
-            && matches!(self.source(), ValueSource::Cli)
-        {
-            warn_user_once_by_id!(from, "`{from}` has been remapped to `{target}`.");
-        }
-        Ok(resolved)
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 
     pub fn new(selector: impl Into<String>, source: ValueSource) -> Self {
@@ -86,9 +82,9 @@ pub struct RuleResolutionError {
 impl RuleResolutionError {
     fn from_selector(unresolved: &UnresolvedRuleSelector, kind: RuleResolutionErrorKind) -> Self {
         Self {
-            selector: unresolved.0.to_string(),
+            selector: unresolved.as_str().to_owned(),
             setting: None,
-            source: unresolved.0.source().clone(),
+            source: unresolved.source().clone(),
             kind,
         }
     }
