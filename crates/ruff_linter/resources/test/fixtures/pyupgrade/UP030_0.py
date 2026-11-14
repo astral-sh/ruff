@@ -63,3 +63,14 @@ kwargs = {x: x for x in range(10)}
 r"\d{{1,2}} {0}".format(42)
 
 "{{{0}}}".format(123)
+
+# https://github.com/astral-sh/ruff/issues/30345
+"{0}{1}".format(1, 2)
+
+r"{0}{1}{2}".format(1, 2, 3)
+
+"{0:x}{1!r}".format(1, 2)
+
+"{1}{0}".format(1, 2)
+
+"{{{0}}}{1}".format(1, 2)
