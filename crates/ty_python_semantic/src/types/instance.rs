@@ -16,7 +16,8 @@ use super::{
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
+    ConstraintScope, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    OwnedConstraintSet,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
@@ -824,6 +825,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
+        fixed_receiver: Option<BoundTypeVarInstance<'db>>,
     ) -> ConstraintSet<'db, 'c> {
         // Explicit protocol inheritance establishes subtyping even when a subclass overrides
         // members incompatibly.
@@ -970,7 +972,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             //
             // Eager finite checks can only reject. Lazy comparisons can also contribute
             // structural solutions, so try them before using the nominal fallback.
-            if (self.typevar_evaluation == TypeVarEvaluation::Lazy || !can_use_nominal_redundancy)
+            if (self.typevar_evaluation.is_lazy() || !can_use_nominal_redundancy)
                 && let Some(structurally_satisfied) = self.try_check_non_recursive_protocol_members(
                     db,
                     ty,
@@ -998,10 +1000,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
+        let receiver = fixed_receiver.map_or(ty, Type::TypeVar);
         let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
             self.check_protocol_interface_pair(
                 db,
-                ty,
+                receiver,
                 source_protocol.interface(db),
                 protocol.interface(db),
             )
@@ -1024,7 +1027,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && structurally_satisfied.is_never_satisfied(db, env, self.inferable)
         {
             context.push(ErrorContext::TypeNotCompatibleWithProtocol {
-                ty,
+                ty: receiver,
                 protocol: Type::ProtocolInstance(protocol),
             });
         }
@@ -1078,7 +1081,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         protocol: ProtocolInstanceType<'db>,
         nominally_satisfied: ConstraintSet<'db, 'c>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        if self.typevar_evaluation != TypeVarEvaluation::Lazy
+        if self.typevar_evaluation == TypeVarEvaluation::Eager
             || self.is_context_collection_enabled()
             || nominally_satisfied.is_trivially_never_satisfied()
         {
@@ -1245,7 +1248,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             {
                 return None;
             }
-            _ if self.typevar_evaluation == TypeVarEvaluation::Lazy
+            _ if self.typevar_evaluation.is_lazy()
                 && (self.relation.is_assignability() || self.relation.is_subtyping()) =>
             {
                 true
@@ -1338,7 +1341,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // We run the eager comparison to reject incompatible finite requirements before
         // expanding recursive members. If it cannot reject, the caller checks the full
         // interface instead.
-        (self.typevar_evaluation == TypeVarEvaluation::Lazy
+        (self.typevar_evaluation.is_lazy()
             || structurally_satisfied.is_never_satisfied(db, env, self.inferable))
         .then_some(structurally_satisfied)
     }
@@ -1474,16 +1477,17 @@ fn non_recursive_protocol_interface<'db>(
 /// checked separately after generic inference.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial = |_, _, _, _| OwnedConstraintSet::always(),
+    cycle_initial = |_, _, _, _, _| OwnedConstraintSet::always(),
     heap_size = ruff_memory_usage::heap_size,
 )]
 fn non_recursive_protocol_constraints<'db>(
     db: &'db dyn Db,
     source: ProtocolInstanceType<'db>,
     target: ProtocolInterfaceView<'db>,
+    scope: ConstraintScope<'db>,
 ) -> OwnedConstraintSet<'db> {
     let env = ProgramEnvironment::from_program(target.base().program(db));
-    let constraints = ConstraintSetBuilder::new();
+    let constraints = ConstraintSetBuilder::with_scope(scope);
     constraints.into_owned(|constraints| {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -1928,7 +1932,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 &materialization_visitor,
             );
             checker
-                .check_type_satisfies_protocol(db, receiver, protocol)
+                .check_type_satisfies_protocol(db, receiver, protocol, None)
                 .is_always_satisfied(db, &env, TypeVarSet::None)
         }
 
@@ -2058,6 +2062,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         target: Self,
+        scope: ConstraintScope<'db>,
     ) -> Option<&'db OwnedConstraintSet<'db>> {
         let origin = target.class_origin(db)?;
         let interface = target.interface(db);
@@ -2072,7 +2077,7 @@ impl<'db> ProtocolInstanceType<'db> {
             return None;
         }
 
-        Some(non_recursive_protocol_constraints(db, self, target))
+        Some(non_recursive_protocol_constraints(db, self, target, scope))
     }
 }
 

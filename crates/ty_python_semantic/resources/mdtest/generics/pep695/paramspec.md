@@ -1186,6 +1186,71 @@ accept(wrap(keyword_only), value=1)
 accept(wrap(keyword_only), value="incorrect")  # error: [invalid-argument-type]
 ```
 
+### Inferring the return type of a forwarded generic call
+
+The arguments forwarded to a generic callback determine its result, including when the wrapper
+returns that result inside another type.
+
+```py
+from typing import Callable
+
+def forward[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def collect[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> list[R]:
+    return [callback(*args, **kwargs)]
+
+def identity[T](value: T, /) -> T:
+    return value
+
+def check(value: int):
+    reveal_type(forward(identity, value))  # revealed: int
+    reveal_type(collect(forward, identity, value))  # revealed: list[int]
+    wrong: list[str] = collect(forward, identity, value)  # error: [invalid-assignment]
+```
+
+Passing the same generic function twice lets the wrapper call one occurrence and return the other.
+The returned function can still be called with a different argument type.
+
+```py
+def call_and_keep[**P, **Q, R, S](
+    call: Callable[P, R], keep: Callable[Q, S], /, *args: P.args, **kwargs: P.kwargs
+) -> tuple[R, Callable[Q, S]]:
+    return call(*args, **kwargs), keep
+
+def independent(number: int, data: bytes):
+    result, kept = call_and_keep(identity, identity, number)
+    reveal_type(result)  # revealed: int
+    reveal_type(kept(data))  # revealed: bytes
+```
+
+A type parameter that defaults to the result type uses the type inferred from the forwarded call.
+
+```py
+def with_buffer[**P, R, B = R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> tuple[R, list[B]]:
+    return callback(*args, **kwargs), []
+
+def buffer(value: int):
+    reveal_type(with_buffer(identity, value))  # revealed: tuple[int, list[int]]
+```
+
+A predicate passed through a generic call returns a boolean. Its result cannot narrow an unrelated
+argument of the wrapper.
+
+```py
+from typing import TypeGuard
+
+def when[**P, R](other: object, callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def is_text(value: object) -> TypeGuard[str]:
+    return isinstance(value, str)
+
+def check_predicate(left: object, right: object):
+    if when(left, forward, is_text, right):
+        reveal_type(left)  # revealed: object
+```
+
 ### Immediate literal forwarding
 
 A literal unpack can supply several arguments to a forwarded `ParamSpec`. The wrapped callable
@@ -1392,6 +1457,17 @@ def construct[**P, R: Factory[object]](factory: Callable[P, R], /, *args: P.args
 reveal_type(construct(Factory))  # revealed: Factory[object]
 ```
 
+Two arguments can capture the same generic constructor with different return bounds:
+
+```py
+def pair[**P, **Q, First: Factory[int], Second: Factory[str]](
+    first: Callable[P, First], second: Callable[Q, Second]
+) -> tuple[First, Second]:
+    raise NotImplementedError
+
+reveal_type(pair(Factory, Factory))  # revealed: tuple[Factory[int], Factory[str]]
+```
+
 ### Class method with a generic callable receiver
 
 A class method's receiver can be a generic callable whose parameters are captured by a `ParamSpec`.
@@ -1437,6 +1513,21 @@ def word[**P](f: Callable[P, str]) -> Word[P]:
 reveal_type(return_type_of(word))  # revealed: str
 ```
 
+### A fixed type variable in the callback's parameter and return types
+
+The callback can return `None`, but it only accepts `T` as an argument. Capturing its parameter list
+preserves that distinction.
+
+```py
+from typing import Callable
+
+def keep[**P, R](callback: Callable[P, R]) -> Callable[P, R]:
+    return callback
+
+def outer[T](callback: Callable[[T], T | None]) -> None:
+    reveal_type(keep(callback))  # revealed: (T@outer, /) -> T@outer | None
+```
+
 ### Captured and fixed variables in a return type
 
 Capturing a callable's type variable does not permit a second, enclosing variable in its return type
@@ -1453,15 +1544,13 @@ def unrestricted[S](fixed: S) -> None:
     def make[T](value: T) -> tuple[T, S]:
         return value, fixed
 
-    # TODO: Reject this call because `S` is not bounded by `str`.
-    forward(make, 1)  # ok
+    forward(make, 1)  # error: [invalid-argument-type]
 
 def non_generic[S](fixed: S) -> None:
     def make(value: int) -> tuple[int, S]:
         return value, fixed
 
-    # TODO: Reject this call because `S` is not bounded by `str`.
-    forward(make, 1)  # ok
+    forward(make, 1)  # error: [invalid-argument-type]
 
 def bounded[S: str](fixed: S) -> None:
     def make[T](value: T) -> tuple[T, S]:

@@ -2,6 +2,7 @@ use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
+use crate::types::constraints::ConstraintScope;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::types::typevar::TypeVarSet;
@@ -641,7 +642,8 @@ fn divergent_type() {
         "Divergent | int"
     );
     for (source, target) in [(div, union), (div, Type::unknown()), (Type::unknown(), div)] {
-        let when = source.when_constraint_set_assignable_to_owned(db, &env, target);
+        let when =
+            source.when_constraint_set_assignable_to_owned(db, &env, target, ConstraintScope::All);
         assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env, TypeVarSet::None)));
     }
     let normalized = union

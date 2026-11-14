@@ -3185,7 +3185,7 @@ impl<'db> Bindings<'db> {
                         let result = constraints.into_owned(|constraints| {
                             let set = constraints.load(db, env, tracked.constraints(db));
                             if matches!(method, KnownBoundMethodType::ConstraintSetExists(_)) {
-                                set.reduce_inferable(db, env, constraints, typevars)
+                                set.reduce_inferable(db, env, typevars, constraints.scope())
                             } else {
                                 set.for_all(db, env, constraints, typevars)
                             }
@@ -8066,6 +8066,31 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
+    /// A captured parameter list omits the callback's return type. Restore it for the forwarded
+    /// call when the inferred `R` still refers to one of the callback's own type variables.
+    fn paramspec_call_with_result(
+        &self,
+        callable: Type<'db>,
+        outer: Specialization<'db>,
+    ) -> Option<(Type<'db>, BoundTypeVarInstance<'db>)> {
+        let db = self.db;
+        let callable = callable.as_callable()?;
+        let [signature] = callable.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        let locals = signature.generic_context?;
+        let (_, variable) = self.signature.forwarded_callback_result(db, self.env)?;
+        let result = outer.get(db, variable)?;
+        let (free, _) = result.free_typevars(db, self.env);
+        if !locals.variables(db).any(|var| var.is_inferable(db, free))
+            || self.signature.return_ty.apply_specialization(db, outer) != self.return_ty
+        {
+            return None;
+        }
+        let signature = signature.clone().with_return_type(result);
+        Some((Type::single_callable(db, signature), variable))
+    }
+
     /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
     ///
     /// The forwarded arguments are those matched to the `ParamSpec` components if provided,
@@ -8090,9 +8115,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
         let db = self.db;
-        let Some(callable) = self
-            .merged_specialization()
-            .and_then(|specialization| specialization.get(db, paramspec))
+        let Some(inference) = self.inference else {
+            return false;
+        };
+        let outer = inference.merged_specialization(db);
+        let Some(callable) = outer
+            .get(db, paramspec)
             .and_then(|value| value.as_paramspec_value(db))
             .and_then(|value| value.to_callable_type(db, self.env))
         else {
@@ -8117,6 +8145,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
         let error_argument_indices = error_argument_indices.as_deref();
 
+        let forwarded = self.paramspec_call_with_result(callable, outer);
+        let return_context =
+            if forwarded.is_some_and(|(_, var)| self.signature.return_ty != Type::TypeVar(var)) {
+                // TODO: Combine the callback result with the expected type during outer inference.
+                // For a wrapper returning list[R], the context here describes the list as a whole.
+                TypeContext::default()
+            } else {
+                self.call_expression_tcx
+            };
+        let callable = forwarded.map_or(callable, |(callable, _)| callable);
         let bindings = match callable
             .bindings(db, self.env)
             .match_parameters(db, self.env, &sub_arguments)
@@ -8125,10 +8163,40 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 self.env,
                 constraints,
                 &sub_arguments,
-                self.call_expression_tcx,
+                return_context,
                 &[],
             ) {
-            Ok(bindings) => bindings,
+            Ok(bindings) => {
+                if let Some((_, variable)) = forwarded {
+                    let result = bindings.return_type(db, self.env);
+                    let result = match result.resolve_type_alias(db) {
+                        // A predicate narrows an argument of the callback. Its boolean result
+                        // says nothing about the wrapper's first argument.
+                        Type::TypeGuard(_) | Type::TypeIs(_) => {
+                            KnownClass::Bool.to_instance(db, self.env)
+                        }
+                        _ => result,
+                    };
+                    // Another parameter can receive the same generic function independently.
+                    // Keep its inferred type and let defaults such as S = R see the new R.
+                    let context = outer.generic_context(db);
+                    let types = context
+                        .variables(db)
+                        .zip(outer.types(db))
+                        .map(|(var, &ty)| {
+                            if var == variable {
+                                Some(result)
+                            } else {
+                                inference
+                                    .has_inferred_type(db, var.identity(db))
+                                    .then_some(ty)
+                            }
+                        });
+                    let refined = context.specialize_partial(db, types);
+                    self.return_ty = self.signature.return_ty.apply_specialization(db, refined);
+                }
+                bindings
+            }
             Err(CallError(_, bindings)) => *bindings,
         };
 
@@ -8884,7 +8952,6 @@ impl<'db> Binding<'db> {
                         env,
                         generic,
                         specialized_overload.inference,
-                        constraints,
                         call_expression_tcx,
                     );
                     parameter_type =
@@ -9041,7 +9108,6 @@ impl<'db> Binding<'db> {
                         env,
                         generic_context,
                         self.inference,
-                        constraints,
                         call_expression_tcx,
                     )
                 })
@@ -9178,7 +9244,7 @@ impl<'db> Binding<'db> {
         tcx: TypeContext<'db>,
     ) -> Option<Specialization<'db>> {
         let generic = self.signature.generic_context?;
-        let constraints = &ConstraintSetBuilder::new();
+        let constraints = &ConstraintSetBuilder::with_inferable(self.inferable_typevars);
         let arguments = arguments.with_self(binding.bound_type);
         let mut restricted = None;
         for (argument_index, (matched, argument)) in self
@@ -9239,15 +9305,8 @@ impl<'db> Binding<'db> {
             return None;
         }
         Some(
-            self.argument_type_context_specialization(
-                db,
-                env,
-                generic,
-                Some(inference),
-                constraints,
-                tcx,
-            )
-            .specialization,
+            self.argument_type_context_specialization(db, env, generic, Some(inference), tcx)
+                .specialization,
         )
     }
 
@@ -9267,7 +9326,6 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         generic_context: GenericContext<'db>,
         inference: Option<TypeVarInference<'db>>,
-        constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Cow<'db, ArgumentContextSpecialization<'db>> {
         /// With no evidence from the expected return type, every call in this program
@@ -9312,17 +9370,14 @@ impl<'db> Binding<'db> {
 
         let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
             FxHashMap::default();
+        let inferable = generic_context.inferable_typevars(db);
         let return_bounds = call_expression_tcx.expected_type().map(|expected| {
             self.unspecialized_return_type(db)
-                .assignable_solutions_for_argument_context(
-                    db,
-                    env,
-                    expected,
-                    generic_context.inferable_typevars(db),
-                )
+                .assignable_solutions_for_argument_context(db, env, expected, inferable)
         });
         if let Some(path_bounds) = return_bounds {
-            let solutions = path_bounds.solve_for_argument_context(db, env, constraints);
+            let constraints = ConstraintSetBuilder::with_inferable(inferable);
+            let solutions = path_bounds.solve_for_argument_context(db, env, &constraints);
             if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions.into_vec() {
                     for binding in solution.solved_typevars {
@@ -9497,7 +9552,8 @@ impl<'db> Binding<'db> {
         // create multiple instances of a single typevar identity with different
         // bounds/constraints. We should reconcile the invariants expected by the constraint solver
         // with those actually enforced by our typevar representation.
-        let constraints = &ConstraintSetBuilder::new();
+        let call = CallInference::new(db, env, self, arguments, call_expression_tcx);
+        let constraints = &ConstraintSetBuilder::with_inferable(call.inferable_typevars);
         let parameters = self.signature.parameters();
 
         if parameters.is_top() {
@@ -9516,8 +9572,7 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let inferred =
-            CallInference::new(db, env, self, arguments, call_expression_tcx).infer(constraints);
+        let inferred = call.infer(constraints);
 
         let mut checker = ArgumentTypeChecker::new(
             db,
@@ -9590,6 +9645,73 @@ impl<'db> Binding<'db> {
         &self.parameter_tys
     }
 
+    /// Infers the return of a forwarding callable from its positionally bound callback, even if
+    /// an unpacking leaves the remaining parameters of the partial unknown.
+    fn partial_forwarded_return_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut wrapped: Type<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> Option<Type<'db>> {
+        let mut arguments = arguments.iter().skip(1);
+        let mut wrappers = SmallVec::<[_; 2]>::new();
+        let result = loop {
+            let callable = wrapped.try_upcast_to_callable(db, env)?.exactly_one()?;
+            let [signature] = callable.signatures(db).overloads.as_slice() else {
+                return None;
+            };
+            // A predicate can narrow an argument already bound by the partial.
+            if matches!(
+                signature.return_ty.resolve_type_alias(db),
+                Type::TypeIs(_) | Type::TypeGuard(_)
+            ) {
+                return None;
+            }
+            let Some(context) = signature.generic_context else {
+                if wrappers.is_empty() {
+                    return None;
+                }
+                break signature.return_ty;
+            };
+
+            // The wrapped signature ends in `f: Callable[P, R], *args: P.args, **kwargs: P.kwargs`.
+            // Only a positional binding fixes `f`: a later call can override any bound keyword.
+            let (prefix, paramspec) = signature.parameters().as_paramspec_with_prefix()?;
+            let (callback, preceding) = prefix.split_last()?;
+            let (index, result_var) = signature.forwarded_callback_result(db, env)?;
+            if index != preceding.len()
+                || context.variables(db).count() != 2
+                || paramspec
+                    .typevar(db)
+                    .bound_or_constraints(db, env)
+                    .is_some()
+                || !prefix.iter().all(Parameter::is_positional)
+                || !preceding
+                    .iter()
+                    .all(|_| matches!(arguments.next(), Some(CallArgument::Positional(_))))
+            {
+                return None;
+            }
+            let CallArgument::Positional(argument) = arguments.next()? else {
+                return None;
+            };
+
+            // TODO: Teach partial binding which type variables are fixed by positional arguments
+            // even when an unpacking prevents us from building the remaining signature.
+            wrappers.push((signature.return_ty, result_var));
+            wrapped = argument.get_for_declared_type(callback.annotated_type());
+        };
+
+        Some(
+            wrappers
+                .into_iter()
+                .rev()
+                .fold(result, |result, (return_ty, variable)| {
+                    return_ty.substitute_one_typevar(db, env, variable, result)
+                }),
+        )
+    }
+
     /// Returns the reduced callable type exposed by this `functools.partial(...)` overload.
     fn functools_partial_return_type<'a>(
         &mut self,
@@ -9603,12 +9725,15 @@ impl<'db> Binding<'db> {
             [Some(func_ty), ..] => *func_ty,
             _ => return None,
         };
-        let imprecise_return_type = self.return_ty;
-        let failed_synthesis_return_type =
-            KnownClass::FunctoolsPartial.to_specialized_instance(db, env, &[Type::unknown()]);
-
-        let (bound_call_arguments, partial_bindings, can_synthesize_signature) =
-            Bindings::functools_partial_matched_bindings(db, env, func_ty, call_arguments)?;
+        let imprecise_return_type = || {
+            let result = Self::partial_forwarded_return_type(db, env, func_ty, call_arguments)?;
+            Some(KnownClass::FunctoolsPartial.to_specialized_instance(db, env, &[result]))
+        };
+        let Some((bound_call_arguments, partial_bindings, can_synthesize_signature)) =
+            Bindings::functools_partial_matched_bindings(db, env, func_ty, call_arguments)
+        else {
+            return imprecise_return_type();
+        };
 
         // Reuse call-binding machinery to resolve which wrapped overloads are compatible with
         // bound arguments and to surface binding diagnostics.
@@ -9626,10 +9751,11 @@ impl<'db> Binding<'db> {
         let new_return_type =
             partial_bindings.functools_partial_type(db, env, func_ty, self, &bound_call_arguments);
 
-        Some(if !can_synthesize_signature {
-            imprecise_return_type
-        } else if new_return_type.is_never() {
-            failed_synthesis_return_type
+        if !can_synthesize_signature {
+            return imprecise_return_type();
+        }
+        Some(if new_return_type.is_never() {
+            KnownClass::FunctoolsPartial.to_specialized_instance(db, env, &[Type::unknown()])
         } else {
             new_return_type
         })

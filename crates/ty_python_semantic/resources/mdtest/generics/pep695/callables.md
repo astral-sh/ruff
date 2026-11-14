@@ -1356,7 +1356,7 @@ def _(callback: Restricted[str]):
     x: Callable[[int], str] = callback  # error: [invalid-assignment]
 
 def _[F: Restricted[str]](callback: F):
-    consume(callback)  # TODO: This should error.
+    consume(callback)  # error: [invalid-argument-type]
     x: Callable[[int], str] = callback  # error: [invalid-assignment]
 ```
 
@@ -1369,8 +1369,7 @@ def _(callback: Restricted[int]):
 
 def _[F: Restricted[int]](callback: F):
     consume(callback)
-    # TODO: This should not error.
-    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+    x: Callable[[int], str] = callback  # ok
 ```
 
 Note that a compatible receiver bound does not satisfy an incompatible return type:

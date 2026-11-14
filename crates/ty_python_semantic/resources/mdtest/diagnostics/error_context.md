@@ -1356,8 +1356,8 @@ info:     └── parameter `y` has an incompatible type: `str` is not assigna
 ## Recursive protocol diagnostic context
 
 A value-constrained type parameter makes the recursive `child` override valid for each permitted
-specialization. The explicit receiver on `Outer.expose` preserves unresolved type variables while
-diagnostic context is collected, including the incompatible recursive member and its return type.
+specialization. When checking `Outer[int]`, the diagnostic follows the return type of `expose` to
+the incompatible `value` method. Its return type is the caller's `T`, which need not be `int`.
 
 ```py
 from __future__ import annotations
@@ -1390,12 +1390,12 @@ error[invalid-assignment]: Object of type `Concrete[T@diagnose]` is not assignab
    |              ----------   ^^^^^ Incompatible value of type `Concrete[T@diagnose]`
    |              |
    |              Declared type
-info: type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
-info: └── protocol member `child` is incompatible
-info:     └── incompatible return types: `Concrete[str]` is not assignable to `Chain[int]`
-info:         └── type `Concrete[str]` is not assignable to protocol `Chain[int]`
+info: type `Concrete[T@diagnose]` is not assignable to protocol `Outer[int]`
+info: └── protocol member `expose` is incompatible
+info:     └── incompatible return types: `Concrete[T@diagnose]` is not assignable to `Chain[int]`
+info:         └── type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
 info:             └── protocol member `value` is incompatible
-info:                 └── incompatible return types: `str` is not assignable to `int`
+info:                 └── incompatible return types: `T@diagnose` is not assignable to `int`
 ```
 
 ## Recursive protocols in a union after overload comparison

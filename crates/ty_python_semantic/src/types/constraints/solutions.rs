@@ -10,14 +10,15 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::sequents::SequentMap;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{
-    AtomicConstraint, Constraint, ConstraintProvenance, UnsatisfiableBound,
-    UnspecializedTypeVarPolicy,
+    AtomicConstraint, ConcreteEquivalenceBound, Constraint, ConstraintProvenance,
+    UnsatisfiableBound, UnspecializedTypeVarPolicy,
 };
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, Assignment, AtomicConstraintId, BoundedSolutionLimits,
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, CandidateTypeVarSolver,
-    ConstraintFailureEvidence, ConstraintSetStorage, EvidenceSource, InteriorNodeData, Node,
-    NodeId, SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
+    ConstraintFailureEvidence, ConstraintScope, ConstraintSetStorage, EvidenceSource,
+    InteriorNodeData, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
+    SolutionViolationKind,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -307,13 +308,15 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         atoms.push(*upper);
         for (i, &id) in atoms.iter().enumerate() {
             let atom = storage.atomic_constraint_data(id);
-            if SequentMap::for_constraint(db, env, atom).is_some_and(|map| !map.sequents.is_empty())
+            if SequentMap::for_constraint(db, env, atom, storage.scope)
+                .is_some_and(|map| !map.sequents.is_empty())
                 || atoms[i + 1..].iter().any(|&other| {
                     SequentMap::for_constraint_pair(
                         db,
                         env,
                         atom,
                         storage.atomic_constraint_data(other),
+                        storage.scope,
                     )
                     .is_some_and(|map| !map.sequents.is_empty())
                 })
@@ -808,10 +811,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let Some(bound) = bound_typevar.typevar(db).upper_bound(db, env) else {
             return ControlFlow::Continue(true);
         };
-        // TODO: ParamSpecs can capture generic callables whose type variables need to be solved
-        // together with the forwarded arguments and return type. Until then, this check can reject
-        // valid calls by treating those variables as fixed. Preserve the existing behavior whenever
-        // a ParamSpec is inferable. See https://github.com/astral-sh/ty/issues/4508.
+        // A ParamSpec can capture a generic callable whose binders are absent from
+        // `self.inferable`. Rechecking the lower bound here would treat those binders as fixed.
+        // Leave calls with an inferable ParamSpec to the path walk, which also sees the capture.
+        // See https://github.com/astral-sh/ty/issues/4508.
         if self
             .inferable
             .iter(db)
@@ -1195,28 +1198,77 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             // constraints can possibly be satisfied.
             return ControlFlow::Continue(());
         };
+        let accepts_fixed_typevar = |var: BoundTypeVarInstance<'db>| {
+            let Some(TypeVarBoundOrConstraints::Constraints(actual)) =
+                var.typevar(db).bound_or_constraints(db, env)
+            else {
+                return false;
+            };
+            actual.is_subset_of(db, env, constrained_typevar.typevar_constraints)
+        };
+        // A caller's constrained U can be the solution for T for every choice of U.
+        // For example, U: (int, str) satisfies T: (int, str, bytes), even though neither
+        // T = int nor T = str works for every U. Check T = U against the other bounds
+        // on this path before trying individual declared constraints.
+        let mut witnesses = SmallVec::<[_; 2]>::new();
+        if let ConstraintScope::Inferable(inferable) = storage.scope {
+            let bounds = path.positive_constraints().filter_map(|(id, _)| {
+                let (subject, ty) = storage.atomic_constraint_data(id).as_concrete()?;
+                subject.is_same_typevar_as(db, bound_typevar).then_some(ty)
+            });
+            // Prefer the combined lower bound when both ends of the range are possible solutions.
+            for ty in evidence.evidence_lower.into_iter().chain(bounds) {
+                if let Type::TypeVar(var) = ty
+                    && !var.is_inferable(db, inferable)
+                    && accepts_fixed_typevar(var)
+                    && !witnesses.contains(&ty)
+                {
+                    witnesses.push(ty);
+                }
+            }
+        }
+        for witness in witnesses {
+            let equality = ConcreteEquivalenceBound::new(
+                ConstraintProvenance::VALIDITY,
+                bound_typevar,
+                witness,
+            );
+            let equality = storage.intern_atomic_constraint(db, env, equality.into());
+            let satisfied = Cell::new(false);
+            let check_candidate: &ProcessSatisfied<'_, 'db, L, Break<L::Break>> =
+                &|this, storage, path| {
+                    if this
+                        .pending_candidate_solution(db, env, storage, path, None)
+                        .is_some()
+                    {
+                        satisfied.set(true);
+                        return process_satisfied(this, storage, path);
+                    }
+                    ControlFlow::Continue(())
+                };
+            self.visit_constraints_and_then(
+                db,
+                env,
+                storage,
+                path,
+                &[equality],
+                &|this, storage, path| {
+                    this.validate_constrained(db, env, storage, path, constrained, check_candidate)
+                },
+            )?;
+            if satisfied.into_inner() {
+                return ControlFlow::Continue(());
+            }
+        }
+
         let has_no_evidence = evidence.evidence_lower.is_none()
             && !evidence
                 .upper
                 .has_evidence_without_validity(EvidenceSource::All);
-        let is_preservable_typevar = |ty| {
-            let Type::TypeVar(typevar) = ty else {
-                return false;
-            };
-            typevar.is_inferable(db, self.inferable)
-                || typevar
-                    .typevar(db)
-                    .constraints(db, env)
-                    .is_some_and(|actual_constraints| {
-                        actual_constraints.iter().all(|actual| {
-                            constrained_typevar
-                                .declared_constraints
-                                .iter()
-                                .any(|declared| {
-                                    actual.is_equivalent_to(db, env, declared.constrained_ty)
-                                })
-                        })
-                    })
+        let is_preservable_typevar = |ty: Type<'db>| {
+            ty.as_typevar().is_some_and(|var| {
+                var.is_inferable(db, self.inferable) || accepts_fixed_typevar(var)
+            })
         };
         let contains_preservable_typevar =
             |ty| any_over_type(db, env, ty, false, is_preservable_typevar);
@@ -1904,6 +1956,9 @@ impl<'db> Validations<'db> {
         while let Some(typevar) = typevar_queue.pop() {
             seen_typevars.insert(typevar);
             let bound_typevar = storage.typevar_data(typevar);
+            if !storage.scope.contains(db, bound_typevar) {
+                continue;
+            }
             result.add_typevar(
                 db,
                 env,
@@ -1999,6 +2054,7 @@ impl<'db> Validations<'db> {
                 ConstraintProvenance::VALIDITY,
                 bound_typevar,
                 bound,
+                storage.scope,
             );
             let constraints = Self::intern_typevar_constraints(
                 db,
@@ -2035,6 +2091,7 @@ impl<'db> Validations<'db> {
                         ConstraintProvenance::VALIDITY,
                         bound_typevar,
                         constrained_ty,
+                        storage.scope,
                     );
                     let constraints = Self::intern_typevar_constraints(
                         db,

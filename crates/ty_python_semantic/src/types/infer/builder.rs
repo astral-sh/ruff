@@ -7177,7 +7177,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             callable.with_signatures(db, signatures)
         });
         let inferable = class_generic_context.inferable_typevars(db);
-        let constraints = ConstraintSetBuilder::new();
+        let constraints = ConstraintSetBuilder::with_inferable(inferable);
         let path_bounds = source_callable
             .to_type(db, env)
             .assignable_solutions_with_inferable(
@@ -8102,8 +8102,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
-        let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(db);
+        let constraints = ConstraintSetBuilder::with_inferable(inferable);
         let identity_instance = Type::instance(db, env, ClassType::Generic(collection_alias));
         let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
 
@@ -8598,7 +8598,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inferable = generic_context.inferable_typevars(db);
         let path_bounds =
             generator_ty.assignable_solutions_with_inferable(db, env, annotation, inferable);
-        let constraints = ConstraintSetBuilder::new();
+        let constraints = ConstraintSetBuilder::with_inferable(inferable);
         let Solutions::Constrained(solutions) = path_bounds.solve(db, env, &constraints) else {
             return TypeContext::default();
         };
