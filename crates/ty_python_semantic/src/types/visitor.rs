@@ -367,6 +367,13 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 ) {
     match TypeKind::from(ty) {
         TypeKind::Atomic => {}
+        // A non-generic nominal instance can only lead to its class literal, which is atomic.
+        // Still visit it, but don't grow the set of types that could lead back to themselves.
+        TypeKind::NonAtomic(NonAtomicType::NominalInstance(instance))
+            if !instance.is_definition_generic(db) =>
+        {
+            visitor.visit_nominal_instance_type(db, instance);
+        }
         TypeKind::NonAtomic(non_atomic_type) => {
             if recursion_guard.type_was_already_seen(ty) {
                 // If we have already seen this type, we can skip it.
