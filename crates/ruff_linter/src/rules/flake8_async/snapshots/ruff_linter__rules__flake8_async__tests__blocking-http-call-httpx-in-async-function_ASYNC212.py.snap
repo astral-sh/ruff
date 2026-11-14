@@ -158,11 +158,159 @@ ASYNC212 Blocking httpx method client.request() in async context, use httpx.Asyn
 62 |     client.anything()  # Ok
    |
 
-ASYNC212 Blocking httpx method global_client.request() in async context, use httpx.AsyncClient
-  --> ASYNC212.py:69:5
-   |
-68 | async def foo():
-69 |     global_client.request()  # ASYNC212
-   |     ^^^^^^^^^^^^^^^^^^^^^
-70 |     global_client.anything()  # Ok
-   |
+ASYNC212 Blocking httpx2 method client.close() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:99:5
+    |
+ 97 | async def foo():
+ 98 |     client = httpx2.Client()
+ 99 |     client.close()  # ASYNC212
+    |     ^^^^^^^^^^^^
+100 |     client.delete()  # ASYNC212
+101 |     client.get()  # ASYNC212
+    |
+
+ASYNC212 Blocking httpx2 method client.delete() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:100:5
+    |
+ 98 |     client = httpx2.Client()
+ 99 |     client.close()  # ASYNC212
+100 |     client.delete()  # ASYNC212
+    |     ^^^^^^^^^^^^^
+101 |     client.get()  # ASYNC212
+102 |     client.head()  # ASYNC212
+    |
+
+ASYNC212 Blocking httpx2 method client.get() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:101:5
+    |
+ 99 |     client.close()  # ASYNC212
+100 |     client.delete()  # ASYNC212
+101 |     client.get()  # ASYNC212
+    |     ^^^^^^^^^^
+102 |     client.head()  # ASYNC212
+103 |     client.options()  # ASYNC212
+    |
+
+ASYNC212 Blocking httpx2 method client.head() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:102:5
+    |
+100 |     client.delete()  # ASYNC212
+101 |     client.get()  # ASYNC212
+102 |     client.head()  # ASYNC212
+    |     ^^^^^^^^^^^
+103 |     client.options()  # ASYNC212
+104 |     client.patch()  # ASYNC212
+    |
+
+ASYNC212 Blocking httpx2 method client.options() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:103:5
+    |
+101 |     client.get()  # ASYNC212
+102 |     client.head()  # ASYNC212
+103 |     client.options()  # ASYNC212
+    |     ^^^^^^^^^^^^^^
+104 |     client.patch()  # ASYNC212
+105 |     client.post()  # ASYNC212
+    |
+
+ASYNC212 Blocking httpx2 method client.patch() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:104:5
+    |
+102 |     client.head()  # ASYNC212
+103 |     client.options()  # ASYNC212
+104 |     client.patch()  # ASYNC212
+    |     ^^^^^^^^^^^^
+105 |     client.post()  # ASYNC212
+106 |     client.put()  # ASYNC212
+    |
+
+ASYNC212 Blocking httpx2 method client.post() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:105:5
+    |
+103 |     client.options()  # ASYNC212
+104 |     client.patch()  # ASYNC212
+105 |     client.post()  # ASYNC212
+    |     ^^^^^^^^^^^
+106 |     client.put()  # ASYNC212
+107 |     client.request()  # ASYNC212
+    |
+
+ASYNC212 Blocking httpx2 method client.put() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:106:5
+    |
+104 |     client.patch()  # ASYNC212
+105 |     client.post()  # ASYNC212
+106 |     client.put()  # ASYNC212
+    |     ^^^^^^^^^^
+107 |     client.request()  # ASYNC212
+108 |     client.send()  # ASYNC212
+    |
+
+ASYNC212 Blocking httpx2 method client.request() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:107:5
+    |
+105 |     client.post()  # ASYNC212
+106 |     client.put()  # ASYNC212
+107 |     client.request()  # ASYNC212
+    |     ^^^^^^^^^^^^^^
+108 |     client.send()  # ASYNC212
+109 |     client.stream()  # ASYNC212
+    |
+
+ASYNC212 Blocking httpx2 method client.send() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:108:5
+    |
+106 |     client.put()  # ASYNC212
+107 |     client.request()  # ASYNC212
+108 |     client.send()  # ASYNC212
+    |     ^^^^^^^^^^^
+109 |     client.stream()  # ASYNC212
+    |
+
+ASYNC212 Blocking httpx2 method client.stream() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:109:5
+    |
+107 |     client.request()  # ASYNC212
+108 |     client.send()  # ASYNC212
+109 |     client.stream()  # ASYNC212
+    |     ^^^^^^^^^^^^^
+110 |
+111 |     client.anything()  # Ok
+    |
+
+ASYNC212 Blocking httpx2 method client.request() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:117:5
+    |
+116 | async def foo(client: httpx2.Client):
+117 |     client.request()  # ASYNC212
+    |     ^^^^^^^^^^^^^^
+118 |     client.anything()  # Ok
+    |
+
+ASYNC212 Blocking httpx2 method client.request() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:122:5
+    |
+121 | async def foo(client: httpx2.Client | None):
+122 |     client.request()  # ASYNC212
+    |     ^^^^^^^^^^^^^^
+123 |     client.anything()  # Ok
+    |
+
+ASYNC212 Blocking httpx2 method client.request() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:127:5
+    |
+126 | async def foo(client: Optional[httpx2.Client]):
+127 |     client.request()  # ASYNC212
+    |     ^^^^^^^^^^^^^^
+128 |     client.anything()  # Ok
+    |
+
+ASYNC212 Blocking httpx2 method client.request() in async context, use httpx2.AsyncClient
+   --> ASYNC212.py:133:5
+    |
+131 | async def foo():
+132 |     client: httpx2.Client = ...
+133 |     client.request()  # ASYNC212
+    |     ^^^^^^^^^^^^^^
+134 |     client.anything()  # Ok
+    |

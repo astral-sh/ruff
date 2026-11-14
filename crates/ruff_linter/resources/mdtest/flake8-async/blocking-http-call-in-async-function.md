@@ -6,7 +6,7 @@ lint.select = ["ASYNC210"]
 
 ## Generic request functions
 
-The generic `requests.request` and `httpx.request` functions block just like the method-specific
+The generic `requests.request`, `httpx.request` and `httpx2.request` functions block just like the method-specific
 helpers such as `get`. Imported aliases have the same behavior.
 
 ```py
@@ -39,7 +39,7 @@ def fetch(url):
 
 ## Shadowed module names
 
-Parameters named `requests` and `httpx` do not refer to the imported libraries.
+Parameters named `requests`, `httpx` and `httpx2` do not refer to the imported libraries.
 
 ```py
 import httpx

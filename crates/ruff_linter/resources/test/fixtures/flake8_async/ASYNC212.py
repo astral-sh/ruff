@@ -1,6 +1,7 @@
 from typing import Optional
 
 import httpx
+import httpx2
 
 
 def foo():
@@ -20,7 +21,6 @@ def foo():
     client.anything()  # Ok
     client.build_request()  # Ok
     client.is_closed  # Ok
-
 
 async def foo():
     client = httpx.Client()
@@ -72,4 +72,76 @@ async def foo():
 
 async def foo():
     async with httpx.AsyncClient() as client:
+        await client.get()  # Ok
+
+
+def foo():
+    client = httpx2.Client()
+    client.close()  # Ok
+    client.delete()  # Ok
+    client.get()  # Ok
+    client.head()  # Ok
+    client.options()  # Ok
+    client.patch()  # Ok
+    client.post()  # Ok
+    client.put()  # Ok
+    client.request()  # Ok
+    client.send()  # Ok
+    client.stream()  # Ok
+
+    client.anything()  # Ok
+    client.build_request()  # Ok
+    client.is_closed  # Ok
+
+
+async def foo():
+    client = httpx2.Client()
+    client.close()  # ASYNC212
+    client.delete()  # ASYNC212
+    client.get()  # ASYNC212
+    client.head()  # ASYNC212
+    client.options()  # ASYNC212
+    client.patch()  # ASYNC212
+    client.post()  # ASYNC212
+    client.put()  # ASYNC212
+    client.request()  # ASYNC212
+    client.send()  # ASYNC212
+    client.stream()  # ASYNC212
+
+    client.anything()  # Ok
+    client.build_request()  # Ok
+    client.is_closed  # Ok
+
+
+async def foo(client: httpx2.Client):
+    client.request()  # ASYNC212
+    client.anything()  # Ok
+
+
+async def foo(client: httpx2.Client | None):
+    client.request()  # ASYNC212
+    client.anything()  # Ok
+
+
+async def foo(client: Optional[httpx2.Client]):
+    client.request()  # ASYNC212
+    client.anything()  # Ok
+
+
+async def foo():
+    client: httpx2.Client = ...
+    client.request()  # ASYNC212
+    client.anything()  # Ok
+
+
+global_client = httpx2.Client()
+
+
+async def foo():
+    global_client.request()  # ASYNC212
+    global_client.anything()  # Ok
+
+
+async def foo():
+    async with httpx2.AsyncClient() as client:
         await client.get()  # Ok

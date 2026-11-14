@@ -64,6 +64,11 @@ pub(crate) fn request_with_no_cert_validation(
             "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request" | "stream"
             | "Client" | "AsyncClient",
         ] => "httpx",
+        [
+            "httpx2",
+            "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request" | "stream"
+            | "Client" | "AsyncClient",
+        ] => "httpx",
         _ => return,
     };
 
