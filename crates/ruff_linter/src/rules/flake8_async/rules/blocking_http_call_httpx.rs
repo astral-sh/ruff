@@ -56,15 +56,15 @@ impl Violation for BlockingHttpCallHttpxInAsyncFunction {
         )
     }
 }
-
+#[derive(Clone, Copy)]
 enum HttpxPackage {
     Httpx,
     Httpx2,
 }
 
 impl HttpxPackage {
-    fn name(&self) -> &'static str {
-        match *self {
+    fn name(self) -> &'static str {
+        match self {
             HttpxPackage::Httpx => "httpx",
             HttpxPackage::Httpx2 => "httpx2",
         }
