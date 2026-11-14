@@ -1554,6 +1554,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Resolve the callee only on paths where execution reaches the call. For
+    /// `f()` or `x.method()`, if the name has exactly one ordinary binding and
+    /// no unbound or deleted alternative, that binding must reach the use on
+    /// every such path. Its value and narrowing still matter; whether earlier
+    /// calls can return does not. Keep this assumption private to this builder:
+    /// regular expression inference must retain `Never` on unreachable paths.
+    pub(super) fn infer_reachable_callee(mut self, callee: Expression<'db>) -> Type<'db> {
+        let expr = callee.node_ref(self.db()).node(self.module());
+        let receiver = expr.as_attribute_expr().map_or(expr, |attr| &attr.value);
+        if let ast::Expr::Name(name) = receiver
+            && let Some(SourcePlace::Indexed(_, operand)) = self.indexed_source_place(name.into())
+        {
+            let mut bindings = self
+                .index
+                .use_def_map(operand.scope)
+                .bindings_at_use(operand.use_id);
+            if let Some(row) = bindings.next()
+                && bindings.next().is_none()
+                && let DefinitionState::Defined(definition) = row.binding
+                && definition.kind(self.db()).is_user_visible()
+            {
+                self.reachability_cache()
+                    .assume_reachable(row.reachability_constraint);
+            }
+        }
+        self.infer_region_expression(callee, TypeContext::default());
+        // Only the callee type affects reachability. Normal call inference owns the diagnostics.
+        self.context.defuse();
+        self.expression_type(expr)
+    }
+
     fn infer_region_expression(&mut self, expression: Expression<'db>, tcx: TypeContext<'db>) {
         self.setup_dataclass_field_specifiers();
 

@@ -204,10 +204,10 @@ use crate::{
         CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, IntersectionType,
         KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
         class_pattern_coverage_target, definite_match_pattern_type,
-        definite_match_pattern_type_for_subject, equality_truthiness, expand_type,
-        infer_narrowing_constraints, infer_predicate_truthiness, infer_same_file_expression_type,
-        mapping_pattern_type, pattern_binding_fallthrough_type, same_enum_or_pattern_type,
-        sequence_pattern_type_builder, singleton_pattern_type,
+        definite_match_pattern_type_for_subject, equality_truthiness, evaluate_callee_type,
+        expand_type, infer_narrowing_constraints, infer_predicate_truthiness,
+        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
+        same_enum_or_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -1928,7 +1928,7 @@ fn analyze_non_terminal_call<'db>(db: &'db dyn Db, call: CallableAndCallExpr<'db
     // inferring argument types to possibly run the overload selection algorithm). Avoiding this on
     // the happy path is important because these constraints can be very large in number, since we
     // add them on all statement-level function calls.
-    let ty = infer_same_file_expression_type(db, callable, TypeContext::default());
+    let ty = evaluate_callee_type(db, callable);
 
     is_non_terminal_call(db, &env, ty, call.is_await(db), || {
         infer_same_file_expression_type(db, call.call_expr(db), TypeContext::default())
@@ -2210,6 +2210,15 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             primary_entries: TruthinessCache::default(),
             primary_predicates: TruthinessCache::default(),
             other_entries: RefCell::new(FxHashMap::default()),
+        }
+    }
+
+    /// Seed a condition that holds whenever the expression being analyzed executes.
+    /// This cache must be private to the conditional analysis.
+    pub(crate) fn assume_reachable(&self, id: ScopedReachabilityConstraintId) {
+        if terminal_reachability(id).is_none() {
+            self.primary_entries
+                .get_or_evaluate(id.index(), || Truthiness::AlwaysTrue);
         }
     }
 

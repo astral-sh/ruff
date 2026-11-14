@@ -651,7 +651,19 @@ pub(super) fn infer_expression_types_impl<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, tcx) = input.into_inner(db);
+    #[expect(
+        clippy::redundant_closure_for_method_calls,
+        reason = "the closure accepts any AST borrow; the method item requires a specific lifetime"
+    )]
+    with_expression_builder(db, expression, tcx, |builder| builder.finish_expression())
+}
 
+fn with_expression_builder<'db, T>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    tcx: TypeContext<'db>,
+    infer: impl FnOnce(TypeInferenceBuilder<'db, '_>) -> T,
+) -> T {
     let program_file = expression.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
@@ -667,7 +679,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let builder = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -675,8 +687,8 @@ pub(super) fn infer_expression_types_impl<'db>(
         program_file,
         index,
         &module,
-    )
-    .finish_expression()
+    );
+    infer(builder)
 }
 
 fn expression_cycle_initial<'db>(
@@ -687,6 +699,14 @@ fn expression_cycle_initial<'db>(
     let (expression, _) = input.into_inner(db);
     let cycle_recovery = Type::divergent(id);
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
+}
+
+/// Infer a statement's callee assuming execution reached the call, so prior calls
+/// don't need to be checked again just to decide whether this one returns.
+pub(crate) fn evaluate_callee_type<'db>(db: &'db dyn Db, callee: Expression<'db>) -> Type<'db> {
+    with_expression_builder(db, callee, TypeContext::default(), |builder| {
+        builder.infer_reachable_callee(callee)
+    })
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
