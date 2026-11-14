@@ -243,14 +243,12 @@ pub(super) fn publish_diagnostics(
         );
         return;
     };
-    let Some(diagnostics) = compute_diagnostics(
+    let diagnostics = compute_diagnostics(
         db,
         file,
         session.position_encoding(),
         session.global_settings(),
-    ) else {
-        return;
-    };
+    );
 
     // Sends a notification to the client with the diagnostics for the document.
     let publish_diagnostics_notification =
@@ -386,24 +384,17 @@ pub(super) fn compute_diagnostics(
     file: File,
     encoding: PositionEncoding,
     global_settings: &GlobalSettings,
-) -> Option<Diagnostics> {
-    // The first uv result supplies the module paths needed for correct diagnostics. Do not analyze
-    // the script until that result is available. Waiting would not help: publishing the environment
-    // advances the database revision and cancels this snapshot, so the request must retry anyway.
-    if db.uv_environments().is_initialization_pending(db, file) {
-        return None;
-    }
-
+) -> Diagnostics {
     let mut diagnostics = db.check_file(file);
     diagnostics.retain(|diagnostic| global_settings.should_show_diagnostic(diagnostic));
     let unnecessary_hints = hints(db, file);
 
-    Some(Diagnostics {
+    Diagnostics {
         items: diagnostics,
         unnecessary_hints,
         encoding,
         file_or_notebook: file,
-    })
+    }
 }
 
 pub(super) fn unnecessary_hints_to_lsp_diagnostics(

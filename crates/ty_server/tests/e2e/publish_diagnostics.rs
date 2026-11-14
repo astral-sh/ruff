@@ -993,11 +993,13 @@ mod uv_metadata {
             .with_workspace(SystemPath::new("src"), None)?
             .with_file(script, &source)?
             .with_real_uv(UseUv::Scripts)?
+            .enable_work_done_progress(true)
             .enable_diagnostic_related_information(true)
             .enable_pull_diagnostics(false)
             .build()
             .wait_until_workspaces_are_initialized();
 
+        server.assert_work_done_progress("Synchronizing scripts")?;
         server.open_text_document(script, source, 1);
         let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
         let [diagnostic] = diagnostics.diagnostics.as_slice() else {
@@ -1118,7 +1120,7 @@ package = "invalid"
     }
 
     #[test]
-    fn pushed_diagnostics_wait_for_the_initial_environment() -> Result<()> {
+    fn pushes_empty_diagnostics_while_the_initial_environment_is_pending() -> Result<()> {
         let workspace_root = SystemPath::new("src");
         let script = SystemPath::new("src/script.py");
         let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
@@ -1126,6 +1128,15 @@ package = "invalid"
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, source)?
+            // Exclude the script from discovery so `didOpen` starts its first sync.
+            // `didOpen` publishes before the main loop can apply the sync result.
+            .with_file(
+                "src/ty.toml",
+                r"
+                [src]
+                exclude-scripts = true
+                ",
+            )?
             .with_use_uv(UseUv::Scripts)
             .with_env_var("UV", "missing-ty-script-uv-executable")
             .enable_pull_diagnostics(false)
@@ -1133,6 +1144,10 @@ package = "invalid"
             .wait_until_workspaces_are_initialized();
 
         server.open_text_document(script, source, 1);
+
+        let pending = server.await_notification::<PublishDiagnosticsNotification>();
+        assert_eq!(pending.uri, server.file_uri(script));
+        assert!(pending.diagnostics.is_empty());
 
         let synchronized = server.await_notification::<PublishDiagnosticsNotification>();
         assert!(synchronized.diagnostics.iter().any(|diagnostic| {
