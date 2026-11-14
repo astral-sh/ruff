@@ -780,6 +780,10 @@ pub(crate) enum CheckTypesMode {
     /// Signature help and keyword completion also display parameters from unmatched overloads.
     SignatureDetails,
 
+    /// Determine which overloads match the call, while retaining provisional bindings for a final
+    /// inference pass over the selected set of overloads.
+    OverloadResolution,
+
     /// Preserve all callable bindings, regardless of whether they evaluate successfully.
     ///
     /// Generic call inference may perform fixpoint iteration in order to unify
@@ -790,7 +794,7 @@ pub(crate) enum CheckTypesMode {
 
 impl CheckTypesMode {
     fn is_provisional(self) -> bool {
-        matches!(self, Self::Provisional)
+        matches!(self, Self::Provisional | Self::OverloadResolution)
     }
 }
 
@@ -4192,9 +4196,13 @@ impl<'db> CallableBinding<'db> {
         let check_types = |overload: &mut Binding<'db>| {
             overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
         };
-        // Signature details and provisional inference need the types of losing candidates too.
+        // Signature details and fixpoint iteration need the types of losing candidates too.
         // An expandable `*args` can also change which parameters the arguments match.
-        if mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity {
+        if matches!(
+            mode,
+            CheckTypesMode::Finalize | CheckTypesMode::OverloadResolution
+        ) && !should_retry_after_provisional_arity
+        {
             self.check_overloads_deferring_literal_mismatches(
                 db,
                 call_arguments.as_ref(),

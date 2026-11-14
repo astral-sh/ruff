@@ -6389,7 +6389,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             argument_types,
             matching_tcx,
             &self.dataclass_field_specifiers,
-            CheckTypesMode::Provisional,
+            CheckTypesMode::OverloadResolution,
         );
 
         // Finalize the set of matching overloads.
