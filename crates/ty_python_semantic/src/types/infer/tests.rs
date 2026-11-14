@@ -854,6 +854,35 @@ if value_{index}:
     Ok(())
 }
 
+#[test]
+fn deferred_annotation_names_follow_import_edits() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_file("/src/api.pyi", "class Name: ...")
+        .with_file(
+            "/src/main.pyi",
+            "from api import Name\ndef f() -> Name: ...\ndef g(x: Name) -> Name: ...",
+        )
+        .build()?;
+    let main = system_path_to_file(&db, "/src/main.pyi")?;
+    assert!(check_types(&db, program_file(&db, main)).is_empty());
+
+    db.write_dedented("/src/api.pyi", "Name = 1")?;
+    let diagnostics = check_types(&db, program_file(&db, main));
+    assert_eq!(diagnostics.len(), 3, "{diagnostics:?}");
+    let ranges = diagnostics
+        .iter()
+        .map(|diagnostic| {
+            assert_eq!(diagnostic.id().as_str(), "invalid-type-form");
+            diagnostic.primary_span().unwrap().range()
+        })
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(ranges.len(), 3);
+
+    db.write_dedented("/src/api.pyi", "class Name: ...")?;
+    assert!(check_types(&db, program_file(&db, main)).is_empty());
+    Ok(())
+}
+
 /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
 /// reachability-constraint checks in that scope.
 #[test]
