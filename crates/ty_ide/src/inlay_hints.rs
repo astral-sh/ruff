@@ -877,10 +877,11 @@ mod tests {
             Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Severity,
             Span, SubDiagnostic, SubDiagnosticSeverity,
         },
-        files::{File, FileRange, system_path_to_file},
+        files::{File, FileRange, system_path_to_file, vendored_path_to_file},
         source::source_text,
     };
     use ruff_diagnostics::{Edit, Fix};
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
 
@@ -5768,6 +5769,8 @@ Source with applied edits:
             my_func(x="hello")"#,
         );
 
+        test.db.set_python_version(PythonVersion::PY311);
+
         assert_snapshot!(test.inlay_hints(), @r#"
 
         from typing import LiteralString
@@ -5776,10 +5779,10 @@ Source with applied edits:
         my_func(x="hello")
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/typing_extensions.pyi:LL:9
+          --> stdlib/typing.pyi:LL:5
            |
-        LL |         LiteralString as LiteralString,
-           |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        LL |     LiteralString: _SpecialForm
+           |     ^^^^^^^^^^^^^
         info: Source
           --> main2.py:LL:9
            |
@@ -5796,6 +5799,36 @@ Source with applied edits:
         5 | my_func(x="hello")
           |
         "#);
+    }
+
+    #[test]
+    fn literal_string_backport_follows_the_active_definition() {
+        let mut test = inlay_hint_test(
+            r#"
+            from typing_extensions import LiteralString
+            def f(x: LiteralString):
+                y = x
+            "#,
+        );
+        for (version, stub) in [
+            (PythonVersion::PY310, "stdlib/typing_extensions.pyi"),
+            (PythonVersion::PY311, "stdlib/typing.pyi"),
+        ] {
+            test.db.set_python_version(version);
+            let hints = test.collect_hints(&InlayHintSettings::default());
+            let target = hints
+                .iter()
+                .flat_map(|hint| hint.label.parts())
+                .find(|part| part.text() == "LiteralString")
+                .and_then(InlayHintLabelPart::target)
+                .expect("the variable type hint should link to the active definition");
+            let expected = vendored_path_to_file(&test.db, stub).unwrap();
+            assert_eq!(target.file(), expected);
+            assert_eq!(
+                &source_text(&test.db, expected).as_str()[target.full_range()],
+                "LiteralString: _SpecialForm"
+            );
+        }
     }
 
     #[test]

@@ -1014,7 +1014,9 @@ impl<'db> RootSearchPaths<'db> {
         // Typing mode requires us to consider stub-only packages (such as the package named
         // `acme-stubs`, which only contains `.pyi` files) when resolving a module name
         // (e.g., the name `acme`), so we must select all stub package paths here.
-        let stub_packages = context.mode.is_typing().then(|| match self {
+        // A non-shadowable name is resolved exclusively from the standard library. Reading the
+        // stub-package index here also makes its importers depend on site-packages listings.
+        let stub_packages = (context.mode.is_typing() && !is_non_shadowable).then(|| match self {
             Self::Configured => {
                 Cow::Borrowed(stub_package_index(context.db, context.resolver_environment))
             }

@@ -868,6 +868,7 @@ fn predicate_contains_special_cased_condition<'db>(
     predicate: ScopedPredicateId,
 ) -> bool {
     let expression = match use_def_map(db, scope).predicates()[predicate].node {
+        PredicateNode::EnvironmentGuard { .. } => return true,
         PredicateNode::Expression(expression) | PredicateNode::IsNonEmptyIterable(expression) => {
             expression
         }

@@ -4917,6 +4917,7 @@ dependencies = [
  "ty_module_resolver",
  "ty_site_packages",
  "ty_vendored",
+ "zip",
 ]
 
 [[package]]
