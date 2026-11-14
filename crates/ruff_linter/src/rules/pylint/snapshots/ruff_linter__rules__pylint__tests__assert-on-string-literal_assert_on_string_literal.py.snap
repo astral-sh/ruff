@@ -104,3 +104,45 @@ PLW0129 Asserting on a non-empty string literal will always pass
    |        ^^^^^^^^^^^^^
 24 | assert 12, "ok here"
    |
+
+PLW0129 Asserting on a non-empty string literal will always pass
+  --> assert_on_string_literal.py:26:8
+   |
+24 | assert 12, "ok here"
+25 |
+26 | assert "active" if condition else item.status  # [assert-on-string-literal]
+   |        ^^^^^^^^
+27 | assert item.status if condition else "inactive"  # [assert-on-string-literal]
+28 | assert "" if condition else item.status  # [assert-on-string-literal]
+   |
+
+PLW0129 Asserting on a non-empty string literal will always pass
+  --> assert_on_string_literal.py:27:38
+   |
+26 | assert "active" if condition else item.status  # [assert-on-string-literal]
+27 | assert item.status if condition else "inactive"  # [assert-on-string-literal]
+   |                                      ^^^^^^^^^^
+28 | assert "" if condition else item.status  # [assert-on-string-literal]
+29 | assert item.status if condition else ""  # [assert-on-string-literal]
+   |
+
+PLW0129 Asserting on an empty string literal will never pass
+  --> assert_on_string_literal.py:28:8
+   |
+26 | assert "active" if condition else item.status  # [assert-on-string-literal]
+27 | assert item.status if condition else "inactive"  # [assert-on-string-literal]
+28 | assert "" if condition else item.status  # [assert-on-string-literal]
+   |        ^^
+29 | assert item.status if condition else ""  # [assert-on-string-literal]
+30 | assert item.status == ("active" if condition else "inactive")
+   |
+
+PLW0129 Asserting on an empty string literal will never pass
+  --> assert_on_string_literal.py:29:38
+   |
+27 | assert item.status if condition else "inactive"  # [assert-on-string-literal]
+28 | assert "" if condition else item.status  # [assert-on-string-literal]
+29 | assert item.status if condition else ""  # [assert-on-string-literal]
+   |                                      ^^
+30 | assert item.status == ("active" if condition else "inactive")
+   |

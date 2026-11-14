@@ -23,6 +23,12 @@ assert "", b"hi"  # [assert-on-string-literal]
 assert "WhyNotHere?", "HereIsOk"  # [assert-on-string-literal]
 assert 12, "ok here"
 
+assert "active" if condition else item.status  # [assert-on-string-literal]
+assert item.status if condition else "inactive"  # [assert-on-string-literal]
+assert "" if condition else item.status  # [assert-on-string-literal]
+assert item.status if condition else ""  # [assert-on-string-literal]
+assert item.status == ("active" if condition else "inactive")
+
 
 # t-strings are always True even when "empty"
 # skip lint in this case
