@@ -1011,6 +1011,7 @@ mod tests {
         	unnecessary-dunder-call (PLC2801),
         	no-method-argument (PLE0211),
         	duplicate-bases (PLE0241),
+        	call-non-callable (PLE1102),
         	dict-iter-missing-items (PLE1141),
         	modified-iterating-set (PLE4703),
         	no-classmethod-decorator (PLR0202),
