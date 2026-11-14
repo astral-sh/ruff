@@ -79,11 +79,21 @@ impl<'db> TypeVarSearch<'db> {
     }
 
     /// Constraints must inspect alias bodies: a type variable may occur only after expansion.
-    /// As in the underlying search, a recursive alias conservatively counts as a possible match.
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
-    fn mentions_typevar_including_aliases(self, db: &'db dyn Db) -> bool {
+    /// Defer to the uncached search if the query itself is recursive, leaving the existing
+    /// alias recursion guard responsible for distinguishing recursive aliases.
+    #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None on recursive lookup"
+    )]
+    fn mentions_typevar_including_aliases(self, db: &'db dyn Db) -> Option<bool> {
         let env = ProgramEnvironment::from_program(self.program(db));
-        visitor::any_over_type_expanding_aliases(db, &env, self.ty(db), Type::is_type_var)
+        Some(visitor::any_over_type_expanding_aliases(
+            db,
+            &env,
+            self.ty(db),
+            Type::is_type_var,
+        ))
     }
 
     /// Receiver binding and contextual inference inspect alias arguments, even those not used
@@ -145,9 +155,17 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        self.is_type_var()
-            || TypeVarSearch::for_composite(db, env, self)
-                .is_some_and(|search| search.mentions_typevar_including_aliases(db))
+        if self.is_type_var() {
+            return true;
+        }
+        let Some(search) = TypeVarSearch::for_composite(db, env, self) else {
+            return false;
+        };
+        search
+            .mentions_typevar_including_aliases(db)
+            .unwrap_or_else(|| {
+                visitor::any_over_type_expanding_aliases(db, env, self, Type::is_type_var)
+            })
     }
 
     pub(crate) fn references_typevar(
