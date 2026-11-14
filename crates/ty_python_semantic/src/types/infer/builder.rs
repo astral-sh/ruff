@@ -7866,14 +7866,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Validate `TypedDict` dictionary literal assignments.
         if let Some(annotation) = tcx.expected_type() {
+            let mut unpacked_cache = FxHashMap::default();
             let annotation = annotation.expand_top_level_aliases(db, env);
             if let Some(typed_dict) = annotation.as_typed_dict() {
                 // If there is a single typed dict annotation, infer against it directly. Expanding
                 // first means a union whose arms all alias the same `TypedDict` reaches this
                 // branch rather than neither.
-                if let Some(ty) =
-                    self.infer_typed_dict_expression(dict, typed_dict, tcx, &mut item_types)
-                {
+                if let Some(ty) = self.infer_typed_dict_expression(
+                    dict,
+                    typed_dict,
+                    tcx,
+                    &mut item_types,
+                    &mut unpacked_cache,
+                ) {
                     return ty;
                 }
             } else if let Type::Union(union) = annotation {
@@ -7899,9 +7904,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let [typed_dict] = typed_dicts.as_slice()
                     && !has_dict_compatible_fallback
                 {
-                    if let Some(ty) =
-                        self.infer_typed_dict_expression(dict, *typed_dict, tcx, &mut item_types)
-                    {
+                    if let Some(ty) = self.infer_typed_dict_expression(
+                        dict,
+                        *typed_dict,
+                        tcx,
+                        &mut item_types,
+                        &mut unpacked_cache,
+                    ) {
                         return ty;
                     }
                 } else if !typed_dicts.is_empty() {
@@ -7918,6 +7927,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             typed_dict,
                             tcx,
                             &mut item_types,
+                            &mut unpacked_cache,
                         ) {
                             narrowed.push((inferred_ty, builder));
                         }
