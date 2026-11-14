@@ -1342,7 +1342,7 @@ pub(crate) fn place_by_id<'db>(
     // Other inferred types are deliberately *not* exposed: narrowing them would leak a subclass into
     // every downstream variable that is inferred from such a read, which breaks code that widens a
     // sentinel with an annotation, like `NO_INFO: Final[Base] = Sentinel()`.
-    if scope.node(db).scope_kind().is_module()
+    if scope.file_scope_id(db).is_global()
         && qualifiers.contains(TypeQualifiers::FINAL)
         && let Some(DefinedPlace { ty: Some(ty), .. }) = declared.place
         && !ty.is_unknown()

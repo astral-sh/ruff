@@ -171,8 +171,8 @@ else:
 
 def read():
     reveal_type(value)  # revealed: Literal["a"] | int
-    reveal_type(possibly_unbound)  # revealed: int
-    reveal_type(always_typed)  # revealed: int
+    reveal_type(possibly_unbound)  # revealed: Literal[0]
+    reveal_type(always_typed)  # revealed: Literal[0]
 ```
 
 ### In class definitions
@@ -390,26 +390,34 @@ from source import VALUE as wrong_type
 
 from source import VALUE as imported_twice
 
-forwarded_value = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `forwarded_value` is not allowed"
+# error: [invalid-assignment] "Reassignment of `Final` symbol `forwarded_value` is not allowed"
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to `Literal[1]`"
+forwarded_value = 2
 # snapshot: invalid-assignment
-forwarded_value = 3
-wildcard_value = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
-imported_twice = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `imported_twice` is not allowed"
+forwarded_value = 1
+# error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to `Literal[1]`"
+wildcard_value = 2
+# error: [invalid-assignment] "Reassignment of `Final` symbol `imported_twice` is not allowed"
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to `Literal[1]`"
+imported_twice = 2
 
 # error: [invalid-assignment] "Reassignment of `Final` symbol `wrong_type` is not allowed"
-# error: [invalid-assignment] "Object of type `Literal["wrong"]` is not assignable to `int`"
+# error: [invalid-assignment] "Object of type `Literal["wrong"]` is not assignable to `Literal[1]`"
 wrong_type = "wrong"
 
 def overwrite_wildcard() -> None:
     global wildcard_value
-    wildcard_value = 3  # error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
+    # error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
+    # error: [invalid-assignment] "Object of type `Literal[3]` is not assignable to `Literal[1]`"
+    wildcard_value = 3
 ```
 
 ```snapshot
 error[invalid-assignment]: Reassignment of `Final` symbol `forwarded_value` is not allowed
-  --> src/main.py:10:1
+  --> src/main.py:12:1
    |
-10 | forwarded_value = 3
+12 | forwarded_value = 1
    | ^^^^^^^^^^^^^^^^^^^ Reassignment of `Final` symbol
 ```
 
@@ -429,7 +437,9 @@ VALUE: Final[int] = 1
 from source import VALUE
 
 for _ in range(2):
-    VALUE = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `VALUE` is not allowed"
+    # error: [invalid-assignment] "Reassignment of `Final` symbol `VALUE` is not allowed"
+    # error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to `Literal[1]`"
+    VALUE = 2
 ```
 
 ### Imported `Final` qualifiers do not replace earlier declared types
@@ -540,7 +550,9 @@ def replace_global() -> None:
     global global_value
     from mutable import VALUE as global_value
 
-    global_value = 2  # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    # error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to `Literal[1]`"
+    global_value = 2
 ```
 
 ### Imported `Final` qualifiers apply to class members
@@ -635,7 +647,7 @@ def reassign(flag: bool) -> None:
         from source import TEXT as value
 
     # error: [invalid-assignment] "Reassignment of `Final` symbol `value` is not allowed"
-    # error: [invalid-assignment] "Object of type `None` is not assignable to `int | str`"
+    # error: [invalid-assignment] "Object of type `None` is not assignable to `Literal[1, "text"]`"
     value = None
 ```
 
