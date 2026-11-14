@@ -3196,21 +3196,16 @@ impl<'db> CandidateTypeVarSolver<'db> {
                     })
             });
 
-        let union_lower_bounds = |source, include_validity| {
-            let bounds: FxIndexSet<_> = iter_lower_bounds(source, include_validity).collect();
+        let union_lower_bounds = |source| {
+            let bounds: FxIndexSet<_> = iter_lower_bounds(source, true).collect();
             (!bounds.is_empty()).then(|| UnionType::from_elements(db, env, bounds))
         };
 
-        // Exclude bounds derived using validity constraints from the declared candidate, so as to
-        // prefer the declared type as written by the caller.
-        let evidence_lower = union_lower_bounds(EvidenceSource::All, true);
-        let (inferred_lower, declared_lower) = if has_declared_lower_evidence {
-            (
-                union_lower_bounds(EvidenceSource::Inferred, true),
-                union_lower_bounds(EvidenceSource::Declared, false),
-            )
+        let evidence_lower = union_lower_bounds(EvidenceSource::All);
+        let inferred_lower = if has_declared_lower_evidence {
+            union_lower_bounds(EvidenceSource::Inferred)
         } else {
-            (evidence_lower, None)
+            evidence_lower
         };
         let validity_lower = UnionType::from_elements(
             db,
@@ -3227,7 +3222,6 @@ impl<'db> CandidateTypeVarSolver<'db> {
             inferable,
             evidence_lower,
             inferred_lower,
-            declared_lower,
             validity_lower,
             upper,
             has_declared_evidence,
@@ -3294,14 +3288,12 @@ impl<'db> PathBoundSolution<'db> {
 
 /// The evidence used to choose a type variable's specialization.
 ///
-/// A candidate solution for a given type variable may prefer bounds derived from inferred evidence,
-/// declared evidence, or both. Note that validity constraints apply regardless of the preferred
-/// evidence source.
+/// Solve from inferred bounds alone to find a candidate, or include contextual bounds to determine
+/// which solutions are acceptable. Validity constraints apply in either case.
 #[derive(Clone, Copy)]
 enum EvidenceSource {
     All,
     Inferred,
-    Declared,
 }
 
 impl EvidenceSource {
@@ -3311,7 +3303,6 @@ impl EvidenceSource {
         match self {
             Self::All => evidence.is_evidence(),
             Self::Inferred => evidence == ConstraintProvenance::INFERRED,
-            Self::Declared => evidence == ConstraintProvenance::DECLARED,
         }
     }
 }
@@ -3323,7 +3314,6 @@ pub(crate) struct CandidateTypeVarSolution<'db> {
     inferable: TypeVarSet<'db>,
     evidence_lower: Option<Type<'db>>,
     inferred_lower: Option<Type<'db>>,
-    declared_lower: Option<Type<'db>>,
     validity_lower: Type<'db>,
     upper: UpperBound<'db>,
     /// Whether any bound originates from declared evidence.
@@ -3345,7 +3335,6 @@ impl<'db> CandidateTypeVarSolution<'db> {
             inferable,
             evidence_lower: Some(ty),
             inferred_lower: Some(ty),
-            declared_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
             has_declared_evidence: false,
@@ -3379,47 +3368,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
         match source {
             EvidenceSource::All => self.evidence_lower,
             EvidenceSource::Inferred => self.inferred_lower,
-            EvidenceSource::Declared => self.declared_lower,
         }
-    }
-
-    fn declared_candidate(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> PathBoundSolution<'db> {
-        // Avoid restricting the range of a gradual declared type using validity bounds, preferring
-        // the declared type as written by the caller.
-        let candidate = match self.lower_bound(EvidenceSource::Declared) {
-            Some(lower) => lower,
-
-            None if self
-                .upper
-                .has_evidence_without_validity(EvidenceSource::Declared) =>
-            {
-                let upper_bounds = self
-                    .upper
-                    .iter_evidence_without_validity(EvidenceSource::Declared);
-
-                let candidate =
-                    UpperBound::single_bound_from_iterator(db, env, upper_bounds.clone())
-                        .or_else(|| IntersectionType::bounded_from_elements(db, env, upper_bounds));
-
-                match candidate {
-                    Some(candidate) => candidate,
-                    None => return PathBoundSolution::BudgetExceeded { fallback: None },
-                }
-            }
-
-            None => return PathBoundSolution::Unsolved,
-        };
-
-        // Static candidates are promoted to the selected type variable constraint.
-        if self.selected_declared_constraint.is_some() && candidate.is_fully_static(db, env) {
-            return PathBoundSolution::Unsolved;
-        }
-
-        PathBoundSolution::Solved(candidate)
     }
 
     /// The assignability relations that place a candidate between its lower and upper bounds.
@@ -4233,16 +4182,6 @@ impl<'db> CandidateSolutions<'db> {
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &CandidateTypeVarSolution<'db>,
     ) -> PathBoundSolution<'db> {
-        Self::solve_with_preference(db, env, builder, path_bound, true)
-    }
-
-    pub(crate) fn solve_with_preference(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
-        path_bound: &CandidateTypeVarSolution<'db>,
-        prefer_declared: bool,
-    ) -> PathBoundSolution<'db> {
         let default_solution =
             Self::solve_from_evidence(db, env, builder, path_bound, EvidenceSource::All);
         let PathBoundSolution::Solved(restricted) = default_solution else {
@@ -4258,46 +4197,16 @@ impl<'db> CandidateSolutions<'db> {
             return PathBoundSolution::Unsatisfiable;
         }
 
-        if !path_bound.has_declared_evidence {
-            return default_solution;
-        }
-
-        let inferred =
-            match Self::solve_from_evidence(db, env, builder, path_bound, EvidenceSource::Inferred)
-            {
-                PathBoundSolution::Solved(inferred) => Some(inferred),
-                PathBoundSolution::Unsolved => None,
-                PathBoundSolution::Unsatisfiable | PathBoundSolution::BudgetExceeded { .. } => {
-                    return default_solution;
-                }
-            }
-            .filter(|candidate| !candidate.has_provisional_marker(db, env));
-
-        let declared = match path_bound.declared_candidate(db, env) {
-            PathBoundSolution::Solved(declared) => Some(declared),
-            PathBoundSolution::Unsolved | PathBoundSolution::Unsatisfiable => None,
-            PathBoundSolution::BudgetExceeded { .. } => return default_solution,
-        }
-        .filter(|candidate| !candidate.has_provisional_marker(db, env));
-
-        // Prefer the declared candidate when it is mutually assignable with the inferred
-        // candidate. Otherwise, prefer the inferred candidate.
-        let candidates = match (inferred, declared) {
-            (Some(inferred), Some(declared))
-                if prefer_declared
-                    && inferred.is_assignable_to(db, env, declared)
-                    && declared.is_assignable_to(db, env, inferred) =>
-            {
-                [Some(declared), Some(inferred)]
-            }
-            (Some(inferred), _) => [Some(inferred), None],
-            (None, declared) => [declared, None],
-        };
-
-        for candidate in candidates.into_iter().flatten() {
-            if path_bound.accepts_candidate(db, env, builder, candidate) {
-                return PathBoundSolution::Solved(candidate);
-            }
+        // Preserve the solution inferred from the arguments if the return context permits it.
+        // For example, passing `identity(any_value)` to a parameter of type `int` leaves the
+        // result of the identity call as `Any`.
+        if path_bound.has_declared_evidence
+            && let PathBoundSolution::Solved(inferred) =
+                Self::solve_from_evidence(db, env, builder, path_bound, EvidenceSource::Inferred)
+            && !inferred.has_provisional_marker(db, env)
+            && path_bound.accepts_candidate(db, env, builder, inferred)
+        {
+            return PathBoundSolution::Solved(inferred);
         }
 
         default_solution
@@ -5860,7 +5769,6 @@ mod tests {
             inferable,
             evidence_lower: None,
             inferred_lower: None,
-            declared_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),
             has_declared_evidence: false,

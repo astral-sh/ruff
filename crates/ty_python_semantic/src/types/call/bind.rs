@@ -6942,15 +6942,7 @@ impl<'db> CallInference<'_, 'db> {
                 &mut builder,
                 errors,
                 &mut specialization_errors,
-                |_, bounds| {
-                    bounds.map(|bounds| {
-                        self.solve_typevar(
-                            constraints,
-                            bounds,
-                            self.call_expression_tcx.should_prefer_expected_type(),
-                        )
-                    })
-                },
+                |_, bounds| bounds.map(|bounds| self.solve_typevar(constraints, bounds)),
             );
             let (return_ty, arguments_validated) = self.select_return_type(inference);
             (inference, return_ty, arguments_validated)
@@ -7195,13 +7187,7 @@ impl<'db> CallInference<'_, 'db> {
         };
 
         let inference = builder.build_inference_with(report_diagnostics, |_, bounds| {
-            bounds.map(|bounds| {
-                self.solve_typevar(
-                    constraints,
-                    bounds,
-                    self.call_expression_tcx.should_prefer_expected_type(),
-                )
-            })
+            bounds.map(|bounds| self.solve_typevar(constraints, bounds))
         })?;
         let (return_ty, arguments_validated) = self.select_return_type(inference);
 
@@ -7225,19 +7211,11 @@ impl<'db> CallInference<'_, 'db> {
         &self,
         constraints: &ConstraintSetBuilder<'db>,
         bounds: &CandidateTypeVarSolution<'db>,
-        prefer_declared: bool,
     ) -> PathBoundSolution<'db> {
         let db = self.db;
         let typevar = bounds.bound_typevar;
 
-        CandidateSolutions::solve_with_preference(
-            db,
-            self.env,
-            constraints,
-            bounds,
-            prefer_declared,
-        )
-        .map(|solution| {
+        CandidateSolutions::default_solve(db, self.env, constraints, bounds).map(|solution| {
             let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, self.env);
 
             // For constrained TypeVars, the inferred type is already one of the
@@ -7341,7 +7319,7 @@ impl<'db> CallInference<'_, 'db> {
                         .apply_optional_specialization(db, preferred_specialization)
                         .is_assignable_to(db, self.env, ty)
                 }) {
-                    return Some(self.solve_typevar(constraints, bounds, true));
+                    return Some(self.solve_typevar(constraints, bounds));
                 }
             }
 
