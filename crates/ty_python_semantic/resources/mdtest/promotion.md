@@ -1027,6 +1027,86 @@ def _(a: A | None):
     return {}
 ```
 
+## Recursive aliases
+
+Collection inference promotes singleton types at every recursive level while retaining the alias
+name. Bottom materialization removes the added `Unknown` and restores the original type.
+
+```py
+from ty_extensions import Bottom
+from ty_extensions._internal import TypeOf
+
+Chain = tuple[None, "Chain"]
+
+def inspect(value: Chain):
+    promoted = [value][0]
+    reveal_type(promoted)  # revealed: Chain
+    reveal_type(promoted[1][1][0])  # revealed: None | Unknown
+    repeated = [promoted][0]
+    reveal_type(repeated[1][1][0])  # revealed: None | Unknown
+
+    def restored(value: Bottom[TypeOf[promoted]]):
+        reveal_type(value)  # revealed: Chain
+        reveal_type(value[1][1][0])  # revealed: None
+```
+
+Restoring singleton types preserves other promotions, such as converting a function to a callable.
+
+```py
+def leaf() -> int:
+    return 1
+
+Callbacks = tuple[TypeOf[leaf], None, "Callbacks"]
+
+def inspect_callbacks(value: Callbacks):
+    promoted = [value][0]
+    reveal_type(promoted[2][2][0])  # revealed: () -> int
+    reveal_type(promoted[2][2][1])  # revealed: None | Unknown
+
+    def restored(value: Bottom[TypeOf[promoted]]):
+        reveal_type(value)  # revealed: Callbacks
+        reveal_type(value[2][2][0])  # revealed: () -> int
+        reveal_type(value[2][2][1])  # revealed: None
+```
+
+## Recursive aliases with permuted arguments
+
+Permuting a fixed set of arguments can expose a singleton several levels into a recursive alias.
+Promotion still reaches that singleton.
+
+```py
+from typing import TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+D = TypeVar("D")
+E = TypeVar("E")
+Rotating = tuple[A, "Rotating[B, C, D, E, A]"]
+
+def inspect(value: Rotating[int, int, int, int, None]):
+    promoted = [value][0]
+    reveal_type(promoted[1][1][1][1][0])  # revealed: None | Unknown
+```
+
+## Recursive aliases with growing arguments
+
+Singleton promotion follows the variance at each level, including new containers introduced by
+recursive type arguments.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Nested = tuple[T, "Nested[list[T]]"]
+
+def inspect(value: Nested[None]):
+    promoted = [value][0]
+    reveal_type(promoted[0])  # revealed: None | Unknown
+    reveal_type(promoted[1][0])  # revealed: list[None]
+    reveal_type(promoted[1][1][0])  # revealed: list[list[None | Unknown]]
+```
+
 ## Module-literal types are not promoted
 
 Since module-literal types are "literal" types in a certain sense (each type is a singleton type),

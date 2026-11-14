@@ -24,11 +24,11 @@ use std::cell::{Cell, OnceCell, RefCell};
 use std::cmp::Eq;
 use std::collections::hash_map::Entry;
 use std::fmt;
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::marker::PhantomData;
 use std::mem;
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
@@ -42,7 +42,7 @@ use crate::types::{
 use crate::{Db, ProgramEnvironment};
 
 /// The type identity used for recursive checks/transformations.
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
@@ -50,7 +50,40 @@ pub enum TypeIdentity<'db> {
     GrowingTypeAlias(Definition<'db>),
     GrowingTypedDict(Definition<'db>),
     GrowingRecursive(Definition<'db>),
+    Union(Box<TypeIdentitySet<'db>>),
+    Intersection {
+        positive: Box<TypeIdentitySet<'db>>,
+        negative: Box<TypeIdentitySet<'db>>,
+    },
     Other(Type<'db>),
+}
+
+/// An unordered set of identities for union or intersection elements.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct TypeIdentitySet<'db>(FxHashSet<TypeIdentity<'db>>);
+
+impl<'db> TypeIdentitySet<'db> {
+    fn from_types(db: &'db dyn Db, types: impl IntoIterator<Item = Type<'db>>) -> Self {
+        Self(
+            types
+                .into_iter()
+                .map(|ty| ty.to_type_identity(db))
+                .collect(),
+        )
+    }
+}
+
+impl Hash for TypeIdentitySet<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // Equal sets can enumerate their elements in different orders.
+        let mut hashes: Vec<_> = self
+            .0
+            .iter()
+            .map(|item| FxBuildHasher.hash_one(item))
+            .collect();
+        hashes.sort_unstable();
+        hashes.hash(state);
+    }
 }
 
 impl<'db> Type<'db> {
@@ -78,6 +111,9 @@ impl<'db> Type<'db> {
             (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
             (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
             (Type::Recursive(a), Type::Recursive(b)) => a.definition(db) == b.definition(db),
+            (Type::Union(_), Type::Union(_)) | (Type::Intersection(_), Type::Intersection(_)) => {
+                true
+            }
             _ => false,
         }
     }
@@ -86,6 +122,22 @@ impl<'db> Type<'db> {
     #[inline(always)]
     fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
         match self {
+            // Preserve recursive identities inside unions and intersections even when their
+            // elements keep changing specialization.
+            Type::Union(union) => Some(TypeIdentity::Union(Box::new(TypeIdentitySet::from_types(
+                db,
+                union.elements(db).iter().copied(),
+            )))),
+            Type::Intersection(intersection) => Some(TypeIdentity::Intersection {
+                positive: Box::new(TypeIdentitySet::from_types(
+                    db,
+                    intersection.positive(db).iter().copied(),
+                )),
+                negative: Box::new(TypeIdentitySet::from_types(
+                    db,
+                    intersection.negative(db).iter().copied(),
+                )),
+            }),
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
             Type::FunctionLiteral(function) => {
@@ -1110,7 +1162,7 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct ActiveTypeTransformation<'db> {
     ty: Type<'db>,
     identity: TypeIdentity<'db>,

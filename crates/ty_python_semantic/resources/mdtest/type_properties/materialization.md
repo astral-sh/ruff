@@ -1520,6 +1520,35 @@ static_assert(not is_subtype_of(Top[WithAny[int]], Bottom[WithAny[int]]))
 static_assert(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))
 ```
 
+Materialization also applies to dynamic types introduced by later recursive arguments, even when the
+initial argument is fully static.
+
+```py
+Nested = tuple[T, "Nested[tuple[T, Any]]"]
+
+def inspect(top: Top[Nested[int]], bottom: Bottom[Nested[int]]):
+    reveal_type(top[0])  # revealed: int
+    reveal_type(top[1][0])  # revealed: tuple[int, object]
+    reveal_type(top[1][1][0])  # revealed: tuple[tuple[int, object], object]
+    reveal_type(bottom[1][1][0])  # revealed: tuple[tuple[int, Never], Never]
+```
+
+## Materialized recursive references
+
+A materialization on a recursive reference applies from that reference onward.
+
+```py
+from typing import Any
+from ty_extensions import Top
+
+Nested = tuple[Any, "Top[Nested]"]
+
+def inspect(value: Nested):
+    reveal_type(value[0])  # revealed: Any
+    reveal_type(value[1][0])  # revealed: object
+    reveal_type(value[1][1][0])  # revealed: object
+```
+
 ## Materialization does not force invalid recursive specializations
 
 An invalid self-referential bound must produce the expected diagnostics without forcing recursive
@@ -1742,6 +1771,31 @@ static_assert(is_equivalent_to(Top[Consumer], Callable[[Bottom[Consumer]], objec
 static_assert(is_equivalent_to(Bottom[Consumer], Callable[[Top[Consumer]], Bottom[Any]]))
 ```
 
+Extracting a recursive parameter repeatedly reverses the materialization at each level, including
+dynamic types introduced by growing type arguments.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+GrowingConsumer: TypeAlias = Callable[["GrowingConsumer[tuple[T, Any]]"], T]
+
+def output(f: Callable[..., T]) -> T:
+    raise NotImplementedError
+
+def parameter(f: Callable[[T], Any]) -> T:
+    raise NotImplementedError
+
+def inspect(top: Top[GrowingConsumer[int]]):
+    first = parameter(top)
+    second = parameter(first)
+    third = parameter(second)
+    reveal_type(output(top))  # revealed: int
+    reveal_type(output(first))  # revealed: tuple[int, Never]
+    reveal_type(output(second))  # revealed: tuple[tuple[int, object], object]
+    reveal_type(output(third))  # revealed: tuple[tuple[tuple[int, Never], Never], Never]
+```
+
 The same applies to mutually recursive legacy aliases.
 
 ```py
@@ -1750,6 +1804,39 @@ Factory: TypeAlias = Callable[[], Node]
 
 def call_mutual(bottom: Bottom[tuple[Node, Factory]]):
     static_assert(is_equivalent_to(TypeOf[bottom[1]()], Bottom[Node]))
+```
+
+## Specialization after recursive materialization
+
+Materializing a generic alias leaves its type parameters available for later specialization. TODO:
+Substituting `Any` afterward should preserve that new argument, as it does for a finite tuple.
+Recursive aliases currently apply their arguments before materializing, regardless of the order in
+which these operations were requested.
+
+```py
+from typing import Any, TypeAlias, TypeVar
+from ty_extensions import Bottom, Top
+
+T = TypeVar("T")
+Flat: TypeAlias = tuple[T, Any]
+FlatTop: TypeAlias = Top[Flat[T]]
+Recursive: TypeAlias = tuple[T, Any, "Recursive[T]"]
+RecursiveTop: TypeAlias = Top[Recursive[T]]
+RecursiveBottom: TypeAlias = Bottom[Recursive[T]]
+
+def specialize_after(flat: FlatTop[Any], top: RecursiveTop[Any], bottom: RecursiveBottom[Any]):
+    reveal_type(flat)  # revealed: tuple[Any, object]
+    reveal_type(top[0])  # revealed: object
+    reveal_type(top[1])  # revealed: object
+    reveal_type(top[2][0])  # revealed: object
+    reveal_type(top[2][1])  # revealed: object
+    reveal_type(bottom[0])  # revealed: Never
+    reveal_type(bottom[2][0])  # revealed: Never
+
+def materialize_after(top: Top[Recursive[Any]], bottom: Bottom[Recursive[Any]]):
+    reveal_type(top[0])  # revealed: object
+    reveal_type(top[2][0])  # revealed: object
+    reveal_type(bottom[0])  # revealed: Never
 ```
 
 ## Recursive function defaults
