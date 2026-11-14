@@ -51,13 +51,14 @@ impl RankBitBox {
     }
 
     pub fn from_bits(bits: RankBitBoxVec) -> Self {
+        let mut rank = 0u32;
         let chunk_ranks = bits
             .as_raw_slice()
             .iter()
-            .scan(0u32, |rank, chunk| {
-                let result = *rank;
-                *rank += chunk.count_ones();
-                Some(result)
+            .map(|chunk| {
+                let result = rank;
+                rank += chunk.count_ones();
+                result
             })
             .collect();
         let bits = bits.into();
