@@ -6,9 +6,10 @@ use lsp_server::RequestId;
 use lsp_types::WorkspaceDiagnosticRequest;
 use lsp_types::{
     FullDocumentDiagnosticReport, PreviousResultId, ProgressToken,
-    UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
-    WorkspaceDiagnosticReportPartialResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
+    UnchangedDocumentDiagnosticReport, Uri, WorkDoneProgressBegin, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceUnchangedDocumentDiagnosticReport,
 };
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
@@ -148,7 +149,12 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         let work_done_progress = LazyWorkDoneProgress::new(
             client,
             params.work_done_progress_params.work_done_token,
-            "Checking",
+            WorkDoneProgressBegin {
+                title: "Checking".into(),
+                cancellable: Some(false),
+                message: None,
+                percentage: Some(0),
+            },
             snapshot.resolved_client_capabilities(),
         );
         let mut reporter = WorkspaceDiagnosticsProgressReporter::new(work_done_progress, writer);

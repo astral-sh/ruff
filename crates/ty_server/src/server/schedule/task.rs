@@ -50,6 +50,8 @@ pub(in crate::server) enum Task {
 // as a reference, to create the inner 'static closure. That closure is then moved to a background task pool.
 pub(in crate::server) struct BackgroundTaskBuilder {
     pub(super) schedule: BackgroundSchedule,
+    /// The response to send if a cancelled request cannot be retried.
+    pub(in crate::server) cancellation_error: Option<fn() -> lsp_server::ResponseError>,
     pub(super) builder: BackgroundFnBuilder,
 }
 
@@ -59,12 +61,17 @@ pub(in crate::server) struct SyncTask {
 
 impl Task {
     /// Creates a new background task.
-    pub(crate) fn background<F>(schedule: BackgroundSchedule, func: F) -> Self
+    pub(crate) fn background<F>(
+        schedule: BackgroundSchedule,
+        cancellation_error: Option<fn() -> lsp_server::ResponseError>,
+        func: F,
+    ) -> Self
     where
         F: FnOnce(&Session) -> Box<dyn FnOnce(&Client) + Send + 'static> + 'static,
     {
         Self::Background(BackgroundTaskBuilder {
             schedule,
+            cancellation_error,
             builder: Box::new(func),
         })
     }

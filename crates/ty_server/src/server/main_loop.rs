@@ -1,9 +1,10 @@
-use crate::server::schedule::Scheduler;
-use crate::server::{Server, api};
+use crate::server::schedule::{Scheduler, Task};
+use crate::server::{MAX_QUEUED_REQUESTS, Server, api};
 use crate::session::client::{Client, ClientResponseHandler};
-use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
+use crate::session::{ClientOptions, Session, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
-use lsp_server::Message;
+use crossbeam::channel::TrySendError;
+use lsp_server::{ErrorCode, Message, Request, ResponseError};
 use lsp_types::Notification;
 use lsp_types::Uri;
 use ruff_db::system::SystemPathBuf;
@@ -37,7 +38,7 @@ impl Server {
                         continue;
                     };
 
-                    let task = match msg {
+                    match msg {
                         Message::Request(req) => {
                             self.session
                                 .request_queue_mut()
@@ -51,8 +52,8 @@ impl Server {
                                 );
                                 client.respond_err(
                                     req.id,
-                                    lsp_server::ResponseError {
-                                        code: lsp_server::ErrorCode::InvalidRequest as i32,
+                                    ResponseError {
+                                        code: ErrorCode::InvalidRequest as i32,
                                         message: "Shutdown already requested".to_owned(),
                                         data: None,
                                     },
@@ -60,7 +61,13 @@ impl Server {
                                 continue;
                             }
 
-                            api::request(req)
+                            dispatch_request(
+                                &mut scheduler,
+                                req,
+                                &mut self.session,
+                                &client,
+                                RequestAttempt::Initial,
+                            )?;
                         }
                         Message::Notification(notification) => {
                             if notification.method == lsp_types::ExitNotification::METHOD.as_str() {
@@ -74,7 +81,11 @@ impl Server {
                                 return Ok(());
                             }
 
-                            api::notification(notification)
+                            scheduler.dispatch(
+                                api::notification(notification),
+                                &mut self.session,
+                                &client,
+                            )?;
                         }
 
                         // Handle the response from the client to a server request
@@ -94,9 +105,7 @@ impl Server {
                             }
                             continue;
                         }
-                    };
-
-                    scheduler.dispatch(task, &mut self.session, client);
+                    }
                 }
                 Event::Action(action) => match action {
                     Action::SendResponse(response) => {
@@ -127,8 +136,13 @@ impl Server {
                             .incoming()
                             .is_pending(&request.id)
                         {
-                            let task = api::request(request);
-                            scheduler.dispatch(task, &mut self.session, client);
+                            dispatch_request(
+                                &mut scheduler,
+                                request,
+                                &mut self.session,
+                                &client,
+                                RequestAttempt::Retry,
+                            )?;
                         } else {
                             tracing::debug!(
                                 "Request {}/{} was cancelled, not retrying",
@@ -169,8 +183,7 @@ impl Server {
     ///
     /// Returns `Ok(None)` if the client connection is closed.
     fn next_event(&mut self) -> Result<Option<Event>, crossbeam::channel::RecvError> {
-        // Drain worker actions before dispatching more deferred requests. Otherwise, workers
-        // can block on the full action channel while this thread blocks on the full job queue.
+        // Deliver ready worker responses before replaying more deferred requests.
         if let Ok(event) = self.main_loop_receiver.try_recv() {
             return Ok(Some(event));
         }
@@ -201,6 +214,68 @@ impl Server {
         self.session
             .request_uninitialized_workspace_folder_configurations(client);
     }
+}
+
+/// Runs a synchronous request on the main loop or tries to queue a background request.
+///
+/// If the editor sends a hover request while the worker queue is full, we reply with
+/// `RequestFailed`. Waiting for a slot here would prevent the main loop from forwarding
+/// responses that workers have already produced. During a restart, the editor could also
+/// time out waiting for the main loop to handle `shutdown`.
+///
+/// An edit can also interrupt a completion that's already running. Normally we retry it.
+/// If shutdown has started, we return `ContentModified` so we don't restart work that
+/// shutdown just cancelled. We also return `ContentModified` if the queue is full.
+/// Posting another retry could keep the main loop busy until a worker frees a slot.
+fn dispatch_request(
+    scheduler: &mut Scheduler,
+    request: Request,
+    session: &mut Session,
+    client: &Client,
+    attempt: RequestAttempt,
+) -> crate::Result<()> {
+    let id = request.id.clone();
+    let task = api::request(request);
+    let retry_error = match (&task, attempt) {
+        (Task::Background(background), RequestAttempt::Retry) => background.cancellation_error,
+        _ => None,
+    };
+    if session.is_shutdown_requested()
+        && let Some(cancelled) = retry_error
+    {
+        client.respond_err(id, cancelled());
+        return Ok(());
+    }
+
+    match scheduler.dispatch(task, session, client) {
+        Ok(()) => Ok(()),
+        Err(TrySendError::Full(())) => {
+            tracing::warn!(
+                %id,
+                method = session.request_queue().incoming().method(&id),
+                ?attempt,
+                capacity = MAX_QUEUED_REQUESTS,
+                "Worker queue is full, cannot schedule request"
+            );
+            let error = match retry_error {
+                Some(cancelled) => cancelled(),
+                None => ResponseError {
+                    code: ErrorCode::RequestFailed as i32,
+                    message: "ty is busy: too many queued requests".to_owned(),
+                    data: None,
+                },
+            };
+            client.respond_err(id, error);
+            Ok(())
+        }
+        Err(TrySendError::Disconnected(())) => anyhow::bail!("Worker pool disconnected"),
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum RequestAttempt {
+    Initial,
+    Retry,
 }
 
 /// An action that should be performed on the main loop.
@@ -254,8 +329,6 @@ struct UvSyncWakeups(Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)>);
 
 impl UvSyncWakeups {
     /// Waits for a main-loop action, project wakeup, or client message, in that order.
-    /// Polling uv can wait for worker database snapshots, so drain the bounded action
-    /// channel before applying uv results. Handle both before accepting new requests.
     fn select(
         &self,
         connection: &crossbeam::channel::Receiver<Message>,
@@ -285,5 +358,73 @@ impl UvSyncWakeups {
         debug_assert_eq!(index, connection_index);
         // Ignore disconnect errors, they're handled by the main loop (it will exit).
         Ok(operation.recv(connection).ok().map(Event::Message))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroUsize;
+    use std::sync::Arc;
+
+    use crossbeam::channel::unbounded;
+    use lsp_server::{ErrorCode, Request};
+    use lsp_types::{CompletionRequest, Request as _};
+    use ruff_db::system::TestSystem;
+    use serde_json::json;
+
+    use super::{Action, Event, RequestAttempt, dispatch_request};
+    use crate::PositionEncoding;
+    use crate::capabilities::ResolvedClientCapabilities;
+    use crate::server::schedule::Scheduler;
+    use crate::session::client::Client;
+    use crate::session::{ClientName, InitializationOptions, Session};
+
+    #[test]
+    fn shutdown_finishes_pending_completion_retry() -> anyhow::Result<()> {
+        let mut session = Session::new(
+            ResolvedClientCapabilities::empty(),
+            PositionEncoding::default(),
+            vec![],
+            InitializationOptions::default(),
+            Arc::new(TestSystem::default()),
+            ClientName::Other,
+            true,
+        )?;
+        // A retry that reaches the worker would return InvalidParams for this unopened file.
+        let request = Request::new(
+            42.into(),
+            CompletionRequest::METHOD.to_string(),
+            json!({"textDocument": {"uri": "file:///example.py"}, "position": {"line": 0, "character": 0}}),
+        );
+        let id = request.id.clone();
+        session
+            .request_queue_mut()
+            .incoming_mut()
+            .register(id.clone(), request.method.clone());
+        session.set_shutdown_requested(true);
+
+        let (sender, actions) = unbounded();
+        let (writer, _messages) = unbounded();
+        let client = Client::new(sender, writer);
+        let mut scheduler = Scheduler::new(NonZeroUsize::MIN);
+        dispatch_request(
+            &mut scheduler,
+            request,
+            &mut session,
+            &client,
+            RequestAttempt::Retry,
+        )?;
+        drop(scheduler);
+
+        let Event::Action(Action::SendResponse(response)) = actions.try_recv()? else {
+            anyhow::bail!("expected a response to the pending completion request");
+        };
+        assert_eq!(response.id, id);
+        assert_eq!(
+            response.response_result.unwrap_err().code,
+            ErrorCode::ContentModified as i32
+        );
+        assert!(actions.is_empty());
+        Ok(())
     }
 }
