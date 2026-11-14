@@ -40,6 +40,14 @@ use ty_python_core::{
     semantic_index,
 };
 
+/// Two properties used while binding receivers and checking arguments. Both inspect alias
+/// arguments without expanding alias bodies or other lazy attributes.
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct TypeVarMarkers {
+    pub(super) typing_self: bool,
+    unspecialized: bool,
+}
+
 impl<'db> Type<'db> {
     pub(crate) const fn is_type_var(self) -> bool {
         matches!(self, Type::TypeVar(_))
@@ -144,11 +152,60 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        // Contextual inference must not adopt an alias whose arguments still
-        // contain placeholders from an enclosing generic call.
-        any_over_type_including_alias_arguments(db, env, self, |ty| {
-            matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
-        })
+        self.typevar_markers(db, env).map_or_else(
+            || {
+                any_over_type_including_alias_arguments(db, env, self, |ty| {
+                    matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
+                })
+            },
+            |markers| markers.unspecialized,
+        )
+    }
+
+    /// Collect the markers in a single pass. If inference reaches this search recursively,
+    /// let the caller fall back to its original short-circuiting search.
+    pub(super) fn typevar_markers(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<TypeVarMarkers> {
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[expect(
+            clippy::unnecessary_wraps,
+            reason = "return None if the search encounters a Salsa cycle"
+        )]
+        fn collect<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: Type<'db>,
+        ) -> Option<TypeVarMarkers> {
+            let markers = Cell::new(TypeVarMarkers::default());
+            let env = ProgramEnvironment::from_program(program);
+            any_over_type_including_alias_arguments(db, &env, ty, |nested| {
+                let mut found = markers.get();
+                match nested {
+                    Type::TypeVar(typevar) => found.typing_self |= typevar.typevar(db).is_self(db),
+                    Type::Dynamic(DynamicType::UnspecializedTypeVar) => found.unspecialized = true,
+                    _ => return false,
+                }
+                markers.set(found);
+                found.typing_self && found.unspecialized
+            });
+            Some(markers.get())
+        }
+
+        match TypeKind::from(self) {
+            TypeKind::Atomic => Some(TypeVarMarkers {
+                typing_self: false,
+                unspecialized: matches!(self, Self::Dynamic(DynamicType::UnspecializedTypeVar)),
+            }),
+            TypeKind::NonAtomic(NonAtomicType::NominalInstance(instance))
+                if !instance.is_definition_generic(db) =>
+            {
+                Some(TypeVarMarkers::default())
+            }
+            TypeKind::NonAtomic(_) => collect(db, env.program(db), self),
+        }
     }
 
     pub(crate) fn has_provisional_marker(
