@@ -8511,10 +8511,35 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        self.try_call_dunder_with_policy_and_receiver(
+            db,
+            env,
+            name,
+            argument_types,
+            tcx,
+            policy,
+            None,
+        )
+    }
+
+    /// Call a dunder looked up on the meta-type of `self`, using `receiver` for descriptor and
+    /// `Self` binding when supplied.
+    #[expect(clippy::too_many_arguments)]
+    fn try_call_dunder_with_policy_and_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
+        receiver: Option<Type<'db>>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         if let Type::Intersection(intersection) = self {
+            let receiver = receiver.unwrap_or(self);
             return intersection
-                .try_call_dunder_with_policy(db, env, self, name, argument_types, tcx, policy)
-                .map(|bindings| bindings.into_bindings(self));
+                .try_call_dunder_with_policy(db, env, receiver, name, argument_types, tcx, policy)
+                .map(|bindings| bindings.into_bindings(receiver));
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
@@ -8522,14 +8547,14 @@ impl<'db> Type<'db> {
         let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
         if let Type::Union(union) = self {
             return union.try_call_dunder(db, env, argument_types, tcx, |element| {
-                element.member_lookup_with_policy_and_receiver(db, env, name, policy, None)
+                lookup_member_on_union_element(db, env, element, name, policy, receiver)
             });
         }
 
         Self::try_call_dunder_member_impl(
             db,
             env,
-            self.member_lookup_with_policy_and_receiver(db, env, name, policy, None),
+            self.member_lookup_with_policy_and_receiver(db, env, name, policy, receiver),
             argument_types,
             tcx,
         )
@@ -8816,17 +8841,7 @@ impl<'db> Type<'db> {
                         .map(|e| e.flatten_typevars(db, env)),
                 )
             }
-            Type::Intersection(intersection) => {
-                // Flatten each positive element and rebuild through the intersection builder.
-                let mut builder = IntersectionBuilder::new(db, env);
-                for pos in intersection.positive(db) {
-                    builder.add_positive_in_place(pos.flatten_typevars(db, env));
-                }
-                for neg in intersection.negative(db) {
-                    builder.add_negative_in_place(neg.flatten_typevars(db, env));
-                }
-                builder.build()
-            }
+            Type::Intersection(intersection) => intersection.flatten_typevars(db, env),
             // Don't descend into other types; only flatten top-level typevars.
             _ => self,
         }
