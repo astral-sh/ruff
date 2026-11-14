@@ -46,3 +46,34 @@ F823 Local variable `sys` referenced before assignment
 63 |
 64 |     for sys in range(5):
    |
+
+F823 Local variable `x` referenced before assignment
+  --> F823.py:90:11
+   |
+89 | def f():
+90 |     print(x)
+   |           ^
+91 |     x = 2
+92 |     x = 3
+   |
+
+F823 Local variable `x` referenced before assignment
+  --> F823.py:97:9
+   |
+95 | def f(c):
+96 |     if c:
+97 |         x += 1
+   |         ^
+98 |     if c:
+99 |         x += 1
+   |
+
+F823 Local variable `x` referenced before assignment
+   --> F823.py:103:11
+    |
+102 | def g():
+103 |     print(x)
+    |           ^
+104 |     try:
+105 |         pass
+    |

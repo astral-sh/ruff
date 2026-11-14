@@ -80,3 +80,36 @@ def f():
     import sklearn
 
     mlflow
+
+
+# https://github.com/astral-sh/ruff/issues/30224
+x = 1
+
+
+def f():
+    print(x)
+    x = 2
+    x = 3
+
+
+def f(c):
+    if c:
+        x += 1
+    if c:
+        x += 1
+
+
+def g():
+    print(x)
+    try:
+        pass
+    except ValueError as x:
+        pass
+
+
+def h():
+    try:
+        pass
+    except ValueError as x:
+        pass
+    print(x)  # `UnboundLocalError` at runtime, but not reported, like pyflakes
