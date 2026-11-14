@@ -142,6 +142,24 @@ reveal_type(select_text)  # revealed: partial[(value: str) -> str]
 select_text(1)  # error: [invalid-argument-type]
 ```
 
+When the literal excludes the first overload, the next matching overload can still win over a
+broader fallback.
+
+```py
+from typing import Literal, overload
+
+@overload
+def decode(kind: Literal["text"], value: int) -> bytes: ...
+@overload
+def decode(kind: Literal["number"], value: int) -> int: ...
+@overload
+def decode(kind: str, value: object) -> object: ...
+def decode(kind: str, value: object) -> object:
+    return value
+
+reveal_type(decode("number", 1))  # revealed: int
+```
+
 ### Type context when no overload matches
 
 Both overloads reject the value, but only the first also rejects the key. The second overload
