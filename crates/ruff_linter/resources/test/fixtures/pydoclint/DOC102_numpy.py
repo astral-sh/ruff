@@ -462,3 +462,51 @@ def add_numbers(a, b):
         The sum of the two numbers.
     """
     return a + b
+
+
+# DOC102 - An unknown section does not hide an earlier extra parameter.
+def extra_before_unknown_section(value):
+    """Describe a value.
+
+    Parameters
+    ----------
+    value : int
+        A value.
+    extra : int
+        An extra parameter.
+
+    Note
+    ----
+    explanation
+    """
+    return value
+
+
+# DOC102 - Blank lines do not end an untyped parameter list.
+def extra_untyped_parameter(value):
+    """Describe a value.
+
+    Parameters
+    ----------
+    value
+
+    extra
+        An extra parameter.
+    """
+    return value
+
+
+# DOC102 - Indented headings do not hide later extra parameters.
+def extra_after_indented_heading(value):
+    """Describe a value.
+
+    Parameters
+    ----------
+    value : int
+        Note
+        ----
+        More information about the value.
+    extra : int
+        An extra parameter.
+    """
+    return value

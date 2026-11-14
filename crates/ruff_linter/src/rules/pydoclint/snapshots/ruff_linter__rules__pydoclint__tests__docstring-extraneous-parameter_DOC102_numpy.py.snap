@@ -220,3 +220,38 @@ DOC102 Documented parameter `extra_param` is not in the function's signature
 419 |         Extra parameter not in signature.
     |
 help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `extra` is not in the function's signature
+   --> DOC102_numpy.py:475:5
+    |
+473 |     value : int
+474 |         A value.
+475 |     extra : int
+    |     ^^^^^
+476 |         An extra parameter.
+    |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `extra` is not in the function's signature
+   --> DOC102_numpy.py:493:5
+    |
+491 |     value
+492 |
+493 |     extra
+    |     ^^^^^
+494 |         An extra parameter.
+495 |     """
+    |
+help: Remove the extraneous parameter from the docstring
+
+DOC102 Documented parameter `extra` is not in the function's signature
+   --> DOC102_numpy.py:509:5
+    |
+507 |         ----
+508 |         More information about the value.
+509 |     extra : int
+    |     ^^^^^
+510 |         An extra parameter.
+511 |     """
+    |
+help: Remove the extraneous parameter from the docstring
