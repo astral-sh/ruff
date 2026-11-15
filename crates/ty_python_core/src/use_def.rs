@@ -3383,23 +3383,20 @@ impl<'db> UseDefMapBuilder<'db> {
                 .map(|(use_id, bindings)| (use_id, place_state_interner.intern_bindings(&bindings)))
                 .collect(),
         );
-        let symbol_states = self
+        let end_of_scope_symbols = self
             .symbol_states
             .into_iter()
-            .map(|state| Rc::unwrap_or_clone(state.state))
+            .map(|state| {
+                let (bindings, declarations) = Rc::unwrap_or_clone(state.state).into_parts();
+                place_state_interner.retain_place_state(&bindings, declarations)
+            })
             .collect();
-        let member_states = self
+        let end_of_scope_members = self
             .member_states
             .into_iter()
-            .map(|state| Rc::unwrap_or_clone(state.state))
-            .collect();
-        let end_of_scope_symbols = Self::intern_place_states(
-            symbol_states,
-            PlaceState::into_parts,
-            &mut place_state_interner,
-        );
+            .map(|state| Rc::unwrap_or_clone(state.state));
         let end_of_scope_members =
-            Self::intern_end_of_scope_members(member_states, &mut place_state_interner);
+            Self::intern_end_of_scope_members(end_of_scope_members, &mut place_state_interner);
         let symbol_states = Self::intern_reachable_place_states(
             end_of_scope_symbols,
             self.reachable_symbol_definitions,
@@ -3583,24 +3580,8 @@ impl<'db> UseDefMapBuilder<'db> {
         FrozenMap::from_entries(interned_ids_by_definition)
     }
 
-    fn intern_place_states<I: Idx, T>(
-        place_states: IndexVec<I, T>,
-        get_parts: impl Fn(T) -> (Bindings, Declarations),
-        place_state_interner: &mut PlaceStateInterner,
-    ) -> IndexVec<I, InternedPlaceStateId> {
-        let mut interned_ids_by_place = IndexVec::with_capacity(place_states.len());
-
-        for place_state in place_states {
-            let (bindings, declarations) = get_parts(place_state);
-            let interned_id = place_state_interner.retain_place_state(&bindings, declarations);
-            interned_ids_by_place.push(interned_id);
-        }
-
-        interned_ids_by_place
-    }
-
     fn intern_end_of_scope_members(
-        end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
+        end_of_scope_members: impl ExactSizeIterator<Item = PlaceState>,
         place_state_interner: &mut PlaceStateInterner,
     ) -> IndexVec<ScopedMemberId, InternedPlaceStateId> {
         let mut interned_ids_by_member = IndexVec::with_capacity(end_of_scope_members.len());
