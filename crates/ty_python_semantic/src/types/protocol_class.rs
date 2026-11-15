@@ -3840,20 +3840,23 @@ pub(super) fn has_all_protocol_members_defined<'db>(
             {
                 let program = class.class_literal(db).program_file(db).program(db);
                 let object_names = object_member_names(db, program);
-                let mro = class.iter_mro(db);
-                for member in target_interface.members(db) {
-                    let name = member.name();
-                    if !object_names.contains(name)
-                        && !mro.clone().filter_map(ClassBase::into_class).any(|base| {
+                // Probe at most one name: if the protocols are compatible, scanning every
+                // member here would duplicate work in the full interface comparison below.
+                if let Some(member) = target_interface
+                    .members(db)
+                    .find(|member| !object_names.contains(member.name()))
+                    && !class
+                        .iter_mro(db)
+                        .filter_map(ClassBase::into_class)
+                        .any(|base| {
                             base.static_class_literal(db).is_some_and(|(base, _)| {
                                 place_table(db, base.body_scope(db))
-                                    .symbol_id(name)
+                                    .symbol_id(member.name())
                                     .is_some()
                             })
                         })
-                    {
-                        return false;
-                    }
+                {
+                    return false;
                 }
             }
 
