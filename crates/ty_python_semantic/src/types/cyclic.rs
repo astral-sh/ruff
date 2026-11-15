@@ -80,8 +80,10 @@ impl<'db> Type<'db> {
                 Type::TypedDict(TypedDictType::Class(a)),
                 Type::TypedDict(TypedDictType::Class(b)),
             ) => {
-                // Only a static class can have a GrowingTypedDict identity. Its body scope
-                // identifies the definition even if decorators changed the class metadata.
+                // Different specializations of the same recursive TypedDict can form a cycle.
+                // Each class statement has a unique body scope, so comparing scopes tells us
+                // whether the types came from the same class, even after decorators.
+                // Other TypedDicts can only match by exact equality, which we checked above.
                 matches!(
                     (a.class_literal(db).as_static(), b.class_literal(db).as_static()),
                     (Some(a), Some(b)) if a.body_scope(db) == b.body_scope(db)
