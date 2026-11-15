@@ -76,7 +76,17 @@ impl<'db> Type<'db> {
                 a.definition(db) == b.definition(db)
             }
             (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
-            (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
+            (
+                Type::TypedDict(TypedDictType::Class(a)),
+                Type::TypedDict(TypedDictType::Class(b)),
+            ) => {
+                // Only a static class can have a GrowingTypedDict identity. Its body scope
+                // identifies the definition even if decorators changed the class metadata.
+                matches!(
+                    (a.class_literal(db).as_static(), b.class_literal(db).as_static()),
+                    (Some(a), Some(b)) if a.body_scope(db) == b.body_scope(db)
+                )
+            }
             (Type::Recursive(a), Type::Recursive(b)) => a.definition(db) == b.definition(db),
             _ => false,
         }
