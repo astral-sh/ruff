@@ -8922,7 +8922,7 @@ class Options(TypedDict):
     enabled: bool
 
 def handler(options: Options) -> Callable[[str], int]:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return options.get("handler", lambda name: len(name))
 ```
 

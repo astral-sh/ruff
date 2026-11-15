@@ -76,7 +76,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<StringLiteralType<'db>> {
         // A return annotation or an enclosing call can use the full overload set
         // to specialize the default argument, even when the key is declared.
-        if result_context.declared_type().is_some() {
+        if result_context.expected_type().is_some() {
             return None;
         }
         let key = Self::literal_get_key(call)?;
