@@ -3833,6 +3833,30 @@ pub(super) fn has_all_protocol_members_defined<'db>(
 
     match ty {
         Type::ProtocolInstance(source_protocol) => {
+            // Specializing a generic protocol's interface computes the types of all its members.
+            // A missing name can rule out compatibility before we need any of those types.
+            if let Some(class) = source_protocol.class_origin(db)
+                && matches!(*class, ClassType::Generic(_))
+            {
+                let program = class.class_literal(db).program_file(db).program(db);
+                let object_names = object_member_names(db, program);
+                let mro = class.iter_mro(db);
+                for member in target_interface.members(db) {
+                    let name = member.name();
+                    if !object_names.contains(name)
+                        && !mro.clone().filter_map(ClassBase::into_class).any(|base| {
+                            base.static_class_literal(db).is_some_and(|(base, _)| {
+                                place_table(db, base.body_scope(db))
+                                    .symbol_id(name)
+                                    .is_some()
+                            })
+                        })
+                    {
+                        return false;
+                    }
+                }
+            }
+
             let source_interface = source_protocol.interface(db);
 
             (source_interface.member_count(db) >= target_interface.member_count(db)
