@@ -6205,8 +6205,9 @@ struct CallInference<'a, 'db> {
     heap_size = ruff_memory_usage::heap_size,
 )]
 #[allow(
+    clippy::boxed_local,
     clippy::needless_pass_by_value,
-    reason = "Salsa owns the argument evidence"
+    reason = "Salsa owns the boxed argument evidence in the query key"
 )]
 fn shared_call_type_arguments<'db>(
     db: &'db dyn Db,
