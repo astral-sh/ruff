@@ -139,42 +139,38 @@ Unlike Black, Ruff preserves the indentation of a single multiline-string argume
 ```python
 # Input
 call(
-  """"
-  A multiline
-  string
-  """
+    """
+    A multiline
+    string
+    """
 )
 
-dedent(""""
+dedent("""
     A multiline
     string
 """)
 
 # Black
-call(
-  """"
-  A multiline
-  string
-  """
-)
+call("""
+    A multiline
+    string
+    """)
 
-dedent(
-  """"
-  A multiline
-  string
-"""
-)
+dedent("""
+    A multiline
+    string
+""")
 
 
 # Ruff
 call(
-  """"
-  A multiline
-  string
-  """
+    """
+    A multiline
+    string
+    """
 )
 
-dedent(""""
+dedent("""
     A multiline
     string
 """)
