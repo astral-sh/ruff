@@ -39,3 +39,24 @@ __all__ = [
     "B",  # 2
     # 3
 ]
+
+# Tuples of a single name
+__all__ = ("A", "A", "A")
+__all__ = ("A", "A",)
+__all__ = ("A", "A")
+__all__ = "A", "A",
+__all__ = "A", "A"
+__all__ = (
+    "A",
+    "A",
+)
+__all__ = (
+    "A",
+    "A"
+)
+__all__ = (
+    "A",
+    "A"  # unsafe
+)
+__all__ = ("A", ("A"),)
+__all__ = ("A", ("A"))

@@ -1,6 +1,6 @@
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
-use ruff_diagnostics::{Applicability, Fix};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
@@ -167,14 +167,20 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
             diagnostic.set_primary_annotation_message(format_args!("`{name}` duplicated here"));
 
             diagnostic.try_set_fix(|| {
-                edits::remove_member(elts, index, source).map(|edit| {
-                    let applicability = if checker.comment_ranges().intersects(edit.range()) {
-                        Applicability::Unsafe
-                    } else {
-                        Applicability::Safe
-                    };
-                    Fix::applicable_edit(edit, applicability)
-                })
+                let edit = if value.is_tuple_expr() && elts.len() == 2 {
+                    // Ensure a trailing comma is present, otherwise we can create a parenthesized
+                    // expression instead of a tuple
+                    let first = checker.locator().slice(previous_expr);
+                    Edit::range_replacement(format!("({first},)"), value.range())
+                } else {
+                    edits::remove_member(elts, index, source)?
+                };
+                let applicability = if checker.comment_ranges().intersects(edit.range()) {
+                    Applicability::Unsafe
+                } else {
+                    Applicability::Safe
+                };
+                Ok(Fix::applicable_edit(edit, applicability))
             });
         }
     }

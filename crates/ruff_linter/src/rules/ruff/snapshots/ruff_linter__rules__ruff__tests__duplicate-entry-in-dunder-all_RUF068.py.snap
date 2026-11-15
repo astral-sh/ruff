@@ -237,3 +237,226 @@ help: Remove duplicate entries from `__all__`
 37 |     "B",  # 2
    |
 note: This is an unsafe fix and may change runtime behavior
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:44:17
+   |
+43 | # Tuples of a single name
+44 | __all__ = ("A", "A", "A")
+   |            ---  ^^^ `A` duplicated here
+   |            |
+   |            previous occurrence of `A` here
+45 | __all__ = ("A", "A",)
+46 | __all__ = ("A", "A")
+   |
+help: Remove duplicate entries from `__all__`
+   |
+43 | # Tuples of a single name
+   - __all__ = ("A", "A", "A")
+44 + __all__ = ("A", "A")
+45 | __all__ = ("A", "A",)
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:44:22
+   |
+43 | # Tuples of a single name
+44 | __all__ = ("A", "A", "A")
+   |                 ---  ^^^ `A` duplicated here
+   |                 |
+   |                 previous occurrence of `A` here
+45 | __all__ = ("A", "A",)
+46 | __all__ = ("A", "A")
+   |
+help: Remove duplicate entries from `__all__`
+   |
+43 | # Tuples of a single name
+   - __all__ = ("A", "A", "A")
+44 + __all__ = ("A", "A")
+45 | __all__ = ("A", "A",)
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:45:17
+   |
+43 | # Tuples of a single name
+44 | __all__ = ("A", "A", "A")
+45 | __all__ = ("A", "A",)
+   |            ---  ^^^ `A` duplicated here
+   |            |
+   |            previous occurrence of `A` here
+46 | __all__ = ("A", "A")
+47 | __all__ = "A", "A",
+   |
+help: Remove duplicate entries from `__all__`
+   |
+44 | __all__ = ("A", "A", "A")
+   - __all__ = ("A", "A",)
+45 + __all__ = ("A",)
+46 | __all__ = ("A", "A")
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:46:17
+   |
+44 | __all__ = ("A", "A", "A")
+45 | __all__ = ("A", "A",)
+46 | __all__ = ("A", "A")
+   |            ---  ^^^ `A` duplicated here
+   |            |
+   |            previous occurrence of `A` here
+47 | __all__ = "A", "A",
+48 | __all__ = "A", "A"
+   |
+help: Remove duplicate entries from `__all__`
+   |
+45 | __all__ = ("A", "A",)
+   - __all__ = ("A", "A")
+46 + __all__ = ("A",)
+47 | __all__ = "A", "A",
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:47:16
+   |
+45 | __all__ = ("A", "A",)
+46 | __all__ = ("A", "A")
+47 | __all__ = "A", "A",
+   |           ---  ^^^ `A` duplicated here
+   |           |
+   |           previous occurrence of `A` here
+48 | __all__ = "A", "A"
+49 | __all__ = (
+   |
+help: Remove duplicate entries from `__all__`
+   |
+46 | __all__ = ("A", "A")
+   - __all__ = "A", "A",
+47 + __all__ = ("A",)
+48 | __all__ = "A", "A"
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:48:16
+   |
+46 | __all__ = ("A", "A")
+47 | __all__ = "A", "A",
+48 | __all__ = "A", "A"
+   |           ---  ^^^ `A` duplicated here
+   |           |
+   |           previous occurrence of `A` here
+49 | __all__ = (
+50 |     "A",
+   |
+help: Remove duplicate entries from `__all__`
+   |
+47 | __all__ = "A", "A",
+   - __all__ = "A", "A"
+48 + __all__ = ("A",)
+49 | __all__ = (
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:51:5
+   |
+48 | __all__ = "A", "A"
+49 | __all__ = (
+50 |     "A",
+   |     --- previous occurrence of `A` here
+51 |     "A",
+   |     ^^^ `A` duplicated here
+52 | )
+53 | __all__ = (
+   |
+help: Remove duplicate entries from `__all__`
+   |
+48 | __all__ = "A", "A"
+   - __all__ = (
+   -     "A",
+   -     "A",
+   - )
+49 + __all__ = ("A",)
+50 | __all__ = (
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:55:5
+   |
+52 | )
+53 | __all__ = (
+54 |     "A",
+   |     --- previous occurrence of `A` here
+55 |     "A"
+   |     ^^^ `A` duplicated here
+56 | )
+57 | __all__ = (
+   |
+help: Remove duplicate entries from `__all__`
+   |
+52 | )
+   - __all__ = (
+   -     "A",
+   -     "A"
+   - )
+53 + __all__ = ("A",)
+54 | __all__ = (
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:59:5
+   |
+56 | )
+57 | __all__ = (
+58 |     "A",
+   |     --- previous occurrence of `A` here
+59 |     "A"  # unsafe
+   |     ^^^ `A` duplicated here
+60 | )
+61 | __all__ = ("A", ("A"),)
+   |
+help: Remove duplicate entries from `__all__`
+   |
+56 | )
+   - __all__ = (
+   -     "A",
+   -     "A"  # unsafe
+   - )
+57 + __all__ = ("A",)
+58 | __all__ = ("A", ("A"),)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:61:18
+   |
+59 |     "A"  # unsafe
+60 | )
+61 | __all__ = ("A", ("A"),)
+   |            ---   ^^^ `A` duplicated here
+   |            |
+   |            previous occurrence of `A` here
+62 | __all__ = ("A", ("A"))
+   |
+help: Remove duplicate entries from `__all__`
+   |
+60 | )
+   - __all__ = ("A", ("A"),)
+61 + __all__ = ("A",)
+62 | __all__ = ("A", ("A"))
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:62:18
+   |
+60 | )
+61 | __all__ = ("A", ("A"),)
+62 | __all__ = ("A", ("A"))
+   |            ---   ^^^ `A` duplicated here
+   |            |
+   |            previous occurrence of `A` here
+help: Remove duplicate entries from `__all__`
+   |
+61 | __all__ = ("A", ("A"),)
+   - __all__ = ("A", ("A"))
+62 + __all__ = ("A",)
+   |
