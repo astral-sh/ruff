@@ -3394,9 +3394,11 @@ impl<'db> UseDefMapBuilder<'db> {
         let end_of_scope_members = self
             .member_states
             .into_iter()
-            .map(|state| Rc::unwrap_or_clone(state.state));
-        let end_of_scope_members =
-            Self::intern_end_of_scope_members(end_of_scope_members, &mut place_state_interner);
+            .map(|state| {
+                let (bindings, declarations) = Rc::unwrap_or_clone(state.state).into_parts();
+                place_state_interner.intern_place_state(&bindings, declarations)
+            })
+            .collect();
         let symbol_states = Self::intern_reachable_place_states(
             end_of_scope_symbols,
             self.reachable_symbol_definitions,
@@ -3578,33 +3580,6 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         FrozenMap::from_entries(interned_ids_by_definition)
-    }
-
-    fn intern_end_of_scope_members(
-        end_of_scope_members: impl ExactSizeIterator<Item = PlaceState>,
-        place_state_interner: &mut PlaceStateInterner,
-    ) -> IndexVec<ScopedMemberId, InternedPlaceStateId> {
-        let mut interned_ids_by_member = IndexVec::with_capacity(end_of_scope_members.len());
-        let mut interned_ids_by_place_state =
-            FxHashMap::with_capacity_and_hasher(end_of_scope_members.len(), FxBuildHasher);
-
-        for place_state in end_of_scope_members {
-            let interned_id = match interned_ids_by_place_state.entry(place_state) {
-                Entry::Occupied(entry) => *entry.get(),
-                Entry::Vacant(entry) => {
-                    let place_state = entry.key();
-                    let interned_id = place_state_interner.intern_place_state(
-                        place_state.bindings(),
-                        place_state.declarations().clone(),
-                    );
-                    entry.insert(interned_id);
-                    interned_id
-                }
-            };
-            interned_ids_by_member.push(interned_id);
-        }
-
-        interned_ids_by_member
     }
 
     fn intern_enclosing_snapshots(
