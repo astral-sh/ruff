@@ -237,3 +237,120 @@ help: Remove duplicate entries from `__all__`
 37 |     "B",  # 2
    |
 note: This is an unsafe fix and may change runtime behavior
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:44:25
+   |
+43 | # Parenthesized duplicates (issue #30343)
+44 | __all__ = ["a", ("b"), ("b")]
+   |                  ---    ^^^ `b` duplicated here
+   |                  |
+   |                  previous occurrence of `b` here
+45 | __all__ = ["a", ("a"), "b"]
+46 | __all__ = [("a"), "a", "b"]
+   |
+help: Remove duplicate entries from `__all__`
+   |
+43 | # Parenthesized duplicates (issue #30343)
+   - __all__ = ["a", ("b"), ("b")]
+44 + __all__ = ["a", ("b")]
+45 | __all__ = ["a", ("a"), "b"]
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:45:18
+   |
+43 | # Parenthesized duplicates (issue #30343)
+44 | __all__ = ["a", ("b"), ("b")]
+45 | __all__ = ["a", ("a"), "b"]
+   |            ---   ^^^ `a` duplicated here
+   |            |
+   |            previous occurrence of `a` here
+46 | __all__ = [("a"), "a", "b"]
+47 | __all__ = [(("a")), "a"]
+   |
+help: Remove duplicate entries from `__all__`
+   |
+44 | __all__ = ["a", ("b"), ("b")]
+   - __all__ = ["a", ("a"), "b"]
+45 + __all__ = ["a", "b"]
+46 | __all__ = [("a"), "a", "b"]
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:46:19
+   |
+44 | __all__ = ["a", ("b"), ("b")]
+45 | __all__ = ["a", ("a"), "b"]
+46 | __all__ = [("a"), "a", "b"]
+   |             ---   ^^^ `a` duplicated here
+   |             |
+   |             previous occurrence of `a` here
+47 | __all__ = [(("a")), "a"]
+48 | __all__: tuple[str, ...] = ("a", ("b"), ("b"))
+   |
+help: Remove duplicate entries from `__all__`
+   |
+45 | __all__ = ["a", ("a"), "b"]
+   - __all__ = [("a"), "a", "b"]
+46 + __all__ = [("a"), "b"]
+47 | __all__ = [(("a")), "a"]
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:47:21
+   |
+45 | __all__ = ["a", ("a"), "b"]
+46 | __all__ = [("a"), "a", "b"]
+47 | __all__ = [(("a")), "a"]
+   |              ---    ^^^ `a` duplicated here
+   |              |
+   |              previous occurrence of `a` here
+48 | __all__: tuple[str, ...] = ("a", ("b"), ("b"))
+49 | __all__ = [
+   |
+help: Remove duplicate entries from `__all__`
+   |
+46 | __all__ = [("a"), "a", "b"]
+   - __all__ = [(("a")), "a"]
+47 + __all__ = [(("a"))]
+48 | __all__: tuple[str, ...] = ("a", ("b"), ("b"))
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:48:42
+   |
+46 | __all__ = [("a"), "a", "b"]
+47 | __all__ = [(("a")), "a"]
+48 | __all__: tuple[str, ...] = ("a", ("b"), ("b"))
+   |                                   ---    ^^^ `b` duplicated here
+   |                                   |
+   |                                   previous occurrence of `b` here
+49 | __all__ = [
+50 |     "a",
+   |
+help: Remove duplicate entries from `__all__`
+   |
+47 | __all__ = [(("a")), "a"]
+   - __all__: tuple[str, ...] = ("a", ("b"), ("b"))
+48 + __all__: tuple[str, ...] = ("a", ("b"))
+49 | __all__ = [
+   |
+
+RUF068 [*] `__all__` contains duplicate entries
+  --> RUF068.py:52:6
+   |
+49 | __all__ = [
+50 |     "a",
+51 |     ("b"),
+   |      --- previous occurrence of `b` here
+52 |     ("b"),
+   |      ^^^ `b` duplicated here
+53 | ]
+   |
+help: Remove duplicate entries from `__all__`
+   |
+51 |     ("b"),
+   -     ("b"),
+52 | ]
+   |

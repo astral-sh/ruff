@@ -39,3 +39,15 @@ __all__ = [
     "B",  # 2
     # 3
 ]
+
+# Parenthesized duplicates (issue #30343)
+__all__ = ["a", ("b"), ("b")]
+__all__ = ["a", ("a"), "b"]
+__all__ = [("a"), "a", "b"]
+__all__ = [(("a")), "a"]
+__all__: tuple[str, ...] = ("a", ("b"), ("b"))
+__all__ = [
+    "a",
+    ("b"),
+    ("b"),
+]

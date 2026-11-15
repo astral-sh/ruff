@@ -34,3 +34,20 @@ correct_set = {"value1", 23, 5}
 correct_set = {5, "5"}
 correct_set = {5}
 correct_set = {}
+
+# Parenthesized duplicates (issue #30343)
+incorrect_set = {1, (1)}
+incorrect_set = {1, (1), 2}
+incorrect_set = {(1), 1}
+incorrect_set = {((1)), 1}
+incorrect_set = {
+    1,
+    (1),
+}
+incorrect_set = {
+    (1),
+    1,
+}
+incorrect_set = {1, (1),}
+incorrect_set = {1, (1  # comment
+), 2}

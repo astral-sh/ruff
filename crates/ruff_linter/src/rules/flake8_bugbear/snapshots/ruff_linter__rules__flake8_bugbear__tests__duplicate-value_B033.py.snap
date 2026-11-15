@@ -202,3 +202,160 @@ help: Remove duplicate item
 26 | }
    |
 note: This is an unsafe fix and may change runtime behavior
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:39:22
+   |
+38 | # Parenthesized duplicates (issue #30343)
+39 | incorrect_set = {1, (1)}
+   |                  -   ^
+   |                  |
+   |                  Previous occurrence here
+40 | incorrect_set = {1, (1), 2}
+41 | incorrect_set = {(1), 1}
+   |
+help: Remove duplicate item
+   |
+38 | # Parenthesized duplicates (issue #30343)
+   - incorrect_set = {1, (1)}
+39 + incorrect_set = {1}
+40 | incorrect_set = {1, (1), 2}
+   |
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:40:22
+   |
+38 | # Parenthesized duplicates (issue #30343)
+39 | incorrect_set = {1, (1)}
+40 | incorrect_set = {1, (1), 2}
+   |                  -   ^
+   |                  |
+   |                  Previous occurrence here
+41 | incorrect_set = {(1), 1}
+42 | incorrect_set = {((1)), 1}
+   |
+help: Remove duplicate item
+   |
+39 | incorrect_set = {1, (1)}
+   - incorrect_set = {1, (1), 2}
+40 + incorrect_set = {1, 2}
+41 | incorrect_set = {(1), 1}
+   |
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:41:23
+   |
+39 | incorrect_set = {1, (1)}
+40 | incorrect_set = {1, (1), 2}
+41 | incorrect_set = {(1), 1}
+   |                   -   ^
+   |                   |
+   |                   Previous occurrence here
+42 | incorrect_set = {((1)), 1}
+43 | incorrect_set = {
+   |
+help: Remove duplicate item
+   |
+40 | incorrect_set = {1, (1), 2}
+   - incorrect_set = {(1), 1}
+41 + incorrect_set = {(1)}
+42 | incorrect_set = {((1)), 1}
+   |
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:42:25
+   |
+40 | incorrect_set = {1, (1), 2}
+41 | incorrect_set = {(1), 1}
+42 | incorrect_set = {((1)), 1}
+   |                    -    ^
+   |                    |
+   |                    Previous occurrence here
+43 | incorrect_set = {
+44 |     1,
+   |
+help: Remove duplicate item
+   |
+41 | incorrect_set = {(1), 1}
+   - incorrect_set = {((1)), 1}
+42 + incorrect_set = {((1))}
+43 | incorrect_set = {
+   |
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:45:6
+   |
+42 | incorrect_set = {((1)), 1}
+43 | incorrect_set = {
+44 |     1,
+   |     - Previous occurrence here
+45 |     (1),
+   |      ^
+46 | }
+47 | incorrect_set = {
+   |
+help: Remove duplicate item
+   |
+44 |     1,
+   -     (1),
+45 | }
+   |
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:49:5
+   |
+46 | }
+47 | incorrect_set = {
+48 |     (1),
+   |      - Previous occurrence here
+49 |     1,
+   |     ^
+50 | }
+51 | incorrect_set = {1, (1),}
+   |
+help: Remove duplicate item
+   |
+48 |     (1),
+   -     1,
+49 | }
+   |
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:51:22
+   |
+49 |     1,
+50 | }
+51 | incorrect_set = {1, (1),}
+   |                  -   ^
+   |                  |
+   |                  Previous occurrence here
+52 | incorrect_set = {1, (1  # comment
+53 | ), 2}
+   |
+help: Remove duplicate item
+   |
+50 | }
+   - incorrect_set = {1, (1),}
+51 + incorrect_set = {1,}
+52 | incorrect_set = {1, (1  # comment
+   |
+
+B033 [*] Sets should not contain duplicate item `1`
+  --> B033.py:52:22
+   |
+50 | }
+51 | incorrect_set = {1, (1),}
+52 | incorrect_set = {1, (1  # comment
+   |                  -   ^
+   |                  |
+   |                  Previous occurrence here
+53 | ), 2}
+   |
+help: Remove duplicate item
+   |
+51 | incorrect_set = {1, (1),}
+   - incorrect_set = {1, (1  # comment
+   - ), 2}
+52 + incorrect_set = {1, 2}
+   |
+note: This is an unsafe fix and may change runtime behavior
