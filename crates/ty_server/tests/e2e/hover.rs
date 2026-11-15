@@ -41,6 +41,42 @@ fn supports_only_plain_text() -> Result<()> {
 }
 
 #[test]
+fn markdown_hover_preserves_advertised_html_tags() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let path = SystemPath::new("src/foo.py");
+    let source = "\
+def foo():
+    \"\"\"<p>Use <code>name</code> and <b>bold</b>.</p>\"\"\"
+
+foo()
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(path, source)?
+        .with_hover_content_format(vec![MarkupKind::Markdown])
+        .with_allowed_html_tags(&["p", "code"])
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.open_text_document(path, source, 1);
+
+    let hover = server
+        .hover_request(path, Position::new(3, 1))
+        .expect("hover");
+    let Contents::MarkupContent(markup) = hover.contents else {
+        panic!("Expected markup content");
+    };
+    assert!(
+        markup
+            .value
+            .ends_with("<p>Use <code>name</code> and &lt;b&gt;bold&lt;/b&gt;.</p>"),
+        "hover: {}",
+        markup.value
+    );
+    Ok(())
+}
+
+#[test]
 fn invalid_script_environment_retains_configured_platform_for_hover() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let script = SystemPath::new("src/script.py");

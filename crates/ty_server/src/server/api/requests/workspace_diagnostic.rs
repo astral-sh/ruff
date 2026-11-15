@@ -342,7 +342,7 @@ struct ResponseWriter<'a> {
     mode: ReportingMode,
     index: &'a Index,
     position_encoding: PositionEncoding,
-    client_capabilities: ResolvedClientCapabilities,
+    client_capabilities: &'a ResolvedClientCapabilities,
     // It's important that we use `AnySystemPath` over `Uri` here because
     // `file_to_uri` isn't guaranteed to return the exact same URI as the one provided
     // by the client.
