@@ -1162,7 +1162,7 @@ def check(values: list[int] | list[bytes]):
 
 def nested(errors: list[Any]):
     first = ExceptionGroup("failed", errors).exceptions[0]
-    first.exceptions  # error: [unresolved-attribute]
+    first.exceptions  # error: [missing-union-attribute]
 ```
 
 A dictionary whose key type is bounded by `Never` rejects every key assignment.
