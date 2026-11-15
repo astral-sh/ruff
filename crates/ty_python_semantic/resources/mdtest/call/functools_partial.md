@@ -726,6 +726,41 @@ reveal_type(p)  # revealed: partial[(path: str, *, start: str | None = ".") -> s
 reveal_type(list(map(p, paths)))  # revealed: list[str]
 ```
 
+### Binding a union to an overloaded keyword
+
+Each union member can match different overloads. Here, two overloads accept `None`. The caller can
+select either one by supplying one or two positional arguments.
+
+```py
+from functools import partial
+from typing import overload
+
+@overload
+def f(value: int, /, *, option: str) -> int: ...
+@overload
+def f(value: int, extra: int, /, *, option: None) -> int: ...
+@overload
+def f(value: int, /, *, option: None) -> int: ...
+def f(value: int, extra: int = 0, /, *, option: str | None) -> int:
+    return value + extra
+
+def check(option: str | None):
+    p = partial(f, option=option)
+    reveal_type(p(1))  # revealed: int
+    p(1, option="text")  # ok
+    p(1, option=None)  # ok
+    p(1, 2, option=None)  # ok
+    p()  # error: [no-matching-overload]
+    p("text")  # error: [no-matching-overload]
+```
+
+Binding the keyword fails if any member of the union is incompatible with every overload.
+
+```py
+def invalid(option: str | bytes):
+    partial(f, option=option)  # error: [invalid-argument-type]
+```
+
 ### ParamSpec callable bound with `partial`
 
 ```py
