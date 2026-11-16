@@ -401,6 +401,23 @@ redundant-condition-strict = "warn"
 disjoint-cast = "warn"
 missing-direct-dependency = "warn"
 
+# TODO: Fix these diagnostics so both PR automation scripts can use the full shared settings.
+[[tool.ty.overrides]]
+include = [
+    "scripts/publish_pr_report.py",
+    "scripts/pull_request_reviewers.py",
+]
+
+[tool.ty.overrides.rules]
+missing-type-argument = "ignore"
+unsound-return = "ignore"
+
+[[tool.ty.overrides]]
+include = ["scripts/publish_pr_report.py"]
+
+[tool.ty.overrides.rules]
+truthiness-test-of-none-union = "ignore"
+
 [tool.black]
 force-exclude = '''
 /(

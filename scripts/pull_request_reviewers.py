@@ -15,7 +15,7 @@ import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, TypedDict, cast
+from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -32,33 +32,7 @@ class Pool:
     reviewers: tuple[str, ...]
 
 
-class User(TypedDict):
-    login: str
-
-
-class Repository(TypedDict):
-    id: int
-
-
-class PullRequestBase(TypedDict):
-    repo: Repository
-
-
-class PullRequestHead(TypedDict):
-    sha: str
-
-
-class PullRequest(TypedDict):
-    number: int
-    state: str
-    draft: bool
-    base: PullRequestBase
-    head: PullRequestHead
-    user: User
-    requested_reviewers: list[User]
-
-
-def api(endpoint: str, *, data: dict[str, object] | None = None) -> Any:
+def api(endpoint: str, *, data: dict | None = None) -> Any:
     request = Request(
         f"{API_ROOT}/{endpoint}",
         data=json.dumps(data).encode() if data is not None else None,
@@ -79,7 +53,7 @@ def changed_files(pull_request: int) -> list[str]:
     page = 1
     while True:
         batch = api(f"pulls/{pull_request}/files?per_page=100&page={page}")
-        files.extend(cast("str", item["filename"]) for item in batch)
+        files.extend(item["filename"] for item in batch)
         if len(batch) < 100:
             return files
         page += 1
@@ -88,11 +62,9 @@ def changed_files(pull_request: int) -> list[str]:
 def parse_pools(contents: str) -> list[Pool]:
     return [
         Pool(
-            name=cast("str", pool["name"]),
-            patterns=tuple(
-                path.lstrip("/") for path in cast("list[str]", pool["paths"])
-            ),
-            reviewers=tuple(cast("list[str]", pool["reviewers"])),
+            name=pool["name"],
+            patterns=tuple(path.lstrip("/") for path in pool["paths"]),
+            reviewers=tuple(pool["reviewers"]),
         )
         for pool in tomllib.loads(contents)["pools"]
     ]
@@ -135,7 +107,7 @@ def load_state(path: Path) -> State:
     return {}
 
 
-def eligible_pull(pull: PullRequest, pull_request: int, head_sha: str) -> bool:
+def eligible_pull(pull: dict, pull_request: int, head_sha: str) -> bool:
     return (
         pull["number"] == pull_request
         and pull["state"] == "open"
@@ -145,7 +117,7 @@ def eligible_pull(pull: PullRequest, pull_request: int, head_sha: str) -> bool:
     )
 
 
-def has_reviewer(pull: PullRequest) -> bool:
+def has_reviewer(pull: dict) -> bool:
     author = pull["user"]["login"].lower()
     return any(user["login"].lower() != author for user in pull["requested_reviewers"])
 
@@ -160,13 +132,14 @@ def assign_reviewer(
     rng: random.Random | None = None,
 ) -> tuple[str, str] | None:
     rng = rng or random.Random()
-    pull = cast("PullRequest", api(f"pulls/{pull_request}"))
+    pull = api(f"pulls/{pull_request}")
     if not eligible_pull(pull, pull_request, head_sha) or has_reviewer(pull):
         return None
     author = pull["user"]["login"].lower()
     matched = matching_pools(pools, changed_files(pull_request))
     while matched:
-        pool, _ = rng.choices(matched, weights=[weight for _, weight in matched])[0]
+        eligible_pools, weights = zip(*matched, strict=True)
+        pool = rng.choices(eligible_pools, weights=weights)[0]
         stored = state.get(pool.name, {})
         credits = {
             login: min(1.0, stored.get(login, 0.0) + 1 / len(pool.reviewers))
@@ -179,7 +152,7 @@ def assign_reviewer(
                 [login for login in candidates if credits[login] == highest]
             )
             candidates.remove(reviewer)
-            current = cast("PullRequest", api(f"pulls/{pull_request}"))
+            current = api(f"pulls/{pull_request}")
             if not eligible_pull(current, pull_request, head_sha) or has_reviewer(
                 current
             ):
