@@ -662,8 +662,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .arg
                 .as_ref()
                 .and_then(|arg_name| typed_dict.item(self.db(), arg_name.id.as_str()))
-                .map(|field| tcx.with_expected_type(Some(field.declared_ty)))
-                .unwrap_or_default();
+                .map_or_default(|field| tcx.with_expected_type(Some(field.declared_ty)));
             self.get_or_infer_expression(&keyword.value, value_tcx);
         }
     }

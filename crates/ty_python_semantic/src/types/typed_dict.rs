@@ -2814,8 +2814,7 @@ fn validate_from_keywords<'db, 'ast>(
 
             let value_tcx = typed_dict
                 .item(db, arg_name.id.as_str())
-                .map(|field| TypeContext::preference(Some(field.declared_ty)))
-                .unwrap_or_default();
+                .map_or_default(|field| TypeContext::preference(Some(field.declared_ty)));
             let value_ty = expression_type_fn(&keyword.value, value_tcx);
             TypedDictKeyAssignment {
                 context,
@@ -2949,8 +2948,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
             if !is_shadowed {
                 let value_tcx = typed_dict
                     .item(db, key.as_str())
-                    .map(|field| TypeContext::preference(Some(field.declared_ty)))
-                    .unwrap_or_default();
+                    .map_or_default(|field| TypeContext::preference(Some(field.declared_ty)));
                 let value_ty = expression_type_fn(&item.value, value_tcx);
                 valid &= TypedDictKeyAssignment {
                     context,

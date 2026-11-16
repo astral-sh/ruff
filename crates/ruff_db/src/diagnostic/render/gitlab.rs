@@ -60,33 +60,28 @@ impl Serialize for SerializedMessages<'_> {
         let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
 
         for diagnostic in self.diagnostics {
-            let location = diagnostic
-                .primary_span()
-                .map(|span| {
-                    let file = span.file();
-                    let positions = if self.resolver.is_notebook(file) {
-                        // We can't give a reasonable location for the structured formats,
-                        // so we show one that's clearly a fallback
-                        Default::default()
-                    } else {
-                        let diagnostic_source = file.diagnostic_source(self.resolver);
-                        let source_code = diagnostic_source.as_source_code();
-                        span.range()
-                            .map(|range| Positions {
-                                begin: source_code.line_column(range.start()),
-                                end: source_code.line_column(range.end()),
-                            })
-                            .unwrap_or_default()
-                    };
+            let location = diagnostic.primary_span().map_or_default(|span| {
+                let file = span.file();
+                let positions = if self.resolver.is_notebook(file) {
+                    // We can't give a reasonable location for the structured formats,
+                    // so we show one that's clearly a fallback
+                    Default::default()
+                } else {
+                    let diagnostic_source = file.diagnostic_source(self.resolver);
+                    let source_code = diagnostic_source.as_source_code();
+                    span.range().map_or_default(|range| Positions {
+                        begin: source_code.line_column(range.start()),
+                        end: source_code.line_column(range.end()),
+                    })
+                };
 
-                    let path = self.project_dir.as_ref().map_or_else(
-                        || file.relative_path(self.resolver).display().to_string(),
-                        |project_dir| relativize_path_to(file.path(self.resolver), project_dir),
-                    );
+                let path = self.project_dir.as_ref().map_or_else(
+                    || file.relative_path(self.resolver).display().to_string(),
+                    |project_dir| relativize_path_to(file.path(self.resolver), project_dir),
+                );
 
-                    Location { path, positions }
-                })
-                .unwrap_or_default();
+                Location { path, positions }
+            });
 
             let mut message_fingerprint = fingerprint(diagnostic, &location.path, 0);
 
