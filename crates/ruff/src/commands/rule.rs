@@ -6,15 +6,17 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
-use ruff_linter::FixAvailability;
 use ruff_linter::codes::{Category, RuleStatus};
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_linter::{FixAvailability, RULE_NAME_REDIRECTS};
 
 use crate::args::HelpFormat;
 
 #[derive(Serialize)]
 struct Explanation<'a> {
     name: &'a str,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    previous_names: Vec<&'static str>,
     code: Option<String>,
     linter: Option<&'a str>,
     summary: &'a str,
@@ -37,8 +39,13 @@ impl<'a> Explanation<'a> {
             .and_then(Linter::parse_code)
             .map(|(linter, _)| linter.name());
         let fix = rule.fixable().to_string();
+        let previous_names = RULE_NAME_REDIRECTS
+            .iter()
+            .filter_map(|&(name, target)| (target == *rule).then_some(name))
+            .collect();
         Self {
             name: rule.name().as_str(),
+            previous_names,
             code,
             linter,
             summary: rule.message_formats()[0],

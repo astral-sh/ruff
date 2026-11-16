@@ -82,7 +82,13 @@ def rule_name_to_code(executable: Path) -> dict[str, str | None]:
             encoding="utf8",
         )
     )
-    return {rule["name"]: rule["code"] for rule in rules}
+    names = {}
+    for rule in rules:
+        code = rule["code"]
+        names[rule["name"]] = code
+        for name in rule.get("previous_names", []):
+            names[name] = code
+    return names
 
 
 def normalize_rule_selectors(
