@@ -176,3 +176,19 @@ help: Remove extraneous parentheses
 39 + print(x for x in range(3))
 40 |
    |
+
+UP034 [*] Avoid extraneous parentheses
+  --> UP034.py:89:13
+   |
+88 | # UP034
+89 | class Qux(f((base for base in bases))):
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^
+90 |     pass
+   |
+help: Remove extraneous parentheses
+   |
+88 | # UP034
+   - class Qux(f((base for base in bases))):
+89 + class Qux(f(base for base in bases)):
+90 |     pass
+   |
