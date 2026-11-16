@@ -16,7 +16,7 @@ import subprocess
 import sys
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -34,12 +34,63 @@ MAX_HTML_ARCHIVE_BYTES = 128 * 1024 * 1024
 MAX_HTML_REPORT_BYTES = 128 * 1024 * 1024
 
 
+class CommentAuthor(TypedDict, total=False):
+    id: int
+    type: str
+
+
+class Comment(TypedDict):
+    id: int
+    user: CommentAuthor | None
+    issue_url: str
+    body: str
+
+
+class Artifact(TypedDict):
+    id: int
+    name: str
+    expired: bool
+    size_in_bytes: int
+
+
+class Repository(TypedDict, total=False):
+    id: int
+
+
+class WorkflowRun(TypedDict):
+    id: int
+    run_attempt: int
+    repository: Repository
+    head_repository: Repository | None
+    event: str
+    path: str
+    head_sha: str
+    head_branch: str
+
+
+class PullRequestBase(TypedDict):
+    repo: Repository
+
+
+class PullRequestHead(TypedDict):
+    repo: Repository | None
+    sha: str
+    ref: str
+
+
+class PullRequest(TypedDict):
+    number: int
+    state: str
+    base: PullRequestBase
+    head: PullRequestHead
+
+
 def read_html_files(value: str) -> dict[str, tuple[str, str]]:
     files = json.loads(value)
     if not isinstance(files, dict):
         raise TypeError("HTML files must be a JSON object keyed by filename.")
     result = {}
-    for filename, metadata in files.items():
+    for filename, metadata in cast("dict[str, object]", files).items():
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", filename):
             raise ValueError(
                 "HTML filenames must be plain filenames without directories."
@@ -94,7 +145,7 @@ def api(
         raise
 
 
-def matches_comment(comment: dict, pull_request: int, marker: str) -> bool:
+def matches_comment(comment: Comment, pull_request: int, marker: str) -> bool:
     author = comment.get("user") or {}
     return (
         author.get("id") == BOT_ID
@@ -117,10 +168,12 @@ def read_comment_id(path: str) -> int | None:
 
 def find_report(
     pull_request: int, report: str, comment_id: int | None = None
-) -> dict | None:
+) -> Comment | None:
     if comment_id is None:
         return None
-    comment = api(f"issues/comments/{comment_id}", missing_ok=True)
+    comment = cast(
+        "Comment | None", api(f"issues/comments/{comment_id}", missing_ok=True)
+    )
     if comment is not None and not matches_comment(
         comment, pull_request, report_marker(report)
     ):
@@ -130,13 +183,12 @@ def find_report(
     return comment
 
 
-def find_artifact(run_id: int, name: str) -> dict | None:
+def find_artifact(run_id: int, name: str) -> Artifact | None:
     matches = []
     page = 1
     while True:
-        artifacts = api(f"actions/runs/{run_id}/artifacts?per_page=100&page={page}")[
-            "artifacts"
-        ]
+        response = api(f"actions/runs/{run_id}/artifacts?per_page=100&page={page}")
+        artifacts = cast("list[Artifact]", response["artifacts"])
         matches.extend(
             artifact
             for artifact in artifacts
@@ -149,7 +201,9 @@ def find_artifact(run_id: int, name: str) -> dict | None:
     return max(matches, key=lambda artifact: artifact["id"]) if matches else None
 
 
-def download_artifact(artifact: dict, *, max_bytes: int = MAX_ARCHIVE_BYTES) -> bytes:
+def download_artifact(
+    artifact: Artifact, *, max_bytes: int = MAX_ARCHIVE_BYTES
+) -> bytes:
     if artifact["size_in_bytes"] > max_bytes:
         raise ValueError("The report archive exceeds the download limit.")
     result = subprocess.run(
@@ -187,7 +241,7 @@ def read_report(
 
 def upload_html_report(
     files: dict[str, tuple[str, str]],
-    artifact: dict,
+    artifact: Artifact,
     *,
     prefix: str,
     bucket: str,
@@ -232,11 +286,11 @@ def upload_html_report(
 def render_report(
     report: str,
     contents: str,
-    run: dict,
-    artifact: dict,
+    run: WorkflowRun,
+    artifact: Artifact,
     *,
     title: str = "",
-    full_report: dict | None = None,
+    full_report: Artifact | None = None,
     full_report_url: str = "",
     html_files: dict[str, tuple[str, str]] | None = None,
 ) -> str:
@@ -273,7 +327,7 @@ def render_report(
     )
 
 
-def report_run(comment: dict) -> tuple[int, int]:
+def report_run(comment: Comment) -> tuple[int, int]:
     lines = comment["body"].splitlines()
     if len(lines) > 1 and (
         match := re.fullmatch(
@@ -286,8 +340,8 @@ def report_run(comment: dict) -> tuple[int, int]:
 
 def current_run(
     run_id: int, run_attempt: int, workflow_ref: str, pull_request: int
-) -> dict | None:
-    run = api(f"actions/runs/{run_id}")
+) -> WorkflowRun | None:
+    run = cast("WorkflowRun", api(f"actions/runs/{run_id}"))
     if run["run_attempt"] != run_attempt:
         print("The workflow run has been rerun.", file=sys.stderr)
         return None
@@ -298,7 +352,7 @@ def current_run(
         or workflow_ref != f"{REPOSITORY}/{run['path']}@refs/pull/{pull_request}/merge"
     ):
         raise ValueError("The workflow run is not an eligible same-repository PR run.")
-    pull = api(f"pulls/{pull_request}")
+    pull = cast("PullRequest", api(f"pulls/{pull_request}"))
     if pull["number"] != pull_request:
         raise ValueError("The run does not belong to the requested pull request.")
     if (
@@ -333,7 +387,7 @@ def publish(
 ) -> int | None:
     if update_existing_only and stored_comment_id is None:
         return
-    if not (run := current_run(run_id, run_attempt, workflow_ref, pull_request)):
+    if (run := current_run(run_id, run_attempt, workflow_ref, pull_request)) is None:
         return
     artifact = find_artifact(run_id, artifact_name)
     if artifact is None:
@@ -373,22 +427,21 @@ def publish(
         return
 
     # Recheck after downloading: the PR may have advanced or the run may have been retried.
-    if not current_run(run_id, run_attempt, workflow_ref, pull_request):
+    if current_run(run_id, run_attempt, workflow_ref, pull_request) is None:
         return
     existing = find_report(pull_request, report, stored_comment_id)
-    if existing and report_run(existing) > (run_id, run_attempt):
+    if existing is not None and report_run(existing) > (run_id, run_attempt):
         print("A newer run already published this report.", file=sys.stderr)
         return existing["id"]
-    if existing:
+    if existing is not None:
         comment_id = existing["id"]
         if existing["body"] != body:
             api(f"issues/comments/{comment_id}", method="PATCH", body=body)
     elif update_existing_only:
         return
     else:
-        comment_id = api(f"issues/{pull_request}/comments", method="POST", body=body)[
-            "id"
-        ]
+        created = api(f"issues/{pull_request}/comments", method="POST", body=body)
+        comment_id = cast("int", created["id"])
     print(f"Published {report} report: {comment_id}")
     return comment_id
 
@@ -432,7 +485,7 @@ def main() -> None:
         update_existing_only=args.update_existing_only,
         dry_run=args.dry_run,
     )
-    if comment_id is not None and (output := os.environ.get("GITHUB_OUTPUT")):
+    if comment_id is not None and (output := os.environ.get("GITHUB_OUTPUT", "")):
         with Path(output).open("a") as file:
             file.write(f"comment-id={comment_id:d}\n")
 

@@ -382,10 +382,6 @@ include = [
     "crates/ruff_python_ast/generate.py",
     "crates/ty_python_semantic/mdtest.py",
 ]
-exclude = [
-    "scripts/publish_pr_report.py",
-    "scripts/pull_request_reviewers.py",
-]
 
 [tool.ty.overrides.analysis]
 return-type-inference = "always"
