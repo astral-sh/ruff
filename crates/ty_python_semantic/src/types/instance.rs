@@ -863,20 +863,20 @@ fn specialization_argument_is_static<'db>(
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
-    /// Check whether `receiver` conforms to `protocol`. For a type variable with a protocol upper
-    /// bound, the bound supplies the members and nominal bases, and `Self` denotes the receiver.
+    /// Check whether `ty` conforms to `protocol`. If `ty` is a variable's protocol bound, look up
+    /// members and nominal bases on the bound and bind `Self` to the variable.
     pub(super) fn check_type_satisfies_protocol(
         &self,
         db: &'db dyn Db,
-        receiver: Type<'db>,
+        ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
-        protocol_bound: Option<ProtocolInstanceType<'db>>,
+        fixed_receiver: Option<BoundTypeVarInstance<'db>>,
     ) -> ConstraintSet<'db, 'c> {
         // Explicit protocol inheritance establishes subtyping even when a subclass overrides
         // members incompatibly.
         let mut result = self.never();
-        let lookup_type = protocol_bound.map_or(receiver, Type::ProtocolInstance);
-        let source_protocol = lookup_type.as_protocol_instance();
+        let source_protocol = ty.as_protocol_instance();
+        let receiver = fixed_receiver.map_or(ty, Type::TypeVar);
 
         // Every gradual type lies between its bottom and top materializations, and is assignable
         // to and from either one. Each materialization is a subtype of itself. For the same class
@@ -935,7 +935,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // A no-op source materialization can be removed before comparing method-only
             // interfaces. For recursive properties and attributes, keep the wrapper: removing
             // it can make the cycle guard reject distinct specializations that stabilize.
-            if protocol_bound.is_none()
+            if fixed_receiver.is_none()
                 && source.materialization_kind(db).is_some()
                 && source.interface(db).has_only_methods(db)
                 && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
@@ -955,7 +955,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // even if `P` overrides a member incompatibly.
             let type_to_test = source_protocol_as_nominal
                 .map(Type::NominalInstance)
-                .unwrap_or(lookup_type);
+                .unwrap_or(ty);
 
             let nominally_satisfied =
                 self.check_type_pair(db, type_to_test, Type::NominalInstance(nominal_instance));
@@ -1040,7 +1040,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // below report per-member errors instead.
         let env = self.env;
         if !self.is_context_collection_enabled()
-            && !has_all_protocol_members_defined(db, env, lookup_type, protocol)
+            && !has_all_protocol_members_defined(db, env, ty, protocol)
         {
             return result;
         }
@@ -1053,7 +1053,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 protocol.interface(db),
             )
         } else if let Some(structurally_satisfied) =
-            self.try_check_nominal_recursive_protocol_members(db, receiver, protocol, result)
+            self.try_check_nominal_recursive_protocol_members(db, ty, protocol, result)
         {
             structurally_satisfied
         } else {
@@ -1064,7 +1064,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .members(db)
                 .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
                 .when_all(db, self.constraints, |member| {
-                    self.type_satisfies_protocol_member(db, receiver, &member)
+                    self.type_satisfies_protocol_member(db, ty, &member)
                 })
         };
         if let Some(context) = self.report_context()

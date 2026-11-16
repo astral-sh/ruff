@@ -5772,6 +5772,15 @@ def check[T: Combinable, U: Combinable](left: T, right: T, other: U) -> None:
     combine(left, other)  # error: [invalid-argument-type]
 ```
 
+An alias for `T` denotes the same receiver.
+
+```py
+type Identity[T] = T
+
+def check_alias[T: Combinable](left: Identity[T], right: T) -> None:
+    reveal_type(combine(left, right))  # revealed: T@check_alias
+```
+
 A value of type `T` cannot stand in for a combiner that accepts *every* `Combinable`. For a union
 target, ty can also try the source's upper bound after checking each arm. Here that would widen the
 `other` parameter from `T` to `Combinable` and incorrectly accept the `Combiner` arm.

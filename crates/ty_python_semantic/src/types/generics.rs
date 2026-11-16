@@ -3700,8 +3700,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             db,
             self.constraints,
             |(source, target)| {
-                if let (Type::TypeVar(variable), Type::ProtocolInstance(protocol)) =
-                    (source, target)
+                if let Type::ProtocolInstance(protocol) = target
+                    && let Type::TypeVar(variable) = source.resolve_type_alias(db)
                     && !variable.is_inferable(db, self.inferable)
                     && let Some(bounds) = variable.typevar(db).bound_or_constraints(db, self.env)
                     && let Some(bound) = bounds.protocol_upper_bound(db)
@@ -3719,9 +3719,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     )
                     .check_type_satisfies_protocol(
                         db,
-                        source,
+                        Type::ProtocolInstance(bound),
                         protocol,
-                        Some(bound),
+                        Some(variable),
                     );
                 }
                 let when = source.when_constraint_set_assignable_to_owned(db, self.env, target);

@@ -2738,7 +2738,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     && bound != protocol
                 {
                     self.with_recursion_guard(db, source, target, || {
-                        self.check_type_satisfies_protocol(db, source, protocol, Some(bound))
+                        self.check_type_satisfies_protocol(
+                            db,
+                            Type::ProtocolInstance(bound),
+                            protocol,
+                            Some(bound_typevar),
+                        )
                     })
                 } else {
                     self.check_source_typevar_bounds(db, bound_or_constraints, target)
