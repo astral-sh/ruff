@@ -44,7 +44,8 @@ V = TypeVar("V", list[int], int)  # valid constrained Type
 
 ## Rule history
 
-- v0.0.102: This rule now also reports a `TypeVar` call with exactly one constraint. Previously,
-    `invalid-legacy-type-variable` reported this error.
+- v0.0.105: This rule now also reports legacy `TypeVar` instantiations with exactly one constraint.
+    Previously, this rule only applied to PEP-695 type variables, and `invalid-legacy-type-variable`
+    reported the error for legacy type variables.
 
 [type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar

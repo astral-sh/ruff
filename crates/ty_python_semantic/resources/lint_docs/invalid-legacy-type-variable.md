@@ -26,6 +26,6 @@ def f(t: TypeVar("U")): ...  # ty: ignore[invalid-type-form]
 
 ## Rule history
 
-- v0.0.102: A `TypeVar` call with exactly one constraint now triggers
-    `invalid-type-variable-constraints`. Use that selector in rule settings and ignore comments for
-    this error.
+- v0.0.105: Instantiating a legacy `TypeVar` with exactly one constraint passed to the constructor
+    now triggers `invalid-type-variable-constraints`. In earlier versions of ty, it caused
+    `invalid-legacy-type-variable` to be emitted.
