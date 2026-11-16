@@ -403,7 +403,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-dataclass-post-init.md")]
     pub(crate) static INVALID_DATACLASS_POST_INIT = {
         summary: "detects incompatible dataclass `__post_init__` signatures",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.105"),
         default_level: Level::Error,
     }
 }

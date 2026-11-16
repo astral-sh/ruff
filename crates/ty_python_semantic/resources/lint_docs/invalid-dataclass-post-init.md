@@ -5,10 +5,10 @@ Checks whether a dataclass's `__post_init__` method accepts the arguments passed
 
 ## Why is this bad?
 
-The generated `__init__` passes every `InitVar` field to `__post_init__` as a positional argument,
-in field order. If the number or kind of parameters is incompatible with that call, constructing an
-instance raises `TypeError`. If a parameter has an incompatible type, the method can receive a value
-it cannot handle.
+If a dataclass defines a `__post_init__` method, its generated `__init__` method will pass every
+`InitVar` field as a positional argument to the `__post_init__` method. If the number or kind of
+parameters is incompatible with that call, constructing an instance raises `TypeError`. If a
+parameter has an incompatible type, the method can receive a value it cannot handle.
 
 ## Example
 
@@ -20,13 +20,12 @@ from dataclasses import InitVar, dataclass
 class Sample:
     count: InitVar[int]
 
+    # `count` is declared as `int` in the field body, but declared as `str` in `__post_init__`:
+    #
     # error: [invalid-dataclass-post-init]
     def __post_init__(self, count: str) -> None: ...
 ```
 
-Here, annotating the `count` parameter as `int` allows the method to accept the value passed by
-`__init__`.
-
 ## Rule history
 
-- v0.0.102: Split out from `invalid-dataclass`.
+- v0.0.105: Split out from `invalid-dataclass`.
