@@ -1550,6 +1550,25 @@ reveal_type(Inherited().__hash__())  # revealed: Literal[7]
 accepts_hashable(Disabled())  # error: [invalid-argument-type]
 ```
 
+## Variance of frozen models
+
+On Python 3.13 and later, the synthesized `__replace__` method takes field values as arguments. A
+frozen model is therefore invariant in the type of its generic field.
+
+```py
+from pydantic import BaseModel, ConfigDict
+
+class Animal: ...
+class Dog(Animal): ...
+
+class Frozen[T](BaseModel):
+    model_config = ConfigDict(frozen=True)
+    value: T
+
+def check(dog: Frozen[Dog]):
+    animal: Frozen[Animal] = dog  # error: [invalid-assignment]
+```
+
 ## Frozen models and protocols
 
 Frozen models cannot satisfy a protocol that requires a writable field, but can satisfy one that
