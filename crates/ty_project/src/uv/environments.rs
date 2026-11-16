@@ -792,18 +792,27 @@ fn script_python(db: &dyn Db) -> Option<SystemPathBuf> {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use anyhow::Context;
     use ruff_db::Db as _;
     use ruff_db::files::{File, system_path_to_file};
-    use ruff_db::system::{DbWithWritableSystem, SystemPath};
+    use ruff_db::system::{DbWithWritableSystem, SystemPath, TestSystem};
+    use ruff_python_trivia::textwrap::dedent;
+    use ruff_ranged_value::RangedValue;
     use salsa::Setter;
     use salsa::plumbing::AsId;
     use serde_json::{Value, json};
+    use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
     use ty_python_semantic::Db as _;
+    use ty_static::EnvVars;
 
-    use super::{UvMetadata, script_environment};
+    use super::{
+        UvMetadata, UvMetadataError, apply_sync_result, script_environment, script_sync_task,
+    };
     use crate::db::testing::TestDb;
-    use crate::{Db as _, ProjectMetadata};
+    use crate::metadata::Options;
+    use crate::{Db as _, ProjectDatabase, ProjectMetadata};
 
     #[test]
     fn disabling_script_uv_discards_pending_synchronization() -> anyhow::Result<()> {
@@ -832,6 +841,76 @@ mod tests {
 
         assert!(!environments.has_pending_synchronizations());
         assert!(environment.initialization_error(&db).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn uv_script_does_not_use_the_project_environment() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPath::new(if cfg!(windows) {
+            "C:/project"
+        } else {
+            "/project"
+        });
+        let venv = root.join("project-venv");
+        system.set_env_var(EnvVars::VIRTUAL_ENV, venv.as_str());
+        let site_packages = venv.join(if cfg!(windows) {
+            "Lib/site-packages"
+        } else {
+            "lib/python3.13/site-packages"
+        });
+        let path = root.join("report.py");
+        let pyvenv_cfg =
+            format!("home = {root}\nversion = 3.13.0\ninclude-system-site-packages = false\n");
+        let source = dedent(
+            "
+            # /// script
+            # dependencies = []
+            # ///
+            import project_dependency
+            ",
+        );
+        system.memory_file_system().write_files_all([
+            (root.join("ty.toml"), "environment.python = 'project-venv'"),
+            (venv.join("pyvenv.cfg"), pyvenv_cfg.as_str()),
+            (site_packages.join("project_dependency.py"), ""),
+            (path.clone(), source.as_ref()),
+        ])?;
+        let mut metadata = ProjectMetadata::discover(root, &system)?;
+        let dependency = ModuleName::new_static("project_dependency").unwrap();
+        let resolves_dependency = |db: &ProjectDatabase, script| {
+            resolve_module(
+                db,
+                ImportingFile::ResolverFile(db.program_file(script).resolver_file(db)),
+                &dependency,
+            )
+            .is_some()
+        };
+
+        let without_uv = ProjectDatabase::fallible(metadata.clone(), system.clone())?;
+        assert!(resolves_dependency(
+            &without_uv,
+            system_path_to_file(&without_uv, &path)?
+        ));
+
+        metadata.set_override_options(Options {
+            use_uv_for_scripts: Some(RangedValue::cli(true)),
+            ..Options::default()
+        });
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        let script = system_path_to_file(&db, &path)?;
+        assert!(!resolves_dependency(&db, script));
+
+        let environment =
+            script_environment(&db, script).context("expected a script environment")?;
+        let task = script_sync_task(&db, script).context("expected a script sync task")?;
+        apply_sync_result(
+            &mut db,
+            environment,
+            &task.request,
+            Err(UvMetadataError::Invocation(io::Error::other("uv failed"))),
+        );
+        assert!(!resolves_dependency(&db, script));
         Ok(())
     }
 

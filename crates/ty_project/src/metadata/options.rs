@@ -261,10 +261,13 @@ impl Options {
                 default
             });
 
+        let allow_environment_fallback = !matches!(context, OptionsContext::UvScript(_));
         let python_environment = match self.python_environment(context.configuration_root(), system)
         {
-            Ok(None) => PythonEnvironment::discover(context.project_root(), system)
-                .map_err(ToProgramSettingsError::PythonEnvironmentDiscovery),
+            Ok(None) if allow_environment_fallback => {
+                PythonEnvironment::discover(context.project_root(), system)
+                    .map_err(ToProgramSettingsError::PythonEnvironmentDiscovery)
+            }
             configured => configured.map_err(ToProgramSettingsError::PythonEnvironment),
         };
 
@@ -283,13 +286,17 @@ impl Options {
             })?
             .flatten();
 
-        let self_environment = self_environment_search_paths(
-            python_environment
-                .as_ref()
-                .map(ty_python_semantic::PythonEnvironment::origin)
-                .cloned(),
-            system,
-        );
+        let self_environment = if allow_environment_fallback {
+            self_environment_search_paths(
+                python_environment
+                    .as_ref()
+                    .map(ty_python_semantic::PythonEnvironment::origin)
+                    .cloned(),
+                system,
+            )
+        } else {
+            None
+        };
 
         let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
             let site_packages_paths = python_environment
@@ -664,19 +671,21 @@ pub(crate) enum OptionsContext<'a> {
     Project(&'a SystemPath),
     /// The directory used to resolve relative settings for the script.
     Script(&'a SystemPath),
+    /// A script whose Python environment is provided by uv.
+    UvScript(&'a SystemPath),
 }
 
 impl<'a> OptionsContext<'a> {
     fn configuration_root(self) -> &'a SystemPath {
         match self {
-            Self::Project(root) | Self::Script(root) => root,
+            Self::Project(root) | Self::Script(root) | Self::UvScript(root) => root,
         }
     }
 
     fn project_root(self) -> Option<&'a SystemPath> {
         match self {
             Self::Project(root) => Some(root),
-            Self::Script(_) => None,
+            Self::Script(_) | Self::UvScript(_) => None,
         }
     }
 }
