@@ -192,8 +192,11 @@ impl<'db> Constraint<'db> {
 /// the elements of the BDD paths that are discovered via
 /// [`PathAssignments`][super::paths::PathAssignments].
 ///
-/// `TypeVarRange` and `TypeVarEquivalence` relate two inferable variables. A caller-fixed variable
-/// is a concrete bound on the inferable one.
+/// When a relation collects or derives an atom, every variable that receives a bound must
+/// be inferable in that relation's scope. This includes both endpoints of `TypeVarRange` and
+/// `TypeVarEquivalence`. A concrete bound constrains only its subject. Its type expression can
+/// reference caller-fixed variables. For example, `U ≤ T` with fixed `U` is a `ConcreteLower`
+/// with subject `T` and bound `Type::TypeVar(U)`.
 ///
 /// See [`Constraint`] to choose whether new kinds of constraint belong here or in `Constraint`.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -220,7 +223,7 @@ impl<'db> AtomicConstraint<'db> {
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
         let choose_lower_bound = move |bound: Type<'db>| {
             let bound = Self::normalize_bound(db, typevar, bound);
@@ -257,7 +260,7 @@ impl<'db> AtomicConstraint<'db> {
                     Some(Err(UnsatisfiableBound))
                 }
 
-                Type::TypeVar(lower) if lower.is_inferable(db, scope) => {
+                Type::TypeVar(lower) if lower.is_inferable(db, inferable) => {
                     let constraint = TypeVarRangeBound::new(db, provenance, lower, typevar).into();
                     Some(Ok(constraint))
                 }
@@ -298,7 +301,7 @@ impl<'db> AtomicConstraint<'db> {
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
         let choose_upper_bound = move |bound: Type<'db>| {
             let bound = Self::normalize_bound(db, typevar, bound);
@@ -323,7 +326,7 @@ impl<'db> AtomicConstraint<'db> {
                     Some(Err(UnsatisfiableBound))
                 }
 
-                Type::TypeVar(upper) if upper.is_inferable(db, scope) => {
+                Type::TypeVar(upper) if upper.is_inferable(db, inferable) => {
                     let constraint = TypeVarRangeBound::new(db, provenance, typevar, upper).into();
                     Some(Ok(constraint))
                 }
@@ -365,7 +368,7 @@ impl<'db> AtomicConstraint<'db> {
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
         let is_same_typevar = |element: &Type<'db>| {
             element
@@ -383,8 +386,8 @@ impl<'db> AtomicConstraint<'db> {
 
         if bound_refers_to_typevar {
             return Either::Left(std::iter::chain(
-                Self::new_lower_bound(db, provenance, typevar, bound, scope),
-                Self::new_upper_bound(db, env, provenance, typevar, bound, scope),
+                Self::new_lower_bound(db, provenance, typevar, bound, inferable),
+                Self::new_upper_bound(db, env, provenance, typevar, bound, inferable),
             ));
         }
 
@@ -398,7 +401,7 @@ impl<'db> AtomicConstraint<'db> {
                 Some(Err(UnsatisfiableBound))
             }
 
-            Type::TypeVar(bound_typevar) if bound_typevar.is_inferable(db, scope) => {
+            Type::TypeVar(bound_typevar) if bound_typevar.is_inferable(db, inferable) => {
                 let constraint =
                     TypeVarEquivalenceBound::new(db, provenance, typevar, bound_typevar).into();
                 Some(Ok(constraint))
@@ -553,6 +556,24 @@ impl<'db> AtomicConstraint<'db> {
         )
     }
 
+    pub(super) fn subjects_are_inferable(
+        self,
+        db: &'db dyn Db,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
+        match self {
+            Self::ConcreteLower(bound) => bound.typevar.is_inferable(db, inferable),
+            Self::ConcreteUpper(bound) => bound.typevar.is_inferable(db, inferable),
+            Self::ConcreteEquivalence(bound) => bound.typevar.is_inferable(db, inferable),
+            Self::TypeVarRange(bound) => {
+                bound.left.is_inferable(db, inferable) && bound.right.is_inferable(db, inferable)
+            }
+            Self::TypeVarEquivalence(bound) => {
+                bound.left.is_inferable(db, inferable) && bound.right.is_inferable(db, inferable)
+            }
+        }
+    }
+
     pub(super) fn provides_bound_for(
         self,
         db: &'db dyn Db,
@@ -688,7 +709,7 @@ impl<'db> AtomicConstraint<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         left: Type<'db>,
         right: Type<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -697,29 +718,32 @@ impl<'db> AtomicConstraint<'db> {
             self,
             Self::ConcreteEquivalence(_) | Self::TypeVarEquivalence(_)
         );
-        let inferable = |ty: Type<'db>| ty.as_typevar().filter(|var| var.is_inferable(db, scope));
-        match (inferable(left), inferable(right)) {
+        let inferable_operand = |ty: Type<'db>| {
+            ty.as_typevar()
+                .filter(|var| var.is_inferable(db, inferable))
+        };
+        match (inferable_operand(left), inferable_operand(right)) {
             (Some(var), _) if equivalence => {
-                let atoms = Self::new_equivalence_bound(db, env, provenance, var, right, scope);
+                let atoms = Self::new_equivalence_bound(db, env, provenance, var, right, inferable);
                 Constraint::new_nodes(db, env, storage, atoms)
             }
             (_, Some(var)) if equivalence => {
-                let atoms = Self::new_equivalence_bound(db, env, provenance, var, left, scope);
+                let atoms = Self::new_equivalence_bound(db, env, provenance, var, left, inferable);
                 Constraint::new_nodes(db, env, storage, atoms)
             }
             (Some(var), _) => {
-                let atoms = Self::new_upper_bound(db, env, provenance, var, right, scope);
+                let atoms = Self::new_upper_bound(db, env, provenance, var, right, inferable);
                 Constraint::new_nodes(db, env, storage, atoms)
             }
             (_, Some(var)) => {
-                let atoms = Self::new_lower_bound(db, provenance, var, left, scope);
+                let atoms = Self::new_lower_bound(db, provenance, var, left, inferable);
                 Constraint::new_nodes(db, env, storage, atoms)
             }
             (None, None) => {
                 let when = if equivalence {
-                    left.when_constraint_set_equivalent_to_owned(db, env, right, scope)
+                    left.when_constraint_set_equivalent_to_owned(db, env, right, inferable)
                 } else {
-                    left.when_constraint_set_assignable_to_owned(db, env, right, scope)
+                    left.when_constraint_set_assignable_to_owned(db, env, right, inferable)
                 };
                 storage.load_with_provenance(db, env, &when, Some(provenance), TypeVarSet::All)
             }

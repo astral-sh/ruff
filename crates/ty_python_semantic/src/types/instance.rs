@@ -981,13 +981,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // Check that inexpensive case first: comparing every requirement of an unrelated
             // recursive protocol can expand its interface before structural member ordering gets
             // a chance to reject an incompatible finite member.
-            let can_use_nominal_result_directly = nominally_satisfied
-                .is_never_satisfied(db, env, self.scope)
-                || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
-                    || !protocol.materialization_changes_requirements(db, env, protocol))
-                    && !source_protocol.is_some_and(|source| {
-                        source.materialization_changes_requirements(db, env, protocol)
-                    }));
+            let can_use_nominal_result_directly =
+                nominally_satisfied.is_never_satisfied(db, env, self.inferable)
+                    || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
+                        || !protocol.materialization_changes_requirements(db, env, protocol))
+                        && !source_protocol.is_some_and(|source| {
+                            source.materialization_changes_requirements(db, env, protocol)
+                        }));
 
             if can_use_nominal_result_directly
                 && result
@@ -1068,7 +1068,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
         };
         if let Some(context) = self.report_context()
-            && structurally_satisfied.is_never_satisfied(db, env, self.scope)
+            && structurally_satisfied.is_never_satisfied(db, env, self.inferable)
         {
             context.push(ErrorContext::TypeNotCompatibleWithProtocol {
                 ty: receiver,
@@ -1192,7 +1192,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         for (_, member) in recursive_members {
             if structurally_satisfied
                 .implies(db, self.constraints, || nominally_satisfied)
-                .is_always_satisfied(db, env, self.scope)
+                .is_always_satisfied(db, env, self.inferable)
             {
                 break;
             }
@@ -1377,7 +1377,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
                 || !structurally_satisfied
                     .implies(db, self.constraints, || nominally_satisfied)
-                    .is_always_satisfied(db, env, self.scope))
+                    .is_always_satisfied(db, env, self.inferable))
         {
             return None;
         }
@@ -1386,7 +1386,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // expanding recursive members. If it cannot reject, the caller checks the full
         // interface instead.
         (self.typevar_evaluation.is_lazy()
-            || structurally_satisfied.is_never_satisfied(db, env, self.scope))
+            || structurally_satisfied.is_never_satisfied(db, env, self.inferable))
         .then_some(structurally_satisfied)
     }
 
@@ -1528,7 +1528,7 @@ fn non_recursive_protocol_constraints<'db>(
     db: &'db dyn Db,
     source: ProtocolInstanceType<'db>,
     target: ProtocolInterfaceView<'db>,
-    scope: TypeVarSet<'db>,
+    inferable: TypeVarSet<'db>,
 ) -> OwnedConstraintSet<'db> {
     let env = ProgramEnvironment::from_program(target.base().program(db));
     let constraints = ConstraintSetBuilder::new();
@@ -1540,7 +1540,7 @@ fn non_recursive_protocol_constraints<'db>(
         let checker = TypeRelationChecker::constraint_set_assignability(
             &env,
             constraints,
-            scope,
+            inferable,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
@@ -2107,7 +2107,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         target: Self,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Option<&'db OwnedConstraintSet<'db>> {
         let origin = target.class_origin(db)?;
         let interface = target.interface(db);
@@ -2122,7 +2122,9 @@ impl<'db> ProtocolInstanceType<'db> {
             return None;
         }
 
-        Some(non_recursive_protocol_constraints(db, self, target, scope))
+        Some(non_recursive_protocol_constraints(
+            db, self, target, inferable,
+        ))
     }
 }
 

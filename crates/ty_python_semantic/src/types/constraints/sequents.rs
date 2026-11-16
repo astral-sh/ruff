@@ -66,7 +66,7 @@ pub(super) struct SequentMap<'db> {
 }
 
 struct SequentMapBuilder<'db> {
-    scope: TypeVarSet<'db>,
+    inferable: TypeVarSet<'db>,
     db: &'db dyn Db,
     sequents: Vec<SequentGroup<'db>>,
     /// Pending sequents that have not yet been added to [`sequents`][Self::sequents]. This is only
@@ -251,10 +251,10 @@ impl<'db> SequentMap<'db> {
 }
 
 impl<'db> SequentMapBuilder<'db> {
-    fn new(db: &'db dyn Db, scope: TypeVarSet<'db>) -> Self {
+    fn new(db: &'db dyn Db, inferable: TypeVarSet<'db>) -> Self {
         Self {
             db,
-            scope,
+            inferable,
             sequents: Vec::new(),
             pending: Vec::new(),
         }
@@ -382,7 +382,7 @@ impl<'db> SequentMap<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         constraint: AtomicConstraint<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Option<&'db Self> {
         // Most individual constraints produce no sequents. Avoid interning the query arguments
         // and retaining an empty Salsa result for those cases. Keep the checks in sync with the
@@ -421,7 +421,7 @@ impl<'db> SequentMap<'db> {
             db: &'db dyn Db,
             program: Program<'db>,
             constraint: InternedSequentConstraint<'db>,
-            scope: TypeVarSet<'db>,
+            inferable: TypeVarSet<'db>,
         ) -> SequentMap<'db> {
             let env = &ProgramEnvironment::from_program(program);
             let constraint = constraint.constraint(db);
@@ -430,7 +430,7 @@ impl<'db> SequentMap<'db> {
                 constraint = %constraint.display(db, env, Some(true)),
                 "add sequents for constraint",
             );
-            let mut map = SequentMapBuilder::new(db, scope);
+            let mut map = SequentMapBuilder::new(db, inferable);
             constraint.add_sequents(db, env, &mut map);
             map.finish()
         }
@@ -439,7 +439,7 @@ impl<'db> SequentMap<'db> {
             db,
             env.program(db),
             InternedSequentConstraint::new(db, constraint),
-            scope,
+            inferable,
         ))
     }
 
@@ -456,7 +456,7 @@ impl<'db> SequentMap<'db> {
         env: &ProgramEnvironment<'db>,
         left: AtomicConstraint<'db>,
         right: AtomicConstraint<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Option<&'db Self> {
         // Currently, the only pattern we look for is when two concrete lower-bound constraints
         // have disjoint bounds. Given `l₁ ≤ T ∧ l₂ ≤ T`, the only sequent we could theoretically
@@ -489,7 +489,7 @@ impl<'db> SequentMap<'db> {
             program: Program<'db>,
             left: InternedSequentConstraint<'db>,
             right: InternedSequentConstraint<'db>,
-            scope: TypeVarSet<'db>,
+            inferable: TypeVarSet<'db>,
         ) -> SequentMap<'db> {
             let env = &ProgramEnvironment::from_program(program);
             let left = left.constraint(db);
@@ -500,7 +500,7 @@ impl<'db> SequentMap<'db> {
                 right = %right.display(db, env, Some(true)),
                 "add sequents for constraint pair",
             );
-            let mut map = SequentMapBuilder::new(db, scope);
+            let mut map = SequentMapBuilder::new(db, inferable);
             left.add_sequents_with(db, env, &mut map, right);
             map.finish()
         }
@@ -510,7 +510,7 @@ impl<'db> SequentMap<'db> {
             env.program(db),
             InternedSequentConstraint::new(db, left),
             InternedSequentConstraint::new(db, right),
-            scope,
+            inferable,
         ))
     }
 }
@@ -731,7 +731,7 @@ impl<'db> AtomicConstraint<'db> {
             db,
             env,
             upper.bound(),
-            map.scope,
+            map.inferable,
         );
         let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
         Self::add_constraint_set_implication(
@@ -759,7 +759,7 @@ impl<'db> AtomicConstraint<'db> {
                 db,
                 env,
                 upper.bound(),
-                map.scope,
+                map.inferable,
             );
             let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
             Self::add_constraint_set_implication(
@@ -1694,12 +1694,17 @@ impl<'db> ConcreteUpperBound<'db> {
         // A fully covered source supplies no inference evidence and must not override T's default.
         if let Type::Union(union) = self.bound
             && let Some((typevar, residual)) =
-                union.residual_typevar_lower_bound(db, env, self.typevar, map.scope)
+                union.residual_typevar_lower_bound(db, env, self.typevar, map.inferable)
             && !residual.is_never()
         {
-            for derived in
-                AtomicConstraint::new_lower_bound(db, self.provenance, typevar, residual, map.scope)
-                    .filter_map(Result::ok)
+            for derived in AtomicConstraint::new_lower_bound(
+                db,
+                self.provenance,
+                typevar,
+                residual,
+                map.inferable,
+            )
+            .filter_map(Result::ok)
             {
                 map.add_single_implication(self.into(), derived);
             }

@@ -330,7 +330,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         node: NodeId,
         visitor: &mut V,
     ) -> ControlFlow<V::Break, V::Result>
@@ -353,14 +353,14 @@ impl PathAssignments {
                     db,
                     env,
                     storage,
-                    scope,
+                    inferable,
                     constraint.when_true(),
                     UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
                         } else {
-                            path.visit(db, env, storage, scope, interior.if_true, visitor)
+                            path.visit(db, env, storage, inferable, interior.if_true, visitor)
                         };
                         match subtree {
                             ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -380,14 +380,14 @@ impl PathAssignments {
                     db,
                     env,
                     storage,
-                    scope,
+                    inferable,
                     constraint.when_unconstrained(),
                     UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
                         } else {
-                            path.visit(db, env, storage, scope, interior.if_uncertain, visitor)
+                            path.visit(db, env, storage, inferable, interior.if_uncertain, visitor)
                         };
                         match subtree {
                             ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -407,14 +407,14 @@ impl PathAssignments {
                     db,
                     env,
                     storage,
-                    scope,
+                    inferable,
                     constraint.when_false(),
                     UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
                         } else {
-                            path.visit(db, env, storage, scope, interior.if_false, visitor)
+                            path.visit(db, env, storage, inferable, interior.if_false, visitor)
                         };
                         match subtree {
                             ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -470,7 +470,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         assignment: Assignment<AtomicConstraintId>,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         f: impl FnOnce(&mut ConstraintSetStorage<'db>, &mut Self, Range<usize>, bool) -> R,
@@ -504,7 +504,7 @@ impl PathAssignments {
                 db,
                 env,
                 storage,
-                scope,
+                inferable,
                 source_constraint,
                 unspecialized_type_var_policy,
             )
@@ -775,7 +775,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         constraint: AtomicConstraintId,
     ) {
         // If we've already processed this constraint, we can skip it.
@@ -786,7 +786,7 @@ impl PathAssignments {
         }
 
         let constraint_data = storage.atomic_constraint_data(constraint);
-        if let Some(map) = SequentMap::for_constraint(db, env, constraint_data, scope) {
+        if let Some(map) = SequentMap::for_constraint(db, env, constraint_data, inferable) {
             let added = self.add_sequents(db, env, storage, map);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
@@ -847,7 +847,8 @@ impl PathAssignments {
                 continue;
             }
 
-            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data, scope) else {
+            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data, inferable)
+            else {
                 continue;
             };
             self.elaborated_pairs.insert((a, b));
@@ -876,12 +877,20 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         source_constraint: AtomicConstraintId,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
     ) -> Result<(), PathAssignmentConflict> {
         while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
-            self.add_assignment(db, env, storage, scope, assignment, source_constraint, fuel)?;
+            self.add_assignment(
+                db,
+                env,
+                storage,
+                inferable,
+                assignment,
+                source_constraint,
+                fuel,
+            )?;
         }
         // Either fuel limit can prevent a replacement from being admitted. Keep the original
         // evidence until the replacement actually holds, including when another derivation
@@ -918,7 +927,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         assignment: Assignment<AtomicConstraintId>,
         source_constraint: AtomicConstraintId,
         fuel: AssignmentFuel,
@@ -1014,7 +1023,7 @@ impl PathAssignments {
             .sequent_antecedents
             .get(&assignment)
             .map_or(0, Vec::len);
-        self.discover_constraint(db, env, storage, scope, assignment.constraint());
+        self.discover_constraint(db, env, storage, inferable, assignment.constraint());
         let sequents_len = self.sequents.len();
 
         // Previously discovered sequents can only start firing if the assignment that we just
@@ -1411,7 +1420,6 @@ mod tests {
                 &mut storage,
                 source_orders.clone(),
                 inferable,
-                inferable,
                 limits,
                 set.node,
             );
@@ -1434,7 +1442,6 @@ mod tests {
                 db,
                 &mut storage,
                 source_orders.clone(),
-                inferable,
                 inferable,
                 limits,
                 set.node,

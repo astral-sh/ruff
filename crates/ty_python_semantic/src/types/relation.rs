@@ -222,11 +222,11 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         source: BoundTypeVarInstance<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
         let elements = self.elements(db);
         let variable = elements.iter().find_map(|element| element.as_typevar())?;
-        if !variable.is_inferable(db, scope) {
+        if !variable.is_inferable(db, inferable) {
             return None;
         }
         let others = elements
@@ -473,14 +473,14 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_with_typevar_evaluation(
             db,
             env,
             target,
             constraints,
-            scope,
+            inferable,
             TypeRelation::Subtyping,
             TypeVarEvaluation::Lazy,
             ConstraintProvenance::INFERRED,
@@ -596,7 +596,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             env,
             constraints: &builder,
-            scope: TypeVarSet::None,
+            inferable: TypeVarSet::None,
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(relation)),
@@ -754,7 +754,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
@@ -764,7 +764,7 @@ impl<'db> Type<'db> {
         fn when_constraint_set_assignable_to_owned_impl<'db>(
             db: &'db dyn Db,
             types: TypePair<'db>,
-            scope: TypeVarSet<'db>,
+            inferable: TypeVarSet<'db>,
         ) -> OwnedConstraintSet<'db> {
             let program = types.program(db);
             let env = ProgramEnvironment::from_program(program);
@@ -773,7 +773,7 @@ impl<'db> Type<'db> {
                 let source = types.first(db);
                 let target = types.second(db);
 
-                source.when_constraint_set_assignable_to(db, &env, target, constraints, scope)
+                source.when_constraint_set_assignable_to(db, &env, target, constraints, inferable)
             })
         }
 
@@ -785,7 +785,7 @@ impl<'db> Type<'db> {
         Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
             db,
             TypePair::new(db, program, self, target),
-            scope,
+            inferable,
         ))
     }
 
@@ -795,14 +795,14 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.when_constraint_set_assignable_to_with_provenance(
             db,
             env,
             target,
             constraints,
-            scope,
+            inferable,
             ConstraintProvenance::INFERRED,
         )
     }
@@ -813,7 +813,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         provenance: ConstraintProvenance,
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_with_typevar_evaluation(
@@ -821,7 +821,7 @@ impl<'db> Type<'db> {
             env,
             target,
             constraints,
-            scope,
+            inferable,
             TypeRelation::Assignability,
             TypeVarEvaluation::Lazy,
             provenance,
@@ -933,7 +933,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         relation: TypeRelation,
         typevar_evaluation: TypeVarEvaluation,
         provenance: ConstraintProvenance,
@@ -945,7 +945,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             env,
             constraints,
-            scope,
+            inferable,
             relation,
             typevar_evaluation,
             context_tree: None,
@@ -1051,7 +1051,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
@@ -1061,7 +1061,7 @@ impl<'db> Type<'db> {
         fn when_constraint_set_equivalent_to_impl<'db>(
             db: &'db dyn Db,
             types: TypePair<'db>,
-            scope: TypeVarSet<'db>,
+            inferable: TypeVarSet<'db>,
         ) -> OwnedConstraintSet<'db> {
             let env = ProgramEnvironment::from_program(types.program(db));
             let constraints = ConstraintSetBuilder::new();
@@ -1075,7 +1075,7 @@ impl<'db> Type<'db> {
                         constraints,
                         &materialization_visitor,
                         TypeVarEvaluation::Lazy,
-                        scope,
+                        inferable,
                     )
             })
         }
@@ -1087,7 +1087,7 @@ impl<'db> Type<'db> {
         Cow::Borrowed(when_constraint_set_equivalent_to_impl(
             db,
             TypePair::new(db, env.program(db), self, other),
-            scope,
+            inferable,
         ))
     }
 
@@ -1112,7 +1112,7 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         materialization_visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         typevar_evaluation: TypeVarEvaluation,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -1123,7 +1123,7 @@ impl<'db> Type<'db> {
             provenance: ConstraintProvenance::INFERRED,
             perform_expensive_checks: true,
             typevar_evaluation,
-            scope,
+            inferable,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -1315,7 +1315,7 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
-    pub(super) scope: TypeVarSet<'db>,
+    pub(super) inferable: TypeVarSet<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
     pub(super) provenance: ConstraintProvenance,
@@ -1341,7 +1341,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         env: &'a ProgramEnvironment<'db>,
         relation: TypeRelation,
         constraints: &'c ConstraintSetBuilder<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
@@ -1350,7 +1350,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             env,
             constraints,
-            scope,
+            inferable,
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
@@ -1366,7 +1366,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn subtyping(
         env: &'a ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
@@ -1376,7 +1376,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             env,
             TypeRelation::Subtyping,
             constraints,
-            scope,
+            inferable,
             relation_visitor,
             disjointness_visitor,
             signature_relation_visitor,
@@ -1387,7 +1387,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn constraint_set_assignability(
         env: &'a ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
@@ -1399,7 +1399,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 env,
                 TypeRelation::Assignability,
                 constraints,
-                scope,
+                inferable,
                 relation_visitor,
                 disjointness_visitor,
                 signature_relation_visitor,
@@ -1411,7 +1411,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn constraint_set_assignability_with_context(
         env: &'a ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
@@ -1422,7 +1422,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             ..Self::constraint_set_assignability(
                 env,
                 constraints,
-                scope,
+                inferable,
                 relation_visitor,
                 disjointness_visitor,
                 signature_relation_visitor,
@@ -1442,7 +1442,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             env,
             constraints,
-            scope: TypeVarSet::None,
+            inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
@@ -1455,15 +1455,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
-    pub(super) fn with_scope(&self, scope: TypeVarSet<'db>) -> Self {
+    pub(super) fn with_inferable(&self, inferable: TypeVarSet<'db>) -> Self {
         Self {
-            scope,
+            inferable,
             ..self.clone()
         }
     }
 
     pub(super) fn collects(&self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> bool {
-        self.typevar_evaluation.is_lazy() && typevar.is_inferable(db, self.scope)
+        self.typevar_evaluation.is_lazy() && typevar.is_inferable(db, self.inferable)
     }
 
     /// Checks class subtyping without discarding the active recursive relation state.
@@ -1505,7 +1505,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .positive(db)
             .iter()
             .any(|element| match element {
-                Type::TypeVar(tvar) => !tvar.is_inferable(db, self.scope.explicit_typevars()),
+                Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable.explicit_typevars()),
                 Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
                 _ => false,
             })
@@ -1586,7 +1586,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .when_all(db, self.constraints, |&element| {
                 let constraint_set = self.check_type_pair(db, element, target);
                 if let Some(context) = self.report_context()
-                    && constraint_set.is_never_satisfied(db, self.env, self.scope)
+                    && constraint_set.is_never_satisfied(db, self.env, self.inferable)
                 {
                     context.push(ErrorContext::NotAllUnionElementsAssignable {
                         element,
@@ -1608,9 +1608,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         if self.relation.is_assignability()
             && self.typevar_evaluation.is_lazy()
             && let Type::TypeVar(fixed) = source
-            && !fixed.is_inferable(db, self.scope)
+            && !fixed.is_inferable(db, self.inferable)
             && let Some((variable, remaining)) =
-                union.residual_typevar_lower_bound(db, self.env, fixed, self.scope)
+                union.residual_typevar_lower_bound(db, self.env, fixed, self.inferable)
         {
             return if remaining.is_never() {
                 self.always()
@@ -1677,7 +1677,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // bound or set of constraints that exposes a union; this requires special handling.
             match source {
                 Type::TypeVar(typevar)
-                    if !typevar.is_inferable(db, self.scope.explicit_typevars())
+                    if !typevar.is_inferable(db, self.inferable.explicit_typevars())
                         && let Some(bound_or_constraints) =
                             typevar.typevar(db).bound_or_constraints(db, self.env) =>
                 {
@@ -1705,7 +1705,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 let element = element
                                     .as_typevar()
                                     .filter(|var| {
-                                        var.is_inferable(db, self.scope.explicit_typevars())
+                                        var.is_inferable(db, self.inferable.explicit_typevars())
                                     })
                                     .and_then(|var| {
                                         var.typevar(db).bound_or_constraints(db, self.env)
@@ -1795,7 +1795,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         if context_tree.is_some()
             && !elements_context.is_empty()
-            && result.is_never_satisfied(db, self.env, self.scope)
+            && result.is_never_satisfied(db, self.env, self.inferable)
         {
             let elements_without_context = elements.len() - elements_context.len();
             if elements_without_context > 0 && elements_without_context < elements.len() {
@@ -1830,7 +1830,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .when_all(db, self.constraints, |&positive| {
                 let constraint_set = self.check_type_pair(db, source, positive);
                 if let Some(context) = self.report_context()
-                    && constraint_set.is_never_satisfied(db, self.env, self.scope)
+                    && constraint_set.is_never_satisfied(db, self.env, self.inferable)
                 {
                     context.push(ErrorContext::NotAssignableToIntersectionElement {
                         source,
@@ -1890,7 +1890,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // type variable. For example, matching `(T) -> T & ~str` against `(U) -> int`
         // can infer `int` for both T and U.
         if typevar.domain(db) != TypeVarDomain::Type
-            || typevar.is_inferable(db, self.scope.explicit_typevars())
+            || typevar.is_inferable(db, self.inferable.explicit_typevars())
         {
             return None;
         }
@@ -1970,7 +1970,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         if context_tree.is_some()
             && !elements_context.is_empty()
-            && result.is_never_satisfied(db, self.env, self.scope)
+            && result.is_never_satisfied(db, self.env, self.inferable)
         {
             self.set_context(
                 ErrorContext::NoIntersectionElementAssignableToTarget {
@@ -2071,13 +2071,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     target,
                     self.relation,
                     self.typevar_evaluation,
-                    self.scope,
+                    self.inferable,
                 ),
                 // Cached constraints do not retain explanations. When collecting context,
                 // recompute unsatisfiable comparisons while preserving the active recursion
                 // guards. Satisfiable constraints remain reusable, including those that
                 // constrain type variables.
-                |result| !collect_context || !result.is_never_satisfied(db, self.env, self.scope),
+                |result| {
+                    !collect_context || !result.is_never_satisfied(db, self.env, self.inferable)
+                },
                 work,
             )
             .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
@@ -2199,7 +2201,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         db: &'db dyn Db,
         source: Type<'db>,
         target: Type<'db>,
-        scope: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
         let env = self.env;
         // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
@@ -2208,7 +2210,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // only has to hold when the typevar has a valid specialization (i.e., one that
         // satisfies the upper bound/constraints).
         if let Type::TypeVar(bound_typevar) = source
-            && bound_typevar.is_inferable(db, scope)
+            && bound_typevar.is_inferable(db, inferable)
         {
             let upper = if self.relation.is_subtyping() {
                 target.bottom_materialization(db, env)
@@ -2220,13 +2222,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 env,
                 self.constraints,
                 self.provenance,
-                scope,
+                inferable,
                 bound_typevar,
                 upper,
             ));
         }
         if let Type::TypeVar(bound_typevar) = target
-            && bound_typevar.is_inferable(db, scope)
+            && bound_typevar.is_inferable(db, inferable)
         {
             let lower = if self.relation.is_subtyping() {
                 source.top_materialization(db, env)
@@ -2238,7 +2240,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 env,
                 self.constraints,
                 self.provenance,
-                scope,
+                inferable,
                 bound_typevar,
                 lower,
             ));
@@ -2276,7 +2278,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let env = self.env;
 
         if self.typevar_evaluation.is_lazy()
-            && let Some(bound) = self.collect_typevar_bound(db, source, target, self.scope)
+            && let Some(bound) = self.collect_typevar_bound(db, source, target, self.inferable)
         {
             return bound;
         }
@@ -2729,7 +2731,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // TypeVarTuples bare for constraint solving, but compare fixed symbolic values using
             // the same tuple relation as concrete specializations.
             (Type::TypeVar(bound_typevar), target)
-                if !bound_typevar.is_inferable(db, self.scope.explicit_typevars())
+                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
                     && bound_typevar.is_typevartuple(db)
                     && target.exact_tuple_instance_spec(db).is_some() =>
             {
@@ -2743,7 +2745,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Let it reach the ordinary rejection below; expanding the target would repeat the
             // same tuple comparison and cause the recursion guard to accept it.
             (source, Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, self.scope.explicit_typevars())
+                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
                     && bound_typevar.is_typevartuple(db)
                     && source
                         .exact_tuple_instance_spec(db)
@@ -2763,7 +2765,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::TypeVar(bound_typevar), Type::Callable(other))
             | (Type::Callable(other), Type::TypeVar(bound_typevar))
                 if self.relation.is_assignability()
-                    && !bound_typevar.is_inferable(db, self.scope.explicit_typevars())
+                    && !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
                     && bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
                     && Self::is_gradual_paramspec_value(db, other) =>
             {
@@ -2773,7 +2775,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Compare fixed `ParamSpec`s with the endpoints of the materialization range of `...`:
             // its bottom is below every `ParamSpec`, and its top is above every `ParamSpec`.
             (Type::TypeVar(bound_typevar), Type::Callable(other))
-                if !bound_typevar.is_inferable(db, self.scope.explicit_typevars())
+                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
                     && bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
                     && other.is_top_paramspec_value(db) =>
             {
@@ -2781,7 +2783,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::Callable(other), Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, self.scope.explicit_typevars())
+                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
                     && bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
                     && other.is_bottom_paramspec_value(db) =>
             {
@@ -2792,7 +2794,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
             (_, Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, self.scope.explicit_typevars())
+                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
                     && let constraints = bound_typevar
                         .typevar(db)
                         .constraints(db, env)
@@ -2801,13 +2803,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 self.check_type_pair(db, source, *c)
                             })
                         })
-                    && !constraints.is_never_satisfied(db, env, self.scope) =>
+                    && !constraints.is_never_satisfied(db, env, self.inferable) =>
             {
                 constraints
             }
 
             (Type::TypeVar(bound_typevar), _)
-                if bound_typevar.is_inferable(db, self.scope.explicit_typevars()) =>
+                if bound_typevar.is_inferable(db, self.inferable.explicit_typevars()) =>
             {
                 // The implicit lower bound of a typevar is `Never`, which means
                 // that it is always assignable to any other type.
@@ -2836,7 +2838,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // type variable could be specialized to a type smaller than `object`.
             (Type::NominalInstance(source), Type::TypeVar(typevar))
                 if source.is_object()
-                    && !typevar.is_inferable(db, self.scope.explicit_typevars()) =>
+                    && !typevar.is_inferable(db, self.inferable.explicit_typevars()) =>
             {
                 self.never()
             }
@@ -2859,7 +2861,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // For `T: A & B`, neither `A` nor `B` alone need satisfy the bound, but `A & B` does.
             (_, Type::TypeVar(typevar))
                 if self.is_eager_assignability()
-                    && typevar.is_inferable(db, self.scope.explicit_typevars()) =>
+                    && typevar.is_inferable(db, self.inferable.explicit_typevars()) =>
             {
                 // TODO: record the unification constraints
                 typevar.typevar(db).upper_bound(db, env).when_none_or(
@@ -2877,7 +2879,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
-                if !bound_typevar.is_inferable(db, self.scope.explicit_typevars())
+                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
                     && let Some(bound_or_constraints) =
                         bound_typevar.typevar(db).bound_or_constraints(db, env) =>
             {
@@ -2893,20 +2895,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
             (_, Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, self.scope.explicit_typevars()) =>
+                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars()) =>
             {
                 self.never()
             }
 
             // TODO: Infer specializations here
             (_, Type::TypeVar(typevar))
-                if typevar.is_inferable(db, self.scope.explicit_typevars()) =>
+                if typevar.is_inferable(db, self.inferable.explicit_typevars()) =>
             {
                 self.never()
             }
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
-                assert!(!bound_typevar.is_inferable(db, self.scope.explicit_typevars()));
+                assert!(!bound_typevar.is_inferable(db, self.inferable.explicit_typevars()));
                 self.never()
             }
 
@@ -3038,7 +3040,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
                     if let Some(context) = self.report_context()
                         && self.should_provide_callable_upcast_context(source)
-                        && result.is_never_satisfied(db, env, self.scope)
+                        && result.is_never_satisfied(db, env, self.inferable)
                     {
                         context.push(ErrorContext::InferredCallableType {
                             source,
@@ -3087,7 +3089,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 // dict contract. Check the schema without inferring type variables or
                                 // contributing error context, but keep the active recursion guards.
                                 let checker = Self {
-                                    scope: TypeVarSet::None,
+                                    inferable: TypeVarSet::None,
                                     typevar_evaluation: TypeVarEvaluation::Eager,
                                     context_tree: None,
                                     ..self.clone()
@@ -3122,7 +3124,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     let result = self.check_type_pair(db, fallback, target);
 
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(db, env, self.scope)
+                        && result.is_never_satisfied(db, env, self.inferable)
                         && let Type::NominalInstance(instance) = target
                     {
                         match instance.class(db, env).known(db) {
@@ -3145,7 +3147,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
                                 if self
                                     .check_type_pair(db, closed_typeddict_fallback, target)
-                                    .is_always_satisfied(db, env, self.scope)
+                                    .is_always_satisfied(db, env, self.inferable)
                                 {
                                     let context_element =
                                         ErrorContext::OpenTypedDictNotAssignableToMapping {
@@ -3555,7 +3557,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
             typevar_evaluation: TypeVarEvaluation::Eager,
-            scope: TypeVarSet::None,
+            inferable: TypeVarSet::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -3567,7 +3569,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         DisjointnessChecker {
             env: self.env,
             constraints: self.constraints,
-            inferable: self.scope.explicit_typevars(),
+            inferable: self.inferable.explicit_typevars(),
             context_tree: None,
             provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
@@ -3598,7 +3600,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 }
 
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
-    scope: TypeVarSet<'db>,
+    inferable: TypeVarSet<'db>,
     env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     provenance: ConstraintProvenance,
@@ -3630,7 +3632,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             context_tree: None,
             provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
-            scope: self.scope,
+            inferable: self.inferable,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -3721,7 +3723,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             constraints: self.constraints,
-            scope: self.inferable,
+            inferable: self.inferable,
             context_tree: None,
             provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
@@ -3751,7 +3753,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         let result = check(&checker);
         if let Some(context) = self.report_context() {
             context.take();
-            if result.is_never_satisfied(db, self.env, checker.scope) {
+            if result.is_never_satisfied(db, self.env, checker.inferable) {
                 context.replace(&checker.into_error_context());
             }
         }
@@ -3765,7 +3767,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
             typevar_evaluation: TypeVarEvaluation::Eager,
-            scope: TypeVarSet::None,
+            inferable: TypeVarSet::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,

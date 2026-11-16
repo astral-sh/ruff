@@ -981,7 +981,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             result.intersect(db, self.constraints, field_constraints);
             if result.is_trivially_never_satisfied()
                 || (self.is_context_collection_enabled()
-                    && result.is_never_satisfied(db, self.env, self.scope))
+                    && result.is_never_satisfied(db, self.env, self.inferable))
             {
                 if let Some(context) = self.report_context()
                     && let Some(source_item_field) = source_items.get(target_item_name.as_str())

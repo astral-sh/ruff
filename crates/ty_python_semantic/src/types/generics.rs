@@ -1952,7 +1952,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 if self.typevar_evaluation.is_lazy()
                     && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
                         (source_type, target_type)
-                    && typevar.is_inferable(db, self.scope)
+                    && typevar.is_inferable(db, self.inferable)
                     && !ty.is_type_var()
                     && (
                         // Preserve union distribution before constructing constraints. Storing the
@@ -1976,7 +1976,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         env,
                         self.constraints,
                         self.provenance,
-                        self.scope,
+                        self.inferable,
                         typevar,
                         lower,
                         upper,
@@ -2220,7 +2220,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                             .for_new_materialization_root()
                     };
                     checker.typevar_evaluation = TypeVarEvaluation::Lazy;
-                    checker.scope = TypeVarSet::All;
+                    checker.inferable = TypeVarSet::All;
                     checker.materialization_visitor = &materialization_visitor;
                     let result = self
                         .check_relation_with_context(db, checker, |checker| {
@@ -3879,8 +3879,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let spec = &[KnownClass::Str.to_instance(db, env), Type::object()];
         let mapping = KnownClass::Mapping.to_specialized_instance(db, env, spec);
         let when_assignable_to_formal = |ty: Type<'db>| {
-            let scope = self.inferable;
-            let when = ty.when_constraint_set_assignable_to_owned(db, env, formal, scope);
+            let when = ty.when_constraint_set_assignable_to_owned(db, env, formal, self.inferable);
             self.constraints.load(db, env, &when)
         };
         let mapping_when = when_assignable_to_formal(mapping);

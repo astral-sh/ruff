@@ -3226,28 +3226,25 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let set = constraints.load(db, env, tracked.constraints(db));
-                        let result =
-                            match set.solutions_for_typevars(db, env, TypeVarSet::All, inferable) {
-                                Ok(Solutions::Constrained(paths)) => Type::heterogeneous_tuple(
-                                    db,
-                                    env,
-                                    paths.into_vec().into_iter().map(|path| {
-                                        let path: Box<[_]> = path
-                                            .solved_typevars
-                                            .into_iter()
-                                            .filter(|binding| binding.bound_typevar == typevar)
-                                            .collect();
-                                        Type::KnownInstance(
-                                            KnownInstanceType::ConstraintSetSolution(
-                                                InternedConstraintSetSolution::new(db, path),
-                                            ),
-                                        )
-                                    }),
-                                ),
-                                Ok(Solutions::Unsatisfiable(_)) => Type::none(db, env),
-                                Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
-                                Err(_) => Type::unknown(),
-                            };
+                        let result = match set.solutions(db, env, inferable) {
+                            Ok(Solutions::Constrained(paths)) => Type::heterogeneous_tuple(
+                                db,
+                                env,
+                                paths.into_vec().into_iter().map(|path| {
+                                    let path: Box<[_]> = path
+                                        .solved_typevars
+                                        .into_iter()
+                                        .filter(|binding| binding.bound_typevar == typevar)
+                                        .collect();
+                                    Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
+                                        InternedConstraintSetSolution::new(db, path),
+                                    ))
+                                }),
+                            ),
+                            Ok(Solutions::Unsatisfiable(_)) => Type::none(db, env),
+                            Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
+                            Err(_) => Type::unknown(),
+                        };
                         overload.set_return_type(result);
                     }
 
@@ -3321,26 +3318,23 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let set = constraints.load(db, env, tracked.constraints(db));
-                        let result =
-                            match set.solutions_for_typevars(db, env, TypeVarSet::All, inferable) {
-                                Ok(Solutions::Constrained(paths)) => Type::heterogeneous_tuple(
-                                    db,
-                                    env,
-                                    paths.into_vec().into_iter().map(|path| {
-                                        Type::KnownInstance(
-                                            KnownInstanceType::ConstraintSetSolution(
-                                                InternedConstraintSetSolution::new(
-                                                    db,
-                                                    path.solved_typevars.into_boxed_slice(),
-                                                ),
-                                            ),
-                                        )
-                                    }),
-                                ),
-                                Ok(Solutions::Unsatisfiable(_)) => Type::none(db, env),
-                                Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
-                                Err(_) => Type::unknown(),
-                            };
+                        let result = match set.solutions(db, env, inferable) {
+                            Ok(Solutions::Constrained(paths)) => Type::heterogeneous_tuple(
+                                db,
+                                env,
+                                paths.into_vec().into_iter().map(|path| {
+                                    Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
+                                        InternedConstraintSetSolution::new(
+                                            db,
+                                            path.solved_typevars.into_boxed_slice(),
+                                        ),
+                                    ))
+                                }),
+                            ),
+                            Ok(Solutions::Unsatisfiable(_)) => Type::none(db, env),
+                            Ok(Solutions::Unconstrained) => Type::empty_tuple(db, env),
+                            Err(_) => Type::unknown(),
+                        };
                         overload.set_return_type(result);
                     }
 
@@ -9110,6 +9104,7 @@ impl<'db> Binding<'db> {
                         env,
                         generic,
                         specialized_overload.inference,
+                        constraints,
                         call_expression_tcx,
                     );
                     parameter_type =
@@ -9350,6 +9345,7 @@ impl<'db> Binding<'db> {
                         env,
                         generic_context,
                         self.inference,
+                        constraints,
                         call_expression_tcx,
                     )
                 })
@@ -9547,8 +9543,15 @@ impl<'db> Binding<'db> {
             return None;
         }
         Some(
-            self.argument_type_context_specialization(db, env, generic, Some(inference), tcx)
-                .specialization,
+            self.argument_type_context_specialization(
+                db,
+                env,
+                generic,
+                Some(inference),
+                constraints,
+                tcx,
+            )
+            .specialization,
         )
     }
 
@@ -9568,6 +9571,7 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         generic_context: GenericContext<'db>,
         inference: Option<TypeVarInference<'db>>,
+        constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Cow<'db, ArgumentContextSpecialization<'db>> {
         /// With no evidence from the expected return type, every call in this program
@@ -9618,8 +9622,7 @@ impl<'db> Binding<'db> {
                 .assignable_solutions_for_argument_context(db, env, expected, inferable)
         });
         if let Some(path_bounds) = return_bounds {
-            let constraints = ConstraintSetBuilder::new();
-            let solutions = path_bounds.solve_for_argument_context(db, env, &constraints);
+            let solutions = path_bounds.solve_for_argument_context(db, env, constraints);
             if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions.into_vec() {
                     for binding in solution.solved_typevars {

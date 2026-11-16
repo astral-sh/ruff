@@ -383,7 +383,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             |(&source, &target)| {
                                 let constraint_set = self.check_type_pair(db, source, target);
                                 if let Some(context) = self.report_context()
-                                    && constraint_set.is_never_satisfied(db, self.env, self.scope)
+                                    && constraint_set.is_never_satisfied(
+                                        db,
+                                        self.env,
+                                        self.inferable,
+                                    )
                                 {
                                     context.push(ErrorContext::TupleElementNotCompatible {
                                         source,
@@ -600,7 +604,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 if self.relation.is_assignability() {
                     match (source.variable(), target.variable()) {
                         (source_segment, VariableSegment::TypeVarTuple(target_pack))
-                            if !target_pack.is_inferable(db, self.scope)
+                            if !target_pack.is_inferable(db, self.inferable)
                                 && !self.collects(db, target_pack)
                                 && let Some(source_element) =
                                     source_segment.gradual_element_type(db, env) =>
@@ -622,7 +626,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             );
                         }
                         (VariableSegment::TypeVarTuple(source_pack), target_segment)
-                            if !source_pack.is_inferable(db, self.scope)
+                            if !source_pack.is_inferable(db, self.inferable)
                                 && !self.collects(db, source_pack)
                                 && let Some(target_element) =
                                     target_segment.gradual_element_type(db, env) =>
