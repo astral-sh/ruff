@@ -13,8 +13,8 @@ use crate::{
     types::{
         DeclaredType, ModuleLiteralType, Type,
         diagnostic::{
-            IMPORT_NOT_FOUND, MISSING_DIRECT_DEPENDENCY, POSSIBLY_MISSING_IMPORT,
-            hint_if_stdlib_attribute_exists_on_other_versions,
+            IMPORT_NOT_FOUND, MISSING_DIRECT_DEPENDENCY, MISSING_MODULE_MEMBER,
+            POSSIBLY_MISSING_IMPORT, hint_if_stdlib_attribute_exists_on_other_versions,
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
         infer::TypeInferenceBuilder,
@@ -637,7 +637,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Some(builder) = self
             .context
-            .report_lint(&IMPORT_NOT_FOUND, ast::AnyNodeRef::Alias(alias))
+            .report_lint(&MISSING_MODULE_MEMBER, ast::AnyNodeRef::Alias(alias))
         else {
             return;
         };

@@ -908,7 +908,7 @@ members = ["packages/*"]
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `typing` has no member `override`
+    error[missing-module-member]: Module `typing` has no member `override`
      --> member.py:1:20
       |
     1 | from typing import override
