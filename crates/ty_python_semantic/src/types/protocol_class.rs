@@ -37,7 +37,11 @@ use crate::{
         variance::infer_protocol_variance,
     },
 };
-use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
+use ty_python_core::{
+    definition::{Definition, DefinitionKind},
+    place::ScopedPlaceId,
+    place_table, use_def_map,
+};
 
 impl<'db> StaticClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
@@ -671,9 +675,9 @@ impl<'db> ProtocolInterfaceView<'db> {
 
     /// Looks up a member guaranteed to exist on every inhabitant of `type[Protocol]`.
     ///
-    /// Methods retain their unbound signatures, while `ClassVar`s and nested classes expose their
-    /// class-side types. Properties are only required on the constructed instance, so they are
-    /// undefined even when the nominal protocol origin provides a property descriptor.
+    /// Methods retain their unbound signatures. Class variables, nested classes, and annotated
+    /// data descriptors expose their class-side types. Ordinary properties are only required
+    /// on the constructed instance.
     pub(super) fn meta_member(
         self,
         db: &'db dyn Db,
@@ -1490,7 +1494,12 @@ impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
         let supported = match self.declaration.kind {
             ProtocolMemberKind::Method(..) => true,
             ProtocolMemberKind::Property { read, .. } => {
-                read.is_some() && (is_instance || is_nested_class)
+                if is_instance {
+                    read.is_some()
+                } else {
+                    self.declaration.class_descriptor.is_some()
+                        || (is_nested_class && read.is_some())
+                }
             }
             ProtocolMemberKind::Attribute(_) => {
                 is_instance || is_nested_class || self.declaration.is_class_var()
@@ -1507,7 +1516,10 @@ impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
     ) -> bool {
         self.read().is_some_and(|read| {
             // A descriptor may support only instance access or only class access.
-            !self.declaration.is_class_var() || read.result_type(db, env, Some(receiver)).is_some()
+            let binds_descriptor = self.declaration.is_class_var()
+                || (self.mode == ProtocolMemberAccessMode::Class
+                    && self.declaration.class_descriptor.is_some());
+            !binds_descriptor || read.result_type(db, env, Some(receiver)).is_some()
         })
     }
 
@@ -1663,6 +1675,19 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
                         .map(BindingContext::Definition),
                 }
             }
+            ProtocolMemberKind::Property { .. }
+                if self.access.mode == ProtocolMemberAccessMode::Class
+                    && let Some(descriptor) = self.access.declaration.class_descriptor =>
+            {
+                // With no receiver, class lookup still needs the unbound descriptor.
+                if let Some(receiver) = self_type {
+                    let read = descriptor
+                        .bind_self(db, env, receiver)?
+                        .class_variable_read_type(db, env, None, receiver.to_meta_type(db, env))?;
+                    return Some(self.access.materialize_type(db, env, read));
+                }
+                descriptor.annotation(db, env)?
+            }
             ProtocolMemberKind::Property { read, .. } => read?.annotation(db, env)?,
             ProtocolMemberKind::Attribute(annotation)
                 if let Some(receiver) = self_type
@@ -1785,6 +1810,8 @@ fn cycle_normalized_optional_type<'db>(
 #[derive(Debug, PartialEq, Eq, Clone, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
+    // A data descriptor annotation can provide a class read independently of its instance read.
+    class_descriptor: Option<ProtocolPropertyType<'db>>,
     qualifiers: TypeQualifiers,
     definition: Option<Definition<'db>>,
 }
@@ -1809,6 +1836,7 @@ impl<'db> ProtocolMemberData<'db> {
 
         Self {
             kind: ProtocolMemberKind::Method(Type::Callable(callable), method_kind),
+            class_descriptor: None,
             qualifiers: TypeQualifiers::default(),
             definition,
         }
@@ -1821,6 +1849,7 @@ impl<'db> ProtocolMemberData<'db> {
     ) -> Self {
         Self {
             kind: ProtocolMemberKind::Property { read, write },
+            class_descriptor: None,
             qualifiers: TypeQualifiers::default(),
             definition,
         }
@@ -1832,6 +1861,7 @@ impl<'db> ProtocolMemberData<'db> {
                 ty: candidate.ty,
                 self_binding_context: candidate.self_binding_context,
             }),
+            class_descriptor: None,
             qualifiers: candidate.qualifiers,
             definition: candidate.definition,
         }
@@ -1846,6 +1876,13 @@ impl<'db> ProtocolMemberData<'db> {
     ) -> Self {
         Self {
             kind: self.kind.cycle_normalized(db, env, previous.kind, cycle),
+            class_descriptor: cycle_normalized_optional_type(
+                db,
+                env,
+                self.class_descriptor,
+                previous.class_descriptor,
+                cycle,
+            ),
             qualifiers: self.qualifiers,
             definition: self.definition,
         }
@@ -1862,6 +1899,12 @@ impl<'db> ProtocolMemberData<'db> {
             kind: self
                 .kind
                 .recursive_type_normalized_impl(db, env, div, nested)?,
+            class_descriptor: match self.class_descriptor {
+                Some(descriptor) => {
+                    Some(descriptor.recursive_type_normalized_impl(db, env, div, nested)?)
+                }
+                None => None,
+            },
             qualifiers: self.qualifiers,
             definition: self.definition,
         })
@@ -1878,9 +1921,18 @@ impl<'db> ProtocolMemberData<'db> {
             kind: self
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            class_descriptor: self.class_descriptor.map(|descriptor| {
+                descriptor.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            }),
             qualifiers: self.qualifiers,
             definition: self.definition,
         }
+    }
+
+    fn member_types(&self) -> impl Iterator<Item = Type<'db>> {
+        self.kind
+            .member_types()
+            .chain(self.class_descriptor.map(ProtocolPropertyType::ty))
     }
 
     fn find_legacy_typevars_impl(
@@ -1891,7 +1943,7 @@ impl<'db> ProtocolMemberData<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         _visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        for member_type in self.kind.member_types() {
+        for member_type in self.member_types() {
             member_type.find_legacy_typevars(db, env, binding_context, typevars);
         }
     }
@@ -2115,7 +2167,7 @@ fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
             walk_protocol_member_access(db, member.access(mode), None, visitor);
         }
     } else {
-        for ty in member.data.kind.member_types() {
+        for ty in member.data.member_types() {
             visitor.visit_type(db, ty);
         }
     }
@@ -2549,17 +2601,21 @@ fn property_set_member_type<'db>(
     })
 }
 
-/// Derive the observable capabilities of a descriptor bound on a protocol class.
+/// Derive the observable capabilities of a descriptor declared on a protocol.
 fn descriptor_protocol_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     protocol: ClassType<'db>,
     mut candidate: ProtocolMemberCandidate<'db>,
+    annotated: bool,
 ) -> Option<ProtocolMemberData<'db>> {
     let descriptor_ty = candidate.ty.resolve_type_alias(db);
     let getter = descriptor_ty
         .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place;
+    if annotated && !getter.is_definitely_bound() {
+        return None;
+    }
     if candidate.qualifiers.contains(TypeQualifiers::NESTED_CLASS) && !getter.is_undefined() {
         // A nested descriptor's getter can return different types on instance and class access.
         // Modeling just the instance read as a property would accept property-only implementations.
@@ -2577,8 +2633,13 @@ fn descriptor_protocol_member<'db>(
     }
 
     let definition = candidate.definition;
+    let annotation = ProtocolAnnotation {
+        ty: candidate.ty,
+        self_binding_context: candidate.self_binding_context,
+    };
     let receiver_ty = Type::instance(db, env, protocol);
-    let write = if descriptor_ty.is_data_descriptor(db, env) {
+    let is_data = descriptor_ty.is_data_descriptor(db, env);
+    let write = if is_data {
         match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
             DescriptorSetterDomain::Missing => None,
             DescriptorSetterDomain::Known(domain) => Some(ProtocolMemberWrite::descriptor(
@@ -2592,6 +2653,10 @@ fn descriptor_protocol_member<'db>(
                 definition,
             )),
         }
+    } else if annotated {
+        Some(ProtocolMemberWrite::from_type(
+            ProtocolPropertyType::Annotation(annotation),
+        ))
     } else {
         None
     };
@@ -2611,8 +2676,18 @@ fn descriptor_protocol_member<'db>(
     } else {
         return None;
     };
+    // With an annotation alone, a non-data descriptor can also be stored directly on
+    // the instance, or shadowed by a write of the declared type.
+    let read_ty = if annotated && !is_data {
+        UnionType::from_two_elements(db, env, read_ty, candidate.ty)
+    } else {
+        read_ty
+    };
     let read = Some(ProtocolPropertyType::with_definition(read_ty, definition));
     let mut member = ProtocolMemberData::property(read, write, definition);
+    if annotated && is_data {
+        member.class_descriptor = Some(ProtocolPropertyType::Annotation(annotation));
+    }
     // Without `__get__`, a nested descriptor still exposes its class object on both the
     // protocol instance and its class. Only instance writes invoke the descriptor setter.
     member.qualifiers = candidate.qualifiers & TypeQualifiers::NESTED_CLASS;
@@ -3114,9 +3189,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ///
     /// Ordinary instance attributes and properties are deliberately absent from this check. They
     /// are requirements on the object produced by constructing the class, not on the class object
-    /// itself. `ClassVar`s, nested classes, and methods are checked through class access; unlike
-    /// ordinary protocol matching, method access compares the unbound signature instead of checking
-    /// only presence.
+    /// itself. Class variables, nested classes, methods, and annotated data descriptors are checked
+    /// through class access. Unlike ordinary protocol matching, method access compares the unbound
+    /// signature instead of checking only presence.
     pub(super) fn check_meta_protocol_members(
         &self,
         db: &'db dyn Db,
@@ -3718,7 +3793,16 @@ fn cached_protocol_interface<'db>(
                 && (definition.is_some_and(|definition| definition.kind(db).is_function_def())
                     || qualifiers.contains(TypeQualifiers::NESTED_CLASS))
                 && let Some(descriptor) =
-                    descriptor_protocol_member(db, &env, class, candidate) =>
+                    descriptor_protocol_member(db, &env, class, candidate, false) =>
+            {
+                descriptor
+            }
+            _ if !qualifiers.contains(TypeQualifiers::FINAL)
+                && definition.is_some_and(|definition| {
+                    matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                })
+                && let Some(descriptor) =
+                    descriptor_protocol_member(db, &env, class, candidate, true) =>
             {
                 descriptor
             }

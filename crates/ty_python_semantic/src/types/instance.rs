@@ -1391,8 +1391,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Return whether a class-object type inhabits `type[protocol]`.
     ///
     /// The effective constructor return must satisfy the instance protocol, while the class object
-    /// itself must provide the protocol's `ClassVar` and unbound method requirements. Ordinary
-    /// instance attributes and properties are intentionally not required on the class object.
+    /// itself must provide the protocol's class-side requirements, including class variables,
+    /// unbound methods, and annotated data descriptors.
     ///
     /// `meta_ty` must be a class-object type represented by `ClassLiteral`, `SubclassOf`, or
     /// `GenericAlias`. Other types are not necessarily subtypes of `type` or callable, and could

@@ -3916,24 +3916,107 @@ static_assert(not is_assignable_to(StrValue, HasValue[int]))
 reveal_protocol_interface(HasValue[int])
 ```
 
-### Descriptor values in annotations
+### Annotated non-data descriptors
 
-Only a descriptor produced by decorating a protocol method changes how that member is read and
-written through an instance. An annotation whose type implements the descriptor protocol still
-declares an ordinary attribute whose protocol member type is the descriptor object. We reveal the
-protocol interface here because ordinary instance access would invoke `cached_property.__get__` and
-reveal `str` in both cases:
+An annotation can describe a non-data descriptor or a value stored directly on the instance. The
+protocol accepts either read result and permits writing the annotated type.
 
 ```py
-from functools import cached_property
-from typing import Protocol
-from ty_extensions._internal import reveal_protocol_interface
+from typing import Protocol, assert_type
 
-class StoresDescriptor(Protocol):
-    name: cached_property[str]
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> int:
+        return 0
 
-# revealed: {"name": AttributeMember(`cached_property[str]`)}
-reveal_protocol_interface(StoresDescriptor)
+class HasX(Protocol):
+    x: Descriptor
+
+class Annotated:
+    x: Descriptor
+
+class Initialized:
+    x: Descriptor = Descriptor()
+
+class Wrong:
+    x: str
+
+def check(value: HasX) -> None:
+    assert_type(value.x, int | Descriptor)
+    value.x = Descriptor()
+    value.x = 1  # error: [invalid-assignment]
+
+check(Annotated())
+check(Initialized())
+check(Wrong())  # error: [invalid-argument-type]
+```
+
+### Annotated data descriptors
+
+A data descriptor can return different types on an instance and on its class. Implementations must
+provide the corresponding read types and accept values permitted by the setter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, assert_type, overload
+
+class Column: ...
+
+class Descriptor:
+    @overload
+    def __get__(self, instance: None, owner: type) -> Column: ...
+    @overload
+    def __get__(self, instance: object, owner: type) -> int: ...
+    def __get__(self, instance: object, owner: type) -> Column | int:
+        return Column() if instance is None else 0
+
+    def __set__(self, instance: object, value: int) -> None: ...
+
+class HasColumn(Protocol):
+    x: Descriptor
+
+class Model:
+    x: Descriptor = Descriptor()
+
+class InstanceOnly:
+    def __init__(self) -> None:
+        self.x = 0
+
+class WrongClassRead:
+    def __get__(self, instance: object, owner: type) -> int:
+        return 0
+
+    def __set__(self, instance: object, value: int) -> None: ...
+
+class WrongSetter:
+    def __get__(self, instance: object, owner: type) -> int:
+        return 0
+
+    def __set__(self, instance: object, value: str) -> None: ...
+
+class WrongClassReadModel:
+    x: WrongClassRead = WrongClassRead()
+
+class WrongSetterModel:
+    x: WrongSetter = WrongSetter()
+
+def check_instance(value: HasColumn) -> None:
+    assert_type(value.x, int)
+    value.x = 1
+    value.x = "wrong"  # error: [invalid-assignment]
+
+def check_class[T: HasColumn](model: type[T]) -> type[T]:
+    assert_type(model.x, Column)
+    return model
+
+check_instance(Model())
+check_instance(WrongSetterModel())  # error: [invalid-argument-type]
+assert_type(check_class(Model), type[Model])
+check_class(InstanceOnly)  # error: [invalid-argument-type]
+check_class(WrongClassReadModel)  # error: [invalid-argument-type]
 ```
 
 ### Overloaded setters selected by receiver type
@@ -8677,11 +8760,12 @@ Where `P` is a protocol type, a class object `N` can be said to inhabit the type
 
 - All `ClassVar` members on `P` exist on the class object `N`
 - All method members on `P` exist on the class object `N`
+- Annotated data descriptors on `P` that support a class read have a compatible class read on `N`
 - Instantiating `N` creates an object that would satisfy the protocol `P`
 
 Ordinary instance attributes are required only on the object constructed by `N`, so they are not
-available through a value of type `type[P]`. Class variables and methods are available because every
-inhabitant of `type[P]` must provide them on the class object itself.
+available through a value of type `type[P]`. Class variables, methods, and class reads from
+annotated data descriptors are available because every inhabitant of `type[P]` must provide them.
 
 ```toml
 [environment]
