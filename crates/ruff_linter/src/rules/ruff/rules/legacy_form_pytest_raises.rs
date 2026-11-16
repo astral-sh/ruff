@@ -48,11 +48,11 @@ use crate::{FixAvailability, Violation, checkers::ast::Checker};
 /// - [`pytest` documentation: `pytest.deprecated_call`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-deprecated-call)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.15.0", category = Category::Style)]
-pub(crate) struct LegacyFormPytestRaises {
+pub(crate) struct PytestLegacyCallableForm {
     context_type: PytestContextType,
 }
 
-impl Violation for LegacyFormPytestRaises {
+impl Violation for PytestLegacyCallableForm {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -150,7 +150,7 @@ pub(crate) fn legacy_raises_warns_deprecated_call(
     }
 
     let mut diagnostic =
-        checker.report_diagnostic(LegacyFormPytestRaises { context_type }, call.range());
+        checker.report_diagnostic(PytestLegacyCallableForm { context_type }, call.range());
 
     let stmt = semantic.current_statement();
     if !has_leading_content(stmt.start(), checker.source())

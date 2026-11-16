@@ -40,11 +40,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// call changes its semantics and runtime behavior.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
-pub(crate) struct TrioSyncCall {
+pub(crate) struct TrioCallNotAwaited {
     method_name: MethodName,
 }
 
-impl Violation for TrioSyncCall {
+impl Violation for TrioCallNotAwaited {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -88,7 +88,8 @@ pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(TrioSyncCall { method_name }, call.range());
+    let mut diagnostic =
+        checker.report_diagnostic(TrioCallNotAwaited { method_name }, call.range());
     if checker.semantic().in_async_context() {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             pad(

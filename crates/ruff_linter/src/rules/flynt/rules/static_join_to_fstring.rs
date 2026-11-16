@@ -41,14 +41,14 @@ use crate::rules::flynt::helpers;
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.266", category = Category::Complexity)]
-pub(crate) struct StaticJoinToFString {
+pub(crate) struct StaticStrJoin {
     expression: SourceCodeSnippet,
 }
 
-impl AlwaysFixableViolation for StaticJoinToFString {
+impl AlwaysFixableViolation for StaticStrJoin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StaticJoinToFString { expression } = self;
+        let StaticStrJoin { expression } = self;
         if let Some(expression) = expression.full_display() {
             format!("Consider `{expression}` instead of string join")
         } else {
@@ -57,7 +57,7 @@ impl AlwaysFixableViolation for StaticJoinToFString {
     }
 
     fn fix_title(&self) -> String {
-        let StaticJoinToFString { expression } = self;
+        let StaticStrJoin { expression } = self;
         if let Some(expression) = expression.full_display() {
             format!("Replace with `{expression}`")
         } else {
@@ -194,7 +194,7 @@ pub(crate) fn static_join_to_fstring(checker: &Checker, expr: &Expr, joiner: &st
     let contents = checker.generator().expr(&new_expr);
 
     let mut diagnostic = checker.report_diagnostic(
-        StaticJoinToFString {
+        StaticStrJoin {
             expression: SourceCodeSnippet::new(contents.clone()),
         },
         expr.range(),

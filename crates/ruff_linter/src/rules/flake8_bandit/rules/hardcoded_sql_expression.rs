@@ -47,9 +47,9 @@ static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 /// - [psycopg3: Server-side binding](https://www.psycopg.org/psycopg3/docs/basic/from_pg2.html#server-side-binding)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.245", category = Category::Security)]
-pub(crate) struct HardcodedSQLExpression;
+pub(crate) struct SqlStringConstruction;
 
-impl Violation for HardcodedSQLExpression {
+impl Violation for SqlStringConstruction {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Possible SQL injection vector through string-based query construction".to_string()
@@ -116,7 +116,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
     };
 
     if SQL_REGEX.is_match(&content) {
-        checker.report_diagnostic(HardcodedSQLExpression, expr.range());
+        checker.report_diagnostic(SqlStringConstruction, expr.range());
     }
 }
 

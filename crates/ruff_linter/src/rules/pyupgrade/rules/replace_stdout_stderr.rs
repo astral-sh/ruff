@@ -45,9 +45,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.199", category = Category::Complexity)]
-pub(crate) struct ReplaceStdoutStderr;
+pub(crate) struct SubprocessPipeStdoutStderr;
 
-impl Violation for ReplaceStdoutStderr {
+impl Violation for SubprocessPipeStdoutStderr {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -89,7 +89,7 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
             return;
         }
 
-        let mut diagnostic = checker.report_diagnostic(ReplaceStdoutStderr, call.range());
+        let mut diagnostic = checker.report_diagnostic(SubprocessPipeStdoutStderr, call.range());
         if call.arguments.find_keyword("capture_output").is_none() {
             diagnostic.try_set_fix(|| {
                 generate_fix(

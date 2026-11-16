@@ -356,7 +356,7 @@ impl Display for LinterSettings {
 #[rustfmt::skip]
 pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::CancelScopeNoCheckpoint), // ASYNC100
-    RuleSelector::rule(Rule::TrioSyncCall), // ASYNC105
+    RuleSelector::rule(Rule::TrioCallNotAwaited), // ASYNC105
     RuleSelector::rule(Rule::AsyncZeroSleep), // ASYNC115
     RuleSelector::rule(Rule::LongSleepNotForever), // ASYNC116
     RuleSelector::rule(Rule::BlockingHttpCallInAsyncFunction), // ASYNC210
@@ -368,7 +368,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnaryPrefixIncrementDecrement), // B002
     RuleSelector::rule(Rule::AssignmentToOsEnviron), // B003
     RuleSelector::rule(Rule::UnreliableCallableCheck), // B004
-    RuleSelector::rule(Rule::StripWithMultiCharacters), // B005
+    RuleSelector::rule(Rule::StripWithDuplicateCharacters), // B005
     RuleSelector::rule(Rule::MutableArgumentDefault), // B006
     RuleSelector::rule(Rule::FunctionCallInDefaultArgument), // B008
     RuleSelector::rule(Rule::GetattrWithConstant), // B009
@@ -400,7 +400,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryGeneratorDict), // C402
     RuleSelector::rule(Rule::UnnecessaryListComprehensionSet), // C403
     RuleSelector::rule(Rule::UnnecessaryListComprehensionDict), // C404
-    RuleSelector::rule(Rule::UnnecessaryLiteralSet), // C405
+    RuleSelector::rule(Rule::UnnecessaryLiteralInSetCall), // C405
     RuleSelector::rule(Rule::UnnecessaryLiteralDict), // C406
     RuleSelector::rule(Rule::UnnecessaryCollectionCall), // C408
     RuleSelector::rule(Rule::UnnecessaryLiteralWithinTupleCall), // C409
@@ -464,7 +464,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::RaiseNotImplemented), // F901
     RuleSelector::rule(Rule::FutureRewritableTypeAnnotation), // FA100
     RuleSelector::rule(Rule::FutureRequiredTypeAnnotation), // FA102
-    RuleSelector::rule(Rule::StaticJoinToFString), // FLY002
+    RuleSelector::rule(Rule::StaticStrJoin), // FLY002
     RuleSelector::rule(Rule::PrintEmptyString), // FURB105
     RuleSelector::rule(Rule::ForLoopWrites), // FURB122
     RuleSelector::rule(Rule::ReadlinesInFor), // FURB129
@@ -540,7 +540,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::BadStringFormatCharacter), // PLE1300
     RuleSelector::rule(Rule::BadStringFormatType), // PLE1307
     RuleSelector::rule(Rule::BadStrStripCall), // PLE1310
-    RuleSelector::rule(Rule::InvalidEnvvarValue), // PLE1507
+    RuleSelector::rule(Rule::InvalidGetenvKey), // PLE1507
     RuleSelector::rule(Rule::SingledispatchMethod), // PLE1519
     RuleSelector::rule(Rule::SingledispatchmethodFunction), // PLE1520
     RuleSelector::rule(Rule::YieldFromInAsyncFunction), // PLE1700
@@ -684,7 +684,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::ReturnInTryExceptFinally), // SIM107
     RuleSelector::rule(Rule::ManualLoopCounter), // SIM113
     RuleSelector::rule(Rule::IfWithIdenticalBranches), // SIM114
-    RuleSelector::rule(Rule::OpenFileWithContextHandler), // SIM115
+    RuleSelector::rule(Rule::OpenFileWithoutContextManager), // SIM115
     RuleSelector::rule(Rule::MultipleWithStatements), // SIM117
     RuleSelector::rule(Rule::InDictKeys), // SIM118
     RuleSelector::rule(Rule::NegateEqualOp), // SIM201
@@ -722,20 +722,20 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryEncodeUTF8), // UP012
     RuleSelector::rule(Rule::FunctionalNamedTuple), // UP014
     RuleSelector::rule(Rule::DatetimeTimezoneUTC), // UP017
-    RuleSelector::rule(Rule::NativeLiterals), // UP018
+    RuleSelector::rule(Rule::UnnecessaryLiteralConstructor), // UP018
     RuleSelector::rule(Rule::TypingTextStrAlias), // UP019
     RuleSelector::rule(Rule::OpenAlias), // UP020
-    RuleSelector::rule(Rule::ReplaceUniversalNewlines), // UP021
-    RuleSelector::rule(Rule::ReplaceStdoutStderr), // UP022
+    RuleSelector::rule(Rule::SubprocessUniversalNewlines), // UP021
+    RuleSelector::rule(Rule::SubprocessPipeStdoutStderr), // UP022
     RuleSelector::rule(Rule::DeprecatedCElementTree), // UP023
     RuleSelector::rule(Rule::OSErrorAlias), // UP024
     RuleSelector::rule(Rule::UnicodeKindPrefix), // UP025
     RuleSelector::rule(Rule::DeprecatedMockImport), // UP026
     RuleSelector::rule(Rule::YieldInForLoop), // UP028
     RuleSelector::rule(Rule::UnnecessaryBuiltinImport), // UP029
-    RuleSelector::rule(Rule::FormatLiterals), // UP030
+    RuleSelector::rule(Rule::UnnecessaryPositionalIndices), // UP030
     RuleSelector::rule(Rule::PrintfStringFormatting), // UP031
-    RuleSelector::rule(Rule::FString), // UP032
+    RuleSelector::rule(Rule::StrFormat), // UP032
     RuleSelector::rule(Rule::LRUCacheWithMaxsizeNone), // UP033
     RuleSelector::rule(Rule::ExtraneousParentheses), // UP034
     RuleSelector::rule(Rule::DeprecatedImport), // UP035
@@ -980,7 +980,7 @@ mod tests {
         	fast-api-non-annotated-dependency (FAST002),
         	fast-api-unused-path-parameter (FAST003),
         	blocking-http-call-httpx-in-async-function (ASYNC212),
-        	blocking-path-method-in-async-function (ASYNC240),
+        	blocking-path-operation-in-async-function (ASYNC240),
         	blocking-input-in-async-function (ASYNC250),
         	abstract-base-class-without-abstract-method (B024),
         	empty-method-without-abstract-decorator (B027),
@@ -1028,7 +1028,7 @@ mod tests {
         	for-loop-set-mutations (FURB142),
         	slice-copy (FURB145),
         	unnecessary-enumerate (FURB148),
-        	math-constant (FURB152),
+        	approximate-math-constant (FURB152),
         	hardcoded-string-charset (FURB156),
         	single-item-membership-test (FURB171),
         	meta-class-abc-meta (FURB180),
@@ -1045,7 +1045,7 @@ mod tests {
         	unnecessary-regular-expression (RUF055),
         	falsy-dict-get-fallback (RUF056),
         	in-empty-collection (RUF060),
-        	legacy-form-pytest-raises (RUF061),
+        	pytest-legacy-callable-form (RUF061),
         	non-octal-permissions (RUF064),
         	logging-eager-conversion (RUF065),
         	property-without-return (RUF066),

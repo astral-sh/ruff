@@ -43,9 +43,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.224", category = Category::Complexity)]
-pub(crate) struct FString;
+pub(crate) struct StrFormat;
 
-impl Violation for FString {
+impl Violation for StrFormat {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -545,7 +545,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(FString, call.range());
+    let mut diagnostic = checker.report_diagnostic(StrFormat, call.range());
 
     // Avoid fix if there are comments within the call:
     // ```

@@ -37,9 +37,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.196", category = Category::Style)]
-pub(crate) struct ReplaceUniversalNewlines;
+pub(crate) struct SubprocessUniversalNewlines;
 
-impl AlwaysFixableViolation for ReplaceUniversalNewlines {
+impl AlwaysFixableViolation for SubprocessUniversalNewlines {
     #[derive_message_formats]
     fn message(&self) -> String {
         "`universal_newlines` is deprecated, use `text`".to_string()
@@ -68,7 +68,7 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
             return;
         };
 
-        let mut diagnostic = checker.report_diagnostic(ReplaceUniversalNewlines, arg.range());
+        let mut diagnostic = checker.report_diagnostic(SubprocessUniversalNewlines, arg.range());
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
 
         if call.arguments.find_keyword("text").is_some() {

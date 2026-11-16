@@ -1,4 +1,4 @@
-# `f-string` (`UP032`)
+# `str-format` (`UP032`)
 
 ```toml
 lint.select = ["UP032"]
@@ -32,20 +32,20 @@ When the argument is interpolated once, the side effect runs once either way, so
 def foo(): ...
 
 
-"{x}".format(x=foo())  # snapshot: f-string
+"{x}".format(x=foo())  # snapshot: str-format
 ```
 
 ```snapshot
 error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:4:1
   |
-4 | "{x}".format(x=foo())  # snapshot: f-string
+4 | "{x}".format(x=foo())  # snapshot: str-format
   | ^^^^^^^^^^^^^^^^^^^^^
 help: Convert to f-string
   |
 3 |
-  - "{x}".format(x=foo())  # snapshot: f-string
-4 + f"{foo()}"  # snapshot: f-string
+  - "{x}".format(x=foo())  # snapshot: str-format
+4 + f"{foo()}"  # snapshot: str-format
   |
 ```
 
@@ -56,39 +56,39 @@ dropping a leading one would orphan whatever precedes the first kept segment, su
 an opening parenthesis, or a comment. A leading empty literal is left in place instead.
 
 ```py
-"" "{}".format(x)  # snapshot: f-string
+"" "{}".format(x)  # snapshot: str-format
 ```
 
 ```snapshot
 error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:1:1
   |
-1 | "" "{}".format(x)  # snapshot: f-string
+1 | "" "{}".format(x)  # snapshot: str-format
   | ^^^^^^^^^^^^^^^^^
 help: Convert to f-string
   |
-  - "" "{}".format(x)  # snapshot: f-string
-1 + "" f"{x}"  # snapshot: f-string
-2 | "a" "" "{}".format(x)  # snapshot: f-string
+  - "" "{}".format(x)  # snapshot: str-format
+1 + "" f"{x}"  # snapshot: str-format
+2 | "a" "" "{}".format(x)  # snapshot: str-format
   |
 ```
 
 ```py
-"a" "" "{}".format(x)  # snapshot: f-string
+"a" "" "{}".format(x)  # snapshot: str-format
 ```
 
 ```snapshot
 error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:2:1
   |
-2 | "a" "" "{}".format(x)  # snapshot: f-string
+2 | "a" "" "{}".format(x)  # snapshot: str-format
   | ^^^^^^^^^^^^^^^^^^^^^
 help: Convert to f-string
   |
-1 | "" "{}".format(x)  # snapshot: f-string
-  - "a" "" "{}".format(x)  # snapshot: f-string
-2 + "a" f"{x}"  # snapshot: f-string
-3 | x = ("" "{}").format(value)  # snapshot: f-string
+1 | "" "{}".format(x)  # snapshot: str-format
+  - "a" "" "{}".format(x)  # snapshot: str-format
+2 + "a" f"{x}"  # snapshot: str-format
+3 | x = ("" "{}").format(value)  # snapshot: str-format
   |
 ```
 
@@ -96,20 +96,20 @@ A leading empty literal inside parentheses must keep the opening parenthesis, ot
 introduce a syntax error by leaving the closing one unbalanced.
 
 ```py
-x = ("" "{}").format(value)  # snapshot: f-string
+x = ("" "{}").format(value)  # snapshot: str-format
 ```
 
 ```snapshot
 error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:3:5
   |
-3 | x = ("" "{}").format(value)  # snapshot: f-string
+3 | x = ("" "{}").format(value)  # snapshot: str-format
   |     ^^^^^^^^^^^^^^^^^^^^^^^
 help: Convert to f-string
   |
-2 | "a" "" "{}".format(x)  # snapshot: f-string
-  - x = ("" "{}").format(value)  # snapshot: f-string
-3 + x = ("" f"{value}")  # snapshot: f-string
+2 | "a" "" "{}".format(x)  # snapshot: str-format
+  - x = ("" "{}").format(value)  # snapshot: str-format
+3 + x = ("" f"{value}")  # snapshot: str-format
 4 | foo(
   |
 ```
@@ -118,7 +118,7 @@ A comment between a leading empty literal and the f-string must not be dropped b
 
 ```py
 foo(
-    ""  # snapshot: f-string
+    ""  # snapshot: str-format
     # comment
     "{}".format(value)
 )
@@ -128,7 +128,7 @@ foo(
 error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:5:5
   |
-5 | /     ""  # snapshot: f-string
+5 | /     ""  # snapshot: str-format
 6 | |     # comment
 7 | |     "{}".format(value)
   | |______________________^
@@ -145,20 +145,20 @@ When every segment is an empty literal, the leading one is still preserved, keep
 and its parentheses balanced.
 
 ```py
-y = ("" "").format(value)  # snapshot: f-string
+y = ("" "").format(value)  # snapshot: str-format
 ```
 
 ```snapshot
 error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:9:5
   |
-9 | y = ("" "").format(value)  # snapshot: f-string
+9 | y = ("" "").format(value)  # snapshot: str-format
   |     ^^^^^^^^^^^^^^^^^^^^^
 help: Convert to f-string
   |
 8 | )
-  - y = ("" "").format(value)  # snapshot: f-string
-9 + y = ("" "")  # snapshot: f-string
+  - y = ("" "").format(value)  # snapshot: str-format
+9 + y = ("" "")  # snapshot: str-format
   |
 ```
 
@@ -215,37 +215,37 @@ Inside brackets, `str.format` only reads an all-digit index as an integer. A sig
 key, so it converts to a quoted subscript rather than an integer one:
 
 ```py
-"{0[+1]}".format(d)  # snapshot: f-string
+"{0[+1]}".format(d)  # snapshot: str-format
 ```
 
 ```snapshot
 error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:1:1
   |
-1 | "{0[+1]}".format(d)  # snapshot: f-string
+1 | "{0[+1]}".format(d)  # snapshot: str-format
   | ^^^^^^^^^^^^^^^^^^^
 help: Convert to f-string
   |
-  - "{0[+1]}".format(d)  # snapshot: f-string
-1 + f"{d['+1']}"  # snapshot: f-string
+  - "{0[+1]}".format(d)  # snapshot: str-format
+1 + f"{d['+1']}"  # snapshot: str-format
   |
 ```
 
 ## Valid conversions are unaffected
 
 ```py
-"{!r}".format(x)  # snapshot: f-string
+"{!r}".format(x)  # snapshot: str-format
 ```
 
 ```snapshot
 error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:1:1
   |
-1 | "{!r}".format(x)  # snapshot: f-string
+1 | "{!r}".format(x)  # snapshot: str-format
   | ^^^^^^^^^^^^^^^^
 help: Convert to f-string
   |
-  - "{!r}".format(x)  # snapshot: f-string
-1 + f"{x!r}"  # snapshot: f-string
+  - "{!r}".format(x)  # snapshot: str-format
+1 + f"{x!r}"  # snapshot: str-format
   |
 ```

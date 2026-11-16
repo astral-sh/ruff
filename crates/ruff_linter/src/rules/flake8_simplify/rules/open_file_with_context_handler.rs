@@ -36,9 +36,9 @@ use crate::codes::Category;
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.219", category = Category::Suspicious)]
-pub(crate) struct OpenFileWithContextHandler;
+pub(crate) struct OpenFileWithoutContextManager;
 
-impl Violation for OpenFileWithContextHandler {
+impl Violation for OpenFileWithoutContextManager {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Use a context manager for opening files".to_string()
@@ -262,5 +262,5 @@ pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::Expr
         }
     }
 
-    checker.report_diagnostic(OpenFileWithContextHandler, call.func.range());
+    checker.report_diagnostic(OpenFileWithoutContextManager, call.func.range());
 }

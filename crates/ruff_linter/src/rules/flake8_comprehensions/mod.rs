@@ -34,7 +34,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryListComprehensionDict, Path::new("C404.py"))]
     #[test_case(Rule::UnnecessaryListComprehensionSet, Path::new("C403.py"))]
     #[test_case(Rule::UnnecessaryLiteralDict, Path::new("C406.py"))]
-    #[test_case(Rule::UnnecessaryLiteralSet, Path::new("C405.py"))]
+    #[test_case(Rule::UnnecessaryLiteralInSetCall, Path::new("C405.py"))]
     #[test_case(Rule::UnnecessaryLiteralWithinDictCall, Path::new("C418.py"))]
     #[test_case(Rule::UnnecessaryLiteralWithinListCall, Path::new("C410.py"))]
     #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409.py"))]

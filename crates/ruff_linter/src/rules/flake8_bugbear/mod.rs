@@ -60,7 +60,7 @@ mod tests {
     #[test_case(Rule::SetattrWithConstant, Path::new("B009_B010.py"))]
     #[test_case(Rule::StarArgAfterKeyword, Path::new("B026.py"))]
     #[test_case(Rule::StaticKeyDictComprehension, Path::new("B035.py"))]
-    #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"))]
+    #[test_case(Rule::StripWithDuplicateCharacters, Path::new("B005.py"))]
     #[test_case(Rule::UnaryPrefixIncrementDecrement, Path::new("B002.py"))]
     #[test_case(Rule::UnintentionalTypeAnnotation, Path::new("B032.py"))]
     #[test_case(Rule::UnreliableCallableCheck, Path::new("B004.py"))]
@@ -96,7 +96,7 @@ mod tests {
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
-    #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"))]
+    #[test_case(Rule::StripWithDuplicateCharacters, Path::new("B005.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
