@@ -5772,7 +5772,9 @@ def check[T: Combinable, U: Combinable](left: T, right: T, other: U) -> None:
     combine(left, other)  # error: [invalid-argument-type]
 ```
 
-A value of type `T` cannot stand in for a combiner that accepts *every* `Combinable`.
+A value of type `T` cannot stand in for a combiner that accepts *every* `Combinable`. For a union
+target, ty can also try the source's upper bound after checking each arm. Here that would widen the
+`other` parameter from `T` to `Combinable` and incorrectly accept the `Combiner` arm.
 
 ```py
 def assign[T: Combinable](value: T) -> None:
