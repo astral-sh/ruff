@@ -1,5 +1,8 @@
+use std::sync::LazyLock;
+
 use anyhow::{Result, anyhow};
 use libcst_native::{Arg, Expression};
+use regex::{Captures, Regex};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
@@ -123,48 +126,32 @@ fn is_sequential(indices: &[usize]) -> bool {
     indices.iter().enumerate().all(|(idx, value)| idx == *value)
 }
 
+static FORMAT_SPECIFIER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?x)
+            \{\{ | }}                   # escaped braces, matched so they are skipped as a unit
+            |
+            \{                          # opening curly brace
+                \d+                     # followed by the positional index
+                (?P<fmt>
+                    (?:\[[^\]]*\]|[^{}\[:!])*  # the rest of the field name; `[...]` keys may contain braces
+                    (?:[!:][^{}]*)?      # an optional conversion and format spec
+                )
+            }                           # followed by a closing brace
+        ",
+    )
+    .unwrap()
+});
+
 /// Remove the positional indices from the replacement fields in `value`, e.g., `{0}{1:x}` becomes
 /// `{}{:x}`.
-///
-/// `{{` and `}}` are escaped braces, and the `[...]` part of a field name is a literal key that may
-/// contain braces, e.g. `{0[{}{1}]}`. Nested fields in the format spec never get here, since the
-/// rule skips format strings with nested parts.
 fn remove_indices(value: &str) -> String {
-    let bytes = value.as_bytes();
-    let mut result = String::with_capacity(value.len());
-    let mut last_end = 0;
-    let mut i = 0;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'{' | b'}' if bytes.get(i + 1) == Some(&bytes[i]) => i += 2,
-            b'{' => {
-                let index_start = i + 1;
-                let index_end = index_start
-                    + bytes[index_start..]
-                        .iter()
-                        .take_while(|byte| byte.is_ascii_digit())
-                        .count();
-                if index_end > index_start {
-                    result.push_str(&value[last_end..index_start]);
-                    last_end = index_end;
-                }
-                // Skip to the closing brace of the field, stepping over `[...]` keys.
-                i = index_end;
-                while i < bytes.len() && bytes[i] != b'}' {
-                    if bytes[i] == b'[' {
-                        while i < bytes.len() && bytes[i] != b']' {
-                            i += 1;
-                        }
-                    }
-                    i += 1;
-                }
-                i += 1;
-            }
-            _ => i += 1,
-        }
-    }
-    result.push_str(&value[last_end..]);
-    result
+    FORMAT_SPECIFIER
+        .replace_all(value, |caps: &Captures| match caps.name("fmt") {
+            Some(fmt) => format!("{{{}}}", fmt.as_str()),
+            None => caps.get(0).map_or("", |m| m.as_str()).to_string(),
+        })
+        .into_owned()
 }
 
 /// Remove the explicit positional indices from a format string.

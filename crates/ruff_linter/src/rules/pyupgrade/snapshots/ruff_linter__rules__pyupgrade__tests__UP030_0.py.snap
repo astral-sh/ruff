@@ -599,10 +599,29 @@ UP030 [*] Use implicit references for positional format fields
 77 |
 78 | "{0[{}{1}]}".format({"{}{1}": 42})
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+79 |
+80 | "{0:[>10}{1}".format(1, 2)
+   |
 help: Remove explicit positional indices
    |
 77 |
    - "{0[{}{1}]}".format({"{}{1}": 42})
 78 + "{[{}{1}]}".format({"{}{1}": 42})
+79 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP030 [*] Use implicit references for positional format fields
+  --> UP030_0.py:80:1
+   |
+78 | "{0[{}{1}]}".format({"{}{1}": 42})
+79 |
+80 | "{0:[>10}{1}".format(1, 2)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove explicit positional indices
+   |
+79 |
+   - "{0:[>10}{1}".format(1, 2)
+80 + "{:[>10}{}".format(1, 2)
    |
 note: This is an unsafe fix and may change runtime behavior
