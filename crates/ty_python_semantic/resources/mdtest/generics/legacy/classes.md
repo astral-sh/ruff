@@ -1781,6 +1781,12 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D(1))  # revealed: D[int]
 ```
 
+Through `super(D, D)`, the inherited `__new__` infers the specialization from its `cls` argument.
+
+```py
+reveal_type(super(D, D).__new__(D[str]))  # revealed: D[str]
+```
+
 ### Generic class inherits `__init__` from generic base class
 
 ```py
@@ -1803,6 +1809,24 @@ reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(C(1, "str"))  # revealed: C[int, str]
 reveal_type(D(1, "str"))  # revealed: D[int, str]
+```
+
+Passing the bare class to `super` leaves the initializer unbound, so each call can infer its type
+arguments.
+
+```py
+def initialize(child: D[int, str]) -> None:
+    super(D, D).__init__(child, 1, "value")  # ok
+```
+
+Inside a class method, `super()` uses the specialization of `cls`. The initializer's `t` parameter
+expects `T`, which could be a type other than `int`.
+
+```py
+class Child(D[T, str]):
+    @classmethod
+    def initialize(cls, child: "Child[T]") -> None:
+        super().__init__(child, 1, "value")  # error: [invalid-argument-type] "Expected `T@Child`"
 ```
 
 ### Generic class inherits `__init__` from `dict`
