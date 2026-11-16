@@ -90,6 +90,9 @@ impl<'a> SequenceIndexVisitor<'a> {
     }
 
     pub(crate) fn into_accesses(self) -> Vec<TextRange> {
+        if self.modified {
+            return Vec::new();
+        }
         self.accesses
     }
 }
@@ -116,6 +119,9 @@ impl SequenceIndexVisitor<'_> {
                 }
                 false
             }
+            Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+                elts.iter().any(|elt| self.is_assignment(elt))
+            }
             _ => false,
         }
     }
@@ -128,21 +134,33 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
         }
         match stmt {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
+                if targets.iter().any(|target| self.is_assignment(target)) {
+                    self.modified = true;
+                    return;
+                }
                 self.visit_expr(value);
             }
             Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+                if self.is_assignment(target) {
+                    self.modified = true;
+                    return;
+                }
                 if let Some(value) = value {
-                    self.modified = self.is_assignment(target);
                     self.visit_expr(value);
                 }
             }
             Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                self.modified = self.is_assignment(target);
+                if self.is_assignment(target) {
+                    self.modified = true;
+                    return;
+                }
                 self.visit_expr(value);
             }
             Stmt::Delete(ast::StmtDelete { targets, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
+                if targets.iter().any(|target| self.is_assignment(target)) {
+                    self.modified = true;
+                    return;
+                }
             }
             _ => visitor::walk_stmt(self, stmt),
         }
@@ -151,6 +169,12 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
     fn visit_expr(&mut self, expr: &Expr) {
         if self.modified {
             return;
+        }
+        if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
+            if self.is_assignment(target) {
+                self.modified = true;
+                return;
+            }
         }
         if let Expr::Subscript(ast::ExprSubscript {
             value,

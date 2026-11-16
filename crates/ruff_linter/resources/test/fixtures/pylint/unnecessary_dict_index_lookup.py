@@ -62,3 +62,12 @@ def for_else_no_false_positive(result: dict[str, float]) -> dict[str, float]:
             if result[res_glob] <= 0:  # okay, res_glob from loop may be unbound
                 result.pop(res_glob)
     return result
+
+
+def issue_29842():
+    # Issue #29842: do not flag d[k] when d[k] is mutated in a while loop
+    for fruit, count in FRUITS.items():
+        while FRUITS[fruit] >= 2:
+            print("eating banana")
+            FRUITS[fruit] -= 2
+

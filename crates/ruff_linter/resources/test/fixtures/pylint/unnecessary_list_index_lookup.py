@@ -83,3 +83,10 @@ def nested_index_lookup():
     column_names = ["a", "b"]
     for index, column_name in enumerate(column_names):
         _ = data[column_names[index]]  # PLR1736
+
+
+def while_loop_mutation():
+    for index, letter in enumerate(letters):
+        while len(letters[index]) < 5:
+            letters[index] += "a"
+
