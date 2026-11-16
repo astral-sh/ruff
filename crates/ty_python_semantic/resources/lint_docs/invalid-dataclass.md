@@ -36,4 +36,8 @@ class Foo(NamedTuple):  # error: [invalid-dataclass]
 
 See: <https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass>
 
+## Rule history
+
+- v0.0.105: `invalid-dataclass-post-init` was split into a separate rule.
+
 [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
