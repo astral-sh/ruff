@@ -773,8 +773,9 @@ super(B, B())[0]
 
 ### Generic base initializer
 
-Inside `Child[S]`, the base initializer expects a callback that accepts `S`. This holds even when
-`S` has a default.
+Inside `Child[S]`, the base initializer expects a callback that accepts `S`, even though `S`
+defaults to `BaseException`. For example, a `Child[ValueError]` could pass a `ValueError` to the
+callback, so a callback that only accepts `OSError` is too narrow.
 
 ```py
 from collections.abc import Callable
@@ -788,9 +789,14 @@ class Base(Generic[T]):
     def __init__(self, check: Callable[[T], bool] | None) -> None:
         self.check = check
 
+def has_filename(error: OSError) -> bool:
+    return error.filename is not None
+
 class Child(Base[S], Generic[S]):
     def __init__(self, check: Callable[[S], bool] | None) -> None:
         super().__init__(check)  # ok
+        # error: [invalid-argument-type] "Expected `((S@Child, /) -> bool) | None`"
+        super().__init__(has_filename)
 ```
 
 ## Inferring `Self` in `super()` calls
