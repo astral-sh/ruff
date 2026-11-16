@@ -1563,18 +1563,20 @@ impl<'db> Specialization<'db> {
         let mut has_unsimplified_dynamic_typevar = false;
         let types = self.map_types(db, |_, bound_typevar, vartype| {
             let variance = specialization_variance(db, bound_typevar);
-            let top_materialization = vartype.materialize(db, MaterializationKind::Top, visitor);
+            // Recomputing the top materialization doubles the work at each covariant layer.
+            let top_materialization =
+                LazyCell::new(|| vartype.materialize(db, MaterializationKind::Top, visitor));
             // Equivalence can recursively inspect a protocol's requirements. Only check it when
             // the result affects this materialization.
             let has_dynamic_type = LazyCell::new(|| {
-                !visitor.is_equivalent_to_materialization(db, vartype, top_materialization)
+                !visitor.is_equivalent_to_materialization(db, vartype, *top_materialization)
             });
 
             match variance {
                 TypeVarVariance::Bivariant => {
                     // With bivariance, all specializations are subtypes of each other,
                     // so any materialization is acceptable.
-                    top_materialization
+                    *top_materialization
                 }
                 TypeVarVariance::Covariant | TypeVarVariance::Contravariant
                     if bound_typevar.typevar(db).is_constrained(db) && *has_dynamic_type =>
@@ -1588,8 +1590,12 @@ impl<'db> Specialization<'db> {
                     } else {
                         materialization_kind.flip()
                     };
-                    let materialized =
-                        vartype.materialize(db, effective_materialization_kind, visitor);
+                    let materialized = match effective_materialization_kind {
+                        MaterializationKind::Top => *top_materialization,
+                        MaterializationKind::Bottom => {
+                            vartype.materialize(db, MaterializationKind::Bottom, visitor)
+                        }
+                    };
 
                     if effective_materialization_kind == MaterializationKind::Top
                         && let Some(upper_bound) = bound_typevar.top_materialized_upper_bound(db)

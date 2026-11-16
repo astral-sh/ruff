@@ -1336,6 +1336,35 @@ fn benchmark_recursive_protocol_materialization_scaling(criterion: &mut Criterio
     }
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/5041>.
+///
+/// Applying `Top` to a nested generic isolates the cost of materialization in overloaded calls.
+/// Covariant layers reuse the top materialization. Contravariant layers alternate between top
+/// and bottom, so computing an unused top materialization can also lead to exponential work.
+fn benchmark_nested_generic_materialization(criterion: &mut Criterion) {
+    for depth in [12, 20] {
+        let nested = format!("{}Any{}", "Row[".repeat(depth), "]".repeat(depth));
+        for variance in ["covariant", "contravariant"] {
+            let code = format!(
+                r#"
+                from typing import Any, Generic, TypeVar
+                from ty_extensions import Top
+
+                T = TypeVar("T", {variance}=True)
+                class Row(Generic[T]): ...
+
+                def f(x: Top[{nested}]): ...
+                "#
+            );
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[nested_{variance}_materialization_{depth}]"),
+                &code,
+            );
+        }
+    }
+}
+
 /// Materializing nested callables reuses shared parameter and return types. A recursive leaf
 /// permits reuse after its cycle closes; a cycle through the whole graph also needs reuse while
 /// the cycle is still active. Both cases should avoid exponential work as the nesting grows.
@@ -2976,6 +3005,7 @@ criterion_group!(
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
+    benchmark_nested_generic_materialization,
     benchmark_recursive_callable_materialization,
     benchmark_recursive_protocol_growing_specialization,
     benchmark_recursive_protocol_specialized_receiver,
