@@ -33,20 +33,20 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
-pub(crate) struct RedirectedNOQA {
+pub(crate) struct RenamedRuleInSuppression {
     pub(crate) original: &'static str,
     pub(crate) target: &'static str,
 }
 
-impl AlwaysFixableViolation for RedirectedNOQA {
+impl AlwaysFixableViolation for RenamedRuleInSuppression {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedirectedNOQA { original, target } = self;
+        let RenamedRuleInSuppression { original, target } = self;
         format!("`{original}` is a redirect to `{target}`")
     }
 
     fn fix_title(&self) -> String {
-        let RedirectedNOQA { target, .. } = self;
+        let RenamedRuleInSuppression { target, .. } = self;
         format!("Replace with `{target}`")
     }
 }
@@ -77,8 +77,8 @@ pub(crate) fn redirected_file_noqa(context: &LintContext, noqa_directives: &File
 fn build_diagnostics(context: &LintContext, codes: &Codes<'_>) {
     for code in codes.iter() {
         if let Some((original, target)) = get_redirect(code.as_str()) {
-            let mut diagnostic =
-                context.report_diagnostic(RedirectedNOQA { original, target }, code.range());
+            let mut diagnostic = context
+                .report_diagnostic(RenamedRuleInSuppression { original, target }, code.range());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 target.to_string(),
                 code.range(),

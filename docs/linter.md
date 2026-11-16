@@ -690,7 +690,7 @@ The file-level suppression comment specification is as follows:
 
 ### Detecting unused suppressions
 
-Ruff implements a special rule, [`unused-noqa`](https://docs.astral.sh/ruff/rules/unused-noqa/),
+Ruff implements a special rule, [`unused-suppression`](https://docs.astral.sh/ruff/rules/unused-suppression/),
 under the `RUF100` code, to enforce that your suppressions are "valid", in that the violations
 they _say_ they ignore are actually being triggered and suppressed. To flag
 unused suppression comments, run Ruff with `--extend-select RUF100`, like so:

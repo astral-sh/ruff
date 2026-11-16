@@ -33,12 +33,12 @@ pub(crate) fn check_tokens(
     let comment_ranges = indexer.comment_ranges();
 
     if context.any_rule_enabled(&[
-        Rule::BlankLineBetweenMethods,
-        Rule::BlankLinesTopLevel,
+        Rule::MissingBlankLineBetweenMethods,
+        Rule::MissingBlankLinesTopLevel,
         Rule::TooManyBlankLines,
         Rule::BlankLineAfterDecorator,
-        Rule::BlankLinesAfterFunctionOrClass,
-        Rule::BlankLinesBeforeNestedDefinition,
+        Rule::MissingBlankLinesAfterFunctionOrClass,
+        Rule::MissingBlankLinesBeforeNestedDefinition,
     ]) {
         BlankLinesChecker::new(locator, stylist, source_type, cell_offsets, context)
             .check_lines(tokens);
@@ -71,11 +71,11 @@ pub(crate) fn check_tokens(
     }
 
     if context.any_rule_enabled(&[
-        Rule::InvalidCharacterBackspace,
-        Rule::InvalidCharacterSub,
-        Rule::InvalidCharacterEsc,
+        Rule::BackspaceCharacter,
+        Rule::SubCharacter,
+        Rule::EscCharacter,
         Rule::InvalidCharacterNul,
-        Rule::InvalidCharacterZeroWidthSpace,
+        Rule::ZeroWidthSpaceCharacter,
     ]) && pylint::rules::contains_invalid_string_character(locator.contents())
     {
         let mut interpolated_string_depths: Vec<u32> = Vec::new();
@@ -149,7 +149,7 @@ pub(crate) fn check_tokens(
     if context.any_rule_enabled(&[
         Rule::MissingTrailingComma,
         Rule::TrailingCommaOnBareTuple,
-        Rule::ProhibitedTrailingComma,
+        Rule::UnnecessaryTrailingComma,
     ]) {
         flake8_commas::rules::trailing_commas(context, tokens, locator, indexer);
     }
@@ -163,8 +163,8 @@ pub(crate) fn check_tokens(
     }
 
     if context.any_rule_enabled(&[
-        Rule::ShebangNotExecutable,
-        Rule::ShebangMissingExecutableFile,
+        Rule::NonExecutableFileWithShebang,
+        Rule::ExecutableFileWithoutShebang,
         Rule::ShebangLeadingWhitespace,
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,

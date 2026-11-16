@@ -227,10 +227,22 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_docstring.py"))]
-    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_expression.py"))]
-    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_function.py"))]
-    #[test_case(Rule::BlankLinesTopLevel, Path::new("E302_first_line_statement.py"))]
+    #[test_case(
+        Rule::MissingBlankLinesTopLevel,
+        Path::new("E302_first_line_docstring.py")
+    )]
+    #[test_case(
+        Rule::MissingBlankLinesTopLevel,
+        Path::new("E302_first_line_expression.py")
+    )]
+    #[test_case(
+        Rule::MissingBlankLinesTopLevel,
+        Path::new("E302_first_line_function.py")
+    )]
+    #[test_case(
+        Rule::MissingBlankLinesTopLevel,
+        Path::new("E302_first_line_statement.py")
+    )]
     #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_comment.py"))]
     #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_docstring.py"))]
     #[test_case(Rule::TooManyBlankLines, Path::new("E303_first_line_expression.py"))]
@@ -245,18 +257,21 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::BlankLineBetweenMethods, Path::new("E30.py"))]
-    #[test_case(Rule::BlankLinesTopLevel, Path::new("E30.py"))]
+    #[test_case(Rule::MissingBlankLineBetweenMethods, Path::new("E30.py"))]
+    #[test_case(Rule::MissingBlankLinesTopLevel, Path::new("E30.py"))]
     #[test_case(Rule::TooManyBlankLines, Path::new("E30.py"))]
     #[test_case(Rule::BlankLineAfterDecorator, Path::new("E30.py"))]
-    #[test_case(Rule::BlankLinesAfterFunctionOrClass, Path::new("E30.py"))]
-    #[test_case(Rule::BlankLinesBeforeNestedDefinition, Path::new("E30.py"))]
-    #[test_case(Rule::BlankLineBetweenMethods, Path::new("E30_syntax_error.py"))]
-    #[test_case(Rule::BlankLinesTopLevel, Path::new("E30_syntax_error.py"))]
+    #[test_case(Rule::MissingBlankLinesAfterFunctionOrClass, Path::new("E30.py"))]
+    #[test_case(Rule::MissingBlankLinesBeforeNestedDefinition, Path::new("E30.py"))]
+    #[test_case(Rule::MissingBlankLineBetweenMethods, Path::new("E30_syntax_error.py"))]
+    #[test_case(Rule::MissingBlankLinesTopLevel, Path::new("E30_syntax_error.py"))]
     #[test_case(Rule::TooManyBlankLines, Path::new("E30_syntax_error.py"))]
-    #[test_case(Rule::BlankLinesAfterFunctionOrClass, Path::new("E30_syntax_error.py"))]
     #[test_case(
-        Rule::BlankLinesBeforeNestedDefinition,
+        Rule::MissingBlankLinesAfterFunctionOrClass,
+        Path::new("E30_syntax_error.py")
+    )]
+    #[test_case(
+        Rule::MissingBlankLinesBeforeNestedDefinition,
         Path::new("E30_syntax_error.py")
     )]
     fn blank_lines(rule_code: Rule, path: &Path) -> Result<()> {
@@ -290,7 +305,7 @@ mod tests {
                     ..isort::settings::Settings::default()
                 },
                 ..settings::LinterSettings::for_rules([
-                    Rule::BlankLinesTopLevel,
+                    Rule::MissingBlankLinesTopLevel,
                     Rule::UnsortedImports,
                 ])
             },
@@ -329,12 +344,12 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::BlankLineBetweenMethods)]
-    #[test_case(Rule::BlankLinesTopLevel)]
+    #[test_case(Rule::MissingBlankLineBetweenMethods)]
+    #[test_case(Rule::MissingBlankLinesTopLevel)]
     #[test_case(Rule::TooManyBlankLines)]
     #[test_case(Rule::BlankLineAfterDecorator)]
-    #[test_case(Rule::BlankLinesAfterFunctionOrClass)]
-    #[test_case(Rule::BlankLinesBeforeNestedDefinition)]
+    #[test_case(Rule::MissingBlankLinesAfterFunctionOrClass)]
+    #[test_case(Rule::MissingBlankLinesBeforeNestedDefinition)]
     fn blank_lines_typing_stub(rule_code: Rule) -> Result<()> {
         let snapshot = format!("blank_lines_{}_typing_stub", rule_code.name());
         let diagnostics = test_path(
@@ -345,12 +360,12 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::BlankLineBetweenMethods)]
-    #[test_case(Rule::BlankLinesTopLevel)]
+    #[test_case(Rule::MissingBlankLineBetweenMethods)]
+    #[test_case(Rule::MissingBlankLinesTopLevel)]
     #[test_case(Rule::TooManyBlankLines)]
     #[test_case(Rule::BlankLineAfterDecorator)]
-    #[test_case(Rule::BlankLinesAfterFunctionOrClass)]
-    #[test_case(Rule::BlankLinesBeforeNestedDefinition)]
+    #[test_case(Rule::MissingBlankLinesAfterFunctionOrClass)]
+    #[test_case(Rule::MissingBlankLinesBeforeNestedDefinition)]
     fn blank_lines_notebook(rule_code: Rule) -> Result<()> {
         let snapshot = format!("blank_lines_{}_notebook", rule_code.name());
         let diagnostics = test_path(
@@ -368,7 +383,7 @@ mod tests {
             &settings::LinterSettings {
                 ..settings::LinterSettings::for_rules([
                     Rule::TooManyBlankLines,
-                    Rule::BlankLinesTopLevel,
+                    Rule::MissingBlankLinesTopLevel,
                     Rule::UnsortedImports,
                 ])
             },

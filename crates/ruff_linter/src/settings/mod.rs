@@ -418,14 +418,14 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::CallDatetimeUtcfromtimestamp), // DTZ004
     RuleSelector::rule(Rule::BareExcept), // E722
     RuleSelector::rule(Rule::IOError), // E902
-    RuleSelector::rule(Rule::ShebangNotExecutable), // EXE001
-    RuleSelector::rule(Rule::ShebangMissingExecutableFile), // EXE002
+    RuleSelector::rule(Rule::NonExecutableFileWithShebang), // EXE001
+    RuleSelector::rule(Rule::ExecutableFileWithoutShebang), // EXE002
     RuleSelector::rule(Rule::ShebangLeadingWhitespace), // EXE004
     RuleSelector::rule(Rule::ShebangNotFirstLine), // EXE005
     RuleSelector::rule(Rule::UnusedImport), // F401
     RuleSelector::rule(Rule::ImportShadowedByLoopVar), // F402
     RuleSelector::rule(Rule::LateFutureImport), // F404
-    RuleSelector::rule(Rule::UndefinedLocalWithNestedImportStarUsage), // F406
+    RuleSelector::rule(Rule::NestedStarImport), // F406
     RuleSelector::rule(Rule::FutureFeatureNotDefined), // F407
     RuleSelector::rule(Rule::PercentFormatInvalidFormat), // F501
     RuleSelector::rule(Rule::PercentFormatExpectedMapping), // F502
@@ -545,11 +545,11 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::SingledispatchmethodFunction), // PLE1520
     RuleSelector::rule(Rule::YieldFromInAsyncFunction), // PLE1700
     RuleSelector::rule(Rule::BidirectionalUnicode), // PLE2502
-    RuleSelector::rule(Rule::InvalidCharacterBackspace), // PLE2510
-    RuleSelector::rule(Rule::InvalidCharacterSub), // PLE2512
-    RuleSelector::rule(Rule::InvalidCharacterEsc), // PLE2513
+    RuleSelector::rule(Rule::BackspaceCharacter), // PLE2510
+    RuleSelector::rule(Rule::SubCharacter), // PLE2512
+    RuleSelector::rule(Rule::EscCharacter), // PLE2513
     RuleSelector::rule(Rule::InvalidCharacterNul), // PLE2514
-    RuleSelector::rule(Rule::InvalidCharacterZeroWidthSpace), // PLE2515
+    RuleSelector::rule(Rule::ZeroWidthSpaceCharacter), // PLE2515
     RuleSelector::rule(Rule::ComparisonWithItself), // PLR0124
     RuleSelector::rule(Rule::ComparisonOfConstant), // PLR0133
     RuleSelector::rule(Rule::PropertyWithParameters), // PLR0206
@@ -672,8 +672,8 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnusedUnpackedVariable), // RUF059
     RuleSelector::rule(Rule::AccessAnnotationsFromClassDict), // RUF063
     RuleSelector::rule(Rule::DuplicateEntryInDunderAll), // RUF068
-    RuleSelector::rule(Rule::UnusedNOQA), // RUF100
-    RuleSelector::rule(Rule::RedirectedNOQA), // RUF101
+    RuleSelector::rule(Rule::UnusedSuppression), // RUF100
+    RuleSelector::rule(Rule::RenamedRuleInSuppression), // RUF101
     RuleSelector::rule(Rule::InvalidPyprojectToml), // RUF200
     RuleSelector::rule(Rule::Exec), // S102
     RuleSelector::rule(Rule::TryExceptPass), // S110

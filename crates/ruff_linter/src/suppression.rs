@@ -23,8 +23,8 @@ use crate::preview::{is_human_readable_names_enabled, is_redirected_suppression_
 use crate::rule_redirects::{get_redirect, get_redirect_target};
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
-    RedirectedNOQA, RuleCodesInSuppressionComments, UnmatchedSuppressionComment, UnusedCodes,
-    UnusedNOQA, UnusedNOQAKind, code_is_valid,
+    RenamedRuleInSuppression, RuleCodesInSuppressionComments, UnmatchedSuppressionComment,
+    UnusedCodes, UnusedNOQAKind, UnusedSuppression, code_is_valid,
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
@@ -401,7 +401,7 @@ impl Suppressions {
     /// Check for rule codes and redirected names in valid suppression comments.
     pub(crate) fn check_rule_codes(&self, context: &LintContext, locator: &Locator) {
         let check_names = context.is_rule_enabled(Rule::RuleCodesInSuppressionComments);
-        let check_redirects = context.is_rule_enabled(Rule::RedirectedNOQA)
+        let check_redirects = context.is_rule_enabled(Rule::RenamedRuleInSuppression)
             && is_redirected_suppression_code_enabled(context.settings());
         if !check_names && !check_redirects {
             return;
@@ -424,8 +424,8 @@ impl Suppressions {
                 let second_range = second_comment.and_then(|comment| comment.codes.get(index));
 
                 if check_redirects && let Some((original, target)) = redirect {
-                    let mut diagnostic =
-                        context.report_diagnostic(RedirectedNOQA { original, target }, *range);
+                    let mut diagnostic = context
+                        .report_diagnostic(RenamedRuleInSuppression { original, target }, *range);
                     let edit = Edit::range_replacement(target.to_string(), *range);
                     // Conservatively mark any fixes involving a `ruff: disable` comment unsafe
                     // because the fix could make the `disable` match a previously unmatched, nested
@@ -512,7 +512,7 @@ impl Suppressions {
                     group.suppression,
                     &codes,
                     false,
-                    UnusedNOQA {
+                    UnusedSuppression {
                         codes: Some(UnusedCodes {
                             disabled: &group.disabled_codes,
                             duplicated: &group.duplicated_codes,
@@ -552,7 +552,7 @@ impl Suppressions {
                 group.invalid_codes.push(code_str);
                 group.has_stable_rule_name |= name_is_known;
             } else if !suppression.used.get() {
-                // UnusedNOQA
+                // UnusedSuppression
                 let Some(rule) = suppression.rule(self.preview) else {
                     continue; // "external" lint code, don't treat it as unused
                 };

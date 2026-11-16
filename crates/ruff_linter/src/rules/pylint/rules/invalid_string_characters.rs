@@ -29,9 +29,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterBackspace;
+pub(crate) struct BackspaceCharacter;
 
-impl Violation for InvalidCharacterBackspace {
+impl Violation for BackspaceCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -65,9 +65,9 @@ impl Violation for InvalidCharacterBackspace {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterSub;
+pub(crate) struct SubCharacter;
 
-impl Violation for InvalidCharacterSub {
+impl Violation for SubCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -101,9 +101,9 @@ impl Violation for InvalidCharacterSub {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterEsc;
+pub(crate) struct EscCharacter;
 
-impl Violation for InvalidCharacterEsc {
+impl Violation for EscCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -172,9 +172,9 @@ impl Violation for InvalidCharacterNul {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterZeroWidthSpace;
+pub(crate) struct ZeroWidthSpaceCharacter;
 
-impl Violation for InvalidCharacterZeroWidthSpace {
+impl Violation for ZeroWidthSpaceCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -234,15 +234,15 @@ pub(crate) fn invalid_string_characters(
         let (replacement, diagnostic) = match c {
             '\x08' => (
                 "\\b",
-                context.report_diagnostic_if_enabled(InvalidCharacterBackspace, range),
+                context.report_diagnostic_if_enabled(BackspaceCharacter, range),
             ),
             '\x1a' => (
                 "\\x1a",
-                context.report_diagnostic_if_enabled(InvalidCharacterSub, range),
+                context.report_diagnostic_if_enabled(SubCharacter, range),
             ),
             '\x1b' => (
                 "\\x1b",
-                context.report_diagnostic_if_enabled(InvalidCharacterEsc, range),
+                context.report_diagnostic_if_enabled(EscCharacter, range),
             ),
             '\0' => (
                 "\\0",
@@ -250,7 +250,7 @@ pub(crate) fn invalid_string_characters(
             ),
             '\u{200b}' => (
                 "\\u200b",
-                context.report_diagnostic_if_enabled(InvalidCharacterZeroWidthSpace, range),
+                context.report_diagnostic_if_enabled(ZeroWidthSpaceCharacter, range),
             ),
             _ => {
                 continue;

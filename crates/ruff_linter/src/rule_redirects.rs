@@ -192,6 +192,43 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         Rule::FunctionalNamedTuple,
     ),
     ("replace-str-enum", Rule::ManualStrEnum),
+    ("prohibited-trailing-comma", Rule::UnnecessaryTrailingComma),
+    (
+        "blank-line-between-methods",
+        Rule::MissingBlankLineBetweenMethods,
+    ),
+    ("blank-lines-top-level", Rule::MissingBlankLinesTopLevel),
+    (
+        "blank-lines-after-function-or-class",
+        Rule::MissingBlankLinesAfterFunctionOrClass,
+    ),
+    (
+        "blank-lines-before-nested-definition",
+        Rule::MissingBlankLinesBeforeNestedDefinition,
+    ),
+    ("shebang-not-executable", Rule::NonExecutableFileWithShebang),
+    (
+        "shebang-missing-executable-file",
+        Rule::ExecutableFileWithoutShebang,
+    ),
+    ("undefined-local-with-import-star", Rule::StarImport),
+    (
+        "undefined-local-with-import-star-usage",
+        Rule::PossiblyUndefinedNameWithStarImport,
+    ),
+    (
+        "undefined-local-with-nested-import-star-usage",
+        Rule::NestedStarImport,
+    ),
+    ("invalid-character-backspace", Rule::BackspaceCharacter),
+    ("invalid-character-sub", Rule::SubCharacter),
+    ("invalid-character-esc", Rule::EscCharacter),
+    (
+        "invalid-character-zero-width-space",
+        Rule::ZeroWidthSpaceCharacter,
+    ),
+    ("unused-noqa", Rule::UnusedSuppression),
+    ("redirected-noqa", Rule::RenamedRuleInSuppression),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
