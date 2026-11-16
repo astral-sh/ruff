@@ -965,6 +965,37 @@ def _(a: A, b: B) -> None:
     reveal_type(infer_result_with_value(identity, consume, b))  # revealed: B
 ```
 
+## Passing a receiver to a generic callback
+
+`apply` passes `self` to the callback. A callback that returns `Box[T]` preserves the element type.
+A callback that returns its input type preserves `Self`.
+
+```py
+from __future__ import annotations
+
+from typing import Callable, Generic, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+T = TypeVar("T")
+
+def apply(value: A, callback: Callable[[A], B], /) -> B:
+    return callback(value)
+
+def as_box(value: Box[T], /) -> Box[T]:
+    return value
+
+def identity(value: A, /) -> A:
+    return value
+
+class Box(Generic[T]):
+    value: T
+
+    def check(self):
+        reveal_type(apply(self, as_box))  # revealed: Box[T@Box]
+        reveal_type(apply(self, identity))  # revealed: Self@check
+```
+
 ## Return type inference from partially annotated overloads
 
 The catch-all overload returns `object`, which is preserved when inferring a return type from the

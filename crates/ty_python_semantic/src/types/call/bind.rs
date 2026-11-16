@@ -7753,6 +7753,65 @@ impl<'db> CallInference<'_, 'db> {
         ))
     }
 
+    /// When a wrapper calls a unary generic callback with a receiver, compare the callback
+    /// against that receiver type. Comparing `(Box[T]) -> Box[T]` with `(A) -> B` can
+    /// otherwise leave only `A <= B` and incorrectly infer `Self` for the result.
+    ///
+    /// TODO: Retain dependencies on callback-local type variables until argument constraints
+    /// are combined, so this works for callback inputs and results of other shapes as well.
+    fn specialize_callback_for_receiver(
+        &self,
+        relation: &ArgumentRelation<'db>,
+    ) -> Option<Type<'db>> {
+        let db = self.db;
+        let return_var = self.return_ty.as_typevar()?;
+        let callback = relation
+            .declared_type
+            .as_callable()?
+            .signatures(db)
+            .as_single()?;
+        let input = callback
+            .single_required_positional_parameter_type()?
+            .as_typevar()?;
+        if callback.return_ty != self.return_ty
+            || input.is_same_typevar_as(db, return_var)
+            || !input.is_inferable(db, self.inferable_typevars)
+            || !return_var.is_inferable(db, self.inferable_typevars)
+        {
+            return None;
+        }
+        let [first, second] = self.signature.parameters().as_slice() else {
+            return None;
+        };
+        if self.is_partial_application || !first.is_positional() || !second.is_positional() {
+            return None;
+        }
+        let receiver = self
+            .argument_relations()
+            .filter(|other| other.declared_type == Type::TypeVar(input))
+            .exactly_one()
+            .ok()?;
+        let receiver_var = receiver.argument_type.as_typevar()?;
+        if !receiver_var.typevar(db).is_self(db)
+            || receiver_var.is_inferable(db, self.inferable_typevars)
+        {
+            return None;
+        }
+        relation
+            .argument_type
+            .try_upcast_to_callable(db, self.env)?
+            .exactly_one()?
+            .signatures(db)
+            .as_single()?
+            .generic_context?;
+        Some(relation.declared_type.substitute_one_typevar(
+            db,
+            self.env,
+            input,
+            receiver.argument_type,
+        ))
+    }
+
     fn infer_argument_constraints<'c>(
         &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
@@ -7781,7 +7840,10 @@ impl<'db> CallInference<'_, 'db> {
                 continue;
             }
 
-            if let Err(error) = builder.infer(relation.declared_type, relation.argument_type) {
+            let formal = self
+                .specialize_callback_for_receiver(&relation)
+                .unwrap_or(relation.declared_type);
+            if let Err(error) = builder.infer(formal, relation.argument_type) {
                 constraint_set_errors[relation.argument_index] = true;
                 specialization_errors.push(BindingError::SpecializationError {
                     error,
