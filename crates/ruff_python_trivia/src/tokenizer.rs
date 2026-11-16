@@ -126,7 +126,7 @@ pub fn lines_after_ignoring_end_of_line_trivia(offset: TextSize, code: &str) -> 
         .count() as u32
 }
 
-fn is_identifier_start(c: char) -> bool {
+pub(super) fn is_identifier_start(c: char) -> bool {
     if c.is_ascii() {
         c.is_ascii_alphabetic() || c == '_'
     } else {
@@ -136,7 +136,7 @@ fn is_identifier_start(c: char) -> bool {
 
 // Checks if the character c is a valid continuation character as described
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
-fn is_identifier_continuation(c: char) -> bool {
+pub(super) fn is_identifier_continuation(c: char) -> bool {
     // Arrange things such that ASCII codepoints never
     // result in the slower `is_xid_continue` getting called.
     if c.is_ascii() {
