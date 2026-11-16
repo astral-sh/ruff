@@ -1550,25 +1550,6 @@ reveal_type(Inherited().__hash__())  # revealed: Literal[7]
 accepts_hashable(Disabled())  # error: [invalid-argument-type]
 ```
 
-## Variance of frozen models
-
-On Python 3.13 and later, the synthesized `__replace__` method takes field values as arguments. A
-frozen model is therefore invariant in the type of its generic field.
-
-```py
-from pydantic import BaseModel, ConfigDict
-
-class Animal: ...
-class Dog(Animal): ...
-
-class Frozen[T](BaseModel):
-    model_config = ConfigDict(frozen=True)
-    value: T
-
-def check(dog: Frozen[Dog]):
-    animal: Frozen[Animal] = dog  # error: [invalid-assignment]
-```
-
 ## Frozen models and protocols
 
 Frozen models cannot satisfy a protocol that requires a writable field, but can satisfy one that
@@ -1613,6 +1594,72 @@ class FrozenField(BaseModel):
 
 update(FrozenField(value=1))  # error: [invalid-argument-type]
 read(FrozenField(value=1))  # ok
+```
+
+## Frozen models and variance
+
+### Python 3.12 and earlier
+
+```toml
+[environment]
+python-version = "3.12"
+python-platform = "linux"
+```
+
+ty infers covariance when the model's configuration makes its generic field read-only.
+
+```py
+from pydantic import BaseModel, ConfigDict
+
+class Animal: ...
+class Dog(Animal): ...
+
+class KeywordFrozen[T](BaseModel, frozen=True):
+    value: T
+
+class ConfigFrozen[T](BaseModel):
+    model_config = ConfigDict(frozen=True)
+    value: T
+
+def check(keyword: KeywordFrozen[Dog], config: ConfigFrozen[Dog]):
+    keyword_animal: KeywordFrozen[Animal] = keyword  # ok
+    config_animal: ConfigFrozen[Animal] = config  # ok
+```
+
+Model fields remain invariant when the model is mutable or a custom setter allows writes.
+
+```py
+class Mutable[T](BaseModel):
+    value: T
+
+class CustomSetter[T](BaseModel, frozen=True):
+    value: T
+
+    def __setattr__(self, name: str, value: object) -> None:
+        object.__setattr__(self, name, value)
+
+def check_mutable(mutable: Mutable[Dog], custom: CustomSetter[Dog]):
+    mutable_animal: Mutable[Animal] = mutable  # error: [invalid-assignment]
+    custom_animal: CustomSetter[Animal] = custom  # error: [invalid-assignment]
+```
+
+### Python 3.13 and later
+
+On Python 3.13 and later, the synthesized `__replace__` method takes field values as arguments. A
+frozen model is therefore invariant in the type of its generic field.
+
+```py
+from pydantic import BaseModel, ConfigDict
+
+class Animal: ...
+class Dog(Animal): ...
+
+class Frozen[T](BaseModel):
+    model_config = ConfigDict(frozen=True)
+    value: T
+
+def check(dog: Frozen[Dog]):
+    animal: Frozen[Animal] = dog  # error: [invalid-assignment]
 ```
 
 ## Validation of default values
