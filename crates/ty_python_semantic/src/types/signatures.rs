@@ -1419,7 +1419,7 @@ impl<'db> Signature<'db> {
         &self.parameters
     }
 
-    fn single_required_positional_parameter_type(&self) -> Option<Type<'db>> {
+    pub(super) fn single_required_positional_parameter_type(&self) -> Option<Type<'db>> {
         match self.parameters.as_slice() {
             [parameter] if parameter.is_positional() && !parameter.has_default() => {
                 Some(parameter.annotated_type())

@@ -6550,6 +6550,91 @@ impl<'db> CallInference<'_, 'db> {
         })
     }
 
+    /// Specializes two-stage decorators that split the leading parameter from a `ParamSpec`.
+    ///
+    /// TODO: Carry constraints between the two calls so a mapper constrains the element type
+    /// and a type variable shared by both calls is specialized only once.
+    fn specialize_curried_return(&self, specialization: Specialization<'db>) -> Option<Type<'db>> {
+        let db = self.db;
+        let [callback] = self.signature.parameters().as_slice() else {
+            return None;
+        };
+        let input = callback
+            .annotated_type()
+            .as_callable()?
+            .signatures(db)
+            .as_single()?;
+        let ([prefix], paramspec) = input.parameters().as_paramspec_with_prefix()? else {
+            return None;
+        };
+        let prefix = prefix.annotated_type().as_typevar()?;
+        let result = input.return_ty.as_typevar()?;
+        if prefix.is_same_typevar_as(db, result) {
+            return None;
+        }
+
+        let first = self.return_ty.as_callable()?.signatures(db).as_single()?;
+        let second = first.return_ty.as_callable()?.signatures(db).as_single()?;
+        let is_prefix_stage = |stage: &Signature<'db>| {
+            matches!(stage.parameters().as_slice(), [parameter]
+                if parameter.is_positional_only() && parameter.annotated_type() == Type::TypeVar(prefix))
+        };
+        let paramspec_first = first.parameters().as_paramspec() == Some(paramspec);
+        if second.return_ty != Type::TypeVar(result)
+            || !(paramspec_first && is_prefix_stage(second)
+                || is_prefix_stage(first) && second.parameters().as_paramspec() == Some(paramspec))
+        {
+            return None;
+        }
+
+        let ParamSpecValue::Callable(capture) =
+            specialization.get(db, paramspec)?.as_paramspec_value(db)?
+        else {
+            return None;
+        };
+        let capture = capture.signatures(db).as_single()?;
+        let context = capture.generic_context?;
+        let prefix_type = specialization.get(db, prefix)?;
+        // A list supplied in the first call to `append(items)(value)` already fixes the
+        // type of `value`. Preserve that binding when the first parameter is invariant.
+        if paramspec_first
+            && let Type::TypeVar(variable) = prefix_type
+            && let Some(argument) = capture.single_required_positional_parameter_type()
+            && argument.is_nominal_instance()
+            && argument
+                .class_specialization(db, self.env)
+                .is_some_and(|(_, specialization)| specialization.types(db) == [prefix_type])
+            && argument
+                .variance_of(db, self.env, variable.identity(db))
+                .evaluate(db)
+                == TypeVarVariance::Invariant
+        {
+            return None;
+        }
+
+        let defaults = context.unknown_specialization(db, None);
+        let gradual_prefix = prefix_type.apply_specialization(db, defaults);
+        let terms = specialization.map_types(db, |_, var, value| {
+            if var == prefix {
+                return gradual_prefix;
+            }
+            if var == result
+                && !paramspec_first
+                && gradual_prefix == prefix_type
+                && capture
+                    .parameters()
+                    .iter()
+                    .any(|p| p.annotated_type() == value)
+                && value.apply_specialization(db, defaults) != value
+            {
+                return Type::unknown();
+            }
+            value
+        });
+        let specialized = specialization.generic_context(db).specialize(db, terms);
+        Some(self.return_ty.apply_specialization(db, specialized))
+    }
+
     /// Chooses the return type of a call, potentially correlating multiple compatible specializations.
     ///
     /// This method also returns a flag indicating whether the call arguments were validated against
@@ -6561,7 +6646,8 @@ impl<'db> CallInference<'_, 'db> {
 
         let merged_specialization = inference.merged_specialization(db);
         let specialize_return_ty = |specialization: Specialization<'db>| {
-            self.return_ty.apply_specialization(db, specialization)
+            self.specialize_curried_return(specialization)
+                .unwrap_or_else(|| self.return_ty.apply_specialization(db, specialization))
         };
 
         // TODO: Project correlated alternatives through constructor stages and partial signatures.

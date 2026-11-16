@@ -1109,6 +1109,148 @@ def parse(s: str) -> int:
 wrap(parse, invoke)  # error: [invalid-argument-type]
 ```
 
+## Currying a generic function
+
+Currying lets us call a function in stages. For a function defined as `f(x, y)`, `curry` gives
+`f(x)(y)` and `curry_flip` gives `f(y)(x)`. These examples model the `@curry(1)` and
+`@curry_flip(1)` decorators from
+[Expression](https://expression.readthedocs.io/en/latest/reference/curry.html).
+
+### Preserving argument order with `curry`
+
+Both parameters of `first` have type `T`. Passing an `int` in the first call produces a function
+that takes an `int` and returns an `int`. A separate call can choose `str`.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar
+
+A = TypeVar("A")
+R = TypeVar("R")
+P = ParamSpec("P")
+T = TypeVar("T")
+U = TypeVar("U")
+
+def curry(f: Callable[Concatenate[A, P], R]) -> Callable[[A], Callable[P, R]]:
+    raise NotImplementedError
+
+@curry
+def first(x: T, y: T) -> T:
+    return x
+
+def use(number: int, text: str):
+    # TODO: Bind the second call's parameter and result to the type supplied in the first call.
+    reveal_type(first(number))  # revealed: [T](y: T) -> T
+    reveal_type(first(text))  # revealed: [T](y: T) -> T
+```
+
+The first list fixes the element type of both lists, even when that type is the caller's own `T`.
+
+```py
+@curry
+def either(left: list[T], right: list[T]) -> list[T]:
+    return left
+
+def batch(items: list[T]):
+    reveal_type(either(items)(items))  # revealed: list[T@batch]
+```
+
+A callback that accepts any object can observe both integers and strings. It places an upper bound
+on `T`. The list supplied in the second call determines the element type.
+
+```py
+@curry
+def visit(observe: Callable[[T], None], items: list[T]) -> list[T]:
+    for item in items:
+        observe(item)
+    return items
+
+def observe_object(value: object) -> None: ...
+
+reveal_type(visit(observe_object))  # revealed: [T](items: list[T]) -> list[T]
+```
+
+The same observer keeps its full input type when a curried function returns it.
+
+```py
+@curry
+def keep_observer(value: T, observe: Callable[[T], None]) -> Callable[[T], None]:
+    observe(value)
+    return observe
+
+reveal_type(keep_observer(1)(observe_object))  # revealed: (object, /) -> None
+```
+
+The caller can supply a mapper from `T` to `U`. Applying it to each item of a `list[T]` produces a
+`list[U]`.
+
+```py
+@curry
+def map_with(f: Callable[[T], U], items: list[T]) -> list[U]:
+    return [f(item) for item in items]
+
+def transform(items: list[T], f: Callable[[T], U]):
+    # TODO: Preserve the result type `list[U@transform]`.
+    reveal_type(map_with(f)(items))  # revealed: Unknown
+```
+
+### Supplying the first argument last with `curry_flip`
+
+`map_items` declares the list first, but we can choose a mapper before we have a list.
+`map_items(len)` returns a function that maps `len` over the list it receives, producing a
+`list[int]`.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar
+
+A = TypeVar("A")
+R = TypeVar("R")
+P = ParamSpec("P")
+T = TypeVar("T")
+U = TypeVar("U")
+
+def curry_flip(f: Callable[Concatenate[A, P], R]) -> Callable[P, Callable[[A], R]]:
+    raise NotImplementedError
+
+@curry_flip
+def map_items(items: list[T], f: Callable[[T], U]) -> list[U]:
+    return [f(item) for item in items]
+
+def check(numbers: list[int], words: list[str]):
+    stringify = map_items(str)
+    lengths = map_items(len)
+    reveal_type(stringify(numbers))  # revealed: list[str]
+    reveal_type(lengths(words))  # revealed: list[int]
+    # TODO: Reject this call because `len` does not accept `int`.
+    lengths(numbers)
+```
+
+Because `append` writes into the list supplied by the first call, the next argument must match the
+list's element type.
+
+```py
+@curry_flip
+def append(item: T, items: list[T]) -> T:
+    items.append(item)
+    return item
+
+def check_append(numbers: list[int]):
+    append_number = append(numbers)
+    reveal_type(append_number(1))  # revealed: int
+    append_number("x")  # error: [invalid-argument-type]
+```
+
+A `tuple[int, ...]` also fits `tuple[int | str, ...]` because tuples are covariant. A string is a
+valid default when the tuple is empty.
+
+```py
+@curry_flip
+def first_or(default: T, items: tuple[T, ...]) -> T:
+    return items[0] if items else default
+
+def check_default(numbers: tuple[int, ...]):
+    first_or(numbers)("empty")  # ok
+```
+
 ## Choosing an overload from a callback's leading parameters
 
 The two overloads of `command` accept callbacks with one or two parameters before `P`. When the
