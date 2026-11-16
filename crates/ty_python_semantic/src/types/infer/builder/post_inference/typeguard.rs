@@ -2,7 +2,9 @@ use ruff_python_ast as ast;
 
 use crate::types::Type;
 use crate::types::context::InferContext;
-use crate::types::diagnostic::{INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_IS_NARROWING};
+use crate::types::diagnostic::{
+    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_IS_NARROWING, SUSPICIOUS_TYPE_IS_NARROWING,
+};
 
 /// Check that all type guard function definitions have at least one positional parameter
 /// (in addition to `self`/`cls` for methods), and for `TypeIs`, that the narrowed type is
@@ -52,18 +54,40 @@ pub(crate) fn check_type_guard_definition<'db>(
         return;
     };
 
-    // For `TypeIs`, check that the narrowed type is assignable to the parameter type.
-    if let Some(narrowed_ty) = narrowed_type {
-        let param_ty = first_narrowed_param.annotated_type();
-        if !narrowed_ty.is_assignable_to(db, env, param_ty)
-            && let Some(builder) = context.report_lint(&INVALID_TYPE_IS_NARROWING, returns_expr)
-        {
-            builder.into_diagnostic(format_args!(
-                "Narrowed type `{narrowed}` is not assignable \
-                    to the declared parameter type `{param}`",
-                narrowed = narrowed_ty.display(db, env),
-                param = param_ty.display(db, env)
+    let Some(narrowed_ty) = narrowed_type else {
+        return;
+    };
+    let param_ty = first_narrowed_param.annotated_type();
+    if narrowed_ty.is_assignable_to(db, env, param_ty)
+        || param_ty.is_equivalent_to(db, env, Type::Never)
+    {
+        return;
+    }
+
+    let is_disjoint = narrowed_ty.is_disjoint_from(db, env, param_ty);
+    let (lint, relation) = if is_disjoint {
+        (&INVALID_TYPE_IS_NARROWING, "disjoint from")
+    } else {
+        (&SUSPICIOUS_TYPE_IS_NARROWING, "not assignable to")
+    };
+    if let Some(builder) = context.report_lint(lint, returns_expr) {
+        let narrowed_display = narrowed_ty.display(db, env);
+        let param_display = param_ty.display(db, env);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Narrowed type `{narrowed_display}` is {relation} \
+             the declared parameter type `{param_display}`"
+        ));
+        if is_disjoint {
+            diagnostic.info(format_args!(
+                "`{param_display}` is disjoint from `{narrowed_display}`"
             ));
+            narrowed_ty
+                .disjointness_error_context(db, env, param_ty)
+                .attach_to(db, env, &mut diagnostic);
+        } else {
+            diagnostic.info(
+                "This is not necessarily unsound, but may indicate a mistake in the signature",
+            );
         }
     }
 }

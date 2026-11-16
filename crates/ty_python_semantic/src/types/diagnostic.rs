@@ -158,6 +158,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_IS_NARROWING);
+    registry.register_lint(&SUSPICIOUS_TYPE_IS_NARROWING);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&INVALID_TYPE_VARIABLE_BOUND);
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
@@ -875,9 +876,18 @@ declare_lint! {
 declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-type-is-narrowing.md")]
     pub(crate) static INVALID_TYPE_IS_NARROWING = {
-        summary: "detects `TypeIs` narrowed types that are not assignable to the input type",
-        status: LintStatus::stable("0.0.97"),
+        summary: "detects incompatible `TypeIs` narrowings to disjoint types",
+        status: LintStatus::stable("0.0.105"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/suspicious-type-is-narrowing.md")]
+    pub(crate) static SUSPICIOUS_TYPE_IS_NARROWING = {
+        summary: "detects incompatible `TypeIs` narrowings to overlapping types",
+        status: LintStatus::stable("0.0.105"),
+        default_level: Level::Warn,
     }
 }
 
