@@ -40,9 +40,9 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.250", category = Category::Complexity)]
-pub(crate) struct VerboseLogMessage;
+pub(crate) struct LoggingRedundantException;
 
-impl Violation for VerboseLogMessage {
+impl Violation for LoggingRedundantException {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Redundant exception object included in `logging.exception` call".to_string()
@@ -84,7 +84,7 @@ pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler])
                     };
                     let binding = checker.semantic().binding(id);
                     if binding.kind.is_bound_exception() {
-                        checker.report_diagnostic(VerboseLogMessage, expr.range());
+                        checker.report_diagnostic(LoggingRedundantException, expr.range());
                     }
                 }
             }

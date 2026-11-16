@@ -951,9 +951,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.any_rule_enabled(&[
-                Rule::RawStringInException,
+                Rule::StringLiteralInException,
                 Rule::FStringInException,
-                Rule::DotFormatInException,
+                Rule::StrFormatInException,
             ]) {
                 if let Some(exc) = exc {
                     flake8_errmsg::rules::string_in_exception(checker, stmt, exc);
@@ -971,12 +971,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
-            if checker.is_rule_enabled(Rule::RaiseVanillaClass) {
+            if checker.is_rule_enabled(Rule::RaiseOverlyBroadException) {
                 if let Some(expr) = exc {
                     tryceratops::rules::raise_vanilla_class(checker, expr);
                 }
             }
-            if checker.is_rule_enabled(Rule::RaiseVanillaArgs) {
+            if checker.is_rule_enabled(Rule::RaiseExceptionWithMessage) {
                 if let Some(expr) = exc {
                     tryceratops::rules::raise_vanilla_args(checker, expr);
                 }
@@ -1404,7 +1404,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::VerboseRaise) {
                 tryceratops::rules::verbose_raise(checker, handlers);
             }
-            if checker.is_rule_enabled(Rule::VerboseLogMessage) {
+            if checker.is_rule_enabled(Rule::LoggingRedundantException) {
                 tryceratops::rules::verbose_log_message(checker, handlers);
             }
             if checker.is_rule_enabled(Rule::RaiseWithinTry) {
@@ -1413,7 +1413,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UselessTryExcept) {
                 tryceratops::rules::useless_try_except(checker, handlers);
             }
-            if checker.is_rule_enabled(Rule::ErrorInsteadOfException) {
+            if checker.is_rule_enabled(Rule::LoggingErrorInsteadOfException) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
             }
             if checker.is_rule_enabled(Rule::NeedlessElse) {

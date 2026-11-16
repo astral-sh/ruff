@@ -56,9 +56,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - `lint.flake8-errmsg.max-string-length`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.183", category = Category::Pedantic)]
-pub(crate) struct RawStringInException;
+pub(crate) struct StringLiteralInException;
 
-impl Violation for RawStringInException {
+impl Violation for StringLiteralInException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -169,9 +169,9 @@ impl Violation for FStringInException {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.183", category = Category::Pedantic)]
-pub(crate) struct DotFormatInException;
+pub(crate) struct StrFormatInException;
 
-impl Violation for DotFormatInException {
+impl Violation for StrFormatInException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -203,10 +203,11 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
         match first {
             // Check for string literals.
             Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. })
-                if checker.is_rule_enabled(Rule::RawStringInException)
+                if checker.is_rule_enabled(Rule::StringLiteralInException)
                     && string.len() >= checker.settings().flake8_errmsg.max_string_length =>
             {
-                let mut diagnostic = checker.report_diagnostic(RawStringInException, first.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(StringLiteralInException, first.range());
                 if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
                     diagnostic.set_fix(generate_fix(
                         stmt,
@@ -220,10 +221,14 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
             }
             // Check for byte string literals.
             Expr::BytesLiteral(ast::ExprBytesLiteral { value: bytes, .. })
-                if checker.settings().rules.enabled(Rule::RawStringInException)
+                if checker
+                    .settings()
+                    .rules
+                    .enabled(Rule::StringLiteralInException)
                     && bytes.len() >= checker.settings().flake8_errmsg.max_string_length =>
             {
-                let mut diagnostic = checker.report_diagnostic(RawStringInException, first.range());
+                let mut diagnostic =
+                    checker.report_diagnostic(StringLiteralInException, first.range());
                 if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
                     diagnostic.set_fix(generate_fix(
                         stmt,
@@ -251,12 +256,12 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
             }
             // Check for .format() calls.
             Expr::Call(ast::ExprCall { func, .. })
-                if checker.is_rule_enabled(Rule::DotFormatInException) =>
+                if checker.is_rule_enabled(Rule::StrFormatInException) =>
             {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     if attr == "format" && value.is_literal_expr() {
                         let mut diagnostic =
-                            checker.report_diagnostic(DotFormatInException, first.range());
+                            checker.report_diagnostic(StrFormatInException, first.range());
                         if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
                             diagnostic.set_fix(generate_fix(
                                 stmt,

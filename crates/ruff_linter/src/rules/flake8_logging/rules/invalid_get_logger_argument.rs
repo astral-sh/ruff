@@ -47,9 +47,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// [logging documentation]: https://docs.python.org/3/library/logging.html#logger-objects
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.2.0", category = Category::Suspicious)]
-pub(crate) struct InvalidGetLoggerArgument;
+pub(crate) struct FilePathAsLoggerName;
 
-impl Violation for InvalidGetLoggerArgument {
+impl Violation for FilePathAsLoggerName {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -89,7 +89,7 @@ pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCal
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(InvalidGetLoggerArgument, expr.range());
+    let mut diagnostic = checker.report_diagnostic(FilePathAsLoggerName, expr.range());
     if checker.semantic().has_builtin_binding("__name__") {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             "__name__".to_string(),

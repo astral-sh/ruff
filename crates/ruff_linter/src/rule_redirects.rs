@@ -95,6 +95,26 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("suspicious-telnet-usage", Rule::SuspiciousTelnetlibUsage),
     ("suspicious-ftp-lib-usage", Rule::SuspiciousFtplibUsage),
     ("p-print", Rule::Pprint),
+    ("raw-string-in-exception", Rule::StringLiteralInException),
+    ("dot-format-in-exception", Rule::StrFormatInException),
+    ("logging-exc-info", Rule::LoggingErrorWithExcInfo),
+    ("invalid-get-logger-argument", Rule::FilePathAsLoggerName),
+    (
+        "log-exception-outside-except-handler",
+        Rule::LoggingExceptionOutsideExceptHandler,
+    ),
+    (
+        "exception-without-exc-info",
+        Rule::LoggingExceptionWithoutExcInfo,
+    ),
+    ("undocumented-warn", Rule::LoggingWarnConstant),
+    ("raise-vanilla-class", Rule::RaiseOverlyBroadException),
+    ("raise-vanilla-args", Rule::RaiseExceptionWithMessage),
+    (
+        "error-instead-of-exception",
+        Rule::LoggingErrorInsteadOfException,
+    ),
+    ("verbose-log-message", Rule::LoggingRedundantException),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

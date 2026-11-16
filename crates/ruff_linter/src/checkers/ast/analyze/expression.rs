@@ -394,7 +394,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::UndocumentedWarn) {
+            if checker.is_rule_enabled(Rule::LoggingWarnConstant) {
                 flake8_logging::rules::undocumented_warn(checker, expr);
             }
         }
@@ -507,7 +507,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::CollectionsNamedTuple) {
                 flake8_pyi::rules::collections_named_tuple(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::UndocumentedWarn) {
+            if checker.is_rule_enabled(Rule::LoggingWarnConstant) {
                 flake8_logging::rules::undocumented_warn(checker, expr);
             }
             if checker.is_rule_enabled(Rule::PandasUseOfDotValues) {
@@ -1005,7 +1005,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::LoggingFString,
                 Rule::LoggingWarn,
                 Rule::LoggingExtraAttrClash,
-                Rule::LoggingExcInfo,
+                Rule::LoggingErrorWithExcInfo,
                 Rule::LoggingRedundantExcInfo,
             ]) {
                 flake8_logging_format::rules::logging_call(checker, call);
@@ -1031,10 +1031,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::DirectLoggerInstantiation) {
                 flake8_logging::rules::direct_logger_instantiation(checker, call);
             }
-            if checker.is_rule_enabled(Rule::InvalidGetLoggerArgument) {
+            if checker.is_rule_enabled(Rule::FilePathAsLoggerName) {
                 flake8_logging::rules::invalid_get_logger_argument(checker, call);
             }
-            if checker.is_rule_enabled(Rule::ExceptionWithoutExcInfo) {
+            if checker.is_rule_enabled(Rule::LoggingExceptionWithoutExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
             if checker.is_rule_enabled(Rule::RootLoggerCall) {
@@ -1127,7 +1127,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::AccessAnnotationsFromClassDict) {
                 ruff::rules::access_annotations_from_class_dict_with_get(checker, call);
             }
-            if checker.is_rule_enabled(Rule::LogExceptionOutsideExceptHandler) {
+            if checker.is_rule_enabled(Rule::LoggingExceptionOutsideExceptHandler) {
                 flake8_logging::rules::log_exception_outside_except_handler(checker, call);
             }
             if checker.is_rule_enabled(Rule::ExcInfoOutsideExceptHandler) {
