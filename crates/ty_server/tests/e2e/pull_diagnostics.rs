@@ -1034,6 +1034,40 @@ def foo() -> str:
     Ok(())
 }
 
+#[test]
+fn workspace_pull_finishes_when_all_diagnostics_were_streamed() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .with_file("src/a.py", "missing_a\n")?
+        .with_file("src/b.py", "missing_b\n")?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let token = lsp_types::ProgressToken::String("diagnostics".into());
+    let request = server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
+        identifier: None,
+        previous_result_ids: Vec::new(),
+        work_done_progress_params: WorkDoneProgressParams::default(),
+        partial_result_params: PartialResultParams {
+            partial_result_token: Some(token.clone()),
+        },
+    });
+
+    let progress = server.await_notification::<ProgressNotification>();
+    assert_eq!(progress.token, token);
+    let batch: WorkspaceDiagnosticReportPartialResult = serde_json::from_value(progress.value)?;
+    assert_eq!(batch.items.len(), 2);
+
+    let response = server
+        .try_await_response::<WorkspaceDiagnosticRequest>(&request, Some(Duration::from_secs(2)))
+        .expect("a pull that streamed changed diagnostics must finish");
+    assert!(response.items.is_empty());
+    Ok(())
+}
+
 /// Tests that the server's diagnostic streaming (partial results) work correctly
 /// with result ids.
 #[test]
