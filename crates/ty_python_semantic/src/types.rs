@@ -1,3 +1,4 @@
+use crate::types::constraints::ConstraintScope;
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
@@ -3690,7 +3691,7 @@ impl<'db> Type<'db> {
         let filtered = self.filter_union(db, env, |elem| {
             !elem
                 .when_disjoint_from(db, env, target, &constraints, inferable)
-                .is_always_satisfied(db, env, inferable)
+                .is_always_satisfied(db, env, ConstraintScope::Inferable(inferable))
         });
         if filtered.is_never() && !self.is_never() {
             DiscardDisjointUnionElementsResult::AllDisjoint

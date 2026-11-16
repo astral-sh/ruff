@@ -32,7 +32,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarSet};
+use crate::types::typevar::TypeVarBoundOrConstraints;
 use crate::types::visitor::{
     DynamicContentMode, TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
     dynamic_content_impl, walk_type_with_recursion_guard,
@@ -982,13 +982,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // Check that inexpensive case first: comparing every requirement of an unrelated
             // recursive protocol can expand its interface before structural member ordering gets
             // a chance to reject an incompatible finite member.
-            let can_use_nominal_result_directly =
-                nominally_satisfied.is_never_satisfied(db, env, self.inferable)
-                    || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
-                        || !protocol.materialization_changes_requirements(db, env, protocol))
-                        && !source_protocol.is_some_and(|source| {
-                            source.materialization_changes_requirements(db, env, protocol)
-                        }));
+            let can_use_nominal_result_directly = nominally_satisfied
+                .is_never_satisfied(db, env, self.scope)
+                || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
+                    || !protocol.materialization_changes_requirements(db, env, protocol))
+                    && !source_protocol.is_some_and(|source| {
+                        source.materialization_changes_requirements(db, env, protocol)
+                    }));
 
             if can_use_nominal_result_directly
                 && result
@@ -1069,7 +1069,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
         };
         if let Some(context) = self.report_context()
-            && structurally_satisfied.is_never_satisfied(db, env, self.inferable)
+            && structurally_satisfied.is_never_satisfied(db, env, self.scope)
         {
             context.push(ErrorContext::TypeNotCompatibleWithProtocol {
                 ty: receiver,
@@ -1193,7 +1193,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         for (_, member) in recursive_members {
             if structurally_satisfied
                 .implies(db, self.constraints, || nominally_satisfied)
-                .is_always_satisfied(db, env, self.inferable)
+                .is_always_satisfied(db, env, self.scope)
             {
                 break;
             }
@@ -1378,7 +1378,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
                 || !structurally_satisfied
                     .implies(db, self.constraints, || nominally_satisfied)
-                    .is_always_satisfied(db, env, self.inferable))
+                    .is_always_satisfied(db, env, self.scope))
         {
             return None;
         }
@@ -1387,7 +1387,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // expanding recursive members. If it cannot reject, the caller checks the full
         // interface instead.
         (self.typevar_evaluation.is_lazy()
-            || structurally_satisfied.is_never_satisfied(db, env, self.inferable))
+            || structurally_satisfied.is_never_satisfied(db, env, self.scope))
         .then_some(structurally_satisfied)
     }
 
@@ -1532,7 +1532,7 @@ fn non_recursive_protocol_constraints<'db>(
     scope: ConstraintScope<'db>,
 ) -> OwnedConstraintSet<'db> {
     let env = ProgramEnvironment::from_program(target.base().program(db));
-    let constraints = ConstraintSetBuilder::with_scope(scope);
+    let constraints = ConstraintSetBuilder::new();
     constraints.into_owned(|constraints| {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -1541,6 +1541,7 @@ fn non_recursive_protocol_constraints<'db>(
         let checker = TypeRelationChecker::constraint_set_assignability(
             &env,
             constraints,
+            scope,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
@@ -1970,7 +1971,7 @@ impl<'db> ProtocolInstanceType<'db> {
             let checker = TypeRelationChecker::subtyping(
                 &env,
                 &constraints,
-                TypeVarSet::None,
+                ConstraintScope::EMPTY,
                 &relation_visitor,
                 &disjointness_visitor,
                 &signature_relation_visitor,
@@ -1978,7 +1979,7 @@ impl<'db> ProtocolInstanceType<'db> {
             );
             checker
                 .check_type_satisfies_protocol(db, receiver, protocol, None)
-                .is_always_satisfied(db, &env, TypeVarSet::None)
+                .is_always_satisfied(db, &env, ConstraintScope::EMPTY)
         }
 
         is_equivalent_to_object_inner(db, self, ())

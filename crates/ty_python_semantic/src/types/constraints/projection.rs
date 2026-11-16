@@ -3,11 +3,10 @@
 use rustc_hash::FxHashSet;
 
 use super::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, PathBoundSolution,
-    ReportDiagnostics, Solutions, TypeVarSolution,
+    CandidateSolutions, CandidateTypeVarSolution, ConstraintScope, ConstraintSet,
+    PathBoundSolution, ReportDiagnostics, Solutions, TypeVarSolution,
 };
-use crate::types::typevar::TypeVarSet;
-use crate::types::{Type, TypeVarVariance};
+use crate::types::{Type, TypeVarSet, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
 
 /// Limits for one projection, including preprocessing, path collection, and its result.
@@ -118,13 +117,25 @@ impl<'db> ConstraintSet<'db, '_> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        inferable: TypeVarSet<'db>,
+        scope: ConstraintScope<'db>,
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        let requested = scope.typevars(db, &self.builder.storage.borrow(), self.node);
+        self.solutions_for_typevars(db, env, scope, requested)
+    }
+
+    pub(in crate::types) fn solutions_for_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        scope: ConstraintScope<'db>,
+        requested: TypeVarSet<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
         let builder = self.builder;
-        self.solutions_with(
+        self.solve_projection(
             db,
             env,
-            inferable,
+            scope,
+            requested,
             SolutionBudget::default(),
             ReportDiagnostics::Yes,
             |_variance, path_bound| CandidateSolutions::default_solve(db, env, builder, path_bound),
@@ -148,7 +159,30 @@ impl<'db> ConstraintSet<'db, '_> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        inferable: TypeVarSet<'db>,
+        scope: ConstraintScope<'db>,
+        budget: SolutionBudget,
+        report_diagnostics: ReportDiagnostics,
+        choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        let requested = scope.typevars(db, &self.builder.storage.borrow(), self.node);
+        self.solve_projection(
+            db,
+            env,
+            scope,
+            requested,
+            budget,
+            report_diagnostics,
+            choose,
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn solve_projection(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        scope: ConstraintScope<'db>,
+        requested: TypeVarSet<'db>,
         budget: SolutionBudget,
         report_diagnostics: ReportDiagnostics,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
@@ -157,7 +191,8 @@ impl<'db> ConstraintSet<'db, '_> {
             db,
             env,
             self,
-            inferable,
+            scope,
+            requested,
             budget,
             report_diagnostics,
         )?;
@@ -194,7 +229,7 @@ impl<'db> ConstraintSet<'db, '_> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        inferable: TypeVarSet<'db>,
+        scope: ConstraintScope<'db>,
         budget: SolutionBudget,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
         initial: T,
@@ -204,11 +239,13 @@ impl<'db> ConstraintSet<'db, '_> {
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {
+        let requested = scope.typevars(db, &self.builder.storage.borrow(), self.node);
         let path_bounds = CandidateSolutions::compute_bounded(
             db,
             env,
             self,
-            inferable,
+            scope,
+            requested,
             budget,
             ReportDiagnostics::Yes,
         )?;

@@ -1,3 +1,4 @@
+use crate::types::constraints::ConstraintScope;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::ops::{Deref, DerefMut};
@@ -981,7 +982,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             result.intersect(db, self.constraints, field_constraints);
             if result.is_trivially_never_satisfied()
                 || (self.is_context_collection_enabled()
-                    && result.is_never_satisfied(db, self.env, self.inferable))
+                    && result.is_never_satisfied(db, self.env, self.scope))
             {
                 if let Some(context) = self.report_context()
                     && let Some(source_item_field) = source_items.get(target_item_name.as_str())
@@ -1244,7 +1245,11 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     self.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
                 };
                 if let Some(context) = self.report_context()
-                    && result.is_always_satisfied(db, self.env, self.inferable)
+                    && result.is_always_satisfied(
+                        db,
+                        self.env,
+                        ConstraintScope::Inferable(self.inferable),
+                    )
                 {
                     context.push(ErrorContext::TypedDictFieldTypeConflict {
                         field_name: name.clone(),

@@ -9,7 +9,7 @@ use crate::{
         SpecialFormType, SubclassOfInner, SubclassOfType, Type, TypeContext,
         TypeVarBoundOrConstraints, TypeVarKind, UnionBuilder, UnionType, UnionTypeInstance,
         callable::CallableTypeKind,
-        constraints::ConstraintSetBuilder,
+        constraints::{ConstraintScope, ConstraintSetBuilder},
         context::InferContext,
         cyclic::ActiveRecursionDetector,
         diagnostic::{
@@ -254,7 +254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 lexical.is_trivially_always_satisfied()
                     || check(*public)
                         .or(db, &builder, || lexical)
-                        .is_always_satisfied(db, env, TypeVarSet::None)
+                        .is_always_satisfied(db, env, ConstraintScope::EMPTY)
             };
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));

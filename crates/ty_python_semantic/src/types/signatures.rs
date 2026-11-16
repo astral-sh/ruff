@@ -648,6 +648,7 @@ impl<'db> CallableSignature<'db> {
         env: &ProgramEnvironment<'db>,
         source: &[Signature<'db>],
         constraints: &'c ConstraintSetBuilder<'db>,
+        scope: ConstraintScope<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -656,6 +657,7 @@ impl<'db> CallableSignature<'db> {
         let checker = TypeRelationChecker::constraint_set_assignability(
             env,
             constraints,
+            scope,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
@@ -799,7 +801,7 @@ impl<'db> ReceiverConstraints<'db> {
         let assignability =
             Signature::map_constraints(db, &self.assignability, type_mapping, tcx, visitor);
         let assignability = if assignability.query(|_builder, constraints| {
-            constraints.is_always_satisfied(db, visitor.env, inferable)
+            constraints.is_always_satisfied(db, visitor.env, ConstraintScope::Inferable(inferable))
         }) {
             OwnedConstraintSet::always()
         } else {
@@ -878,7 +880,7 @@ impl<'db> SignatureRelationKey<'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
         relation: TypeRelation,
-        typevar_evaluation: TypeVarEvaluation<'db>,
+        typevar_evaluation: TypeVarEvaluation,
     ) -> Option<Self> {
         Some(Self {
             source_definition: source.definition?,
@@ -1051,10 +1053,7 @@ impl<'db> Signature<'db> {
 
     /// A captured parameter list refers to typevars owned by the surrounding call inference.
     /// Eager comparisons still use its generic context to simplify bounds for compatibility.
-    fn local_generic_context(
-        &self,
-        evaluation: TypeVarEvaluation<'db>,
-    ) -> Option<GenericContext<'db>> {
+    fn local_generic_context(&self, evaluation: TypeVarEvaluation) -> Option<GenericContext<'db>> {
         self.generic_context
             .filter(|_| !evaluation.is_lazy() || !self.is_paramspec_value())
     }
@@ -1789,10 +1788,15 @@ impl<'db> Signature<'db> {
         };
 
         let inferable = self.inferable_typevars(db);
-        let constraints = ConstraintSetBuilder::with_inferable(inferable);
-        let when = constraints.load(db, env, &receiver_constraints.assignability);
+        let constraints = ConstraintSetBuilder::new();
+        let when = constraints.load_in_scope(
+            db,
+            env,
+            &receiver_constraints.assignability,
+            ConstraintScope::Inferable(inferable),
+        );
 
-        match when.solutions(db, env, inferable) {
+        match when.solutions(db, env, ConstraintScope::Inferable(inferable)) {
             Ok(Solutions::Unsatisfiable(_)) => return None,
             Ok(Solutions::Unconstrained) | Err(_) => {
                 return Some(CallableSignature::single(self.clone()));
@@ -1928,7 +1932,7 @@ impl<'db> Signature<'db> {
         let inferable = self.inferable_typevars(db);
         self_type
             .when_assignable_to(db, env, expected_self_ty, &constraints, inferable)
-            .is_always_satisfied(db, env, inferable)
+            .is_always_satisfied(db, env, ConstraintScope::Inferable(inferable))
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
@@ -2181,10 +2185,7 @@ impl<'db> Signature<'db> {
             checker.env,
             &constraints.assignability,
             checker.provenance,
-            match checker.typevar_evaluation {
-                TypeVarEvaluation::Lazy(scope) => scope,
-                TypeVarEvaluation::Eager => checker.constraints.scope(),
-            },
+            checker.scope,
         );
         if checker.relation == TypeRelation::Assignability {
             return assignability;
@@ -2439,6 +2440,7 @@ impl<'db> Signature<'db> {
         let checker = TypeRelationChecker::constraint_set_assignability_with_context(
             env,
             &constraints,
+            ConstraintScope::All,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
@@ -2447,7 +2449,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_signature_pair(db, &implementation, &overload)
-            .is_always_satisfied(db, env, TypeVarSet::None);
+            .is_always_satisfied(db, env, ConstraintScope::EMPTY);
 
         if is_consistent {
             ParameterConsistency::Consistent
@@ -2483,7 +2485,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_type_pair(db, overload.return_ty, self.return_ty)
-            .is_always_satisfied(db, env, TypeVarSet::None);
+            .is_always_satisfied(db, env, ConstraintScope::EMPTY);
 
         if is_consistent {
             ReturnTypeConsistency::Consistent
@@ -2663,7 +2665,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let signatures_are_disjoint = self
                 .as_disjointness_checker()
                 .check_type_pair(db, self_parameter_type, other_parameter_type)
-                .is_always_satisfied(db, env, self.inferable);
+                .is_always_satisfied(db, env, self.scope);
 
             if signatures_are_disjoint {
                 continue;
@@ -2686,7 +2688,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let aggregate_relation =
             parameters_cover_target.and(db, self.constraints, returns_match_target);
         aggregate_relation
-            .is_always_satisfied(db, env, self.inferable)
+            .is_always_satisfied(db, env, self.scope)
             .then_some(aggregate_relation)
     }
 
@@ -2707,8 +2709,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
     ) -> ConstraintSet<'db, 'c> {
-        if let TypeVarEvaluation::Lazy(ConstraintScope::Inferable(inferable)) =
-            self.typevar_evaluation
+        if self.typevar_evaluation.is_lazy()
+            && let ConstraintScope::Inferable(inferable) = self.scope
         {
             let capture = |overloads: &[Signature<'db>], other: &[Signature<'db>]| {
                 let [target] = other else {
@@ -2755,12 +2757,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
             if let Some((scope, source)) = capture(source_overloads, target_overloads) {
                 return self
-                    .with_inferable_typevars(scope)
+                    .with_scope(ConstraintScope::Inferable(scope))
                     .check_callable_overloads(db, &source, target_overloads);
             }
             if let Some((scope, target)) = capture(target_overloads, source_overloads) {
                 return self
-                    .with_inferable_typevars(scope)
+                    .with_scope(ConstraintScope::Inferable(scope))
                     .check_callable_overloads(db, source_overloads, &target);
             }
         }
@@ -2845,7 +2847,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                                 target_signature,
                                             )
                                         })
-                                        .is_never_satisfied(db, env, self.inferable)
+                                        .is_never_satisfied(db, env, self.scope)
                                 })
                                 .map(capture_parameters),
                         ),
@@ -3020,17 +3022,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let target_inferable = signature_typevars(target);
         let signature_inferable = source_inferable.merge(db, target_inferable);
 
-        let inferable = self.inferable.merge(db, signature_inferable);
+        let scope = self.scope.with_inferable(db, signature_inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
-        let mut checker = self.with_inferable_typevars(inferable);
+        let mut checker = self.with_scope(scope);
         // Preserve receiver typevar constraints until the complete signature relation is solved.
         if [source, target].iter().any(|signature| {
             signature
                 .receiver_constraints()
                 .is_some_and(|constraints| constraints.requires_lazy_evaluation(db, &checker))
         }) {
-            checker.typevar_evaluation = checker.typevar_evaluation.lazy(inferable);
+            checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
             // A target that permits no calls imposes no receiver requirements. Still compare
@@ -3062,10 +3064,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        let scope = match checker.typevar_evaluation {
-            TypeVarEvaluation::Lazy(scope) => scope,
-            TypeVarEvaluation::Eager => self.constraints.scope().with_inferable(db, inferable),
-        };
         when.reduce_inferable(db, env, signature_inferable, scope)
     }
 
@@ -3111,16 +3109,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 source.is_same_typevar_as(db, target),
             );
         };
-        self.constraints.in_scope(scope, || {
-            ConstraintSet::constrain_typevar_equivalence_bound(
-                db,
-                self.env,
-                self.constraints,
-                self.provenance,
-                subject,
-                Type::TypeVar(bound),
-            )
-        })
+        ConstraintSet::constrain_typevar_equivalence_bound(
+            db,
+            self.env,
+            self.constraints,
+            self.provenance,
+            scope,
+            subject,
+            Type::TypeVar(bound),
+        )
     }
 
     fn check_signature_return_pair(
@@ -3308,7 +3305,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if parameter.has_starred_annotation()
                 && let Type::TypeVar(typevartuple) = parameter.annotated_type()
                 && typevartuple.is_typevartuple(db)
-                && self.typevar_evaluation.collects(db, typevartuple)
+                && self.collects(db, typevartuple)
             {
                 Some((index, typevartuple))
             } else {
@@ -3409,7 +3406,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
-            .is_never_satisfied(db, env, self.inferable);
+            .is_never_satisfied(db, env, self.scope);
         if let Some(context) = self.report_context()
             && !return_type_checks
         {
@@ -3461,7 +3458,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let no_collision = self.check_type_pair(db, keyword.annotated_type(), Type::Never);
                 if result
                     .intersect(db, self.constraints, no_collision)
-                    .is_never_satisfied(db, env, self.inferable)
+                    .is_never_satisfied(db, env, self.scope)
                 {
                     // Still allow the ParamSpec handling below to preserve its inferred binding.
                     keyword_collision_checks = false;
@@ -3485,12 +3482,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (Type::TypeVar(typevar1), Type::TypeVar(typevar2))
                     if typevar1.paramspec_attr(db).is_some()
                         && typevar1.paramspec_attr(db) == typevar2.paramspec_attr(db)
-                        && typevar1
-                            .without_paramspec_attr(db)
-                            .is_inferable(db, self.inferable)
-                        && typevar2
-                            .without_paramspec_attr(db)
-                            .is_inferable(db, self.inferable) =>
+                        && self.scope.contains(db, typevar1.without_paramspec_attr(db))
+                        && self.scope.contains(db, typevar2.without_paramspec_attr(db)) =>
                 {
                     return true;
                 }
@@ -3499,7 +3492,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             let constraint_set = self.check_type_pair(db, target_ty, source_ty);
             if let Some(context) = self.report_context()
-                && constraint_set.is_never_satisfied(db, env, self.inferable)
+                && constraint_set.is_never_satisfied(db, env, self.scope)
             {
                 let parameter = ParameterDescription::new(target_index, target_name);
                 context.push(ErrorContext::IncompatibleParameterTypes {
@@ -3512,7 +3505,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // replace the diagnostic context that explains the incompatible parameter.
             !result
                 .intersect(db, self.constraints, constraint_set)
-                .is_never_satisfied(db, env, self.inferable)
+                .is_never_satisfied(db, env, self.scope)
         };
         let parameter_must_have_default = |parameter: &Parameter<'db>, index: usize| {
             ErrorContext::RequiredParameterMustHaveDefault {
@@ -3526,7 +3519,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        if let TypeVarEvaluation::Lazy(scope) = self.typevar_evaluation {
+        if self.typevar_evaluation.is_lazy() {
+            let scope = self.scope;
             let source_paramspec = source_parameters.as_paramspec_with_prefix();
             let target_paramspec = target_parameters.as_paramspec_with_prefix();
 
@@ -4223,9 +4217,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     if let Some(source_prefix) = match source_parameters.kind() {
                         ParametersKind::Standard => Some(source_parameters.as_slice()),
                         _ => source_parameters.as_paramspec_with_prefix().and_then(
-                            |(prefix, tail)| {
-                                (!tail.is_inferable(db, self.inferable)).then_some(prefix)
-                            },
+                            |(prefix, tail)| (!self.scope.contains(db, tail)).then_some(prefix),
                         ),
                     } =>
                 {

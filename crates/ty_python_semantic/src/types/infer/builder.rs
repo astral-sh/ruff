@@ -63,7 +63,9 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
 };
-use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Solutions};
+use crate::types::constraints::{
+    CandidateSolutions, ConstraintScope, ConstraintSetBuilder, Solutions,
+};
 use crate::types::context::{InferContext, InferContextResult};
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
@@ -6200,7 +6202,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 !overload
                     .return_ty
                     .when_assignable_to(db, env, compatible_ty, &constraints, inferable)
-                    .is_never_satisfied(db, env, inferable)
+                    .is_never_satisfied(db, env, ConstraintScope::Inferable(inferable))
             }) {
                 return None;
             }
@@ -7171,7 +7173,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             callable.with_signatures(db, signatures)
         });
         let inferable = class_generic_context.inferable_typevars(db);
-        let constraints = ConstraintSetBuilder::with_inferable(inferable);
+        let constraints = ConstraintSetBuilder::new();
         let path_bounds = source_callable
             .to_type(db, env)
             .assignable_solutions_with_inferable(
@@ -8108,7 +8110,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let inferable = generic_context.inferable_typevars(db);
-        let constraints = ConstraintSetBuilder::with_inferable(inferable);
+        let constraints = ConstraintSetBuilder::new();
         let identity_instance = Type::instance(db, env, ClassType::Generic(collection_alias));
         let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
 
@@ -8603,7 +8605,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inferable = generic_context.inferable_typevars(db);
         let path_bounds =
             generator_ty.assignable_solutions_with_inferable(db, env, annotation, inferable);
-        let constraints = ConstraintSetBuilder::with_inferable(inferable);
+        let constraints = ConstraintSetBuilder::new();
         let Solutions::Constrained(solutions) = path_bounds.solve(db, env, &constraints) else {
             return TypeContext::default();
         };

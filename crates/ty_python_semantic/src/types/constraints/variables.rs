@@ -665,6 +665,7 @@ impl<'db> AtomicConstraint<'db> {
             db,
             visitor.env,
             &mut builder.storage.borrow_mut(),
+            ConstraintScope::All,
             left,
             right,
         )
@@ -687,10 +688,10 @@ impl<'db> AtomicConstraint<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        scope: ConstraintScope<'db>,
         left: Type<'db>,
         right: Type<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
-        let scope = storage.scope;
         let provenance = self.provenance();
         let equivalence = matches!(
             self,
@@ -720,7 +721,7 @@ impl<'db> AtomicConstraint<'db> {
                 } else {
                     left.when_constraint_set_assignable_to_owned(db, env, right, scope)
                 };
-                storage.load_with_provenance(db, env, &when, Some(provenance))
+                storage.load_with_provenance(db, env, &when, Some(provenance), ConstraintScope::All)
             }
         }
     }

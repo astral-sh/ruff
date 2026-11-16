@@ -11,6 +11,7 @@
 mod constructor;
 mod property;
 
+use crate::types::constraints::ConstraintScope;
 use std::borrow::Cow;
 use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::HashSet;
@@ -2278,6 +2279,7 @@ impl<'db> Bindings<'db> {
                                             env,
                                             ty_b,
                                             constraints,
+                                            ConstraintScope::All,
                                         )
                                     } else {
                                         ty_a.when_subtype_of(
@@ -2328,6 +2330,7 @@ impl<'db> Bindings<'db> {
                                         env,
                                         ty_b,
                                         constraints,
+                                        ConstraintScope::All,
                                     )
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
@@ -2976,6 +2979,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                ConstraintScope::All,
                                 typevar,
                                 lower,
                             )
@@ -3005,6 +3009,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                ConstraintScope::All,
                                 typevar,
                                 upper,
                             )
@@ -3034,6 +3039,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                ConstraintScope::All,
                                 typevar,
                                 value,
                             )
@@ -3066,6 +3072,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                ConstraintScope::All,
                                 typevar,
                                 lower,
                                 upper,
@@ -3183,9 +3190,9 @@ impl<'db> Bindings<'db> {
                         let result = constraints.into_owned(|constraints| {
                             let set = constraints.load(db, env, tracked.constraints(db));
                             if matches!(method, KnownBoundMethodType::ConstraintSetExists(_)) {
-                                set.reduce_inferable(db, env, typevars, constraints.scope())
+                                set.reduce_inferable(db, env, typevars, ConstraintScope::All)
                             } else {
-                                set.for_all(db, env, constraints, typevars)
+                                set.for_all(db, env, constraints, typevars, ConstraintScope::All)
                             }
                         });
                         let tracked = InternedConstraintSet::new(db, result);
@@ -3214,7 +3221,12 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let set = constraints.load(db, env, tracked.constraints(db));
-                        let result = match set.solutions(db, env, inferable) {
+                        let result = match set.solutions_for_typevars(
+                            db,
+                            env,
+                            ConstraintScope::All,
+                            inferable,
+                        ) {
                             Ok(Solutions::Constrained(paths)) => Type::heterogeneous_tuple(
                                 db,
                                 env,
@@ -3257,9 +3269,17 @@ impl<'db> Bindings<'db> {
                                 method,
                                 KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
                             ) {
-                                set.is_always_satisfied_bounded(db, env, inferable)
+                                set.is_always_satisfied_bounded(
+                                    db,
+                                    env,
+                                    ConstraintScope::Inferable(inferable),
+                                )
                             } else {
-                                set.is_never_satisfied_bounded(db, env, inferable)
+                                set.is_never_satisfied_bounded(
+                                    db,
+                                    env,
+                                    ConstraintScope::Inferable(inferable),
+                                )
                             }
                         });
                         overload.set_return_type(result.map_or_else(
@@ -3306,7 +3326,12 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let set = constraints.load(db, env, tracked.constraints(db));
-                        let result = match set.solutions(db, env, inferable) {
+                        let result = match set.solutions_for_typevars(
+                            db,
+                            env,
+                            ConstraintScope::All,
+                            inferable,
+                        ) {
                             Ok(Solutions::Constrained(paths)) => Type::heterogeneous_tuple(
                                 db,
                                 env,
@@ -4135,7 +4160,7 @@ impl<'db> CallableBinding<'db> {
                             constraints,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied(db, env, overload.inferable_typevars)
+                        .is_always_satisfied(db, env, ConstraintScope::Inferable(overload.inferable_typevars))
                 })
             });
             if !is_argument_assignable_to_any_overload {
@@ -4460,7 +4485,7 @@ impl<'db> CallableBinding<'db> {
                     (Some(first_parameter_type), Some(current_parameter_type)) => {
                         if !first_parameter_type
                             .when_equivalent_to(db, env, current_parameter_type, constraints)
-                            .is_always_satisfied(db, env, TypeVarSet::None)
+                            .is_always_satisfied(db, env, ConstraintScope::EMPTY)
                         {
                             participating_slot_indices.insert(slot_index);
                             break;
@@ -4542,7 +4567,7 @@ impl<'db> CallableBinding<'db> {
             let inferable = self.overloads[*current_index].inferable_typevars;
             if top_materialized_argument_type
                 .when_assignable_to(db, env, parameter_types, constraints, inferable)
-                .is_always_satisfied(db, env, inferable)
+                .is_always_satisfied(db, env, ConstraintScope::Inferable(inferable))
             {
                 for &index in remaining {
                     self.overloads[index].mark_as_unmatched_overload();
@@ -4564,7 +4589,7 @@ impl<'db> CallableBinding<'db> {
                     overload
                         .return_type()
                         .when_equivalent_to(db, env, first_overload_return_type, constraints)
-                        .is_always_satisfied(db, env, TypeVarSet::None)
+                        .is_always_satisfied(db, env, ConstraintScope::EMPTY)
                 })
             } else {
                 // No matching overload
@@ -5882,7 +5907,7 @@ fn validate_keyword_unpack_key_type<'db>(
             constraints,
             inferable_typevars,
         )
-        .is_always_satisfied(db, env, inferable_typevars)
+        .is_always_satisfied(db, env, ConstraintScope::Inferable(inferable_typevars))
     {
         KeywordUnpackKeyTypeCheck::Valid
     } else {
@@ -6989,6 +7014,7 @@ impl<'db> CallInference<'_, 'db> {
                 self.env,
                 tcx,
                 constraints,
+                ConstraintScope::Inferable(self.inferable_typevars),
                 provenance,
             );
             builder.record_constraint_set(return_constraints);
@@ -7990,7 +8016,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     constraints,
                     self.inferable_typevars,
                 )
-                .is_never_satisfied(db, self.env, self.inferable_typevars)
+                .is_never_satisfied(
+                    db,
+                    self.env,
+                    ConstraintScope::Inferable(self.inferable_typevars),
+                )
             && !self.should_defer_typevartuple_callable_check(
                 parameter.annotated_type(),
                 expected_ty,
@@ -9467,7 +9497,7 @@ impl<'db> Binding<'db> {
         tcx: TypeContext<'db>,
     ) -> Option<Specialization<'db>> {
         let generic = self.signature.generic_context?;
-        let constraints = &ConstraintSetBuilder::with_inferable(self.inferable_typevars);
+        let constraints = &ConstraintSetBuilder::new();
         let arguments = arguments.with_self(binding.bound_type);
         let mut restricted = None;
         for (argument_index, (matched, argument)) in self
@@ -9493,7 +9523,11 @@ impl<'db> Binding<'db> {
                 // but that does not let us bind an argument of type `U` to `list[T]` here.
                 if actual
                     .when_assignable_to(db, env, nested, constraints, self.inferable_typevars)
-                    .is_never_satisfied_bounded(db, env, self.inferable_typevars)
+                    .is_never_satisfied_bounded(
+                        db,
+                        env,
+                        ConstraintScope::Inferable(self.inferable_typevars),
+                    )
                     == Some(false)
                 {
                     let matches = restricted.get_or_insert_with(|| self.argument_matches.clone());
@@ -9599,7 +9633,7 @@ impl<'db> Binding<'db> {
                 .assignable_solutions_for_argument_context(db, env, expected, inferable)
         });
         if let Some(path_bounds) = return_bounds {
-            let constraints = ConstraintSetBuilder::with_inferable(inferable);
+            let constraints = ConstraintSetBuilder::new();
             let solutions = path_bounds.solve_for_argument_context(db, env, &constraints);
             if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions.into_vec() {
@@ -9776,7 +9810,7 @@ impl<'db> Binding<'db> {
         // bounds/constraints. We should reconcile the invariants expected by the constraint solver
         // with those actually enforced by our typevar representation.
         let call = CallInference::new(db, env, self, arguments, call_expression_tcx);
-        let constraints = &ConstraintSetBuilder::with_inferable(call.inferable_typevars);
+        let constraints = &ConstraintSetBuilder::new();
         let parameters = self.signature.parameters();
 
         if parameters.is_top() {

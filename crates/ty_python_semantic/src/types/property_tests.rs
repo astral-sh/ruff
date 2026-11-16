@@ -77,8 +77,7 @@ mod stable {
         type_generation::{FullyStaticTy, Ty},
         union,
     };
-    use crate::types::constraints::ConstraintSetBuilder;
-    use crate::types::typevar::TypeVarSet;
+    use crate::types::constraints::{ConstraintScope, ConstraintSetBuilder};
     use crate::types::{CallableType, IntersectionBuilder, KnownClass, Type};
 
     // Reflexivity: `T` is equivalent to itself.
@@ -98,7 +97,7 @@ mod stable {
         equivalent_to_never, db, env,
         forall types t. t.is_equivalent_to(db, env, Type::Never)
             == t.when_equivalent_to(db, env, Type::Never, &ConstraintSetBuilder::new())
-                .is_always_satisfied(db, env, TypeVarSet::None)
+                .is_always_satisfied(db, env, ConstraintScope::All)
     );
 
     // Transitivity: If `S` is equivalent to `T` and `T` is equivalent to `U`, then `S` must be equivalent to `U`.

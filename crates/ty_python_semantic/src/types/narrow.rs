@@ -1,3 +1,4 @@
+use crate::types::constraints::ConstraintScope;
 use std::borrow::Cow;
 use std::cell::LazyCell;
 use std::cmp::Ordering;
@@ -914,7 +915,7 @@ fn specialize_narrowing_target_from_intersection<'db>(
     }
 
     let inferable = generic_context.inferable_typevars(db);
-    let constraints = ConstraintSetBuilder::with_inferable(inferable);
+    let constraints = ConstraintSetBuilder::new();
     let mut base_constraints = compatible_bases
         .into_iter()
         .map(|(target_base, subject_class)| {
@@ -923,6 +924,7 @@ fn specialize_narrowing_target_from_intersection<'db>(
                 env,
                 Type::instance(db, env, subject_class),
                 &constraints,
+                ConstraintScope::Inferable(inferable),
             )
         });
     let mut combined_constraints = base_constraints.next()?;
@@ -930,7 +932,9 @@ fn specialize_narrowing_target_from_intersection<'db>(
         combined_constraints.intersect(db, &constraints, base_constraint);
     }
 
-    let solutions = combined_constraints.solutions(db, env, inferable).ok()?;
+    let solutions = combined_constraints
+        .solutions(db, env, ConstraintScope::Inferable(inferable))
+        .ok()?;
     let specialized_class =
         specialize_generic_class_from_solutions(db, env, target_class, solutions)?;
     Some(Type::instance(db, env, specialized_class))
@@ -1039,7 +1043,7 @@ fn specialize_generic_class_for_subject<'db>(
     };
 
     let inferable = generic_context.inferable_typevars(db);
-    let constraints = ConstraintSetBuilder::with_inferable(inferable);
+    let constraints = ConstraintSetBuilder::new();
     let solutions = Type::instance(db, env, source)
         .assignable_solutions_with_inferable(db, env, Type::instance(db, env, target), inferable)
         .solve(db, env, &constraints);

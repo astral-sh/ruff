@@ -13,7 +13,6 @@
 //! of an unpacking assignment. A `tuple` specialization can include `Never` as a fixed-length
 //! element because a user-defined tuple subclass can inhabit that type.
 
-use crate::types::typevar::TypeVarSet;
 use crate::{Program, ProgramEnvironment};
 use std::cmp::Ordering;
 use std::hash::Hash;
@@ -26,7 +25,7 @@ use crate::subscript::{
     Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError, py_slice_with_step,
 };
 use crate::types::class::{ClassType, KnownClass};
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintScope, ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -383,11 +382,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             |(&source, &target)| {
                                 let constraint_set = self.check_type_pair(db, source, target);
                                 if let Some(context) = self.report_context()
-                                    && constraint_set.is_never_satisfied(
-                                        db,
-                                        self.env,
-                                        self.inferable,
-                                    )
+                                    && constraint_set.is_never_satisfied(db, self.env, self.scope)
                                 {
                                     context.push(ErrorContext::TupleElementNotCompatible {
                                         source,
@@ -561,7 +556,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // supply fixed target elements, and generate constraints for source packs that
                 // overlap fixed target elements.
                 if let VariableSegment::TypeVarTuple(typevartuple) = target.variable()
-                    && self.typevar_evaluation.collects(db, typevartuple)
+                    && self.collects(db, typevartuple)
                 {
                     let source_prefix = source.prefix_elements();
                     let source_suffix = source.suffix_elements();
@@ -604,8 +599,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 if self.relation.is_assignability() {
                     match (source.variable(), target.variable()) {
                         (source_segment, VariableSegment::TypeVarTuple(target_pack))
-                            if !target_pack.is_inferable(db, self.inferable)
-                                && !self.typevar_evaluation.collects(db, target_pack)
+                            if !self.scope.contains(db, target_pack)
+                                && !self.collects(db, target_pack)
                                 && let Some(source_element) =
                                     source_segment.gradual_element_type(db, env) =>
                         {
@@ -626,8 +621,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             );
                         }
                         (VariableSegment::TypeVarTuple(source_pack), target_segment)
-                            if !source_pack.is_inferable(db, self.inferable)
-                                && !self.typevar_evaluation.collects(db, source_pack)
+                            if !self.scope.contains(db, source_pack)
+                                && !self.collects(db, source_pack)
                                 && let Some(target_element) =
                                     target_segment.gradual_element_type(db, env) =>
                         {
@@ -835,7 +830,11 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             let check_element = |(index, (&left, &right))| {
                 let result = self.check_type_pair(db, left, right);
                 if let Some(context) = self.report_context()
-                    && result.is_always_satisfied(db, self.env, self.inferable)
+                    && result.is_always_satisfied(
+                        db,
+                        self.env,
+                        ConstraintScope::Inferable(self.inferable),
+                    )
                 {
                     context.push(ErrorContext::DisjointTupleElement {
                         left,
@@ -2137,7 +2136,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
                 checker
                     .as_equivalence_checker()
                     .check_type_pair(db, *element, variable)
-                    .is_always_satisfied(db, checker.env, TypeVarSet::None)
+                    .is_always_satisfied(db, checker.env, ConstraintScope::EMPTY)
             }))
     }
 
@@ -2171,7 +2170,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             checker
                 .as_equivalence_checker()
                 .check_type_pair(db, *element, variable)
-                .is_always_satisfied(db, checker.env, TypeVarSet::None)
+                .is_always_satisfied(db, checker.env, ConstraintScope::EMPTY)
         })
     }
 

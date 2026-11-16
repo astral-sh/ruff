@@ -1,3 +1,4 @@
+use crate::types::constraints::ConstraintScope;
 use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
@@ -12,7 +13,7 @@ use crate::types::attribute_write::{
     property_setter_value_type,
 };
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
@@ -2735,11 +2736,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source = prepare(source, source_self_type)?;
         let target = prepare(target, target_self_type)?;
         let mut checker = self.clone();
-        checker.typevar_evaluation = checker.typevar_evaluation.lazy(checker.inferable);
+        checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         let result = checker.check_callable_signature_pair(db, &source, &target);
         // This is a sufficient proof. A failed nominal comparison does not rule out a
         // structural match, even between specializations of the same protocol.
-        (!result.is_never_satisfied(db, self.env, self.inferable)).then_some(result)
+        (!result.is_never_satisfied(db, self.env, self.scope)).then_some(result)
     }
 
     fn check_protocol_member_read(
@@ -2791,7 +2792,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |required_ty| {
                     let result = self.check_type_pair(db, attribute_type, required_ty);
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(db, env, self.inferable)
+                        && result.is_never_satisfied(db, env, self.scope)
                     {
                         context.push(ErrorContext::ProtocolMemberReadTypeIncompatible {
                             source: attribute_type,
@@ -3013,7 +3014,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             let result =
                                 self.check_attribute_write(db, receiver_ty, member.name, write_ty);
                             if let Some(context) = self.report_context()
-                                && result.is_never_satisfied(db, env, self.inferable)
+                                && result.is_never_satisfied(db, env, self.scope)
                             {
                                 context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible {
                                     target: write_ty,
@@ -3101,7 +3102,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
             });
         if let Some(context) = self.report_context()
-            && result.is_never_satisfied(db, env, self.inferable)
+            && result.is_never_satisfied(db, env, self.scope)
         {
             context.push(ErrorContext::ProtocolMemberIncompatible {
                 member_name: member.name.into(),
@@ -3147,7 +3148,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 };
 
                 if let Some(context) = self.report_context()
-                    && result.is_never_satisfied(db, env, self.inferable)
+                    && result.is_never_satisfied(db, env, self.scope)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: member.name.into(),
@@ -3219,7 +3220,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let result = self.check_type_pair(db, source, target);
             if let Some(context) = self.report_context()
                 && !target_member.is_method()
-                && result.is_never_satisfied(db, env, self.inferable)
+                && result.is_never_satisfied(db, env, self.scope)
             {
                 context.push(ErrorContext::ProtocolMemberReadTypeIncompatible { source, target });
             }
@@ -3254,7 +3255,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     };
                     let result = self.check_type_pair(db, target, source);
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(db, env, self.inferable)
+                        && result.is_never_satisfied(db, env, self.scope)
                     {
                         context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible { target });
                     }
@@ -3320,7 +3321,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
                 });
                 if let Some(context) = self.report_context()
-                    && result.is_never_satisfied(db, env, self.inferable)
+                    && result.is_never_satisfied(db, env, self.scope)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: target_member.name.into(),
@@ -3388,7 +3389,11 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |read_ty| {
                     let result = self.check_type_pair(db, ty, read_ty);
                     if let Some(context) = self.report_context()
-                        && result.is_always_satisfied(db, env, self.inferable)
+                        && result.is_always_satisfied(
+                            db,
+                            env,
+                            ConstraintScope::Inferable(self.inferable),
+                        )
                     {
                         context.push(ErrorContext::DisjointTypes {
                             left: ty,
@@ -3436,7 +3441,11 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                                     callable_signature.return_ty,
                                 );
                                 if let Some(context) = self.report_context()
-                                    && result.is_always_satisfied(db, env, self.inferable)
+                                    && result.is_always_satisfied(
+                                        db,
+                                        env,
+                                        ConstraintScope::Inferable(self.inferable),
+                                    )
                                 {
                                     context.push(ErrorContext::DisjointReturnTypes {
                                         left: method_signature.return_ty,
@@ -3450,7 +3459,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             })
         };
         if let Some(context) = self.report_context()
-            && !result.is_always_satisfied(db, env, self.inferable)
+            && !result.is_always_satisfied(db, env, ConstraintScope::Inferable(self.inferable))
         {
             context.take();
         }
