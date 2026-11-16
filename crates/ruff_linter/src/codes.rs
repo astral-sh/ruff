@@ -940,9 +940,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (PandasVet, "901") => rules::pandas_vet::rules::PandasDfVariableName,
 
         // flake8-errmsg
-        (Flake8ErrMsg, "101") => rules::flake8_errmsg::rules::RawStringInException,
+        (Flake8ErrMsg, "101") => rules::flake8_errmsg::rules::StringLiteralInException,
         (Flake8ErrMsg, "102") => rules::flake8_errmsg::rules::FStringInException,
-        (Flake8ErrMsg, "103") => rules::flake8_errmsg::rules::DotFormatInException,
+        (Flake8ErrMsg, "103") => rules::flake8_errmsg::rules::StrFormatInException,
 
         // flake8-pyi
         (Flake8Pyi, "001") => rules::flake8_pyi::rules::UnprefixedTypeParam,
@@ -1073,16 +1073,16 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8TypeChecking, "010") => rules::flake8_type_checking::rules::RuntimeStringUnion,
 
         // tryceratops
-        (Tryceratops, "002") => rules::tryceratops::rules::RaiseVanillaClass,
-        (Tryceratops, "003") => rules::tryceratops::rules::RaiseVanillaArgs,
+        (Tryceratops, "002") => rules::tryceratops::rules::RaiseOverlyBroadException,
+        (Tryceratops, "003") => rules::tryceratops::rules::RaiseExceptionWithMessage,
         (Tryceratops, "004") => rules::tryceratops::rules::TypeCheckWithoutTypeError,
         (Tryceratops, "200") => rules::tryceratops::rules::ReraiseNoCause,
         (Tryceratops, "201") => rules::tryceratops::rules::VerboseRaise,
         (Tryceratops, "203") => rules::tryceratops::rules::UselessTryExcept,
         (Tryceratops, "300") => rules::tryceratops::rules::TryConsiderElse,
         (Tryceratops, "301") => rules::tryceratops::rules::RaiseWithinTry,
-        (Tryceratops, "400") => rules::tryceratops::rules::ErrorInsteadOfException,
-        (Tryceratops, "401") => rules::tryceratops::rules::VerboseLogMessage,
+        (Tryceratops, "400") => rules::tryceratops::rules::LoggingErrorInsteadOfException,
+        (Tryceratops, "401") => rules::tryceratops::rules::LoggingRedundantException,
 
         // flake8-use-pathlib
         (Flake8UsePathlib, "100") => rules::flake8_use_pathlib::rules::OsPathAbspath,
@@ -1128,7 +1128,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8LoggingFormat, "004") => rules::flake8_logging_format::violations::LoggingFString,
         (Flake8LoggingFormat, "010") => rules::flake8_logging_format::violations::LoggingWarn,
         (Flake8LoggingFormat, "101") => rules::flake8_logging_format::violations::LoggingExtraAttrClash,
-        (Flake8LoggingFormat, "201") => rules::flake8_logging_format::violations::LoggingExcInfo,
+        (Flake8LoggingFormat, "201") => rules::flake8_logging_format::violations::LoggingErrorWithExcInfo,
         (Flake8LoggingFormat, "202") => rules::flake8_logging_format::violations::LoggingRedundantExcInfo,
 
         // flake8-raise
@@ -1365,10 +1365,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-logging
         (Flake8Logging, "001") => rules::flake8_logging::rules::DirectLoggerInstantiation,
-        (Flake8Logging, "002") => rules::flake8_logging::rules::InvalidGetLoggerArgument,
-        (Flake8Logging, "004") => rules::flake8_logging::rules::LogExceptionOutsideExceptHandler,
-        (Flake8Logging, "007") => rules::flake8_logging::rules::ExceptionWithoutExcInfo,
-        (Flake8Logging, "009") => rules::flake8_logging::rules::UndocumentedWarn,
+        (Flake8Logging, "002") => rules::flake8_logging::rules::FilePathAsLoggerName,
+        (Flake8Logging, "004") => rules::flake8_logging::rules::LoggingExceptionOutsideExceptHandler,
+        (Flake8Logging, "007") => rules::flake8_logging::rules::LoggingExceptionWithoutExcInfo,
+        (Flake8Logging, "009") => rules::flake8_logging::rules::LoggingWarnConstant,
         (Flake8Logging, "014") => rules::flake8_logging::rules::ExcInfoOutsideExceptHandler,
         (Flake8Logging, "015") => rules::flake8_logging::rules::RootLoggerCall,
 
