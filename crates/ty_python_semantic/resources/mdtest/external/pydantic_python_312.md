@@ -35,8 +35,8 @@ def check(keyword: KeywordFrozen[Dog], config: ConfigFrozen[Dog], mutable: Mutab
     mutable_animal: Mutable[Animal] = mutable  # error: [invalid-assignment]
 ```
 
-A custom `__setattr__` can bypass Pydantic's freeze. The model's field remains writable, so the
-model is invariant.
+A custom `__setattr__` can bypass Pydantic's enforcement of `frozen=True`. The model's field remains
+writable, so the model is invariant.
 
 ```py
 class FrozenWithCustomSetattr[T](BaseModel, frozen=True):
