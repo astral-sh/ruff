@@ -3776,6 +3776,27 @@ class ReturnsSelf(Protocol):
 static_assert(not is_equivalent_to(ReturnsSelf, object))
 ```
 
+## Binding `Self` through a protocol bound
+
+`operator.mul` uses the left operand's type for `Self` in `__mul__`. The result keeps that type, and
+the right operand must be assignable to it. Sharing a protocol bound is insufficient.
+
+```py
+from operator import mul
+from typing import Protocol, TypeVar
+from typing_extensions import Self
+
+class SupportsProduct(Protocol):
+    def __mul__(self, other: Self, /) -> Self: ...
+
+T = TypeVar("T", bound=SupportsProduct)
+U = TypeVar("U", bound=SupportsProduct)
+
+def check(left: T, right: T, other: U) -> None:
+    reveal_type(mul(left, right))  # revealed: T@check
+    mul(left, other)  # error: [no-matching-overload]
+```
+
 ## Enum members and writable protocol members
 
 An enum class can satisfy a read-only property protocol through one of its members. It cannot
