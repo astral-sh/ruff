@@ -513,6 +513,27 @@ def invalid_argument_with_context(value: Callable[[], S]) -> list[str]:
     return box_callable(value)  # error: [invalid-argument-type]
 ```
 
+## Binding `Self` through a protocol bound
+
+`operator.mul` infers its argument and return types from `__mul__`. When that method uses `Self`,
+both types refer to the left operand's type variable.
+
+```py
+from operator import mul
+from typing import Protocol, TypeVar
+from typing_extensions import Self
+
+class SupportsProduct(Protocol):
+    def __mul__(self, other: Self, /) -> Self: ...
+
+T = TypeVar("T", bound=SupportsProduct)
+U = TypeVar("U", bound=SupportsProduct)
+
+def check(left: T, right: T, other: U) -> None:
+    reveal_type(mul(left, right))  # revealed: T@check
+    mul(left, other)  # error: [no-matching-overload]
+```
+
 ## Inferring a bound from a narrowed protocol
 
 Narrowing to `Text` supplies a `str` return type that satisfies the bound, even when the original

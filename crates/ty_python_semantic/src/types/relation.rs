@@ -1558,7 +1558,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 Type::TypeVar(typevar)
                     if !typevar.is_inferable(db, self.inferable)
                         && let Some(bound_or_constraints) =
-                            typevar.typevar(db).bound_or_constraints(db, self.env) =>
+                            typevar.typevar(db).bound_or_constraints(db, self.env)
+                        // Each arm has already seen the receiver. Retrying with a protocol
+                        // bound would rebind `Self` in its members to the bound itself.
+                        && bound_or_constraints.protocol_upper_bound(db).is_none() =>
                 {
                     self.check_source_typevar_bounds(db, bound_or_constraints, target)
                 }
@@ -2730,6 +2733,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     self.with_recursion_guard(db, source, target, || {
                         self.check_callables_vs_callable(db, &callables, target_callable)
                     })
+                } else if let Type::ProtocolInstance(protocol) = target
+                    && let Some(bound) = bound_or_constraints.protocol_upper_bound(db)
+                    && bound != protocol
+                {
+                    self.with_recursion_guard(db, source, target, || {
+                        self.check_type_satisfies_protocol(db, source, protocol, Some(bound))
+                    })
                 } else {
                     self.check_source_typevar_bounds(db, bound_or_constraints, target)
                 }
@@ -2912,7 +2922,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::ProtocolInstance(target_proto)) => {
                 self.with_recursion_guard(db, source, target, || {
-                    self.check_type_satisfies_protocol(db, source, target_proto)
+                    self.check_type_satisfies_protocol(db, source, target_proto, None)
                 })
             }
 
