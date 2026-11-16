@@ -1,12 +1,10 @@
-"""Python Character Mapping Codec mac_croatian generated from 'MAPPINGS/VENDORS/APPLE/CROATIAN.TXT' with gencodec.py."""
-
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer
 
 class Codec(codecs.Codec):
     def encode(self, input: str, errors: str = "strict") -> tuple[bytes, int]: ...
-    def decode(self, input: bytes, errors: str = "strict") -> tuple[str, int]: ...
+    def decode(self, input: ReadableBuffer, errors: str = "strict") -> tuple[str, int]: ...
 
 class IncrementalEncoder(codecs.IncrementalEncoder):
     def encode(self, input: str, final: bool = False) -> bytes: ...

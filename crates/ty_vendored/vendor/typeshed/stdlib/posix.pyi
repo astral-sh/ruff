@@ -1,9 +1,3 @@
-"""This module provides access to operating system functionality that is
-standardized by the C Standard and the POSIX standard (a thinly
-disguised Unix interface).  Refer to the library manual and
-corresponding Unix manual entries for more information on calls.
-"""
-
 import sys
 
 if sys.platform != "win32":
@@ -278,11 +272,14 @@ if sys.platform != "win32":
             AT_STATX_DONT_SYNC as AT_STATX_DONT_SYNC,
             AT_STATX_FORCE_SYNC as AT_STATX_FORCE_SYNC,
             AT_STATX_SYNC_AS_STAT as AT_STATX_SYNC_AS_STAT,
+            RWF_ATOMIC as RWF_ATOMIC,
+            RWF_DONTCACHE as RWF_DONTCACHE,
             STATX_ATIME as STATX_ATIME,
             STATX_BASIC_STATS as STATX_BASIC_STATS,
             STATX_BLOCKS as STATX_BLOCKS,
             STATX_BTIME as STATX_BTIME,
             STATX_CTIME as STATX_CTIME,
+            STATX_DIO_READ_ALIGN as STATX_DIO_READ_ALIGN,
             STATX_DIOALIGN as STATX_DIOALIGN,
             STATX_GID as STATX_GID,
             STATX_INO as STATX_INO,
@@ -292,8 +289,10 @@ if sys.platform != "win32":
             STATX_MTIME as STATX_MTIME,
             STATX_NLINK as STATX_NLINK,
             STATX_SIZE as STATX_SIZE,
+            STATX_SUBVOL as STATX_SUBVOL,
             STATX_TYPE as STATX_TYPE,
             STATX_UID as STATX_UID,
+            STATX_WRITE_ATOMIC as STATX_WRITE_ATOMIC,
             _clearenv as _clearenv,
             statx as statx,
             statx_result as statx_result,

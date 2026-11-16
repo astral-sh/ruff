@@ -1,0 +1,288 @@
+[project]
+# This section is needed to avoid writing --no-project everytime when using "uv run"
+# https://github.com/astral-sh/uv/issues/8666
+name = "typeshed"
+version = "0"
+requires-python = ">=3.10" # Minimum version to run tests, used by uv run
+
+[tool.black]
+line-length = 130
+target-version = ["py310"]
+skip-magic-trailing-comma = true
+preview = true
+
+# Override `exclude` so that the `stdlib/venv` directory is not excluded
+# if you invoke Black "manually" (not using pre-commit). `venv` is one of
+# the directories that Black excludes by default if `tool.black.exclude`
+# is not set. See https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#exclude
+exclude = '''
+/(
+    \.env|
+    \.venv|
+    env|
+    \.git|
+    \.mypy_cache
+)/
+'''
+
+[tool.ruff]
+line-length = 130
+fix = true
+
+# Override `exclude` so that the `stdlib/venv` directory is not excluded
+# if you invoke Ruff "manually" (not using pre-commit). `venv` is one of
+# the directories that Ruff excludes by default if `tool.ruff.exclude`
+# is not set. See https://docs.astral.sh/ruff/configuration/
+exclude = [
+    # virtual environment
+    ".env",
+    ".venv",
+    "env",
+    # cache directories, etc.:
+    ".git",
+    ".mypy_cache",
+]
+
+[tool.ruff.lint]
+future-annotations = true
+preview = true
+# Disable all rules on test cases by default:
+# test cases often deliberately contain code
+# that might not be considered idiomatic or modern.
+#
+# Note: some rules that are specifically useful to the test cases
+# are invoked via separate runs of ruff in pre-commit:
+# see our .pre-commit-config.yaml file for details
+exclude = ["**/test_cases/**/*.py"]
+# We still use flake8-pyi to check these (see .flake8 config file);
+# tell ruff not to flag these as e.g. "unused noqa comments"
+external = ["F821", "Y"]
+select = [
+    "A", # flake8-builtins
+    "ARG", # flake8-unused-arguments
+    "B", # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "D", # pydocstyle
+    "DTZ", # flake8-datetimez
+    "EXE", # flake8-executable
+    "FA", # flake8-future-annotations
+    "FBT", # flake8-boolean-trap
+    "FLY", # flynt
+    "I", # isort
+    "N", # pep8-naming
+    "PGH", # pygrep-hooks
+    "PIE", # flake8-pie
+    "PL", # Pylint
+    "PTH", # flake8-use-pathlib
+    "RSE", # flake8-raise
+    "RUF", # Ruff-specific and unused-noqa
+    "SLOT", # flake8-slots
+    "T10", # flake8-debugger
+    "TD", # flake8-todos
+    "TRY", # tryceratops
+    "UP", # pyupgrade
+    "YTT", # flake8-2020
+    # Flake8 base rules
+    "E", # pycodestyle Error
+    "F", # Pyflakes
+    "W", # pycodestyle Warning
+    # Only include flake8-annotations rules that are autofixable. Otherwise leave this to mypy+pyright
+    "ANN2",
+    # Most refurb rules are in preview and can be opinionated,
+    # consider them individually as they come out of preview (last check: 0.13.1)
+    "print-empty-string", # Unnecessary empty string passed to `print`
+    "f-string-number-format", # Replace `{function_name}` call with `{display}`
+    "for-loop-writes", # Use of `{}.write` in a for loop
+    "readlines-in-for", # Instead of calling `readlines()`, iterate over file object directly
+    "check-and-remove-from-set", # Use `{suggestion}` instead of `check` and `remove`
+    "if-expr-min-max", # Replace `if` expression with `{min_max}` call
+    "verbose-decimal-constructor", # Verbose expression in `Decimal` constructor
+    "fromisoformat-replace-z", # Unnecessary timezone replacement with zero offset
+    "int-on-sliced-str", # Use of `int` with explicit `base={base}` after removing prefix
+    "regex-flag-alias", # Use of regular expression alias `re.{}`
+    "isinstance-type-none", # Prefer `is` operator over `isinstance` to check if an object is `None`
+    "type-none-comparison", # Compare the identities of `{object}` and None instead of their respective types
+    "implicit-cwd", # Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+    "list-reverse-copy", # Use of assignment of `reversed` on list `{name}`
+    "slice-to-remove-prefix-or-suffix", # Prefer `str.removeprefix()` over conditionally replacing with slice.
+    # Used for lint.flake8-import-conventions.aliases
+    "unconventional-import-alias", # `{name}` should be imported as `{asname}`
+    # PYI: only enable rules that have autofixes and that we always want to fix (even manually),
+    # avoids duplicate # noqa with flake8-pyi
+    "pass-statement-stub-body", # Empty body should contain `...`, not pass
+    "non-empty-stub-body", # Function body must contain only `...`
+    "pass-in-class-body", # Class bodies must not contain `pass`
+    "ellipsis-in-non-empty-class-body", # Non-empty class bodies must not contain `...`
+    "argument-default-in-stub", # Only simple default values allowed for arguments
+    "assignment-default-in-stub", # Only simple default values allowed for assignments
+    "duplicate-union-member",
+    "unused-private-type-var", # Private `{type_var_like_kind}` `{type_var_like_name}` is never used
+    "custom-type-var-for-self", # Methods like `{method_name}` should return `Self` instead of a custom `TypeVar`
+    "quoted-annotation-in-stub", # Quoted annotations should not be included in stubs
+    "unaliased-collections-abc-set-import", # Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+    # "PYI026", Waiting for this mypy bug to be fixed: https://github.com/python/mypy/issues/16581
+    "unnecessary-literal-union", # Multiple literal members in a union. Use a single literal, e.g. `Literal[{}]`
+    "any-eq-ne-annotation", # Prefer `object` to `Any` for the second parameter to `{method_name}`
+    "bad-exit-annotation", # Star-args in `{method_name}` should be annotated with `object`
+    "future-annotations-in-stub", # `from __future__ import annotations` has no effect in stub files, since type checkers automatically treat stubs as having those semantics
+    "unnecessary-type-union", # Multiple `type[T]` usages in a union. Combine them into one, e.g., `type[{union_str}]`.
+    "generator-return-from-iter-method", # Use `{return_type}` as the return value for simple `{method}` methods
+    "generic-not-last-base-class", # Checks for classes inheriting from typing.Generic[] where Generic[] is not the last base class in the bases tuple
+    "redundant-none-literal", # Use `None` rather than `Literal[None]`
+    "duplicate-literal-member", # Duplicate literal member `{}`
+    "redundant-final-literal", # `Final[Literal[{literal}]]` can be replaced with a bare Final
+    # flake8-simplify, excluding rules that can reduce performance or readability due to long line formatting
+    "duplicate-isinstance-call", # Multiple `isinstance` calls for `{name}`, merge into a single call
+    "needless-bool", # Return the condition `{condition}` directly
+    "return-in-try-except-finally", # Don't use return in `try-except` and `finally`
+    "compare-with-tuple", # Use `{replacement}` instead of multiple equality comparisons
+    "uncapitalized-environment-variables", # Use capitalized environment variable `{expected}` instead of `{actual}`
+    "enumerate-for-loop", # Use `enumerate()` for index variable `{index}` in `for` loop
+    "if-with-same-arms", # Combine `if` branches using logical `or` operator
+    "open-file-with-context-handler", # Use a context manager for opening files
+    "in-dict-keys", # Use key `{operator}` dict instead of key `{operator} dict.keys()`
+    "negate-equal-op", # Use `{left} != {right}` instead of not `{left} == {right}`
+    "negate-not-equal-op", # Use `{left} == {right}` instead of not `{left} != {right}`
+    "double-negation", # Use `{expr}` instead of `not (not {expr})`
+    "if-expr-with-true-false", # Remove unnecessary `True if ... else False`
+    "if-expr-with-false-true", # Use `not ...` instead of `False if ... else True`
+    "if-expr-with-twisted-arms", # Use `{expr_else} if {expr_else} else {expr_body}` instead of `{expr_body} if not {expr_else} else {expr_else}`
+    "expr-and-not-expr", # Use `False` instead of `{name} and not {name}`
+    "expr-or-not-expr", # Use `True` instead of `{name} or not {name}`
+    "expr-or-true",
+    "expr-and-false",
+    "yoda-conditions",
+    "if-else-block-instead-of-dict-get",
+    "split-static-string", # Consider using a list literal instead of `str.{}`
+    "dict-get-with-none-default",
+    "zip-dict-keys-and-values",
+    # Don't include TC rules that create a TYPE_CHECKING block or stringifies annotations
+    "runtime-import-in-type-checking-block", # Move import `{qualified_name}` out of type-checking block. Import is used for more than type hinting.
+    "empty-type-checking-block",
+    "quoted-type-alias",
+    "runtime-string-union", # Invalid string member in `X | Y`-style union type
+    # Used for lint.flake8-import-conventions.aliases
+    "banned-api",
+]
+extend-safe-fixes = [
+    "outdated-version-block", # Remove unnecessary `sys.version_info` blocks
+]
+ignore = [
+    ###
+    # Rules that can conflict with the formatter (Black)
+    # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    ###
+    "indentation-with-invalid-multiple",
+    "indentation-with-invalid-multiple-comment",
+    "over-indented",
+    "tab-indentation",
+    ###
+    # Rules we don't want or don't agree with
+    ###
+    # We're not a library, no need to document everything
+    "D1", # Missing docstring in ...
+    # Sometimes, an extra blank line is more readable
+    "blank-line-after-function", # No blank lines allowed after function docstring
+    # Doesn't support split "summary line"
+    "missing-blank-line-after-summary", # 1 blank line required between summary line and description
+    # Used for direct, non-subclass type comparison, for example: `type(val) is str`
+    # see https://github.com/astral-sh/ruff/issues/6465
+    "type-comparison", # Do not compare types, use `isinstance()`
+    # Highly opinionated, and it's often necessary to violate it
+    "import-outside-top-level", # `import` should be at the top-level of a file
+    # Leave the size and complexity of tests to human interpretation
+    "PLR09", # Too many ...
+    # Too many magic number "2" that are preferable inline. https://github.com/astral-sh/ruff/issues/10009
+    "magic-value-comparison", # Magic value used in comparison, consider replacing `{value}` with a constant variable
+    # Keep codeflow path separation explicit
+    "collapsible-else-if", # Use `elif` instead of `else` then `if`, to reduce indentation
+    # Often just leads to redundant more verbose code when needing an actual str
+    "os-listdir", # Use `pathlib.Path.iterdir()` instead.
+    # Allow FIXME
+    "invalid-todo-tag", # Invalid TODO tag: `{tag}`
+    # Git blame is sufficient
+    "missing-todo-author", # Missing author in TODO;
+    "missing-todo-link", # Missing issue link for this TODO
+    # Mostly from scripts and tests, it's ok to have messages passed directly to exceptions
+    "raise-vanilla-args", # Avoid specifying long messages outside the exception class
+    # Stubs need private imports to describe runtime APIs; our scripts also import local private modules such as `_utils`.
+    "import-private-name",
+    ###
+    # False-positives, but already checked by type-checkers
+    ###
+    # Ruff doesn't support multi-file analysis yet: https://github.com/astral-sh/ruff/issues/5295
+    "implicit-optional", # PEP 484 prohibits implicit `Optional`
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*.pyi" = [
+    # A lot of stubs are incomplete on purpose, and that's configured through pyright
+    # Some ANN204 (special method) are autofixable in stubs, but not all.
+    "ANN2", # Missing return type annotation for ...
+    # Ruff 0.8.0 added sorting of __all__ and __slots_.
+    # There is no consensus on whether we want to apply this to stubs, so keeping the status quo.
+    # See https://github.com/python/typeshed/pull/13108
+    "unsorted-dunder-all",
+    "unsorted-dunder-slots",
+    ###
+    # Rules that are out of the control of stub authors:
+    ###
+    # Names in stubs should match the implementation, even if it's ambiguous.
+    # https://github.com/astral-sh/ruff/issues/15293
+    "A", # flake8-builtins
+    # Stubs can sometimes re-export entire modules.
+    # Issues with using a star-imported name will be caught by type-checkers.
+    "undefined-local-with-import-star", # `from . import *` used; unable to detect undefined names
+    "undefined-local-with-import-star-usage", # may be undefined, or defined from star imports
+    # Most pep8-naming rules don't apply for third-party stubs like typeshed.
+    # N811 to N814 could apply, but we often use them to disambiguate a name whilst making it look like a more common one
+    "N8", # pep8-naming
+    # Sometimes __slots__ really is a string at runtime
+    "single-string-slots", # Class `__slots__` should be a non-string iterable
+    # Names in stubs should match implementation
+    "bad-staticmethod-argument", # First argument of a static method should not be named `{argument_name}`
+    # Runtime classes may redefine inherited slots, which their stubs need to preserve.
+    "redefined-slots-in-subclass",
+    # String literals in stubs must sometimes match runtime values containing confusable Unicode.
+    "ambiguous-unicode-character-string",
+]
+"lib/ts_utils/**" = [
+    # Doesn't affect stubs. The only re-exports we have should be in our local lib ts_utils
+    "useless-import-alias", # Import alias does not rename original package
+]
+"*_pb2.pyi" = [
+    # Special autogenerated typing --> typing_extensions aliases
+    "unconventional-import-alias", # `{name}` should be imported as `{asname}`
+    # Leave the docstrings as-is, matching source
+    "D", # pydocstyle
+    # See comment on black's force-exclude config above
+    "line-too-long",
+    "outdated-version-block", # Remove unnecessary `sys.version_info` blocks
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257" # https://docs.astral.sh/ruff/settings/#lint_pydocstyle_convention
+
+[tool.ruff.lint.flake8-import-conventions.aliases]
+# Prevent aliasing these, as it causes false-negatives for certain rules
+typing_extensions = "typing_extensions"
+typing = "typing"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"tempfile.NamedTemporaryFile".msg = "Use `ts_util.util.NamedTemporaryFile` instead."
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+combine-as-imports = true
+extra-standard-library = [
+    # Group these with stdlib
+    "_typeshed",
+    "typing_extensions",
+    # Extra modules not recognized by Ruff
+    # Added in Python 3.14
+    "compression",
+]
+known-first-party = ["_utils", "ts_utils"]
+
+[tool.typeshed]
+oldest-supported-python = "3.10"

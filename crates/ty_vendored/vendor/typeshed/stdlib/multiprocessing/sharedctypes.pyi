@@ -13,26 +13,21 @@ _T = TypeVar("_T")
 _CT = TypeVar("_CT", bound=_CData)
 
 @overload
-def RawValue(typecode_or_type: type[_CT], *args: Any) -> _CT:
-    """
-    Returns a ctypes object allocated from shared memory
-    """
+def RawValue(typecode_or_type: type[_CT], *args: Any) -> _CT: ...
 @overload
 def RawValue(typecode_or_type: str, *args: Any) -> Any: ...
 
 @overload
-def RawArray(typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any]) -> ctypes.Array[_CT]:
-    """
-    Returns a ctypes array allocated from shared memory
-    """
+def RawArray(typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any]) -> ctypes.Array[_CT]: ...
 @overload
 def RawArray(typecode_or_type: str, size_or_initializer: int | Sequence[Any]) -> Any: ...
 
 @overload
-def Value(typecode_or_type: type[_CT], *args: Any, lock: Literal[False], ctx: BaseContext | None = None) -> _CT:
-    """
-    Return a synchronization wrapper for a Value
-    """
+def Value(typecode_or_type: type[_CT], *args: Any, lock: Literal[False], ctx: BaseContext | None = None) -> _CT: ...
+@overload
+def Value(
+    typecode_or_type: type[_SimpleCData[_T]], *args: Any, lock: Literal[True] | _LockLike = True, ctx: BaseContext | None = None
+) -> Synchronized[_T]: ...
 @overload
 def Value(
     typecode_or_type: type[_CT], *args: Any, lock: Literal[True] | _LockLike = True, ctx: BaseContext | None = None
@@ -40,7 +35,7 @@ def Value(
 @overload
 def Value(
     typecode_or_type: str, *args: Any, lock: Literal[True] | _LockLike = True, ctx: BaseContext | None = None
-) -> SynchronizedBase[Any]: ...
+) -> Synchronized[Any]: ...
 @overload
 def Value(
     typecode_or_type: str | type[_CData], *args: Any, lock: bool | _LockLike = True, ctx: BaseContext | None = None
@@ -49,10 +44,7 @@ def Value(
 @overload
 def Array(
     typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any], *, lock: Literal[False], ctx: BaseContext | None = None
-) -> _CT:
-    """
-    Return a synchronization wrapper for a RawArray
-    """
+) -> ctypes.Array[_CT]: ...
 @overload
 def Array(
     typecode_or_type: type[c_char],

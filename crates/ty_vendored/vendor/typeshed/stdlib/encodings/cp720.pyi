@@ -1,15 +1,10 @@
-"""Python Character Mapping Codec cp720 generated on Windows:
-Vista 6.0.6002 SP2 Multiprocessor Free with the command:
-  python Tools/unicode/genwincodec.py 720
-"""
-
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer
 
 class Codec(codecs.Codec):
     def encode(self, input: str, errors: str = "strict") -> tuple[bytes, int]: ...
-    def decode(self, input: bytes, errors: str = "strict") -> tuple[str, int]: ...
+    def decode(self, input: ReadableBuffer, errors: str = "strict") -> tuple[str, int]: ...
 
 class IncrementalEncoder(codecs.IncrementalEncoder):
     def encode(self, input: str, final: bool = False) -> bytes: ...

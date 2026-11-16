@@ -1,12 +1,10 @@
-"""Python Character Mapping Codec cp1257 generated from 'MAPPINGS/VENDORS/MICSFT/WINDOWS/CP1257.TXT' with gencodec.py."""
-
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer
 
 class Codec(codecs.Codec):
     def encode(self, input: str, errors: str = "strict") -> tuple[bytes, int]: ...
-    def decode(self, input: bytes, errors: str = "strict") -> tuple[str, int]: ...
+    def decode(self, input: ReadableBuffer, errors: str = "strict") -> tuple[str, int]: ...
 
 class IncrementalEncoder(codecs.IncrementalEncoder):
     def encode(self, input: str, final: bool = False) -> bytes: ...

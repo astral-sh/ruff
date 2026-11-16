@@ -1,9 +1,3 @@
-"""
-Path operations common to more than one OS
-Do not use directly.  The OS specific modules import the appropriate
-functions from this module themselves.
-"""
-
 import os
 import sys
 from _typeshed import BytesPath, FileDescriptorOrPath, StrOrBytesPath, StrPath, SupportsRichComparisonT
@@ -38,8 +32,7 @@ if sys.version_info >= (3, 15):
 if sys.version_info >= (3, 15):
     @overload
     @deprecated("Deprecated since Python 3.15; use os.path.commonpath() for path prefixes.")
-    def commonprefix(m: Sequence[LiteralString], /) -> LiteralString:
-        """Given a list of pathnames, returns the longest common leading component"""
+    def commonprefix(m: Sequence[LiteralString], /) -> LiteralString: ...
     @overload
     @deprecated("Deprecated since Python 3.15; use os.path.commonpath() for path prefixes.")
     def commonprefix(m: Sequence[StrPath], /) -> str: ...
@@ -54,8 +47,7 @@ if sys.version_info >= (3, 15):
     def commonprefix(m: Sequence[tuple[SupportsRichComparisonT, ...]], /) -> Sequence[SupportsRichComparisonT]: ...
 else:
     @overload
-    def commonprefix(m: Sequence[LiteralString]) -> LiteralString:
-        """Given a list of pathnames, returns the longest common leading component"""
+    def commonprefix(m: Sequence[LiteralString]) -> LiteralString: ...
     @overload
     def commonprefix(m: Sequence[StrPath]) -> str: ...
     @overload
@@ -65,83 +57,37 @@ else:
     @overload
     def commonprefix(m: Sequence[tuple[SupportsRichComparisonT, ...]]) -> Sequence[SupportsRichComparisonT]: ...
 
-def exists(path: FileDescriptorOrPath) -> bool:
-    """Test whether a path exists.  Returns False for broken symbolic links"""
-
-def isfile(path: FileDescriptorOrPath) -> bool:
-    """Test whether a path is a regular file"""
-
-def isdir(s: FileDescriptorOrPath) -> bool:
-    """Return true if the pathname refers to an existing directory."""
+def exists(path: FileDescriptorOrPath) -> bool: ...
+def isfile(path: FileDescriptorOrPath) -> bool: ...
+def isdir(s: FileDescriptorOrPath) -> bool: ...
 
 if sys.version_info >= (3, 12):
-    def islink(path: StrOrBytesPath) -> bool:
-        """Test whether a path is a symbolic link"""
+    def islink(path: StrOrBytesPath) -> bool: ...
 
 # These return float if os.stat_float_times() == True,
 # but int is a subclass of float.
-def sameopenfile(fp1: int, fp2: int) -> bool:
-    """Test whether two open file objects reference the same file"""
+def sameopenfile(fp1: int, fp2: int) -> bool: ...
 
 if sys.version_info >= (3, 15):
-    def getsize(filename: FileDescriptorOrPath, /) -> int:
-        """Return the size of a file, reported by os.stat()."""
-
-    def getatime(filename: FileDescriptorOrPath, /) -> float:
-        """Return the last access time of a file, reported by os.stat()."""
-
-    def getmtime(filename: FileDescriptorOrPath, /) -> float:
-        """Return the last modification time of a file, reported by os.stat()."""
-
-    def getctime(filename: FileDescriptorOrPath, /) -> float:
-        """Return the metadata change time of a file, reported by os.stat()."""
-
-    def samefile(f1: FileDescriptorOrPath, f2: FileDescriptorOrPath, /) -> bool:
-        """Test whether two pathnames reference the same actual file or directory
-
-        This is determined by the device number and i-node number and
-        raises an exception if an os.stat() call on either pathname fails.
-        """
-
-    def samestat(s1: os.stat_result, s2: os.stat_result, /) -> bool:
-        """Test whether two stat buffers reference the same file"""
+    def getsize(filename: FileDescriptorOrPath, /) -> int: ...
+    def getatime(filename: FileDescriptorOrPath, /) -> float: ...
+    def getmtime(filename: FileDescriptorOrPath, /) -> float: ...
+    def getctime(filename: FileDescriptorOrPath, /) -> float: ...
+    def samefile(f1: FileDescriptorOrPath, f2: FileDescriptorOrPath, /) -> bool: ...
+    def samestat(s1: os.stat_result, s2: os.stat_result, /) -> bool: ...
 
 else:
-    def getsize(filename: FileDescriptorOrPath) -> int:
-        """Return the size of a file, reported by os.stat()."""
-
-    def getatime(filename: FileDescriptorOrPath) -> float:
-        """Return the last access time of a file, reported by os.stat()."""
-
-    def getmtime(filename: FileDescriptorOrPath) -> float:
-        """Return the last modification time of a file, reported by os.stat()."""
-
-    def getctime(filename: FileDescriptorOrPath) -> float:
-        """Return the metadata change time of a file, reported by os.stat()."""
-
-    def samefile(f1: FileDescriptorOrPath, f2: FileDescriptorOrPath) -> bool:
-        """Test whether two pathnames reference the same actual file or directory
-
-        This is determined by the device number and i-node number and
-        raises an exception if an os.stat() call on either pathname fails.
-        """
-
-    def samestat(s1: os.stat_result, s2: os.stat_result) -> bool:
-        """Test whether two stat buffers reference the same file"""
+    def getsize(filename: FileDescriptorOrPath) -> int: ...
+    def getatime(filename: FileDescriptorOrPath) -> float: ...
+    def getmtime(filename: FileDescriptorOrPath) -> float: ...
+    def getctime(filename: FileDescriptorOrPath) -> float: ...
+    def samefile(f1: FileDescriptorOrPath, f2: FileDescriptorOrPath) -> bool: ...
+    def samestat(s1: os.stat_result, s2: os.stat_result) -> bool: ...
 
 if sys.version_info >= (3, 13):
-    def isjunction(path: StrOrBytesPath) -> bool:
-        """Test whether a path is a junction
-        Junctions are not supported on the current platform
-        """
-
-    def isdevdrive(path: StrOrBytesPath) -> bool:
-        """Determines whether the specified path is on a Windows Dev Drive.
-        Dev Drives are not supported on the current platform
-        """
-
-    def lexists(path: StrOrBytesPath) -> bool:
-        """Test whether a path exists.  Returns True for broken symbolic links"""
+    def isjunction(path: StrOrBytesPath) -> bool: ...
+    def isdevdrive(path: StrOrBytesPath) -> bool: ...
+    def lexists(path: StrOrBytesPath) -> bool: ...
 
 # Added in Python 3.9.23, 3.10.18, 3.11.13, 3.12.11, 3.13.4
 _AllowMissingType = NewType("_AllowMissingType", object)
