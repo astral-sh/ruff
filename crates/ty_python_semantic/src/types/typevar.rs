@@ -146,9 +146,23 @@ impl<'db> Type<'db> {
     ) -> bool {
         // Contextual inference must not adopt an alias whose arguments still
         // contain placeholders from an enclosing generic call.
-        any_over_type_including_alias_arguments(db, env, self, |ty| {
-            matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
-        })
+        if matches!(TypeKind::from(self), TypeKind::Atomic) {
+            return matches!(self, Type::Dynamic(DynamicType::UnspecializedTypeVar));
+        }
+
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+        fn has_unspecialized_type_var_impl<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: Type<'db>,
+        ) -> bool {
+            let env = ProgramEnvironment::from_program(program);
+            any_over_type_including_alias_arguments(db, &env, ty, |ty| {
+                matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
+            })
+        }
+
+        has_unspecialized_type_var_impl(db, env.program(db), self)
     }
 
     pub(crate) fn has_provisional_marker(
