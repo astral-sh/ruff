@@ -114,7 +114,11 @@ impl Client {
         }
     }
 
-    /// Drops the notification if the client writer is busy or has disconnected.
+    /// Attempts to send a notification, dropping it if the stdout channel to the editor
+    /// is full or disconnected.
+    ///
+    /// This channel (`Writer`) has zero capacity, so the thread that writes to stdout
+    /// must be ready to receive the notification immediately.
     pub(crate) fn try_send_notification<N>(&self, params: N::Params)
     where
         N: lsp_types::Notification,
