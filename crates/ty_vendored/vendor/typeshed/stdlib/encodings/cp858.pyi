@@ -1,3 +1,6 @@
+"""Python Character Mapping Codec for CP858, modified from cp850.
+
+"""
 import codecs
 from _typeshed import ReadableBuffer
 
