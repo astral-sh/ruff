@@ -15,7 +15,7 @@ import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -53,7 +53,7 @@ def changed_files(pull_request: int) -> list[str]:
     page = 1
     while True:
         batch = api(f"pulls/{pull_request}/files?per_page=100&page={page}")
-        files.extend(item["filename"] for item in batch)
+        files.extend(cast("str", item["filename"]) for item in batch)
         if len(batch) < 100:
             return files
         page += 1
@@ -108,7 +108,7 @@ def load_state(path: Path) -> State:
 
 
 def eligible_pull(pull: dict[str, Any], pull_request: int, head_sha: str) -> bool:
-    return (
+    return bool(
         pull["number"] == pull_request
         and pull["state"] == "open"
         and not pull["draft"]
@@ -138,8 +138,7 @@ def assign_reviewer(
     author = pull["user"]["login"].lower()
     matched = matching_pools(pools, changed_files(pull_request))
     while matched:
-        eligible_pools, weights = zip(*matched, strict=True)
-        pool = rng.choices(eligible_pools, weights=weights)[0]
+        pool, _ = rng.choices(matched, weights=[weight for _, weight in matched])[0]
         stored = state.get(pool.name, {})
         credits = {
             login: min(1.0, stored.get(login, 0.0) + 1 / len(pool.reviewers))
