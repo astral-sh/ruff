@@ -37,7 +37,7 @@ use crate::types::typevar::{
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    walk_type_with_recursion_guard,
+    any_over_type_including_alias_arguments, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -948,15 +948,7 @@ impl<'db> GenericContext<'db> {
             db,
             self,
             self.variables(db)
-                .map(|typevar| match typevar.kind(db) {
-                    TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
-                        Type::homogeneous_tuple(db, &env, Type::unknown())
-                    }
-                    TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
-                        Type::paramspec_value_callable(db, Parameters::unknown())
-                    }
-                    _ => Type::unknown(),
-                })
+                .map(|typevar| typevar.kind(db).unknown_value(db, &env))
                 .collect::<Box<[_]>>(),
             None,
             (known_class == Some(KnownClass::Tuple))
@@ -1120,15 +1112,7 @@ impl<'db> GenericContext<'db> {
                     TypeContext::default(),
                 )
             } else {
-                match typevar.kind(db) {
-                    TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
-                        Type::homogeneous_tuple(db, &env, Type::unknown())
-                    }
-                    TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
-                        Type::paramspec_value_callable(db, Parameters::unknown())
-                    }
-                    _ => Type::unknown(),
-                }
+                typevar.kind(db).unknown_value(db, &env)
             };
             expanded.push(ty);
         }
@@ -2932,10 +2916,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Option<&CandidateTypeVarSolution<'db>>,
         ) -> Option<PathBoundSolution<'db>>,
     ) -> PendingInference<'db, T> {
-        let merged_types = self
+        let mut merged_types = self
             .solve_hash_map_with(self.generic_context, &mut |typevar, bounds| {
                 choose(typevar, bounds).and_then(PathBoundSolution::as_type)
             });
+        if reason == TypeVarInferenceFallback::Unsatisfiable {
+            self.remove_expanding_cycles(&mut merged_types);
+        }
         PendingInference {
             merged_types,
             solutions: Err(reason),
@@ -3274,7 +3261,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 .iter_positive(db)
                 .chain(intersection.iter_negative(db))
                 .any(|element| self.has_expanding_cycle(generic_context, types, identity, element)),
-            _ => any_over_type(db, self.env, ty, false, |nested| {
+            _ => any_over_type_including_alias_arguments(db, self.env, ty, |nested| {
                 nested.as_typevar().is_some_and(|dependency| {
                     let dependency = dependency.identity(db);
                     dependency != identity
@@ -3308,7 +3295,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
 
         types.get(&identity).is_some_and(|ty| {
-            any_over_type(db, self.env, *ty, false, |nested| {
+            any_over_type_including_alias_arguments(db, self.env, *ty, |nested| {
                 nested.as_typevar().is_some_and(|dependency| {
                     let dependency = dependency.identity(db);
                     // Recursive specialization skips a typevar's own slot. Only references
@@ -3432,6 +3419,35 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 Some((*identity, chosen))
             })
             .collect()
+    }
+
+    /// Solving argument relations independently can introduce a cycle when their solutions are
+    /// merged. For example, if `A = int | list[B]` and `B = A`, keep the independent evidence
+    /// for `A` so we can still diagnose arguments that require an incompatible type.
+    fn remove_expanding_cycles(&self, types: &mut FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>) {
+        let db = self.db;
+        let generic_context = self.generic_context;
+        // Check every binding against the original map so recovery is independent of iteration order.
+        let mut replacements = Vec::new();
+        for (&identity, variable) in generic_context.variables_inner(db) {
+            let Some(&ty) = types.get(&identity) else {
+                continue;
+            };
+            let expands = |ty| self.has_expanding_cycle(generic_context, types, identity, ty);
+            if !expands(ty) {
+                continue;
+            }
+            let replacement = if let Type::Union(union) = ty
+                && let retained = union.filter(db, |element| !expands(*element))
+                && !retained.is_never()
+            {
+                retained
+            } else {
+                variable.kind(db).unknown_value(db, self.env)
+            };
+            replacements.push((identity, replacement));
+        }
+        types.extend(replacements);
     }
 
     fn unknown_type_mappings(

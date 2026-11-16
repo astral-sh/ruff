@@ -1899,6 +1899,56 @@ reveal_type(C(1, True))  # revealed: C[int]
 wrong_innards: C[int] = C("five", 1)
 ```
 
+### Calling a generic initializer on an existing instance
+
+An inherited initializer can infer its own type parameters from the arguments. Its explicit `self`
+annotation must also match the specialization of the receiver.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+E = TypeVar("E")
+A = TypeVar("A")
+B = TypeVar("B")
+T = TypeVar("T", bound=str | int)
+
+class Either(Generic[E]):
+    value: E
+
+    def __init__(
+        self: "Either[A | B]",
+        first: type[A],
+        second: type[B],
+        default: A | B | Callable[[], A | B],
+    ) -> None: ...
+
+class TextOrNumber(Either[str | int], Generic[T]):
+    def initialize(self, default: T | Callable[[], T]) -> None:
+        super().__init__(str, int, default)  # ok
+```
+
+An instance of `Either[T]` can accept values of type `T`. Even with the upper bound `str | int`, `T`
+could be `str` alone, so the initializer cannot assume it accepts both types.
+
+```py
+class Child(Either[T]):
+    def initialize(self, cls: type[T], default: T | Callable[[], T]) -> None:
+        super().__init__(cls, cls, default)  # ok
+        super().__init__(str, int, default)  # error: [invalid-argument-type] "Expected `Either[str | int]`"
+```
+
+For `Either[bytes]`, the receiver is incompatible whether it is bound implicitly or passed
+explicitly to the inherited method.
+
+```py
+class Bytes(Either[bytes], Generic[T]):
+    def initialize(self, default: T | Callable[[], T]) -> None:
+        super().__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+        self.__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+        Bytes.__init__(self, str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+```
+
 ### Class-scoped type variables in `__init__` receiver annotations
 
 The `invalid-init-type-variable` rule rejects class-scoped type variables in explicit `__init__`
@@ -2102,6 +2152,10 @@ T = TypeVar("T")
 @dataclass
 class A(Generic[T]):
     x: T
+
+    def reset(self, x: T) -> None:
+        self.__init__(x)  # ok
+        self.__init__(42)  # error: [invalid-argument-type]
 
 # revealed: ty_extensions._internal.GenericContext[T@A]
 reveal_type(generic_context(A))

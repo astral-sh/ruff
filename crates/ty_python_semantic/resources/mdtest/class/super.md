@@ -773,9 +773,8 @@ super(B, B())[0]
 
 ### Generic base initializer
 
-A generic base initializer can inherit both its own class's generic context and the subclass's
-generic context. The merged context is not the same as the subclass's enclosing context and should
-not be freshened as a recursive reference.
+Inside `Child[S]`, the base initializer expects a callback that accepts `S`. This holds even when
+`S` has a default.
 
 ```py
 from collections.abc import Callable
@@ -791,8 +790,6 @@ class Base(Generic[T]):
 
 class Child(Base[S], Generic[S]):
     def __init__(self, check: Callable[[S], bool] | None) -> None:
-        # Regression test: Freshening the merged context made this expect
-        # `Callable[[BaseException], bool]` instead of `Callable[[S], bool]`.
         super().__init__(check)
 ```
 
