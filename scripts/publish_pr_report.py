@@ -391,7 +391,7 @@ def publish(
         return None
     else:
         created = api(f"issues/{pull_request}/comments", method="POST", body=body)
-        comment_id =  created["id"]
+        comment_id = created["id"]
         assert isinstance(comment_id, int)
 
     print(f"Published {report} report: {comment_id}")
