@@ -561,8 +561,9 @@ impl Session {
         if let Some(project_path) = result.project_sync_path() {
             db.uv_environments()
                 .request_project_sync(db, project_path, &|db, project| {
-                    Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
+                    Some(Box::new(LazyWorkDoneProgress::new(
                         client,
+                        None,
                         WorkDoneProgressBegin {
                             title: format!("Refreshing {} metadata", project.name(db)),
                             cancellable: Some(false),

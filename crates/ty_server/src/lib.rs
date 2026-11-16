@@ -1,3 +1,82 @@
+//! The ty language server.
+//!
+//! ## Request handling
+//!
+//! The main loop communicates with the editor and delegates code analysis to background
+//! workers. When the user hovers over a name, for example, a worker looks up its type
+//! while the main loop stays free to handle the user's next edit. When the worker
+//! returns the result, the main loop forwards it to the editor.
+//!
+//! ```text
+//!           buffered stdin
+//! [Editor] --------------> [Reader]
+//!    ^                        |
+//!    |                 [[ Input | 0 ]]
+//!    |                        |
+//!    |                        v
+//!    |                   [Main loop] -----------------------> [[ Jobs | 2048 ]]
+//!    |                      |    ^                                    |
+//!    |                      |    |                                    v
+//!    |                      |    +-- [[ Actions | unbounded ]] <- [Workers]
+//!    |                      |                                         |
+//!    |                      v                                         |
+//!    |               [[ Writer | 0 ]] <--- progress notifications ----+
+//!    |                      |
+//!    |                      v
+//!    +------------------ [Writer]
+//!       buffered stdout
+//! ```
+//!
+//! **Legend**
+//!
+//! - `[ ]` An active component or thread.
+//! - `[[ name | capacity ]]` A channel. `0` means a direct handoff, `2048` allows
+//!   2,048 waiting jobs per pool, and `unbounded` means no fixed limit.
+//! - `-->` Direction of message flow.
+//! - `buffered stdin` and `buffered stdout` OS pipes that buffer bytes.
+//!
+//! ## Back pressure
+//!
+//! The `Jobs` queue lets a hover request wait for a worker while the main loop handles
+//! other messages. If the queue is already full, the main loop replies with
+//! `RequestFailed` and the editor can drop the request or retry it later. Waiting for
+//! space would prevent the main loop from forwarding completed responses or handling
+//! `shutdown`.
+//!
+//! The `Actions` queue is unbounded so workers can return results even when the main
+//! loop is waiting for them. For example, applying an edit can require the main loop to
+//! wait for queued jobs to release their database snapshots. If all workers were blocked
+//! trying to return results, those queued jobs could never run. In practice, most jobs
+//! produce a single response. When responses accumulate, the main loop drains ready
+//! actions before reading more requests from the editor.
+//!
+//! The zero-capacity `Input` and `Writer` channels let back pressure reach the OS pipes.
+//! If the main loop falls behind, the reader waits and the editor's writes block once
+//! stdin fills. If the editor stops reading, stdout can fill and the writer must finish
+//! its current write before it can accept another response.
+//!
+//! ## Request cancellation
+//!
+//! The main loop queues a hover request in `Jobs`. If the editor cancels the request
+//! while it is pending, the main loop marks it cancelled and replies immediately with
+//! a cancellation error so the editor doesn't have to wait for a worker.
+//!
+//! - If the job is still queued, it stays in `Jobs` until a worker picks it up. The
+//!   worker checks for cancellation at that point and skips the request.
+//! - If a worker has already started processing the request, it returns the result
+//!   through `Actions`. Before forwarding the result, the main loop checks
+//!   whether the request is still pending. It discards the result because it already
+//!   sent the editor a cancellation response.
+//!
+//! ## Salsa cancellation
+//!
+//! Applying an edit can cause Salsa to interrupt a worker analyzing an older database
+//! snapshot. The editor may still need the result, so some requests, such as code
+//! completion, support a retry. The worker sends the request back through `Actions`,
+//! and the main loop automatically retries it with a fresh snapshot. If `Jobs` is full
+//! or shutdown has started, the main loop replies with the request's cancellation error
+//! (`ContentModified` for completions).
+
 use std::{num::NonZeroUsize, sync::Arc};
 
 use anyhow::Context;
