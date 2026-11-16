@@ -2149,6 +2149,38 @@ def narrowed[S](value: Source[S]) -> None:
         reveal_type(require_text(value))  # revealed: str
 ```
 
+## Recursive protocol bounds
+
+`Tree.label` pairs a label of any type with the tree itself. For a `str` label it returns
+`tuple[str, Tree]`, which satisfies the recursive return type of `Node.label`.
+
+```py
+from typing import Protocol
+
+class Node(Protocol):
+    def label(self, value: str) -> tuple[str, "Node"]: ...
+
+class Tree:
+    def label[V](self, value: V) -> tuple[V, "Tree"]:
+        return value, self
+
+def keep[T: Node](node: T) -> T:
+    return node
+
+reveal_type(keep(Tree()))  # revealed: Tree
+```
+
+Copying a `list[Tree]` can produce a `list[Node]` when the context calls for one. Passing the
+original list would let the callee append a different kind of node to it.
+
+```py
+def accept(nodes: list[Node]) -> None: ...
+def check(trees: list[Tree]):
+    nodes: list[Node] = list(trees)  # ok
+    accept(list(trees))  # ok
+    accept(trees)  # error: [invalid-argument-type]
+```
+
 ## Inferring a constrained typevar
 
 ```py
