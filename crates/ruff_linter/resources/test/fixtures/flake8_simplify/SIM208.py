@@ -31,3 +31,12 @@ print(not not x in y in z)  # SIM208
 # These may not be `bool`, so the fix still wraps them in `bool(...)`.
 print(not not x == y)  # SIM208
 print(not not x == y in z)  # SIM208
+
+
+def shadowed_bool(bool):
+    # No fix: the operand needs a `bool(...)` wrapper, but `bool` is shadowed.
+    print(not not x)  # SIM208
+    # No fix: this `bool(...)` call is not the builtin, so it may not return a `bool`.
+    print(not not bool(x))  # SIM208
+    # Fixed: the operand is always a `bool`, so no wrapper is needed.
+    print(not not x in y)  # SIM208

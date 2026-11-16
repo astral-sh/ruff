@@ -7,7 +7,7 @@ use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for negated `==` operators.
@@ -112,6 +112,12 @@ impl AlwaysFixableViolation for NegateNotEqualOp {
 /// a
 /// ```
 ///
+/// ## Fix availability
+/// Outside of a boolean context (such as an `if` test), the fix wraps the operand in
+/// `bool(...)` unless the operand is already known to be a `bool`. This rule will emit a
+/// diagnostic but not suggest a fix if that wrapper is needed and `bool` has been shadowed
+/// from its builtin binding.
+///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
@@ -120,16 +126,18 @@ pub(crate) struct DoubleNegation {
     expr: String,
 }
 
-impl AlwaysFixableViolation for DoubleNegation {
+impl Violation for DoubleNegation {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let DoubleNegation { expr } = self;
         format!("Use `{expr}` instead of `not (not {expr})`")
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let DoubleNegation { expr } = self;
-        format!("Replace with `{expr}`")
+        Some(format!("Replace with `{expr}`"))
     }
 }
 
