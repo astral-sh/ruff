@@ -134,7 +134,7 @@ We agree that Ruff's formatting (that matches Black's 23) is hard to read and ne
 
 ### Call expressions with a single multiline string argument
 
-Unlike Black, Ruff preserves the indentation of a single multiline-string argument in a call expression:
+Black and Ruff both preserve the indentation inside the multiline-string argument in a call expression. The key difference is the placement of the opening quotation marks and the placement of the closing parenthesis:
 
 ```python
 # Input
