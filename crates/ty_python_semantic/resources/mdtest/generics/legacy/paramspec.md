@@ -1160,6 +1160,40 @@ def identity(value: T, /) -> T:
 reveal_type(pipe(1, identity))  # revealed: Literal[1]
 ```
 
+With one list, `Box` takes its elements. With two lists, it takes the lists themselves as elements.
+Passing the constructor to `pipe` preserves that distinction. An expected result type can also widen
+the element type, just as it can for a direct constructor call.
+
+```py
+from collections.abc import Iterable
+from typing import Generic, overload
+
+class Box(Generic[T]):
+    value: T
+
+    @overload
+    def __init__(self, items: Iterable[T], /) -> None: ...
+    @overload
+    def __init__(self, item: T, /, *rest: T) -> None: ...
+    def __init__(self, *args: object) -> None: ...
+
+def check(items: list[int]) -> Box[object]:
+    reveal_type(pipe(items, Box))  # revealed: Box[int]
+    reveal_type(pipe(items, Box, items))  # revealed: Box[list[int]]
+    return pipe(items, Box)
+```
+
+`operator.call` and `map` each pass one list to `Box`, so both select the iterable overload.
+
+```py
+from operator import call
+
+def other_wrappers(items: list[int]):
+    # TODO: Infer `Box[int]` for both calls.
+    reveal_type(call(Box, items))  # revealed: Box[T@Box] | Box[T@Box]
+    reveal_type(next(map(Box, [items])))  # revealed: Box[int | list[int]]
+```
+
 ## Inferring through unions of structural `ParamSpec` protocols
 
 Different protocols with the same parameter list can satisfy a target protocol structurally, even
