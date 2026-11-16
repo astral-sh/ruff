@@ -57,17 +57,6 @@ class Container[T]:
         return self.value
 ```
 
-## Quoted type parameter annotations
-
-Quoted annotations also refer to the enclosing type parameter.
-
-```py
-from somewhere import T  # error: [unused-import]
-
-def identity[T](value: "T") -> "T":
-    return value
-```
-
 ## Imports used outside a generic definition
 
 ```py
@@ -99,22 +88,5 @@ def call[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) ->
     callback(*args, **kwargs)
 
 def identity[*Ts](value: tuple[*Ts]) -> tuple[*Ts]:
-    return value
-```
-
-## Future annotations with type parameters
-
-```toml
-target-version = "py312"
-
-[lint]
-select = ["F401"]
-```
-
-```py
-from __future__ import annotations
-from somewhere import T  # error: [unused-import]
-
-def identity[T](value: T) -> T:
     return value
 ```

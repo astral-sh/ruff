@@ -485,9 +485,7 @@ impl<'a> SemanticModel<'a> {
     pub fn resolve_load(&mut self, name: &'a ast::ExprName) -> ReadResult {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
-        if self.in_forward_reference()
-            && !self.resolves_to_type_parameter(name.id.as_str(), self.scope_id)
-        {
+        if self.in_forward_reference() {
             if let Some(binding_id) = self.scopes.global().get(name.id.as_str()) {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
@@ -863,7 +861,7 @@ impl<'a> SemanticModel<'a> {
         scope_id: ScopeId,
         in_forward_reference: bool,
     ) -> Symbol {
-        if in_forward_reference && !self.resolves_to_type_parameter(symbol, scope_id) {
+        if in_forward_reference {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
                     return Symbol::Binding(binding_id);
@@ -910,15 +908,6 @@ impl<'a> SemanticModel<'a> {
         } else {
             Symbol::Unbound
         }
-    }
-
-    /// Type parameters retain their lexical scope in forward references.
-    fn resolves_to_type_parameter(&self, symbol: &str, scope_id: ScopeId) -> bool {
-        let Symbol::Binding(binding_id) = self.lookup_symbol_in_scope(symbol, scope_id, false)
-        else {
-            return false;
-        };
-        matches!(self.bindings[binding_id].kind, BindingKind::TypeParam)
     }
 
     /// Simulates a runtime load of a given [`ast::ExprName`].
@@ -2198,7 +2187,9 @@ impl<'a> SemanticModel<'a> {
     /// ```
     const fn in_forward_reference(&self) -> bool {
         self.in_string_type_definition()
-            || (self.in_future_type_definition() && self.in_typing_only_annotation())
+            || (self.in_future_type_definition()
+                && self.in_typing_only_annotation()
+                && self.future_annotations_or_stub())
     }
 
     /// Return `true` if the model is visiting the value expression
