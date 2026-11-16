@@ -96,6 +96,9 @@ verbose_file_reads = "warn"
 wildcard_imports = "warn"
 zero_sized_map_values = "warn"
 
+[lints.cargo]
+redundant_homepage = "allow"
+
 [lib]
 name = "annotate_snippets"
 test = false

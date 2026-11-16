@@ -47,7 +47,7 @@ pub(super) fn in_dunder_method(
         return false;
     };
 
-    if !matches!(
+    matches!(
         function_type::classify(
             name,
             decorator_list,
@@ -57,10 +57,7 @@ pub(super) fn in_dunder_method(
             &settings.pep8_naming.staticmethod_decorators,
         ),
         function_type::FunctionType::Method
-    ) {
-        return false;
-    }
-    true
+    )
 }
 
 /// Visitor to track reads from an iterable in a loop.
