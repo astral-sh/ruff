@@ -3673,10 +3673,13 @@ impl<'db> StaticClassLiteral<'db> {
 
         let default_attribute_variance = {
             let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self.into());
-            // From Python 3.13, the synthesized `__replace__` method on dataclasses and Pydantic
-            // models uses field types in contravariant position, so frozen fields are invariant.
-            // TODO: Look up synthesized methods during variance inference so their signatures
-            // determine variance directly.
+            // Python 3.13 introduced a synthesized `__replace__` method on dataclasses which uses
+            // their field types in contravariant position, thus meaning a frozen dataclass must
+            // still be invariant in its field types. Other synthesized methods on dataclasses are
+            // not considered here, since they don't use field types in their signatures. TODO:
+            // ideally we'd have a single source of truth for information about synthesized
+            // methods, so we just look them up normally and don't hardcode this knowledge here.
+            // We also synthesize `__replace__` for Pydantic models on Python 3.13 and later.
             let is_frozen_prior_to_313 = python_version <= PythonVersion::PY312
                 && CodeGeneratorKind::from_static_class(db, self).is_some_and(|kind| match kind {
                     CodeGeneratorKind::Pydantic(metadata) => {
