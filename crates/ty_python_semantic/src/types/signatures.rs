@@ -4153,19 +4153,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
 
-                // Other is a `Concatenate` with gradual form while self is a regular non-gradual
-                // callable
-                (
-                    ParametersKind::Standard,
-                    ParametersKind::Concatenate(ConcatenateTail::Gradual),
-                ) => {
+                // Only the fixed prefix of a parameter list ending in a caller-owned
+                // ParamSpec is guaranteed to accept positional arguments.
+                (_, ParametersKind::Concatenate(ConcatenateTail::Gradual))
+                    if let Some(source_prefix) = match source_parameters.kind() {
+                        ParametersKind::Standard => Some(source_parameters.as_slice()),
+                        _ => source_parameters.as_paramspec_with_prefix().and_then(
+                            |(prefix, tail)| {
+                                (!tail.is_inferable(db, self.inferable)).then_some(prefix)
+                            },
+                        ),
+                    } =>
+                {
                     let target_prefix_params =
                         &target_parameters.as_slice()[..target_parameters.len().saturating_sub(2)];
 
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
-                        source_iter: source_parameters.iter(),
+                        source_iter: source_prefix.iter(),
                         target_iter: target_prefix_params.iter(),
                     };
 
