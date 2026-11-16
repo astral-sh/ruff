@@ -1027,6 +1027,66 @@ p = partial(f, *get_args())
 reveal_type(p)  # revealed: partial[bool]
 ```
 
+### Return type fixed by a bound callback
+
+When a partial forwards arguments to a callback bound by position, the callback can determine the
+result even if the number of bound arguments is unknown.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from functools import partial
+
+def collect[**P, R](f: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> list[R]:
+    return [f(*args, **kwargs)]
+
+def check[T](f: Callable[..., T], *args: object) -> None:
+    reveal_type(partial(collect, f, *args)())  # revealed: list[T@check]
+    reveal_type(partial(collect, collect, f, *args)())  # revealed: list[list[T@check]]
+```
+
+Both the default and the callback's return type constrain `R` in `choose`.
+
+```py
+def choose[**P, R](default: R, f: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return default
+
+def check_default(f: Callable[..., int], *args: object) -> None:
+    # TODO: Infer `Literal["fallback"] | int`, as in a direct call to `choose`.
+    reveal_type(partial(choose, "fallback", f, *args)())  # revealed: R@choose
+```
+
+### Forwarding a predicate with a bound argument
+
+A type guard predicate whose first argument is supplied by `partial` checks the curried argument; it
+doesn't narrow a second argument supplied later.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from functools import partial
+from typing import TypeGuard
+
+def call[**P, R](f: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return f(*args, **kwargs)
+
+def is_text(first: object, second: object) -> TypeGuard[str]:
+    return isinstance(first, str)
+
+def check(value: object, *args: object) -> None:
+    test = partial(call, is_text, "bound", *args)
+    if test(value):
+        reveal_type(value)  # revealed: object
+```
+
 ### Kwargs splat with an immediate dictionary
 
 Unpacking an immediate dictionary binds its entries as keyword arguments. These arguments can still
