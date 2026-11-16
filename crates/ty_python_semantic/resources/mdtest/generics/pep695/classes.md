@@ -717,13 +717,13 @@ class C[T]:
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
+        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
         invalid: C[int] = C(value)
 
     def from_union(self, value: T | list[T]) -> None:
         reveal_type(C(value))  # revealed: C[T@C | list[T@C]]
 
-        # error: [invalid-argument-type] "Expected `list[T@C]`, found `T@C | list[T@C]`"
+        # error: [invalid-assignment] "Object of type `C[T@C | list[T@C]]` is not assignable to `C[list[T@C]]`"
         invalid_union: C[list[T]] = C(value)
 ```
 
@@ -1650,6 +1650,28 @@ class GenericChild[T](Gradual, Base[list[T]]): ...
 
 as_specialized: Base[list[int]] = GenericChild[int]()
 incompatible_specialization: Base[list[str]] = GenericChild[int]()  # error: [unsound-assignment]
+```
+
+Both `Child` and `Reversed` inherit `Base[int]`, so a value stored in either must be assignable to
+`int`.
+
+```py
+def store[T](value: T, box: Base[T]) -> None:
+    box.value = value
+
+def check[U](value: U, child: Child, reversed_child: Reversed, concrete: Concrete):
+    # TODO: error: [invalid-argument-type]
+    store("wrong", child)
+    # TODO: error: [invalid-argument-type]
+    store(value, child)
+
+    # TODO: error: [invalid-argument-type]
+    store("wrong", reversed_child)
+    # TODO: error: [invalid-argument-type]
+    store(value, reversed_child)
+
+    store("wrong", concrete)  # error: [invalid-argument-type]
+    store(value, concrete)  # error: [invalid-argument-type]
 ```
 
 ## Method overrides through gradual and concrete inheritance paths

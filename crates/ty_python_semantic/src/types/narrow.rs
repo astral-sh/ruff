@@ -913,7 +913,8 @@ fn specialize_narrowing_target_from_intersection<'db>(
         return None;
     }
 
-    let constraints = ConstraintSetBuilder::new();
+    let inferable = generic_context.inferable_typevars(db);
+    let constraints = ConstraintSetBuilder::with_inferable(inferable);
     let mut base_constraints = compatible_bases
         .into_iter()
         .map(|(target_base, subject_class)| {
@@ -929,9 +930,7 @@ fn specialize_narrowing_target_from_intersection<'db>(
         combined_constraints.intersect(db, &constraints, base_constraint);
     }
 
-    let solutions = combined_constraints
-        .solutions(db, env, generic_context.inferable_typevars(db))
-        .ok()?;
+    let solutions = combined_constraints.solutions(db, env, inferable).ok()?;
     let specialized_class =
         specialize_generic_class_from_solutions(db, env, target_class, solutions)?;
     Some(Type::instance(db, env, specialized_class))
@@ -1039,8 +1038,8 @@ fn specialize_generic_class_for_subject<'db>(
         return None;
     };
 
-    let constraints = ConstraintSetBuilder::new();
     let inferable = generic_context.inferable_typevars(db);
+    let constraints = ConstraintSetBuilder::with_inferable(inferable);
     let solutions = Type::instance(db, env, source)
         .assignable_solutions_with_inferable(db, env, Type::instance(db, env, target), inferable)
         .solve(db, env, &constraints);

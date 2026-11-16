@@ -190,6 +190,7 @@ impl OwnedConstraintSetBuilder {
             node: root.node(),
             source_order: Some(mapped_source_order),
             inner: Some(Arc::new(OwnedConstraintSetInner {
+                scope: storage.scope,
                 constraints,
                 constraint_supports,
                 constraint_indices,

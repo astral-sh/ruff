@@ -27,7 +27,7 @@ use crate::subscript::{
 };
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
@@ -560,8 +560,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // TODO: Extend lazy inference for mixed gradual tuples: let gradual segments
                 // supply fixed target elements, and generate constraints for source packs that
                 // overlap fixed target elements.
-                if self.typevar_evaluation == TypeVarEvaluation::Lazy
-                    && let VariableSegment::TypeVarTuple(typevartuple) = target.variable()
+                if let VariableSegment::TypeVarTuple(typevartuple) = target.variable()
+                    && self.typevar_evaluation.collects(db, typevartuple)
                 {
                     let source_prefix = source.prefix_elements();
                     let source_suffix = source.suffix_elements();
@@ -601,12 +601,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 // These checks must hold for every specialization of a non-inferable pack.
-                // Lazy evaluation needs to retain pack constraints for later solving; its empty
-                // `inferable` set does not imply universal quantification.
-                if self.is_eager_assignability() {
+                if self.relation.is_assignability() {
                     match (source.variable(), target.variable()) {
                         (source_segment, VariableSegment::TypeVarTuple(target_pack))
                             if !target_pack.is_inferable(db, self.inferable)
+                                && !self.typevar_evaluation.collects(db, target_pack)
                                 && let Some(source_element) =
                                     source_segment.gradual_element_type(db, env) =>
                         {
@@ -628,6 +627,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                         (VariableSegment::TypeVarTuple(source_pack), target_segment)
                             if !source_pack.is_inferable(db, self.inferable)
+                                && !self.typevar_evaluation.collects(db, source_pack)
                                 && let Some(target_element) =
                                     target_segment.gradual_element_type(db, env) =>
                         {

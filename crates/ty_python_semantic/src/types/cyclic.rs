@@ -324,24 +324,12 @@ impl<'db> RecursiveDefinition<'db> {
         generic_context.default_specialization(db, known_class)
     }
 
-    fn parameter_identity(
-        db: &'db dyn Db,
-        parameter: BoundTypeVarInstance<'db>,
-    ) -> BoundTypeVarIdentity<'db> {
-        let identity = parameter.identity(db);
-        if identity.is_paramspec(db) {
-            identity.without_paramspec_attr(db)
-        } else {
-            identity
-        }
-    }
-
     /// The identities of this definition's formal parameters, in declaration order.
     fn parameters(self, db: &'db dyn Db) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
         self.generic_context(db)
             .into_iter()
             .flat_map(|context| context.variables(db))
-            .map(move |parameter| Self::parameter_identity(db, parameter))
+            .map(move |parameter| parameter.identity(db).binder())
     }
 
     /// Returns `None` if two formal parameters share an identity, since their flows could not be
@@ -675,7 +663,7 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
-            let identity = RecursiveDefinition::parameter_identity(db, typevar);
+            let identity = typevar.identity(db).binder();
             if !self.source_parameters.contains(&identity) {
                 // Nested definitions can capture a type variable from an outer generic scope.
                 // Specialization does not yet retain the parent mapping needed to model it.
@@ -744,7 +732,7 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
-            let identity = RecursiveDefinition::parameter_identity(db, typevar);
+            let identity = typevar.identity(db).binder();
             if self.source_parameters.contains(&identity) {
                 self.found
                     .borrow_mut()

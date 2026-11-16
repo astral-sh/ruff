@@ -12,7 +12,7 @@ use crate::types::attribute_write::{
     property_setter_value_type,
 };
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
@@ -2735,7 +2735,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source = prepare(source, source_self_type)?;
         let target = prepare(target, target_self_type)?;
         let mut checker = self.clone();
-        checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+        checker.typevar_evaluation = checker.typevar_evaluation.lazy(checker.inferable);
         let result = checker.check_callable_signature_pair(db, &source, &target);
         // This is a sufficient proof. A failed nominal comparison does not rule out a
         // structural match, even between specializations of the same protocol.

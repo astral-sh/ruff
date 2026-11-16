@@ -1478,12 +1478,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 generic_context,
                 delta,
             } => visitor.visit(db, Type::TypeVar(self), type_mapping, || {
-                let identity = if self.is_paramspec(db) {
-                    self.identity(db).without_paramspec_attr(db)
-                } else {
-                    self.identity(db)
-                };
-                let nonce = if generic_context.contains(db, identity) {
+                let nonce = if generic_context.contains(db, self.identity(db)) {
                     self.freshness(db).add(*delta)
                 } else {
                     self.freshness(db)
@@ -1920,9 +1915,8 @@ impl<'db> BoundTypeVarIdentity<'db> {
     /// the same source declaration.
     fn unfreshened_binder(self) -> Self {
         Self {
-            paramspec_attr: None,
             freshness: TypeVarNonce::NONE,
-            ..self
+            ..self.binder()
         }
     }
 
@@ -1930,17 +1924,9 @@ impl<'db> BoundTypeVarIdentity<'db> {
         self.identity.kind(db)
     }
 
-    pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
-        self.kind(db).is_paramspec()
-    }
-
-    pub(crate) fn without_paramspec_attr(mut self, db: &'db dyn Db) -> Self {
-        debug_assert!(
-            self.is_paramspec(db),
-            "Expected a ParamSpec, got {:?}",
-            self.kind(db)
-        );
-
+    /// The identity of the binder, shared by a `ParamSpec` and its `args` and `kwargs`.
+    /// Fresh occurrences of the same declaration keep distinct binder identities.
+    pub(super) fn binder(mut self) -> Self {
         self.paramspec_attr = None;
         self
     }
@@ -1993,17 +1979,12 @@ impl<'db> Type<'db> {
                     };
                     let enclosing = self.variables.take();
                     walk_signature(db, signature, self);
-                    let locals = context.inferable_typevars(db);
                     let candidates = self.variables.replace(enclosing);
-                    self.variables
-                        .borrow_mut()
-                        .extend(candidates.into_iter().filter(|variable| {
-                            let mut identity = variable.identity(db);
-                            if variable.paramspec_attr(db).is_some() {
-                                identity = identity.without_paramspec_attr(db);
-                            }
-                            !identity.is_inferable(db, locals)
-                        }));
+                    self.variables.borrow_mut().extend(
+                        candidates
+                            .into_iter()
+                            .filter(|variable| !context.contains(db, variable.identity(db))),
+                    );
                 }
 
                 fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
@@ -2689,15 +2670,11 @@ mod tests {
         assert!(!paramspec.is_inferable(db, inferable));
 
         let paramspec_only = TypeVarSet::from_typevars(db, [paramspec]);
-        assert!(
-            args.identity(db)
-                .without_paramspec_attr(db)
-                .is_inferable(db, paramspec_only)
-        );
+        assert!(args.identity(db).binder().is_inferable(db, paramspec_only));
         assert!(
             kwargs
                 .identity(db)
-                .without_paramspec_attr(db)
+                .binder()
                 .is_inferable(db, paramspec_only)
         );
     }

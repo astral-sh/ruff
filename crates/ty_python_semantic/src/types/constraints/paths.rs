@@ -11,6 +11,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_index::{IndexVec, newtype_index};
 
+use crate::types::Type;
 use crate::types::constraints::sequents::{
     GroupedSequents, InternedSequentConstraint, Sequent, SequentGroup, SequentMap,
 };
@@ -271,31 +272,55 @@ impl PathAssignments {
             })
     }
 
-    pub(super) fn new(
-        constraints: impl IntoIterator<Item = AtomicConstraintId>,
-        independent_typevars: FxHashSet<TypeVarId>,
+    pub(super) fn new<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_orders: &FxIndexSet<AtomicConstraintId>,
+        constraints: &mut [AtomicConstraintId],
     ) -> Self {
-        let discovered = constraints
-            .into_iter()
-            .map(|constraint| (constraint, false))
-            .collect();
+        // `PathAssignments` seeds its insertion-ordered discovered-constraint map from this list,
+        // and uses that order when constructing non-commutative sequent pairs. Do not replace this
+        // with TDD traversal order: doing so can change inference and lose gradual constraints.
+        // Sorting the collected paths after sequent discovery would be too late.
+        // Every constraint in the TDD must appear in the sidecar. If an operation introduces new
+        // constraints, it must preserve their source orders rather than invent an order here.
+        constraints.sort_by_key(|constraint| {
+            source_orders
+                .get_index_of(constraint)
+                .expect("every BDD constraint should have a source-order entry")
+        });
+
+        let bound_is_concrete = |bound: Type<'db>| {
+            !bound.has_typevar(db, env)
+                && !bound.has_unspecialized_type_var(db, env)
+                && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
+        };
+
+        let mut independent_typevars = FxHashSet::default();
+        let mut dependent_typevars = FxHashSet::default();
+        for &constraint_id in constraints.iter() {
+            let constraint = storage.atomic_constraint_data(constraint_id);
+            if let Some((typevar, bound)) = constraint.as_concrete()
+                && bound_is_concrete(bound)
+            {
+                let typevar = storage.typevar_id(db, typevar);
+                independent_typevars.insert(typevar);
+            } else {
+                dependent_typevars.extend(
+                    storage
+                        .constraint_support(constraint_id.into_inner())
+                        .iter(),
+                );
+            }
+        }
+
+        independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
+
         Self {
-            sequents: Vec::default(),
-            sequent_antecedents: FxHashMap::default(),
-            assignments: FxIndexMap::default(),
-            substituted_constraints: FxIndexSet::default(),
-            pending_substitutions: Vec::default(),
-            positive_assignment_indices: IndexVec::default(),
-            negative_assignment_indices: IndexVec::default(),
-            fuel_undo: Vec::default(),
-            discovered,
-            elaborated_pairs: FxHashSet::default(),
-            single_replay_consequents: FxHashMap::default(),
-            pair_replay_consequents: FxHashMap::default(),
+            discovered: constraints.iter().map(|&id| (id, false)).collect(),
             independent_typevars,
-            remaining_overall_fuel: OVERALL_FUEL_BUDGET,
-            assignment_queue: VecDeque::default(),
-            new_assignments: FxIndexMap::default(),
+            ..Self::default()
         }
     }
 
@@ -752,7 +777,7 @@ impl PathAssignments {
         }
 
         let constraint_data = storage.atomic_constraint_data(constraint);
-        if let Some(map) = SequentMap::for_constraint(db, env, constraint_data) {
+        if let Some(map) = SequentMap::for_constraint(db, env, constraint_data, storage.scope) {
             let added = self.add_sequents(db, env, storage, map);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
@@ -813,7 +838,8 @@ impl PathAssignments {
                 continue;
             }
 
-            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data) else {
+            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data, storage.scope)
+            else {
                 continue;
             };
             self.elaborated_pairs.insert((a, b));

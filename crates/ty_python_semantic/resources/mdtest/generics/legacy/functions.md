@@ -513,6 +513,45 @@ def invalid_argument_with_context(value: Callable[[], S]) -> list[str]:
     return box_callable(value)  # error: [invalid-argument-type]
 ```
 
+`consume` expects to read a `str` from `source.value`. We can't assume a compatible specialization
+of `Source[T]`: a caller of `wrapper` could pass a `Source[object]` whose `value` is `42`.
+
+```py
+from typing import Protocol, TypeVar
+
+Element = TypeVar("Element")
+
+class Source(Protocol[Element]):
+    value: Element
+
+SourceT = TypeVar("SourceT", bound=Source[object])
+Text = TypeVar("Text", bound=str)
+
+def consume(source: Source[Text]) -> str:
+    return source.value
+
+def wrapper(source: SourceT) -> None:
+    consume(source)  # error: [invalid-argument-type]
+```
+
+## Preserving an argument through a gradual upper bound
+
+In the call on the last line of this example, we should infer `list[T]`, not substitute `Any` for
+`T` (due to the `list[Any]` upper bound) and infer `list[Any]`:
+
+```py
+from typing import Any, TypeVar
+
+L = TypeVar("L", bound=list[Any])
+T = TypeVar("T")
+
+def keep(items: L) -> L:
+    return items
+
+def forward(items: list[T]) -> list[T]:
+    return reveal_type(keep(items))  # revealed: list[T@forward]
+```
+
 ## Inferring a bound from a narrowed protocol
 
 Narrowing to `Text` supplies a `str` return type that satisfies the bound, even when the original
@@ -625,6 +664,31 @@ def extend(values: list[T], other: list[T]) -> None:
 
     # error: [invalid-argument-type] "Expected `Iterable[T@extend]`, found `list[int]`"
     values.extend([1])
+```
+
+## Passing bound methods with a specialized receiver
+
+A method restricted to `Box[int]` is a valid callback when the receiver has that specialization. A
+caller with a `Box[T]` cannot assume its element type is `int`.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    value: T
+
+    def get_int(self: "Box[int]") -> int:
+        return self.value
+
+def invoke(callback: Callable[[], T]) -> T:
+    return callback()
+
+def forward(box: Box[T], ints: Box[int]) -> None:
+    invoke(box.get_int)  # error: [invalid-argument-type]
+    reveal_type(invoke(ints.get_int))  # revealed: int
 ```
 
 ## Generic callbacks in bound method calls
@@ -2586,6 +2650,30 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
+Inside `find`, `wrap(value)` has type `list[T]` for any `T` the caller chooses. Calling `first` on
+that list gives `T | None`, which matches `find`'s return annotation.
+
+```py
+def wrap(value: T) -> list[T]:
+    return [value]
+
+def first(items: list[T]) -> T | None:
+    return next(iter(items), None)
+
+def find(value: T) -> T | None:
+    return first(wrap(value))  # ok
+```
+
+The two arguments to `next` contribute separately to its return type. `iter(items)` yields the
+caller's `T`, and the `None` default covers the empty-list case.
+
+```py
+I = TypeVar("I", bound=int)
+
+def first_int(items: list[I]) -> I | None:
+    return reveal_type(next(iter(items), None))  # revealed: I@first_int | None
+```
+
 ## List literals with ambiguous union parameters
 
 When a type variable appears at different nesting levels in a union parameter, an argument can
@@ -3695,18 +3783,30 @@ def invalid(value: Callable[[], list[U] | list[U | str] | int]) -> None:
 
 ## Bounds and constraints with fixed outer union members
 
-In a union annotation like `T | int`, the concrete part (`int` here) can accept part of the caller's
-type variable. The remaining part must satisfy the callee's bound or constraints; requiring the
-entire caller variable to satisfy them would reject these valid calls:
+When the caller's type variable is constrained to `int` or `str`, the `int` arm of `T | int` covers
+the first choice. That leaves `str` for `T`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+ConstrainedToIntOrStr = TypeVar("ConstrainedToIntOrStr", int, str)
+
+def remove_int(value: T | int) -> T:
+    raise NotImplementedError
+
+def split_value(value: ConstrainedToIntOrStr) -> None:
+    reveal_type(remove_int(value))  # revealed: str
+```
+
+If the callee's type variable has a bound or constraints of its own, only the part left over by the
+`int` arm needs to satisfy them.
 
 ```py
 from collections.abc import Callable
-from typing import TypeVar
 
 Bounded = TypeVar("Bounded", bound=str)
 Constrained = TypeVar("Constrained", str, bytes)
-UnionBound = TypeVar("UnionBound", bound=int | str)
-Constraints = TypeVar("Constraints", int, str)
 
 def bounded(value: Callable[[], Bounded | int]) -> Bounded:
     raise NotImplementedError
@@ -3714,15 +3814,18 @@ def bounded(value: Callable[[], Bounded | int]) -> Bounded:
 def constrained(value: Callable[[], Constrained | int]) -> Constrained:
     raise NotImplementedError
 
-def split_constraints(value: Callable[[], Constraints | str]) -> None:
+def split_constraints(value: Callable[[], ConstrainedToIntOrStr | str]) -> None:
     reveal_type(bounded(value))  # revealed: str
     reveal_type(constrained(value))  # revealed: str
 ```
 
-Without a separate `str` member, the inferred bound preserves the caller's variable while excluding
-its `int` part. A constrained callee instead selects the compatible declared constraint:
+A caller variable with the upper bound `int | str` can also specialize to a subtype of `str`.
+Inference preserves the part of that variable outside `int`. A constrained callee selects the
+compatible declared constraint.
 
 ```py
+UnionBound = TypeVar("UnionBound", bound=int | str)
+
 def only_bound(value: Callable[[], UnionBound]) -> None:
     reveal_type(bounded(value))  # revealed: UnionBound@only_bound & ~int
     reveal_type(constrained(value))  # revealed: str
@@ -3904,6 +4007,30 @@ def union_caller(value: UnionS) -> UnionS:
     result = union_callee(value)
     reveal_type(result)  # revealed: UnionS@union_caller
     return result  # ok
+```
+
+Two caller variables can also contribute bounds. Every choice for `Lower` is assignable to every
+choice for `Upper`, so the two values together fit `Upper`. When the callback supplies only an upper
+bound, the value alone determines the result.
+
+```py
+from typing import Callable, TypeVar
+
+Result = TypeVar("Result", bool, int, object)
+Lower = TypeVar("Lower", bool, int)
+Upper = TypeVar("Upper", int, object)
+
+def combine(x: Result, y: Result) -> Result:
+    return x
+
+def apply(x: Result, accept: Callable[[Result], None]) -> Result:
+    accept(x)
+    return x
+
+def check_bounds(low: Lower, high: Upper, accept: Callable[[Upper], None]) -> None:
+    reveal_type(combine(low, high))  # revealed: Upper@check_bounds
+    reveal_type(combine(high, low))  # revealed: Upper@check_bounds
+    reveal_type(apply(low, accept))  # revealed: Lower@check_bounds
 ```
 
 A fixed constrained typevar and a gradual argument can provide separate bounds for another
@@ -5393,7 +5520,8 @@ def forward(mapping: V | Invariant[V] | Covariant[V]) -> V:
 
 The comparison uses the complete return types after substituting the inferred type arguments. For
 `make_list`, the two choices produce `list[V]` and `list[V | Invariant[V]]`. Neither is a subtype of
-the other, because lists are invariant, so inference keeps the merged result below.
+the other, because lists are invariant, so inference keeps the merged result below. Both choices
+accept the caller's `Covariant[V]` through the covariant arm of the parameter.
 
 For `make_sink`, a callable accepting `V | Invariant[V]` is a subtype of one accepting only `V`: it
 accepts every input the latter accepts. The wider parameter type therefore produces the narrower
@@ -5407,9 +5535,9 @@ def make_sink(mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> Callabl
     return lambda value: None
 
 def wrapped_returns(mapping: V | Invariant[V] | Covariant[V]) -> None:
-    # revealed: list[Invariant[V@wrapped_returns] | V@wrapped_returns | Covariant[V@wrapped_returns]]
+    # revealed: list[V@wrapped_returns | Invariant[V@wrapped_returns]]
     reveal_type(make_list(lambda: mapping))
-    reveal_type(make_sink(lambda: mapping))  # revealed: (Invariant[V@wrapped_returns] | V@wrapped_returns, /) -> None
+    reveal_type(make_sink(lambda: mapping))  # revealed: (V@wrapped_returns | Invariant[V@wrapped_returns], /) -> None
 ```
 
 ### Inferred TypedDict return alternatives
