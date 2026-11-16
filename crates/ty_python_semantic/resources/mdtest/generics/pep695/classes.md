@@ -1220,6 +1220,7 @@ class Either[T]:
 class TextOrNumber[T: str | int](Either[str | int]):
     def initialize(self, default: T | Factory[T]) -> None:
         super().__init__(str, int, default)  # ok
+        super().__init__(str, bytes, default)  # error: [invalid-argument-type] "found `Self@initialize`"
 ```
 
 An instance of `Either[T]` can accept values of type `T`. Even with the upper bound `str | int`, `T`

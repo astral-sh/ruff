@@ -790,7 +790,7 @@ class Base(Generic[T]):
 
 class Child(Base[S], Generic[S]):
     def __init__(self, check: Callable[[S], bool] | None) -> None:
-        super().__init__(check)
+        super().__init__(check)  # ok
 ```
 
 ## Inferring `Self` in `super()` calls
