@@ -51,9 +51,9 @@ use crate::types::tuple::{Tuple, TupleLength, TupleSpec};
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceOrigin;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
-    TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassFlags, DataclassParams,
+    ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext,
+    TypeMapping, TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet,
@@ -336,6 +336,22 @@ impl<'db> CodeGeneratorKind<'db> {
 
     pub(super) const fn is_pydantic(self) -> bool {
         matches!(self, Self::Pydantic(_))
+    }
+
+    /// Whether the class's frozen setting is enforced for ordinary attribute writes.
+    fn is_frozen(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: StaticClassLiteral<'db>,
+    ) -> bool {
+        match self {
+            Self::Pydantic(metadata) => {
+                metadata.is_frozen(db)
+                    && pydantic::uses_base_model_setattr(db, env, class) == Some(true)
+            }
+            _ => class.has_dataclass_param(db, self, DataclassFlags::FROZEN),
+        }
     }
 
     /// Return `true` if field declarations should be treated as instance attributes.
