@@ -257,21 +257,29 @@ class type:
     """
 
     # object.__base__ is None. Otherwise, it would be a type.
-    __base__: Final[type | None]
+    @property
+    def __base__(self) -> type | None: ...
     __bases__: tuple[type, ...]
-    __basicsize__: Final[int]
+    @property
+    def __basicsize__(self) -> int: ...
     # type.__dict__ is read-only at runtime, but that can't be expressed currently.
     # See https://github.com/python/typeshed/issues/11033 for a discussion.
     __dict__: Final[types.MappingProxyType[str, Any]]  # type: ignore[assignment]
-    __dictoffset__: Final[int]
-    __flags__: Final[int]
-    __itemsize__: Final[int]
+    @property
+    def __dictoffset__(self) -> int: ...
+    @property
+    def __flags__(self) -> int: ...
+    @property
+    def __itemsize__(self) -> int: ...
     __module__: str
-    __mro__: Final[tuple[type, ...]]
+    @property
+    def __mro__(self) -> tuple[type, ...]: ...
     __name__: str
     __qualname__: str
-    __text_signature__: Final[str | None]
-    __weakrefoffset__: Final[int]
+    @property
+    def __text_signature__(self) -> str | None: ...
+    @property
+    def __weakrefoffset__(self) -> int: ...
 
     @overload
     def __init__(self, o: object, /) -> None: ...
@@ -3171,12 +3179,12 @@ class dict(MutableMapping[_KT, _VT]):
 
     # Positional-only in dict, but not in MutableMapping
     @overload  # type: ignore[override]
-    def get(self, key: _KT, default: None = None, /) -> _VT | None:
+    def get(self, key: object, default: None = None, /) -> _VT | None:
         """Return the value for key if key is in the dictionary, else default."""
     @overload
-    def get(self, key: _KT, default: _VT, /) -> _VT: ...
+    def get(self, key: object, default: _VT, /) -> _VT: ...
     @overload
-    def get(self, key: _KT, default: _T, /) -> _VT | _T: ...
+    def get(self, key: object, default: _T, /) -> _VT | _T: ...
 
     @overload
     def pop(self, key: _KT, /) -> _VT:
@@ -3186,9 +3194,9 @@ class dict(MutableMapping[_KT, _VT]):
         raise a KeyError.
         """
     @overload
-    def pop(self, key: _KT, default: _VT, /) -> _VT: ...
+    def pop(self, key: object, default: _VT, /) -> _VT: ...
     @overload
-    def pop(self, key: _KT, default: _T, /) -> _VT | _T: ...
+    def pop(self, key: object, default: _T, /) -> _VT | _T: ...
 
     def __len__(self) -> int:
         """Return len(self)."""
@@ -4962,6 +4970,10 @@ def __build_class__(func: Callable[[], CellType | Any], name: str, /, *bases: An
 
     Internal helper function used by the class statement.
     """
+
+# Temporary compatibility hack: Pydantic 2.13 uses this legacy typeshed alias in Field overloads,
+# although it does not exist at runtime; remove in early/mid 2027?
+ellipsis = EllipsisType
 
 Ellipsis: EllipsisType
 NotImplemented: NotImplementedType
