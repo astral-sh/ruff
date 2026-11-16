@@ -4717,12 +4717,12 @@ impl<'db> Type<'db> {
             Some(PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
-                        origin: TypeOrigin::Declared,
+                        origin,
                         definedness,
                         ..
                     }),
                 ..
-            }) => Some(definedness),
+            }) if origin.is_declared() => Some(definedness),
             _ => None,
         };
         if own_declaration_definedness == Some(Definedness::AlwaysDefined) {
@@ -5997,15 +5997,10 @@ impl<'db> Type<'db> {
             name,
             MemberLookupPolicy::default(),
         );
-        let Place::Defined(DefinedPlace {
-            ty,
-            origin: TypeOrigin::Declared,
-            ..
-        }) = member.place
-        else {
+        let Place::Defined(DefinedPlace { ty, origin, .. }) = member.place else {
             return false;
         };
-        if member.is_class_var() {
+        if !origin.is_declared() || member.is_class_var() {
             return false;
         }
         let ty = ty.expand_top_level_aliases(db, env);
@@ -12189,11 +12184,33 @@ impl<'db> TypeAndQualifiers<'db> {
 }
 
 impl<'db> DeclaredType<'db> {
+    fn from_annotation(ty: Type<'db>) -> Self {
+        Self::from_type(ty).with_annotation_origin()
+    }
+
+    /// Record whether the annotation supplies a type to prefer on subsequent assignments.
+    fn with_annotation_origin(mut self) -> Self {
+        // In `str: "str" = ""`, retaining the inferred value lets the next cycle iteration
+        // reject the annotation. Unqualified annotations resolving to `Unknown` also recover
+        // with the inferred value. An argument to `Final` or `ClassVar` supplies a preferred
+        // type even if it is `Unknown`.
+        if let Some(ty) = self.inner
+            && !matches!(ty, Type::Divergent(_))
+            && (!matches!(ty, Type::Dynamic(DynamicType::Unknown))
+                || self
+                    .qualifiers
+                    .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR))
+        {
+            self.origin = TypeOrigin::Annotated;
+        }
+        self
+    }
+
     fn from_type(ty: Type<'db>) -> Self {
         Self::new(Some(ty), TypeOrigin::Declared, TypeQualifiers::empty())
     }
 
-    fn inner_type_or_unknown(self) -> Type<'db> {
+    pub(crate) fn inner_type_or_unknown(self) -> Type<'db> {
         self.inner.unwrap_or_else(Type::unknown)
     }
 

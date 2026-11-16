@@ -13,7 +13,7 @@ use ty_python_core::{
 use crate::{
     Db, Program, ProgramEnvironment,
     lint::LintMetadata,
-    place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
+    place::{Place, PlaceAndQualifiers},
     types::{
         ClassBase, ClassLiteral, ClassType, InstanceFallbackShadowsNonDataDescriptor,
         IntersectionType, KnownInstanceType, MemberLookupPolicy, StaticClassLiteral, Type,
@@ -206,8 +206,8 @@ fn unbound_member_contract<'db>(
     };
     let has_receiver_declaration = matches!(
         instance_member.place,
-        Place::Defined(DefinedPlace { origin: TypeOrigin::Declared, provenance, .. })
-            if provenance.definition().is_some_and(|definition| definition.place(db).is_member())
+        Place::Defined(place) if place.origin.is_declared()
+            && place.provenance.definition().is_some_and(|definition| definition.place(db).is_member())
     );
     // An annotation such as `type[Any]` permits values that act as descriptors, but it
     // still declares a writable attribute unless its type supplies a descriptor method.
@@ -828,10 +828,7 @@ pub(super) fn check_instance_overrides<'db>(
                     !base.own_class_member(db, env, None, name).is_undefined()
                         || matches!(
                             base.own_instance_member(db, env, name).inner.place,
-                            Place::Defined(DefinedPlace {
-                                origin: TypeOrigin::Declared,
-                                ..
-                            })
+                            Place::Defined(place) if place.origin.is_declared()
                         )
                 })
         else {
@@ -840,7 +837,7 @@ pub(super) fn check_instance_overrides<'db>(
         let Place::Defined(place) = class.own_instance_member(db, env, name).inner.place else {
             continue;
         };
-        if place.origin != TypeOrigin::Declared {
+        if !place.origin.is_declared() {
             continue;
         }
         let Some(definition) = place.provenance.definition() else {

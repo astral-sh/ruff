@@ -590,14 +590,10 @@ pub(super) fn nested_class_instance_override<'db>(
             return None;
         }
         let member = owner.own_instance_member(db, env, attribute).inner;
-        if matches!(
-            member.place,
-            Place::Defined(DefinedPlace {
-                origin: TypeOrigin::Declared,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            })
-        ) {
+        if let Place::Defined(place) = member.place
+            && place.origin.is_declared()
+            && place.is_definitely_defined()
+        {
             return Some(member.map_type(|ty| {
                 bind_attribute_self_typevars(
                     db,

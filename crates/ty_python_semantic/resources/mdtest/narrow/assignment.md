@@ -99,6 +99,38 @@ does.nt.exist = 0
 reveal_type(does.nt.exist)  # revealed: Literal[0]
 ```
 
+### Assigning gradual values to attributes
+
+Assigning `Any` to an annotated attribute preserves its declared type. An attribute whose type was
+inferred from its initializer takes the type of the assigned value.
+
+```py
+from typing import Any
+
+class Fields:
+    declared: int
+    inferred = 0
+
+    def __init__(self):
+        self.instance_field: int = 0
+
+def update(fields: Fields, dynamic: Any):
+    fields.declared = dynamic
+    reveal_type(fields.declared)  # revealed: int
+    fields.instance_field = dynamic
+    reveal_type(fields.instance_field)  # revealed: int
+    fields.inferred = dynamic
+    reveal_type(fields.inferred)  # revealed: Any
+```
+
+A receiver of type `Any` supplies no annotation for its attributes.
+
+```py
+def update_dynamic(fields: Any):
+    fields.declared = 1
+    reveal_type(fields.declared)  # revealed: Literal[1]
+```
+
 ### Narrowing chain
 
 ```py

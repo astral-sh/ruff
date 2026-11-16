@@ -150,6 +150,81 @@ reveal_type(v4)  # revealed: list[int]
 invalid: list[str] = returns_list_int()
 ```
 
+## Assignments to previously annotated variables and parameters
+
+A variable or parameter annotation also supplies the preferred type for a later assignment when the
+declared and inferred types are mutually assignable. Assigning a narrower static type still narrows
+the binding.
+
+```py
+from typing import Any
+
+def update(number: int, dynamic: Any, unannotated):
+    value: Any
+    value = number
+    reveal_type(value)  # revealed: Any
+
+    number = reveal_type(dynamic)  # revealed: Any
+    reveal_type(number)  # revealed: int
+    number = 1
+    reveal_type(number)  # revealed: Literal[1]
+
+    unannotated = 1
+    reveal_type(unannotated)  # revealed: Literal[1]
+```
+
+An annotation on an initialized variable continues to apply when its value is replaced.
+
+```py
+def replace(items: list[int]):
+    values: list[Any] = []
+    values = items
+    reveal_type(values)  # revealed: list[Any]
+    values.append("new item")  # ok
+```
+
+Unpacking into variadic parameters uses their annotated tuple and dictionary types.
+
+```py
+def unpack(pair: tuple[Any, Any], *numbers: int, **names: str):
+    numbers, names = pair
+    reveal_type(numbers)  # revealed: tuple[int, ...]
+    reveal_type(names)  # revealed: dict[str, str]
+```
+
+## Assigning to a function name
+
+A function definition gives the name a callable type. Rebinding it to a value of type `Any` leaves
+the binding as `Any`.
+
+```py
+from typing import Any
+
+def update(dynamic: Any):
+    def callback() -> int:
+        return 1
+
+    callback = dynamic
+    reveal_type(callback)  # revealed: Any
+```
+
+## Assignments after conditional annotations
+
+When both branches declare the same type, that type is preferred after the branches join.
+
+```py
+from typing import Any
+
+def update(condition: bool, dynamic: Any):
+    if condition:
+        value: int
+    else:
+        value: int
+
+    value = dynamic
+    reveal_type(value)  # revealed: int
+```
+
 ## PEP-604 annotations are supported
 
 ```py

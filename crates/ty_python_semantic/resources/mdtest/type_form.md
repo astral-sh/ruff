@@ -208,7 +208,7 @@ from typing_extensions import TypeForm
 
 def unwrap(form: TypeForm):
     while True:
-        # error: [missing-union-attribute]
+        # error: [missing-attribute]
         form = form.__supertype__
         unwrap(form)
 ```
@@ -221,7 +221,7 @@ class Wrapper: ...
 
 def unwrap_alias(form: Wrapper) -> TypeForm:
     while True:
-        # error: [missing-union-attribute]
+        # error: [missing-attribute]
         form = form.__value__
         if form:
             return form

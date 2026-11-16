@@ -59,19 +59,32 @@ impl Definedness {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) enum TypeOrigin {
+    /// A variable or parameter annotation supplies a preferred binding type for assignments.
+    Annotated,
+    /// Other declarations, such as a function definition or an unresolved annotation.
     Declared,
     Inferred,
 }
 
 impl TypeOrigin {
     pub(crate) const fn is_declared(self) -> bool {
-        matches!(self, TypeOrigin::Declared)
+        matches!(self, Self::Annotated | Self::Declared)
     }
 
     pub(crate) const fn merge(self, other: Self) -> Self {
         match (self, other) {
-            (TypeOrigin::Declared, TypeOrigin::Declared) => TypeOrigin::Declared,
-            _ => TypeOrigin::Inferred,
+            (Self::Inferred, _) | (_, Self::Inferred) => Self::Inferred,
+            (Self::Declared, _) | (_, Self::Declared) => Self::Declared,
+            (Self::Annotated, Self::Annotated) => Self::Annotated,
+        }
+    }
+
+    /// A definition can supply a declared type even when its value type was inferred,
+    /// as with a decorated function or class.
+    pub(crate) const fn as_declaration(self) -> Self {
+        match self {
+            Self::Annotated => Self::Annotated,
+            Self::Declared | Self::Inferred => Self::Declared,
         }
     }
 }
@@ -224,9 +237,9 @@ impl<'db> DefinedPlace<'db> {
 /// If we look up places in this scope, we would get the following results:
 /// ```rs
 /// bound:               Place::Defined(DefinedPlace { ty: Literal[1], origin: TypeOrigin::Inferred, definedness: Definedness::AlwaysDefined, .. }),
-/// declared:            Place::Defined(DefinedPlace { ty: int, origin: TypeOrigin::Declared, definedness: Definedness::AlwaysDefined, .. }),
+/// declared:            Place::Defined(DefinedPlace { ty: int, origin: TypeOrigin::Annotated, definedness: Definedness::AlwaysDefined, .. }),
 /// possibly_unbound:    Place::Defined(DefinedPlace { ty: Literal[2], origin: TypeOrigin::Inferred, definedness: Definedness::PossiblyUndefined, .. }),
-/// possibly_undeclared: Place::Defined(DefinedPlace { ty: int, origin: TypeOrigin::Declared, definedness: Definedness::PossiblyUndefined, .. }),
+/// possibly_undeclared: Place::Defined(DefinedPlace { ty: int, origin: TypeOrigin::Annotated, definedness: Definedness::PossiblyUndefined, .. }),
 /// bound_or_declared:   Place::Defined(DefinedPlace { ty: Literal[1], origin: TypeOrigin::Inferred, definedness: Definedness::PossiblyUndefined, .. }),
 /// non_existent:        Place::Undefined,
 /// ```
@@ -248,6 +261,13 @@ impl<'db> Place<'db> {
     /// Constructor that creates a [`Place`] with type origin [`TypeOrigin::Declared`] and definedness [`Definedness::AlwaysDefined`].
     pub(crate) fn declared(ty: impl Into<Type<'db>>) -> Self {
         Place::Defined(DefinedPlace::new(ty.into()).with_origin(TypeOrigin::Declared))
+    }
+
+    pub(crate) fn from_declaration(declaration: DeclaredType<'db>) -> Self {
+        Place::Defined(
+            DefinedPlace::new(declaration.inner_type_or_unknown())
+                .with_origin(declaration.origin().as_declaration()),
+        )
     }
 
     /// Returns this place with the given definition attached. A no-op for [`Place::Undefined`].
@@ -272,7 +292,7 @@ impl<'db> Place<'db> {
         match (self, other) {
             (Place::Defined(left), Place::Defined(right)) => {
                 left.ty == right.ty
-                    && left.origin == right.origin
+                    && left.origin.is_declared() == right.origin.is_declared()
                     && left.definedness == right.definedness
                     && left.public_type_policy == right.public_type_policy
             }
@@ -2141,6 +2161,7 @@ impl<'db> PublicTypeBuilder<'db> {
 struct DeclaredTypeBuilder<'db> {
     inner: Option<PublicTypeBuilder<'db>>,
     qualifiers: TypeQualifiers,
+    has_unannotated_type: bool,
     first_type: Option<Type<'db>>,
     conflicting_types: FxOrderSet<Type<'db>>,
 }
@@ -2157,6 +2178,7 @@ impl<'db> DeclaredTypeBuilder<'db> {
         let Some(element_ty) = element.inner_type() else {
             return;
         };
+        self.has_unannotated_type |= element.origin() != TypeOrigin::Annotated;
         let inner = self
             .inner
             .get_or_insert_with(|| PublicTypeBuilder::new(db, env));
@@ -2174,7 +2196,12 @@ impl<'db> DeclaredTypeBuilder<'db> {
 
     fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
         let ty = self.inner.map(PublicTypeBuilder::build);
-        let ty = DeclaredType::new(ty, TypeOrigin::Declared, self.qualifiers);
+        let origin = if ty.is_some() && !self.has_unannotated_type {
+            TypeOrigin::Annotated
+        } else {
+            TypeOrigin::Declared
+        };
+        let ty = DeclaredType::new(ty, origin, self.qualifiers);
         if self.conflicting_types.is_empty() {
             (ty, None)
         } else {
@@ -2291,7 +2318,7 @@ fn place_from_declarations_impl<'db>(
         PlaceFromDeclarationsResult {
             place: Some(
                 DefinedPlace::new(declared.inner_type())
-                    .with_origin(TypeOrigin::Declared)
+                    .with_origin(declared.origin().as_declaration())
                     .with_definedness(boundness)
                     .with_provenance(provenance),
             ),
@@ -2353,7 +2380,9 @@ pub(crate) mod implicit_globals {
     use ty_python_core::symbol::Symbol;
     use ty_python_core::{ProgramFile, place_table, semantic_index, use_def_map};
 
-    use super::{DefinedPlace, Place, core_module_scope, is_reexported, place_from_declarations};
+    use super::{
+        DefinedPlace, Place, TypeOrigin, core_module_scope, is_reexported, place_from_declarations,
+    };
 
     /// Returns the body scope when all reachable, exported definitions of `name`
     /// in a vendored module are the same direct class definition.
@@ -2442,12 +2471,18 @@ pub(crate) mod implicit_globals {
         let Some(symbol_id) = place_table.symbol_id(name) else {
             return Place::Undefined.into();
         };
-        place_from_declarations(
+        let mut declaration = place_from_declarations(
             db,
             env,
             use_def_map(db, module_type_scope).end_of_scope_symbol_declarations(symbol_id),
         )
-        .ignore_conflicting_declarations()
+        .ignore_conflicting_declarations();
+        // ModuleType supplies a default contract for this name in every module. The
+        // assignment's own module can still annotate it explicitly.
+        if let Place::Defined(place) = &mut declaration.place {
+            place.origin = TypeOrigin::Declared;
+        }
+        declaration
     }
 
     /// Looks up the type of an "implicit global symbol". Returns [`Place::Undefined`] if

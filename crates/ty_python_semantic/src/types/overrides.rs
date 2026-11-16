@@ -191,7 +191,7 @@ fn check_inherited_conflicts<'db>(
             .iter()
             .filter(|name| {
                 matches!(class_type.own_instance_member(db, env, name).inner.place,
-                    Place::Defined(place) if place.origin == TypeOrigin::Declared)
+                    Place::Defined(place) if place.origin.is_declared())
             })
             .cloned(),
     );
@@ -1097,10 +1097,7 @@ fn check_class_declaration<'db>(
                             .own_instance_member(db, env, &member.name)
                             .inner
                             .place,
-                        Place::Defined(DefinedPlace {
-                            origin: TypeOrigin::Declared,
-                            ..
-                        })
+                        Place::Defined(place) if place.origin.is_declared()
                     ))
             {
                 inherited_member_owner = Some(superclass);

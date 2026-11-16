@@ -5,8 +5,8 @@ use crate::{
     reachability::is_end_of_scope_reachable,
     types::{
         Binding, Bindings, CallableBinding, CallableType, ClassBase, ClassLiteral, ClassType,
-        DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType, ParamSpecAttrKind,
-        SpecialFormType, SubclassOfInner, SubclassOfType, Type, TypeContext,
+        DeclaredType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
+        ParamSpecAttrKind, SpecialFormType, SubclassOfInner, SubclassOfType, Type, TypeContext,
         TypeVarBoundOrConstraints, TypeVarKind, UnionBuilder, UnionType, UnionTypeInstance,
         callable::CallableTypeKind,
         constraints::ConstraintSetBuilder,
@@ -1172,7 +1172,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.add_declaration_with_binding(
                     parameter.into(),
                     definition,
-                    &DeclaredAndInferredType::are_the_same_type(declared_ty),
+                    &DeclaredAndInferredType::FromDeclaration(DeclaredType::from_annotation(
+                        declared_ty,
+                    )),
                 );
             }
         } else if let Some(definition) = definition {
@@ -1270,7 +1272,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
-                &DeclaredAndInferredType::are_the_same_type(ty),
+                &DeclaredAndInferredType::FromDeclaration(DeclaredType::from_annotation(ty)),
             );
         } else {
             let inferred_ty =
@@ -1371,7 +1373,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
-                &DeclaredAndInferredType::are_the_same_type(ty),
+                &DeclaredAndInferredType::FromDeclaration(DeclaredType::from_annotation(ty)),
             );
         } else {
             let inferred_ty = KnownClass::Dict.to_specialized_instance(

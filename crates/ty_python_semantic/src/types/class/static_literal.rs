@@ -16,7 +16,7 @@ use crate::{
     Db, FxIndexMap, FxIndexSet, TypeQualifiers,
     place::{
         ConsideredDefinitions, DefinedPlace, Definedness, Place, PlaceAndQualifiers,
-        PublicTypePolicy, RequiresExplicitReExport, TypeOrigin, place_by_id, place_from_bindings,
+        PublicTypePolicy, RequiresExplicitReExport, place_by_id, place_from_bindings,
         place_from_declarations,
     },
     reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension},
@@ -3184,6 +3184,7 @@ impl<'db> StaticClassLiteral<'db> {
                     place:
                         mut declared @ Place::Defined(DefinedPlace {
                             ty: declared_ty,
+                            origin: declared_origin,
                             definedness: declaredness,
                             provenance: declared_provenance,
                             ..
@@ -3227,7 +3228,7 @@ impl<'db> StaticClassLiteral<'db> {
                     let union_with_implicit = |implicit: DefinedPlace<'db>| Member {
                         inner: Place::Defined(DefinedPlace {
                             ty: UnionType::from_two_elements(db, env, declared_ty, implicit.ty),
-                            origin: TypeOrigin::Declared,
+                            origin: declared_origin.merge(implicit.origin).as_declaration(),
                             // An unconditional receiver annotation can declare the field even when
                             // the class body annotation is conditional.
                             definedness: if implicit.origin.is_declared() {

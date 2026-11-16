@@ -2337,7 +2337,7 @@ impl<'db> TypeVarConstraints<'db> {
 
         let mut all_unbound = true;
         let mut possibly_unbound = false;
-        let mut origin = TypeOrigin::Declared;
+        let mut origin = TypeOrigin::Annotated;
         for ty in self.elements(db) {
             let PlaceAndQualifiers {
                 place: ty_member,

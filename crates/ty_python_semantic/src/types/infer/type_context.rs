@@ -80,7 +80,7 @@ impl<'db> TypeContext<'db> {
 
     pub(super) fn from_origin(ty: Type<'db>, origin: TypeOrigin) -> Self {
         match origin {
-            TypeOrigin::Declared => Self::preference(Some(ty)),
+            TypeOrigin::Annotated | TypeOrigin::Declared => Self::preference(Some(ty)),
             // Later assignments are validated against the type of an inferred attribute, but it
             // does not provide a declared type preference, allowing the type of the attribute to
             // be overwritten by a gradual type.

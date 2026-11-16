@@ -123,6 +123,21 @@ def read():
     reveal_type(always_typed)  # revealed: int
 ```
 
+A bare `Final` on one branch and an unqualified `Unknown` on the other both allow the assignment to
+retain the inferred type.
+
+```py
+from ty_extensions._internal import Unknown
+
+def initialize(condition: bool):
+    if condition:
+        item: Final
+    else:
+        item: Unknown
+    item = 1
+    reveal_type(item)  # revealed: Literal[1]
+```
+
 ### In class definitions
 
 ```py
@@ -151,8 +166,8 @@ reveal_type(C().FINAL_E)  # revealed: int
 
 ### Inferring a final attribute from its initializer
 
-A bare `Final` uses the type inferred in `__init__`. An explicit `Final[Unknown]` narrows inside
-`__init__` and exposes `Unknown` to callers.
+A bare `Final` uses the type inferred in `__init__`. An explicit `Final[Unknown]` keeps its declared
+type both inside and outside `__init__`.
 
 ```py
 from typing import Final
@@ -166,7 +181,7 @@ class C:
         self.inferred = bytes.fromhex("fd")
         reveal_type(self.inferred)  # revealed: bytes
         self.declared = "data".encode()
-        reveal_type(self.declared)  # revealed: bytes
+        reveal_type(self.declared)  # revealed: Unknown
 
     def reset(self):
         self.inferred = 1  # error: [invalid-assignment]

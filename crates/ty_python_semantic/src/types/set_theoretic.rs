@@ -571,7 +571,7 @@ impl<'db> UnionType<'db> {
 
         let mut all_unbound = true;
         let mut possibly_unbound = false;
-        let mut origin = TypeOrigin::Declared;
+        let mut origin = TypeOrigin::Annotated;
         let mut provenance = Provenance::Unknown;
         for ty in self.elements(db) {
             let ty_member = transform_fn(ty);
@@ -628,7 +628,7 @@ impl<'db> UnionType<'db> {
 
         let mut all_unbound = true;
         let mut possibly_unbound = false;
-        let mut origin = TypeOrigin::Declared;
+        let mut origin = TypeOrigin::Annotated;
         let mut provenance = Provenance::Unknown;
         for ty in self.elements(db) {
             let PlaceAndQualifiers {
@@ -1380,7 +1380,7 @@ impl<'db> IntersectionType<'db> {
 
         let mut all_unbound = true;
         let mut any_definitely_bound = false;
-        let mut origin = TypeOrigin::Declared;
+        let mut origin = TypeOrigin::Annotated;
         let mut provenance = Provenance::Unknown;
         for ty in self.positive_elements_or_object(db) {
             let ty_member = transform_fn(&ty);
@@ -1433,7 +1433,7 @@ impl<'db> IntersectionType<'db> {
 
         let mut all_unbound = true;
         let mut any_definitely_bound = false;
-        let mut origin = TypeOrigin::Declared;
+        let mut origin = TypeOrigin::Annotated;
         let mut provenance = Provenance::Unknown;
         for ty in self.positive_elements_or_object(db) {
             let PlaceAndQualifiers {

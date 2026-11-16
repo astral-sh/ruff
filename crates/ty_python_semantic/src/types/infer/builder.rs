@@ -196,7 +196,6 @@ mod typevar;
 use super::comparisons;
 
 /// How to determine the binding type for a definition that also declares its target.
-#[derive(Debug, Clone, PartialEq, Eq)]
 enum DeclaredAndInferredType<'db> {
     /// The declaration supplies the binding type. A qualifier-only declaration in a stub
     /// binds the name even though its value's type is unknown.
@@ -205,11 +204,7 @@ enum DeclaredAndInferredType<'db> {
     MightBeDifferent {
         declared_ty: DeclaredType<'db>,
         inferred_ty: Type<'db>,
-        /// `true` when the annotation specifies a value type, as in `x: ClassVar[Any]`.
-        /// `false` for a bare qualifier such as `x: ClassVar`, even if `declared_ty` contains
-        /// an inherited type. For example, if `x` inherits `Any`, assigning `1` to it binds
-        /// the name to `Literal[1]` in the class body. An explicit `ClassVar[Any]` binds it to `Any`.
-        has_explicit_type: bool,
+        declaration: AssignmentDeclaration<'db>,
     },
 }
 
@@ -221,12 +216,6 @@ impl<'db> DeclaredAndInferredType<'db> {
             TypeQualifiers::empty(),
         ))
     }
-}
-
-fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
-    // Dataclass field specifiers carry metadata in the inferred RHS type; replacing it with the
-    // declared field type would lose settings like `init=False`.
-    matches!(ty, Type::KnownInstance(KnownInstanceType::Field(_)))
 }
 
 /// We currently store one dataclass field-specifiers inline, because that covers standard
@@ -1709,14 +1698,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Place::Undefined => None,
         };
 
-        let type_context = match resolved_place {
-            Place::Defined(place) if !qualifier_only => TypeContext::from(place.ty),
-            Place::Undefined if !place.is_symbol() => self.fallback_member_type_context(node),
-            _ => TypeContext::default(),
+        let expected_type = match resolved_place {
+            Place::Defined(place) if !qualifier_only => {
+                Some((place.ty, place.origin.as_declaration()))
+            }
+            Place::Undefined if !place.is_symbol() => self.fallback_member_type(node),
+            _ => None,
         };
 
         AddBinding {
-            type_context,
+            expected_type,
             declaration,
             binding,
             node,
@@ -1726,9 +1717,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// For a member binding without a live place declaration, obtain its type context from
+    /// For a member binding without a live place declaration, obtain its expected type from
     /// normal attribute or subscript lookup on its receiver.
-    fn fallback_member_type_context(&mut self, node: AnyNodeRef<'_>) -> TypeContext<'db> {
+    fn fallback_member_type(&mut self, node: AnyNodeRef<'_>) -> Option<(Type<'db>, TypeOrigin)> {
         let db = self.db();
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
             let value_type = self.try_expression_type(value).unwrap_or_else(|| {
@@ -1745,7 +1736,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // type that could guide inference of the right-hand side.
                 && (origin.is_declared() || !member.qualifiers.contains(TypeQualifiers::FINAL))
             {
-                return TypeContext::from_origin(ty, origin);
+                return Some((ty, origin));
             }
         } else if let AnyNodeRef::ExprSubscript(
             subscript @ ast::ExprSubscript {
@@ -1755,12 +1746,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             let value_ty = self.get_or_infer_expression(value, TypeContext::default());
             let slice_ty = self.get_or_infer_expression(slice, TypeContext::default());
-            return TypeContext::from(
-                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
-                    .unwrap_or_else(|recovery_ty| recovery_ty),
-            );
+            let ty = self
+                .infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
+                .unwrap_or_else(|recovery_ty| recovery_ty);
+            return Some((ty, TypeOrigin::Declared));
         }
-        TypeContext::default()
+        None
     }
 
     /// Returns the owner of an assignment redirected by `global` or `nonlocal`.
@@ -1943,7 +1934,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
-                has_explicit_type,
+                declaration,
             } if let Some(declared_type) = declared_ty.inner_type() => {
                 let env = self.program_environment();
                 let file_scope_id = self.scope().file_scope_id(self.db());
@@ -1979,38 +1970,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                let binding_ty = if self.validate_assignment_type(
+                let binding_ty = self.assignment_binding_type(
                     node,
                     definition,
-                    if has_explicit_type {
-                        AssignmentDeclaration::Ordinary(None)
-                    } else {
-                        AssignmentDeclaration::InheritedClassVar
-                    },
-                    declared_type,
+                    declaration,
+                    (declared_type, declared_ty.origin()),
                     inferred_ty,
-                ) {
-                    // For `str: "str" = ""`, retaining the binding lets the next cycle
-                    // iteration reject the annotation. Unqualified annotations that resolve to
-                    // `Unknown` also recover with the inferred value. A type argument to
-                    // `Final` or `ClassVar` supplies a declared type even if it is `Unknown`.
-                    if has_explicit_type
-                        && !should_preserve_inferred_binding_type(inferred_ty)
-                        && !matches!(declared_type, Type::Divergent(_))
-                        && (!matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
-                            || declared_ty
-                                .qualifiers()
-                                .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR))
-                        && declared_type.is_assignable_to(db, env, inferred_ty)
-                    {
-                        declared_type
-                    } else {
-                        inferred_ty
-                    }
-                } else {
-                    self.discard_dict_key_assignments_for(definition);
-                    declared_type
-                };
+                );
                 (declared_ty, binding_ty)
             }
             DeclaredAndInferredType::MightBeDifferent {
@@ -2024,22 +1990,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.bindings.insert(definition, inferred_ty);
     }
 
-    /// Checks an assigned value against its target's declared type and reports any mismatch.
-    ///
-    /// Returns `true` when the value is assignable, even if the stricter `unsound-assignment`
-    /// rule reports that it is not a subtype. Returns `false` when the value is not assignable,
-    /// in which case `invalid-assignment` is reported instead.
-    ///
-    /// The `unsound-assignment` rule is deliberately limited to name bindings; assignments to
-    /// attributes and subscripts are outside its scope.
-    fn validate_assignment_type(
-        &self,
+    /// Check the inferred RHS type before choosing the type of the binding. If the value and
+    /// the annotation are mutually assignable, use the annotation for subsequent reads.
+    /// The stricter `unsound-assignment` check uses the RHS type and applies only to name bindings.
+    fn assignment_binding_type(
+        &mut self,
         target_node: AnyNodeRef,
         definition: Definition<'db>,
         declaration: AssignmentDeclaration<'db>,
-        target_ty: Type<'db>,
+        (target_ty, origin): (Type<'db>, TypeOrigin),
         value_ty: Type<'db>,
-    ) -> bool {
+    ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
 
@@ -2052,7 +2013,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 target_ty,
                 value_ty,
             );
-            return false;
+            self.discard_dict_key_assignments_for(definition);
+            return target_ty;
         }
 
         // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_RETURN`;
@@ -2074,7 +2036,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        true
+        if origin == TypeOrigin::Annotated
+            && target_ty != value_ty
+            && matches!(
+                definition.kind(db),
+                DefinitionKind::Assignment(_)
+                    | DefinitionKind::AugmentedAssignment(_)
+                    | DefinitionKind::AnnotatedAssignment(_)
+            )
+            // Dataclass field specifiers carry settings such as `init=False` in the RHS type.
+            && !matches!(value_ty, Type::KnownInstance(KnownInstanceType::Field(_)))
+            && target_ty.is_assignable_to(db, env, value_ty)
+        {
+            target_ty
+        } else {
+            value_ty
+        }
     }
 
     fn record_return_type(&mut self, ty: Type<'db>, range: TextRange) {
@@ -3601,7 +3578,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let add = self.add_binding(target.into(), definition);
         let target_ty =
-            self.infer_assignment_definition_impl(assignment, definition, add.type_context);
+            self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
         add.insert(self, target_ty);
     }
@@ -4706,7 +4683,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         self.dataclass_field_specifiers.clear();
 
-        declared
+        declared.with_annotation_origin()
     }
 
     /// Resolve the value type for a bare `ClassVar` that repeats an inherited qualifier.
@@ -4771,7 +4748,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let node = target.into();
             let add = AddBinding {
-                type_context: self.fallback_member_type_context(node),
+                expected_type: self.fallback_member_type(node),
                 declaration: None,
                 binding: definition,
                 node,
@@ -4782,12 +4759,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let target_ty = if let Some(value) = value {
                 // Infer the value as an ordinary assignment without using the rejected annotation
                 // as its declared type.
-                let value_ty = self.infer_maybe_standalone_expression(value, add.type_context);
+                let value_ty = self.infer_maybe_standalone_expression(value, add.type_context());
                 self.stub_placeholder_binding_type(value)
                     .unwrap_or(value_ty)
             } else {
                 // Annotation-only definitions are bindings in stubs.
-                add.type_context
+                add.type_context()
                     .expected_type()
                     .unwrap_or_else(Type::unknown)
             };
@@ -5008,10 +4985,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // In this case, we can simply store types in `target` below, instead of calling `infer_expression` (which would return `Never`).
         debug_assert!(PlaceExpr::try_from_expr(target).is_some());
 
-        let has_explicit_type = declared.inner_type().is_some();
-        if !has_explicit_type && declared.qualifiers() == TypeQualifiers::CLASS_VAR {
+        let declaration = if declared.inner_type().is_none()
+            && declared.qualifiers() == TypeQualifiers::CLASS_VAR
+        {
             declared.inner = self.inherited_class_var_type(target);
-        }
+            AssignmentDeclaration::InheritedClassVar
+        } else {
+            AssignmentDeclaration::Ordinary(None)
+        };
 
         if let Some(value) = value {
             self.setup_dataclass_field_specifiers();
@@ -5128,7 +5109,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &DeclaredAndInferredType::MightBeDifferent {
                         declared_ty: declared,
                         inferred_ty,
-                        has_explicit_type,
+                        declaration,
                     },
                 );
             }
@@ -9113,7 +9094,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let add = self.add_binding(named.target.as_ref().into(), definition);
 
-        let ty = self.infer_expression(value, add.type_context);
+        let ty = self.infer_expression(value, add.type_context());
         self.store_expression_type(target, ty);
         add.insert(self, ty)
     }
@@ -13597,7 +13578,7 @@ impl<V> IntoIterator for VecSet<V> {
 
 #[must_use]
 struct AddBinding<'db, 'ast> {
-    type_context: TypeContext<'db>,
+    expected_type: Option<(Type<'db>, TypeOrigin)>,
     declaration: Option<Definition<'db>>,
     binding: Definition<'db>,
     node: AnyNodeRef<'ast>,
@@ -13608,6 +13589,11 @@ struct AddBinding<'db, 'ast> {
 }
 
 impl<'db, 'ast> AddBinding<'db, 'ast> {
+    fn type_context(&self) -> TypeContext<'db> {
+        self.expected_type
+            .map_or_default(|(ty, origin)| TypeContext::from_origin(ty, origin))
+    }
+
     fn insert(
         self,
         builder: &mut TypeInferenceBuilder<'db, 'ast>,
@@ -13615,16 +13601,17 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
     ) -> Type<'db> {
         let env = builder.program_environment();
         let declared_ty = self
-            .type_context
+            .type_context()
             .expected_type()
             .unwrap_or_else(Type::unknown);
+        let origin = self
+            .expected_type
+            .map_or(TypeOrigin::Inferred, |(_, origin)| origin);
 
         let db = builder.db();
         let file_scope_id = self.binding.file_scope(db);
         let use_def = builder.index.use_def_map(file_scope_id);
         let place_table = builder.index.place_table(file_scope_id);
-
-        let mut bound_ty = inferred_ty;
 
         if self.qualifiers.contains(TypeQualifiers::FINAL) {
             let mut previous_bindings = use_def.bindings_at_definition(self.binding);
@@ -13670,18 +13657,13 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        if !builder.validate_assignment_type(
+        let mut bound_ty = builder.assignment_binding_type(
             self.node,
             self.binding,
             AssignmentDeclaration::Ordinary(self.declaration),
-            declared_ty,
-            bound_ty,
-        ) {
-            builder.discard_dict_key_assignments_for(self.binding);
-
-            // Allow declarations to override inference in case of invalid assignment.
-            bound_ty = declared_ty;
-        }
+            (declared_ty, origin),
+            inferred_ty,
+        );
         // In the following cases, the bound type may not be the same as the RHS value type.
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = self.node {
             let value_ty = builder.try_expression_type(value).unwrap_or_else(|| {

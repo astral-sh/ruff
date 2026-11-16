@@ -239,7 +239,7 @@ impl<'db> StaticClassLiteral<'db> {
                         TypeContext::default(),
                     ))
                 } else {
-                    Place::declared(annotation.inner_type_or_unknown())
+                    Place::from_declaration(annotation)
                 };
 
                 return ControlFlow::Continue(ImplicitAttribute {
