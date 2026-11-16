@@ -11,6 +11,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_index::{IndexVec, newtype_index};
 
+use crate::types::Type;
 use crate::types::constraints::sequents::{
     GroupedSequents, InternedSequentConstraint, Sequent, SequentGroup, SequentMap,
 };
@@ -22,6 +23,7 @@ use crate::types::constraints::{
     Assignment, AtomicConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor, SourceOrderId,
     TypeVarId,
 };
+use crate::types::typevar::TypeVarSet;
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 /// The position of an assignment in insertion order.
@@ -274,30 +276,43 @@ impl PathAssignments {
             })
     }
 
-    pub(super) fn new(
-        constraints: impl IntoIterator<Item = AtomicConstraintId>,
-        independent_typevars: FxHashSet<TypeVarId>,
+    /// Seeds the path with each reachable atomic constraint in source order.
+    pub(super) fn new<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        constraints: impl Iterator<Item = AtomicConstraintId> + Clone,
     ) -> Self {
-        let discovered = constraints
-            .into_iter()
-            .map(|constraint| (constraint, false))
-            .collect();
+        let bound_is_concrete = |bound: Type<'db>| {
+            !bound.has_typevar(db, env)
+                && !bound.has_unspecialized_type_var(db, env)
+                && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
+        };
+
+        let mut independent_typevars = FxHashSet::default();
+        let mut dependent_typevars = FxHashSet::default();
+        for constraint_id in constraints.clone() {
+            let constraint = storage.atomic_constraint_data(constraint_id);
+            if let Some((typevar, bound)) = constraint.as_concrete()
+                && bound_is_concrete(bound)
+            {
+                let typevar = storage.typevar_id(db, typevar);
+                independent_typevars.insert(typevar);
+            } else {
+                dependent_typevars.extend(
+                    storage
+                        .constraint_support(constraint_id.into_inner())
+                        .iter(),
+                );
+            }
+        }
+
+        independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
+
         Self {
-            sequents: Vec::default(),
-            sequent_antecedents: FxHashMap::default(),
-            assignments: FxIndexMap::default(),
-            substituted_constraints: FxIndexSet::default(),
-            pending_substitutions: Vec::default(),
-            positive_assignment_indices: IndexVec::default(),
-            negative_assignment_indices: IndexVec::default(),
-            fuel_undo: Vec::default(),
-            discovered,
-            single_replay_consequents: FxHashMap::default(),
-            pair_replay_consequents: FxHashMap::default(),
+            discovered: constraints.map(|id| (id, false)).collect(),
             independent_typevars,
-            remaining_overall_fuel: OVERALL_FUEL_BUDGET,
-            assignment_queue: VecDeque::default(),
-            new_assignments: FxIndexMap::default(),
+            ..Self::default()
         }
     }
 
@@ -306,6 +321,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
         node: NodeId,
         visitor: &mut V,
     ) -> ControlFlow<V::Break, V::Result>
@@ -328,13 +344,14 @@ impl PathAssignments {
                     db,
                     env,
                     storage,
+                    inferable,
                     constraint.when_true(),
                     UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
                         } else {
-                            path.visit(db, env, storage, interior.if_true, visitor)
+                            path.visit(db, env, storage, inferable, interior.if_true, visitor)
                         };
                         match subtree {
                             ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -354,13 +371,14 @@ impl PathAssignments {
                     db,
                     env,
                     storage,
+                    inferable,
                     constraint.when_unconstrained(),
                     UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
                         } else {
-                            path.visit(db, env, storage, interior.if_uncertain, visitor)
+                            path.visit(db, env, storage, inferable, interior.if_uncertain, visitor)
                         };
                         match subtree {
                             ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -380,13 +398,14 @@ impl PathAssignments {
                     db,
                     env,
                     storage,
+                    inferable,
                     constraint.when_false(),
                     UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
                         } else {
-                            path.visit(db, env, storage, interior.if_false, visitor)
+                            path.visit(db, env, storage, inferable, interior.if_false, visitor)
                         };
                         match subtree {
                             ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -421,6 +440,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
         assignment: Assignment<AtomicConstraintId>,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
     ) -> bool {
@@ -431,6 +451,7 @@ impl PathAssignments {
             db,
             env,
             storage,
+            inferable,
             assignment.constraint(),
             unspecialized_type_var_policy,
         )
@@ -493,11 +514,13 @@ impl PathAssignments {
     /// the BDD. You should make this call from inside of your callback, so that as you get further
     /// down into the BDD structure, we remember all of the information that we have learned from
     /// the path we're on.
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn walk_edge<'db, R>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
         assignment: Assignment<AtomicConstraintId>,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         f: impl FnOnce(&mut ConstraintSetStorage<'db>, &mut Self, Range<usize>, bool) -> R,
@@ -517,8 +540,14 @@ impl PathAssignments {
             edge = %assignment.into_inner().display(db, env, storage),
             "walk edge",
         );
-        let found_conflict =
-            !self.assume(db, env, storage, assignment, unspecialized_type_var_policy);
+        let found_conflict = !self.assume(
+            db,
+            env,
+            storage,
+            inferable,
+            assignment,
+            unspecialized_type_var_policy,
+        );
         if !found_conflict {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
@@ -762,6 +791,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
         constraint: AtomicConstraintId,
     ) {
         // If we've already processed this constraint, we can skip it.
@@ -772,7 +802,7 @@ impl PathAssignments {
         }
 
         let constraint_data = storage.atomic_constraint_data(constraint);
-        if let Some(map) = SequentMap::for_constraint(db, env, constraint_data) {
+        if let Some(map) = SequentMap::for_constraint(db, env, constraint_data, inferable) {
             let added = self.add_sequents(db, env, storage, map);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
@@ -828,14 +858,15 @@ impl PathAssignments {
             } else {
                 (constraint, constraint_data, *existing, existing_data)
             };
-            let key = (env.program(db), a, b);
+            let key = (env.program(db), inferable, a, b);
             if storage.empty_sequent_pairs.contains(&key)
                 || self.pair_replay_consequents.contains_key(&(a, b))
             {
                 continue;
             }
 
-            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data) else {
+            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data, inferable)
+            else {
                 continue;
             };
             // Empty maps have no path-local effects. Nonempty maps must still be
@@ -869,11 +900,20 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
         source_constraint: AtomicConstraintId,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
     ) -> Result<(), PathAssignmentConflict> {
         while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
-            self.add_assignment(db, env, storage, assignment, source_constraint, fuel)?;
+            self.add_assignment(
+                db,
+                env,
+                storage,
+                inferable,
+                assignment,
+                source_constraint,
+                fuel,
+            )?;
         }
         // Either fuel limit can prevent a replacement from being admitted. Keep the original
         // evidence until the replacement actually holds, including when another derivation
@@ -904,11 +944,13 @@ impl PathAssignments {
     /// Adds a new assignment, along with any derived information that we can infer from the new
     /// assignment combined with the assignments we've already seen. If any of this causes the path
     /// to become invalid, due to a contradiction, returns a [`PathAssignmentConflict`] error.
+    #[expect(clippy::too_many_arguments)]
     fn add_assignment<'db>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
         assignment: Assignment<AtomicConstraintId>,
         source_constraint: AtomicConstraintId,
         fuel: AssignmentFuel,
@@ -1004,7 +1046,7 @@ impl PathAssignments {
             .sequent_antecedents
             .get(&assignment)
             .map_or(0, Vec::len);
-        self.discover_constraint(db, env, storage, assignment.constraint());
+        self.discover_constraint(db, env, storage, inferable, assignment.constraint());
         let sequents_len = self.sequents.len();
 
         // Previously discovered sequents can only start firing if the assignment that we just
@@ -1272,6 +1314,7 @@ mod tests {
             &env,
             builder,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             bound_typevar,
             ty,
         )
@@ -1301,6 +1344,7 @@ mod tests {
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             t,
             KnownClass::Bool.to_instance(db, &env),
         );
@@ -1309,6 +1353,7 @@ mod tests {
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             t,
             KnownClass::Int.to_instance(db, &env),
         );
@@ -1318,9 +1363,9 @@ mod tests {
 
         for set in [lhs, rhs, intersection, tautology, implication] {
             assert_eq!(
-                set.is_always_satisfied(db, &env, TypeVarSet::None),
+                set.is_always_satisfied(db, &env, TypeVarSet::All),
                 set.negate(db, &builder)
-                    .is_never_satisfied(db, &env, TypeVarSet::None)
+                    .is_never_satisfied(db, &env, TypeVarSet::All)
             );
         }
     }

@@ -1,5 +1,4 @@
 use crate::Db;
-use crate::types::typevar::TypeVarSet;
 use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
@@ -19,6 +18,7 @@ use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
 use crate::types::literal::{LiteralComparisonKind, WideLiteralComparison};
 use crate::types::tuple::{Tuple, TupleSpec};
+use crate::types::typevar::TypeVarSet;
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType,
@@ -1320,7 +1320,7 @@ fn infer_binary_type_comparison_inner<'db>(
             let right = constraints.load(db, env, right.constraints(db));
             let equivalent =
                 left.iff(db, &constraints, right)
-                    .is_always_satisfied(db, env, TypeVarSet::None);
+                    .is_always_satisfied(db, env, TypeVarSet::All);
             match op {
                 NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
                     Some(Ok(Type::bool_literal(equivalent)))
