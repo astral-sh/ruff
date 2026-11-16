@@ -176,6 +176,13 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    pub(super) fn as_single(&self) -> Option<&Signature<'db>> {
+        match self.overloads.as_slice() {
+            [signature] => Some(signature),
+            _ => None,
+        }
+    }
+
     pub(crate) fn bottom() -> Self {
         Self::single(Signature::bottom())
     }
@@ -997,6 +1004,49 @@ impl<'db> Signature<'db> {
         self.extras
             .as_ref()
             .is_some_and(|extras| extras.is_paramspec_value)
+    }
+
+    /// Finds the callback that supplies both the wrapper's forwarded parameters and its result.
+    /// Returns its parameter index, result variable, and any positional prefix from `Concatenate`.
+    pub(super) fn forwarded_callback_result(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<(usize, BoundTypeVarInstance<'db>, &[Parameter<'db>])> {
+        let context = self.generic_context?;
+        let (prefix, paramspec) = self.parameters().as_paramspec_with_prefix()?;
+        let (index, result, fixed) = prefix.iter().enumerate().find_map(|(i, parameter)| {
+            let callback = parameter
+                .annotated_type()
+                .resolve_type_alias(db)
+                .as_callable()?
+                .signatures(db)
+                .as_single()?;
+            let (fixed, captured) = callback.parameters().as_paramspec_with_prefix()?;
+            let result = callback.return_ty.as_typevar()?;
+            (captured == paramspec).then_some((i, result, fixed))
+        })?;
+        if !context.contains(db, paramspec.identity(db))
+            || !context.contains(db, result.identity(db))
+            || result.typevar(db).bound_or_constraints(db, env).is_some()
+        {
+            return None;
+        }
+        let (returned, skipped) = self.return_ty.free_typevars(db, env);
+        if skipped || !result.is_inferable(db, returned) || paramspec.is_inferable(db, returned) {
+            return None;
+        }
+        let other_parameters = prefix
+            .iter()
+            .enumerate()
+            .filter_map(|(i, parameter)| (i != index).then_some(parameter));
+        if other_parameters.chain(fixed).any(|parameter| {
+            let (free, skipped) = parameter.annotated_type().free_typevars(db, env);
+            skipped || result.is_inferable(db, free) || paramspec.is_inferable(db, free)
+        }) {
+            return None;
+        }
+        Some((index, result, fixed))
     }
 
     /// A captured parameter list refers to typevars owned by the surrounding call inference.
@@ -2495,8 +2545,18 @@ impl<'db> Signature<'db> {
     }
 
     /// Create a new signature with the given return type.
-    pub(crate) fn with_return_type(self, return_ty: Type<'db>) -> Self {
-        Self { return_ty, ..self }
+    pub(crate) fn with_return_type(mut self, return_ty: Type<'db>) -> Self {
+        if self.is_paramspec_value()
+            && let Some(extras) = self.extras.take()
+        {
+            self.extras = SignatureExtras::new(
+                extras.source_overload_index,
+                extras.receiver_constraints,
+                false,
+            );
+        }
+        self.return_ty = return_ty;
+        self
     }
 }
 

@@ -8061,6 +8061,33 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
+    /// A captured parameter list omits the callback's return type. Restore it for the forwarded
+    /// call when the inferred `R` still refers to one of the callback's own type variables.
+    ///
+    /// TODO: Infer the callback's return type and its captured parameters together from
+    /// the forwarded arguments, so the outer call can use the same specialization.
+    fn paramspec_call_with_result(
+        &self,
+        callable: Type<'db>,
+        outer: Specialization<'db>,
+    ) -> Option<(Type<'db>, BoundTypeVarInstance<'db>)> {
+        let db = self.db;
+        let signature = callable.as_callable()?.signatures(db).as_single()?;
+        let locals = signature.generic_context?;
+        let (_, variable, []) = self.signature.forwarded_callback_result(db, self.env)? else {
+            return None;
+        };
+        let result = outer.get(db, variable)?;
+        let (free, _) = result.free_typevars(db, self.env);
+        if !locals.variables(db).any(|var| var.is_inferable(db, free))
+            || self.signature.return_ty.apply_specialization(db, outer) != self.return_ty
+        {
+            return None;
+        }
+        let signature = signature.clone().with_return_type(result);
+        Some((Type::single_callable(db, signature), variable))
+    }
+
     /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
     ///
     /// The forwarded arguments are those matched to the `ParamSpec` components if provided,
@@ -8085,9 +8112,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
         let db = self.db;
-        let Some(callable) = self
-            .merged_specialization()
-            .and_then(|specialization| specialization.get(db, paramspec))
+        let Some(inference) = self.inference else {
+            return false;
+        };
+        let outer = inference.merged_specialization(db);
+        let Some(callable) = outer
+            .get(db, paramspec)
             .and_then(|value| value.as_paramspec_value(db))
             .and_then(|value| value.to_callable_type(db, self.env))
         else {
@@ -8112,6 +8142,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
         let error_argument_indices = error_argument_indices.as_deref();
 
+        let forwarded = self.paramspec_call_with_result(callable, outer);
+        let return_context =
+            if forwarded.is_some_and(|(_, var)| self.signature.return_ty != Type::TypeVar(var)) {
+                // TODO: Combine the callback result with the expected type during outer inference.
+                // For a wrapper returning list[R], the context here describes the list as a whole.
+                TypeContext::default()
+            } else {
+                self.call_expression_tcx
+            };
+        let callable = forwarded.map_or(callable, |(callable, _)| callable);
         let bindings = match callable
             .bindings(db, self.env)
             .match_parameters(db, self.env, &sub_arguments)
@@ -8120,10 +8160,40 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 self.env,
                 constraints,
                 &sub_arguments,
-                self.call_expression_tcx,
+                return_context,
                 &[],
             ) {
-            Ok(bindings) => bindings,
+            Ok(bindings) => {
+                if let Some((_, variable)) = forwarded {
+                    let result = bindings.return_type(db, self.env);
+                    let result = match result.resolve_type_alias(db) {
+                        // A predicate narrows an argument of the callback. Its boolean result
+                        // says nothing about the wrapper's first argument.
+                        Type::TypeGuard(_) | Type::TypeIs(_) => {
+                            KnownClass::Bool.to_instance(db, self.env)
+                        }
+                        _ => result,
+                    };
+                    // Another parameter can receive the same generic function independently.
+                    // Keep its inferred type and let defaults such as S = R see the new R.
+                    let context = outer.generic_context(db);
+                    let types = context
+                        .variables(db)
+                        .zip(outer.types(db))
+                        .map(|(var, &ty)| {
+                            if var == variable {
+                                Some(result)
+                            } else {
+                                inference
+                                    .has_inferred_type(db, var.identity(db))
+                                    .then_some(ty)
+                            }
+                        });
+                    let refined = context.specialize_partial(db, types);
+                    self.return_ty = self.signature.return_ty.apply_specialization(db, refined);
+                }
+                bindings
+            }
             Err(CallError(_, bindings)) => *bindings,
         };
 

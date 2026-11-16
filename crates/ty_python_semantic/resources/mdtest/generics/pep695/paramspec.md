@@ -1186,6 +1186,84 @@ accept(wrap(keyword_only), value=1)
 accept(wrap(keyword_only), value="incorrect")  # error: [invalid-argument-type]
 ```
 
+### Inferring the return type of a forwarded generic call
+
+The arguments forwarded to a generic callback determine its result, including when the wrapper
+returns that result inside another type.
+
+```py
+from typing import Callable
+
+def forward[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def collect[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> list[R]:
+    return [callback(*args, **kwargs)]
+
+def identity[T](value: T, /) -> T:
+    return value
+
+def check(value: int):
+    reveal_type(forward(identity, value))  # revealed: int
+    reveal_type(collect(forward, identity, value))  # revealed: list[int]
+    wrong: list[str] = collect(forward, identity, value)  # error: [invalid-assignment]
+```
+
+The annotation on `widened` gives `collect` an expected type of `list[list[object]]`. This lets
+`box` infer `object` as its element type even though its argument is an `int`.
+
+```py
+def box[T](value: T) -> list[T]:
+    return [value]
+
+def widen(value: int):
+    # TODO: Pass the assignment's type context through to `box`.
+    # error: [invalid-assignment] "Object of type `list[list[int]]`"
+    widened: list[list[object]] = collect(box, value)
+```
+
+Passing the same generic function twice lets the wrapper call one occurrence and return the other.
+The returned function can still be called with a different argument type.
+
+```py
+def call_and_keep[**P, **Q, R, S](
+    call: Callable[P, R], keep: Callable[Q, S], /, *args: P.args, **kwargs: P.kwargs
+) -> tuple[R, Callable[Q, S]]:
+    return call(*args, **kwargs), keep
+
+def independent(number: int, data: bytes):
+    result, kept = call_and_keep(identity, identity, number)
+    reveal_type(result)  # revealed: int
+    reveal_type(kept(data))  # revealed: bytes
+```
+
+A type parameter that defaults to the result type uses the type inferred from the forwarded call.
+
+```py
+def with_buffer[**P, R, B = R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> tuple[R, list[B]]:
+    return callback(*args, **kwargs), []
+
+def buffer(value: int):
+    reveal_type(with_buffer(identity, value))  # revealed: tuple[int, list[int]]
+```
+
+A predicate passed through a generic call returns a boolean. Its result cannot narrow an unrelated
+argument of the wrapper.
+
+```py
+from typing import TypeGuard
+
+def when[**P, R](other: object, callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def is_text(value: object) -> TypeGuard[str]:
+    return isinstance(value, str)
+
+def check_predicate(left: object, right: object):
+    if when(left, forward, is_text, right):
+        reveal_type(left)  # revealed: object
+```
+
 ### Immediate literal forwarding
 
 A literal unpack can supply several arguments to a forwarded `ParamSpec`. The wrapped callable
@@ -1737,17 +1815,23 @@ forward(target, "a", ["a"])
 
 ### Forwarded arguments with type-variable constraints
 
-A constrained generic callback can receive an argument matching any of its constraints. Capturing
-its parameters in a `ParamSpec` does not restrict the callback to its first constraint:
+A forwarded argument can select any of a callback's constraints. An unannotated argument leaves the
+result unknown, just as it does in a direct call.
 
 ```py
 from collections.abc import Callable
 
-def forward[**P](function: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def forward[**P, R](function: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return function(*args, **kwargs)
+
 def identity[T: (str, bytes)](value: T) -> T:
     return value
 
-forward(identity, b"text")  # ok
+def consume[**P](function: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def check(data: bytes, unannotated):
+    consume(identity, data)  # ok
+    reveal_type(forward(identity, data))  # revealed: bytes
+    reveal_type(forward(identity, unannotated))  # revealed: Unknown
 ```
 
 ### Forwarded callbacks with gradual types
