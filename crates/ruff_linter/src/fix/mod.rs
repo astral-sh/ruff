@@ -154,13 +154,13 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
             .name()
             .as_str();
         let if_else_instead_of_dict_get = Rule::IfElseBlockInsteadOfDictGet.name().as_str();
-        let if_else_instead_of_if_exp = Rule::IfElseBlockInsteadOfIfExp.name().as_str();
+        let if_else_instead_of_if_exp = Rule::IfElseBlockInsteadOfIfExpr.name().as_str();
         if rules == (missing_trailing_period, newline_after_last_paragraph) {
             std::cmp::Ordering::Less
         } else if rules == (newline_after_last_paragraph, missing_trailing_period) {
             std::cmp::Ordering::Greater
         }
-        // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
+        // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExpr` fixes.
         else if rules == (if_else_instead_of_dict_get, if_else_instead_of_if_exp) {
             std::cmp::Ordering::Less
         } else if rules == (if_else_instead_of_if_exp, if_else_instead_of_dict_get) {

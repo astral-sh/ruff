@@ -68,9 +68,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [FastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.2.1", category = Category::Suspicious)]
-pub(crate) struct MissingFStringSyntax;
+pub(crate) struct MissingFStringPrefix;
 
-impl AlwaysFixableViolation for MissingFStringSyntax {
+impl AlwaysFixableViolation for MissingFStringPrefix {
     #[derive_message_formats]
     fn message(&self) -> String {
         r"Possible f-string without an `f` prefix".to_string()
@@ -128,7 +128,7 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
         checker.target_version(),
     ) {
         checker
-            .report_diagnostic(MissingFStringSyntax, literal.range())
+            .report_diagnostic(MissingFStringPrefix, literal.range())
             .set_fix(fix_fstring_syntax(literal.range()));
     }
 }
@@ -185,7 +185,7 @@ fn is_method_call_on_literal(call_expr: &ast::ExprCall, literal: &ast::StringLit
 }
 
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.
-/// See [`MissingFStringSyntax`] for the validation criteria.
+/// See [`MissingFStringPrefix`] for the validation criteria.
 fn should_be_fstring(
     literal: &ast::StringLiteral,
     locator: &Locator,

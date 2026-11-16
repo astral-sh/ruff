@@ -122,15 +122,15 @@ impl AlwaysFixableViolation for IfExprWithFalseTrue {
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.214", category = Category::Pedantic)]
-pub(crate) struct IfExprWithTwistedArms {
+pub(crate) struct IfExprNegatedCondition {
     expr_body: String,
     expr_else: String,
 }
 
-impl AlwaysFixableViolation for IfExprWithTwistedArms {
+impl AlwaysFixableViolation for IfExprNegatedCondition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfExprWithTwistedArms {
+        let IfExprNegatedCondition {
             expr_body,
             expr_else,
         } = self;
@@ -141,7 +141,7 @@ impl AlwaysFixableViolation for IfExprWithTwistedArms {
     }
 
     fn fix_title(&self) -> String {
-        let IfExprWithTwistedArms {
+        let IfExprNegatedCondition {
             expr_body,
             expr_else,
         } = self;
@@ -267,7 +267,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        IfExprWithTwistedArms {
+        IfExprNegatedCondition {
             expr_body: checker.generator().expr(body),
             expr_else: checker.generator().expr(orelse),
         },

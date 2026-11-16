@@ -42,11 +42,11 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: the `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#the-nonlocal-statement)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.4.9", category = Category::Formatting)]
-pub(crate) struct RepeatedGlobal {
+pub(crate) struct ConsecutiveScopeDeclarations {
     global_kind: GlobalKind,
 }
 
-impl AlwaysFixableViolation for RepeatedGlobal {
+impl AlwaysFixableViolation for ConsecutiveScopeDeclarations {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use of repeated consecutive `{}`", self.global_kind)
@@ -87,7 +87,7 @@ pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
             };
 
             checker
-                .report_diagnostic(RepeatedGlobal { global_kind }, range)
+                .report_diagnostic(ConsecutiveScopeDeclarations { global_kind }, range)
                 .set_fix(Fix::applicable_edit(
                     Edit::range_replacement(
                         format!(

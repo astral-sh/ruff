@@ -68,19 +68,19 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// [pycodestyle.max-line-length]: https://docs.astral.sh/ruff/settings/#lint_pycodestyle_max-line-length
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.213", category = Category::Pedantic)]
-pub(crate) struct IfElseBlockInsteadOfIfExp {
+pub(crate) struct IfElseBlockInsteadOfIfExpr {
     /// The ternary or binary expression to replace the `if`-`else`-block.
     contents: String,
     /// Whether to use a binary or ternary assignment.
     kind: AssignmentKind,
 }
 
-impl Violation for IfElseBlockInsteadOfIfExp {
+impl Violation for IfElseBlockInsteadOfIfExpr {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfElseBlockInsteadOfIfExp { contents, kind } = self;
+        let IfElseBlockInsteadOfIfExpr { contents, kind } = self;
         match kind {
             AssignmentKind::Ternary => {
                 format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
@@ -92,7 +92,7 @@ impl Violation for IfElseBlockInsteadOfIfExp {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let IfElseBlockInsteadOfIfExp { contents, .. } = self;
+        let IfElseBlockInsteadOfIfExpr { contents, .. } = self;
         Some(format!("Replace `if`-`else`-block with `{contents}`"))
     }
 }
@@ -239,7 +239,7 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        IfElseBlockInsteadOfIfExp {
+        IfElseBlockInsteadOfIfExpr {
             contents: contents.clone(),
             kind: assignment_kind,
         },

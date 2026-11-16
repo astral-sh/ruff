@@ -24,9 +24,9 @@ use crate::codes::Category;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.9.0", category = Category::Correctness)]
-pub(crate) struct UselessIfElse;
+pub(crate) struct UselessIfExpr;
 
-impl Violation for UselessIfElse {
+impl Violation for UselessIfExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Useless `if`-`else` condition".to_string()
@@ -47,5 +47,5 @@ pub(crate) fn useless_if_else(checker: &Checker, if_expr: &ast::ExprIf) {
         return;
     }
 
-    checker.report_diagnostic(UselessIfElse, *range);
+    checker.report_diagnostic(UselessIfExpr, *range);
 }

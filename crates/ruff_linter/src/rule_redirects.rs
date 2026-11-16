@@ -236,6 +236,34 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     ("unused-noqa", Rule::UnusedSuppressionComment),
     ("redirected-noqa", Rule::RenamedRuleInSuppressionComment),
+    (
+        "star-arg-unpacking-after-keyword-arg",
+        Rule::StarArgAfterKeyword,
+    ),
+    (
+        "if-exp-instead-of-or-operator",
+        Rule::IfExprInsteadOfOrOperator,
+    ),
+    ("repeated-global", Rule::ConsecutiveScopeDeclarations),
+    ("stop-iteration-return", Rule::GeneratorRaiseStopIteration),
+    ("assert-on-string-literal", Rule::AssertStringLiteral),
+    ("redefined-loop-name", Rule::RedefinedForOrWithTarget),
+    ("superfluous-else-return", Rule::UnnecessaryElseReturn),
+    ("superfluous-else-raise", Rule::UnnecessaryElseRaise),
+    ("superfluous-else-continue", Rule::UnnecessaryElseContinue),
+    ("superfluous-else-break", Rule::UnnecessaryElseBreak),
+    (
+        "parenthesize-chained-operators",
+        Rule::AmbiguousChainedOperators,
+    ),
+    ("missing-f-string-syntax", Rule::MissingFStringPrefix),
+    ("useless-if-else", Rule::UselessIfExpr),
+    (
+        "if-else-block-instead-of-if-exp",
+        Rule::IfElseBlockInsteadOfIfExpr,
+    ),
+    ("enumerate-for-loop", Rule::ManualLoopCounter),
+    ("if-expr-with-twisted-arms", Rule::IfExprNegatedCondition),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

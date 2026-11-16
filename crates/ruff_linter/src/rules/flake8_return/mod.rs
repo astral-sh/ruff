@@ -22,10 +22,10 @@ mod tests {
     #[test_case(Rule::ImplicitReturnValue, Path::new("RET502.py"))]
     #[test_case(Rule::ImplicitReturn, Path::new("RET503.py"))]
     #[test_case(Rule::UnnecessaryAssign, Path::new("RET504.py"))]
-    #[test_case(Rule::SuperfluousElseReturn, Path::new("RET505.py"))]
-    #[test_case(Rule::SuperfluousElseRaise, Path::new("RET506.py"))]
-    #[test_case(Rule::SuperfluousElseContinue, Path::new("RET507.py"))]
-    #[test_case(Rule::SuperfluousElseBreak, Path::new("RET508.py"))]
+    #[test_case(Rule::UnnecessaryElseReturn, Path::new("RET505.py"))]
+    #[test_case(Rule::UnnecessaryElseRaise, Path::new("RET506.py"))]
+    #[test_case(Rule::UnnecessaryElseContinue, Path::new("RET507.py"))]
+    #[test_case(Rule::UnnecessaryElseBreak, Path::new("RET508.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
