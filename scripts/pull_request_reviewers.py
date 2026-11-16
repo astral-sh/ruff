@@ -32,16 +32,6 @@ class Pool:
     reviewers: tuple[str, ...]
 
 
-class PoolConfig(TypedDict):
-    name: str
-    paths: list[str]
-    reviewers: list[str]
-
-
-class ChangedFile(TypedDict):
-    filename: str
-
-
 class User(TypedDict):
     login: str
 
@@ -88,25 +78,23 @@ def changed_files(pull_request: int) -> list[str]:
     files = []
     page = 1
     while True:
-        batch = cast(
-            "list[ChangedFile]",
-            api(f"pulls/{pull_request}/files?per_page=100&page={page}"),
-        )
-        files.extend(item["filename"] for item in batch)
+        batch = api(f"pulls/{pull_request}/files?per_page=100&page={page}")
+        files.extend(cast("str", item["filename"]) for item in batch)
         if len(batch) < 100:
             return files
         page += 1
 
 
 def parse_pools(contents: str) -> list[Pool]:
-    pools = cast("list[PoolConfig]", tomllib.loads(contents)["pools"])
     return [
         Pool(
-            name=pool["name"],
-            patterns=tuple(path.lstrip("/") for path in pool["paths"]),
-            reviewers=tuple(pool["reviewers"]),
+            name=cast("str", pool["name"]),
+            patterns=tuple(
+                path.lstrip("/") for path in cast("list[str]", pool["paths"])
+            ),
+            reviewers=tuple(cast("list[str]", pool["reviewers"])),
         )
-        for pool in pools
+        for pool in tomllib.loads(contents)["pools"]
     ]
 
 
