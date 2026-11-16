@@ -63,6 +63,23 @@ reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
 
+When an alias expands to a type variable, we can infer the callback's return type even if it is
+still generic in the caller.
+
+```py
+from typing import Callable
+from typing_extensions import TypeAliasType
+
+R = TypeVar("R")
+Id = TypeAliasType("Id", T, type_params=(T,))
+
+def run(callback: Callable[[], Id[R]]) -> R:
+    return callback()
+
+def check(callback: Callable[[], T]):
+    reveal_type(run(callback))  # revealed: T@check
+```
+
 ## Conditional imports of `Type`
 
 Either binding of `Type` lets ty infer `T` from the class passed to `make`.

@@ -1270,6 +1270,175 @@ def outer(_: Callable[P, None]):
     reveal_type(generic_context(inner))  # revealed: None
 ```
 
+### Inferring the return type of a forwarded generic call
+
+The arguments forwarded to a generic callback determine its result, including when the wrapper
+returns that result inside another type.
+
+```py
+from typing import Callable, ParamSpec
+from typing_extensions import TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+
+def forward(callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def collect(callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> list[R]:
+    return [callback(*args, **kwargs)]
+
+def identity(value: T, /) -> T:
+    return value
+
+def check(value: int):
+    reveal_type(forward(identity, value))  # revealed: int
+    reveal_type(collect(forward, identity, value))  # revealed: list[int]
+```
+
+Forwarded arguments also select a constrained type variable, just as they would in a direct call.
+
+```py
+C = TypeVar("C", str, bytes)
+
+def constrained(value: C) -> C:
+    return value
+
+def check_constrained(data: bytes, unannotated):
+    reveal_type(forward(constrained, data))  # revealed: bytes
+    reveal_type(forward(constrained, unannotated))  # revealed: Unknown
+    forward(constrained, 1)  # error: [invalid-argument-type]
+```
+
+The expected result type reaches the callback when the wrapper returns it directly. An expected
+container type would also allow widening the callback result.
+
+```py
+def box(value: T, /) -> list[T]:
+    return [value]
+
+def widen(value: int):
+    direct: list[object] = forward(box, value)  # ok
+    # TODO: Pass the assignment's type context through to `box`.
+    # error: [invalid-assignment] "Object of type `list[list[int]]`"
+    widened: list[list[object]] = collect(box, value)
+```
+
+Callbacks that accept the same arguments can still return different types.
+
+```py
+def choose(value: int, as_list: bool):
+    callback = box if as_list else identity
+    reveal_type(forward(callback, value))  # revealed: list[int] | int
+```
+
+A forwarded call to an overloaded callback uses the return type of the matching overload.
+
+```py
+from typing import overload
+
+@overload
+def first(value: None) -> None: ...
+@overload
+def first(value: list[T]) -> T: ...
+def first(value):
+    return None if value is None else value[0]
+
+def check_overload(values: list[int]):
+    reveal_type(forward(first, values))  # revealed: int
+    reveal_type(forward(first, None))  # revealed: None
+```
+
+Passing a generic function more than once preserves its independent type parameters. This also
+applies when the callback returns the wrapper itself.
+
+```py
+Q = ParamSpec("Q")
+S = TypeVar("S")
+
+def call_and_keep(call: Callable[P, R], keep: Callable[Q, S], /, *args: P.args, **kwargs: P.kwargs) -> tuple[R, Callable[Q, S]]:
+    return call(*args, **kwargs), keep
+
+def independent(number: int, data: bytes):
+    result, kept = call_and_keep(identity, identity, number)
+    reveal_type(result)  # revealed: int
+    reveal_type(kept(data))  # revealed: bytes
+
+    wrapper = forward(identity, forward)
+    reveal_type(wrapper(identity, number))  # revealed: int
+```
+
+A type parameter that defaults to the result type uses the type inferred from the forwarded call.
+
+```py
+B = TypeVar("B", default=R)
+
+def with_buffer(callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> tuple[R, list[B]]:
+    return callback(*args, **kwargs), []
+
+def buffer(value: int):
+    reveal_type(with_buffer(identity, value))  # revealed: tuple[int, list[int]]
+```
+
+A union of bound methods can share a type variable but infer different results. Here the two
+receivers specialize `replace` differently, so the forwarded call can return either type.
+
+```py
+from typing import Generic
+
+X = TypeVar("X")
+
+class Replacer(Generic[X]):
+    def replace(self, value: X | T, default: T) -> T:
+        raise NotImplementedError
+
+def check_union(replacer: Replacer[int] | Replacer[str], number: int, text: str):
+    reveal_type(forward(replacer.replace, number, text))  # revealed: str | int
+```
+
+The wrappers infer the callback result through aliases, including aliases nested inside a parameter
+or return annotation.
+
+```py
+from typing_extensions import TypeAliasType
+
+Timeout = TypeAliasType("Timeout", float | None)
+Result = TypeAliasType("Result", T, type_params=(T,))
+
+def with_timeout(timeout: Timeout, callback: Callable[P, Result[R]], /, *args: P.args, **kwargs: P.kwargs) -> Result[R]:
+    return callback(*args, **kwargs)
+
+def collect_with_timeouts(
+    timeouts: list[Timeout], callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs
+) -> list[Result[R]]:
+    return [callback(*args, **kwargs)]
+
+def check_alias(value: int):
+    reveal_type(with_timeout(None, identity, value))  # revealed: int
+    reveal_type(collect_with_timeouts([], identity, value))  # revealed: list[Result[int]]
+```
+
+When forwarding specializes a predicate's return type, the wrapper receives its boolean value.
+
+```py
+from typing import TypeGuard
+
+def is_instance(value: object, cls: type[T]) -> TypeGuard[T]:
+    return isinstance(value, cls)
+
+def ignore(value: object, cls: type) -> None:
+    pass
+
+def check_predicate(timeout: Timeout, value: object, enabled: bool):
+    reveal_type(with_timeout(timeout, is_instance, value, str))  # revealed: bool
+    if with_timeout(timeout, is_instance, value, str):
+        reveal_type(timeout)  # revealed: float | None
+
+    callback = is_instance if enabled else ignore
+    reveal_type(collect(callback, value, str))  # revealed: list[bool | None]
+```
+
 ### Immediate literal forwarding
 
 A literal unpack can supply several arguments to a forwarded `ParamSpec`. The wrapped callable
@@ -1291,6 +1460,34 @@ reveal_type(forward(target, *[1, 2]))  # revealed: int
 reveal_type(forward(target, **{"x": 1, "y": 2}))  # revealed: int
 forward(target, *[1])  # error: [missing-argument]
 forward(target, **{"x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
+A positional unpack can also supply the callback. Only the values after the callback determine its
+result, including when more arguments follow the unpack.
+
+```py
+T = TypeVar("T")
+
+def first(value: T, *rest: object) -> T:
+    return value
+
+def check(number: int, text: str):
+    reveal_type(forward(*(first, number)))  # revealed: int
+    reveal_type(forward(*(first, number), text))  # revealed: int
+    forward(*(target, number, text))  # error: [invalid-argument-type]
+```
+
+A bound method can consume part of the unpack and still use the callback's next parameter to infer
+the type of a list literal.
+
+```py
+class Runner:
+    def run(self, callback: Callable[P, None], tag: object, /, *args: P.args, **kwargs: P.kwargs) -> None:
+        callback(*args, **kwargs)
+
+def consume(value: int, items: list[object]) -> None: ...
+
+Runner().run(*(consume, None, 1), [1])  # ok
 ```
 
 A dictionary can supply both a wrapper parameter and arguments to forward. The wrapper checks its

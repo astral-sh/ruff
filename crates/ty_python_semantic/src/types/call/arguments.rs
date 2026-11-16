@@ -12,6 +12,7 @@ use rustc_hash::FxHashMap;
 use crate::FxIndexMap;
 use crate::ProgramEnvironment;
 use crate::subscript::PyIndex;
+use crate::types::call::MatchedArgument;
 use crate::types::tuple::{TupleLength, TupleSpec};
 use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
@@ -778,28 +779,52 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     /// Select the arguments forwarded to a `ParamSpec` sub-call.
     ///
-    /// The resulting argument list preserves the order of `indices`. Unlike [`Self::start_from`],
-    /// this can project a non-contiguous subset of the original call arguments. Known keyword
-    /// arguments retain only keys that were not consumed by the wrapper's prefix:
+    /// Each selected source argument produces one sub-call argument, even if
+    /// the wrapper consumes part of a fixed-length positional unpack or a known keyword unpack:
     ///
     /// ```py
-    /// def wrapper[**P, R](func: Callable[P, R], **kwargs: P.kwargs) -> R: ...
-    /// wrapper(TagSet=[...], func=f)  # select `TagSet=[...]`, but not the later `func=f`
+    /// def wrapper[**P, R](func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R: ...
+    /// wrapper(*(f, value))  # forward only `value`
+    /// wrapper(TagSet=[...], func=f)  # forward only `TagSet`
     /// ```
+    ///
+    /// Also returns the number of selected arguments that could be projected exactly. Keep
+    /// ambiguous unpacks available for diagnostic recovery.
     pub(crate) fn select_for_paramspec(
         &self,
-        indices: &[usize],
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        indices: impl ExactSizeIterator<Item = usize>,
+        matches: &[MatchedArgument<'db>],
         parameters: &Parameters<'db>,
         prefix_len: usize,
-    ) -> Self {
-        Self {
-            items: indices
+    ) -> (Self, usize) {
+        let mut items = Vec::with_capacity(indices.len());
+        let mut projected = 0;
+        for index in indices {
+            let mut argument = self.items[index].clone();
+            let prefix_matches = matches[index]
+                .parameters
                 .iter()
-                .map(|index| {
-                    let mut argument = self.items[*index].clone();
-                    if let CallArgument::Keywords(KeywordArgument::Known { keywords, .. }) =
-                        &mut argument
-                    {
+                .filter(|matched| matched.index < prefix_len)
+                .count();
+            match &mut argument {
+                _ if prefix_matches == 0 => projected += 1,
+                CallArgument::Variadic(variadic)
+                    if let Some(sequence) = variadic.sequence(db, env)
+                        && let Some(fixed) = sequence.as_fixed_length() =>
+                {
+                    *variadic = VariadicArgument::Sequence {
+                        types: variadic.source_types().clone(),
+                        sequence: TupleSpec::heterogeneous(
+                            fixed.iter_all_elements().skip(prefix_matches),
+                        ),
+                    };
+                    projected += 1;
+                }
+                CallArgument::Keywords(argument) => {
+                    projected += usize::from(argument.is_complete());
+                    if let KeywordArgument::Known { keywords, .. } = argument {
                         keywords.keys = keywords
                             .keys
                             .iter()
@@ -811,10 +836,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                             .cloned()
                             .collect();
                     }
-                    argument
-                })
-                .collect(),
+                }
+                _ => {}
+            }
+            items.push(argument);
         }
+        (Self { items }, projected)
     }
 
     /// Returns the `functools.partial(...)` bound-argument slice and whether it is concrete enough

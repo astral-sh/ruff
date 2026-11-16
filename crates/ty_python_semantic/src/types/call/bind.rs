@@ -74,7 +74,9 @@ use crate::types::signatures::{
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::walk_type_alias_arguments;
 use crate::types::typed_dict::TypedDictOpenness;
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarSet};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeAliasExpansion, TypeVarKind, TypeVarNonceGenerator, TypeVarSet,
+};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
@@ -1532,6 +1534,23 @@ impl<'db> Bindings<'db> {
                 .iter()
                 .map(|element| element.return_type(db, env)),
         )
+    }
+
+    /// A predicate narrows an argument of its own call. A wrapper receives its boolean value,
+    /// including when only some alternatives in a union of callbacks are predicates.
+    fn forwarded_return_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        let result = self.return_type(db, env);
+        let as_value = |ty: &Type<'db>| match ty {
+            Type::TypeGuard(_) | Type::TypeIs(_) => KnownClass::Bool.to_instance(db, env),
+            _ => *ty,
+        };
+        let expanded = result.expand_top_level_aliases(db, env);
+        let value = match expanded {
+            Type::Union(union) => union.map(db, env, as_value),
+            _ => as_value(&expanded),
+        };
+        // Preserve the original alias when there were no predicates to erase.
+        if value == expanded { result } else { value }
     }
 
     /// Returns the inferred type for the argument at the specified index.
@@ -7993,40 +8012,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let paramspec = self.signature.parameters().as_paramspec_with_prefix();
         let paramspec_component_start = paramspec.and_then(|(prefix, paramspec)| {
             let prefix_len = prefix.len();
-            let paramspec_argument_indices = self.paramspec_argument_indices(prefix_len);
-            if paramspec_argument_indices.is_empty() {
-                self.evaluate_paramspec_sub_call(constraints, None, prefix_len, paramspec);
-                return None;
-            }
-
-            let has_paramspec_component_argument =
-                paramspec_argument_indices
-                    .iter()
-                    .any(|(argument_index, _)| {
-                        let matches = &self.argument_matches[*argument_index].parameters;
-                        // Complete keyword sets are projected onto the ParamSpec in the sub-call.
-                        // Other arguments must belong entirely to the ParamSpec.
-                        matches!(
-                            self.arguments.get(*argument_index),
-                            Some(CallArgument::Keywords(keywords)) if keywords.is_complete()
-                        ) || matches
-                            .iter()
-                            .all(|parameter| parameter.index >= prefix_len)
-                    });
-
-            if has_paramspec_component_argument
-                && self.evaluate_paramspec_sub_call(
-                    constraints,
-                    Some(&paramspec_argument_indices),
-                    prefix_len,
-                    paramspec,
-                )
-            {
-                Some(prefix_len)
-            } else {
-                self.evaluate_paramspec_sub_call(constraints, None, prefix_len, paramspec);
-                None
-            }
+            self.evaluate_paramspec_sub_call(constraints, prefix_len, paramspec)
+                .then_some(prefix_len)
         });
 
         let is_paramspec_component_parameter = |parameter_index: usize| {
@@ -8087,10 +8074,66 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
     }
 
+    /// Recover the callback's full signature when the inferred `R` still refers to one of its
+    /// type variables. Calling it with the forwarded arguments can then specialize `R`.
+    ///
+    /// TODO: Infer the callback's return type and its captured parameters together from
+    /// the forwarded arguments, so the outer call can use the same specialization.
+    fn paramspec_call_with_result(
+        &self,
+        callable: Type<'db>,
+        outer: Specialization<'db>,
+    ) -> Option<(Bindings<'db>, BoundTypeVarInstance<'db>)> {
+        let db = self.db;
+        let mut locals = callable
+            .as_callable()?
+            .signatures(db)
+            .iter()
+            .filter_map(|signature| signature.generic_context)
+            .flat_map(|context| context.variables(db))
+            .peekable();
+        locals.peek()?;
+        let (index, variable) = self.signature.forwarded_callback_result(db, self.env)?;
+        let result = outer.get(db, variable)?;
+        let (free, _) = result.free_typevars(db, self.env, TypeAliasExpansion::Skip);
+        // Preserve a return type that outer inference has already refined independently.
+        if !locals.any(|var| var.is_inferable(db, free))
+            || self.signature.return_ty.apply_specialization(db, outer) != self.return_ty
+        {
+            return None;
+        }
+
+        // The captured ParamSpec omits the return type and may contain only the first parameter
+        // list from a union. Recover every signature from the callback argument.
+        let (argument, matched) = self
+            .arguments
+            .iter()
+            .zip(self.argument_matches)
+            .filter_map(|(argument, matches)| {
+                let matched = matches.iter().find(|matched| matched.index == index)?;
+                Some((argument, matched))
+            })
+            .exactly_one()
+            .ok()?;
+        let actual = argument.matched_type(
+            self.signature.parameters()[index].annotated_type(),
+            matched.argument_type,
+        )?;
+        let callables = actual.try_upcast_to_callable(db, self.env)?;
+        // Bind each alternative separately. Forming a union of the upcast signatures can discard
+        // a generic callable before the forwarded arguments specialize its return type.
+        let bindings = Bindings::from_union(
+            actual,
+            callables
+                .iter()
+                .map(|&ty| Type::Callable(ty).bindings(db, self.env)),
+        );
+        Some((bindings, variable))
+    }
+
     /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
     ///
-    /// The forwarded arguments are those matched to the `ParamSpec` components if provided,
-    /// otherwise no arguments are passed. No forwarded arguments can still require a sub-call:
+    /// Even when no arguments are forwarded, the sub-call can produce diagnostics:
     ///
     /// ```py
     /// from typing import Callable
@@ -8101,56 +8144,91 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// foo(f)  # P specializes to `(x: int)`, so `f` is checked with no arguments.
     /// ```
     ///
-    /// This method returns `false` if the specialization does not contain a mapping for the given
-    /// `paramspec` or contains a value other than captured parameter lists.
+    /// Returns whether the sub-call checked forwarded arguments against the captured parameters.
     fn evaluate_paramspec_sub_call(
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
-        paramspec_arguments: Option<&[(usize, Option<usize>)]>,
         prefix_len: usize,
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
         let db = self.db;
-        let Some(callable) = self
-            .merged_specialization()
-            .and_then(|specialization| specialization.get(db, paramspec))
+        let Some(inference) = self.inference else {
+            return false;
+        };
+        let outer = inference.merged_specialization(db);
+        let Some(callable) = outer
+            .get(db, paramspec)
             .and_then(|value| value.as_paramspec_value(db))
             .and_then(|value| value.to_callable_type(db, self.env))
         else {
             return false;
         };
 
-        let (sub_arguments, error_argument_indices) =
-            if let Some(paramspec_arguments) = paramspec_arguments {
-                let (paramspec_argument_indices, error_argument_indices): (Vec<_>, Vec<_>) =
-                    paramspec_arguments.iter().copied().unzip();
-
-                (
-                    self.arguments.select_for_paramspec(
-                        &paramspec_argument_indices,
-                        self.signature.parameters(),
-                        prefix_len,
-                    ),
-                    Some(error_argument_indices),
-                )
-            } else {
-                (CallArguments::none(), None)
-            };
-        let error_argument_indices = error_argument_indices.as_deref();
-
-        let bindings = match callable
-            .bindings(db, self.env)
+        let paramspec_arguments = self.paramspec_argument_indices(prefix_len);
+        let (mut sub_arguments, projected) = self.arguments.select_for_paramspec(
+            db,
+            self.env,
+            paramspec_arguments.iter().map(|&(index, _)| index),
+            self.argument_matches,
+            self.signature.parameters(),
+            prefix_len,
+        );
+        let has_projected_arguments = projected > 0;
+        if !has_projected_arguments {
+            // When every unpack overlaps the wrapper's prefix ambiguously, use the empty
+            // call for diagnostic recovery and let the wrapper check the unpacks.
+            sub_arguments = CallArguments::none();
+        }
+        // Only a complete projection describes the call that can determine the wrapper's result.
+        let (forwarded_bindings, result_variable) = (projected == paramspec_arguments.len())
+            .then(|| self.paramspec_call_with_result(callable, outer))
+            .flatten()
+            .unzip();
+        let return_context = if result_variable.is_some_and(|var| {
+            self.signature.return_ty.resolve_type_alias(db) != Type::TypeVar(var)
+        }) {
+            // TODO: Combine the callback result with the expected type during outer inference.
+            // For a wrapper returning list[R], the context here describes the list as a whole.
+            TypeContext::default()
+        } else {
+            self.call_expression_tcx
+        };
+        let bindings = match forwarded_bindings
+            .unwrap_or_else(|| callable.bindings(db, self.env))
             .match_parameters(db, self.env, &sub_arguments)
             .check_types(
                 db,
                 self.env,
                 constraints,
                 &sub_arguments,
-                self.call_expression_tcx,
+                return_context,
                 &[],
             ) {
-            Ok(bindings) => bindings,
-            Err(CallError(_, bindings)) => *bindings,
+            Ok(bindings) => {
+                if let Some(variable) = result_variable {
+                    let result = bindings.forwarded_return_type(db, self.env);
+                    // The callback can return the generic wrapper itself. Its type variables
+                    // belong to that separate use, so do not recursively specialize the result.
+                    // Recompute defaults such as S = R using the new R.
+                    let context = outer.generic_context(db);
+                    let types = context
+                        .variables(db)
+                        .zip(outer.types(db))
+                        .map(|(var, &ty)| {
+                            if var == variable {
+                                Some(result)
+                            } else {
+                                inference
+                                    .has_inferred_type(db, var.identity(db))
+                                    .then_some(ty)
+                            }
+                        });
+                    let refined = context.specialize_partial(db, types);
+                    self.return_ty = self.signature.return_ty.apply_specialization(db, refined);
+                }
+                return has_projected_arguments;
+            }
+            Err(CallError(_, bindings)) => bindings,
         };
 
         let mut extend_errors = |binding: &Binding<'db>| {
@@ -8180,7 +8258,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         {
                             *error_parameter_source = Some(parameter_source);
                         } else if let Some(parameter_index) = argument_index
-                            .and_then(|index| paramspec_arguments?.get(index))
+                            .and_then(|index| paramspec_arguments.get(index))
                             .and_then(|(index, _)| {
                                 argument_matches[*index]
                                     .parameters
@@ -8193,7 +8271,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
                     }
 
-                    error.maybe_remap_argument_indices(error_argument_indices)
+                    if has_projected_arguments {
+                        error.map_argument_indices(|index| paramspec_arguments.get(index?)?.1);
+                    }
+                    error
                 }));
         };
 
@@ -8242,7 +8323,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        true
+        has_projected_arguments
     }
 
     fn check_variadic_argument_type(
@@ -8859,8 +8940,12 @@ impl<'db> Binding<'db> {
             .iter()
             .position(|paramspec_argument_index| *paramspec_argument_index == argument_index)?;
 
-        let mut sub_arguments = arguments_types.select_for_paramspec(
-            &paramspec_argument_indices,
+        let bound_argument_offset = usize::from(binding.bound_type.is_some());
+        let (mut sub_arguments, _) = arguments_types.select_for_paramspec(
+            db,
+            env,
+            paramspec_argument_indices.into_iter(),
+            &self.argument_matches[bound_argument_offset..],
             self.signature.parameters(),
             prefix.len(),
         );
@@ -10499,23 +10584,8 @@ impl BindingError<'_> {
         self
     }
 
-    /// Remaps any argument index in this error when a remapping table is available.
-    ///
-    /// This is used when propagating errors from a synthetic sub-call back to the original call.
-    /// Each sub-call argument index is looked up in `argument_indices`; `None` means the error
-    /// should be reported on the whole call expression.
-    fn maybe_remap_argument_indices(mut self, argument_indices: Option<&[Option<usize>]>) -> Self {
-        if let Some(argument_indices) = argument_indices {
-            self.map_argument_indices(|argument_index| {
-                argument_index
-                    .and_then(|index| argument_indices.get(index).copied())
-                    .flatten()
-            });
-        }
-        self
-    }
-
     /// Rewrites every stored argument index with the provided mapping function.
+    /// An index mapped to `None` reports the error on the whole call expression.
     ///
     /// This supports both simple offsets and sparse sub-call remapping. For a forwarded `ParamSpec`
     /// call, the sub-call only contains the arguments supplied to `P`. An error at sub-call
