@@ -94,7 +94,7 @@ def api(
         raise
 
 
-def matches_comment(comment: dict, pull_request: int, marker: str) -> bool:
+def matches_comment(comment: dict[str, Any], pull_request: int, marker: str) -> bool:
     author = comment.get("user") or {}
     return (
         author.get("id") == BOT_ID
@@ -117,7 +117,7 @@ def read_comment_id(path: str) -> int | None:
 
 def find_report(
     pull_request: int, report: str, comment_id: int | None = None
-) -> dict | None:
+) -> dict[str, Any] | None:
     if comment_id is None:
         return None
     comment = api(f"issues/comments/{comment_id}", missing_ok=True)
@@ -130,7 +130,7 @@ def find_report(
     return comment
 
 
-def find_artifact(run_id: int, name: str) -> dict | None:
+def find_artifact(run_id: int, name: str) -> dict[str, Any] | None:
     matches = []
     page = 1
     while True:
@@ -149,7 +149,9 @@ def find_artifact(run_id: int, name: str) -> dict | None:
     return max(matches, key=lambda artifact: artifact["id"]) if matches else None
 
 
-def download_artifact(artifact: dict, *, max_bytes: int = MAX_ARCHIVE_BYTES) -> bytes:
+def download_artifact(
+    artifact: dict[str, Any], *, max_bytes: int = MAX_ARCHIVE_BYTES
+) -> bytes:
     if artifact["size_in_bytes"] > max_bytes:
         raise ValueError("The report archive exceeds the download limit.")
     result = subprocess.run(
@@ -187,7 +189,7 @@ def read_report(
 
 def upload_html_report(
     files: dict[str, tuple[str, str]],
-    artifact: dict,
+    artifact: dict[str, Any],
     *,
     prefix: str,
     bucket: str,
@@ -232,11 +234,11 @@ def upload_html_report(
 def render_report(
     report: str,
     contents: str,
-    run: dict,
-    artifact: dict,
+    run: dict[str, Any],
+    artifact: dict[str, Any],
     *,
     title: str = "",
-    full_report: dict | None = None,
+    full_report: dict[str, Any] | None = None,
     full_report_url: str = "",
     html_files: dict[str, tuple[str, str]] | None = None,
 ) -> str:
@@ -273,7 +275,7 @@ def render_report(
     )
 
 
-def report_run(comment: dict) -> tuple[int, int]:
+def report_run(comment: dict[str, Any]) -> tuple[int, int]:
     lines = comment["body"].splitlines()
     if len(lines) > 1 and (
         match := re.fullmatch(
@@ -286,7 +288,7 @@ def report_run(comment: dict) -> tuple[int, int]:
 
 def current_run(
     run_id: int, run_attempt: int, workflow_ref: str, pull_request: int
-) -> dict | None:
+) -> dict[str, Any] | None:
     run = api(f"actions/runs/{run_id}")
     if run["run_attempt"] != run_attempt:
         print("The workflow run has been rerun.", file=sys.stderr)

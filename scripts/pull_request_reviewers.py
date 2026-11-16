@@ -32,7 +32,7 @@ class Pool:
     reviewers: tuple[str, ...]
 
 
-def api(endpoint: str, *, data: dict | None = None) -> Any:
+def api(endpoint: str, *, data: dict[str, object] | None = None) -> Any:
     request = Request(
         f"{API_ROOT}/{endpoint}",
         data=json.dumps(data).encode() if data is not None else None,
@@ -107,7 +107,7 @@ def load_state(path: Path) -> State:
     return {}
 
 
-def eligible_pull(pull: dict, pull_request: int, head_sha: str) -> bool:
+def eligible_pull(pull: dict[str, Any], pull_request: int, head_sha: str) -> bool:
     return (
         pull["number"] == pull_request
         and pull["state"] == "open"
@@ -117,7 +117,7 @@ def eligible_pull(pull: dict, pull_request: int, head_sha: str) -> bool:
     )
 
 
-def has_reviewer(pull: dict) -> bool:
+def has_reviewer(pull: dict[str, Any]) -> bool:
     author = pull["user"]["login"].lower()
     return any(user["login"].lower() != author for user in pull["requested_reviewers"])
 

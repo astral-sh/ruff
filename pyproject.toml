@@ -409,7 +409,6 @@ include = [
 ]
 
 [tool.ty.overrides.rules]
-missing-type-argument = "ignore"
 unsound-return = "ignore"
 
 [[tool.ty.overrides]]
