@@ -22,23 +22,27 @@ fn unit_struct_cache_key() {
 fn named_field_struct() {
     #[derive(CacheKey, Hash)]
     struct NamedFieldsStruct {
-        a: String,
-        b: String,
+        name: String,
+        version: u32,
     }
 
     let mut key = CacheKeyHasher::new();
 
     let named_fields = NamedFieldsStruct {
-        a: "Hello".into(),
-        b: "World".into(),
+        name: "Hello".into(),
+        version: 1,
     };
 
     named_fields.cache_key(&mut key);
 
     let mut hash = CacheKeyHasher::new();
     named_fields.hash(&mut hash);
-
     assert_eq!(hash.finish(), key.finish());
+
+    let mut fields = CacheKeyHasher::new();
+    named_fields.name.cache_key(&mut fields);
+    named_fields.version.cache_key(&mut fields);
+    assert_eq!(fields.finish(), key.finish());
 }
 
 #[test]

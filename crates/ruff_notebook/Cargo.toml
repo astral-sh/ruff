@@ -10,6 +10,9 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[lib]
+doctest = false
+
 [dependencies]
 ruff_diagnostics = { workspace = true }
 ruff_source_file = { workspace = true, features = ["serde"] }

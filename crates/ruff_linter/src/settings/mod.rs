@@ -936,6 +936,8 @@ impl Display for TargetVersion {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt;
+
     use crate::RuleSelector;
     use crate::codes::Category;
     use crate::registry::RuleSet;
@@ -943,6 +945,29 @@ mod tests {
     use crate::settings::types::PreviewMode;
 
     use super::DEFAULT_SELECTORS;
+
+    #[test]
+    fn display_quoted_settings() {
+        struct Settings<'a> {
+            name: &'a str,
+        }
+
+        for name in ["Default Name", ""] {
+            let settings = Settings { name };
+            let display = fmt::from_fn(|f| {
+                display_settings! {
+                    formatter = f,
+                    namespace = "sub_settings",
+                    fields = [settings.name | quoted]
+                }
+                Ok(())
+            });
+            assert_eq!(
+                display.to_string(),
+                format!("sub_settings.name = \"{name}\"\n")
+            );
+        }
+    }
 
     #[test]
     fn preview_default_rules() {

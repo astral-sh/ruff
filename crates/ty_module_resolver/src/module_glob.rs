@@ -485,10 +485,16 @@ mod tests {
     fn test_negated_pattern() {
         let set = ModuleGlobSet::from_patterns(["test.*", "!test.internal"]).unwrap();
 
-        assert_include(&set, "test.foo");
+        assert!(
+            set.matches(&ModuleName::new("test.foo").unwrap())
+                .is_include()
+        );
         assert_include(&set, "test.bar");
         // Last match wins - !test.internal matches last, so it excludes.
-        assert_excludes(&set, "test.internal");
+        assert!(
+            set.matches(&ModuleName::new("test.internal").unwrap())
+                .is_exclude()
+        );
     }
 
     #[test]

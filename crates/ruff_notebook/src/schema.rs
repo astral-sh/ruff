@@ -259,3 +259,19 @@ pub enum SourceValue {
     String(String),
     StringArray(Vec<String>),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{LanguageInfo, SortAlphabetically};
+
+    #[test]
+    fn sort_flattened_metadata_alphabetically() {
+        let info: LanguageInfo =
+            serde_json::from_str(r#"{"name":"python","version":"3","display_name":"Python"}"#)
+                .unwrap();
+        assert_eq!(
+            serde_json::to_string(&SortAlphabetically(&info)).unwrap(),
+            r#"{"display_name":"Python","name":"python","version":"3"}"#,
+        );
+    }
+}
