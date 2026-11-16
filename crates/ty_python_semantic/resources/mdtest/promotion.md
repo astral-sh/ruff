@@ -305,14 +305,14 @@ segments: Sequence[tuple[int, int] | tuple[int, int, int]] = [(1, 2), (3, 4, 5)]
 reveal_type(segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
 ```
 
-Promotion still occurs when a covariant collection type context provides a gradual element type.
+A covariant collection type context can instead supply a gradual element type.
 
 ```py
 from typing import Any
 from collections.abc import Mapping
 
 segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
-reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
+reveal_type(segments)  # revealed: dict[str, Any]
 ```
 
 ## Non-tuple elements do not block tuple-size promotion

@@ -103,11 +103,19 @@ c: tuple[str | int, str] = ([], "foo")
 ## Incorrect collection literal assignments are complained about
 
 ```py
-# error: [invalid-assignment] "Object of type `list[str | int]` is not assignable to `list[str]`"
+from collections.abc import Mapping
+
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[str]`"
 a: list[str] = [1, 2, 3]
 
 # error: [invalid-assignment] "Object of type `set[int | str]` is not assignable to `set[int]`"
 b: set[int] = {1, 2, "3"}
+
+# error: [invalid-assignment] "Object of type `dict[int, int]` is not assignable to `dict[str, object]`"
+bad_key: dict[str, object] = {1: 2}
+
+# error: [invalid-assignment] "Object of type `dict[int, int]` is not assignable to `Mapping[str, object]`"
+bad_mapping_key: Mapping[str, object] = {1: 2}
 ```
 
 ## Mutually assignable annotated assignments use the declared type

@@ -107,9 +107,8 @@ class Items:
 
 def _(items: Items):
     items.update(items.items)
-    # TODO: This should still be a list, and accessing `missing` should be an error.
-    reveal_type(items.items)  # revealed: Unknown
-    items.items.missing
+    reveal_type(items.items)  # revealed: list[Unknown] | list[tuple[Unknown]]
+    items.items.missing  # error: [missing-attribute]
 ```
 
 ## Reading an attribute with a growing type argument

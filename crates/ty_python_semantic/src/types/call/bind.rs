@@ -9334,8 +9334,6 @@ impl<'db> Binding<'db> {
             ))
         }
 
-        let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
-            FxHashMap::default();
         let return_bounds = call_expression_tcx.expected_type().map(|expected| {
             self.unspecialized_return_type(db)
                 .assignable_solutions_for_argument_context(
@@ -9345,27 +9343,9 @@ impl<'db> Binding<'db> {
                     generic_context.inferable_typevars(db),
                 )
         });
-        if let Some(path_bounds) = return_bounds {
-            let solutions = path_bounds.solve_for_argument_context(db, env, constraints);
-            if let Solutions::Constrained(solutions) = solutions {
-                for solution in solutions.into_vec() {
-                    for binding in solution.solved_typevars {
-                        let identity = binding.bound_typevar.identity(db);
-                        return_type_solutions
-                            .entry(identity)
-                            .and_modify(|existing| {
-                                *existing = UnionType::from_two_elements(
-                                    db,
-                                    env,
-                                    *existing,
-                                    binding.solution,
-                                );
-                            })
-                            .or_insert(binding.solution);
-                    }
-                }
-            }
-        }
+        let return_type_solutions = return_bounds
+            .map(|bounds| bounds.solve_for_argument_context(db, env, constraints))
+            .unwrap_or_default();
 
         if return_type_solutions.is_empty()
             && let Some(specialization) = inferred_parameter_context(

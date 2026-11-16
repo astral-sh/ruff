@@ -90,7 +90,7 @@ def _(flag: bool, unknown: list[Unknown], gradual: list[Any]):
     reveal_type(["x"] if flag else unknown)  # revealed: list[Unknown]
     reveal_type(["x"] if flag else gradual)  # revealed: list[Any]
     # TODO: This should reveal `list[int | str]` based on the peer type context.
-    reveal_type(["x"] if flag else [1])  # revealed: list[int | str] | list[int]
+    reveal_type(["x"] if flag else [1])  # revealed: list[str] | list[int]
     reveal_type(["x"] if flag else {})  # revealed: list[str] | dict[Unknown, Unknown]
 ```
 

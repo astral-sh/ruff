@@ -162,14 +162,13 @@ def assign(**values: first.Value) -> None:
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `dict[str, first.Value | second.Value]` is not assignable to `dict[str, first.Value]`
+error[invalid-assignment]: Object of type `dict[str, second.Value]` is not assignable to `dict[str, first.Value]`
  --> src/mdtest_snippet.py:5:14
   |
 4 | def assign(**values: first.Value) -> None:
   |                      ----------- Keyword-variadic parameter annotation declares the type as `dict[str, first.Value]`
 5 |     values = {"item": second.Value()}  # snapshot: invalid-assignment
-  |              ^^^^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `dict[str, first.Value | second.Value]`
-info: element `second.Value` of union `first.Value | second.Value` is not assignable to `first.Value`
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `dict[str, second.Value]`
 ```
 
 ## Ambiguous declaration origins

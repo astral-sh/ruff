@@ -3565,7 +3565,7 @@ def inspect(container: Container):
             reveal_type(tree[0][0])  # revealed: int | Growing[list[list[int]]]
 
     values = [legacy(1), modern(1)]
-    reveal_type(values)  # revealed: list[int | list[Growing[list[int]]]]
+    reveal_type(values)  # revealed: list[Growing[int]]
     tree = values[0]
     if isinstance(tree, list):
         reveal_type(tree[0])  # revealed: Growing[list[int]]
