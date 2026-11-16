@@ -569,10 +569,10 @@ fn fix_by_removing_imports<'a>(
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
-    let aliases = match statement {
-        Stmt::Import(ast::StmtImport { names, .. })
-        | Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => names,
-        _ => bail!("Expected import statement"),
+    let (Stmt::Import(ast::StmtImport { names: aliases, .. })
+    | Stmt::ImportFrom(ast::StmtImportFrom { names: aliases, .. })) = statement
+    else {
+        bail!("Expected import statement");
     };
 
     // Identify each import by its position in the statement rather than by its name, since the
