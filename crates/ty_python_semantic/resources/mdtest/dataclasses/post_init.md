@@ -34,16 +34,31 @@ class Empty5:
 @dataclass
 class Empty6:
     def __post_init__(self, *args, **kargs): ...  # fine
+```
 
+```py
 @dataclass
 class Empty7:
     # no arguments will be passed to this method at runtime,
     # because there are no `InitVar` fields on the class,
     # so this is an error:
     #
-    # error: [invalid-dataclass-post-init]
+    # snapshot: invalid-dataclass-post-init
     def __post_init__(self, required_argument: int): ...
+```
 
+```snapshot
+error[invalid-dataclass-post-init]: Invalid `__post_init__` signature for dataclass `Empty7`
+  --> src/mdtest_snippet.py:36:9
+   |
+36 |     def __post_init__(self, required_argument: int): ...
+   |         ^^^^^^^^^^^^^
+info: unexpected extra parameter `required_argument`
+help: Parameter `required_argument` must have a default value
+help: A `__post_init__` method must accept a call where all `InitVar` fields are passed as positional arguments
+```
+
+```py
 @dataclass
 class Empty8:
     # error: [invalid-dataclass-post-init]
@@ -95,16 +110,17 @@ class HasInitVarBadParameterType:
     x: InitVar[int]
 
     # snapshot: invalid-dataclass-post-init
-    def __post_init__(self, x: str) -> None: ...
+    def __post_init__(self, value: str) -> None: ...
 ```
 
 ```snapshot
 error[invalid-dataclass-post-init]: Invalid `__post_init__` signature for dataclass `HasInitVarBadParameterType`
-  --> src/mdtest_snippet.py:87:9
+  --> src/mdtest_snippet.py:85:9
    |
-87 |     def __post_init__(self, x: str) -> None: ...
+85 |     def __post_init__(self, value: str) -> None: ...
    |         ^^^^^^^^^^^^^
-info: `__post_init__` methods must accept all `InitVar` fields as positional-only parameters
+info: the second parameter has an incompatible type: `int` is not assignable to `str`
+help: A `__post_init__` method must accept a call where all `InitVar` fields are passed as positional arguments
 ```
 
 ```py
@@ -112,9 +128,21 @@ info: `__post_init__` methods must accept all `InitVar` fields as positional-onl
 class HasInitVarBadParameterKind:
     x: InitVar[int]
 
-    # error: [invalid-dataclass-post-init]
+    # snapshot: invalid-dataclass-post-init
     def __post_init__(self, *, x: int) -> None: ...
+```
 
+```snapshot
+error[invalid-dataclass-post-init]: Invalid `__post_init__` signature for dataclass `HasInitVarBadParameterKind`
+  --> src/mdtest_snippet.py:91:9
+   |
+91 |     def __post_init__(self, *, x: int) -> None: ...
+   |         ^^^^^^^^^^^^^
+info: parameter `x` is keyword-only but must also accept positional arguments
+help: A `__post_init__` method must accept a call where all `InitVar` fields are passed as positional arguments
+```
+
+```py
 @dataclass
 class HasInitVarGood:
     x: InitVar[int]
