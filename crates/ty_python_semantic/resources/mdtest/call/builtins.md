@@ -697,8 +697,8 @@ OrderedDict(zip(["name"], items))
 
 ## Contextual inference for `next`
 
-An incompatible return context does not make an invalid iterator argument valid. An optional context
-also preserves the concrete return type of a valid iterator.
+The iterator determines the result type of `next`. Returning that `int` from a method annotated with
+`str` is an error.
 
 ```toml
 [rules]
@@ -711,11 +711,7 @@ class Counter:
         return 1
 
     def text(self) -> str:
-        # TODO: Infer `int` for `next(self)` and report a single `invalid-explicit-return` error
-        # for returning `int` where `str` is expected.
-        # error: [invalid-argument-type] "Expected `SupportsNext[str]`, found `Self@text`"
-        # error: [unsound-return] "`Unknown`"
-        return next(self)
+        return next(self)  # error: [invalid-explicit-return]
 
     def read(self) -> int | None:
         return reveal_type(next(self))  # revealed: int

@@ -1144,6 +1144,42 @@ class Task(Generic[P]):
         return 1
 ```
 
+### Implementation consistency with an enclosing bounded type variable
+
+An overload can refer to a type variable declared by its enclosing function. The implementation must
+accept every specialization allowed by that variable's bound.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import overload
+
+def outer[T: int](value: T) -> None:
+    @overload
+    def inner(value: T) -> None: ...
+    @overload
+    def inner(value: str) -> None: ...
+    def inner(value: int | str) -> None: ...
+```
+
+The same applies to legacy type variables:
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T", bound=int)
+
+def outer_legacy(value: T) -> None:
+    @overload
+    def inner(value: T) -> None: ...
+    @overload
+    def inner(value: str) -> None: ...
+    def inner(value: int | str) -> None: ...
+```
+
 ### Decorated implementation consistency
 
 Decorators on an overload implementation apply only to the implementation signature. The decorated

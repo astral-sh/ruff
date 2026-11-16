@@ -1,7 +1,6 @@
 //! Display implementations for types.
 
 use crate::ProgramEnvironment;
-use crate::types::typevar::TypeVarSet;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
@@ -30,7 +29,7 @@ use crate::types::recursive::RecursiveType;
 use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature};
 use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::type_alias::QualifiedTypeAliasName;
-use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
@@ -3970,9 +3969,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 let set = constraints.load(db, self.env, interned_set.constraints(db));
                 if interned_set.detailed_display(db) {
                     write!(f, "[{}]", set.display(db, self.env))
-                } else if set.is_always_satisfied(db, self.env, TypeVarSet::None) {
+                } else if set.is_always_satisfied(db, self.env, TypeVarSet::All) {
                     f.write_str("[Literal[True]]")
-                } else if set.is_never_satisfied(db, self.env, TypeVarSet::None) {
+                } else if set.is_never_satisfied(db, self.env, TypeVarSet::All) {
                     f.write_str("[Literal[False]]")
                 } else {
                     f.write_str("[bool]")

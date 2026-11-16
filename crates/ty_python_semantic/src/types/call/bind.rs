@@ -2301,6 +2301,7 @@ impl<'db> Bindings<'db> {
                                             env,
                                             ty_b,
                                             constraints,
+                                            TypeVarSet::All,
                                         )
                                     } else {
                                         ty_a.when_subtype_of(
@@ -2351,6 +2352,7 @@ impl<'db> Bindings<'db> {
                                         env,
                                         ty_b,
                                         constraints,
+                                        TypeVarSet::All,
                                     )
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
@@ -2999,6 +3001,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 lower,
                             )
@@ -3028,6 +3031,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 upper,
                             )
@@ -3057,6 +3061,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 value,
                             )
@@ -3089,6 +3094,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 lower,
                                 upper,
@@ -3206,9 +3212,15 @@ impl<'db> Bindings<'db> {
                         let result = constraints.into_owned(|constraints| {
                             let set = constraints.load(db, env, tracked.constraints(db));
                             if matches!(method, KnownBoundMethodType::ConstraintSetExists(_)) {
-                                set.reduce_inferable(db, env, constraints, typevars)
+                                set.reduce_inferable(
+                                    db,
+                                    env,
+                                    constraints,
+                                    typevars,
+                                    TypeVarSet::All,
+                                )
                             } else {
-                                set.for_all(db, env, constraints, typevars)
+                                set.for_all(db, env, constraints, typevars, TypeVarSet::All)
                             }
                         });
                         let tracked = InternedConstraintSet::new(db, result);
@@ -6982,7 +6994,11 @@ impl<'db> CallInference<'_, 'db> {
             };
             let return_constraints = return_ty
                 .when_constraint_set_assignable_to_owned_with_provenance(
-                    db, self.env, tcx, provenance,
+                    db,
+                    self.env,
+                    tcx,
+                    self.inferable_typevars,
+                    provenance,
                 );
             builder.record_constraint_set(constraints.load(db, self.env, &return_constraints));
             (return_ty, tcx)
@@ -8666,12 +8682,11 @@ pub(crate) fn inferable_typevar_occurrences<'db>(
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             if let Type::TypeVar(typevar) = ty {
-                let identity = if typevar.is_paramspec(db) {
-                    typevar.without_paramspec_attr(db).identity(db)
-                } else {
-                    typevar.identity(db)
-                };
-                if identity.is_inferable(db, self.inferable) {
+                if typevar
+                    .identity(db)
+                    .binder()
+                    .is_inferable(db, self.inferable)
+                {
                     self.count.set(self.count.get() + 1);
                 }
                 return;
@@ -9354,14 +9369,10 @@ impl<'db> Binding<'db> {
 
         let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
             FxHashMap::default();
+        let inferable = generic_context.inferable_typevars(db);
         let return_bounds = call_expression_tcx.expected_type().map(|expected| {
             self.unspecialized_return_type(db)
-                .assignable_solutions_for_argument_context(
-                    db,
-                    env,
-                    expected,
-                    generic_context.inferable_typevars(db),
-                )
+                .assignable_solutions_for_argument_context(db, env, expected, inferable)
         });
         if let Some(path_bounds) = return_bounds {
             let solutions = path_bounds.solve_for_argument_context(db, env, constraints);
@@ -9550,6 +9561,7 @@ impl<'db> Binding<'db> {
         // create multiple instances of a single typevar identity with different
         // bounds/constraints. We should reconcile the invariants expected by the constraint solver
         // with those actually enforced by our typevar representation.
+        let call = CallInference::new(db, env, self, arguments, call_expression_tcx);
         let constraints = &ConstraintSetBuilder::new();
         let parameters = self.signature.parameters();
 
@@ -9569,8 +9581,7 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let inferred =
-            CallInference::new(db, env, self, arguments, call_expression_tcx).infer(constraints);
+        let inferred = call.infer(constraints);
 
         let mut checker = ArgumentTypeChecker::new(
             db,

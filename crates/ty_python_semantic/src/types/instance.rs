@@ -1015,7 +1015,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             //
             // Eager finite checks can only reject. Lazy comparisons can also contribute
             // structural solutions, so try them before using the nominal fallback.
-            if (self.typevar_evaluation == TypeVarEvaluation::Lazy || !can_use_nominal_redundancy)
+            if (self.typevar_evaluation.is_lazy() || !can_use_nominal_redundancy)
                 && let Some(structurally_satisfied) = self.try_check_non_recursive_protocol_members(
                     db,
                     ty,
@@ -1123,7 +1123,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         protocol: ProtocolInstanceType<'db>,
         nominally_satisfied: ConstraintSet<'db, 'c>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        if self.typevar_evaluation != TypeVarEvaluation::Lazy
+        if self.typevar_evaluation == TypeVarEvaluation::Eager
             || self.is_context_collection_enabled()
             || nominally_satisfied.is_trivially_never_satisfied()
         {
@@ -1290,7 +1290,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             {
                 return None;
             }
-            _ if self.typevar_evaluation == TypeVarEvaluation::Lazy
+            _ if self.typevar_evaluation.is_lazy()
                 && (self.relation.is_assignability() || self.relation.is_subtyping()) =>
             {
                 true
@@ -1383,7 +1383,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // We run the eager comparison to reject incompatible finite requirements before
         // expanding recursive members. If it cannot reject, the caller checks the full
         // interface instead.
-        (self.typevar_evaluation == TypeVarEvaluation::Lazy
+        (self.typevar_evaluation.is_lazy()
             || structurally_satisfied.is_never_satisfied(db, env, self.inferable))
         .then_some(structurally_satisfied)
     }
@@ -1519,13 +1519,14 @@ fn non_recursive_protocol_interface<'db>(
 /// checked separately after generic inference.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial = |_, _, _, _| OwnedConstraintSet::always(),
+    cycle_initial = |_, _, _, _, _| OwnedConstraintSet::always(),
     heap_size = ruff_memory_usage::heap_size,
 )]
 fn non_recursive_protocol_constraints<'db>(
     db: &'db dyn Db,
     source: ProtocolInstanceType<'db>,
     target: ProtocolInterfaceView<'db>,
+    inferable: TypeVarSet<'db>,
 ) -> OwnedConstraintSet<'db> {
     let env = ProgramEnvironment::from_program(target.base().program(db));
     let constraints = ConstraintSetBuilder::new();
@@ -1537,6 +1538,7 @@ fn non_recursive_protocol_constraints<'db>(
         let checker = TypeRelationChecker::constraint_set_assignability(
             &env,
             constraints,
+            inferable,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
@@ -2103,6 +2105,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         target: Self,
+        inferable: TypeVarSet<'db>,
     ) -> Option<&'db OwnedConstraintSet<'db>> {
         let origin = target.class_origin(db)?;
         let interface = target.interface(db);
@@ -2117,7 +2120,9 @@ impl<'db> ProtocolInstanceType<'db> {
             return None;
         }
 
-        Some(non_recursive_protocol_constraints(db, self, target))
+        Some(non_recursive_protocol_constraints(
+            db, self, target, inferable,
+        ))
     }
 }
 

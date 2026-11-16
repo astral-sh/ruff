@@ -1441,7 +1441,7 @@ class C(Generic[T]):
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
+        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
         invalid: C[int] = C(value)
 ```
 
@@ -2020,7 +2020,7 @@ could be `str` alone, so the initializer cannot assume it accepts both types.
 class Child(Either[T]):
     def initialize(self, cls: type[T], default: T | Callable[[], T]) -> None:
         super().__init__(cls, cls, default)  # ok
-        super().__init__(str, int, default)  # error: [invalid-argument-type] "Expected `Either[str | int]`"
+        super().__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
 ```
 
 For `Either[bytes]`, the receiver is incompatible whether it is bound implicitly or passed
@@ -2562,6 +2562,30 @@ class GenericChild(Gradual, Base[list[T]]): ...
 
 as_specialized: Base[list[int]] = GenericChild[int]()
 incompatible_specialization: Base[list[str]] = GenericChild[int]()  # error: [unsound-assignment]
+```
+
+Both `Child` and `Reversed` inherit `Base[int]`, so a value stored in either must be assignable to
+`int`, even though they both also inherit `Base[Any]`.
+
+```py
+U = TypeVar("U")
+
+def store(value: T, box: Base[T]) -> None:
+    box.value = value
+
+def check(value: U, child: Child, reversed_child: Reversed, concrete: Concrete):
+    # TODO: error: [invalid-argument-type]
+    store("wrong", child)
+    # TODO: error: [invalid-argument-type]
+    store(value, child)
+
+    # TODO: error: [invalid-argument-type]
+    store("wrong", reversed_child)
+    # TODO: error: [invalid-argument-type]
+    store(value, reversed_child)
+
+    store("wrong", concrete)  # error: [invalid-argument-type]
+    store(value, concrete)  # error: [invalid-argument-type]
 ```
 
 ## Method overrides through gradual and concrete inheritance paths
