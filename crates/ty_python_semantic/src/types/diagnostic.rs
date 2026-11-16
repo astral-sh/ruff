@@ -157,7 +157,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_MATCH_PATTERN);
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
-    registry.register_lint(&INVALID_TYPE_IS_NARROWING);
+    registry.register_lint(&DISJOINT_TYPE_IS_NARROWING);
     registry.register_lint(&SUSPICIOUS_TYPE_IS_NARROWING);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&INVALID_TYPE_VARIABLE_BOUND);
@@ -874,8 +874,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-type-is-narrowing.md")]
-    pub(crate) static INVALID_TYPE_IS_NARROWING = {
+    #[doc = include_str!("../../resources/lint_docs/disjoint-type-is-narrowing.md")]
+    pub(crate) static DISJOINT_TYPE_IS_NARROWING = {
         summary: "detects incompatible `TypeIs` narrowings to disjoint types",
         status: LintStatus::stable("0.0.105"),
         default_level: Level::Error,

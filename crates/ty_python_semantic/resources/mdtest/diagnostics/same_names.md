@@ -61,6 +61,46 @@ class DataFrame:
     pass
 ```
 
+## Disjoint `TypeIs` types
+
+`left.py`:
+
+```py
+from typing import final
+
+@final
+class Item: ...
+```
+
+`right.py`:
+
+```py
+from typing import final
+
+@final
+class Item: ...
+```
+
+```pyi
+from typing_extensions import TypeIs
+
+import left
+import right
+
+# snapshot: disjoint-type-is-narrowing
+def is_right_item(value: left.Item) -> TypeIs[right.Item]: ...
+```
+
+```snapshot
+error[disjoint-type-is-narrowing]: Narrowed type `right.Item` is disjoint from the declared parameter type `left.Item`
+ --> src/mdtest_snippet.pyi:7:40
+  |
+7 | def is_right_item(value: left.Item) -> TypeIs[right.Item]: ...
+  |                                        ^^^^^^^^^^^^^^^^^^
+info: `left.Item` is disjoint from `right.Item`
+info: `right.Item` is `@final` and not a subclass of `left.Item`
+```
+
 ## Variadic positional parameter annotations
 
 A variadic positional parameter's annotation uses the same qualified type name as the assignment

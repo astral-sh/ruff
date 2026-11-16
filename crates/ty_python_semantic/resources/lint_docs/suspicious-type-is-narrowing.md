@@ -3,11 +3,10 @@
 Checks for `TypeIs[T]` return annotations where `T` can overlap with the declared type of the
 parameter being narrowed but is not [assignable to] it.
 
-This is a sibling rule to `invalid-type-is-narrowing`, which flags `TypeIs` functions where
-`T` is disjoint from the declared type of the parameter being narrowed. Unlike those cases,
-which are always unsound, the cases caught by this rule can be sound in some situations.
-Nonetheless, their usefulness is rare; this rule can often help identify mistakes in your
-code.
+This is a sibling rule to `disjoint-type-is-narrowing`, which flags `TypeIs` functions where `T` is
+disjoint from the declared type of the parameter being narrowed. Unlike those cases, which are
+always useless, the cases caught by this rule can be sound and useful in some situations.
+Nonetheless, their usefulness is rare; this rule can often help identify mistakes in your code.
 
 ## Why is this bad?
 

@@ -28,10 +28,9 @@ def is_string(value: int | str) -> TypeIs[str]:
 
 ## See also
 
-This rule exclusively covers cases where the parameter type is disjoint from the return type, which
-is always unsound. It sibling rule, `suspicious-type-is-narrowing`, covers cases where the two
-types are not disjoint, but where the return annotation is not a subtype of the parameter
-annotation.
+This rule exclusively covers cases where the parameter type is disjoint from the narrowed type,
+which is always useless. Its sibling rule, `suspicious-type-is-narrowing`, covers cases where the
+two types are not disjoint, but where the narrowed type is [not assignable to] the parameter type.
 
 ## References
 

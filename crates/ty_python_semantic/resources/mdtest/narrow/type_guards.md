@@ -108,12 +108,12 @@ def unreachable(a: Never) -> TypeIs[str]: ...
 If the narrowed type is incompatible and disjoint from the parameter type, ty reports an error:
 
 ```pyi
-# snapshot: invalid-type-is-narrowing
+# snapshot: disjoint-type-is-narrowing
 def _(a: int) -> TypeIs[str]: ...
 ```
 
 ```snapshot
-error[invalid-type-is-narrowing]: Narrowed type `str` is disjoint from the declared parameter type `int`
+error[disjoint-type-is-narrowing]: Narrowed type `str` is disjoint from the declared parameter type `int`
   --> src/mdtest_snippet.pyi:51:18
    |
 51 | def _(a: int) -> TypeIs[str]: ...
@@ -123,12 +123,12 @@ info: `str` and `int` are disjoint due to incompatible instance layouts
 ```
 
 ```pyi
-# snapshot: invalid-type-is-narrowing
+# snapshot: disjoint-type-is-narrowing
 def _(a: list[int]) -> TypeIs[list[str]]: ...
 ```
 
 ```snapshot
-error[invalid-type-is-narrowing]: Narrowed type `list[str]` is disjoint from the declared parameter type `list[int]`
+error[disjoint-type-is-narrowing]: Narrowed type `list[str]` is disjoint from the declared parameter type `list[int]`
   --> src/mdtest_snippet.pyi:53:24
    |
 53 | def _(a: list[int]) -> TypeIs[list[str]]: ...
@@ -164,17 +164,17 @@ from typing import overload
 from typing_extensions import TypeIs
 
 @overload
-# error: [invalid-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `int`"
+# error: [disjoint-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `int`"
 def one_invalid(value: int) -> TypeIs[str]: ...
 @overload
 def one_invalid(value: str) -> TypeIs[str]: ...
 
 # Two distinct invalid overloads should each report their own diagnostic.
 @overload
-# error: [invalid-type-is-narrowing] "Narrowed type `int` is disjoint from the declared parameter type `str`"
+# error: [disjoint-type-is-narrowing] "Narrowed type `int` is disjoint from the declared parameter type `str`"
 def two_invalid(value: str) -> TypeIs[int]: ...
 @overload
-# error: [invalid-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `int`"
+# error: [disjoint-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `int`"
 def two_invalid(value: int) -> TypeIs[str]: ...
 ```
 
