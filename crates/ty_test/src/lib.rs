@@ -57,7 +57,7 @@ pub fn run(
         snapshots: snapshot_path,
     };
 
-    let (suite, dependency_config) =
+    let suite =
         parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
     mdtest::run(
@@ -71,7 +71,6 @@ pub fn run(
             run_test(
                 &mut db,
                 fixture_paths,
-                dependency_config.as_ref(),
                 test,
                 assertion,
                 output_format,
@@ -91,7 +90,6 @@ struct FixturePaths<'a> {
 fn run_test(
     db: &mut db::Db,
     fixture_paths: FixturePaths<'_>,
-    dependency_config: Option<&MarkdownTestConfig>,
     test: &parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
     assertion: &mut String,
     output_format: OutputFormat,
@@ -140,16 +138,12 @@ fn run_test(
 
     // Setup virtual environment with dependencies if specified
     let venv_for_external_dependencies = SystemPathBuf::from("/.venv");
-    // Dependency installation uses the fixture's Python version and lockfile even when a
-    // section overrides the Python version for type checking.
-    if let Some((config, dependencies)) =
-        dependency_config.and_then(|config| Some((config, config.dependencies()?)))
-    {
+    if let Some(dependencies) = test.configuration().dependencies() {
         if !std::env::var(MDTEST_EXTERNAL).is_ok_and(|v| v == "1") {
             return Ok((TestOutcome::Skipped, vec![]));
         }
 
-        let python_platform = config.python_platform().expect(
+        let python_platform = test.configuration().python_platform().expect(
             "Tests with external dependencies must specify `python-platform` in the configuration",
         );
 
@@ -158,7 +152,7 @@ fn run_test(
         external_dependencies::setup_venv(
             db,
             dependencies,
-            config.python_version().unwrap_or_default(),
+            python_version,
             &python_platform,
             &venv_for_external_dependencies,
             &lockfile_path,
@@ -252,7 +246,7 @@ fn run_test(
 
     let configuration = test.configuration();
 
-    let python = if dependency_config.is_some() {
+    let python = if configuration.dependencies().is_some() {
         // If dependencies were specified, use the venv we just set up
         Some(venv_for_external_dependencies.as_path())
     } else {
@@ -621,24 +615,20 @@ fn expand_site_packages_placeholder(
 fn parse<'s>(
     short_title: &'s str,
     source: &'s str,
-) -> anyhow::Result<(
-    parser::MarkdownTestSuite<'s, MarkdownTestConfig>,
-    Option<MarkdownTestConfig>,
-)> {
-    let mut dependency_config = None;
-    let suite = parser::parse::<MarkdownTestConfig>(short_title, source, |config| {
+) -> anyhow::Result<parser::MarkdownTestSuite<'s, MarkdownTestConfig>> {
+    let mut file_has_dependencies = false;
+    parser::parse::<MarkdownTestConfig>(short_title, source, |config| {
         if config.dependencies().is_some() {
-            if dependency_config.is_some() {
+            if file_has_dependencies {
                 bail!(
                     "Multiple sections with `[project]` dependencies in the same file are not allowed. \
                      External dependencies must be specified in a single top-level configuration block."
                 );
             }
-            dependency_config = Some(config.clone());
+            file_has_dependencies = true;
         }
         Ok(())
-    })?;
-    Ok((suite, dependency_config))
+    })
 }
 
 #[cfg(test)]
