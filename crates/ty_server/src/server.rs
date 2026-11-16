@@ -34,6 +34,10 @@ pub(crate) use script_progress::ScriptProgress;
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 /// Maximum number of requests waiting for a worker.
+///
+/// The exact number is arbitrary. A high limit leaves room for bursts of editor
+/// requests. When the queue fills, the server rejects new background requests
+/// to apply back pressure.
 pub(crate) const MAX_QUEUED_REQUESTS: usize = 2048;
 
 pub struct Server {
