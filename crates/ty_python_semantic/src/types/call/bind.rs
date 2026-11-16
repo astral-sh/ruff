@@ -4859,8 +4859,14 @@ impl<'db> CallableBinding<'db> {
             );
 
             let inferable = self.overloads[*current_index].inferable_typevars;
-            if top_materialized_argument_type
-                .when_assignable_to(db, env, parameter_types, constraints, inferable)
+            let when = top_materialized_argument_type.when_assignable_to_owned(
+                db,
+                env,
+                parameter_types,
+                inferable,
+            );
+            if constraints
+                .load(db, env, &when)
                 .is_always_satisfied(db, env, inferable)
             {
                 for &index in remaining {
@@ -7229,14 +7235,11 @@ impl<'db> CallInference<'_, 'db> {
             } else {
                 ConstraintProvenance::DECLARED
             };
-            let return_constraints = return_ty.when_constraint_set_assignable_to_with_provenance(
-                db,
-                self.env,
-                tcx,
-                constraints,
-                provenance,
-            );
-            builder.record_constraint_set(return_constraints);
+            let return_constraints = return_ty
+                .when_constraint_set_assignable_to_owned_with_provenance(
+                    db, self.env, tcx, provenance,
+                );
+            builder.record_constraint_set(constraints.load(db, self.env, &return_constraints));
             (return_ty, tcx)
         });
 
@@ -8165,13 +8168,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && !constructor_receiver
             && (!has_starred_annotation || matched_parameter.expected_type.is_some())
             && !is_valid_isinstance_target()
-            && argument_type
-                .when_assignable_to(
+            && constraints
+                .load(
                     db,
                     self.env,
-                    expected_ty,
-                    constraints,
-                    self.inferable_typevars,
+                    &argument_type.when_assignable_to_owned(
+                        db,
+                        self.env,
+                        expected_ty,
+                        self.inferable_typevars,
+                    ),
                 )
                 .is_never_satisfied(db, self.env, self.inferable_typevars)
             && !self.should_defer_typevartuple_callable_check(
