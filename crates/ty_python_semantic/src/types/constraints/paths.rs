@@ -54,7 +54,7 @@ struct AssignmentIndex;
 /// "per-path" limit, which records how far removed a derived constraint is from a constraint that
 /// actually appears in the BDD. If either of those limits are exceeded, we ignore the derived
 /// constraint that we are currently considering.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent<AtomicConstraintId, u16>>,
@@ -412,6 +412,29 @@ impl PathAssignments {
         }
     }
 
+    /// Add an assignment and propagate its consequences. On conflict, the caller
+    /// must discard the path or roll back the edge before adding another assignment.
+    pub(super) fn assume<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        assignment: Assignment<AtomicConstraintId>,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
+    ) -> bool {
+        debug_assert!(self.assignment_queue.is_empty());
+        self.assignment_queue
+            .push_back((assignment, AssignmentFuel::origin()));
+        self.drain_assignment_queue(
+            db,
+            env,
+            storage,
+            assignment.constraint(),
+            unspecialized_type_var_policy,
+        )
+        .is_ok()
+    }
+
     /// Walks one of the outgoing edges of an internal BDD node. `assignment` describes the
     /// constraint that the BDD node checks, and whether we are following the `if_true` or
     /// `if_false` edge.
@@ -463,19 +486,8 @@ impl PathAssignments {
             edge = %assignment.into_inner().display(db, env, storage),
             "walk edge",
         );
-        debug_assert!(self.assignment_queue.is_empty());
-        self.assignment_queue
-            .push_back((assignment, AssignmentFuel::origin()));
-        let source_constraint = assignment.constraint();
-        let found_conflict = self
-            .drain_assignment_queue(
-                db,
-                env,
-                storage,
-                source_constraint,
-                unspecialized_type_var_policy,
-            )
-            .is_err();
+        let found_conflict =
+            !self.assume(db, env, storage, assignment, unspecialized_type_var_policy);
         if !found_conflict {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",

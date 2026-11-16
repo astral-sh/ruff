@@ -280,6 +280,10 @@ fn benchmark_counterexample_behind_implied_bound(criterion: &mut Criterion) {
             2 * i, 2 * i + 1
         ))
         .join(" & ");
+    // Falsifying a long disjunction requires one continuous path through every bound.
+    let alternatives = (1000..1033)
+        .map(|i| format!("ConstraintSet.lower_bound(Literal[{i}], U)"))
+        .join(" | ");
     let code = format!(
         "
         from typing import Literal
@@ -292,6 +296,8 @@ fn benchmark_counterexample_behind_implied_bound(criterion: &mut Criterion) {
             u_int = ConstraintSet.upper_bound(U, int)
             choices = {choices}
             static_assert(not (~(t_bool & choices) | (u_int & t_int)))
+            alternatives = {alternatives}
+            static_assert(not (((t_int | ~choices) & t_bool) | alternatives))
         "
     );
     criterion.bench_function("ty_micro[counterexample_behind_implied_bound]", |b| {

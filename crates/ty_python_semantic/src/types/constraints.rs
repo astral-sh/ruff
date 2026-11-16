@@ -2450,6 +2450,26 @@ impl NodeId {
         }
     }
 
+    /// Look for a counterexample by falsifying each atom. When the false branch
+    /// has no disjunct of its own, only the uncertain branch can still be true.
+    /// Stop if following an edge would require combining branches.
+    fn all_negative_path_to_false(
+        self,
+        storage: &ConstraintSetStorage<'_>,
+    ) -> Option<SmallVec<[AtomicConstraintId; 4]>> {
+        let mut atoms = SmallVec::new();
+        let mut node = self;
+        while let Node::Interior(_) = node.node() {
+            let interior = storage.interior_node_data(node);
+            if interior.if_false != ALWAYS_FALSE {
+                return None;
+            }
+            atoms.push(interior.constraint.as_atomic(storage)?);
+            node = interior.if_uncertain;
+        }
+        (node == ALWAYS_FALSE).then_some(atoms)
+    }
+
     /// Returns whether this BDD represent the constant function `true`.
     fn is_always_satisfied<'db>(
         self,
@@ -2459,25 +2479,6 @@ impl NodeId {
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
-        // Look for a short counterexample before committing to an unbounded search.
-        // The opposite branch can contain the only witness, so cap the speculative work.
-        if let Node::Interior(interior) = self.node() {
-            const PROBE_VISITS: usize = 32;
-            let limits = BoundedSolutionLimits {
-                remaining_paths: PROBE_VISITS,
-                remaining_visits: PROBE_VISITS,
-            };
-            let source_orders = storage.calculate_source_orders(source_order);
-            let mut probe =
-                SolutionWalker::new(db, storage, source_orders, inferable, limits, self);
-            probe.prefer_false = true;
-            let mut path = interior.path_assignments(db, env, storage, source_order);
-            if let ControlFlow::Continue(result) =
-                probe.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
-            {
-                return result;
-            }
-        }
         let ControlFlow::Continue(result) = self.is_always_satisfied_with_limits(
             db,
             env,
@@ -2502,10 +2503,24 @@ impl NodeId {
             Node::AlwaysTrue => ControlFlow::Continue(true),
             Node::AlwaysFalse => ControlFlow::Continue(false),
             Node::Interior(interior) => {
+                // Bounded callers account for each visit in the exact traversal.
+                let try_all_negative_path = limits.traversal_budget().is_none();
                 let source_orders = storage.calculate_source_orders(source_order);
                 let mut walker =
                     SolutionWalker::new(db, storage, source_orders, inferable, limits, self);
                 let mut path = interior.path_assignments(db, env, storage, source_order);
+                if try_all_negative_path
+                    && let Some(atoms) = self.all_negative_path_to_false(storage)
+                    && walker.has_all_negative_counterexample(
+                        db,
+                        env,
+                        storage,
+                        path.clone(),
+                        &atoms,
+                    )
+                {
+                    return ControlFlow::Continue(false);
+                }
                 walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
             }
         }
