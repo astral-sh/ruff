@@ -90,3 +90,14 @@ def while_loop_mutation():
         while len(letters[index]) < 5:
             letters[index] += "a"
 
+    # unpack assignment to index
+    for index, letter in enumerate(letters):
+        index, _ = 1, 2
+        print(letters[index])
+
+    # list unpack assignment to letter
+    for index, letter in enumerate(letters):
+        [_, letter] = 1, "d"
+        print(letters[index])
+
+

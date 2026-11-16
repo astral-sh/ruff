@@ -134,33 +134,21 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
         }
         match stmt {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                if targets.iter().any(|target| self.is_assignment(target)) {
-                    self.modified = true;
-                    return;
-                }
+                self.modified = targets.iter().any(|target| self.is_assignment(target));
                 self.visit_expr(value);
             }
             Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                if self.is_assignment(target) {
-                    self.modified = true;
-                    return;
-                }
                 if let Some(value) = value {
+                    self.modified = self.is_assignment(target);
                     self.visit_expr(value);
                 }
             }
             Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                if self.is_assignment(target) {
-                    self.modified = true;
-                    return;
-                }
+                self.modified = self.is_assignment(target);
                 self.visit_expr(value);
             }
             Stmt::Delete(ast::StmtDelete { targets, .. }) => {
-                if targets.iter().any(|target| self.is_assignment(target)) {
-                    self.modified = true;
-                    return;
-                }
+                self.modified = targets.iter().any(|target| self.is_assignment(target));
             }
             _ => visitor::walk_stmt(self, stmt),
         }
@@ -169,12 +157,6 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
     fn visit_expr(&mut self, expr: &Expr) {
         if self.modified {
             return;
-        }
-        if let Expr::Named(ast::ExprNamed { target, .. }) = expr {
-            if self.is_assignment(target) {
-                self.modified = true;
-                return;
-            }
         }
         if let Expr::Subscript(ast::ExprSubscript {
             value,
