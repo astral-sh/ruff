@@ -417,16 +417,18 @@ impl Rule {
 /// Pairs of checks that shouldn't be enabled together.
 pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
     (
-        Rule::BlankLineBeforeClass,
-        Rule::IncorrectBlankLineBeforeClass,
-        "`incorrect-blank-line-before-class` (D203) and `blank-line-before-class` (D211) are \
-         incompatible. Ignoring `incorrect-blank-line-before-class`.",
+        Rule::BlankLineBeforeClassDocstring,
+        Rule::IncorrectBlankLineBeforeClassDocstring,
+        "`incorrect-blank-line-before-class-docstring` (D203) and \
+         `blank-line-before-class-docstring` (D211) are incompatible. \
+         Ignoring `incorrect-blank-line-before-class-docstring`.",
     ),
     (
-        Rule::MultiLineSummaryFirstLine,
-        Rule::MultiLineSummarySecondLine,
-        "`multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are \
-         incompatible. Ignoring `multi-line-summary-second-line`.",
+        Rule::BlankLineBeforeDocstringSummaryLine,
+        Rule::MissingBlankLineBeforeDocstringSummaryLine,
+        "`blank-line-before-docstring-summary-line` (D212) and \
+         `missing-blank-line-before-docstring-summary-line` (D213) are incompatible. \
+         Ignoring `missing-blank-line-before-docstring-summary-line`.",
     ),
 ];
 

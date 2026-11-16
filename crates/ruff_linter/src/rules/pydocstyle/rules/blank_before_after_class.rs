@@ -47,13 +47,13 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Options
 /// - `lint.pydocstyle.convention`
 ///
-/// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class
+/// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class-docstring
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.70", category = Category::Formatting)]
-pub(crate) struct IncorrectBlankLineBeforeClass;
+pub(crate) struct IncorrectBlankLineBeforeClassDocstring;
 
-impl AlwaysFixableViolation for IncorrectBlankLineBeforeClass {
+impl AlwaysFixableViolation for IncorrectBlankLineBeforeClassDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         "1 blank line required before class docstring".to_string()
@@ -104,9 +104,9 @@ impl AlwaysFixableViolation for IncorrectBlankLineBeforeClass {
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.70", category = Category::Formatting)]
-pub(crate) struct IncorrectBlankLineAfterClass;
+pub(crate) struct IncorrectBlankLineAfterClassDocstring;
 
-impl AlwaysFixableViolation for IncorrectBlankLineAfterClass {
+impl AlwaysFixableViolation for IncorrectBlankLineAfterClassDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         "1 blank line required after class docstring".to_string()
@@ -149,12 +149,12 @@ impl AlwaysFixableViolation for IncorrectBlankLineAfterClass {
 /// ## Options
 /// - `lint.pydocstyle.convention`
 ///
-/// [D203]: https://docs.astral.sh/ruff/rules/incorrect-blank-line-before-class
+/// [D203]: https://docs.astral.sh/ruff/rules/incorrect-blank-line-before-class-docstring
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.70", category = Category::Formatting)]
-pub(crate) struct BlankLineBeforeClass;
+pub(crate) struct BlankLineBeforeClassDocstring;
 
-impl AlwaysFixableViolation for BlankLineBeforeClass {
+impl AlwaysFixableViolation for BlankLineBeforeClassDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         "No blank lines allowed before class docstring".to_string()
@@ -180,8 +180,8 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         return;
     }
 
-    if checker.is_rule_enabled(Rule::IncorrectBlankLineBeforeClass)
-        || checker.is_rule_enabled(Rule::BlankLineBeforeClass)
+    if checker.is_rule_enabled(Rule::IncorrectBlankLineBeforeClassDocstring)
+        || checker.is_rule_enabled(Rule::BlankLineBeforeClassDocstring)
     {
         let mut lines = UniversalNewlineIterator::with_offset(
             checker.locator().slice(between_range),
@@ -201,10 +201,10 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
             }
         }
 
-        if checker.is_rule_enabled(Rule::BlankLineBeforeClass) {
+        if checker.is_rule_enabled(Rule::BlankLineBeforeClassDocstring) {
             if blank_lines_before != 0 {
                 let mut diagnostic =
-                    checker.report_diagnostic(BlankLineBeforeClass, docstring.range());
+                    checker.report_diagnostic(BlankLineBeforeClassDocstring, docstring.range());
                 // Delete the blank line before the class.
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
                     blank_lines_start,
@@ -212,10 +212,10 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
                 )));
             }
         }
-        if checker.is_rule_enabled(Rule::IncorrectBlankLineBeforeClass) {
+        if checker.is_rule_enabled(Rule::IncorrectBlankLineBeforeClassDocstring) {
             if blank_lines_before != 1 {
-                let mut diagnostic =
-                    checker.report_diagnostic(IncorrectBlankLineBeforeClass, docstring.range());
+                let mut diagnostic = checker
+                    .report_diagnostic(IncorrectBlankLineBeforeClassDocstring, docstring.range());
                 // Insert one blank line before the class.
                 diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                     checker.stylist().line_ending().to_string(),
@@ -226,7 +226,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
         }
     }
 
-    if checker.is_rule_enabled(Rule::IncorrectBlankLineAfterClass) {
+    if checker.is_rule_enabled(Rule::IncorrectBlankLineAfterClassDocstring) {
         let class_after_docstring_range = TextRange::new(docstring.end(), class.end());
         let class_after_docstring = checker.locator().slice(class_after_docstring_range);
         let mut lines = UniversalNewlineIterator::with_offset(
@@ -253,8 +253,8 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
             if let Some(next_statement) = trailing.strip_prefix(';') {
                 let indentation = indentation_at_offset(docstring.start(), checker.source())
                     .expect("Own line docstring must have indentation");
-                let mut diagnostic =
-                    checker.report_diagnostic(IncorrectBlankLineAfterClass, docstring.range());
+                let mut diagnostic = checker
+                    .report_diagnostic(IncorrectBlankLineAfterClassDocstring, docstring.range());
                 let line_ending = checker.stylist().line_ending().as_str();
                 // We have to trim the whitespace twice, once before the semicolon above and
                 // once after the semicolon here, or we get invalid indents:
@@ -290,7 +290,7 @@ pub(crate) fn blank_before_after_class(checker: &Checker, docstring: &Docstring)
 
         if blank_lines_after != 1 {
             let mut diagnostic =
-                checker.report_diagnostic(IncorrectBlankLineAfterClass, docstring.range());
+                checker.report_diagnostic(IncorrectBlankLineAfterClassDocstring, docstring.range());
             // Insert a blank line before the class (replacing any existing lines).
             diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                 checker.stylist().line_ending().to_string(),

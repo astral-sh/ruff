@@ -148,9 +148,11 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     // Break ties in the event of overlapping rules, for some specific combinations.
     .then_with(|| {
         let rules = (name1, name2);
-        // Apply `MissingTrailingPeriod` fixes before `NewLineAfterLastParagraph` fixes.
+        // Apply `MissingTrailingPeriod` fixes before `MissingNewLineAfterLastDocstringParagraph` fixes.
         let missing_trailing_period = Rule::MissingTrailingPeriod.name().as_str();
-        let newline_after_last_paragraph = Rule::NewLineAfterLastParagraph.name().as_str();
+        let newline_after_last_paragraph = Rule::MissingNewLineAfterLastDocstringParagraph
+            .name()
+            .as_str();
         let if_else_instead_of_dict_get = Rule::IfElseBlockInsteadOfDictGet.name().as_str();
         let if_else_instead_of_if_exp = Rule::IfElseBlockInsteadOfIfExp.name().as_str();
         if rules == (missing_trailing_period, newline_after_last_paragraph) {

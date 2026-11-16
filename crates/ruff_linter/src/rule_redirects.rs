@@ -14,10 +14,77 @@ pub(crate) fn get_redirect(selector: &str) -> Option<(&'static str, &'static str
 }
 
 /// Former rule names and their current rules.
-pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[(
-    "missing-return-type-undocumented-public-function",
-    Rule::MissingReturnTypePublicFunction,
-)];
+pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
+    (
+        "missing-return-type-undocumented-public-function",
+        Rule::MissingReturnTypePublicFunction,
+    ),
+    (
+        "blank-line-before-function",
+        Rule::BlankLineBeforeFunctionDocstring,
+    ),
+    (
+        "blank-line-after-function",
+        Rule::BlankLineAfterFunctionDocstring,
+    ),
+    (
+        "incorrect-blank-line-before-class",
+        Rule::IncorrectBlankLineBeforeClassDocstring,
+    ),
+    (
+        "incorrect-blank-line-after-class",
+        Rule::IncorrectBlankLineAfterClassDocstring,
+    ),
+    (
+        "missing-blank-line-after-summary",
+        Rule::IncorrectBlankLineAfterDocstringSummary,
+    ),
+    ("under-indentation", Rule::UnderIndentedDocstringLine),
+    ("over-indentation", Rule::OverIndentedDocstringLine),
+    (
+        "new-line-after-last-paragraph",
+        Rule::MissingNewLineAfterLastDocstringParagraph,
+    ),
+    (
+        "surrounding-whitespace",
+        Rule::SurroundingWhitespaceInDocstring,
+    ),
+    (
+        "blank-line-before-class",
+        Rule::BlankLineBeforeClassDocstring,
+    ),
+    (
+        "multi-line-summary-first-line",
+        Rule::BlankLineBeforeDocstringSummaryLine,
+    ),
+    (
+        "multi-line-summary-second-line",
+        Rule::MissingBlankLineBeforeDocstringSummaryLine,
+    ),
+    ("overindented-section", Rule::OverIndentedDocstringSection),
+    (
+        "overindented-section-underline",
+        Rule::OverIndentedDocstringSectionUnderline,
+    ),
+    ("triple-single-quotes", Rule::IncorrectDocstringQuotes),
+    (
+        "missing-section-underline-after-name",
+        Rule::BlankLineBeforeDocstringSectionUnderline,
+    ),
+    (
+        "no-blank-line-after-section",
+        Rule::MissingBlankLineAfterDocstringSection,
+    ),
+    (
+        "no-blank-line-before-section",
+        Rule::MissingBlankLineBeforeDocstringSection,
+    ),
+    (
+        "missing-blank-line-after-last-section",
+        Rule::MissingBlankLineAfterLastDocstringSection,
+    ),
+    ("undocumented-param", Rule::UndocumentedParameters),
+];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
     let mut redirects = HashMap::from([

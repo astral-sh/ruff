@@ -59,13 +59,13 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
-/// [D213]: https://docs.astral.sh/ruff/rules/multi-line-summary-second-line
+/// [D213]: https://docs.astral.sh/ruff/rules/missing-blank-line-before-docstring-summary-line
 /// [PEP 257]: https://peps.python.org/pep-0257
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.69", category = Category::Pedantic)]
-pub(crate) struct MultiLineSummaryFirstLine;
+pub(crate) struct BlankLineBeforeDocstringSummaryLine;
 
-impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
+impl AlwaysFixableViolation for BlankLineBeforeDocstringSummaryLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Multi-line docstring summary should start at the first line".to_string()
@@ -123,13 +123,13 @@ impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
-/// [D212]: https://docs.astral.sh/ruff/rules/multi-line-summary-first-line
+/// [D212]: https://docs.astral.sh/ruff/rules/blank-line-before-docstring-summary-line
 /// [PEP 257]: https://peps.python.org/pep-0257
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.69", category = Category::Pedantic)]
-pub(crate) struct MultiLineSummarySecondLine;
+pub(crate) struct MissingBlankLineBeforeDocstringSummaryLine;
 
-impl AlwaysFixableViolation for MultiLineSummarySecondLine {
+impl AlwaysFixableViolation for MissingBlankLineBeforeDocstringSummaryLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Multi-line docstring summary should start at the second line".to_string()
@@ -158,9 +158,9 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
     };
 
     if is_triple_quote(&first_line) {
-        if checker.is_rule_enabled(Rule::MultiLineSummaryFirstLine) {
+        if checker.is_rule_enabled(Rule::BlankLineBeforeDocstringSummaryLine) {
             let mut diagnostic =
-                checker.report_diagnostic(MultiLineSummaryFirstLine, docstring.range());
+                checker.report_diagnostic(BlankLineBeforeDocstringSummaryLine, docstring.range());
             // Delete until first non-whitespace char.
             for line in content_lines {
                 if let Some(end_column) = line.find(|c: char| !c.is_whitespace()) {
@@ -181,9 +181,11 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
         // "
         // ```
     } else {
-        if checker.is_rule_enabled(Rule::MultiLineSummarySecondLine) {
-            let mut diagnostic =
-                checker.report_diagnostic(MultiLineSummarySecondLine, docstring.range());
+        if checker.is_rule_enabled(Rule::MissingBlankLineBeforeDocstringSummaryLine) {
+            let mut diagnostic = checker.report_diagnostic(
+                MissingBlankLineBeforeDocstringSummaryLine,
+                docstring.range(),
+            );
             let mut indentation = Cow::Borrowed(docstring.compute_indentation());
             let mut fixable = true;
             if !indentation.chars().all(char::is_whitespace) {
