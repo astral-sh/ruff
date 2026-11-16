@@ -5745,6 +5745,41 @@ static_assert(not is_assignable_to(Source[str], IntSource))
 static_assert(not is_subtype_of(Source[str], IntSource))
 ```
 
+## Binding `Self` through a protocol bound
+
+When `T` is bounded by `Combinable`, its `combine` method accepts another `T` and returns a `T`. We
+use that signature to infer both type arguments of `Combiner`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self
+
+class Combinable(Protocol):
+    def combine(self, other: Self, /) -> Self: ...
+
+class Combiner[Arg, Result](Protocol):
+    def combine(self, other: Arg, /) -> Result: ...
+
+def combine[Arg, Result](left: Combiner[Arg, Result], right: Arg) -> Result:
+    return left.combine(right)
+
+def check[T: Combinable, U: Combinable](left: T, right: T, other: U) -> None:
+    reveal_type(combine(left, right))  # revealed: T@check
+    combine(left, other)  # error: [invalid-argument-type]
+```
+
+A value of type `T` cannot stand in for a combiner that accepts *every* `Combinable`.
+
+```py
+def assign[T: Combinable](value: T) -> None:
+    direct: Combiner[Combinable, Combinable] = value  # error: [invalid-assignment]
+    optional: Combiner[Combinable, Combinable] | None = value  # error: [invalid-assignment]
+```
+
 ## `Self` in generic type aliases during protocol matching
 
 `Self` in a protocol method's return type refers to the structural implementation, even when it is
