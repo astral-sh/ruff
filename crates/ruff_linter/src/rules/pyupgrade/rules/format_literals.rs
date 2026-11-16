@@ -1,8 +1,5 @@
-use std::sync::LazyLock;
-
 use anyhow::{Result, anyhow};
 use libcst_native::{Arg, Expression};
-use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
@@ -126,40 +123,45 @@ fn is_sequential(indices: &[usize]) -> bool {
     indices.iter().enumerate().all(|(idx, value)| idx == *value)
 }
 
-static FORMAT_SPECIFIER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?x)
-            \{                     # opening curly brace
-                (?P<int>\d+)       # followed by any integer
-                .*?                # followed by any text
-            }                      # followed by a closing brace
-        ",
-    )
-    .unwrap()
-});
-
 /// Remove the positional indices from the replacement fields in `value`, e.g., `{0}{1:x}` becomes
 /// `{}{:x}`.
+///
+/// `{{` and `}}` are escaped braces, and the `[...]` part of a field name is a literal key that may
+/// contain braces, e.g. `{0[{}{1}]}`. Nested fields in the format spec never get here, since the
+/// rule skips format strings with nested parts.
 fn remove_indices(value: &str) -> String {
+    let bytes = value.as_bytes();
     let mut result = String::with_capacity(value.len());
     let mut last_end = 0;
-    for captures in FORMAT_SPECIFIER.captures_iter(value) {
-        let Some(index) = captures.name("int") else {
-            continue;
-        };
-        // An odd number of braces before the opening brace means that it's escaped: `{{0}}` is the
-        // literal text `{0}`, while `{{{0}}}` is a literal brace around the field `{0}`.
-        let opening_brace = index.start() - 1;
-        let preceding_braces = value[..opening_brace]
-            .bytes()
-            .rev()
-            .take_while(|&byte| byte == b'{')
-            .count();
-        if preceding_braces % 2 == 1 {
-            continue;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'{' | b'}' if bytes.get(i + 1) == Some(&bytes[i]) => i += 2,
+            b'{' => {
+                let index_start = i + 1;
+                let index_end = index_start
+                    + bytes[index_start..]
+                        .iter()
+                        .take_while(|byte| byte.is_ascii_digit())
+                        .count();
+                if index_end > index_start {
+                    result.push_str(&value[last_end..index_start]);
+                    last_end = index_end;
+                }
+                // Skip to the closing brace of the field, stepping over `[...]` keys.
+                i = index_end;
+                while i < bytes.len() && bytes[i] != b'}' {
+                    if bytes[i] == b'[' {
+                        while i < bytes.len() && bytes[i] != b']' {
+                            i += 1;
+                        }
+                    }
+                    i += 1;
+                }
+                i += 1;
+            }
+            _ => i += 1,
         }
-        result.push_str(&value[last_end..index.start()]);
-        last_end = index.end();
     }
     result.push_str(&value[last_end..]);
     result
