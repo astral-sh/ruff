@@ -28,10 +28,10 @@ use crate::types::known_instance::FieldInstance;
 use crate::types::member::class_member;
 use crate::types::special_form::SpecialFormType;
 use crate::types::{
-    ClassBase, ClassType, DataclassTransformerParams, FunctionType, KnownClass, KnownFunction,
-    KnownInstanceType, KnownUnion, MemberLookupPolicy, Parameter, Parameters, Signature,
-    Specialization, StaticClassLiteral, Type, TypeAliasType, UnionType, definition_expression_type,
-    definition_expression_type_in_scope,
+    ClassBase, ClassType, DataclassFlags, DataclassTransformerParams, FunctionType, KnownClass,
+    KnownFunction, KnownInstanceType, KnownUnion, MemberLookupPolicy, Parameter, Parameters,
+    Signature, Specialization, StaticClassLiteral, Type, TypeAliasType, UnionType,
+    definition_expression_type, definition_expression_type_in_scope,
 };
 
 /// Pydantic treats underscore-prefixed annotations as private instance attributes.
@@ -86,7 +86,7 @@ impl<'db> ModelMetadata<'db> {
         field.or(self.config(db).strict).is_enabled()
     }
 
-    pub(in crate::types) fn is_frozen(self, db: &'db dyn Db) -> bool {
+    fn is_frozen(self, db: &'db dyn Db) -> bool {
         self.config(db).frozen.is_enabled()
     }
 
@@ -664,9 +664,26 @@ pub(in crate::types) fn setattr_behavior(
     })
 }
 
+impl<'db> CodeGeneratorKind<'db> {
+    /// Whether the class's frozen setting is enforced for ordinary attribute writes.
+    pub(in crate::types) fn is_frozen(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: StaticClassLiteral<'db>,
+    ) -> bool {
+        match self {
+            Self::Pydantic(metadata) => {
+                metadata.is_frozen(db) && uses_base_model_setattr(db, env, class) == Some(true)
+            }
+            _ => class.has_dataclass_param(db, self, DataclassFlags::FROZEN),
+        }
+    }
+}
+
 /// Check whether attribute assignments use Pydantic's setter. Return `None` if the MRO does not
 /// resolve to a known setter.
-pub(in crate::types) fn uses_base_model_setattr<'db>(
+fn uses_base_model_setattr<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     class: StaticClassLiteral<'db>,

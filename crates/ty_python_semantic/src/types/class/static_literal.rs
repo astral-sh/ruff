@@ -3681,13 +3681,8 @@ impl<'db> StaticClassLiteral<'db> {
             // methods, so we just look them up normally and don't hardcode this knowledge here.
             // We also synthesize `__replace__` for Pydantic models on Python 3.13 and later.
             let is_frozen_prior_to_313 = python_version <= PythonVersion::PY312
-                && CodeGeneratorKind::from_static_class(db, self).is_some_and(|kind| match kind {
-                    CodeGeneratorKind::Pydantic(metadata) => {
-                        metadata.is_frozen(db)
-                            && pydantic::uses_base_model_setattr(db, &env, self) == Some(true)
-                    }
-                    _ => self.has_dataclass_param(db, kind, DataclassFlags::FROZEN),
-                });
+                && CodeGeneratorKind::from_static_class(db, self)
+                    .is_some_and(|kind| kind.is_frozen(db, &env, self));
 
             if is_namedtuple || is_frozen_prior_to_313 {
                 TypeVarVariance::Covariant
