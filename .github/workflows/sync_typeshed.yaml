@@ -125,7 +125,7 @@ jobs:
           git commit -am "Sync Linux docstrings" --allow-empty
       - name: Get repository token
         id: token
-        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
+        uses: astral-sh/github-actions/simple-token-service@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -179,7 +179,7 @@ jobs:
         run: ./scripts/codemod_docstrings.sh
       - name: Get repository token
         id: token
-        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
+        uses: astral-sh/github-actions/simple-token-service@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -218,7 +218,7 @@ jobs:
       contents: read
       id-token: write # for STS
     steps:
-      - uses: astral-sh/github-actions/demudhra@7aa50a3def9f5428c532b0ae972d1e5b357de5a5 # 2026.11.03.0
+      - uses: astral-sh/github-actions/demudhra@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         name: Checkout Ruff
         with:
@@ -258,7 +258,7 @@ jobs:
           git commit -am "Remove pyproject.toml file"
       - name: Get repository token
         id: token
-        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
+        uses: astral-sh/github-actions/simple-token-service@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -366,7 +366,7 @@ jobs:
           path: ${{ runner.temp }}/snapshot-updates
       - name: Get repository token
         id: token
-        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
+        uses: astral-sh/github-actions/simple-token-service@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}

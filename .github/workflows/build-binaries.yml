@@ -61,7 +61,7 @@ jobs:
           command: sdist
           args: --out dist
       - name: "Test sdist"
-        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
           artifacts: dist
@@ -83,7 +83,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'namespace-profile-macos-15' || 'macos-15' }}
     steps:
-      - uses: astral-sh/github-actions/demudhra@7aa50a3def9f5428c532b0ae972d1e5b357de5a5 # 2026.11.03.0
+      - uses: astral-sh/github-actions/demudhra@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
@@ -139,7 +139,7 @@ jobs:
       # ICF reduces the macOS aarch64 ruff binary size by ~0.8%.
       RUSTFLAGS: "-C linker=rust-lld -C linker-flavor=ld64.lld -C link-arg=--icf=safe"
     steps:
-      - uses: astral-sh/github-actions/demudhra@7aa50a3def9f5428c532b0ae972d1e5b357de5a5 # 2026.11.03.0
+      - uses: astral-sh/github-actions/demudhra@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
@@ -332,7 +332,7 @@ jobs:
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
-        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
           artifacts: dist
@@ -406,7 +406,7 @@ jobs:
           docker-options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
-        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
           platform: linux/arm64
@@ -495,7 +495,7 @@ jobs:
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: ${{ matrix.platform.target != 'powerpc64le-unknown-linux-gnu' }}
-        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           image: ${{ matrix.platform.test_image }}
           platform: ${{ matrix.platform.test_platform }}
@@ -564,7 +564,7 @@ jobs:
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           image: alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
           artifacts: dist
@@ -634,7 +634,7 @@ jobs:
           args: --release --locked --out dist --compatibility pypi
           docker-options: ${{ matrix.platform.maturin_docker_options }}
       - name: "Test wheel"
-        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           image: alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
           platform: ${{ matrix.platform.test_platform }}
