@@ -2059,16 +2059,20 @@ union_list_result: list[int | str] = to_thread_like(
     reveal_type([1]),  # revealed: list[int]
 )
 
+# TODO: These should not error once we infer a shared forwarded specialization during fixpoint inference.
 to_thread_like(
     generic_pair,
-    reveal_type([1]),  # revealed: list[str | int]
-    reveal_type([""]),  # revealed: list[int | str]
+    # error: [invalid-argument-type]
+    reveal_type([1]),  # revealed: list[int]
+    # error: [invalid-argument-type]
+    reveal_type([""]),  # revealed: list[str]
 )
 
 to_thread_like(
     generic_pair_with_container,
     1,
-    reveal_type([""]),  # revealed: list[int | str]
+    # error: [invalid-argument-type]
+    reveal_type([""]),  # revealed: list[str]
 )
 ```
 

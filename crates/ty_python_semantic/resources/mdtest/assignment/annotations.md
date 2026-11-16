@@ -103,11 +103,31 @@ c: tuple[str | int, str] = ([], "foo")
 ## Incorrect collection literal assignments are complained about
 
 ```py
-# error: [invalid-assignment] "Object of type `list[str | int]` is not assignable to `list[str]`"
+from collections.abc import Mapping
+from typing import Any
+
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[str]`"
 a: list[str] = [1, 2, 3]
 
 # error: [invalid-assignment] "Object of type `set[int | str]` is not assignable to `set[int]`"
 b: set[int] = {1, 2, "3"}
+
+# error: [invalid-assignment] "Object of type `dict[int, int]` is not assignable to `dict[str, object]`"
+bad_key: dict[str, object] = {1: 2}
+
+# error: [invalid-assignment] "Object of type `dict[int, int]` is not assignable to `Mapping[str, object]`"
+bad_mapping_key: Mapping[str, object] = {1: 2}
+
+def _(items: dict[int, int]):
+    # error: [invalid-assignment] "Object of type `dict[int, int]` is not assignable to `Mapping[str, object]`"
+    bad_unpack: Mapping[str, object] = {**items}
+
+def _(xs: list[int | None]):
+    bad: list[str] = xs + [None]  # error: [invalid-assignment]
+
+def _(x: Any):
+    # error: [invalid-assignment] "Object of type `list[tuple[Any] | tuple[Any, Any]]` is not assignable to `list[tuple[int]]`"
+    singletons: list[tuple[int]] = [(x,), (x, x)]
 ```
 
 ## Mutually assignable annotated assignments use the declared type
