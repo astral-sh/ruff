@@ -15,7 +15,7 @@ import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, cast
+from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -53,7 +53,10 @@ def changed_files(pull_request: int) -> list[str]:
     page = 1
     while True:
         batch = api(f"pulls/{pull_request}/files?per_page=100&page={page}")
-        files.extend(cast("str", item["filename"]) for item in batch)
+        for item in batch:
+            filename = item["filename"]
+            assert isinstance(filename, str)
+            files.append(filename)
         if len(batch) < 100:
             return files
         page += 1

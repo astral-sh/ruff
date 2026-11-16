@@ -16,7 +16,7 @@ import subprocess
 import sys
 import zipfile
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -38,8 +38,8 @@ def read_html_files(value: str) -> dict[str, tuple[str, str]]:
     files = json.loads(value)
     if not isinstance(files, dict):
         raise TypeError("HTML files must be a JSON object keyed by filename.")
-    result = {}
-    for filename, metadata in cast("dict[str, object]", files).items():
+    result: dict[str, tuple[str, str]] = {}
+    for filename, metadata in files.items():
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", filename):
             raise ValueError(
                 "HTML filenames must be plain filenames without directories."
@@ -380,16 +380,20 @@ def publish(
     existing = find_report(pull_request, report, stored_comment_id)
     if existing is not None and report_run(existing) > (run_id, run_attempt):
         print("A newer run already published this report.", file=sys.stderr)
-        return cast("int", existing["id"])
+        assert isinstance(existing["id"], int)
+        return existing["id"]
     if existing is not None:
-        comment_id = cast("int", existing["id"])
+        comment_id = existing["id"]
+        assert isinstance(comment_id, int)
         if existing["body"] != body:
             api(f"issues/comments/{comment_id}", method="PATCH", body=body)
     elif update_existing_only:
-        return
+        return None
     else:
         created = api(f"issues/{pull_request}/comments", method="POST", body=body)
-        comment_id = cast("int", created["id"])
+        comment_id =  created["id"]
+        assert isinstance(comment_id, int)
+
     print(f"Published {report} report: {comment_id}")
     return comment_id
 
