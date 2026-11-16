@@ -216,12 +216,13 @@ impl Server {
     }
 }
 
-/// Runs a synchronous request on the main loop or tries to queue a background request.
+/// Dispatches a new request or retries one interrupted by Salsa.
 ///
-/// If the editor sends a hover request while the worker queue is full, we reply with
-/// `RequestFailed`. Waiting for a slot here would prevent the main loop from forwarding
-/// responses that workers have already produced. During a restart, the editor could also
-/// time out waiting for the main loop to handle `shutdown`.
+/// Synchronous requests such as `shutdown` run directly on the main loop. Background
+/// requests such as hover need a slot in the worker queue. If the queue is full, the
+/// main loop replies to a new background request with `RequestFailed`. Waiting for a
+/// slot would prevent the main loop from forwarding completed responses and could
+/// cause the editor to time out waiting for `shutdown` during a restart.
 ///
 /// An edit can also interrupt a completion that's already running. Normally we retry it.
 /// If shutdown has started, we return `ContentModified` so we don't restart work that
