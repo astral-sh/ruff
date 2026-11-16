@@ -4662,6 +4662,7 @@ class OSError(Exception):
     
     if sys.platform == "win32":
         winerror: int
+        """Win32 exception code"""
 
 EnvironmentError = OSError
 IOError = OSError
