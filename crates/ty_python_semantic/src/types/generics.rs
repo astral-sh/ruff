@@ -15,9 +15,9 @@ use crate::types::constraints::projection::{ProjectionError, SolutionBudget, Sol
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
-    ConstraintScope, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    PathBoundSolution, ReportDiagnostics, Solution, SolutionPaths, SolutionViolation,
-    SolutionViolationKind, Solutions, TypeVarSolution,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution,
+    ReportDiagnostics, Solution, SolutionPaths, SolutionViolation, SolutionViolationKind,
+    Solutions, TypeVarSolution,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
@@ -1952,7 +1952,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 if self.typevar_evaluation.is_lazy()
                     && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
                         (source_type, target_type)
-                    && self.scope.contains(db, typevar)
+                    && typevar.is_inferable(db, self.scope)
                     && !ty.is_type_var()
                     && (
                         // Preserve union distribution before constructing constraints. Storing the
@@ -2220,7 +2220,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                             .for_new_materialization_root()
                     };
                     checker.typevar_evaluation = TypeVarEvaluation::Lazy;
-                    checker.scope = ConstraintScope::All;
+                    checker.scope = TypeVarSet::All;
                     checker.materialization_visitor = &materialization_visitor;
                     let result = self
                         .check_relation_with_context(db, checker, |checker| {
@@ -2238,11 +2238,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         })
                         .negate(db, self.constraints);
                     if let Some(context) = self.report_context()
-                        && result.is_always_satisfied(
-                            db,
-                            self.env,
-                            ConstraintScope::Inferable(self.inferable),
-                        )
+                        && result.is_always_satisfied(db, self.env, self.inferable)
                     {
                         context.push(ErrorContext::InvariantTypeArgument {
                             left: left_type,
@@ -2813,7 +2809,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 builder.pending.try_fold_solutions(
                     db,
                     builder.env,
-                    ConstraintScope::Inferable(builder.inferable),
+                    builder.inferable,
                     SolutionBudget::default(),
                     |_variance, path_bound| {
                         let outcome = choose(path_bound.bound_typevar, Some(path_bound))
@@ -2901,7 +2897,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.env,
                 formal,
                 self.constraints,
-                ConstraintScope::Inferable(self.inferable),
+                self.inferable,
             );
             let analysis = self.analyze_constraint_set(when);
             if matches!(&analysis, ConstraintSetAnalysis::Unsatisfiable(failures) if failures.is_empty())
@@ -2989,7 +2985,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             let solutions = builder.pending.solutions_with(
                 db,
                 builder.env,
-                ConstraintScope::Inferable(builder.inferable),
+                builder.inferable,
                 budget,
                 report_diagnostics,
                 |_variance, path_bound| {
@@ -3558,7 +3554,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.env,
                 self.constraints,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::Inferable(self.inferable),
+                self.inferable,
                 bound_typevar,
                 ty,
             ),
@@ -3567,7 +3563,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.env,
                 self.constraints,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::Inferable(self.inferable),
+                self.inferable,
                 bound_typevar,
                 ty,
             ),
@@ -3576,7 +3572,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.env,
                 self.constraints,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::Inferable(self.inferable),
+                self.inferable,
                 bound_typevar,
                 ty,
             ),
@@ -3591,7 +3587,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let solutions = set.solutions_with(
             db,
             self.env,
-            ConstraintScope::Inferable(self.inferable),
+            self.inferable,
             SolutionBudget::default(),
             ReportDiagnostics::Yes,
             |_variance, path_bound| {
@@ -3712,7 +3708,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     db,
                     self.env,
                     target,
-                    ConstraintScope::Inferable(self.inferable),
+                    self.inferable,
                 );
                 self.constraints.load(db, self.env, &when)
             },
@@ -3883,7 +3879,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let spec = &[KnownClass::Str.to_instance(db, env), Type::object()];
         let mapping = KnownClass::Mapping.to_specialized_instance(db, env, spec);
         let when_assignable_to_formal = |ty: Type<'db>| {
-            let scope = ConstraintScope::Inferable(self.inferable);
+            let scope = self.inferable;
             let when = ty.when_constraint_set_assignable_to_owned(db, env, formal, scope);
             self.constraints.load(db, env, &when)
         };
@@ -3891,14 +3887,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // Logically equivalent constraints can still infer different solutions, such as `Any`
         // instead of `object`; preserve the original constraints when gradual evidence differs
         // or either solution collection exceeds its budget.
-        let mapping_solutions = mapping_when
-            .solutions(db, env, ConstraintScope::Inferable(self.inferable))
-            .ok()?;
+        let mapping_solutions = mapping_when.solutions(db, env, self.inferable).ok()?;
         if !typed_dicts.into_iter().all(|element| {
             let element_when = when_assignable_to_formal(element);
             element_when.is_equivalent_to(db, env, mapping_when, self.inferable)
                 && element_when
-                    .solutions(db, env, ConstraintScope::Inferable(self.inferable))
+                    .solutions(db, env, self.inferable)
                     .is_ok_and(|solutions| solutions == mapping_solutions)
         }) {
             return None;
@@ -3942,7 +3936,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     self.env,
                     &actual_callable.signatures(db).overloads,
                     self.constraints,
-                    ConstraintScope::Inferable(self.inferable),
+                    self.inferable,
                 );
                 self.infer_from_constraint_set(when)?;
             } else {
@@ -3961,7 +3955,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         &env,
                         std::slice::from_ref(actual_signature),
                         constraints,
-                        ConstraintScope::Inferable(self.inferable),
+                        self.inferable,
                     );
                     let analysis = self.analyze_constraint_set(when);
                     match analysis {
@@ -4229,7 +4223,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             !element
                 .apply_specialization(db, self.generic_context.unknown_specialization(db, None))
                 .when_disjoint_from(db, self.env, actual, &disjoint_constraints, self.inferable)
-                .is_always_satisfied(db, self.env, ConstraintScope::Inferable(self.inferable))
+                .is_always_satisfied(db, self.env, self.inferable)
         });
 
         // Parameter-list inference extracts the actual signature's shape, including a
@@ -4411,11 +4405,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     let assignable_elements = union_formal.elements(db).iter().filter(|ty| {
                         actual
                             .when_subtype_of(db, self.env, **ty, self.constraints, self.inferable)
-                            .is_always_satisfied(
-                                db,
-                                self.env,
-                                ConstraintScope::Inferable(self.inferable),
-                            )
+                            .is_always_satisfied(db, self.env, self.inferable)
                     });
                     if assignable_elements.exactly_one().is_ok() {
                         return Ok(());
@@ -4453,11 +4443,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_never_satisfied(
-                                db,
-                                self.env,
-                                ConstraintScope::Inferable(self.inferable),
-                            );
+                            .is_never_satisfied(db, self.env, self.inferable);
 
                         (formal_element, matches)
                     })
@@ -4519,11 +4505,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_always_satisfied(
-                                db,
-                                self.env,
-                                ConstraintScope::Inferable(self.inferable),
-                            )
+                            .is_always_satisfied(db, self.env, self.inferable)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -4574,11 +4556,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                         self.constraints,
                                         self.inferable,
                                     )
-                                    .is_always_satisfied(
-                                        db,
-                                        self.env,
-                                        ConstraintScope::Inferable(self.inferable),
-                                    )
+                                    .is_always_satisfied(db, self.env, self.inferable)
                             } else {
                                 ty.when_assignable_to(
                                     db,
@@ -4590,7 +4568,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 .is_always_satisfied(
                                     db,
                                     self.env,
-                                    ConstraintScope::Inferable(self.inferable),
+                                    self.inferable,
                                 )
                             };
 
@@ -4711,11 +4689,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_never_satisfied(
-                                db,
-                                self.env,
-                                ConstraintScope::Inferable(self.inferable),
-                            )
+                            .is_never_satisfied(db, self.env, self.inferable)
                         {
                             found_matching_element = true;
                         }
@@ -4853,14 +4827,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                         db,
                                         self.env,
                                         Type::ProtocolInstance(target),
-                                        ConstraintScope::Inferable(self.inferable),
+                                        self.inferable,
                                     )
                             } else {
                                 Cow::Borrowed(
                                     source.when_non_recursive_members_assignable_to_owned(
                                         db,
                                         target,
-                                        ConstraintScope::Inferable(self.inferable),
+                                        self.inferable,
                                     )?,
                                 )
                             };
@@ -5157,7 +5131,7 @@ mod tests {
                         &env,
                         constraints,
                         ConstraintProvenance::INFERRED,
-                        ConstraintScope::All,
+                        TypeVarSet::All,
                         typevar,
                         ty,
                     )
@@ -5284,7 +5258,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             int,
         ));
@@ -5342,7 +5316,7 @@ mod tests {
                 &env,
                 &constraints,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 t,
                 ty,
             ));
@@ -5384,7 +5358,7 @@ mod tests {
                 &env,
                 &constraints,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 t,
                 ty,
             )
@@ -5451,7 +5425,7 @@ mod tests {
                 &env,
                 &constraints,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 t,
                 ty,
             )
@@ -5528,7 +5502,7 @@ mod tests {
                 &env,
                 &constraints,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 t,
                 ty,
             )
@@ -5678,7 +5652,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             int,
             int,
@@ -5851,26 +5825,26 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             typevar,
             int,
         );
 
         let analysis = builder.analyze_constraint_set(set);
         assert!(matches!(&builder.types, LegacyTypeMappings::Available(types) if types.is_empty()));
-        assert!(builder.pending.is_always_satisfied(
-            db,
-            &env,
-            ConstraintScope::Inferable(builder.inferable)
-        ));
+        assert!(
+            builder
+                .pending
+                .is_always_satisfied(db, &env, builder.inferable)
+        );
 
         builder.record_constraint_set(set);
         assert!(matches!(&builder.types, LegacyTypeMappings::Available(types) if types.is_empty()));
-        assert!(!builder.pending.is_always_satisfied(
-            db,
-            &env,
-            ConstraintScope::Inferable(builder.inferable)
-        ));
+        assert!(
+            !builder
+                .pending
+                .is_always_satisfied(db, &env, builder.inferable)
+        );
 
         builder.project_for_legacy_fallback(&analysis);
         assert!(builder.inferred_type_is_assignable_to(typevar.identity(db), int));
@@ -5899,7 +5873,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             typevar,
             ty,
         );
@@ -5907,11 +5881,11 @@ mod tests {
         builder.project_for_legacy_fallback(&ConstraintSetAnalysis::BudgetExceeded);
         builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
         assert!(matches!(builder.types, LegacyTypeMappings::BudgetExceeded));
-        assert!(!builder.pending.is_never_satisfied(
-            db,
-            &env,
-            ConstraintScope::Inferable(builder.inferable)
-        ));
+        assert!(
+            !builder
+                .pending
+                .is_never_satisfied(db, &env, builder.inferable)
+        );
 
         let mut choices = 0;
         let types = builder.solve_hash_map_with(context, &mut |_, _| {
@@ -5947,7 +5921,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             typevar,
             str,
         );
@@ -5956,7 +5930,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             typevar,
             str,
         );
@@ -5965,7 +5939,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             typevar,
             int,
         );

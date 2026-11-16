@@ -1,4 +1,3 @@
-use crate::types::constraints::ConstraintScope;
 use std::borrow::Cow;
 use std::cell::LazyCell;
 use std::cmp::Ordering;
@@ -924,7 +923,7 @@ fn specialize_narrowing_target_from_intersection<'db>(
                 env,
                 Type::instance(db, env, subject_class),
                 &constraints,
-                ConstraintScope::Inferable(inferable),
+                inferable,
             )
         });
     let mut combined_constraints = base_constraints.next()?;
@@ -932,9 +931,7 @@ fn specialize_narrowing_target_from_intersection<'db>(
         combined_constraints.intersect(db, &constraints, base_constraint);
     }
 
-    let solutions = combined_constraints
-        .solutions(db, env, ConstraintScope::Inferable(inferable))
-        .ok()?;
+    let solutions = combined_constraints.solutions(db, env, inferable).ok()?;
     let specialized_class =
         specialize_generic_class_from_solutions(db, env, target_class, solutions)?;
     Some(Type::instance(db, env, specialized_class))

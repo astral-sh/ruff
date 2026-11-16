@@ -16,9 +16,8 @@ use crate::types::constraints::variables::{
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, Assignment, AtomicConstraintId, BoundedSolutionLimits,
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, CandidateTypeVarSolver,
-    ConstraintFailureEvidence, ConstraintScope, ConstraintSetStorage, EvidenceSource,
-    InteriorNodeData, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
-    SolutionViolationKind,
+    ConstraintFailureEvidence, ConstraintSetStorage, EvidenceSource, InteriorNodeData, Node,
+    NodeId, SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -77,7 +76,7 @@ pub(super) struct SolutionWalker<'db, L> {
     /// original upper bounds for diagnostics, since projected paths can contain derived bounds
     /// that obscure the original evidence.
     original_node: NodeId,
-    scope: ConstraintScope<'db>,
+    scope: TypeVarSet<'db>,
     /// Variables to report bindings for. Captured callable binders can also be in scope.
     requested: TypeVarSet<'db>,
     requested_support: Support,
@@ -122,7 +121,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
         source_orders: FxIndexSet<AtomicConstraintId>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
         limits: L,
         original_node: NodeId,
@@ -1238,7 +1237,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // T = int nor T = str works for every U. Check T = U against the other bounds
         // on this path before trying individual declared constraints.
         let mut witnesses = SmallVec::<[_; 2]>::new();
-        if let ConstraintScope::Inferable(inferable) = self.scope {
+        if self.scope != TypeVarSet::All {
             let bounds = path.positive_constraints().filter_map(|(id, _)| {
                 let (subject, ty) = storage.atomic_constraint_data(id).as_concrete()?;
                 subject.is_same_typevar_as(db, bound_typevar).then_some(ty)
@@ -1246,7 +1245,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             // Prefer the combined lower bound when both ends of the range are possible solutions.
             for ty in evidence.evidence_lower.into_iter().chain(bounds) {
                 if let Type::TypeVar(var) = ty
-                    && !var.is_inferable(db, inferable)
+                    && !var.is_inferable(db, self.scope)
                     && accepts_fixed_typevar(var)
                     && !witnesses.contains(&ty)
                 {
@@ -1974,7 +1973,7 @@ impl<'db> Validations<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         all_typevars: &Support,
     ) -> Self {
         let mut result = Self::default();
@@ -1983,7 +1982,7 @@ impl<'db> Validations<'db> {
         while let Some(typevar) = typevar_queue.pop() {
             seen_typevars.insert(typevar);
             let bound_typevar = storage.typevar_data(typevar);
-            if !scope.contains(db, bound_typevar) {
+            if !bound_typevar.is_inferable(db, scope) {
                 continue;
             }
             result.add_typevar(
@@ -2005,7 +2004,7 @@ impl<'db> Validations<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
         bound_typevar: BoundTypeVarInstance<'db>,
@@ -2074,7 +2073,7 @@ impl<'db> Validations<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
         bound_typevar: BoundTypeVarInstance<'db>,
@@ -2108,7 +2107,7 @@ impl<'db> Validations<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
         bound_typevar: BoundTypeVarInstance<'db>,

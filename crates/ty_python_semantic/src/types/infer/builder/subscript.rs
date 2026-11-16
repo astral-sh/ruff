@@ -11,7 +11,7 @@ use super::post_inference::type_param_validation::check_no_default_after_typevar
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
-use crate::types::constraints::{ConstraintScope, ConstraintSetBuilder};
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
     INVALID_TYPED_DICT_KEY, NOT_CALLABLE, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
@@ -1099,7 +1099,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             if type_to_check
                                 .when_assignable_to(db, env, bound, &constraints, TypeVarSet::None)
-                                .is_never_satisfied(db, env, ConstraintScope::EMPTY)
+                                .is_never_satisfied(db, env, TypeVarSet::None)
                             {
                                 if let Some(builder) = self
                                     .context
@@ -1136,7 +1136,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     &constraints,
                                     TypeVarSet::None,
                                 )
-                                .is_never_satisfied(db, env, ConstraintScope::EMPTY)
+                                .is_never_satisfied(db, env, TypeVarSet::None)
                             {
                                 if let Some(builder) = self
                                     .context

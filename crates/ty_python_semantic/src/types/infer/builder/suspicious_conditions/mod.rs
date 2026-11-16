@@ -69,7 +69,7 @@ use crate::{
     reachability::is_non_terminal_call,
     types::{
         CallableTypes, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, UnionType,
-        constraints::{ConstraintScope, ConstraintSetBuilder},
+        constraints::ConstraintSetBuilder,
         diagnostic::{
             REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT, TRUTHINESS_TEST_OF_CALLABLE,
             TRUTHINESS_TEST_OF_ITERABLE, TRUTHINESS_TEST_OF_NONE_UNION,
@@ -914,7 +914,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let iterable = KnownClass::Iterable.to_specialized_instance(db, env, TOP_SPEC);
                 check(value_type, iterable)
             })
-            .is_always_satisfied(db, env, ConstraintScope::EMPTY)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     /// Read an already-inferred expression's type and truthiness using the requested

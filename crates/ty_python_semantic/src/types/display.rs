@@ -22,14 +22,14 @@ use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
-use crate::types::constraints::{ConstraintScope, ConstraintSetBuilder};
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
 use crate::types::recursive::RecursiveType;
 use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature};
 use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::type_alias::QualifiedTypeAliasName;
-use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
@@ -3969,9 +3969,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 let set = constraints.load(db, self.env, interned_set.constraints(db));
                 if interned_set.detailed_display(db) {
                     write!(f, "[{}]", set.display(db, self.env))
-                } else if set.is_always_satisfied(db, self.env, ConstraintScope::All) {
+                } else if set.is_always_satisfied(db, self.env, TypeVarSet::All) {
                     f.write_str("[Literal[True]]")
-                } else if set.is_never_satisfied(db, self.env, ConstraintScope::All) {
+                } else if set.is_never_satisfied(db, self.env, TypeVarSet::All) {
                     f.write_str("[Literal[False]]")
                 } else {
                     f.write_str("[bool]")

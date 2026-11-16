@@ -132,56 +132,28 @@ use solutions::{Polarity, SolutionWalker};
 pub(crate) use variables::ConstraintProvenance;
 use variables::{AtomicConstraint, Constraint, UnspecializedTypeVarPolicy};
 
-/// The type variables that can acquire bounds in a constraint relation. Symbolic relations used
-/// for overlap and explicit constraint algebra can constrain every variable.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum ConstraintScope<'db> {
-    All,
-    Inferable(TypeVarSet<'db>),
-}
-
-impl<'db> ConstraintScope<'db> {
-    pub(crate) const EMPTY: Self = Self::Inferable(TypeVarSet::None);
-
-    pub(super) fn finite_typevars(self) -> TypeVarSet<'db> {
-        match self {
-            Self::Inferable(typevars) => typevars,
-            Self::All => TypeVarSet::None,
-        }
-    }
-
-    fn typevars(
+impl<'db> TypeVarSet<'db> {
+    /// An unrestricted solve only needs to return bindings for variables in the graph.
+    fn requested_typevars(
         self,
         db: &'db dyn Db,
         storage: &ConstraintSetStorage<'db>,
         node: NodeId,
-    ) -> TypeVarSet<'db> {
-        match self {
-            Self::Inferable(typevars) => typevars,
-            Self::All => TypeVarSet::from_typevars(
-                db,
-                storage
-                    .node_support(node)
-                    .into_iter()
-                    .flat_map(Support::iter)
-                    .map(|id| storage.typevar_data(id)),
-            ),
+    ) -> Self {
+        if self != Self::All {
+            return self;
         }
+
+        Self::from_typevars(
+            db,
+            storage
+                .node_support(node)
+                .into_iter()
+                .flat_map(Support::iter)
+                .map(|id| storage.typevar_data(id)),
+        )
     }
 
-    pub(crate) fn contains(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> bool {
-        match self {
-            Self::All => true,
-            Self::Inferable(inferable) => typevar.is_inferable(db, inferable),
-        }
-    }
-
-    pub(crate) fn with_inferable(self, db: &'db dyn Db, local: TypeVarSet<'db>) -> Self {
-        match self {
-            Self::All => Self::All,
-            Self::Inferable(inferable) => Self::Inferable(inferable.merge(db, local)),
-        }
-    }
     /// A captured generic callable brings its own binders into scope when comparing its
     /// parameters with other bounds, such as the arguments forwarded by `fn(*args, **kwargs)`.
     fn with_captured_paramspecs<I: IntoIterator<Item = AtomicConstraintId>>(
@@ -190,26 +162,23 @@ impl<'db> ConstraintScope<'db> {
         storage: &ConstraintSetStorage<'db>,
         constraints: impl FnOnce() -> I,
     ) -> Self {
-        let Self::Inferable(inferable) = self else {
-            return self;
-        };
-        if !inferable.iter(db).any(|typevar| typevar.is_paramspec(db)) {
+        if self == Self::All || !self.iter(db).any(|typevar| typevar.is_paramspec(db)) {
             return self;
         }
 
-        let mut expanded = inferable;
+        let mut expanded = self;
         for id in constraints() {
             if let Some((parameter, Type::Callable(captured))) =
                 storage.atomic_constraint_data(id).as_concrete()
                 && parameter.is_paramspec(db)
-                && parameter.is_inferable(db, inferable)
+                && parameter.is_inferable(db, self)
             {
                 for signature in captured.signatures(db) {
                     expanded = expanded.merge(db, signature.inferable_typevars(db));
                 }
             }
         }
-        Self::Inferable(expanded)
+        expanded
     }
 }
 
@@ -528,7 +497,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         provenance: ConstraintProvenance,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
@@ -554,7 +523,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         provenance: ConstraintProvenance,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
     ) -> Self {
@@ -570,7 +539,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         provenance: ConstraintProvenance,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
@@ -587,7 +556,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         provenance: ConstraintProvenance,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
     ) -> Self {
@@ -616,7 +585,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> bool {
         let mut storage = self.builder.storage.borrow_mut();
         self.node
@@ -629,7 +598,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> Option<bool> {
         let budget = SolutionBudget::default();
         let limits = BoundedSolutionLimits {
@@ -643,7 +612,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 env,
                 &mut storage,
                 scope,
-                scope.finite_typevars(),
+                scope.explicit_typevars(),
                 self.source_order,
                 limits,
             )
@@ -664,9 +633,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        self.is_never_satisfied(db, env, ConstraintScope::All)
+        self.is_never_satisfied(db, env, TypeVarSet::All)
             || matches!(
-                self.solutions(db, env, ConstraintScope::All),
+                self.solutions(db, env, TypeVarSet::All),
                 Ok(Solutions::Unsatisfiable(_))
             )
     }
@@ -687,16 +656,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> bool {
-        self.is_always_satisfied_with_requested(db, env, scope, scope.finite_typevars())
+        self.is_always_satisfied_with_requested(db, env, scope, scope.explicit_typevars())
     }
 
     fn is_always_satisfied_with_requested(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
     ) -> bool {
         self.node.is_always_satisfied(
@@ -715,7 +684,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> Option<bool> {
         let budget = SolutionBudget::default();
         let limits = BoundedSolutionLimits {
@@ -729,7 +698,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 env,
                 &mut storage,
                 scope,
-                scope.finite_typevars(),
+                scope.explicit_typevars(),
                 self.source_order,
                 limits,
             )
@@ -764,7 +733,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         rhs: Type<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        let when = lhs.when_constraint_set_subtype_of(db, env, rhs, builder, ConstraintScope::All);
+        let when = lhs.when_constraint_set_subtype_of(db, env, rhs, builder, TypeVarSet::All);
         self.implies(db, builder, || when)
     }
 
@@ -889,7 +858,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         // combines both sets of paths before the solver can rule either direction out.
         let is_subset = |left: Self, right: Self| {
             left.and(db, self.builder, || right.negate(db, self.builder))
-                .is_never_satisfied(db, env, ConstraintScope::Inferable(inferable))
+                .is_never_satisfied(db, env, inferable)
         };
         self.node == other.node || (is_subset(self, other) && is_subset(other, self))
     }
@@ -903,10 +872,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         to_remove: TypeVarSet<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> Self {
-        let builder = self.builder;
+        self.verify_builder(builder);
         if to_remove == TypeVarSet::None {
             return self;
         }
@@ -924,7 +894,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 remaining_paths: budget.paths,
                 remaining_visits: budget.visits,
             };
-            let requested = scope.typevars(db, &storage, self.node);
+            let requested = scope.requested_typevars(db, &storage, self.node);
             if let ControlFlow::Continue(true) = self.node.is_never_satisfied_with_limits(
                 db,
                 env,
@@ -1073,7 +1043,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         to_remove: TypeVarSet<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> Self {
         self.verify_builder(builder);
         if to_remove == TypeVarSet::None {
@@ -1083,7 +1053,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         // Universal and existential quantification are duals. Reusing existential abstraction
         // also keeps this operation on its cached, single-pass implementation.
         self.negate(db, builder)
-            .reduce_inferable(db, env, to_remove, scope)
+            .reduce_inferable(db, env, builder, to_remove, scope)
             .negate(db, builder)
     }
 
@@ -1151,7 +1121,7 @@ pub(crate) struct ConstraintSetBuilder<'db> {
 
 type ExistsCacheKey<'db> = (
     NodeId,
-    ConstraintScope<'db>,
+    TypeVarSet<'db>,
     TypeVarSet<'db>,
     Option<SourceOrderId>,
 );
@@ -1208,7 +1178,7 @@ struct ConstraintSetStorage<'db> {
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache. A BDD's satisfiability does not depend on the
     /// source order used to traverse it.
-    never_satisfied_cache: FxHashMap<(NodeId, ConstraintScope<'db>, TypeVarSet<'db>), bool>,
+    never_satisfied_cache: FxHashMap<(NodeId, TypeVarSet<'db>, TypeVarSet<'db>), bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId), NodeId>,
@@ -1365,7 +1335,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let (node, source_order) = self
             .storage
@@ -1381,7 +1351,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
         provenance: ConstraintProvenance,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let (node, source_order) =
             self.storage
@@ -1728,7 +1698,7 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
-        self.load_with_provenance(db, env, other, None, ConstraintScope::All)
+        self.load_with_provenance(db, env, other, None, TypeVarSet::All)
     }
 
     fn load_with_provenance(
@@ -1737,7 +1707,7 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
         provenance: Option<ConstraintProvenance>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
         fn rebuild_node<'db>(
             storage: &mut ConstraintSetStorage<'db>,
@@ -1801,7 +1771,7 @@ impl<'db> ConstraintSetStorage<'db> {
                 let Constraint::Atomic(atomic) = old_constraint;
                 let atomic =
                     provenance.map_or(*atomic, |provenance| atomic.with_provenance(provenance));
-                if scope != ConstraintScope::All {
+                if scope != TypeVarSet::All {
                     // Stored receiver constraints can be symbolic in the bound method. Once
                     // the method is compared or called, its caller's type variables are fixed.
                     let (left, right) = atomic.operands();
@@ -2108,7 +2078,7 @@ impl<'db> UpperBound<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         source: EvidenceSource,
         lower: Type<'db>,
     ) -> bool {
@@ -2586,7 +2556,7 @@ impl NodeId {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
@@ -2608,7 +2578,7 @@ impl NodeId {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
         limits: L,
@@ -2630,7 +2600,7 @@ impl NodeId {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
         self.is_never_satisfied_with_requested(
@@ -2638,7 +2608,7 @@ impl NodeId {
             env,
             storage,
             scope,
-            scope.finite_typevars(),
+            scope.explicit_typevars(),
             source_order,
         )
     }
@@ -2648,7 +2618,7 @@ impl NodeId {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
@@ -2671,7 +2641,7 @@ impl NodeId {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
         mut limits: L,
@@ -2958,7 +2928,7 @@ impl NodeId {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> (Self, Option<SourceOrderId>) {
@@ -3000,8 +2970,8 @@ impl NodeId {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_orders: &FxIndexSet<AtomicConstraintId>,
-        scope: ConstraintScope<'db>,
-    ) -> (ConstraintScope<'db>, PathAssignments) {
+        scope: TypeVarSet<'db>,
+    ) -> (TypeVarSet<'db>, PathAssignments) {
         let mut atoms = self.atomic_constraints(storage);
         let scope = scope.with_captured_paramspecs(db, storage, || atoms.iter().copied());
         let path = PathAssignments::new(db, env, storage, source_orders, &mut atoms);
@@ -3332,7 +3302,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> Option<CandidateTypeVarSolution<'db>> {
         let Self {
             lower,
@@ -3485,7 +3455,7 @@ impl EvidenceSource {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct CandidateTypeVarSolution<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
-    scope: ConstraintScope<'db>,
+    scope: TypeVarSet<'db>,
     evidence_lower: Option<Type<'db>>,
     inferred_lower: Option<Type<'db>>,
     declared_lower: Option<Type<'db>>,
@@ -3507,7 +3477,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
     ) -> Self {
         Self {
             bound_typevar,
-            scope: ConstraintScope::Inferable(inferable),
+            scope: inferable,
             evidence_lower: Some(ty),
             inferred_lower: Some(ty),
             declared_lower: None,
@@ -3619,7 +3589,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
         !self
             .candidate_relations(db, env, candidate, None)
             .when_all(db, builder, |(lower, upper)| {
-                lower.when_assignable_to(db, env, upper, builder, scope.finite_typevars())
+                lower.when_assignable_to(db, env, upper, builder, scope.explicit_typevars())
             })
             .is_never_satisfied(db, env, scope)
     }
@@ -3795,12 +3765,7 @@ fn assignable_solutions_impl<'db>(
     unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
 ) -> CandidateSolutions<'db> {
     let env = &ProgramEnvironment::from_program(program);
-    let when = source.when_constraint_set_assignable_to_owned(
-        db,
-        env,
-        target,
-        ConstraintScope::Inferable(inferable),
-    );
+    let when = source.when_constraint_set_assignable_to_owned(db, env, target, inferable);
     when.query(|builder, when| {
         let mut storage = builder.storage.borrow_mut();
         CandidateSolutions::compute(
@@ -3808,7 +3773,7 @@ fn assignable_solutions_impl<'db>(
             env,
             &mut storage,
             when.node,
-            ConstraintScope::Inferable(inferable),
+            inferable,
             when.source_order,
             unspecialized_type_var_policy,
         )
@@ -3933,7 +3898,7 @@ impl<'db> CandidateSolutions<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         node: NodeId,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
     ) -> Self {
@@ -3943,7 +3908,7 @@ impl<'db> CandidateSolutions<'db> {
             storage,
             node,
             scope,
-            scope.typevars(db, storage, node),
+            scope.requested_typevars(db, storage, node),
             source_order,
             UnboundedSolutionLimits,
             unspecialized_type_var_policy,
@@ -3961,7 +3926,7 @@ impl<'db> CandidateSolutions<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         set: ConstraintSet<'db, '_>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
         budget: SolutionBudget,
         report_diagnostics: ReportDiagnostics,
@@ -3993,7 +3958,7 @@ impl<'db> CandidateSolutions<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         node: NodeId,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
         mut limits: L,
@@ -4049,7 +4014,7 @@ impl<'db> CandidateSolutions<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         source_orders: &FxIndexSet<AtomicConstraintId>,
         node: NodeId,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
         limits: &mut L,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
@@ -4728,7 +4693,7 @@ impl InteriorNode {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -4756,7 +4721,7 @@ impl InteriorNode {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
         limits: &mut L,
         should_remove: F,
@@ -5363,7 +5328,7 @@ mod tests {
             &env,
             builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             bound_typevar,
             ty,
         )
@@ -5384,7 +5349,7 @@ mod tests {
                 env,
                 builder,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 typevar,
                 lower,
             ),
@@ -5393,7 +5358,7 @@ mod tests {
                 env,
                 builder,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 typevar,
                 upper,
             ),
@@ -5402,7 +5367,7 @@ mod tests {
                 env,
                 builder,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 typevar,
                 lower,
                 upper,
@@ -5425,7 +5390,7 @@ mod tests {
             db,
             &db.program_environment(),
             set,
-            ConstraintScope::Inferable(inferable),
+            inferable,
             inferable,
             SolutionBudget {
                 paths: max_paths,
@@ -5492,7 +5457,7 @@ mod tests {
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             list_of_u,
         );
@@ -5510,16 +5475,16 @@ mod tests {
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             list_of_int,
         );
 
-        assert!(mapped.iff(db, &builder, expected).is_always_satisfied(
-            db,
-            &env,
-            ConstraintScope::All
-        ));
+        assert!(
+            mapped
+                .iff(db, &builder, expected)
+                .is_always_satisfied(db, &env, TypeVarSet::All)
+        );
     }
 
     #[test]
@@ -5540,13 +5505,13 @@ mod tests {
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             list_u,
             list_int,
         );
-        let fixed = ConstraintScope::Inferable(TypeVarSet::from_typevars(db, [t]));
-        let inferable = ConstraintScope::Inferable(TypeVarSet::from_typevars(db, [t, u]));
+        let fixed = TypeVarSet::from_typevars(db, [t]);
+        let inferable = TypeVarSet::from_typevars(db, [t, u]);
         assert!(set.is_never_satisfied(db, &env, fixed));
         assert!(!set.is_never_satisfied(db, &env, inferable));
         assert!(set.is_never_satisfied(db, &env, fixed));
@@ -5596,7 +5561,7 @@ mod tests {
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             actual_bound,
         );
@@ -5679,7 +5644,7 @@ mod tests {
                 db,
                 &env,
                 set,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 requested,
                 SolutionBudget::default(),
                 ReportDiagnostics::Yes,
@@ -5710,7 +5675,7 @@ mod tests {
             &ApplyTypeMappingVisitor::new(&env),
         );
 
-        assert!(mapped.is_always_satisfied(db, &env, ConstraintScope::All));
+        assert!(mapped.is_always_satisfied(db, &env, TypeVarSet::All));
     }
 
     #[test]
@@ -5734,7 +5699,7 @@ mod tests {
             &ApplyTypeMappingVisitor::new(&env),
         );
 
-        assert!(mapped.is_always_satisfied(db, &env, ConstraintScope::All));
+        assert!(mapped.is_always_satisfied(db, &env, TypeVarSet::All));
     }
 
     #[test]
@@ -5858,7 +5823,7 @@ mod tests {
             let full = left.when_disjoint_from(db, &env, right, &builder, TypeVarSet::None);
 
             assert!(trivial.is_trivially_never_satisfied());
-            assert!(!full.is_always_satisfied(db, &env, ConstraintScope::All));
+            assert!(!full.is_always_satisfied(db, &env, TypeVarSet::All));
         }
     }
 
@@ -5896,7 +5861,7 @@ mod tests {
                     positive_results += 1;
                     assert!(
                         left.when_disjoint_from(db, &env, right, &builder, TypeVarSet::None)
-                            .is_always_satisfied(db, &env, ConstraintScope::All),
+                            .is_always_satisfied(db, &env, TypeVarSet::All),
                         "cheap disjointness incorrectly accepts `{}` and `{}`",
                         left.display(db, &env),
                         right.display(db, &env)
@@ -5972,7 +5937,7 @@ mod tests {
             &env,
             &mut builder.storage.borrow_mut(),
             set.node,
-            ConstraintScope::Inferable(inferable),
+            inferable,
             set.source_order,
             UnspecializedTypeVarPolicy::Ignore,
         );
@@ -5997,7 +5962,7 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let path_bound = CandidateTypeVarSolution {
             bound_typevar: t,
-            scope: ConstraintScope::Inferable(inferable),
+            scope: inferable,
             evidence_lower: None,
             inferred_lower: None,
             declared_lower: None,
@@ -6041,13 +6006,7 @@ mod tests {
         );
         let mut storage = builder.storage.borrow_mut();
         let inferable = TypeVarSet::from_typevars(db, [t]);
-        let invalid = bounds.finish(
-            db,
-            &env,
-            &mut storage,
-            t,
-            ConstraintScope::Inferable(inferable),
-        );
+        let invalid = bounds.finish(db, &env, &mut storage, t, inferable);
         assert_eq!(invalid, None);
         drop(storage);
 
@@ -6152,13 +6111,7 @@ class E: ...
             bounds.add_upper(ConstraintProvenance::INFERRED, right);
             let mut storage = builder.storage.borrow_mut();
             let exhausted = bounds
-                .finish(
-                    db,
-                    &env,
-                    &mut storage,
-                    t,
-                    ConstraintScope::Inferable(inferable),
-                )
+                .finish(db, &env, &mut storage, t, inferable)
                 .expect("expected a valid solution");
             drop(storage);
             let expected = PathBoundSolution::BudgetExceeded { fallback: lower };
@@ -6229,7 +6182,7 @@ class E: ...
                 &env,
                 &mut storage,
                 constrained,
-                ConstraintScope::Inferable(TypeVarSet::from_typevars(db, [constrained])),
+                TypeVarSet::from_typevars(db, [constrained]),
             )
             .expect("expected a valid solution");
         drop(storage);
@@ -6266,7 +6219,7 @@ class E: ...
                         &env,
                         &builder,
                         ConstraintProvenance::INFERRED,
-                        ConstraintScope::All,
+                        TypeVarSet::All,
                         t,
                         gradual,
                     );
@@ -6277,7 +6230,7 @@ class E: ...
                         &env,
                         &builder,
                         ConstraintProvenance::INFERRED,
-                        ConstraintScope::All,
+                        TypeVarSet::All,
                         t,
                         witness,
                     );
@@ -6288,14 +6241,14 @@ class E: ...
                         equivalent
                             .or(db, &builder, || range)
                             .and(db, &builder, || witness);
-                    assert!(!alternatives.is_never_satisfied(db, &env, ConstraintScope::All));
+                    assert!(!alternatives.is_never_satisfied(db, &env, TypeVarSet::All));
 
                     // Requiring both bounds still rules out that specialization.
                     let conjunction =
                         equivalent
                             .and(db, &builder, || range)
                             .and(db, &builder, || witness);
-                    assert!(conjunction.is_never_satisfied(db, &env, ConstraintScope::All));
+                    assert!(conjunction.is_never_satisfied(db, &env, TypeVarSet::All));
                 }
             }
         }
@@ -6318,7 +6271,7 @@ class E: ...
         assert!(!ConstraintSet::never(&builder).is_trivially_always_satisfied());
         assert!(!t_int.is_trivially_always_satisfied());
         assert!(!t_int.is_trivially_never_satisfied());
-        assert!(impossible.is_never_satisfied(db, &env, ConstraintScope::All));
+        assert!(impossible.is_never_satisfied(db, &env, TypeVarSet::All));
         assert!(!impossible.is_trivially_never_satisfied());
 
         let t_bool_upper = ConstraintSet::constrain_typevar_upper_bound(
@@ -6326,7 +6279,7 @@ class E: ...
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             KnownClass::Bool.to_instance(db, &env),
         );
@@ -6335,7 +6288,7 @@ class E: ...
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             KnownClass::Int.to_instance(db, &env),
         );
@@ -6343,7 +6296,7 @@ class E: ...
             .negate(db, &builder)
             .or(db, &builder, || t_int_upper);
 
-        assert!(tautology.is_always_satisfied(db, &env, ConstraintScope::All));
+        assert!(tautology.is_always_satisfied(db, &env, TypeVarSet::All));
         assert!(!tautology.is_trivially_always_satisfied());
     }
 
@@ -6362,7 +6315,7 @@ class E: ...
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             KnownClass::Bool.to_instance(db, &env),
         );
@@ -6371,7 +6324,7 @@ class E: ...
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             KnownClass::Int.to_instance(db, &env),
         );
@@ -6448,21 +6401,17 @@ class E: ...
         let t_str = create_constraint(db, &builder, t, KnownClass::Str);
         let impossible = t_int.and(db, &builder, || t_str);
 
-        assert!(!t_int.is_never_satisfied(db, &env, ConstraintScope::All));
-        assert!(!t_int.is_never_satisfied(db, &env, ConstraintScope::All));
-        assert!(impossible.is_never_satisfied(db, &env, ConstraintScope::All));
-        assert!(impossible.is_never_satisfied(db, &env, ConstraintScope::All));
-        assert!(ConstraintSet::never(&builder).is_never_satisfied(db, &env, ConstraintScope::All));
-        assert!(!ConstraintSet::always(&builder).is_never_satisfied(
-            db,
-            &env,
-            ConstraintScope::All
-        ));
+        assert!(!t_int.is_never_satisfied(db, &env, TypeVarSet::All));
+        assert!(!t_int.is_never_satisfied(db, &env, TypeVarSet::All));
+        assert!(impossible.is_never_satisfied(db, &env, TypeVarSet::All));
+        assert!(impossible.is_never_satisfied(db, &env, TypeVarSet::All));
+        assert!(ConstraintSet::never(&builder).is_never_satisfied(db, &env, TypeVarSet::All));
+        assert!(!ConstraintSet::always(&builder).is_never_satisfied(db, &env, TypeVarSet::All));
 
         let owned = create_compacted_owned_set(db);
         owned.query(|_builder, set| {
-            assert!(!set.is_never_satisfied(db, &env, ConstraintScope::All));
-            assert!(!set.is_never_satisfied(db, &env, ConstraintScope::All));
+            assert!(!set.is_never_satisfied(db, &env, TypeVarSet::All));
+            assert!(!set.is_never_satisfied(db, &env, TypeVarSet::All));
         });
 
         // tuple[Any, str] <= T <= tuple[int, int] has conflicting bounds when T is inferable.
@@ -6479,7 +6428,7 @@ class E: ...
                 &env,
                 builder,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 t,
                 lower,
                 upper,
@@ -6488,14 +6437,14 @@ class E: ...
 
         // The answer must not depend on which inferable set was queried first.
         owned.query(|_builder, set| {
-            assert!(!set.is_never_satisfied(db, &env, ConstraintScope::EMPTY));
-            assert!(set.is_never_satisfied(db, &env, ConstraintScope::Inferable(infer_t)));
-            assert!(!set.is_never_satisfied(db, &env, ConstraintScope::Inferable(infer_u)));
+            assert!(!set.is_never_satisfied(db, &env, TypeVarSet::None));
+            assert!(set.is_never_satisfied(db, &env, infer_t));
+            assert!(!set.is_never_satisfied(db, &env, infer_u));
         });
         owned.query(|_builder, set| {
-            assert!(set.is_never_satisfied(db, &env, ConstraintScope::Inferable(infer_t)));
-            assert!(!set.is_never_satisfied(db, &env, ConstraintScope::Inferable(infer_u)));
-            assert!(!set.is_never_satisfied(db, &env, ConstraintScope::EMPTY));
+            assert!(set.is_never_satisfied(db, &env, infer_t));
+            assert!(!set.is_never_satisfied(db, &env, infer_u));
+            assert!(!set.is_never_satisfied(db, &env, TypeVarSet::None));
         });
     }
 
@@ -6515,8 +6464,8 @@ class E: ...
 
         assert_eq!(first.node, second.node);
         assert_ne!(first.source_order, second.source_order);
-        assert!(!first.is_never_satisfied(db, &env, ConstraintScope::All));
-        assert!(!second.is_never_satisfied(db, &env, ConstraintScope::All));
+        assert!(!first.is_never_satisfied(db, &env, TypeVarSet::All));
+        assert!(!second.is_never_satisfied(db, &env, TypeVarSet::All));
         let storage = builder.storage.borrow();
         assert_eq!(storage.never_satisfied_cache.len(), 1);
     }
@@ -6543,7 +6492,7 @@ class E: ...
                         provenance,
                         typevar,
                         lower,
-                        ConstraintScope::All,
+                        TypeVarSet::All,
                     )
                 }),
                 upper.into_iter().flat_map(move |upper| {
@@ -6553,7 +6502,7 @@ class E: ...
                         provenance,
                         typevar,
                         upper,
-                        ConstraintScope::All,
+                        TypeVarSet::All,
                     )
                 }),
             )
@@ -6616,7 +6565,7 @@ class E: ...
             drop(storage);
 
             let set = ConstraintSet::from_node(&builder, node, source_order);
-            let solutions = set.solutions(db, &env, ConstraintScope::Inferable(inferable));
+            let solutions = set.solutions(db, &env, inferable);
             let mut merged = FxHashMap::default();
             if let Ok(Solutions::Constrained(paths)) = &solutions {
                 for path in paths.as_slice() {
@@ -6670,8 +6619,8 @@ class E: ...
             };
             signatures.insert(format!(
                 "never={} always={} merged=[{merged}] paths=[{paths}]",
-                set.is_never_satisfied(db, &env, ConstraintScope::All),
-                set.is_always_satisfied(db, &env, ConstraintScope::All),
+                set.is_never_satisfied(db, &env, TypeVarSet::All),
+                set.is_always_satisfied(db, &env, TypeVarSet::All),
             ));
         }
 
@@ -7161,18 +7110,16 @@ class E: ...
         let negated = tdd.negate(db, &builder);
 
         // T ∧ ¬T == false
-        assert!(tdd.and(db, &builder, || negated).is_never_satisfied(
-            db,
-            &env,
-            ConstraintScope::All
-        ));
+        assert!(
+            tdd.and(db, &builder, || negated)
+                .is_never_satisfied(db, &env, TypeVarSet::All)
+        );
 
         // T ∨ ¬T == true
-        assert!(tdd.or(db, &builder, || negated).is_always_satisfied(
-            db,
-            &env,
-            ConstraintScope::All
-        ));
+        assert!(
+            tdd.or(db, &builder, || negated)
+                .is_always_satisfied(db, &env, TypeVarSet::All)
+        );
     }
 
     /// Double negation of a TDD with uncertain branches is semantically equivalent to the
@@ -7195,7 +7142,7 @@ class E: ...
         assert!(!t_int.is_equivalent_to(db, &env, tdd, TypeVarSet::None));
 
         let equivalent = tdd.iff(db, &builder, double_negated);
-        assert!(equivalent.is_always_satisfied(db, &env, ConstraintScope::All));
+        assert!(equivalent.is_always_satisfied(db, &env, TypeVarSet::All));
     }
 
     /// `iff(T, T)` is always satisfied for TDDs with uncertain branches.
@@ -7214,14 +7161,14 @@ class E: ...
         // iff(T, T) == true
         assert!(
             tdd.iff(db, &builder, tdd)
-                .is_always_satisfied(db, &env, ConstraintScope::All)
+                .is_always_satisfied(db, &env, TypeVarSet::All)
         );
 
         // iff(T, ¬T) == false
         let negated = tdd.negate(db, &builder);
         assert!(
             tdd.iff(db, &builder, negated)
-                .is_never_satisfied(db, &env, ConstraintScope::All)
+                .is_never_satisfied(db, &env, TypeVarSet::All)
         );
     }
 
@@ -7358,7 +7305,7 @@ class E: ...
                 &env,
                 builder,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 t,
                 Type::TypeVar(u),
             )
@@ -7391,7 +7338,7 @@ class E: ...
                 &env,
                 builder,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 t,
                 Type::TypeVar(u),
             )
@@ -7407,15 +7354,15 @@ class E: ...
                 &env,
                 builder,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 t,
                 Type::TypeVar(u),
             );
-            assert!(loaded.iff(db, builder, direct).is_always_satisfied(
-                db,
-                &env,
-                ConstraintScope::All
-            ));
+            assert!(
+                loaded
+                    .iff(db, builder, direct)
+                    .is_always_satisfied(db, &env, TypeVarSet::All)
+            );
 
             let mut storage = builder.storage.borrow_mut();
             assert_eq!(storage.typevar_id(db, u), original_u_id);
@@ -7474,8 +7421,9 @@ class E: ...
             t_int.and(db, builder, || u_str).reduce_inferable(
                 db,
                 &env,
+                builder,
                 TypeVarSet::from_typevars(db, [t]),
-                ConstraintScope::All,
+                TypeVarSet::All,
             )
         });
 
@@ -7517,7 +7465,7 @@ class E: ...
                 &env,
                 builder,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 u,
                 Type::TypeVar(t),
             );
@@ -7531,13 +7479,11 @@ class E: ...
                 .reduce_inferable(
                     db,
                     &env,
+                    builder,
                     TypeVarSet::from_typevars(db, [t]),
-                    ConstraintScope::All,
+                    TypeVarSet::All,
                 );
-            assert_eq!(
-                projected.solutions(db, &env, ConstraintScope::Inferable(inferable)),
-                expected
-            );
+            assert_eq!(projected.solutions(db, &env, inferable), expected);
             projected
         });
 
@@ -7545,10 +7491,7 @@ class E: ...
             ConstraintSetBuilder::new().into_owned(|builder| builder.load(db, &env, &owned));
         for constraints in [&owned, &reloaded] {
             constraints.query(|_builder, constraints| {
-                assert_eq!(
-                    constraints.solutions(db, &env, ConstraintScope::Inferable(inferable)),
-                    expected
-                );
+                assert_eq!(constraints.solutions(db, &env, inferable), expected);
             });
         }
 
@@ -7602,8 +7545,9 @@ class E: ...
                 .reduce_inferable(
                     db,
                     &env,
+                    &builder,
                     TypeVarSet::from_typevars(db, [fresh_a, fresh_r]),
-                    ConstraintScope::All,
+                    TypeVarSet::All,
                 );
             let storage = builder.storage.borrow();
             storage
@@ -7643,17 +7587,17 @@ class E: ...
                     &env,
                     builder,
                     ConstraintProvenance::INFERRED,
-                    ConstraintScope::All,
+                    TypeVarSet::All,
                     t,
                     int,
                 );
                 let later = create_constraint_set_with_bounds(db, &env, builder, t, lower, upper);
                 let absorbed = earlier.or(db, builder, || later).and(db, builder, || later);
-                expected = Some(absorbed.or(db, builder, || earlier).solutions(
-                    db,
-                    &env,
-                    ConstraintScope::Inferable(inferable),
-                ));
+                expected = Some(
+                    absorbed
+                        .or(db, builder, || earlier)
+                        .solutions(db, &env, inferable),
+                );
                 absorbed
             });
             assert_matches!(&expected, Some(Ok(Solutions::Constrained(_))));
@@ -7665,16 +7609,16 @@ class E: ...
                 &env,
                 &builder,
                 ConstraintProvenance::INFERRED,
-                ConstraintScope::All,
+                TypeVarSet::All,
                 t,
                 int,
             );
             assert_eq!(
-                Some(reloaded.or(db, &builder, || earlier).solutions(
-                    db,
-                    &env,
-                    ConstraintScope::Inferable(inferable)
-                ),),
+                Some(
+                    reloaded
+                        .or(db, &builder, || earlier)
+                        .solutions(db, &env, inferable),
+                ),
                 expected,
             );
         }
@@ -7758,7 +7702,7 @@ class E: ...
             );
 
             let combined = set.and(db, builder, || w_str);
-            assert!(!combined.is_never_satisfied(db, &env, ConstraintScope::All));
+            assert!(!combined.is_never_satisfied(db, &env, TypeVarSet::All));
 
             let storage = builder.storage.borrow();
             assert!(!storage.nodes.is_empty());
@@ -7803,7 +7747,7 @@ class E: ...
         assert!(owned.inner.is_none());
 
         owned.query(|builder, set| {
-            assert!(set.is_always_satisfied(db, &env, ConstraintScope::All));
+            assert!(set.is_always_satisfied(db, &env, TypeVarSet::All));
             let storage = builder.storage.borrow();
             assert!(storage.compacted.is_none());
             assert!(storage.nodes.is_empty());
@@ -7813,7 +7757,7 @@ class E: ...
 
         let builder = ConstraintSetBuilder::new();
         let loaded = builder.load(db, &env, &owned);
-        assert!(loaded.is_always_satisfied(db, &env, ConstraintScope::All));
+        assert!(loaded.is_always_satisfied(db, &env, TypeVarSet::All));
     }
 
     /// Round-trip through `OwnedConstraintSet`: build a TDD with uncertain branches, convert to

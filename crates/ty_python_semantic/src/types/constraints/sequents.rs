@@ -14,8 +14,8 @@ use crate::types::constraints::variables::{
     TypeVarRangeBound,
 };
 use crate::types::constraints::{
-    ALWAYS_FALSE, AtomicConstraintId, ConstraintScope, ConstraintSetBuilder, ConstraintSetStorage,
-    Node, OwnedConstraintSet,
+    ALWAYS_FALSE, AtomicConstraintId, ConstraintSetBuilder, ConstraintSetStorage, Node,
+    OwnedConstraintSet,
 };
 use crate::types::signatures::CallableSignature;
 use crate::types::typevar::TypeVarSet;
@@ -66,7 +66,7 @@ pub(super) struct SequentMap<'db> {
 }
 
 struct SequentMapBuilder<'db> {
-    scope: ConstraintScope<'db>,
+    scope: TypeVarSet<'db>,
     db: &'db dyn Db,
     sequents: Vec<SequentGroup<'db>>,
     /// Pending sequents that have not yet been added to [`sequents`][Self::sequents]. This is only
@@ -251,7 +251,7 @@ impl<'db> SequentMap<'db> {
 }
 
 impl<'db> SequentMapBuilder<'db> {
-    fn new(db: &'db dyn Db, scope: ConstraintScope<'db>) -> Self {
+    fn new(db: &'db dyn Db, scope: TypeVarSet<'db>) -> Self {
         Self {
             db,
             scope,
@@ -382,7 +382,7 @@ impl<'db> SequentMap<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         constraint: AtomicConstraint<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> Option<&'db Self> {
         // Most individual constraints produce no sequents. Avoid interning the query arguments
         // and retaining an empty Salsa result for those cases. Keep the checks in sync with the
@@ -421,7 +421,7 @@ impl<'db> SequentMap<'db> {
             db: &'db dyn Db,
             program: Program<'db>,
             constraint: InternedSequentConstraint<'db>,
-            scope: ConstraintScope<'db>,
+            scope: TypeVarSet<'db>,
         ) -> SequentMap<'db> {
             let env = &ProgramEnvironment::from_program(program);
             let constraint = constraint.constraint(db);
@@ -456,7 +456,7 @@ impl<'db> SequentMap<'db> {
         env: &ProgramEnvironment<'db>,
         left: AtomicConstraint<'db>,
         right: AtomicConstraint<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> Option<&'db Self> {
         // Currently, the only pattern we look for is when two concrete lower-bound constraints
         // have disjoint bounds. Given `l₁ ≤ T ∧ l₂ ≤ T`, the only sequent we could theoretically
@@ -489,7 +489,7 @@ impl<'db> SequentMap<'db> {
             program: Program<'db>,
             left: InternedSequentConstraint<'db>,
             right: InternedSequentConstraint<'db>,
-            scope: ConstraintScope<'db>,
+            scope: TypeVarSet<'db>,
         ) -> SequentMap<'db> {
             let env = &ProgramEnvironment::from_program(program);
             let left = left.constraint(db);
@@ -2274,13 +2274,8 @@ mod tests {
                 AtomicConstraint::from(ConcreteUpperBound::new(provenance, t, int)),
                 AtomicConstraint::from(ConcreteEquivalenceBound::new(provenance, t, int)),
             ] {
-                let sequents = SequentMap::for_constraint_pair(
-                    db,
-                    &env,
-                    lower,
-                    replacement,
-                    ConstraintScope::All,
-                );
+                let sequents =
+                    SequentMap::for_constraint_pair(db, &env, lower, replacement, TypeVarSet::All);
                 if provenance == ConstraintProvenance::VALIDITY {
                     assert!(
                         sequents.is_none_or(|sequents| sequents.all_sequents().next().is_none()),
@@ -2350,8 +2345,7 @@ mod tests {
                 p,
                 expected_bound,
             ));
-            let sequents =
-                SequentMap::for_constraint_pair(db, &env, lower, upper, ConstraintScope::All);
+            let sequents = SequentMap::for_constraint_pair(db, &env, lower, upper, TypeVarSet::All);
             assert!(sequents.is_some_and(|sequents| {
                 sequents.all_sequents().any(|sequent| {
                     matches!(sequent, Sequent::PairImplication { post, .. }
@@ -2410,7 +2404,7 @@ mod tests {
             captured.substitute_one_typevar(db, &env, q, overloads),
         ));
         let sequents =
-            SequentMap::for_constraint_pair(db, &env, lower, replacement, ConstraintScope::All);
+            SequentMap::for_constraint_pair(db, &env, lower, replacement, TypeVarSet::All);
         assert!(sequents.is_some_and(|sequents| {
             sequents.all_sequents().any(|sequent| {
                 matches!(sequent, Sequent::PairImplication { post, .. }
@@ -2436,12 +2430,11 @@ mod tests {
             Type::int_literal(1),
         ));
 
-        assert!(SequentMap::for_constraint(db, &env, left, ConstraintScope::All).is_none());
-        assert!(SequentMap::for_constraint(db, &env, right, ConstraintScope::All).is_none());
+        assert!(SequentMap::for_constraint(db, &env, left, TypeVarSet::All).is_none());
+        assert!(SequentMap::for_constraint(db, &env, right, TypeVarSet::All).is_none());
         for (left, right) in [(left, right), (right, left)] {
             assert!(
-                SequentMap::for_constraint_pair(db, &env, left, right, ConstraintScope::All)
-                    .is_none()
+                SequentMap::for_constraint_pair(db, &env, left, right, TypeVarSet::All).is_none()
             );
         }
     }
@@ -2469,8 +2462,7 @@ mod tests {
         ));
 
         for (left, right) in [(left, right), (right, left)] {
-            let sequents =
-                SequentMap::for_constraint_pair(db, &env, left, right, ConstraintScope::All);
+            let sequents = SequentMap::for_constraint_pair(db, &env, left, right, TypeVarSet::All);
 
             assert!(sequents.is_some_and(|sequents| {
                 sequents

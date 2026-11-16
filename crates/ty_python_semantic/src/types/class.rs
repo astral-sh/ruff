@@ -1,5 +1,4 @@
 use crate::ProgramEnvironment;
-use crate::types::constraints::ConstraintScope;
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
@@ -1513,7 +1512,7 @@ impl<'db> ClassType<'db> {
             env,
             relation,
             &constraints,
-            ConstraintScope::EMPTY,
+            TypeVarSet::None,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
@@ -1521,7 +1520,7 @@ impl<'db> ClassType<'db> {
         );
         checker
             .check_class_pair(db, self, target)
-            .is_always_satisfied(db, env, ConstraintScope::EMPTY)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     /// Select the more derived metaclass, or return `None` for a conflict.
@@ -1649,7 +1648,7 @@ impl<'db> ClassType<'db> {
     ) -> bool {
         self.could_exist_in_mro_of_impl(db, other, |this, other| {
             this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                .is_always_satisfied(db, env, ConstraintScope::EMPTY)
+                .is_always_satisfied(db, env, TypeVarSet::None)
         })
     }
 
@@ -1665,7 +1664,7 @@ impl<'db> ClassType<'db> {
         self.could_exist_in_mro_of_impl(db, other, |this, other| {
             checker
                 .check_specialization_pair(db, this, other)
-                .is_always_satisfied(db, env, ConstraintScope::Inferable(checker.inferable))
+                .is_always_satisfied(db, env, checker.inferable)
         })
     }
 
@@ -1740,11 +1739,11 @@ impl<'db> ClassType<'db> {
             |this, other| this.could_exist_in_mro_of(db, env, other, constraints),
             |this, other| {
                 this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                    .is_always_satisfied(db, env, ConstraintScope::EMPTY)
+                    .is_always_satisfied(db, env, TypeVarSet::None)
             },
             |this, other| {
                 this.when_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                    .is_always_satisfied(db, env, ConstraintScope::EMPTY)
+                    .is_always_satisfied(db, env, TypeVarSet::None)
             },
         )
     }
@@ -1769,12 +1768,12 @@ impl<'db> ClassType<'db> {
             |this, other| {
                 checker
                     .check_specialization_pair(db, this, other)
-                    .is_always_satisfied(db, env, ConstraintScope::Inferable(checker.inferable))
+                    .is_always_satisfied(db, env, checker.inferable)
             },
             |this, other| {
                 checker
                     .check_type_pair(db, this, other)
-                    .is_always_satisfied(db, env, ConstraintScope::Inferable(checker.inferable))
+                    .is_always_satisfied(db, env, checker.inferable)
             },
         )
     }

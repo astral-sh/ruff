@@ -3,8 +3,8 @@
 use rustc_hash::FxHashSet;
 
 use super::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintScope, ConstraintSet,
-    PathBoundSolution, ReportDiagnostics, Solutions, TypeVarSolution,
+    CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, PathBoundSolution,
+    ReportDiagnostics, Solutions, TypeVarSolution,
 };
 use crate::types::{Type, TypeVarSet, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
@@ -117,9 +117,9 @@ impl<'db> ConstraintSet<'db, '_> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
-        let requested = scope.typevars(db, &self.builder.storage.borrow(), self.node);
+        let requested = scope.requested_typevars(db, &self.builder.storage.borrow(), self.node);
         self.solutions_for_typevars(db, env, scope, requested)
     }
 
@@ -127,7 +127,7 @@ impl<'db> ConstraintSet<'db, '_> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
         let builder = self.builder;
@@ -159,12 +159,12 @@ impl<'db> ConstraintSet<'db, '_> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         budget: SolutionBudget,
         report_diagnostics: ReportDiagnostics,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
-        let requested = scope.typevars(db, &self.builder.storage.borrow(), self.node);
+        let requested = scope.requested_typevars(db, &self.builder.storage.borrow(), self.node);
         self.solve_projection(
             db,
             env,
@@ -181,7 +181,7 @@ impl<'db> ConstraintSet<'db, '_> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         requested: TypeVarSet<'db>,
         budget: SolutionBudget,
         report_diagnostics: ReportDiagnostics,
@@ -229,7 +229,7 @@ impl<'db> ConstraintSet<'db, '_> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         budget: SolutionBudget,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
         initial: T,
@@ -239,7 +239,7 @@ impl<'db> ConstraintSet<'db, '_> {
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {
-        let requested = scope.typevars(db, &self.builder.storage.borrow(), self.node);
+        let requested = scope.requested_typevars(db, &self.builder.storage.borrow(), self.node);
         let path_bounds = CandidateSolutions::compute_bounded(
             db,
             env,

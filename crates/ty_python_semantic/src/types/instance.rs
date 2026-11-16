@@ -16,8 +16,7 @@ use super::{
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
-    ConstraintScope, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    OwnedConstraintSet,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
@@ -32,7 +31,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::typevar::TypeVarBoundOrConstraints;
+use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarSet};
 use crate::types::visitor::{
     DynamicContentMode, TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
     dynamic_content_impl, walk_type_with_recursion_guard,
@@ -1529,7 +1528,7 @@ fn non_recursive_protocol_constraints<'db>(
     db: &'db dyn Db,
     source: ProtocolInstanceType<'db>,
     target: ProtocolInterfaceView<'db>,
-    scope: ConstraintScope<'db>,
+    scope: TypeVarSet<'db>,
 ) -> OwnedConstraintSet<'db> {
     let env = ProgramEnvironment::from_program(target.base().program(db));
     let constraints = ConstraintSetBuilder::new();
@@ -1971,7 +1970,7 @@ impl<'db> ProtocolInstanceType<'db> {
             let checker = TypeRelationChecker::subtyping(
                 &env,
                 &constraints,
-                ConstraintScope::EMPTY,
+                TypeVarSet::None,
                 &relation_visitor,
                 &disjointness_visitor,
                 &signature_relation_visitor,
@@ -1979,7 +1978,7 @@ impl<'db> ProtocolInstanceType<'db> {
             );
             checker
                 .check_type_satisfies_protocol(db, receiver, protocol, None)
-                .is_always_satisfied(db, &env, ConstraintScope::EMPTY)
+                .is_always_satisfied(db, &env, TypeVarSet::None)
         }
 
         is_equivalent_to_object_inner(db, self, ())
@@ -2108,7 +2107,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         target: Self,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> Option<&'db OwnedConstraintSet<'db>> {
         let origin = target.class_origin(db)?;
         let interface = target.interface(db);

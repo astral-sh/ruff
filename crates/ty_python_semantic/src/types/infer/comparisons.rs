@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 use crate::ProgramEnvironment;
 use crate::types::call::{CallArguments, CallDunderError};
-use crate::types::constraints::{ConstraintScope, ConstraintSetBuilder};
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{
@@ -18,6 +18,7 @@ use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
 use crate::types::literal::{LiteralComparisonKind, WideLiteralComparison};
 use crate::types::tuple::{Tuple, TupleSpec};
+use crate::types::typevar::TypeVarSet;
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType,
@@ -1317,11 +1318,9 @@ fn infer_binary_type_comparison_inner<'db>(
             let constraints = ConstraintSetBuilder::new();
             let left = constraints.load(db, env, left.constraints(db));
             let right = constraints.load(db, env, right.constraints(db));
-            let equivalent = left.iff(db, &constraints, right).is_always_satisfied(
-                db,
-                env,
-                ConstraintScope::All,
-            );
+            let equivalent =
+                left.iff(db, &constraints, right)
+                    .is_always_satisfied(db, env, TypeVarSet::All);
             match op {
                 NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
                     Some(Ok(Type::bool_literal(equivalent)))

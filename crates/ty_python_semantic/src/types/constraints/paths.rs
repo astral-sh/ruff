@@ -20,9 +20,10 @@ use crate::types::constraints::variables::AtomicConstraint::{
 };
 use crate::types::constraints::variables::{AtomicConstraint, UnspecializedTypeVarPolicy};
 use crate::types::constraints::{
-    Assignment, AtomicConstraintId, ConstraintScope, ConstraintSetStorage, Node, NodeId,
-    PathVisitor, SourceOrderId, TypeVarId,
+    Assignment, AtomicConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor, SourceOrderId,
+    TypeVarId,
 };
+use crate::types::typevar::TypeVarSet;
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 /// The position of an assignment in insertion order.
@@ -329,7 +330,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         node: NodeId,
         visitor: &mut V,
     ) -> ControlFlow<V::Break, V::Result>
@@ -469,7 +470,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         assignment: Assignment<AtomicConstraintId>,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         f: impl FnOnce(&mut ConstraintSetStorage<'db>, &mut Self, Range<usize>, bool) -> R,
@@ -774,7 +775,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         constraint: AtomicConstraintId,
     ) {
         // If we've already processed this constraint, we can skip it.
@@ -875,7 +876,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         source_constraint: AtomicConstraintId,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
     ) -> Result<(), PathAssignmentConflict> {
@@ -917,7 +918,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         assignment: Assignment<AtomicConstraintId>,
         source_constraint: AtomicConstraintId,
         fuel: AssignmentFuel,
@@ -1281,7 +1282,7 @@ mod tests {
             &env,
             builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             bound_typevar,
             ty,
         )
@@ -1311,7 +1312,7 @@ mod tests {
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             KnownClass::Bool.to_instance(db, &env),
         );
@@ -1320,7 +1321,7 @@ mod tests {
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
-            ConstraintScope::All,
+            TypeVarSet::All,
             t,
             KnownClass::Int.to_instance(db, &env),
         );
@@ -1330,9 +1331,9 @@ mod tests {
 
         for set in [lhs, rhs, intersection, tautology, implication] {
             assert_eq!(
-                set.is_always_satisfied(db, &env, ConstraintScope::All),
+                set.is_always_satisfied(db, &env, TypeVarSet::All),
                 set.negate(db, &builder)
-                    .is_never_satisfied(db, &env, ConstraintScope::All)
+                    .is_never_satisfied(db, &env, TypeVarSet::All)
             );
         }
     }
@@ -1386,7 +1387,7 @@ mod tests {
             &env,
             &mut builder.storage.borrow_mut(),
             set.node,
-            ConstraintScope::Inferable(inferable),
+            inferable,
             set.source_order,
             UnspecializedTypeVarPolicy::Ignore,
         );
@@ -1409,7 +1410,7 @@ mod tests {
                 db,
                 &mut storage,
                 source_orders.clone(),
-                ConstraintScope::Inferable(inferable),
+                inferable,
                 inferable,
                 limits,
                 set.node,
@@ -1433,7 +1434,7 @@ mod tests {
                 db,
                 &mut storage,
                 source_orders.clone(),
-                ConstraintScope::Inferable(inferable),
+                inferable,
                 inferable,
                 limits,
                 set.node,

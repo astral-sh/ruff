@@ -1,4 +1,3 @@
-use crate::types::constraints::ConstraintScope;
 use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
@@ -3389,11 +3388,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |read_ty| {
                     let result = self.check_type_pair(db, ty, read_ty);
                     if let Some(context) = self.report_context()
-                        && result.is_always_satisfied(
-                            db,
-                            env,
-                            ConstraintScope::Inferable(self.inferable),
-                        )
+                        && result.is_always_satisfied(db, env, self.inferable)
                     {
                         context.push(ErrorContext::DisjointTypes {
                             left: ty,
@@ -3441,11 +3436,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                                     callable_signature.return_ty,
                                 );
                                 if let Some(context) = self.report_context()
-                                    && result.is_always_satisfied(
-                                        db,
-                                        env,
-                                        ConstraintScope::Inferable(self.inferable),
-                                    )
+                                    && result.is_always_satisfied(db, env, self.inferable)
                                 {
                                     context.push(ErrorContext::DisjointReturnTypes {
                                         left: method_signature.return_ty,
@@ -3459,7 +3450,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             })
         };
         if let Some(context) = self.report_context()
-            && !result.is_always_satisfied(db, env, ConstraintScope::Inferable(self.inferable))
+            && !result.is_always_satisfied(db, env, self.inferable)
         {
             context.take();
         }

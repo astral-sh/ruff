@@ -8,10 +8,10 @@ use itertools::Either;
 use salsa::plumbing::AsId;
 
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintScope, ConstraintSetBuilder, ConstraintSetStorage, Node,
-    NodeId, SourceOrderId, max_constructor_and_typevar_depth, wobble_index,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetBuilder, ConstraintSetStorage, Node, NodeId,
+    SourceOrderId, max_constructor_and_typevar_depth, wobble_index,
 };
-use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
+use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain, TypeVarSet};
 use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
 use crate::{Db, ProgramEnvironment};
 
@@ -220,7 +220,7 @@ impl<'db> AtomicConstraint<'db> {
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
         let choose_lower_bound = move |bound: Type<'db>| {
             let bound = Self::normalize_bound(db, typevar, bound);
@@ -257,7 +257,7 @@ impl<'db> AtomicConstraint<'db> {
                     Some(Err(UnsatisfiableBound))
                 }
 
-                Type::TypeVar(lower) if scope.contains(db, lower) => {
+                Type::TypeVar(lower) if lower.is_inferable(db, scope) => {
                     let constraint = TypeVarRangeBound::new(db, provenance, lower, typevar).into();
                     Some(Ok(constraint))
                 }
@@ -298,7 +298,7 @@ impl<'db> AtomicConstraint<'db> {
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
         let choose_upper_bound = move |bound: Type<'db>| {
             let bound = Self::normalize_bound(db, typevar, bound);
@@ -323,7 +323,7 @@ impl<'db> AtomicConstraint<'db> {
                     Some(Err(UnsatisfiableBound))
                 }
 
-                Type::TypeVar(upper) if scope.contains(db, upper) => {
+                Type::TypeVar(upper) if upper.is_inferable(db, scope) => {
                     let constraint = TypeVarRangeBound::new(db, provenance, typevar, upper).into();
                     Some(Ok(constraint))
                 }
@@ -365,7 +365,7 @@ impl<'db> AtomicConstraint<'db> {
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
     ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
         let is_same_typevar = |element: &Type<'db>| {
             element
@@ -398,7 +398,7 @@ impl<'db> AtomicConstraint<'db> {
                 Some(Err(UnsatisfiableBound))
             }
 
-            Type::TypeVar(bound_typevar) if scope.contains(db, bound_typevar) => {
+            Type::TypeVar(bound_typevar) if bound_typevar.is_inferable(db, scope) => {
                 let constraint =
                     TypeVarEquivalenceBound::new(db, provenance, typevar, bound_typevar).into();
                 Some(Ok(constraint))
@@ -665,7 +665,7 @@ impl<'db> AtomicConstraint<'db> {
             db,
             visitor.env,
             &mut builder.storage.borrow_mut(),
-            ConstraintScope::All,
+            TypeVarSet::All,
             left,
             right,
         )
@@ -688,7 +688,7 @@ impl<'db> AtomicConstraint<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        scope: ConstraintScope<'db>,
+        scope: TypeVarSet<'db>,
         left: Type<'db>,
         right: Type<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -697,7 +697,7 @@ impl<'db> AtomicConstraint<'db> {
             self,
             Self::ConcreteEquivalence(_) | Self::TypeVarEquivalence(_)
         );
-        let inferable = |ty: Type<'db>| ty.as_typevar().filter(|var| scope.contains(db, *var));
+        let inferable = |ty: Type<'db>| ty.as_typevar().filter(|var| var.is_inferable(db, scope));
         match (inferable(left), inferable(right)) {
             (Some(var), _) if equivalence => {
                 let atoms = Self::new_equivalence_bound(db, env, provenance, var, right, scope);
@@ -721,7 +721,7 @@ impl<'db> AtomicConstraint<'db> {
                 } else {
                     left.when_constraint_set_assignable_to_owned(db, env, right, scope)
                 };
-                storage.load_with_provenance(db, env, &when, Some(provenance), ConstraintScope::All)
+                storage.load_with_provenance(db, env, &when, Some(provenance), TypeVarSet::All)
             }
         }
     }
