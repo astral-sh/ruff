@@ -376,6 +376,31 @@ combine-as-imports = true
 "crates/ty_vendored/ty_extensions/*.pyi" = "py312"
 "scripts/*.py" = "py312"
 
+[[tool.ty.overrides]]
+include = [
+    "scripts/*.py",
+    "crates/ruff_python_ast/generate.py",
+    "crates/ty_python_semantic/mdtest.py",
+]
+
+[tool.ty.overrides.analysis]
+return-type-inference = "always"
+
+[tool.ty.overrides.rules]
+truthiness-test-of-none-union = "warn"
+blanket-ignore-comment = "warn"
+missing-type-argument = "warn"
+possibly-unresolved-reference = "warn"
+unsound-return = "warn"
+unsound-yield = "warn"
+unsupported-dynamic-base = "warn"
+division-by-zero = "warn"
+dynamic-function-decorator-return = "warn"
+unsound-assignment = "warn"
+redundant-condition-strict = "warn"
+disjoint-cast = "warn"
+missing-direct-dependency = "warn"
+
 [tool.black]
 force-exclude = '''
 /(
