@@ -18,13 +18,13 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
-        Rule::InvalidFirstArgumentNameForClassMethod,
-        Rule::InvalidFirstArgumentNameForMethod,
+        Rule::ClassMethodFirstArgumentNotCls,
+        Rule::InstanceMethodFirstArgumentNotSelf,
         Rule::MethodReceiverDefault,
         Rule::MutableClassDefault,
         Rule::MutableDataclassDefault,
         Rule::NoMethodArgument,
-        Rule::NoSelfUse,
+        Rule::UnusedSelf,
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
         Rule::RuntimeImportInTypeCheckingBlock,
@@ -251,7 +251,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 pylint::rules::no_method_argument(checker, scope);
             }
 
-            if checker.is_rule_enabled(Rule::NoSelfUse) {
+            if checker.is_rule_enabled(Rule::UnusedSelf) {
                 pylint::rules::no_self_use(checker, scope_id, scope);
             }
 
@@ -272,8 +272,8 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
 
             if checker.any_rule_enabled(&[
-                Rule::InvalidFirstArgumentNameForClassMethod,
-                Rule::InvalidFirstArgumentNameForMethod,
+                Rule::ClassMethodFirstArgumentNotCls,
+                Rule::InstanceMethodFirstArgumentNotSelf,
             ]) {
                 pep8_naming::rules::invalid_first_argument_name(checker, scope);
             }

@@ -65,21 +65,21 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [Dunder names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155", category = Category::Pedantic)]
-pub(crate) struct ConvertTypedDictFunctionalToClass {
+pub(crate) struct TypedDictFunctional {
     name: String,
 }
 
-impl Violation for ConvertTypedDictFunctionalToClass {
+impl Violation for TypedDictFunctional {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertTypedDictFunctionalToClass { name } = self;
+        let TypedDictFunctional { name } = self;
         format!("Convert `{name}` from `TypedDict` functional to class syntax")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ConvertTypedDictFunctionalToClass { name } = self;
+        let TypedDictFunctional { name } = self;
         Some(format!("Convert `{name}` to class syntax"))
     }
 }
@@ -102,7 +102,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
     };
 
     let mut diagnostic = checker.report_diagnostic(
-        ConvertTypedDictFunctionalToClass {
+        TypedDictFunctional {
             name: class_name.to_string(),
         },
         stmt.range(),

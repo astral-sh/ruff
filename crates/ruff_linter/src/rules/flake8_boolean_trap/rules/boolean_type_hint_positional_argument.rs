@@ -100,9 +100,9 @@ use crate::rules::flake8_boolean_trap::helpers::{
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.127", category = Category::Pedantic)]
-pub(crate) struct BooleanTypeHintPositionalArgument;
+pub(crate) struct BooleanPositionalParameter;
 
-impl Violation for BooleanTypeHintPositionalArgument {
+impl Violation for BooleanPositionalParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Boolean-typed positional argument in function definition".to_string()
@@ -153,7 +153,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         }
 
         let mut diagnostic =
-            checker.report_diagnostic(BooleanTypeHintPositionalArgument, parameter.identifier());
+            checker.report_diagnostic(BooleanPositionalParameter, parameter.identifier());
 
         add_liskov_substitution_principle_help(&mut diagnostic, name, decorator_list, checker);
     }

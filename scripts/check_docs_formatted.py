@@ -90,7 +90,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "multiple-statements-on-one-line-colon",
     "multiple-statements-on-one-line-semicolon",
     "no-indented-block-comment",
-    "no-return-argument-annotation-in-stub",
+    "no-return-parameter-annotation",
     "no-space-after-block-comment",
     "no-space-after-inline-comment",
     "non-empty-stub-body",

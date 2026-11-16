@@ -48,14 +48,14 @@ use crate::codes::Category;
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
-pub(crate) struct InvalidArgumentName {
+pub(crate) struct NonLowercaseArgumentName {
     name: String,
 }
 
-impl Violation for InvalidArgumentName {
+impl Violation for NonLowercaseArgumentName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidArgumentName { name } = self;
+        let NonLowercaseArgumentName { name } = self;
         format!("Argument name `{name}` should be lowercase")
     }
 }
@@ -99,7 +99,7 @@ fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
         }
 
         checker.report_diagnostic(
-            InvalidArgumentName {
+            NonLowercaseArgumentName {
                 name: name.to_string(),
             },
             parameter.range(),

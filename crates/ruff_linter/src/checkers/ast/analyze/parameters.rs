@@ -16,7 +16,7 @@ pub(crate) fn parameters(parameters: &Parameters, checker: &Checker) {
         if checker.is_rule_enabled(Rule::TypedArgumentDefaultInStub) {
             flake8_pyi::rules::typed_argument_simple_defaults(checker, parameters);
         }
-        if checker.is_rule_enabled(Rule::ArgumentDefaultInStub) {
+        if checker.is_rule_enabled(Rule::UntypedArgumentDefaultInStub) {
             flake8_pyi::rules::argument_simple_defaults(checker, parameters);
         }
     }

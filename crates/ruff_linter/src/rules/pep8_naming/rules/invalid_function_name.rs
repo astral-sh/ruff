@@ -50,14 +50,14 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
-pub(crate) struct InvalidFunctionName {
+pub(crate) struct NonLowercaseFunctionName {
     name: String,
 }
 
-impl Violation for InvalidFunctionName {
+impl Violation for NonLowercaseFunctionName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidFunctionName { name } = self;
+        let NonLowercaseFunctionName { name } = self;
         format!("Function name `{name}` should be lowercase")
     }
 }
@@ -132,7 +132,7 @@ pub(crate) fn invalid_function_name(
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        InvalidFunctionName {
+        NonLowercaseFunctionName {
             name: name.to_string(),
         },
         stmt.identifier(),

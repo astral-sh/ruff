@@ -122,6 +122,65 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         "verbose-log-message",
         Rule::RedundantExceptionInLoggingMessage,
     ),
+    (
+        "boolean-type-hint-positional-argument",
+        Rule::BooleanPositionalParameter,
+    ),
+    ("invalid-class-name", Rule::NonCamelCaseClassName),
+    ("invalid-function-name", Rule::NonLowercaseFunctionName),
+    ("invalid-argument-name", Rule::NonLowercaseArgumentName),
+    (
+        "invalid-first-argument-name-for-class-method",
+        Rule::ClassMethodFirstArgumentNotCls,
+    ),
+    (
+        "invalid-first-argument-name-for-method",
+        Rule::InstanceMethodFirstArgumentNotSelf,
+    ),
+    (
+        "camelcase-imported-as-lowercase",
+        Rule::CamelCaseImportedAsLowercase,
+    ),
+    (
+        "camelcase-imported-as-constant",
+        Rule::CamelCaseImportedAsConstant,
+    ),
+    (
+        "camelcase-imported-as-acronym",
+        Rule::CamelCaseImportedAsAcronym,
+    ),
+    (
+        "error-suffix-on-exception-name",
+        Rule::MissingErrorSuffixOnExceptionName,
+    ),
+    ("no-classmethod-decorator", Rule::NonDecoratorClassmethod),
+    ("no-staticmethod-decorator", Rule::NonDecoratorStaticmethod),
+    ("no-self-use", Rule::UnusedSelf),
+    (
+        "argument-default-in-stub",
+        Rule::UntypedArgumentDefaultInStub,
+    ),
+    ("type-alias-without-annotation", Rule::UnannotatedTypeAlias),
+    (
+        "no-return-argument-annotation-in-stub",
+        Rule::NoReturnParameterAnnotation,
+    ),
+    ("redundant-literal-union", Rule::LiteralUnionWithSupertype),
+    ("byte-string-usage", Rule::ByteStringType),
+    (
+        "generator-return-from-iter-method",
+        Rule::IterMethodGeneratorReturnType,
+    ),
+    ("runtime-cast-value", Rule::TypingCastUnquotedType),
+    (
+        "convert-typed-dict-functional-to-class",
+        Rule::TypedDictFunctional,
+    ),
+    (
+        "convert-named-tuple-functional-to-class",
+        Rule::NamedTupleFunctional,
+    ),
+    ("replace-str-enum", Rule::ManualStrEnum),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

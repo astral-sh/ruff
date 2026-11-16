@@ -30,16 +30,16 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: The `ByteString` type](https://docs.python.org/3/library/typing.html#typing.ByteString)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
-pub(crate) struct ByteStringUsage {
+pub(crate) struct ByteStringType {
     origin: ByteStringOrigin,
 }
 
-impl Violation for ByteStringUsage {
+impl Violation for ByteStringType {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ByteStringUsage { origin } = self;
+        let ByteStringType { origin } = self;
         format!("Do not use `{origin}.ByteString`, which has unclear semantics and is deprecated")
     }
 }
@@ -76,7 +76,7 @@ pub(crate) fn bytestring_attribute(checker: &Checker, attribute: &Expr) {
         ["collections", "abc", "ByteString"] => ByteStringOrigin::CollectionsAbc,
         _ => return,
     };
-    let mut diagnostic = checker.report_diagnostic(ByteStringUsage { origin }, attribute.range());
+    let mut diagnostic = checker.report_diagnostic(ByteStringType { origin }, attribute.range());
     diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
 }
 
@@ -97,8 +97,7 @@ pub(crate) fn bytestring_import(checker: &Checker, import_from: &ast::StmtImport
 
     for name in names {
         if name.name.as_str() == "ByteString" {
-            let mut diagnostic =
-                checker.report_diagnostic(ByteStringUsage { origin }, name.range());
+            let mut diagnostic = checker.report_diagnostic(ByteStringType { origin }, name.range());
             diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         }
     }

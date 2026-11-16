@@ -90,9 +90,9 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.253", category = Category::Pedantic)]
-pub(crate) struct ArgumentDefaultInStub;
+pub(crate) struct UntypedArgumentDefaultInStub;
 
-impl AlwaysFixableViolation for ArgumentDefaultInStub {
+impl AlwaysFixableViolation for UntypedArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Only simple default values allowed for arguments".to_string()
@@ -237,16 +237,16 @@ impl Violation for UnassignedSpecialVariableInStub {
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.279", category = Category::Style)]
-pub(crate) struct TypeAliasWithoutAnnotation {
+pub(crate) struct UnannotatedTypeAlias {
     module: TypingModule,
     name: String,
     value: String,
 }
 
-impl AlwaysFixableViolation for TypeAliasWithoutAnnotation {
+impl AlwaysFixableViolation for UnannotatedTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeAliasWithoutAnnotation {
+        let UnannotatedTypeAlias {
             module,
             name,
             value,
@@ -549,7 +549,7 @@ pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameter
                 checker.semantic(),
             ) {
                 let mut diagnostic =
-                    checker.report_diagnostic(ArgumentDefaultInStub, default.range());
+                    checker.report_diagnostic(UntypedArgumentDefaultInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
@@ -699,7 +699,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
     };
 
     let mut diagnostic = checker.report_diagnostic(
-        TypeAliasWithoutAnnotation {
+        UnannotatedTypeAlias {
             module,
             name: id.to_string(),
             value: checker.generator().expr(value),

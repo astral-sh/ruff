@@ -91,7 +91,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.any_rule_enabled(&[
                 Rule::UnnecessaryLiteralUnion,
                 Rule::DuplicateUnionMember,
-                Rule::RedundantLiteralUnion,
+                Rule::LiteralUnionWithSupertype,
                 Rule::UnnecessaryTypeUnion,
                 Rule::NoneNotAtEndOfUnion,
             ]) {
@@ -107,7 +107,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
                     }
-                    if checker.is_rule_enabled(Rule::RedundantLiteralUnion) {
+                    if checker.is_rule_enabled(Rule::LiteralUnionWithSupertype) {
                         flake8_pyi::rules::redundant_literal_union(checker, expr);
                     }
                     if checker.is_rule_enabled(Rule::UnnecessaryTypeUnion) {
@@ -513,7 +513,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::PandasUseOfDotValues) {
                 pandas_vet::rules::attr(checker, attribute);
             }
-            if checker.is_rule_enabled(Rule::ByteStringUsage) {
+            if checker.is_rule_enabled(Rule::ByteStringType) {
                 flake8_pyi::rules::bytestring_attribute(checker, expr);
             }
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
@@ -1366,7 +1366,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.is_rule_enabled(Rule::UnnecessaryLiteralUnion) {
                     flake8_pyi::rules::unnecessary_literal_union(checker, expr);
                 }
-                if checker.is_rule_enabled(Rule::RedundantLiteralUnion) {
+                if checker.is_rule_enabled(Rule::LiteralUnionWithSupertype) {
                     flake8_pyi::rules::redundant_literal_union(checker, expr);
                 }
                 if checker.is_rule_enabled(Rule::UnnecessaryTypeUnion) {
@@ -1701,7 +1701,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &lambda.into());
             }
-            if checker.is_rule_enabled(Rule::InvalidArgumentName) {
+            if checker.is_rule_enabled(Rule::NonLowercaseArgumentName) {
                 pep8_naming::rules::invalid_argument_name_lambda(checker, lambda);
             }
         }

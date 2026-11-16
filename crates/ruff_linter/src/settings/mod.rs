@@ -610,7 +610,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::CustomTypeVarForSelf), // PYI019
     RuleSelector::rule(Rule::QuotedAnnotationInStub), // PYI020
     RuleSelector::rule(Rule::UnaliasedCollectionsAbcSetImport), // PYI025
-    RuleSelector::rule(Rule::TypeAliasWithoutAnnotation), // PYI026
+    RuleSelector::rule(Rule::UnannotatedTypeAlias), // PYI026
     RuleSelector::rule(Rule::StrOrReprDefinedInStub), // PYI029
     RuleSelector::rule(Rule::UnnecessaryLiteralUnion), // PYI030
     RuleSelector::rule(Rule::AnyEqNeAnnotation), // PYI032
@@ -627,11 +627,11 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnusedPrivateTypeAlias), // PYI047
     RuleSelector::rule(Rule::StubBodyMultipleStatements), // PYI048
     RuleSelector::rule(Rule::UnusedPrivateTypedDict), // PYI049
-    RuleSelector::rule(Rule::NoReturnArgumentAnnotationInStub), // PYI050
+    RuleSelector::rule(Rule::NoReturnParameterAnnotation), // PYI050
     RuleSelector::rule(Rule::UnannotatedAssignmentInStub), // PYI052
     RuleSelector::rule(Rule::UnnecessaryTypeUnion), // PYI055
-    RuleSelector::rule(Rule::ByteStringUsage), // PYI057
-    RuleSelector::rule(Rule::GeneratorReturnFromIterMethod), // PYI058
+    RuleSelector::rule(Rule::ByteStringType), // PYI057
+    RuleSelector::rule(Rule::IterMethodGeneratorReturnType), // PYI058
     RuleSelector::rule(Rule::GenericNotLastBaseClass), // PYI059
     RuleSelector::rule(Rule::RedundantNoneLiteral), // PYI061
     RuleSelector::rule(Rule::DuplicateLiteralMember), // PYI062
@@ -720,7 +720,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryFutureImport), // UP010
     RuleSelector::rule(Rule::LRUCacheWithoutParameters), // UP011
     RuleSelector::rule(Rule::UnnecessaryEncodeUTF8), // UP012
-    RuleSelector::rule(Rule::ConvertNamedTupleFunctionalToClass), // UP014
+    RuleSelector::rule(Rule::NamedTupleFunctional), // UP014
     RuleSelector::rule(Rule::DatetimeTimezoneUTC), // UP017
     RuleSelector::rule(Rule::NativeLiterals), // UP018
     RuleSelector::rule(Rule::TypingTextStrAlias), // UP019
@@ -1013,12 +1013,12 @@ mod tests {
         	duplicate-bases (PLE0241),
         	dict-iter-missing-items (PLE1141),
         	modified-iterating-set (PLE4703),
-        	no-classmethod-decorator (PLR0202),
-        	no-staticmethod-decorator (PLR0203),
+        	non-decorator-classmethod (PLR0202),
+        	non-decorator-staticmethod (PLR0203),
         	swap-with-temporary-variable (PLR1712),
         	unnecessary-lambda (PLW0108),
         	redefined-slots-in-subclass (PLW0244),
-        	replace-str-enum (UP042),
+        	manual-str-enum (UP042),
         	while-one (UP048),
         	deprecated-abc-decorator (UP051),
         	context-manager-iterator (UP052),
