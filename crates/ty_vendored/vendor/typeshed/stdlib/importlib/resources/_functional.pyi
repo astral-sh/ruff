@@ -1,4 +1,5 @@
 """Simplified function-based API for importlib.resources"""
+
 import sys
 
 # Even though this file is 3.13+ only, Pyright will complain in stubtest for older versions.
@@ -36,15 +37,17 @@ if sys.version_info >= (3, 13):
 
     def path(anchor: Anchor, *path_names: StrPath) -> AbstractContextManager[Path, Literal[False]]:
         """Return the path to the *resource* as an actual file system path."""
+
     def is_resource(anchor: Anchor, *path_names: StrPath) -> bool:
         """Return ``True`` if there is a resource named *name* in the package,
 
-Otherwise returns ``False``.
-"""
+        Otherwise returns ``False``.
+        """
+
     @deprecated("Deprecated since Python 3.11. Use `files(anchor).iterdir()`.")
     def contents(anchor: Anchor, *path_names: StrPath) -> Iterator[str]:
         """Return an iterable over the named resources within the package.
 
-The iterable returns :class:`str` resources (e.g. files).
-The iterable does not recurse into subdirectories.
-"""
+        The iterable returns :class:`str` resources (e.g. files).
+        The iterable does not recurse into subdirectories.
+        """

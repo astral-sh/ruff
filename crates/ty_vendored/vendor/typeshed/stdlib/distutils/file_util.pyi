@@ -2,6 +2,7 @@
 
 Utility functions for operating on single files.
 """
+
 from _typeshed import BytesPath, StrOrBytesPath, StrPath
 from collections.abc import Iterable
 from typing import Literal, TypeVar, overload

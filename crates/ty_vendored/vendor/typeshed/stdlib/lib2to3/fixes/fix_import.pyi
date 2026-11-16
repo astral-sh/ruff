@@ -9,6 +9,7 @@ And this import:
 Becomes:
     from . import spam
 """
+
 from _typeshed import StrPath
 from collections.abc import Generator
 from typing import ClassVar, Literal

@@ -9,6 +9,7 @@ This package provides two types of profilers:
 - profiling.sampling: Statistical sampling profiler that periodically samples
   the call stack. Low overhead and suitable for production use.
 """
+
 from . import sampling as sampling, tracing as tracing
 
 __all__ = ("tracing", "sampling")

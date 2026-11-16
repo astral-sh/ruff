@@ -5,6 +5,7 @@ from ctypes import Structure, Union
 # while the other is a subclass with a metaclass added in.
 class BigEndianStructure(Structure):
     """Structure with big endian byte order"""
+
     __slots__ = ()
 
 class LittleEndianStructure(Structure):
@@ -14,6 +15,7 @@ class LittleEndianStructure(Structure):
 if sys.version_info >= (3, 11):
     class BigEndianUnion(Union):
         """Union with big endian byte order"""
+
         __slots__ = ()
 
     class LittleEndianUnion(Union):

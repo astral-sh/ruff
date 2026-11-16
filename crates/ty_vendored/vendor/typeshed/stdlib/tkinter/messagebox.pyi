@@ -1,4 +1,5 @@
 """Interface to the standard Tk message boxes."""
+
 from tkinter import Misc
 from tkinter.commondialog import Dialog
 from typing import ClassVar, Final, Literal
@@ -24,6 +25,7 @@ NO: Final = "no"
 
 class Message(Dialog):
     """A message box"""
+
     command: ClassVar[str]
 
 def showinfo(
@@ -36,6 +38,7 @@ def showinfo(
     parent: Misc = ...,
 ) -> str:
     """Show an info message"""
+
 def showwarning(
     title: str | None = None,
     message: str | None = None,
@@ -46,6 +49,7 @@ def showwarning(
     parent: Misc = ...,
 ) -> str:
     """Show a warning message"""
+
 def showerror(
     title: str | None = None,
     message: str | None = None,
@@ -56,6 +60,7 @@ def showerror(
     parent: Misc = ...,
 ) -> str:
     """Show an error message"""
+
 def askquestion(
     title: str | None = None,
     message: str | None = None,
@@ -66,6 +71,7 @@ def askquestion(
     parent: Misc = ...,
 ) -> str:
     """Ask a question; return the symbolic name of the selected button"""
+
 def askokcancel(
     title: str | None = None,
     message: str | None = None,
@@ -76,6 +82,7 @@ def askokcancel(
     parent: Misc = ...,
 ) -> bool:
     """Ask if operation should proceed; return True if the answer is ok"""
+
 def askyesno(
     title: str | None = None,
     message: str | None = None,
@@ -86,6 +93,7 @@ def askyesno(
     parent: Misc = ...,
 ) -> bool:
     """Ask a question; return True if the answer is yes"""
+
 def askyesnocancel(
     title: str | None = None,
     message: str | None = None,
@@ -96,6 +104,7 @@ def askyesnocancel(
     parent: Misc = ...,
 ) -> bool | None:
     """Ask a question; return True if the answer is yes, None if cancelled"""
+
 def askretrycancel(
     title: str | None = None,
     message: str | None = None,

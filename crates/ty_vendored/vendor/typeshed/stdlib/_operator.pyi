@@ -6,6 +6,7 @@ is equivalent to the expression x+y.  The function names are those
 used for special methods; variants without leading and trailing
 '__' are also provided for convenience.
 """
+
 import sys
 from _typeshed import (
     ReadableBuffer,
@@ -226,6 +227,7 @@ def le(a: _ComparisonOperand[_T], b: _SupportsComparisonWith[_T], /) -> Any: ...
 # ops = {"<": lt, "==": eq}, so ops[symbol](a, b) type-checks.
 def eq(a: Any, b: Any, /) -> Any:
     """Same as a == b."""
+
 def ne(a: Any, b: Any, /) -> Any:
     """Same as a != b."""
 
@@ -243,12 +245,16 @@ def gt(a: _ComparisonOperand[_T], b: _SupportsComparisonWith[_T], /) -> Any: ...
 
 def not_(a: object, /) -> bool:
     """Same as not a."""
+
 def truth(a: object, /) -> bool:
     """Return True if a is true, False otherwise."""
+
 def is_(a: object, b: object, /) -> bool:
     """Same as a is b."""
+
 def is_not(a: object, b: object, /) -> bool:
     """Same as a is not b."""
+
 def abs(a: SupportsAbs[_T], /) -> _T:
     """Same as abs(a)."""
 
@@ -272,8 +278,10 @@ def floordiv(a: _T_contra, b: _SupportsRFloorDiv[_T_contra, _T_co], /) -> _T_co:
 
 def index(a: SupportsIndex, /) -> int:
     """Same as a.__index__()"""
+
 def inv(a: _SupportsInversion[_T_co], /) -> _T_co:
     """Same as ~a."""
+
 def invert(a: _SupportsInversion[_T_co], /) -> _T_co:
     """Same as ~a."""
 
@@ -345,8 +353,10 @@ def xor(a: _T_contra, b: _SupportsRXOr[_T_contra, _T_co], /) -> _T_co: ...
 
 def concat(a: Sequence[_T], b: Sequence[_T], /) -> Sequence[_T]:
     """Same as a + b, for a and b sequences."""
+
 def contains(a: Container[object], b: object, /) -> bool:
     """Same as b in a (note reversed operands)."""
+
 def countOf(a: Iterable[object], b: object, /) -> int:
     """Return the number of items in a which are, or which equal, b."""
 
@@ -378,12 +388,12 @@ def setitem(a: MutableMapping[_K, _V], b: _K, c: _V, /) -> None: ...
 def length_hint(obj: object, default: int = 0, /) -> int:
     """Return an estimate of the number of items in obj.
 
-This is useful for presizing containers when building from an iterable.
+    This is useful for presizing containers when building from an iterable.
 
-If the object supports len(), the result will be exact.
-Otherwise, it may over- or under-estimate by an arbitrary amount.
-The result will be an integer >= 0.
-"""
+    If the object supports len(), the result will be exact.
+    Otherwise, it may over- or under-estimate by an arbitrary amount.
+    The result will be an integer >= 0.
+    """
 
 @overload
 def iadd(a: _SupportsIAdd[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
@@ -500,21 +510,22 @@ if sys.version_info >= (3, 11):
 def _compare_digest(a: ReadableBuffer, b: ReadableBuffer, /) -> bool:
     """Return 'a == b'.
 
-This function uses an approach designed to prevent
-timing analysis, making it appropriate for cryptography.
+    This function uses an approach designed to prevent
+    timing analysis, making it appropriate for cryptography.
 
-a and b must both be of the same type: either str (ASCII only),
-or any bytes-like object.
+    a and b must both be of the same type: either str (ASCII only),
+    or any bytes-like object.
 
-Note: If a and b are of different lengths, or if an error occurs,
-a timing attack could theoretically reveal information about the
-types and lengths of a and b--but not their values.
-"""
+    Note: If a and b are of different lengths, or if an error occurs,
+    a timing attack could theoretically reveal information about the
+    types and lengths of a and b--but not their values.
+    """
 @overload
 def _compare_digest(a: str, b: str, /) -> bool: ...
 
 if sys.version_info >= (3, 14):
     def is_none(a: object, /) -> TypeIs[None]:
         """Same as a is None."""
+
     def is_not_none(a: _T | None, /) -> TypeIs[_T]:
         """Same as a is not None."""

@@ -1,6 +1,7 @@
 """
 Main program for 2to3.
 """
+
 from _typeshed import FileDescriptorOrPath
 from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
 from logging import _ExcInfoType
@@ -20,6 +21,7 @@ class StdoutRefactoringTool(refactor.MultiprocessRefactoringTool):
     have an extra file suffix appended to their name for use in situations
     where you do not want to replace the input files.
     """
+
     nobackups: bool
     show_diffs: bool
     def __init__(
@@ -51,6 +53,7 @@ class StdoutRefactoringTool(refactor.MultiprocessRefactoringTool):
                 this appended to their filename.  Useful for changing .py to
                 .py3 for example by passing append_suffix='3'.
         """
+
     # Same as super.log_error and Logger.error
     def log_error(  # type: ignore[override]
         self,
