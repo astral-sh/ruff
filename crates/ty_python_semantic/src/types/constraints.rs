@@ -2459,6 +2459,25 @@ impl NodeId {
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
+        // Look for a short counterexample before committing to an unbounded search.
+        // The opposite branch can contain the only witness, so cap the speculative work.
+        if let Node::Interior(interior) = self.node() {
+            const PROBE_VISITS: usize = 32;
+            let limits = BoundedSolutionLimits {
+                remaining_paths: PROBE_VISITS,
+                remaining_visits: PROBE_VISITS,
+            };
+            let source_orders = storage.calculate_source_orders(source_order);
+            let mut probe =
+                SolutionWalker::new(db, storage, source_orders, inferable, limits, self);
+            probe.prefer_false = true;
+            let mut path = interior.path_assignments(db, env, storage, source_order);
+            if let ControlFlow::Continue(result) =
+                probe.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
+            {
+                return result;
+            }
+        }
         let ControlFlow::Continue(result) = self.is_always_satisfied_with_limits(
             db,
             env,

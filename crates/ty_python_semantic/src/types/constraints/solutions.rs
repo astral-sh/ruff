@@ -79,6 +79,7 @@ pub(super) struct SolutionWalker<'db, L> {
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
     limits: L,
+    pub(super) prefer_false: bool,
     /// How many rejected paths can be rechecked within the traversal budget.
     remaining_failed_paths: Option<usize>,
 
@@ -132,6 +133,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             inferable,
             inferable_support,
             limits,
+            prefer_false: false,
             remaining_failed_paths: None,
             declared_constraint_solutions: FxHashMap::default(),
             explored_nodes: FxHashSet::default(),
@@ -622,54 +624,48 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         constraint: AtomicConstraintId,
         process_node: &ProcessNode<'_, 'db, L, B, ()>,
     ) -> ControlFlow<B> {
-        // The repetitive nature of the visit_atomic_edge calls is intentional; in the negative
-        // polarity case, it's important that we not construct the `if_false` edge sink unless we
-        // actually need to visit it.
-        let if_true = if polarity == Polarity::Positive {
-            interior.if_true
-        } else {
-            interior.if_true.or(storage, interior.if_uncertain)
-        };
-        self.visit_atomic_edge(
-            db,
-            env,
-            storage,
-            path,
-            polarity,
-            constraint.when_true(),
-            if_true,
-            process_node,
-        )?;
-
-        if polarity == Polarity::Positive {
-            self.visit_atomic_edge(
-                db,
-                env,
-                storage,
-                path,
-                polarity,
-                constraint.when_unconstrained(),
-                interior.if_uncertain,
-                process_node,
-            )?;
+        let true_edge = (constraint.when_true(), interior.if_true);
+        let false_edge = (constraint.when_false(), interior.if_false);
+        match polarity {
+            Polarity::Positive => {
+                let uncertain = (constraint.when_unconstrained(), interior.if_uncertain);
+                for (assignment, child) in [true_edge, uncertain, false_edge] {
+                    self.visit_atomic_edge(
+                        db,
+                        env,
+                        storage,
+                        path,
+                        polarity,
+                        assignment,
+                        child,
+                        process_node,
+                    )?;
+                }
+            }
+            Polarity::Negative => {
+                let mut edges = [true_edge, false_edge];
+                // When the false branch has no disjunct of its own, taking it leaves only
+                // the uncertain branch to disprove. Trying true first can enumerate every
+                // way to satisfy the remaining clauses before finding a counterexample.
+                if self.prefer_false && interior.if_false == ALWAYS_FALSE {
+                    edges.reverse();
+                }
+                for (assignment, child) in edges {
+                    // Combine the uncertain branch only when we actually visit this edge.
+                    let child = child.or(storage, interior.if_uncertain);
+                    self.visit_atomic_edge(
+                        db,
+                        env,
+                        storage,
+                        path,
+                        polarity,
+                        assignment,
+                        child,
+                        process_node,
+                    )?;
+                }
+            }
         }
-
-        let if_false = if polarity == Polarity::Positive {
-            interior.if_false
-        } else {
-            interior.if_false.or(storage, interior.if_uncertain)
-        };
-        self.visit_atomic_edge(
-            db,
-            env,
-            storage,
-            path,
-            polarity,
-            constraint.when_false(),
-            if_false,
-            process_node,
-        )?;
-
         ControlFlow::Continue(())
     }
 
