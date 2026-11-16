@@ -50,7 +50,14 @@ pub(in crate::server) enum Task {
 // as a reference, to create the inner 'static closure. That closure is then moved to a background task pool.
 pub(in crate::server) struct BackgroundTaskBuilder {
     pub(super) schedule: BackgroundSchedule,
-    /// The response to send if a cancelled request cannot be retried.
+    /// A database modification can cause Salsa to cancel a running request. If the handler
+    /// enables `RetriableRequestHandler::RETRY_ON_CANCELLATION`, the main loop automatically
+    /// retries the request while it is still pending. There is no limit on the number of retries.
+    /// If the worker queue is full or shutdown has started when a retry is due, the main loop
+    /// replies with this error.
+    ///
+    /// Request builders store the handler's `salsa_cancellation_error` here.
+    /// Use `None` for requests that have no response, such as notifications.
     pub(in crate::server) cancellation_error: Option<fn() -> lsp_server::ResponseError>,
     pub(super) builder: BackgroundFnBuilder,
 }
