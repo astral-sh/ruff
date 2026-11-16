@@ -48,11 +48,11 @@ use crate::rules::flake8_gettext::is_ngettext_call;
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.260", category = Category::Suspicious)]
-pub(crate) struct FStringInGetTextFuncCall {
+pub(crate) struct FStringInGettextCall {
     is_plural: bool,
 }
 
-impl Violation for FStringInGetTextFuncCall {
+impl Violation for FStringInGettextCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.is_plural {
@@ -69,7 +69,7 @@ pub(crate) fn f_string_in_gettext_func_call(checker: &Checker, func: &Expr, args
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if first.is_f_string_expr() {
-            checker.report_diagnostic(FStringInGetTextFuncCall { is_plural: false }, first.range());
+            checker.report_diagnostic(FStringInGettextCall { is_plural: false }, first.range());
         }
     }
 
@@ -78,6 +78,6 @@ pub(crate) fn f_string_in_gettext_func_call(checker: &Checker, func: &Expr, args
         && let Some(second) = args.get(1)
         && second.is_f_string_expr()
     {
-        checker.report_diagnostic(FStringInGetTextFuncCall { is_plural: true }, second.range());
+        checker.report_diagnostic(FStringInGettextCall { is_plural: true }, second.range());
     }
 }

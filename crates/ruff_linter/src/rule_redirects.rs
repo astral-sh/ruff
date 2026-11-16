@@ -84,6 +84,17 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         Rule::MissingBlankLineAfterLastDocstringSection,
     ),
     ("undocumented-param", Rule::UndocumentedParameter),
+    ("get-attr-with-constant", Rule::GetattrWithConstant),
+    ("set-attr-with-constant", Rule::SetattrWithConstant),
+    ("del-attr-with-constant", Rule::DelattrWithConstant),
+    ("f-string-in-get-text-func-call", Rule::FStringInGettextCall),
+    ("format-in-get-text-func-call", Rule::FormatInGettextCall),
+    ("printf-in-get-text-func-call", Rule::PrintfInGettextCall),
+    ("exec-builtin", Rule::Exec),
+    ("suspicious-eval-usage", Rule::Eval),
+    ("suspicious-telnet-usage", Rule::SuspiciousTelnetlibUsage),
+    ("suspicious-ftp-lib-usage", Rule::SuspiciousFtplibUsage),
+    ("p-print", Rule::Pprint),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

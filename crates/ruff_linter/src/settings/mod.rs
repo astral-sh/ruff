@@ -371,8 +371,8 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::StripWithMultiCharacters), // B005
     RuleSelector::rule(Rule::MutableArgumentDefault), // B006
     RuleSelector::rule(Rule::FunctionCallInDefaultArgument), // B008
-    RuleSelector::rule(Rule::GetAttrWithConstant), // B009
-    RuleSelector::rule(Rule::SetAttrWithConstant), // B010
+    RuleSelector::rule(Rule::GetattrWithConstant), // B009
+    RuleSelector::rule(Rule::SetattrWithConstant), // B010
     RuleSelector::rule(Rule::JumpStatementInFinally), // B012
     RuleSelector::rule(Rule::RedundantTupleInExceptionHandler), // B013
     RuleSelector::rule(Rule::DuplicateHandlerException), // B014
@@ -487,9 +487,9 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::LoggingExcInfo), // G201
     RuleSelector::rule(Rule::LoggingRedundantExcInfo), // G202
     RuleSelector::rule(Rule::UnsortedImports), // I001
-    RuleSelector::rule(Rule::FStringInGetTextFuncCall), // INT001
-    RuleSelector::rule(Rule::FormatInGetTextFuncCall), // INT002
-    RuleSelector::rule(Rule::PrintfInGetTextFuncCall), // INT003
+    RuleSelector::rule(Rule::FStringInGettextCall), // INT001
+    RuleSelector::rule(Rule::FormatInGettextCall), // INT002
+    RuleSelector::rule(Rule::PrintfInGettextCall), // INT003
     RuleSelector::rule(Rule::ImplicitStringConcatenationInCollectionLiteral), // ISC004
     RuleSelector::rule(Rule::DirectLoggerInstantiation), // LOG001
     RuleSelector::rule(Rule::InvalidGetLoggerArgument), // LOG002
@@ -675,7 +675,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnusedNOQA), // RUF100
     RuleSelector::rule(Rule::RedirectedNOQA), // RUF101
     RuleSelector::rule(Rule::InvalidPyprojectToml), // RUF200
-    RuleSelector::rule(Rule::ExecBuiltin), // S102
+    RuleSelector::rule(Rule::Exec), // S102
     RuleSelector::rule(Rule::TryExceptPass), // S110
     RuleSelector::rule(Rule::TryExceptContinue), // S112
     RuleSelector::rule(Rule::DuplicateIsinstanceCall), // SIM101
@@ -984,7 +984,7 @@ mod tests {
         	blocking-input-in-async-function (ASYNC250),
         	abstract-base-class-without-abstract-method (B024),
         	empty-method-without-abstract-decorator (B027),
-        	del-attr-with-constant (B043),
+        	delattr-with-constant (B043),
         	return-in-generator (B901),
         	loop-iterator-mutation (B909),
         	trailing-comma-on-bare-tuple (COM818),
@@ -1067,7 +1067,7 @@ mod tests {
 
         Removed in preview:
         [
-        	exec-builtin (S102),
+        	exec (S102),
         ]
         ");
     }
