@@ -2517,7 +2517,7 @@ impl NodeId {
                         return ControlFlow::Continue(false);
                     }
                     // Keep discovered rules for the fallback, as when backtracking to a sibling.
-                    path.truncate(snapshot);
+                    path.truncate(&snapshot);
                 }
                 walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
             }

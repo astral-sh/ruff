@@ -452,7 +452,7 @@ impl PathAssignments {
         }
     }
 
-    pub(super) fn truncate(&mut self, snapshot: PathSnapshot) {
+    pub(super) fn truncate(&mut self, snapshot: &PathSnapshot) {
         self.assignment_queue.clear();
         self.pending_substitutions.clear();
         // A branch can replenish an assignment more than once. Restore in reverse order while
@@ -545,7 +545,7 @@ impl PathAssignments {
         let end = self.assignments.len();
         let result = f(storage, self, start..end, found_conflict);
 
-        self.truncate(snapshot);
+        self.truncate(&snapshot);
         result
     }
 
