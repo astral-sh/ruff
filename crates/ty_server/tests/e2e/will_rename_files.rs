@@ -1,6 +1,8 @@
 use lsp_types::{FileRename, Position, Range, TextEdit, Uri, WorkspaceEdit};
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
+#[cfg(feature = "test-uv")]
+use ty_server::DiagnosticMode;
 
 use crate::notebook::NotebookBuilder;
 use crate::{TestServer, TestServerBuilder};
@@ -118,6 +120,84 @@ fn batch_renames_a_package_and_a_module_file() -> anyhow::Result<()> {
                 ],
             ),
         ],
+    );
+
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "test-uv")]
+fn closed_script_import_is_preserved_before_uv_sync() -> anyhow::Result<()> {
+    let script = "workspace/tools/report.py";
+    let source = "\
+# /// script
+# requires-python = '>=3.12'
+# dependencies = ['attrs==25.4.0']
+# ///
+from attrs import define
+print(define)
+";
+
+    let builder = TestServerBuilder::new()?;
+    let python_home = builder.file_path("python/bin");
+    let project_sources = builder.file_path("workspace/src");
+    let (base_python, pth) = if cfg!(windows) {
+        (
+            "python/bin/python.exe",
+            "venv/Lib/site-packages/project.pth",
+        )
+    } else {
+        (
+            "python/bin/python",
+            "venv/lib/python3.13/site-packages/project.pth",
+        )
+    };
+
+    // The project exposes its own attrs.define submodule through its virtual environment.
+    // The script uses the define function from its declared attrs dependency.
+    let mut server = builder
+        .with_workspace(
+            SystemPath::new("workspace"),
+            Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly)),
+        )?
+        .with_files([
+            (base_python, ""),
+            (pth, project_sources.as_str()),
+            (
+                "workspace/ty.toml",
+                "use-uv-for-scripts = true\n\n[environment]\nroot = ['src']\npython = '../venv'\n",
+            ),
+            ("workspace/src/attrs/__init__.py", ""),
+            ("workspace/src/attrs/define.py", ""),
+            ("workspace/src/caller.py", "from attrs import define\n"),
+            (script, source),
+        ])?
+        .with_file(
+            "venv/pyvenv.cfg",
+            format!("home = {python_home}\nversion = 3.13\n"),
+        )?
+        .with_real_uv()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let edit = rename_edit(
+        &mut server,
+        &[(
+            "workspace/src/attrs/define.py",
+            "workspace/src/attrs/new.py",
+        )],
+    );
+
+    assert_edits(
+        edit.as_ref(),
+        &[(
+            server.file_uri("workspace/src/caller.py"),
+            &[ExpectedEdit {
+                line: 0,
+                columns: 18..24,
+                new_text: "new",
+            }],
+        )],
     );
 
     Ok(())
