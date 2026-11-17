@@ -25,7 +25,8 @@ Not: _SpecialForm
 
 In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
 negation types. Note that either spelling will fail in runtime contexts or in cases where an
-annotation expression could be evaluated.
+annotation expression could be evaluated. You can prevent this by installing `ty-extensions`
+and using `Not[T]` from `ty_extensions`, which Python can evaluate and inspect at runtime.
 """
 
 Intersection: _SpecialForm
@@ -50,7 +51,9 @@ s: Intersection[P, Q] = S()
 
 In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax
 when displaying intersection types. Note that either spelling will fail in runtime contexts or in
-cases where an annotation expression could be evaluated.
+cases where an annotation expression could be evaluated. You can prevent this by installing
+`ty-extensions` and using `Intersection[T1, T2]` from `ty_extensions`, which Python can evaluate
+and inspect at runtime.
 """
 
 Top: _SpecialForm
