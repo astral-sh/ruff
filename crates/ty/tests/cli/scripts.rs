@@ -1357,7 +1357,7 @@ fn invalid_inline_src_glob_does_not_prevent_checking_script() -> anyhow::Result<
 }
 
 #[test]
-fn invalid_glob_in_script_analysis_override_is_a_warning() -> anyhow::Result<()> {
+fn invalid_glob_in_script_analysis_override_is_ignored() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "script.py",
         r#"
@@ -1374,13 +1374,12 @@ fn invalid_glob_in_script_analysis_override_is_a_warning() -> anyhow::Result<()>
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().args(["--exit-zero-on-warning", "--output-format=concise"]), @"
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    script.py:6:33: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
     script.py:11:13: info[revealed-type] Revealed type: `Literal[1]`
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     ");

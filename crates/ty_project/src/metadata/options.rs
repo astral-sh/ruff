@@ -597,6 +597,10 @@ impl Options {
         }
         if let Some(overrides) = &self.overrides {
             for section in &overrides.0 {
+                // Inline overrides never apply to a script.
+                if matches!(section.source(), ValueSource::ScriptMetadata(_)) {
+                    continue;
+                }
                 OverrideOptions::lint(db, section, &mut diagnostics);
             }
         }
