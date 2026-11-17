@@ -5,10 +5,181 @@ use lsp_types::{
 };
 use ruff_db::system::SystemPath;
 use ruff_python_trivia::textwrap::dedent;
+#[cfg(feature = "test-uv")]
+use ty_project::UseUv;
 use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::TestServerBuilder;
+#[cfg(feature = "test-uv")]
+use crate::diagnostic_snapshots::condensed_document_diagnostic_snapshot;
 use crate::diagnostic_snapshots::condensed_workspace_diagnostic_snapshot;
+
+#[test]
+#[cfg(feature = "test-uv")]
+fn legacy_use_uv_overrides_script_setting() -> Result<()> {
+    let script = SystemPath::new("src/script.py");
+    let source = dedent(
+        r#"
+        # /// script
+        # dependencies = ["attrs==25.4.0"]
+        #
+        # [tool.ty]
+        # use-uv-for-scripts = false
+        # ///
+
+        import attrs
+        "#,
+    );
+    let mut server = workspace_builder(DiagnosticMode::OpenFilesOnly)?
+        .with_file(script, &source)?
+        .with_raw_initialization_options(serde_json::json!({
+            "experimental": {"useUv": "scripts"}
+        }))
+        .with_real_uv()?
+        .enable_workspace_diagnostic_refresh(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, source, 1);
+    server.await_diagnostic_refresh();
+    let report = server.document_diagnostic_request(script, None);
+    assert_snapshot!(condensed_document_diagnostic_snapshot(report), @"");
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "test-uv")]
+fn editor_script_setting_overrides_legacy_use_uv() -> Result<()> {
+    let script = SystemPath::new("src/script.py");
+    let source = dedent(
+        r#"
+        # /// script
+        # dependencies = ["attrs==25.4.0"]
+        # ///
+
+        import attrs
+        "#,
+    );
+    let mut server = workspace_builder(DiagnosticMode::OpenFilesOnly)?
+        .with_file(script, &source)?
+        .with_raw_initialization_options(serde_json::json!({
+            "experimental": {"useUv": "scripts"},
+            "configuration": {"use-uv-for-scripts": false}
+        }))
+        .with_real_uv()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, source, 1);
+    let report = server.document_diagnostic_request(script, None);
+    assert_snapshot!(condensed_document_diagnostic_snapshot(report), @"
+    5:7..5:12[ERROR]: Cannot resolve imported module `attrs`
+
+    info: Searched in the following paths during module resolution:
+    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    ");
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "test-uv")]
+fn ty_uv_off_overrides_editor_settings() -> Result<()> {
+    let script = SystemPath::new("src/script.py");
+    let source = dedent(
+        r"
+        # /// script
+        # dependencies = ['attrs==25.4.0']
+        # ///
+
+        import attrs
+        ",
+    );
+    let mut server = workspace_builder(DiagnosticMode::OpenFilesOnly)?
+        .with_file(script, &source)?
+        .with_use_uv(UseUv::On)
+        .with_use_uv_for_scripts(true)
+        .with_env_var("TY_UV", "off")
+        .with_real_uv()?
+        .enable_work_done_progress(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, source, 1);
+    let diagnostics =
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(script, None));
+    assert_snapshot!(diagnostics, @"
+    5:7..5:12[ERROR]: Cannot resolve imported module `attrs`
+
+    info: Searched in the following paths during module resolution:
+    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    ");
+    server.assert_no_pending_messages();
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "test-uv")]
+fn reopening_a_script_picks_up_project_uv_opt_in() -> Result<()> {
+    let script = SystemPath::new("src/script.py");
+    let source = dedent(
+        r"
+        # /// script
+        # dependencies = ['attrs==25.4.0']
+        # ///
+
+        import attrs
+        ",
+    );
+    let config = "src/ty.toml";
+    let mut server = workspace_builder(DiagnosticMode::OpenFilesOnly)?
+        .with_file(config, "use-uv-for-scripts = false")?
+        .with_file(script, &source)?
+        .with_real_uv()?
+        .enable_workspace_diagnostic_refresh(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.open_text_document(script, &source, 1);
+    let initial =
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(script, None));
+    assert_snapshot!(initial, @"
+    5:7..5:12[ERROR]: Cannot resolve imported module `attrs`
+
+    info: Searched in the following paths during module resolution:
+    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    ");
+
+    server.write_file(config, "use-uv-for-scripts = true")?;
+    server.did_change_watched_file(config, lsp_types::FileChangeType::Changed);
+    server.await_diagnostic_refresh();
+    let before_reopen =
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(script, None));
+    assert_snapshot!(before_reopen, @"
+    5:7..5:12[ERROR]: Cannot resolve imported module `attrs`
+
+    info: Searched in the following paths during module resolution:
+    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    ");
+    server.assert_no_pending_messages();
+
+    server.close_text_document(script);
+    server.open_text_document(script, &source, 2);
+    server.await_diagnostic_refresh();
+    let enabled =
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(script, None));
+    assert_snapshot!(enabled, @"");
+
+    server.write_file(config, "use-uv-for-scripts = false")?;
+    server.did_change_watched_file(config, lsp_types::FileChangeType::Changed);
+    server.await_diagnostic_refresh();
+    let disabled =
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(script, None));
+    assert_eq!(disabled, initial);
+    Ok(())
+}
 
 #[test]
 #[cfg(feature = "test-uv")]
@@ -64,6 +235,61 @@ fn script_syncs_on_open_without_workspace_diagnostics() -> Result<()> {
         server.goto_definition_request(script, attrs).is_some(),
         "opening the script should make attrs available"
     );
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "test-uv")]
+fn saving_a_script_uv_opt_out_stops_resolving_its_dependencies() -> Result<()> {
+    let script = SystemPath::new("src/script.py");
+    let source = dedent(
+        r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # dependencies = ["attrs==25.4.0"]
+        #
+        # [tool.ty]
+        # use-uv-for-scripts = true
+        # ///
+
+        import attrs
+        "#,
+    );
+    let mut server = workspace_builder(DiagnosticMode::OpenFilesOnly)?
+        .with_file(script, &source)?
+        .with_real_uv()?
+        .enable_work_done_progress(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, &source, 1);
+    server.assert_work_done_progress("Synchronizing scripts")?;
+    let enabled =
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(script, None));
+    assert_snapshot!(enabled, @"");
+
+    let disabled = source.replace("use-uv-for-scripts = true", "use-uv-for-scripts = false");
+    server.change_text_document(
+        script,
+        vec![
+            lsp_types::TextDocumentContentChangeWholeDocument {
+                text: disabled.clone(),
+            }
+            .into(),
+        ],
+        2,
+    );
+    server.write_file(script, disabled)?;
+    server.save_text_document(script);
+    let disabled =
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(script, None));
+    assert_snapshot!(disabled, @"
+    9:7..9:12[ERROR]: Cannot resolve imported module `attrs`
+
+    info: Searched in the following paths during module resolution:
+    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    ");
     Ok(())
 }
 
