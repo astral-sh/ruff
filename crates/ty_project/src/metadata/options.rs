@@ -1056,7 +1056,7 @@ pub struct SrcOptions {
         "#
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub exclude_scripts: Option<bool>,
+    pub exclude_scripts: Option<RangedValue<bool>>,
 
     /// A list of files and directories to check. The `include` option
     /// follows a similar syntax to `.gitignore` but reversed:
@@ -1177,7 +1177,7 @@ impl SrcOptions {
 
         Ok(SrcSettings {
             respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
-            exclude_scripts: self.exclude_scripts.unwrap_or(false),
+            exclude_scripts: self.exclude_scripts.as_deref().copied().unwrap_or(false),
             files,
         })
     }
