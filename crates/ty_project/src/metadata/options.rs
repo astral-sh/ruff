@@ -1,8 +1,8 @@
-use crate::Db;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
 use crate::metadata::pyproject::{ResolveRequiresPythonError, resolve_requires_python_lower_bound};
 use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
+use crate::{Db, UseUv};
 
 use super::settings::{Override, Settings, TerminalSettings};
 use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
@@ -77,6 +77,28 @@ pub struct Options {
     )]
     pub baseline: Option<RelativePathBuf>,
 
+    /// Use [uv](https://docs.astral.sh/uv/) to install the dependencies declared in a script's
+    /// PEP 723 inline metadata.
+    /// Each script gets its own Python environment, which ty uses to resolve its imports.
+    /// This feature requires uv 0.12.3 or newer.
+    ///
+    /// If a script has an inline `[tool.ty]` table, the script's `use-uv-for-scripts` setting
+    /// takes precedence. Otherwise, the script inherits the project's value.
+    ///
+    /// When checking untrusted code with `ty check`, pass `--config use-uv-for-scripts=false`
+    /// to override the project and script settings for that invocation. To disable all uv
+    /// integration, set the `TY_UV` environment variable to `off`.
+    ///
+    /// `TY_UV` takes precedence over `--config`. `uv check` always enables uv for scripts
+    /// by passing `TY_UV=1` to ty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = "use-uv-for-scripts = true"
+    )]
+    pub use_uv_for_scripts: Option<RangedValue<bool>>,
+
     /// Configures the type checking environment.
     #[option_group]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -132,6 +154,14 @@ pub struct Options {
 }
 
 impl Options {
+    /// Translates an explicit uv mode into ty configuration overrides.
+    pub fn from_uv_mode(mode: Option<RangedValue<UseUv>>) -> Self {
+        Self {
+            use_uv_for_scripts: mode.map(|mode| mode.map_value(UseUv::script_environments_enabled)),
+            ..Self::default()
+        }
+    }
+
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let mut options: Self = toml::from_str(content)?;

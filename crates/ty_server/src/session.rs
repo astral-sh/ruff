@@ -364,6 +364,9 @@ impl Session {
         for &file in scripts {
             // Open and save handle editor documents separately. Their metadata may contain
             // unsaved changes, including overlays that are not in the diagnostic open-file set.
+            // If a project reload enables `use-uv-for-scripts` for an open script, we accept that
+            // a user must save or reopen the document to request a sync. This avoids rereading open scripts
+            // on reload to check whether their inline metadata matches what uv will read from disk.
             if db.document(file).is_some() {
                 continue;
             }
@@ -812,13 +815,29 @@ impl Session {
             metadata.set_fallback_options(fallback_options.clone());
         }
 
+        // Untrusted workspaces disable uv. In trusted workspaces, `TY_UV` takes precedence
+        // for both workspace discovery and scripts. When it is unset, discovery uses
+        // `experimental.useUv`. For scripts, `use-uv-for-scripts` in `ty.configuration` wins
+        // over `experimental.useUv`, and either editor setting overrides script or project configuration.
         let uv_override = self.initialization_options.uv_override(&system);
         let legacy_uv = self.initialization_options.experimental_use_uv();
-        let use_uv = uv_override.as_deref().or(legacy_uv.as_deref()).copied();
-        metadata = metadata.with_use_uv(use_uv.unwrap_or_default());
+        let uv_workspace_discovery = uv_override
+            .as_deref()
+            .or(legacy_uv.as_deref())
+            .copied()
+            .is_some_and(UseUv::workspace_discovery_enabled);
+        metadata = metadata.with_uv_workspace_discovery(uv_workspace_discovery);
 
-        if let Some(override_options) = workspace.settings.override_options() {
-            metadata.set_override_options(override_options.clone());
+        let editor_options = workspace
+            .settings
+            .override_options()
+            .cloned()
+            .unwrap_or_default();
+        let overrides = Options::from_uv_mode(uv_override)
+            .combine(editor_options)
+            .combine(Options::from_uv_mode(legacy_uv));
+        if overrides != Options::default() {
+            metadata.set_override_options(overrides);
         }
 
         // Load user configuration even if project discovery failed.
@@ -829,7 +848,7 @@ impl Session {
                     .context("Failed to apply configuration files"),
             )
             .and_then(|()| {
-                if metadata.use_uv().workspace_discovery_enabled() {
+                if metadata.uv_workspace_discovery_enabled() {
                     let workspace = UvWorkspace::discover(workspace_directory, &system);
                     metadata
                         .apply_uv_workspace(&system, workspace)
@@ -1374,7 +1393,7 @@ impl Session {
             let script_progress = self.script_progress.clone();
             let db = self.project_db_mut(&AnySystemPath::System(system_path.clone()));
 
-            if db.project().metadata(db).use_uv() != UseUv::Off {
+            if db.project().metadata(db).script_uv_override() != Some(false) {
                 // Refresh any cached disk revision before reading the script tag. A filesystem
                 // change may not have reached the watcher yet, and the later open event will
                 // refresh the file from the editor contents instead.

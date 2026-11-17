@@ -60,7 +60,8 @@ impl UseUv {
         matches!(self, Self::On)
     }
 
-    pub(super) const fn script_environments_enabled(self) -> bool {
+    /// Whether uv should prepare standalone script environments.
+    pub const fn script_environments_enabled(self) -> bool {
         matches!(self, Self::Scripts | Self::On)
     }
 }

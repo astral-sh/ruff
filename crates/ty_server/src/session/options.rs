@@ -508,6 +508,7 @@ impl Combine for DiagnosticMode {
 pub struct Experimental {
     /// Controls which uv integrations ty uses.
     ///
+    /// Deprecated for script environments. Set `use-uv-for-scripts` in the ty configuration instead.
     /// This setting is resolved during initialization. Changing it requires restarting the server.
     /// All uv integrations are disabled in untrusted workspaces.
     pub use_uv: Option<UseUv>,
