@@ -6381,6 +6381,26 @@ Alias: TypeAlias = "int <CURSOR>& str"
         runtime contexts or in cases where an annotation expression could be evaluated, however,
         `Intersection[]` can be used in arbitrary contexts if the `ty-extensions` package is installed.
 
+        Nested intersections are flattened at runtime, and duplicate operands are removed using
+        runtime equality, keeping the first occurrence of each. A named alias created using the
+        `type` statement is always kept as an operand. Intersections are unordered types, so
+        nongeneric intersections always compare equal at runtime when they have the same
+        operands:
+
+        ```pycon
+        >>> from ty_extensions import Intersection
+        >>> Intersection[Intersection[str, int], str]
+        ty_extensions.Intersection[str, int]
+        >>> type Alias = Intersection[str, int]  # Python 3.12+
+        >>> Intersection[Alias, str]
+        ty_extensions.Intersection[Alias, str]
+        >>> Intersection[int, str] == Intersection[str, int]
+        True
+        >>> hash(Intersection[int, str]) == hash(Intersection[str, int])
+        True
+
+        ```
+
         ---------------------------------------------
         ```xml
         <special-form 'ty_extensions.Intersection'>
@@ -6407,7 +6427,27 @@ Alias: TypeAlias = "int <CURSOR>& str"
         In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax<HB>
         when displaying intersection types. While the experimental syntax will raise an exception in<HB>
         runtime contexts or in cases where an annotation expression could be evaluated, however,<HB>
-        `Intersection[]` can be used in arbitrary contexts if the `ty-extensions` package is installed.
+        `Intersection[]` can be used in arbitrary contexts if the `ty-extensions` package is installed.<HB>
+        <HB>
+        Nested intersections are flattened at runtime, and duplicate operands are removed using<HB>
+        runtime equality, keeping the first occurrence of each. A named alias created using the<HB>
+        `type` statement is always kept as an operand. Intersections are unordered types, so<HB>
+        nongeneric intersections always compare equal at runtime when they have the same<HB>
+        operands:<HB>
+        <HB>
+        ```pycon
+        >>> from ty_extensions import Intersection
+        >>> Intersection[Intersection[str, int], str]
+        ty_extensions.Intersection[str, int]
+        >>> type Alias = Intersection[str, int]  # Python 3.12+
+        >>> Intersection[Alias, str]
+        ty_extensions.Intersection[Alias, str]
+        >>> Intersection[int, str] == Intersection[str, int]
+        True
+        >>> hash(Intersection[int, str]) == hash(Intersection[str, int])
+        True
+
+        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:3:25
