@@ -2785,8 +2785,7 @@ def wrap(value: T) -> list[T]:
     return [value]
 
 def find(value: T) -> T | None:
-    result: T | None = first(wrap(value))
-    reveal_type(result)  # revealed: T@find | None
+    result: T | None = reveal_type(first(wrap(value)))  # revealed: T@find | None
     return result
 ```
 
@@ -2796,7 +2795,32 @@ The same applies to the iterator passed to `next` when the caller's type variabl
 Bounded = TypeVar("Bounded", bound=int)
 
 def first_int(values: list[Bounded]) -> Bounded | None:
-    return next(iter(values), None)
+    return reveal_type(next(iter(values), None))  # revealed: Bounded@first_int | None
+```
+
+## Suppressed argument errors do not justify union narrowing
+
+Disabling an argument diagnostic does not make a failed speculative specialization valid.
+
+```toml
+[rules]
+invalid-argument-type = "ignore"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def first(items: list[T]) -> T | None:
+    return items[0] if items else None
+
+def wrap(value: T) -> list[T]:
+    return [value]
+
+def find(value: T) -> T | None:
+    result: T | None = reveal_type(first(wrap(value)))  # revealed: T@find | None
+    return result
 ```
 
 ## Passing generic functions to generic functions

@@ -694,3 +694,27 @@ from collections import OrderedDict
 items = [OrderedDict([["key", 1.0]])]  # error: [no-matching-overload]
 OrderedDict(zip(["name"], items))
 ```
+
+## Contextual inference for `next`
+
+An incompatible return context does not make an invalid iterator argument valid. An optional context
+also preserves the concrete return type of a valid iterator.
+
+```toml
+[rules]
+unsound-return = "error"
+```
+
+```py
+class Counter:
+    def __next__(self) -> int:
+        return 1
+
+    def text(self) -> str:
+        # error: [invalid-argument-type]
+        # error: [unsound-return]
+        return next(self)
+
+    def read(self) -> int | None:
+        return reveal_type(next(self))  # revealed: int
+```

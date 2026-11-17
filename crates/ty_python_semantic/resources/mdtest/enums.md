@@ -2477,6 +2477,22 @@ class Answer(Enum):
 reveal_type(Answer.YES.identity())  # revealed: Literal[Answer.YES]
 ```
 
+### Contextual element types when listing enum members
+
+The fresh list can use the annotated enum element type even when the classmethod receiver has a more
+specific `Self` type.
+
+```py
+from enum import Enum
+
+class Mode(Enum):
+    A = 1
+
+    @classmethod
+    def all(cls) -> list["Mode"]:
+        return reveal_type(list(cls))  # revealed: list[Mode]
+```
+
 ### Special attributes on bounded type variables
 
 An ordinary type variable bounded by an enum has the same special attributes as the enum itself.

@@ -6220,6 +6220,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
             .ok()?;
 
+            // Nested calls can return recovery types after binding fails. Those types can make
+            // this call appear compatible with the target, but do not justify committing to it.
+            if speculative_builder.context.has_failed_call() {
+                return None;
+            }
+
             if !speculative_bindings
                 .return_type(db, env)
                 .is_assignable_to(db, env, compatible_ty)
@@ -10215,6 +10221,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inferred = match bindings_result {
             Ok(inferred) => inferred,
             Err(CallError(_, bindings)) => {
+                self.context.mark_failed_call();
                 bindings.report_diagnostics(&self.context, call_expression.into());
                 return bindings.return_type(db, env);
             }
@@ -12524,11 +12531,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (1, None) if !deferred.is_empty() => Some(Box::new(
                 DefinitionInferenceExtra::Deferred(deferred.into_boxed_slice()),
             )),
-            (1, None) if !context.is_empty() => Some(Box::new(if context.diagnostics.is_empty() {
-                DefinitionInferenceExtra::InvalidTypeForm
-            } else {
-                DefinitionInferenceExtra::Context(Box::new(context))
-            })),
+            (1, None) if !context.is_empty() => Some(Box::new(
+                if context.diagnostics.is_empty() && !context.has_failed_call {
+                    DefinitionInferenceExtra::InvalidTypeForm
+                } else {
+                    DefinitionInferenceExtra::Context(Box::new(context))
+                },
+            )),
             (1, None) if !called_functions.is_empty() => {
                 Some(Box::new(DefinitionInferenceExtra::CalledFunctions(
                     called_functions

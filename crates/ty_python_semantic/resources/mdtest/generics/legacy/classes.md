@@ -1381,7 +1381,7 @@ class C(Generic[T]):
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
         invalid: C[int] = C(value)
 ```
 
