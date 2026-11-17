@@ -75,6 +75,28 @@ C().value = "new"
 C().value = 1  # error: [invalid-assignment]
 ```
 
+The subclass may also have an overloaded constructor:
+
+```py
+from typing import Self, overload
+
+class OverloadedProperty(property):
+    @overload
+    def __new__(cls, fget: None) -> Self: ...
+    @overload
+    def __new__(cls, fget: object) -> Self: ...
+    def __new__(cls, fget: object) -> Self:
+        return super().__new__(cls)
+
+class C:
+    def get_value(self) -> int:
+        return 1
+
+    value = OverloadedProperty(get_value)
+
+reveal_type(C().value)  # revealed: int
+```
+
 ## Replacing subclass accessors
 
 Direct construction and each accessor decorator preserve the subclass. Replacing one accessor also

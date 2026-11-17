@@ -716,14 +716,30 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
+        self.when_constraint_set_assignable_to_owned_with_provenance(
+            db,
+            env,
+            target,
+            ConstraintProvenance::INFERRED,
+        )
+    }
+
+    pub(super) fn when_constraint_set_assignable_to_owned_with_provenance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+        provenance: ConstraintProvenance,
+    ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _| OwnedConstraintSet::always(),
+            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_constraint_set_assignable_to_owned_impl<'db>(
             db: &'db dyn Db,
             types: TypePair<'db>,
+            provenance: ConstraintProvenance,
         ) -> OwnedConstraintSet<'db> {
             let program = types.program(db);
             let env = ProgramEnvironment::from_program(program);
@@ -740,7 +756,7 @@ impl<'db> Type<'db> {
                     TypeVarSet::None,
                     TypeRelation::Assignability,
                     TypeVarEvaluation::Lazy,
-                    ConstraintProvenance::INFERRED,
+                    provenance,
                 )
             })
         }
@@ -753,6 +769,7 @@ impl<'db> Type<'db> {
         Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
             db,
             TypePair::new(db, program, self, target),
+            provenance,
         ))
     }
 
@@ -763,23 +780,6 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.when_constraint_set_assignable_to_with_provenance(
-            db,
-            env,
-            target,
-            constraints,
-            ConstraintProvenance::INFERRED,
-        )
-    }
-
-    pub(super) fn when_constraint_set_assignable_to_with_provenance<'c>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        target: Type<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        provenance: ConstraintProvenance,
-    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_with_typevar_evaluation(
             db,
             env,
@@ -788,7 +788,7 @@ impl<'db> Type<'db> {
             TypeVarSet::None,
             TypeRelation::Assignability,
             TypeVarEvaluation::Lazy,
-            provenance,
+            ConstraintProvenance::INFERRED,
         )
     }
 

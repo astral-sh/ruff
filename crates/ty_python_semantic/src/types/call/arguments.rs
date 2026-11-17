@@ -736,6 +736,27 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .all(|&index| self.items.get(index) == other.items.get(index))
     }
 
+    /// Returns `true` if the arguments inferred for this call are equivalent to the provided arguments.
+    pub(super) fn same_inferred_types(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        self.items.iter().zip(&other.items).all(|(left, right)| {
+            let left = left.source_types();
+            let right = right.source_types();
+
+            if left == right {
+                return true;
+            }
+
+            // The arguments are equivalent if the same type was inferred under every type context,
+            // even if the sets of type contexts themselves differ.
+            left.types.values().chain(right.types.values()).all_equal()
+                && left.get_default() == right.get_default()
+        })
+    }
+
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
     /// of this argument list. (If `bound_self` is none, we return the argument list
     /// unmodified.)
@@ -953,6 +974,13 @@ impl<'a, 'db> CallArgumentExpansions<'_, 'a, 'db> {
     ///
     /// See [argument type expansion](https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion).
     pub(super) fn iter(&self) -> impl Iterator<Item = Expansion<'a, 'db>> + '_ {
+        self.iter_with_base(self.arguments)
+    }
+
+    pub(super) fn iter_with_base<'s>(
+        &'s self,
+        base: &'s CallArguments<'a, 'db>,
+    ) -> impl Iterator<Item = Expansion<'a, 'db>> + 's {
         /// Represents the state of the expansion process.
         enum State<'a, 'db> {
             LimitReached(usize),
@@ -1017,7 +1045,7 @@ impl<'a, 'db> CallArgumentExpansions<'_, 'a, 'db> {
 
                 let mut expanded_arguments = Vec::with_capacity(expansion_size);
 
-                for pre_expanded_types in state.iter(self.arguments) {
+                for pre_expanded_types in state.iter(base) {
                     for alternative in expanded_types {
                         let mut expanded_argument = pre_expanded_types.clone();
                         expanded_argument.items[index] = alternative.clone();
