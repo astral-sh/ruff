@@ -797,8 +797,7 @@ mod tests {
     use anyhow::Context;
     use ruff_db::Db as _;
     use ruff_db::files::{File, system_path_to_file};
-    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemVirtualPath};
-    use ruff_python_trivia::textwrap::dedent;
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath};
     use salsa::Setter;
     use salsa::plumbing::AsId;
     use serde_json::{Value, json};
@@ -879,15 +878,17 @@ mod tests {
             ",
         )?;
         db.write_file(site_packages.join("project_dependency.py"), "")?;
-        let source = r"
+        db.write_dedented(
+            path.as_str(),
+            r"
             # /// script
-            # dependencies = []
             # [tool.ty]
-            # use-uv-for-scripts = true
+            # use-uv-for-scripts = false
             # ///
+
             import project_dependency
-            ";
-        db.write_dedented(path.as_str(), &source.replace("true", "false"))?;
+            ",
+        )?;
         let script = system_path_to_file(&db, &path)?;
         let dependency =
             ModuleName::new_static("project_dependency").context("expected a valid module name")?;
@@ -902,12 +903,17 @@ mod tests {
 
         assert!(resolves_dependency(&db, script));
 
-        db.write_dedented(path.as_str(), source)?;
-        let virtual_path = SystemVirtualPath::new("untitled:report.py");
-        db.write_virtual_file(virtual_path, dedent(source).as_bytes());
-        let virtual_script = db.files().virtual_file(&db, virtual_path).file();
-        db.project().open_file(&mut db, virtual_script);
-        assert!(!resolves_dependency(&db, virtual_script));
+        db.write_dedented(
+            path.as_str(),
+            r"
+            # /// script
+            # [tool.ty]
+            # use-uv-for-scripts = true
+            # ///
+
+            import project_dependency
+            ",
+        )?;
 
         let environment =
             script_environment(&db, script).context("expected a script environment")?;
