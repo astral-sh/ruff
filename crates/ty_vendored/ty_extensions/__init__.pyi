@@ -1,5 +1,15 @@
 # ruff: file-ignore[docstring-in-stub]
-"""Experimental ty APIs intended to be exposed to end users."""
+"""ty-extensions is a module that provides experimental typing features supported by ty.
+
+ty bundles the typing stubs for this module, which means that you can use them without
+installing anything. However, if you rely on runtime evaluation of type annotations,
+you should add the [`ty-extensions` package](https://pypi.org/project/ty-extensions/)
+as a dependency in your project:
+
+```bash
+uv add ty-extensions
+```
+"""
 
 import collections.abc
 import sys
@@ -18,9 +28,11 @@ def static_assert(condition: object, msg: LiteralString | None = None) -> None:
 
     Example:
 
-        static_assert(sys.version_info[:2] >= (3, 13), "Python 3.13 or higher is required")
+    ```python
+    static_assert(sys.version_info[:2] >= (3, 13), "Python 3.13 or higher is required")
+    ```
 
-    At runtime, a false condition raises AssertionError (even with Python optimization enabled)."""
+    At runtime, a false condition raises `AssertionError` (even with Python optimization enabled)."""
 
 # -------------
 # Special forms
