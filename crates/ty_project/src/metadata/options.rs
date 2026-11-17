@@ -597,6 +597,10 @@ impl Options {
         }
         if let Some(overrides) = &self.overrides {
             for section in &overrides.0 {
+                // Inline overrides never apply to a script.
+                if matches!(section.source(), ValueSource::ScriptMetadata(_)) {
+                    continue;
+                }
                 OverrideOptions::lint(db, section, &mut diagnostics);
             }
         }
@@ -1863,7 +1867,7 @@ impl AnalysisOptions {
         }
     }
 
-    pub(super) fn to_settings(
+    pub(crate) fn to_settings(
         &self,
         db: &dyn Db,
         context: AnalysisOptionsContext,
@@ -1934,7 +1938,7 @@ impl AnalysisOptions {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum AnalysisOptionsContext {
+pub(crate) enum AnalysisOptionsContext {
     TopLevel,
     Override,
 }
