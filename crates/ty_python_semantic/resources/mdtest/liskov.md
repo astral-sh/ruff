@@ -4343,11 +4343,11 @@ class Base:
 
 class Child(Base):
     __slots__ = ()
-    value: int  # snapshot: invalid-property-type-override
+    value: int  # snapshot: incompatible-property-override
 ```
 
 ```snapshot
-error[invalid-property-type-override]: Invalid override of attribute `value`
+error[incompatible-property-override]: Invalid override of attribute `value`
   --> src/mdtest_snippet.py:13:5
    |
  9 |     def value(self, value: int) -> None: ...
@@ -4355,7 +4355,7 @@ error[invalid-property-type-override]: Invalid override of attribute `value`
 10 |
 11 | class Child(Base):
 12 |     __slots__ = ()
-13 |     value: int  # snapshot: invalid-property-type-override
+13 |     value: int  # snapshot: incompatible-property-override
    |     ^^^^^ Override does not accept writes of type `int`
 info: Attribute `value` is not included in `__slots__`, and the class has no instance dictionary
 ```
@@ -4378,11 +4378,11 @@ class Base:
 
 class Child(Base):
     __slots__ = ()
-    value: int  # snapshot: invalid-mutable-override
+    value: int  # snapshot: incompatible-mutable-override
 ```
 
 ```snapshot
-error[invalid-mutable-override]: Invalid override of attribute `value`
+error[incompatible-mutable-override]: Invalid override of attribute `value`
   --> src/mdtest_snippet.py:13:5
    |
  9 |     value: Descriptor = Descriptor()
@@ -4390,7 +4390,7 @@ error[invalid-mutable-override]: Invalid override of attribute `value`
 10 |
 11 | class Child(Base):
 12 |     __slots__ = ()
-13 |     value: int  # snapshot: invalid-mutable-override
+13 |     value: int  # snapshot: incompatible-mutable-override
    |     ^^^^^ Override does not accept writes of type `int`
 info: Attribute `value` is not included in `__slots__`, and the class has no instance dictionary
 ```
@@ -4419,14 +4419,14 @@ class Child(Base):
         return 0
 
     @value.setter
-    def value(self, value: bool) -> None: ...  # snapshot: invalid-property-type-override
+    def value(self, value: bool) -> None: ...  # snapshot: incompatible-property-override
 ```
 
 ```snapshot
-error[invalid-property-type-override]: Invalid override of attribute `value`
+error[incompatible-property-override]: Invalid override of attribute `value`
   --> src/mdtest_snippet.py:19:9
    |
-19 |     def value(self, value: bool) -> None: ...  # snapshot: invalid-property-type-override
+19 |     def value(self, value: bool) -> None: ...  # snapshot: incompatible-property-override
    |         ^^^^^ Override does not accept writes of type `int`
    |
   ::: src/mdtest_snippet.py:9:9
@@ -4453,13 +4453,13 @@ class Base:
 
 class Child(Base):
     __slots__ = ()
-    value: bool  # snapshot: invalid-property-type-override
+    value: bool  # snapshot: incompatible-property-override
 
     def __setattr__(self, name: str, value: int) -> None: ...
 ```
 
 ```snapshot
-error[invalid-property-type-override]: Invalid override of attribute `value`
+error[incompatible-property-override]: Invalid override of attribute `value`
   --> src/mdtest_snippet.py:13:5
    |
  9 |     def value(self, value: int) -> None: ...
@@ -4467,7 +4467,7 @@ error[invalid-property-type-override]: Invalid override of attribute `value`
 10 |
 11 | class Child(Base):
 12 |     __slots__ = ()
-13 |     value: bool  # snapshot: invalid-property-type-override
+13 |     value: bool  # snapshot: incompatible-property-override
    |     ^^^^^ Override does not accept writes of type `int`
 ```
 
@@ -4503,11 +4503,11 @@ class Base:
 
 class Child(Base, Setter):
     __slots__ = ()
-    value: int  # snapshot: invalid-property-type-override
+    value: int  # snapshot: incompatible-property-override
 ```
 
 ```snapshot
-error[invalid-property-type-override]: Invalid override of attribute `value`
+error[incompatible-property-override]: Invalid override of attribute `value`
   --> src/main.py:15:5
    |
 11 |     def value(self, value: int) -> None: ...
@@ -4515,7 +4515,7 @@ error[invalid-property-type-override]: Invalid override of attribute `value`
 12 |
 13 | class Child(Base, Setter):
 14 |     __slots__ = ()
-15 |     value: int  # snapshot: invalid-property-type-override
+15 |     value: int  # snapshot: incompatible-property-override
    |     ^^^^^ Override does not accept writes of type `int`
    |
   ::: src/setters.py:4:9
