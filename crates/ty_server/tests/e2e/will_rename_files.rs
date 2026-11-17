@@ -146,12 +146,10 @@ fn closed_script_import_is_preserved_before_uv_sync() -> anyhow::Result<()> {
             SystemPath::new("workspace"),
             Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly)),
         )?
-        .with_files([
-            (pth, project_sources.as_str()),
-            ("workspace/src/attrs/__init__.py", ""),
-            ("workspace/src/attrs/define.py", ""),
-            ("workspace/src/caller.py", "from attrs import define"),
-        ])?
+        .with_file(pth, project_sources.as_str())?
+        .with_file("workspace/src/attrs/__init__.py", "")?
+        .with_file("workspace/src/attrs/define.py", "")?
+        .with_file("workspace/src/caller.py", "from attrs import define")?
         .with_file(
             "workspace/ty.toml",
             dedent(
