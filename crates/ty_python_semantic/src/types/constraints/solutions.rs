@@ -178,13 +178,13 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     }
 
     /// With every atom on this path false, the diagram reaches its false terminal.
-    /// Check that the assignments can actually hold together.
+    /// Add those assignments to the path and check whether they can hold together.
     pub(super) fn has_all_negative_counterexample(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        mut path: PathAssignments,
+        path: &mut PathAssignments,
         atoms: &[AtomicConstraintId],
     ) -> bool {
         atoms.iter().all(|atom| {
@@ -196,7 +196,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 self.unspecialized_type_var_policy,
             )
         }) && self
-            .pending_candidate_solution(db, env, storage, &path, None)
+            .pending_candidate_solution(db, env, storage, path, None)
             .is_some()
     }
 

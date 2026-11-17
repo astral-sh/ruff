@@ -2511,15 +2511,13 @@ impl NodeId {
                 let mut path = interior.path_assignments(db, env, storage, source_order);
                 if try_all_negative_path
                     && let Some(atoms) = self.all_negative_path_to_false(storage)
-                    && walker.has_all_negative_counterexample(
-                        db,
-                        env,
-                        storage,
-                        path.clone(),
-                        &atoms,
-                    )
                 {
-                    return ControlFlow::Continue(false);
+                    let snapshot = path.snapshot();
+                    if walker.has_all_negative_counterexample(db, env, storage, &mut path, &atoms) {
+                        return ControlFlow::Continue(false);
+                    }
+                    // Keep discovered rules for the fallback, as when backtracking to a sibling.
+                    path.truncate(snapshot);
                 }
                 walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
             }
