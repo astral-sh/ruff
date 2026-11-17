@@ -25,7 +25,7 @@ env:
   CARGO_PROFILE_DEV_OPT_LEVEL: 0
   CARGO_TERM_COLOR: always
   # renovate: datasource=github-releases depName=astral-sh/hawk
-  HAWK_VERSION: 0.1.17
+  HAWK_VERSION: 0.1.18
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
@@ -398,7 +398,7 @@ jobs:
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 15
     env:
-      RUSTUP_TOOLCHAIN: "1.99.0"
+      RUSTUP_TOOLCHAIN: "1.100.0"
       RUSTC_BOOTSTRAP: "1"
       CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
     steps:
@@ -407,7 +407,7 @@ jobs:
           persist-credentials: false
       - name: Install Rust toolchain
         run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
-      - uses: astral-sh/github-actions/rust-workspace-cache@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
+      - uses: astral-sh/github-actions/rust-workspace-cache@61a5a2c7e0df1c0caf46fe5d1e74a4cb8a7205f8 # 2026.11.16.1
         with:
           target-directory: target/hawk
           extra-target-directory: hawk-fragments
