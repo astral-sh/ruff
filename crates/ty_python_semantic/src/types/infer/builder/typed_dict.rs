@@ -334,7 +334,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         unpacked_cache: &mut UnpackedTypedDictCache<'db>,
     ) -> Option<Type<'db>> {
         self.infer_typed_dict_items(dict, typed_dict, tcx, item_types);
-        self.validate_typed_dict_items(dict, typed_dict, item_types, unpacked_cache)
+        let ty = self.validate_typed_dict_items(dict, typed_dict, item_types, unpacked_cache);
+        let key = ast::ExprRef::Dict(dict).into();
+        if ty.is_none()
+            && let Some(contexts) = &self.unpacked_collection_contexts
+            && let Some(&target) = contexts.get(&key)
+            && Some(target) == tcx.expected_type()
+        {
+            self.record_invalid_unpacked_typed_dict(key);
+        }
+        ty
     }
 
     pub(super) fn infer_typed_dict_items(

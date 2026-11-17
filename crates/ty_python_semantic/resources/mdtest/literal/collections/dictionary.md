@@ -49,6 +49,30 @@ def _(a: dict[str, int], b: Mapping[str, int], c: HasKeysAndGetItem, d: object):
     reveal_type({**d})  # revealed: dict[Unknown, Unknown]
 ```
 
+## Unpacking into a dictionary with an expected type
+
+Unpacking copies the entries into a fresh dictionary. Its key and value types can therefore be wider
+than the source mapping's types.
+
+```py
+from typing import Any
+
+def _(numbers: dict[str, int], names: dict[int, str]):
+    result: dict[str, Any]
+    result = {**numbers}
+    reveal_type(result)  # revealed: dict[str, Any]
+    result["name"] = "Ada"  # ok
+    reveal_type(numbers)  # revealed: dict[str, int]
+
+    mixed: dict[str | int, Any] = reveal_type({**numbers, **names})  # revealed: dict[str | int, Any]
+
+    # error: [invalid-assignment]
+    result = {**numbers, **names}
+
+    # error: [invalid-assignment]
+    integers: dict[str | int, int] = {**numbers, **names}
+```
+
 ## Dict of functions
 
 ```py

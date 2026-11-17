@@ -504,24 +504,10 @@ fn assignment_values_for_target<'ast>(
     }
 
     let targets = sequence_elts(unpack_target)?;
-    let values = literal_sequence(
-        value,
-        false,
-        &|expression, _| Some(expression),
-        &|_, _, known_length| {
-            if let Some(length) = known_length {
-                Tuple::heterogeneous(std::iter::repeat_n(None, length))
-            } else {
-                VariableLengthTuple::mixed([], vec![None], [])
-            }
-        },
-    )?;
-    let matched = values
-        .unpack(target_length(targets), Clone::clone, |_| None)
-        .ok()?;
+    let sources = unpacked_value_expressions(targets, value)?;
     let (target, source) = targets
         .iter()
-        .zip(matched.into_all_elements_with_kind())
+        .zip(sources.into_all_elements_with_kind())
         .find(|(target, _)| target.range().contains_range(requested_target.range()))?;
     match source {
         TupleElement::Variable(values) => {
@@ -541,6 +527,59 @@ fn assignment_values_for_target<'ast>(
             assignment_values_for_target(target, value?, requested_target)
         }
     }
+}
+
+/// Visit explicit source expressions that are unpacked into a single target. Skip starred targets
+/// because each collects a new list.
+pub(super) fn visit_unpacked_assignment_values<'ast>(
+    target: &'ast ast::Expr,
+    value: &'ast ast::Expr,
+    visit: &mut impl FnMut(&'ast ast::Expr, &'ast ast::Expr),
+) {
+    let Some(targets) = sequence_elts(target) else {
+        visit(target, value);
+        return;
+    };
+    // The usual case can pair the elements without building a tuple to model starred expansions.
+    if let Some(values) = fixed_sequence_elements(value, targets.len())
+        && targets.iter().all(|target| !target.is_starred_expr())
+    {
+        for (target, value) in targets.iter().zip(values) {
+            visit_unpacked_assignment_values(target, value, visit);
+        }
+        return;
+    }
+    if let Some(sources) = unpacked_value_expressions(targets, value) {
+        for (target, source) in targets.iter().zip(sources.into_all_elements_with_kind()) {
+            if let TupleElement::Fixed(Some(value))
+            | TupleElement::Prefix(Some(value))
+            | TupleElement::Suffix(Some(value)) = source
+            {
+                visit_unpacked_assignment_values(target, value, visit);
+            }
+        }
+    }
+}
+
+fn unpacked_value_expressions<'ast>(
+    targets: &[ast::Expr],
+    value: &'ast ast::Expr,
+) -> Option<Tuple<Option<&'ast ast::Expr>, Vec<Option<&'ast ast::Expr>>>> {
+    let values = literal_sequence(
+        value,
+        false,
+        &|expression, _| Some(expression),
+        &|_, _, known_length| {
+            if let Some(length) = known_length {
+                Tuple::heterogeneous(std::iter::repeat_n(None, length))
+            } else {
+                VariableLengthTuple::mixed([], vec![None], [])
+            }
+        },
+    )?;
+    values
+        .unpack(target_length(targets), Clone::clone, |_| None)
+        .ok()
 }
 
 fn target_length(targets: &[ast::Expr]) -> TupleLength {

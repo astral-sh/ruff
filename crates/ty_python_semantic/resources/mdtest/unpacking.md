@@ -327,6 +327,48 @@ def _(value: list[int]):
 
 ## List and tuple literals
 
+### Declared types for collection literals
+
+When unpacking a literal, a target's declared type supplies context for its corresponding element.
+
+```py
+from typing import Any
+
+data: dict[str, Any]
+data, count = {"a": 1, "b": "foo"}, 0
+reveal_type(data)  # revealed: dict[str, Any]
+reveal_type(count)  # revealed: Literal[0]
+data["c"] = 1.5  # ok
+```
+
+Parameter annotations also supply context inside nested unpacking targets.
+
+```py
+def update(items: list[Any], labels: set[Any]):
+    [items, (labels, count)] = [[n for n in range(2)], ({"label"}, 0)]
+    reveal_type(items)  # revealed: list[Any]
+    reveal_type(labels)  # revealed: set[Any]
+```
+
+A collection unpacked from an existing variable keeps its inferred type.
+
+```py
+def reuse(source: dict[str, int], optional: dict[str, int] | None):
+    first: dict[str, Any]
+    second: dict[str, Any] | None
+    first, second = source, optional
+    reveal_type(first)  # revealed: dict[str, int]
+    reveal_type(second)  # revealed: dict[str, int] | None
+```
+
+An incompatible literal still produces an assignment error.
+
+```py
+names: list[str]
+# error: [invalid-assignment]
+names, count = [1], 0
+```
+
 ### Starred targets
 
 Unpacking a list literal assigns each element to its corresponding target.
@@ -354,6 +396,16 @@ type:
 reveal_type(first)  # revealed: Literal[1]
 reveal_type(rest)  # revealed: list[str]
 reveal_type(last)  # revealed: Literal[4]
+```
+
+An expansion of unknown length preserves the context for literals at either end.
+
+```py
+def bookends(prefix: list[object], suffix: set[object], *numbers: int):
+    prefix, *middle, suffix = [1], *numbers, {"last"}
+    reveal_type(prefix)  # revealed: list[object]
+    reveal_type(middle)  # revealed: list[int]
+    reveal_type(suffix)  # revealed: set[object]
 ```
 
 ### Empty starred targets

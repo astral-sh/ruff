@@ -133,7 +133,7 @@ use crate::types::typevar::{
 };
 use crate::types::unpacker::{
     UnpackResult, fixed_sequence_elements, sequence_from_literal_elements,
-    tuple_literal_needs_promotion,
+    tuple_literal_needs_promotion, visit_unpacked_assignment_values,
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
@@ -319,6 +319,11 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// An expression cache shared across builders during multi-inference.
     expression_cache: Option<Rc<RefCell<ExpressionCache<'db>>>>,
+
+    /// Earlier declarations for collection expressions at known positions in an unpacked RHS.
+    unpacked_collection_contexts: Option<Rc<FxHashMap<ExpressionNodeKey, Type<'db>>>>,
+    /// Dictionary literals whose unpack target supplied a failing `TypedDict` validation.
+    invalid_unpacked_typed_dicts: Vec<ExpressionNodeKey>,
 
     /// Reachability evaluations reused while inferring this region.
     ///
@@ -571,6 +576,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: FxHashMap::default(),
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
+            unpacked_collection_contexts: None,
+            invalid_unpacked_typed_dicts: Vec::new(),
             reachability_cache: OnceCell::new(),
             qualifiers: FxHashMap::default(),
             type_expression_flags: FxHashMap::default(),
@@ -848,6 +855,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(self.scope, inference.scope);
 
         self.extend_expression_types(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
+        for &literal in &inference.invalid_unpacked_typed_dicts {
+            self.record_invalid_unpacked_typed_dict(literal);
+        }
         self.comparison_truthiness.extend(
             inference
                 .comparison_truthiness
@@ -1557,24 +1567,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_region_expression(&mut self, expression: Expression<'db>, tcx: TypeContext<'db>) {
         self.setup_dataclass_field_specifiers();
 
+        let node = expression.node_ref(self.db()).node(self.module());
+        if matches!(node, ast::Expr::Tuple(_) | ast::Expr::List(_))
+            && let Some(assignment) = expression.assigned_to(self.db())
+            // A chained assignment can give the same literal conflicting contexts.
+            && let [target @ (ast::Expr::Tuple(_) | ast::Expr::List(_))] =
+                assignment.node(self.module()).targets.as_slice()
+        {
+            let mut contexts = FxHashMap::default();
+            visit_unpacked_assignment_values(target, node, &mut |target, value| {
+                if (is_collection_literal(value)
+                    || matches!(
+                        value,
+                        ast::Expr::ListComp(_) | ast::Expr::SetComp(_) | ast::Expr::DictComp(_)
+                    ))
+                    && let ast::Expr::Name(name) = target
+                    && let Some(binding) = self.index.try_definition(name)
+                    && let Some(ty) = self
+                        .add_binding(target.into(), binding)
+                        .type_context
+                        .expected_type()
+                {
+                    contexts.insert(value.into(), ty);
+                }
+            });
+            if !contexts.is_empty() {
+                self.unpacked_collection_contexts = Some(Rc::new(contexts));
+            }
+        }
+
         match expression.kind(self.db()) {
             ExpressionKind::Callee => {
                 self.context.inference_flags |= InferenceFlags::CHECK_UNBOUND_TYPEVARS;
-                self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
+                self.infer_expression_impl(node, tcx);
             }
             ExpressionKind::Normal | ExpressionKind::Predicate { .. } => {
-                self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
+                self.infer_expression_impl(node, tcx);
             }
             ExpressionKind::TypeExpression => {
-                self.infer_type_expression(expression.node_ref(self.db()).node(self.module()));
+                self.infer_type_expression(node);
             }
         }
     }
 
-    /// Add a binding for the given definition.
-    ///
-    /// Returns the result of the `infer_value_ty` closure, which is called with the declared type
-    /// as type context.
+    /// Look up the declarations that apply to a binding before inferring its value.
     fn add_binding<'a>(
         &mut self,
         node: AnyNodeRef<'a>,
@@ -1588,7 +1624,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_binding()
         );
 
-        let db = self.db();
         let file_scope_id = binding.file_scope(db);
         let place_table = self.index.place_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
@@ -1660,17 +1695,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        if let Some(conflicting) = conflicting {
-            // TODO point out the conflicting declarations in the diagnostic?
-            let place = place_table.place(binding.place(db));
-            if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
-                builder.into_diagnostic(format_args!(
-                    "Conflicting declared types for `{place}`: {}",
-                    format_enumeration(conflicting.iter().map(|ty| ty.display(db, env)))
-                ));
-            }
-        }
-
         if place_and_quals.is_undefined()
             && is_local
             // Avoid allocating inheritance-query cache entries for ordinary local variables.
@@ -1717,6 +1741,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         AddBinding {
             type_context,
+            conflicting,
             declaration,
             binding,
             node,
@@ -4771,6 +4796,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let node = target.into();
             let add = AddBinding {
+                conflicting: None,
                 type_context: self.fallback_member_type_context(node),
                 declaration: None,
                 binding: definition,
@@ -6911,6 +6937,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        let tcx = self
+            .unpacked_collection_contexts
+            .as_ref()
+            .and_then(|contexts| contexts.get(&expression.into()))
+            .map_or(tcx, |&ty| TypeContext::from(ty));
         let Some(expression_cache) = &self.expression_cache else {
             return self.infer_expression_uncached(expression, tcx);
         };
@@ -6953,6 +6984,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 ty
             }
+        }
+    }
+
+    fn record_invalid_unpacked_typed_dict(&mut self, literal: ExpressionNodeKey) {
+        if !self.invalid_unpacked_typed_dicts.contains(&literal) {
+            self.invalid_unpacked_typed_dicts.push(literal);
         }
     }
 
@@ -8245,9 +8282,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (elt_tcx_constraints, elt_tcx_variance)
         };
 
-        // Dictionary unpacking always contributes constraints on the inferred key and value types,
-        // even when the unpacked mapping is assignable to the context. Keep it on the general path
-        // so gradual types such as `Any` are preserved.
+        // An unpacked mapping supplies both key and value types. Extract them on the general path.
         let has_dict_unpack = collection_class == KnownClass::Dict
             && elts
                 .iter()
@@ -8434,26 +8469,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 };
 
-                let mut elt_tys = elt_tys.clone();
-                if let Some((key_ty, value_ty)) = elt_tys.next_tuple() {
+                for (elt_ty, unpacked_ty) in
+                    elt_tys.clone().zip([unpacked_key_ty, unpacked_value_ty])
+                {
+                    let identity = elt_ty.identity(self.db());
+                    // The new dictionary can use the contextual type if it admits every possible
+                    // unpacked element. For example, `int` fits an `Any` context, but an unpacked
+                    // `Any` can contribute values outside an `int` context.
+                    if let Some(elt_tcx) = elt_tcx_constraints.get(&identity)
+                        && !elt_tcx_variance[&identity].is_covariant()
+                        && unpacked_ty.is_subtype_of(db, env, elt_tcx.top_materialization(db, env))
+                    {
+                        continue;
+                    }
                     tuple_size_promotion_constraints.record_unpromotable_type(
                         db,
                         env,
-                        key_ty.identity(self.db()),
-                        unpacked_key_ty.promote(db, env),
+                        identity,
+                        unpacked_ty.promote(db, env),
                     );
-                    tuple_size_promotion_constraints.record_unpromotable_type(
-                        db,
-                        env,
-                        value_ty.identity(self.db()),
-                        unpacked_value_ty.promote(db, env),
-                    );
-
-                    builder.infer(Type::TypeVar(key_ty), unpacked_key_ty).ok()?;
-
-                    builder
-                        .infer(Type::TypeVar(value_ty), unpacked_value_ty)
-                        .ok()?;
+                    builder.infer(Type::TypeVar(elt_ty), unpacked_ty).ok()?;
                 }
 
                 continue;
@@ -12203,6 +12238,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Consume the results already collected by this builder without compacting them.
     fn into_expression_cache_entry(self) -> FullExpressionCacheEntry<'db> {
         let Self {
+            invalid_unpacked_typed_dicts,
             legacy_aliases,
             context,
             expressions,
@@ -12227,6 +12263,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            unpacked_collection_contexts: _,
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -12249,6 +12286,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         FullExpressionCacheEntry {
+            invalid_unpacked_typed_dicts,
             legacy_aliases,
             expressions,
             comparison_truthiness,
@@ -12270,6 +12308,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_region();
 
         let Self {
+            invalid_unpacked_typed_dicts: _,
             legacy_aliases,
             context,
             expressions,
@@ -12295,6 +12334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            unpacked_collection_contexts: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -12412,6 +12452,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let Self {
+            invalid_unpacked_typed_dicts: _,
             legacy_aliases,
             context,
             expressions,
@@ -12419,6 +12460,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             called_functions,
             expression_cache: _,
+            unpacked_collection_contexts: _,
             reachability_cache: _,
             declarations: _,
             deferred: _,
@@ -12467,6 +12509,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn finish_inferred_definition(self, definition: Definition<'db>) -> DefinitionInference<'db> {
         let Self {
+            invalid_unpacked_typed_dicts: _,
             legacy_aliases,
             context,
             expressions,
@@ -12489,6 +12532,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            unpacked_collection_contexts: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -12671,6 +12715,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let return_type = self.inferred_return_type();
 
         let Self {
+            invalid_unpacked_typed_dicts: _,
             legacy_aliases,
             context,
             string_annotations,
@@ -12696,6 +12741,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Builder only state
             expression_cache: _,
+            unpacked_collection_contexts: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -12759,6 +12805,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state,
             typevar_binding_context,
             ref expression_cache,
+            ref unpacked_collection_contexts,
+            invalid_unpacked_typed_dicts: _,
             ref reachability_cache,
             ref return_types_and_ranges,
             ref dataclass_field_specifiers,
@@ -12807,6 +12855,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             builder.context.collect_type_expression_diagnostics();
         }
         builder.expression_cache.clone_from(expression_cache);
+        builder
+            .unpacked_collection_contexts
+            .clone_from(unpacked_collection_contexts);
         builder.reachability_cache.clone_from(reachability_cache);
         builder
             .return_types_and_ranges
@@ -12832,6 +12883,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
     fn extend(&mut self, other: Self) {
         let Self {
+            invalid_unpacked_typed_dicts,
             legacy_aliases,
             context,
             expressions,
@@ -12855,6 +12907,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            unpacked_collection_contexts: _,
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -12878,6 +12931,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         self.extend_expression_types(expressions);
+        for literal in invalid_unpacked_typed_dicts {
+            self.record_invalid_unpacked_typed_dict(literal);
+        }
         self.comparison_truthiness.extend(comparison_truthiness);
         self.context.extend(&context);
         self.extend_cycle_recovery(cycle_recovery);
@@ -13006,6 +13062,7 @@ enum ExpressionCacheEntry<'db> {
 /// Unlike [`ExpressionInference`], this type is short-lived, and avoids the cost of compaction
 /// that is otherwise performed for Salsa results.
 struct FullExpressionCacheEntry<'db> {
+    invalid_unpacked_typed_dicts: Vec<ExpressionNodeKey>,
     legacy_aliases: FxIndexSet<Definition<'db>>,
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
@@ -13039,6 +13096,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
 
     fn has_extra(&self) -> bool {
         !self.legacy_aliases.is_empty()
+            || !self.invalid_unpacked_typed_dicts.is_empty()
             || !self.string_annotations.is_empty()
             || !self.deferred_name_loads.is_empty()
             || !self.comparison_truthiness.is_empty()
@@ -13068,6 +13126,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
             self.collection_use_constraints.shrink_to_fit();
             self.context.diagnostics.shrink_to_fit();
             Box::new(ExpressionInferenceExtra {
+                invalid_unpacked_typed_dicts: self.invalid_unpacked_typed_dicts.into_boxed_slice(),
                 legacy_aliases: self.legacy_aliases.into_iter().collect(),
                 string_annotations: FrozenSet::from(self.string_annotations),
                 deferred_name_loads: FrozenSet::from(self.deferred_name_loads),
@@ -13598,6 +13657,7 @@ impl<V> IntoIterator for VecSet<V> {
 #[must_use]
 struct AddBinding<'db, 'ast> {
     type_context: TypeContext<'db>,
+    conflicting: Option<Box<indexmap::set::Slice<Type<'db>>>>,
     declaration: Option<Definition<'db>>,
     binding: Definition<'db>,
     node: AnyNodeRef<'ast>,
@@ -13625,6 +13685,19 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         let place_table = builder.index.place_table(file_scope_id);
 
         let mut bound_ty = inferred_ty;
+
+        if let Some(conflicting) = self.conflicting
+            && let Some(diagnostic) = builder
+                .context
+                .report_lint(&CONFLICTING_DECLARATIONS, self.node)
+        {
+            // TODO point out the conflicting declarations in the diagnostic?
+            let place = place_table.place(self.binding.place(db));
+            diagnostic.into_diagnostic(format_args!(
+                "Conflicting declared types for `{place}`: {}",
+                format_enumeration(conflicting.iter().map(|ty| ty.display(db, env)))
+            ));
+        }
 
         if self.qualifiers.contains(TypeQualifiers::FINAL) {
             let mut previous_bindings = use_def.bindings_at_definition(self.binding);
