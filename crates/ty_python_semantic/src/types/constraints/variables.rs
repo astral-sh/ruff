@@ -7,12 +7,12 @@ use std::marker::PhantomData;
 use itertools::Either;
 use salsa::plumbing::AsId;
 
+use crate::types::Type;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetBuilder, ConstraintSetStorage, Node, NodeId,
-    SourceOrderId, max_constructor_and_typevar_depth, wobble_index,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetStorage, Node, NodeId, SourceOrderId,
+    max_constructor_and_typevar_depth, wobble_index,
 };
 use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain, TypeVarSet};
-use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
 use crate::{Db, ProgramEnvironment};
 
 /// The solver policy for handling unspecialized type variables as inference evidence.
@@ -152,27 +152,6 @@ impl<'db> Constraint<'db> {
             source_order = storage.ordered_source_order(source_order, constraint_source_order);
         }
         (node, source_order)
-    }
-
-    pub(super) fn apply_type_mapping_impl(
-        &self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        match self {
-            Constraint::Atomic(atomic) => {
-                atomic.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-        }
-    }
-
-    pub(super) fn types(&self) -> impl Iterator<Item = Type<'db>> {
-        match self {
-            Constraint::Atomic(atomic) => atomic.types().into_iter(),
-        }
     }
 
     pub(super) fn display<'a>(
@@ -668,102 +647,6 @@ impl<'db> AtomicConstraint<'db> {
                 max_constructor_and_typevar_depth(db, env, this.bound)
             }
             AtomicConstraint::TypeVarRange(_) | AtomicConstraint::TypeVarEquivalence(_) => (0, 0),
-        }
-    }
-
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let (left, right) = self.operands();
-        let left = left.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let right = right.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        self.with_operands(
-            db,
-            visitor.env,
-            &mut builder.storage.borrow_mut(),
-            TypeVarSet::All,
-            left,
-            right,
-        )
-    }
-
-    /// Returns the types in relation order: lower then upper, or the two sides of an equality.
-    pub(super) fn operands(self) -> (Type<'db>, Type<'db>) {
-        let [subject, bound] = self.types();
-        if matches!(self, Self::ConcreteLower(_)) {
-            (bound, subject)
-        } else {
-            (subject, bound)
-        }
-    }
-
-    /// Rebuilds the relation after substituting types or importing symbolic constraints into
-    /// a narrower inference scope. Either change can make a formerly inferable operand concrete.
-    pub(super) fn with_operands(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        inferable: TypeVarSet<'db>,
-        left: Type<'db>,
-        right: Type<'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let provenance = self.provenance();
-        let equivalence = matches!(
-            self,
-            Self::ConcreteEquivalence(_) | Self::TypeVarEquivalence(_)
-        );
-        let inferable_operand = |ty: Type<'db>| {
-            ty.as_typevar()
-                .filter(|var| var.is_inferable(db, inferable))
-        };
-        match (inferable_operand(left), inferable_operand(right)) {
-            (Some(var), _) if equivalence => {
-                let atoms = Self::new_equivalence_bound(db, env, provenance, var, right, inferable);
-                Constraint::new_nodes(db, env, storage, atoms)
-            }
-            (_, Some(var)) if equivalence => {
-                let atoms = Self::new_equivalence_bound(db, env, provenance, var, left, inferable);
-                Constraint::new_nodes(db, env, storage, atoms)
-            }
-            (Some(var), _) => {
-                let atoms = Self::new_upper_bound(db, env, provenance, var, right, inferable);
-                Constraint::new_nodes(db, env, storage, atoms)
-            }
-            (_, Some(var)) => {
-                let atoms = Self::new_lower_bound(db, provenance, var, left, inferable);
-                Constraint::new_nodes(db, env, storage, atoms)
-            }
-            (None, None) => {
-                let when = if equivalence {
-                    left.when_constraint_set_equivalent_to_owned(db, env, right, inferable)
-                } else {
-                    left.when_constraint_set_assignable_to_owned(db, env, right, inferable)
-                };
-                storage.load_with_provenance(db, env, &when, Some(provenance), TypeVarSet::All)
-            }
-        }
-    }
-
-    /// Semantic walks visit the subject of a concrete bound first.
-    fn types(self) -> [Type<'db>; 2] {
-        match self {
-            AtomicConstraint::ConcreteLower(this) => [Type::TypeVar(this.typevar), this.bound],
-            AtomicConstraint::ConcreteUpper(this) => [Type::TypeVar(this.typevar), this.bound],
-            AtomicConstraint::ConcreteEquivalence(this) => {
-                [Type::TypeVar(this.typevar), this.bound]
-            }
-            AtomicConstraint::TypeVarRange(this) => {
-                [Type::TypeVar(this.left), Type::TypeVar(this.right)]
-            }
-            AtomicConstraint::TypeVarEquivalence(this) => {
-                [Type::TypeVar(this.left), Type::TypeVar(this.right)]
-            }
         }
     }
 

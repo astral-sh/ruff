@@ -20,10 +20,6 @@
 //! `T` for `U ≤ T` produces a concrete lower bound on `T`. A type-variable range would give both
 //! `T` a lower bound and `U` an upper bound, so it requires both variables to be inferable.
 //!
-//! Explicit constraint algebra can build formulas under [`TypeVarSet::All`]. Such a formula may
-//! still contain atoms outside a smaller inference scope. When importing it into a relation with
-//! fixed variables, use [`ConstraintSetBuilder::load_in_scope`] to reinterpret its bounds.
-//!
 //! You can build up more complex constraint sets using union, intersection, and negation. We use
 //! a ternary decision diagram (TDD), as described in §11.2 of [Duboc's thesis][duboc], to represent
 //! a constraint set.
@@ -103,7 +99,6 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 use std::sync::{Arc, LazyLock};
 
-use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -119,8 +114,8 @@ use crate::types::visitor::{
     NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases, walk_non_atomic_type,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -334,21 +329,6 @@ impl<'db> OwnedConstraintSet<'db> {
         }
     }
 
-    /// Returns `true` if this constraint set's root is the `always` terminal.
-    ///
-    /// This is only a cheap sufficient check. A nonterminal constraint set can also be always
-    /// satisfied, so `false` does not prove that the set is not always satisfied. Call
-    /// [`ConstraintSet::is_always_satisfied`] through [`Self::query`] when false negatives are not
-    /// acceptable.
-    pub(crate) fn is_trivially_always_satisfied(&self) -> bool {
-        self.node == ALWAYS_TRUE
-    }
-
-    /// Returns `true` if this constraint set's root is not a terminal.
-    pub(super) fn is_nontrivial(&self) -> bool {
-        !self.node.is_terminal()
-    }
-
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
@@ -367,24 +347,6 @@ impl<'db> OwnedConstraintSet<'db> {
         };
         let set = ConstraintSet::from_node(&builder, self.node, self.source_order);
         f(&builder, set)
-    }
-
-    /// Returns the typevars and stored bound types still reachable from the decision diagram.
-    ///
-    /// Source ordering can retain constraints that are no longer in the diagram, but their type
-    /// variables must not participate in semantic walks or callable freshening.
-    /// Synthetic defaults are not stored types and must not affect these walks either.
-    pub(crate) fn types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
-        self.inner.iter().flat_map(|inner| {
-            inner
-                .nodes
-                .iter()
-                .map(|node| node.constraint)
-                .unique()
-                .flat_map(|constraint| {
-                    inner.constraints[inner.retained_constraint_index(constraint)].types()
-                })
-        })
     }
 }
 
@@ -904,105 +866,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
-    /// Applies a type mapping to every constraint in this constraint set.
-    pub(crate) fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        fn rebuild_node(
-            storage: &mut ConstraintSetStorage<'_>,
-            old_node: NodeId,
-            mapped_constraints: &FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
-            mapped_nodes: &mut FxHashMap<NodeId, NodeId>,
-        ) -> NodeId {
-            if old_node.is_terminal() {
-                return old_node;
-            }
-            if let Some(mapped) = mapped_nodes.get(&old_node) {
-                return *mapped;
-            }
-
-            let old_interior = storage.interior_node_data(old_node);
-            let (condition, _) = mapped_constraints[&old_interior.constraint];
-            let if_true = rebuild_node(
-                storage,
-                old_interior.if_true,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let if_uncertain = rebuild_node(
-                storage,
-                old_interior.if_uncertain,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let if_false = rebuild_node(
-                storage,
-                old_interior.if_false,
-                mapped_constraints,
-                mapped_nodes,
-            );
-            let mapped = condition.ite_uncertain(storage, if_true, if_uncertain, if_false);
-            mapped_nodes.insert(old_node, mapped);
-            mapped
-        }
-
-        // We have to collect this into a temporary vec since we can't hold an open borrow on the
-        // storage during the apply_type_mapping calls below, since they also need to borrow the
-        // storage.
-        let storage = self.builder.storage.borrow();
-        let mut constraints = SmallVec::<[_; 8]>::new();
-        self.node
-            .for_each_unique_constraint(&storage, &mut |constraint_id| {
-                constraints.push(constraint_id);
-            });
-        // Mapping can intern constraints and typevars. Preserve their source order rather than
-        // letting the old diagram's variable order determine the rebuilt diagram's ordering.
-        let source_orders = storage.calculate_source_orders(self.source_order);
-        constraints.sort_unstable_by_key(|constraint| {
-            constraint
-                .as_atomic(&storage)
-                .and_then(|constraint| source_orders.get_index_of(&constraint))
-        });
-        drop(storage);
-
-        let mut mapped_constraints = FxHashMap::default();
-        for constraint_id in constraints {
-            let storage = self.builder.storage.borrow();
-            let constraint = storage.constraint_data(constraint_id).clone();
-            drop(storage);
-            mapped_constraints.insert(
-                constraint_id,
-                constraint.apply_type_mapping_impl(db, self.builder, type_mapping, tcx, visitor),
-            );
-        }
-
-        let mut storage = self.builder.storage.borrow_mut();
-        let source_order = source_orders
-            .into_iter()
-            .fold(None, |source_order, constraint| {
-                mapped_constraints.get(&constraint.into_inner()).map_or(
-                    source_order,
-                    |(_, mapped_source_order)| {
-                        storage.ordered_source_order(source_order, *mapped_source_order)
-                    },
-                )
-            });
-        Self::from_node(
-            self.builder,
-            rebuild_node(
-                &mut storage,
-                self.node,
-                &mapped_constraints,
-                &mut FxHashMap::default(),
-            ),
-            source_order,
-        )
-    }
-
     /// Universally abstracts constraints involving the given type variables from this TDD.
     ///
     /// This is the Boolean dual of [`Self::reduce_inferable`]. Declared type variable bounds and
@@ -1306,21 +1169,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         ConstraintSet::from_node(self, node, source_order)
     }
 
-    /// Imports a symbolic constraint set into a specific inference scope.
-    pub(super) fn load_in_scope<'c>(
-        &'c self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        other: &OwnedConstraintSet<'db>,
-        inferable: TypeVarSet<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        let (node, source_order) = self
-            .storage
-            .borrow_mut()
-            .load_with_provenance(db, env, other, None, inferable);
-        ConstraintSet::from_node(self, node, source_order)
-    }
-
     /// Loads an owned constraint set, replacing the provenance of every constraint.
     pub(crate) fn load_with_provenance<'c>(
         &'c self,
@@ -1328,15 +1176,11 @@ impl<'db> ConstraintSetBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
         provenance: ConstraintProvenance,
-        inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let (node, source_order) = self.storage.borrow_mut().load_with_provenance(
-            db,
-            env,
-            other,
-            Some(provenance),
-            inferable,
-        );
+        let (node, source_order) =
+            self.storage
+                .borrow_mut()
+                .load_with_provenance(db, env, other, Some(provenance));
         ConstraintSet::from_node(self, node, source_order)
     }
 }
@@ -1678,7 +1522,7 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
-        self.load_with_provenance(db, env, other, None, TypeVarSet::All)
+        self.load_with_provenance(db, env, other, None)
     }
 
     fn load_with_provenance(
@@ -1687,7 +1531,6 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
         provenance: Option<ConstraintProvenance>,
-        inferable: TypeVarSet<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
         fn rebuild_node<'db>(
             storage: &mut ConstraintSetStorage<'db>,
@@ -1751,14 +1594,7 @@ impl<'db> ConstraintSetStorage<'db> {
                 let Constraint::Atomic(atomic) = old_constraint;
                 let atomic =
                     provenance.map_or(*atomic, |provenance| atomic.with_provenance(provenance));
-                if inferable != TypeVarSet::All {
-                    // Stored receiver constraints can be symbolic in the bound method. Once
-                    // the method is compared or called, its caller's type variables are fixed.
-                    let (left, right) = atomic.operands();
-                    atomic.with_operands(db, env, self, inferable, left, right)
-                } else {
-                    Constraint::Atomic(atomic).new_node(db, env, self)
-                }
+                Constraint::Atomic(atomic).new_node(db, env, self)
             })
             .collect();
 
@@ -5239,11 +5075,12 @@ mod tests {
     use super::*;
 
     use indoc::indoc;
+    use itertools::Itertools;
     use pretty_assertions::assert_eq;
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
-    use crate::types::generics::{ApplySpecialization, GenericContext};
+    use crate::types::generics::GenericContext;
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
         TypeVarInstance,
@@ -5386,51 +5223,6 @@ mod tests {
         assert_eq!(
             bounds.promote_for_argument_context(db, &env, original, widest),
             original
-        );
-    }
-
-    #[test]
-    fn type_mapping_updates_constraint_bounds() {
-        // (list[U] ≤ T ≤ list[U])[U ↦ int] = (list[int] ≤ T ≤ list[int])
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let t = create_typevar(db, "T");
-        let u = create_typevar(db, "U");
-        let builder = ConstraintSetBuilder::new();
-        let list_of_u = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
-        let set = ConstraintSet::constrain_typevar_equivalence_bound(
-            db,
-            &env,
-            &builder,
-            ConstraintProvenance::INFERRED,
-            TypeVarSet::All,
-            t,
-            list_of_u,
-        );
-
-        let int = KnownClass::Int.to_instance(db, &env);
-        let mapped = set.apply_type_mapping_impl(
-            db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(u, int)),
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(&env),
-        );
-        let list_of_int = KnownClass::List.to_specialized_instance(db, &env, &[int]);
-        let expected = ConstraintSet::constrain_typevar_equivalence_bound(
-            db,
-            &env,
-            &builder,
-            ConstraintProvenance::INFERRED,
-            TypeVarSet::All,
-            t,
-            list_of_int,
-        );
-
-        assert!(
-            mapped
-                .iff(db, &builder, expected)
-                .is_always_satisfied(db, &env, TypeVarSet::All)
         );
     }
 
@@ -5596,55 +5388,6 @@ mod tests {
             ),
             Ok(CandidateSolutions::Unsatisfiable)
         );
-    }
-
-    #[test]
-    fn type_mapping_evaluates_mapped_subjects() {
-        // ((T = int) ∧ ¬(T = str))[T ↦ int] = true
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let t = create_typevar(db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let set = create_constraint(db, &builder, t, KnownClass::Int).and(db, &builder, || {
-            create_constraint(db, &builder, t, KnownClass::Str).negate(db, &builder)
-        });
-
-        let mapped = set.apply_type_mapping_impl(
-            db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                t,
-                KnownClass::Int.to_instance(db, &env),
-            )),
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(&env),
-        );
-
-        assert!(mapped.is_always_satisfied(db, &env, TypeVarSet::All));
-    }
-
-    #[test]
-    fn type_mapping_handles_absorbed_constraints_in_source_order() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let t = create_typevar(db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let str = create_constraint(db, &builder, t, KnownClass::Str);
-        let int = create_constraint(db, &builder, t, KnownClass::Int);
-        let set = str.or(db, &builder, || int).and(db, &builder, || str);
-
-        let mapped = set.apply_type_mapping_impl(
-            db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                t,
-                KnownClass::Str.to_instance(db, &env),
-            )),
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(&env),
-        );
-
-        assert!(mapped.is_always_satisfied(db, &env, TypeVarSet::All));
     }
 
     #[test]
@@ -7370,11 +7113,13 @@ class E: ...
         });
 
         assert_eq!(
-            owned
-                .types()
-                .filter_map(Type::as_typevar)
-                .collect::<Vec<_>>(),
-            vec![u],
+            owned.query(|_, constraints| constraints.solutions(db, &env, TypeVarSet::All)),
+            Ok(Solutions::Constrained(SolutionPaths::Complete(vec![
+                solution([TypeVarSolution {
+                    bound_typevar: u,
+                    solution: known_instance(db, KnownClass::Str),
+                },])
+            ]))),
         );
         assert_eq!(
             owned.inner.as_ref().map(|inner| inner.source_orders.len()),
