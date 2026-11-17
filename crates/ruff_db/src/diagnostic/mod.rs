@@ -177,11 +177,7 @@ impl Diagnostic {
 
     /// Adds an "info" sub-diagnostic before any existing sub-diagnostics.
     pub fn prepend_info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
-        let subs = &mut Arc::make_mut(&mut self.inner).subs;
-        if subs.is_empty() {
-            subs.reserve_exact(1);
-        }
-        subs.insert(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
+        self.prepend_sub(SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
     }
 
     /// Adds a "help" sub-diagnostic with the given message.
@@ -202,6 +198,15 @@ impl Diagnostic {
             subs.reserve_exact(1);
         }
         subs.push(sub);
+    }
+
+    /// Adds a sub-diagnostic before any existing sub-diagnostics.
+    pub fn prepend_sub(&mut self, sub: SubDiagnostic) {
+        let subs = &mut Arc::make_mut(&mut self.inner).subs;
+        if subs.is_empty() {
+            subs.reserve_exact(1);
+        }
+        subs.insert(0, sub);
     }
 
     /// Return a `std::fmt::Display` implementation that renders this
