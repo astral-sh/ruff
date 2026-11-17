@@ -62,6 +62,68 @@ old",
 }
 
 #[test]
+fn batch_renames_a_package_and_a_module_file() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_files([
+            ("old_pkg/__init__.py", "from old_pkg.helpers import VALUE"),
+            ("old_pkg/helpers.py", "VALUE = 1"),
+            ("old_file.py", "VALUE = 1"),
+            (
+                "consumer.py",
+                "import old_pkg.helpers, old_file\nold_pkg.helpers.VALUE + old_file.VALUE",
+            ),
+        ])?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let edit = rename_edit(
+        &mut server,
+        &[("old_pkg", "new_pkg"), ("old_file.py", "new_file.py")],
+    );
+
+    assert_edits(
+        edit.as_ref(),
+        &[
+            (
+                server.file_uri("old_pkg/__init__.py"),
+                &[ExpectedEdit {
+                    line: 0,
+                    columns: 5..20,
+                    new_text: "new_pkg.helpers",
+                }],
+            ),
+            (
+                server.file_uri("consumer.py"),
+                &[
+                    ExpectedEdit {
+                        line: 0,
+                        columns: 7..22,
+                        new_text: "new_pkg.helpers",
+                    },
+                    ExpectedEdit {
+                        line: 0,
+                        columns: 24..32,
+                        new_text: "new_file",
+                    },
+                    ExpectedEdit {
+                        line: 1,
+                        columns: 0..7,
+                        new_text: "new_pkg",
+                    },
+                    ExpectedEdit {
+                        line: 1,
+                        columns: 24..32,
+                        new_text: "new_file",
+                    },
+                ],
+            ),
+        ],
+    );
+
+    Ok(())
+}
+
+#[test]
 fn unsupported_renames_do_not_suppress_supported_edits() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_files([("old.py", ""), ("use.py", "import old"), ("notes.txt", "")])?
