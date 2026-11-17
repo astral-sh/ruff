@@ -306,7 +306,7 @@ impl CheckCommand {
             }),
             src: Some(SrcOptions {
                 respect_ignore_files,
-                exclude_scripts,
+                exclude_scripts: exclude_scripts.map(RangedValue::cli),
                 exclude: self.exclude.map(|excludes| {
                     RangedValue::cli(excludes.iter().map(RelativeGlobPattern::cli).collect())
                 }),

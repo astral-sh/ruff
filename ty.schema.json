@@ -1947,9 +1947,13 @@
         },
         "exclude-scripts": {
           "description": "Whether to exclude files containing PEP 723 inline script metadata unless they are\nexplicitly passed on the command line.",
-          "type": [
-            "boolean",
-            "null"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/boolean"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "include": {
@@ -2050,6 +2054,9 @@
         }
       },
       "additionalProperties": false
+    },
+    "boolean": {
+      "type": "boolean"
     },
     "string": {
       "type": "string"
