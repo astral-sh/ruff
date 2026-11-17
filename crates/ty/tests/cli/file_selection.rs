@@ -1276,6 +1276,176 @@ fn response_files_preserve_literal_at_paths() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn parent_component_after_symlink() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("main.py", "value: int = 1\n"),
+        ("other/main.py", "value: int = 'wrong'\n"),
+        ("other/nested/placeholder", ""),
+    ])?;
+    case.write_symlink("other/nested", "link")?;
+
+    let output = case.command().arg("link/../main.py").output()?;
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8(output.stdout)?.contains("invalid-assignment"));
+
+    let output = case
+        .command()
+        .args(["link/../main.py", "--add-ignore"])
+        .output()?;
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        std::fs::read_to_string(case.root().join("main.py"))?,
+        "value: int = 1\n"
+    );
+    assert!(
+        std::fs::read_to_string(case.root().join("other/main.py"))?
+            .contains("# ty: ignore[invalid-assignment]")
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn parent_component_preserves_remaining_symlinks() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("real/target.py", "value: int = 'wrong'\n"),
+        ("real/nested/placeholder", ""),
+    ])?;
+    case.write_symlink("real", "alias")?;
+    case.write_symlink("real/target.py", "real/generated.py")?;
+    case.write_symlink("real/nested", "real/link")?;
+
+    for (input, expected) in [
+        ("real/nested/../generated.py", "real/generated.py"),
+        ("alias/nested/../generated.py", "alias/generated.py"),
+        ("alias/link/../generated.py", "alias/generated.py"),
+    ] {
+        let output = case
+            .command()
+            .args(["--output-format", "concise", input])
+            .output()?;
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        let stdout = String::from_utf8(output.stdout)?;
+        assert!(
+            stdout.contains(&format!("{expected}:1:14: error[invalid-assignment]")),
+            "{stdout}"
+        );
+
+        let output = case
+            .command()
+            .args(["--force-exclude", "--exclude", expected, input])
+            .output()?;
+        assert!(output.status.success(), "{output:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn missing_file_after_parent_component() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("main.py", "value: int = 'wrong'\n"),
+        ("nested/placeholder", ""),
+    ])?;
+    let output = case
+        .command()
+        .args([
+            "--exit-zero",
+            "--output-format",
+            "concise",
+            "main.py",
+            "nested/../missing.py",
+        ])
+        .output()?;
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        stdout.contains("main.py:1:14: error[invalid-assignment]"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("error[io]") && stdout.contains("missing.py"),
+        "{stdout}"
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn invalid_component_before_parent_does_not_select_lexical_target() -> anyhow::Result<()> {
+    let source = "value: int = 'wrong'\n";
+    let case = CliTest::with_files([("main.py", source), ("other.py", source)])?;
+    case.write_symlink("absent", "dangling")?;
+    case.write_symlink("main.py", "file_link")?;
+    let output = case
+        .command()
+        .args([
+            "--add-ignore",
+            "--output-format",
+            "concise",
+            "absent/../main.py",
+            "dangling/../main.py",
+            "file_link/../main.py",
+        ])
+        .output()?;
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_eq!(stdout.matches("error[io]").count(), 3, "{stdout}");
+    for file in ["main.py", "other.py"] {
+        assert_eq!(std::fs::read_to_string(case.root().join(file))?, source);
+    }
+
+    let output = case
+        .command()
+        .args([
+            "--exit-zero",
+            "--output-format",
+            "concise",
+            "other.py",
+            "absent/../main.py",
+        ])
+        .output()?;
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        stdout.contains("other.py:1:14: error[invalid-assignment]"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("error[io]") && stdout.contains("absent/../main.py"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("main.py:1:14"), "{stdout}");
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn project_and_config_after_symlink_parent() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("main.py", "missing_name\n"),
+        ("other/main.py", "value: int = 1\n"),
+        ("ty.toml", "[rules]\nunresolved-reference = 'error'\n"),
+        (
+            "other/ty.toml",
+            "[rules]\nunresolved-reference = 'ignore'\n",
+        ),
+        ("other/nested/placeholder", ""),
+    ])?;
+    case.write_symlink("other/nested", "link")?;
+
+    let output = case.command().args(["--project", "link/.."]).output()?;
+    assert!(output.status.success(), "{output:?}");
+
+    let output = case
+        .command()
+        .args(["main.py", "--config-file", "link/../ty.toml"])
+        .output()?;
+    assert!(output.status.success(), "{output:?}");
+    Ok(())
+}
+
 /// Test that ty works correctly with Bazel's symlinked file structure
 #[test]
 #[cfg(unix)]

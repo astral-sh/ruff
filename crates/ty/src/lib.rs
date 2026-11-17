@@ -6,6 +6,7 @@ mod rule;
 mod server;
 mod version;
 
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::{self, BufWriter, Write};
 use std::process::{ExitCode, Termination};
@@ -116,27 +117,51 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     // The base path to which all CLI arguments are relative to.
     let cwd = current_directory()?;
+    let system = OsSystem::new(&cwd);
 
-    let project_path = args
-        .project
-        .as_ref()
-        .map(|project| {
-            if project.as_std_path().is_dir() {
-                Ok(SystemPath::absolute(project, &cwd))
-            } else {
-                Err(anyhow!(
-                    "Provided project path `{project}` is not a directory"
-                ))
+    let (project_path, check_paths, path_diagnostics, config_file) = {
+        let mut resolver = CliPathResolver::new(&system);
+        let project_path = args
+            .project
+            .as_ref()
+            .map(|project| {
+                if project.as_std_path().is_dir() {
+                    resolver
+                        .resolve(project)
+                        .with_context(|| format!("Failed to resolve project path `{project}`"))
+                } else {
+                    Err(anyhow!(
+                        "Provided project path `{project}` is not a directory"
+                    ))
+                }
+            })
+            .transpose()?
+            .unwrap_or_else(|| cwd.clone());
+
+        let mut check_paths = Vec::with_capacity(args.paths.len());
+        let mut path_diagnostics = Vec::new();
+        for path in &args.paths {
+            match resolver.resolve(path) {
+                Ok(path) => check_paths.push(path),
+                Err(error) => path_diagnostics.push(Diagnostic::new(
+                    DiagnosticId::Io,
+                    Severity::Error,
+                    format!("`{path}`: {error}"),
+                )),
             }
-        })
-        .transpose()?
-        .unwrap_or_else(|| cwd.clone());
+        }
 
-    let check_paths: Vec<_> = args
-        .paths
-        .iter()
-        .map(|path| SystemPath::absolute(path, &cwd))
-        .collect();
+        let config_file = args
+            .config_file
+            .as_ref()
+            .map(|path| {
+                resolver
+                    .resolve(path)
+                    .with_context(|| format!("Failed to resolve configuration path `{path}`"))
+            })
+            .transpose()?;
+        (project_path, check_paths, path_diagnostics, config_file)
+    };
 
     let mode = if args.fix {
         MainLoopMode::Fix(FixMode::ApplyFixes)
@@ -148,14 +173,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         MainLoopMode::Check
     };
 
-    let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
     let memory_report = std::env::var(EnvVars::TY_MEMORY_REPORT).ok();
-    let config_file = args
-        .config_file
-        .as_ref()
-        .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
 
     let mut project_metadata = match &config_file {
@@ -169,6 +189,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     project_metadata.set_override_options(args.into_options());
     if project_metadata.use_uv() == UseUv::On
+        && path_diagnostics.is_empty()
         && let [path] = check_paths.as_slice()
         && system.is_file(path)
         && system
@@ -197,8 +218,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     project.set_force_exclude(&mut db, force_exclude);
 
-    if !check_paths.is_empty() {
-        project.set_included_paths(&mut db, check_paths);
+    if !check_paths.is_empty() || !path_diagnostics.is_empty() {
+        project.set_included_paths_with_diagnostics(&mut db, check_paths, path_diagnostics);
     }
 
     // Disabling LRU only assumes that the database is short-lived; unlike freezing below, it does
@@ -496,6 +517,17 @@ impl MainLoop {
                             } else {
                                 Err(Canceled)
                             }
+                        }
+                        MainLoopMode::UpdateBaseline
+                            if result
+                                .iter()
+                                .any(|diagnostic| diagnostic.id() == DiagnosticId::Io) =>
+                        {
+                            // An I/O error can leave files unchecked, so the diagnostics are
+                            // incomplete and would drop entries from the baseline.
+                            retain_visible_diagnostics(&mut result);
+                            self.write_diagnostics(db, &result, None)?;
+                            Ok(result)
                         }
                         MainLoopMode::UpdateBaseline => {
                             let settings = db.project().settings(db);
@@ -951,6 +983,70 @@ fn request_check(sender: &crossbeam_channel::Sender<()>) {
     // A full channel means that a check has already been requested. Keeping one pending request
     // coalesces bursts of file changes while the main loop drains higher-priority work.
     let _ = sender.try_send(());
+}
+
+struct CliPathResolver<'a> {
+    system: &'a OsSystem,
+    parents: HashMap<SystemPathBuf, SystemPathBuf>,
+}
+
+impl<'a> CliPathResolver<'a> {
+    fn new(system: &'a OsSystem) -> Self {
+        Self {
+            system,
+            parents: HashMap::new(),
+        }
+    }
+
+    fn resolve(&mut self, path: &SystemPath) -> io::Result<SystemPathBuf> {
+        let cwd = self.system.current_directory();
+        // Unix follows symlinks before traversing `..`. Ordinary Win32 paths collapse it lexically.
+        if cfg!(unix)
+            && path
+                .components()
+                .any(|component| component.as_str() == "..")
+        {
+            let mut resolved = cwd.to_path_buf();
+            for component in path.components() {
+                match component.as_str() {
+                    "." => {}
+                    ".." => resolved = self.resolve_parent(resolved)?,
+                    component => resolved.push(component),
+                }
+            }
+            return Ok(resolved);
+        }
+        Ok(SystemPath::absolute(path, cwd))
+    }
+
+    fn resolve_parent(&mut self, path: SystemPathBuf) -> io::Result<SystemPathBuf> {
+        if let Some(parent) = self.parents.get(&path) {
+            return Ok(parent.clone());
+        }
+
+        let lexical_parent = path.parent().unwrap_or(&path);
+        let traversal = path.join("..");
+        let parent = if path.as_std_path().symlink_metadata()?.is_symlink() {
+            let resolved = self.system.canonicalize_path(&traversal)?;
+            // Keep the original spelling if following the link reaches the same parent.
+            if resolved.as_path() == lexical_parent
+                || self
+                    .system
+                    .canonicalize_path(lexical_parent)
+                    .is_ok_and(|canonical| canonical == resolved)
+            {
+                lexical_parent.to_path_buf()
+            } else {
+                resolved
+            }
+        } else {
+            // The canceled component still needs to be a searchable directory.
+            self.system.path_metadata(&traversal)?;
+            lexical_parent.to_path_buf()
+        };
+        self.parents.insert(path, parent.clone());
+        Ok(parent)
+    }
 }
 
 fn current_directory() -> Result<SystemPathBuf> {

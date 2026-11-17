@@ -6,6 +6,40 @@ use insta_cmd::assert_cmd_snapshot;
 use crate::CliTest;
 
 #[test]
+fn io_error_preserves_baseline() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("main.py", "value: int = 'wrong'\n"),
+        ("other.py", "value: int = 'other'\n"),
+        ("nested/placeholder", ""),
+    ])?;
+    let baseline = case.root().join("baseline.json");
+    let update = ["--baseline", "baseline.json", "--update-baseline"];
+    let output = case.command().args(update).output()?;
+    assert!(output.status.success(), "{output:?}");
+    let original = fs::read_to_string(&baseline)?;
+    assert!(original.contains("other.py"), "{original}");
+
+    let output = case
+        .command()
+        .args(update)
+        .args([
+            "--output-format",
+            "concise",
+            "main.py",
+            "nested/../missing.py",
+        ])
+        .output()?;
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        stdout.contains("error[io]") && stdout.contains("missing.py"),
+        "{stdout}"
+    );
+    assert_eq!(fs::read_to_string(&baseline)?, original);
+    Ok(())
+}
+
+#[test]
 fn update_and_use_configured_baseline() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
