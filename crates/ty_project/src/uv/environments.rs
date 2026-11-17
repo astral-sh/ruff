@@ -797,9 +797,8 @@ mod tests {
     use anyhow::Context;
     use ruff_db::Db as _;
     use ruff_db::files::{File, system_path_to_file};
-    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemVirtualPath, TestSystem};
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemVirtualPath};
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_ranged_value::RangedValue;
     use salsa::Setter;
     use salsa::plumbing::AsId;
     use serde_json::{Value, json};
@@ -812,7 +811,9 @@ mod tests {
     };
     use crate::db::testing::TestDb;
     use crate::metadata::Options;
-    use crate::{Db as _, ProjectDatabase, ProjectMetadata};
+    use crate::metadata::options::EnvironmentOptions;
+    use crate::metadata::value::RelativePathBuf;
+    use crate::{Db as _, ProjectMetadata};
 
     #[test]
     fn disabling_script_uv_discards_pending_synchronization() -> anyhow::Result<()> {
@@ -846,55 +847,51 @@ mod tests {
 
     #[test]
     fn uv_script_does_not_use_the_project_environment() -> anyhow::Result<()> {
-        let system = TestSystem::default();
         let root = SystemPath::new(if cfg!(windows) {
             "C:/project"
         } else {
             "/project"
         });
         let venv = root.join("project-venv");
-        system.set_env_var(EnvVars::VIRTUAL_ENV, venv.as_str());
         let site_packages = venv.join(if cfg!(windows) {
             "Lib/site-packages"
         } else {
             "lib/python3.13/site-packages"
         });
         let path = root.join("report.py");
-        let pyvenv_cfg = dedent(
+        let mut metadata = ProjectMetadata::new("test", root.to_path_buf());
+        metadata.set_fallback_options(Options {
+            environment: Some(EnvironmentOptions {
+                python: Some(RelativePathBuf::python_extension(&venv)),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        });
+        let mut db = TestDb::new(metadata);
+        db.test_system()
+            .set_env_var(EnvVars::VIRTUAL_ENV, venv.as_str());
+        db.write_dedented(
+            venv.join("pyvenv.cfg").as_str(),
             r"
             home = /missing
             version = 3.13.0
             include-system-site-packages = false
             ",
-        );
-        let config = dedent(
-            r"
-            use-uv-for-scripts = true
-            environment.python = 'project-venv'
-            ",
-        );
-        let source = dedent(
-            r"
+        )?;
+        db.write_file(site_packages.join("project_dependency.py"), "")?;
+        let source = r"
             # /// script
             # dependencies = []
+            # [tool.ty]
+            # use-uv-for-scripts = true
             # ///
             import project_dependency
-            ",
-        );
-        system.memory_file_system().write_files_all([
-            (root.join("ty.toml"), config.as_ref()),
-            (venv.join("pyvenv.cfg"), pyvenv_cfg.as_ref()),
-            (site_packages.join("project_dependency.py"), ""),
-            (path.clone(), source.as_ref()),
-        ])?;
-        let virtual_path = SystemVirtualPath::new("untitled:report.py");
-        system
-            .memory_file_system()
-            .write_virtual_file(virtual_path, source.as_bytes());
-        let metadata = ProjectMetadata::discover(root, &system)?;
+            ";
+        db.write_dedented(path.as_str(), &source.replace("true", "false"))?;
+        let script = system_path_to_file(&db, &path)?;
         let dependency =
             ModuleName::new_static("project_dependency").context("expected a valid module name")?;
-        let resolves_dependency = |db: &ProjectDatabase, script| {
+        let resolves_dependency = |db: &TestDb, script| {
             resolve_module(
                 db,
                 ImportingFile::ResolverFile(db.program_file(script).resolver_file(db)),
@@ -903,23 +900,15 @@ mod tests {
             .is_some()
         };
 
-        let mut without_uv = metadata.clone();
-        without_uv.set_override_options(Options {
-            use_uv_for_scripts: Some(RangedValue::cli(false)),
-            ..Options::default()
-        });
-        let without_uv = ProjectDatabase::fallible(without_uv, system.clone())?;
-        assert!(resolves_dependency(
-            &without_uv,
-            system_path_to_file(&without_uv, &path)?
-        ));
+        assert!(resolves_dependency(&db, script));
 
-        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        db.write_dedented(path.as_str(), source)?;
+        let virtual_path = SystemVirtualPath::new("untitled:report.py");
+        db.write_virtual_file(virtual_path, dedent(source).as_bytes());
         let virtual_script = db.files().virtual_file(&db, virtual_path).file();
         db.project().open_file(&mut db, virtual_script);
         assert!(!resolves_dependency(&db, virtual_script));
 
-        let script = system_path_to_file(&db, &path)?;
         let environment =
             script_environment(&db, script).context("expected a script environment")?;
         let task = script_sync_task(&db, script).context("expected a script sync task")?;
