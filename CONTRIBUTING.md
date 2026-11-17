@@ -528,9 +528,9 @@ review and remaining preparation steps below. To prepare the release locally, st
 
 1. Merge the PR
 
-1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yml) with:
-
-    - The new version number (without starting `v`)
+1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yml) from
+    `main`. The workflow reads the version from `crates/ruff/Cargo.toml` and rejects versions that
+    already have a GitHub release. Enable **dry-run** to build release artifacts without publishing.
 
 1. Request a deployment approval from another team member
 
@@ -542,7 +542,7 @@ review and remaining preparation steps below. To prepare the release locally, st
         jobs](https://docs.github.com/en/actions/managing-workflow-runs/re-running-workflows-and-jobs#re-running-failed-jobs-in-a-workflow) and not just a single failed job.
     1. Wait for aforementioned approval
     1. Upload to PyPI.
-    1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
+    1. Create and push the Git tag for the resolved version. We create the Git tag only
         after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/astral-sh/ruff/issues/4468)).
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
