@@ -209,8 +209,8 @@ fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
 }
 
 #[track_caller]
-fn run_multithreaded(bencher: Bencher, benchmark: &Benchmark, thread_pool: ThreadPoolBuilder) {
-    let thread_pool = thread_pool.build().unwrap();
+fn run_multithreaded(bencher: Bencher, benchmark: &Benchmark) {
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
 
     bencher
         .with_inputs(|| benchmark.setup_iteration())
@@ -252,19 +252,10 @@ fn colour_science(bencher: Bencher) {
     run_single_threaded(bencher, &COLOUR_SCIENCE);
 }
 
-#[bench(sample_size = 1, sample_count = 2)]
+#[bench(sample_size = 1, sample_count = 5)]
 fn numpy(bencher: Bencher) {
     // Checking NumPy and its tests on a single thread takes too long for CI.
-    run_multithreaded(bencher, &NUMPY, ThreadPoolBuilder::new());
-}
-
-#[bench(args = [0, 8, 16], sample_size = 1, sample_count = 4)]
-fn numpy_worker_count(bencher: Bencher, workers: usize) {
-    run_multithreaded(
-        bencher,
-        &NUMPY,
-        ThreadPoolBuilder::new().num_threads(workers),
-    );
+    run_multithreaded(bencher, &NUMPY);
 }
 
 #[bench(sample_size = 1, sample_count = 2)]
@@ -280,7 +271,7 @@ fn sympy(bencher: Bencher) {
 #[bench(sample_size = 3, sample_count = 8)]
 fn multithreaded(bencher: Bencher) {
     // Use the same workload as `altair` so we can compare single- and multithreaded check times.
-    run_multithreaded(bencher, &ALTAIR, ThreadPoolBuilder::new());
+    run_multithreaded(bencher, &ALTAIR);
 }
 
 fn main() {
