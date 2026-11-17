@@ -15,7 +15,7 @@ use crate::{
         function::OverloadLiteral,
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
-        signatures::{CallableSignature, PartialSignatureApplication},
+        signatures::CallableSignature,
         visitor,
     },
 };
@@ -924,15 +924,13 @@ impl<'db> CallableType<'db> {
     }
 
     /// Returns the reduced callable produced by partially applying selected overloads.
-    pub(crate) fn partially_apply(
+    pub(crate) fn from_partial_overloads(
         db: &'db dyn Db,
-        overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
+        overloads: impl IntoIterator<Item = Signature<'db>>,
     ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            CallableSignature::partially_apply(db, overloads)?,
-            CallableTypeKind::Regular,
-        ))
+        let signatures = CallableSignature::from_partial_overloads(overloads);
+        (!signatures.overloads.is_empty())
+            .then(|| Self::new(db, signatures, CallableTypeKind::Regular))
     }
 
     /// Reifies this callable as the nominal `functools.partial[T]` instance for its return type.
@@ -1168,30 +1166,13 @@ impl<'db> CallableTypes<'db> {
         db: &'db dyn Db,
         wrapped: Type<'db>,
     ) -> Type<'db> {
-        let mut overloads = Vec::new();
-        let mut seen_overloads = FxHashSet::default();
-
-        for callable in self.0 {
-            for signature in callable.signatures(db) {
-                let signature = signature.clone();
-                let dedup_key = signature
-                    .clone()
-                    .with_definition(None)
-                    .with_source_overload_index(None);
-                if seen_overloads.insert(dedup_key) {
-                    overloads.push(signature);
-                }
-            }
-        }
-
-        debug_assert!(!overloads.is_empty(), "CallableTypes should not be empty");
-
-        CallableType::new(
-            db,
-            CallableSignature::from_overloads(overloads),
-            CallableTypeKind::Regular,
-        )
-        .into_precise_functools_partial_instance(db, wrapped)
+        let signatures = CallableSignature::from_partial_overloads(self.signatures(db).cloned());
+        debug_assert!(
+            !signatures.overloads.is_empty(),
+            "CallableTypes should not be empty"
+        );
+        CallableType::new(db, signatures, CallableTypeKind::Regular)
+            .into_precise_functools_partial_instance(db, wrapped)
     }
 }
 

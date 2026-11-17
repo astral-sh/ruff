@@ -728,30 +728,35 @@ reveal_type(list(map(p, paths)))  # revealed: list[str]
 
 ### Binding a union to an overloaded keyword
 
-Each union member can match different overloads. Here, two overloads accept `None`. The caller can
-select either one by supplying one or two positional arguments.
+Each union member can match different overloads. Both `str` and `None` allow one positional
+argument. A second positional argument is only valid when the caller overrides `option` with `None`.
 
 ```py
 from functools import partial
-from typing import overload
+from typing import Callable, overload
 
 @overload
-def f(value: int, /, *, option: str) -> int: ...
+def f(value: int, /, *, option: str) -> str: ...
 @overload
 def f(value: int, extra: int, /, *, option: None) -> int: ...
 @overload
 def f(value: int, /, *, option: None) -> int: ...
-def f(value: int, extra: int = 0, /, *, option: str | None) -> int:
-    return value + extra
+def f(value: int, extra: int = 0, /, *, option: str | None) -> str | int:
+    return option if option is not None else value + extra
 
 def check(option: str | None):
     p = partial(f, option=option)
-    reveal_type(p(1))  # revealed: int
-    p(1, option="text")  # ok
-    p(1, option=None)  # ok
-    p(1, 2, option=None)  # ok
+    # TODO: should reveal `str | int` because the return type depends on the bound `option`.
+    reveal_type(p(1))  # revealed: str
+    reveal_type(p(1, option="text"))  # revealed: str
+    reveal_type(p(1, option=None))  # revealed: int
+    p(1, 2)  # error: [no-matching-overload]
+    reveal_type(p(1, 2, option=None))  # revealed: int
     p()  # error: [no-matching-overload]
     p("text")  # error: [no-matching-overload]
+
+    unary: Callable[[int], object] = p  # ok
+    binary: Callable[[int, int], object] = p  # error: [invalid-assignment]
 ```
 
 Binding the keyword fails if any member of the union is incompatible with every overload.
@@ -759,6 +764,27 @@ Binding the keyword fails if any member of the union is incompatible with every 
 ```py
 def invalid(option: str | bytes):
     partial(f, option=option)  # error: [invalid-argument-type]
+```
+
+### Overlapping parameter types after binding a union
+
+Without a keyword override, a positional argument must be valid for every possible value of the
+bound `option`. A `str` satisfies both overloads here.
+
+```py
+from functools import partial
+from typing import overload
+
+@overload
+def f(value: int | str, /, *, option: str) -> None: ...
+@overload
+def f(value: str | bytes, /, *, option: None) -> None: ...
+def f(value: int | str | bytes, /, *, option: str | None) -> None: ...
+def check(option: str | None):
+    p = partial(f, option=option)
+    p("value")  # ok
+    p(1)  # error: [invalid-argument-type]
+    p(1, option="text")  # ok
 ```
 
 ### ParamSpec callable bound with `partial`
@@ -1084,6 +1110,25 @@ p = partial(f, **{"a": "wrong", "a": 1})
 reveal_type(p)  # revealed: partial[(*, a: int = 1, b: str) -> bool]
 
 partial(f, **{"a": "wrong"})  # error: [invalid-argument-type]
+```
+
+If an overload accepts the unpacked keywords through `**kwargs`, the caller can override an
+individual entry to select that overload.
+
+```py
+from typing import overload
+
+@overload
+def choose(x: int, /, **options: int | bytes) -> int: ...
+@overload
+def choose(x: str, /, **options: str | bytes) -> str: ...
+def choose(x: int | str, /, **options: int | str | bytes) -> int | str:
+    return x
+
+def check(flag: int | str):
+    p = partial(choose, **{"common": b"", "flag": flag})
+    reveal_type(p(1, flag=2))  # revealed: int
+    reveal_type(p("a", flag="b"))  # revealed: str
 ```
 
 ### Kwargs splat with TypedDict
