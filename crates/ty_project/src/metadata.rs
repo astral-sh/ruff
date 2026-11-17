@@ -589,6 +589,7 @@ impl MergedOptions<'_> {
     > {
         self.options.to_program_settings(
             OptionsContext::Project(self.metadata.root()),
+            true,
             self.metadata.name(),
             system,
             vendored,

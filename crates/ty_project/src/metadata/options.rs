@@ -236,6 +236,7 @@ impl Options {
     pub(crate) fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
         context: OptionsContext<'_>,
+        allow_environment_fallback: bool,
         project_name: &str,
         system: &dyn System,
         vendored: &VendoredFileSystem,
@@ -261,8 +262,6 @@ impl Options {
                 default
             });
 
-        let allow_environment_fallback = !matches!(context, OptionsContext::Script(_))
-            || self.use_uv_for_scripts.as_deref() != Some(&true);
         let python_environment = match self.python_environment(context.configuration_root(), system)
         {
             Ok(None) if allow_environment_fallback => {
