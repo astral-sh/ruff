@@ -1306,6 +1306,22 @@ def same_paramspec[**P]() -> None:
     static_assert(constraints == expected)
 ```
 
+## Truthiness of a constraint set
+
+A constraint set is truthy when every specialization satisfies it. Any `T` fits in `object`, but
+`U = str` is a counterexample to the conjunction below.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def upper_bounds[T, U]() -> None:
+    domain = ConstraintSet.upper_bound(T, object)
+    limited = ConstraintSet.upper_bound(U, int)
+    static_assert(domain)
+    static_assert(not (limited & domain))
+```
+
 ## Satisfiability with inferable typevars
 
 Satisfiability checks validate the inferred lower and upper bounds of the given inferable type

@@ -102,6 +102,14 @@ pub(crate) struct PathAssignments {
     new_assignments: FxIndexMap<Assignment<AtomicConstraintId>, AssignmentFuel>,
 }
 
+/// Branch-local state restored after visiting an edge.
+pub(super) struct PathSnapshot {
+    assignments: usize,
+    substituted_constraints: usize,
+    fuel_undo: usize,
+    remaining_overall_fuel: u16,
+}
+
 /// The total amount of fuel that we are willing to spend for this path traversal. This was
 /// chosen empirically, to balance performance with accurate ecosystem diagnostics.
 const OVERALL_FUEL_BUDGET: u16 = 256;
@@ -412,6 +420,63 @@ impl PathAssignments {
         }
     }
 
+    /// Add an assignment and propagate its consequences. On conflict, the caller
+    /// must discard the path or roll back the edge before adding another assignment.
+    pub(super) fn assume<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        assignment: Assignment<AtomicConstraintId>,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
+    ) -> bool {
+        debug_assert!(self.assignment_queue.is_empty());
+        self.assignment_queue
+            .push_back((assignment, AssignmentFuel::origin()));
+        self.drain_assignment_queue(
+            db,
+            env,
+            storage,
+            assignment.constraint(),
+            unspecialized_type_var_policy,
+        )
+        .is_ok()
+    }
+
+    pub(super) fn snapshot(&self) -> PathSnapshot {
+        PathSnapshot {
+            assignments: self.assignments.len(),
+            substituted_constraints: self.substituted_constraints.len(),
+            fuel_undo: self.fuel_undo.len(),
+            remaining_overall_fuel: self.remaining_overall_fuel,
+        }
+    }
+
+    pub(super) fn truncate(&mut self, snapshot: &PathSnapshot) {
+        self.assignment_queue.clear();
+        self.pending_substitutions.clear();
+        // A branch can replenish an assignment more than once. Restore in reverse order while
+        // every referenced assignment still exists.
+        for (index, previous_fuel) in self.fuel_undo.drain(snapshot.fuel_undo..).rev() {
+            self.assignments[index].1 = previous_fuel;
+        }
+        for assignment in self.assignments[snapshot.assignments..].keys() {
+            match *assignment {
+                Assignment::Positive(constraint) => {
+                    self.positive_assignment_indices[constraint] = None;
+                }
+                Assignment::Negative(constraint) => {
+                    self.negative_assignment_indices[constraint] = None;
+                }
+                Assignment::Unconstrained(_) => {}
+            }
+        }
+        self.assignments.truncate(snapshot.assignments);
+        self.substituted_constraints
+            .truncate(snapshot.substituted_constraints);
+        self.remaining_overall_fuel = snapshot.remaining_overall_fuel;
+    }
+
     /// Walks one of the outgoing edges of an internal BDD node. `assignment` describes the
     /// constraint that the BDD node checks, and whether we are following the `if_true` or
     /// `if_false` edge.
@@ -443,13 +508,8 @@ impl PathAssignments {
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         f: impl FnOnce(&mut ConstraintSetStorage<'db>, &mut Self, Range<usize>, bool) -> R,
     ) -> R {
-        // Record a snapshot of the assignments that we already knew held — both so that we can
-        // pass along the range of which assignments are new, and so that we can reset back to this
-        // point before returning.
-        let start = self.assignments.len();
-        let substituted_constraints_start = self.substituted_constraints.len();
-        let fuel_undo_start = self.fuel_undo.len();
-        let previous_remaining_overall_fuel = self.remaining_overall_fuel;
+        let snapshot = self.snapshot();
+        let start = snapshot.assignments;
 
         // Add the new assignment and anything we can derive from it.
         tracing::trace!(
@@ -463,19 +523,8 @@ impl PathAssignments {
             edge = %assignment.into_inner().display(db, env, storage),
             "walk edge",
         );
-        debug_assert!(self.assignment_queue.is_empty());
-        self.assignment_queue
-            .push_back((assignment, AssignmentFuel::origin()));
-        let source_constraint = assignment.constraint();
-        let found_conflict = self
-            .drain_assignment_queue(
-                db,
-                env,
-                storage,
-                source_constraint,
-                unspecialized_type_var_policy,
-            )
-            .is_err();
+        let found_conflict =
+            !self.assume(db, env, storage, assignment, unspecialized_type_var_policy);
         if !found_conflict {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
@@ -496,30 +545,7 @@ impl PathAssignments {
         let end = self.assignments.len();
         let result = f(storage, self, start..end, found_conflict);
 
-        // Reset back to where we were before following this edge, so that the caller can reuse a
-        // single instance for the entire BDD traversal.
-        self.assignment_queue.clear();
-        self.pending_substitutions.clear();
-        // A branch can replenish an assignment more than once. Restore in reverse order while
-        // every referenced assignment still exists.
-        for (index, previous_fuel) in self.fuel_undo.drain(fuel_undo_start..).rev() {
-            self.assignments[index].1 = previous_fuel;
-        }
-        for assignment in self.assignments[start..].keys() {
-            match *assignment {
-                Assignment::Positive(constraint) => {
-                    self.positive_assignment_indices[constraint] = None;
-                }
-                Assignment::Negative(constraint) => {
-                    self.negative_assignment_indices[constraint] = None;
-                }
-                Assignment::Unconstrained(_) => {}
-            }
-        }
-        self.assignments.truncate(start);
-        self.substituted_constraints
-            .truncate(substituted_constraints_start);
-        self.remaining_overall_fuel = previous_remaining_overall_fuel;
+        self.truncate(&snapshot);
         result
     }
 

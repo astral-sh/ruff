@@ -2450,6 +2450,26 @@ impl NodeId {
         }
     }
 
+    /// Look for a counterexample by falsifying each atom. When the false branch
+    /// has no disjunct of its own, only the uncertain branch can still be true.
+    /// Stop if following an edge would require combining branches.
+    fn all_negative_path_to_false(
+        self,
+        storage: &ConstraintSetStorage<'_>,
+    ) -> Option<SmallVec<[AtomicConstraintId; 4]>> {
+        let mut atoms = SmallVec::new();
+        let mut node = self;
+        while let Node::Interior(_) = node.node() {
+            let interior = storage.interior_node_data(node);
+            if interior.if_false != ALWAYS_FALSE {
+                return None;
+            }
+            atoms.push(interior.constraint.as_atomic(storage)?);
+            node = interior.if_uncertain;
+        }
+        (node == ALWAYS_FALSE).then_some(atoms)
+    }
+
     /// Returns whether this BDD represent the constant function `true`.
     fn is_always_satisfied<'db>(
         self,
@@ -2483,10 +2503,22 @@ impl NodeId {
             Node::AlwaysTrue => ControlFlow::Continue(true),
             Node::AlwaysFalse => ControlFlow::Continue(false),
             Node::Interior(interior) => {
+                // Bounded callers account for each visit in the exact traversal.
+                let try_all_negative_path = limits.traversal_budget().is_none();
                 let source_orders = storage.calculate_source_orders(source_order);
                 let mut walker =
                     SolutionWalker::new(db, storage, source_orders, inferable, limits, self);
                 let mut path = interior.path_assignments(db, env, storage, source_order);
+                if try_all_negative_path
+                    && let Some(atoms) = self.all_negative_path_to_false(storage)
+                {
+                    let snapshot = path.snapshot();
+                    if walker.has_all_negative_counterexample(db, env, storage, &mut path, &atoms) {
+                        return ControlFlow::Continue(false);
+                    }
+                    // Keep discovered rules for the fallback, as when backtracking to a sibling.
+                    path.truncate(&snapshot);
+                }
                 walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
             }
         }
