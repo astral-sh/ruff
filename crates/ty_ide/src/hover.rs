@@ -6377,8 +6377,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         ```
 
         In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax
-        when displaying intersection types. Note that either spelling will fail in runtime contexts or in
-        cases where an annotation expression could be evaluated.
+        when displaying intersection types. While the experimental syntax will raise an exception in
+        runtime contexts or in cases where an annotation expression could be evaluated, however,
+        `Intersection[]` can be used in arbitrary contexts if the `ty-extensions` package is installed.
 
         ---------------------------------------------
         ```xml
@@ -6404,8 +6405,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         ```<HB>
         <HB>
         In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax<HB>
-        when displaying intersection types. Note that either spelling will fail in runtime contexts or in<HB>
-        cases where an annotation expression could be evaluated.
+        when displaying intersection types. While the experimental syntax will raise an exception in<HB>
+        runtime contexts or in cases where an annotation expression could be evaluated, however,<HB>
+        `Intersection[]` can be used in arbitrary contexts if the `ty-extensions` package is installed.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:3:25
@@ -6459,8 +6461,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
 
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an
-        annotation expression could be evaluated.
+        negation types. While the experimental syntax will raise an exception in runtime contexts or in
+        cases where an annotation expression could be evaluated, however, `Not[]` can be used in arbitrary
+        contexts if the `ty-extensions` package is installed.
 
         ---------------------------------------------
         ```xml
@@ -6470,8 +6473,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.<HB>
         <HB>
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying<HB>
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an<HB>
-        annotation expression could be evaluated.
+        negation types. While the experimental syntax will raise an exception in runtime contexts or in<HB>
+        cases where an annotation expression could be evaluated, however, `Not[]` can be used in arbitrary<HB>
+        contexts if the `ty-extensions` package is installed.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:1:16
@@ -6511,8 +6515,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
 
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an
-        annotation expression could be evaluated.
+        negation types. While the experimental syntax will raise an exception in runtime contexts or in
+        cases where an annotation expression could be evaluated, however, `Not[]` can be used in arbitrary
+        contexts if the `ty-extensions` package is installed.
 
         ---------------------------------------------
         ```xml
@@ -6522,8 +6527,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.<HB>
         <HB>
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying<HB>
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an<HB>
-        annotation expression could be evaluated.
+        negation types. While the experimental syntax will raise an exception in runtime contexts or in<HB>
+        cases where an annotation expression could be evaluated, however, `Not[]` can be used in arbitrary<HB>
+        contexts if the `ty-extensions` package is installed.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:1:10

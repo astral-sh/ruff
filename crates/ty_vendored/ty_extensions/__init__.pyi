@@ -24,8 +24,9 @@ Not: _SpecialForm
 `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
 
 In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
-negation types. Note that either spelling will fail in runtime contexts or in cases where an
-annotation expression could be evaluated.
+negation types. While the experimental syntax will raise an exception in runtime contexts or in
+cases where an annotation expression could be evaluated, however, `Not[]` can be used in arbitrary
+contexts if the `ty-extensions` package is installed.
 """
 
 Intersection: _SpecialForm
@@ -49,8 +50,9 @@ s: Intersection[P, Q] = S()
 ```
 
 In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax
-when displaying intersection types. Note that either spelling will fail in runtime contexts or in
-cases where an annotation expression could be evaluated.
+when displaying intersection types. While the experimental syntax will raise an exception in
+runtime contexts or in cases where an annotation expression could be evaluated, however,
+`Intersection[]` can be used in arbitrary contexts if the `ty-extensions` package is installed.
 """
 
 Top: _SpecialForm
