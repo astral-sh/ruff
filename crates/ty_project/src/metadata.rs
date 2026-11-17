@@ -20,7 +20,7 @@ use crate::metadata::options::{
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
-use crate::uv::{self, UseUv, UvWorkspace};
+use crate::uv::{self, UvWorkspace};
 pub use options::Options;
 use options::TyTomlError;
 mod configuration_file;
@@ -69,8 +69,12 @@ pub struct ProjectMetadata {
     #[cfg_attr(test, serde(skip))]
     uv_workspace: UvWorkspace,
 
+    /// Whether ty should query uv for workspace metadata during project discovery and reload.
+    /// The CLI or language server supplies this flag.
+    ///
+    /// TODO: Remove this field when the `use-uv-for-projects` setting is introduced.
     #[cfg_attr(test, serde(skip))]
-    use_uv: UseUv,
+    use_uv_for_workspace: bool,
 }
 
 impl ProjectMetadata {
@@ -86,7 +90,7 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             uv_workspace: UvWorkspace::default(),
-            use_uv: UseUv::Off,
+            use_uv_for_workspace: false,
         }
     }
 
@@ -117,7 +121,7 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             uv_workspace: UvWorkspace::default(),
-            use_uv: UseUv::Off,
+            use_uv_for_workspace: false,
         })
     }
 
@@ -172,7 +176,7 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             uv_workspace: UvWorkspace::default(),
-            use_uv: UseUv::Off,
+            use_uv_for_workspace: false,
         })
     }
 
@@ -222,7 +226,7 @@ impl ProjectMetadata {
         Ok(metadata)
     }
 
-    /// Applies a previously obtained uv workspace without invoking uv or checking [`Self::use_uv`].
+    /// Applies a previously obtained uv workspace without invoking uv or checking [`Self::uv_workspace_discovery_enabled`].
     ///
     /// An explicit ty configuration keeps its root; otherwise uv's workspace root supplies
     /// the project configuration. Already applied option layers are preserved.
@@ -347,10 +351,10 @@ impl ProjectMetadata {
         Ok(Some(metadata))
     }
 
-    /// Overrides which uv integrations are enabled for this project.
+    /// Sets whether ty queries uv for workspace metadata during project discovery and reload.
     #[must_use]
-    pub fn with_use_uv(mut self, use_uv: UseUv) -> Self {
-        self.use_uv = use_uv;
+    pub fn with_uv_workspace_discovery(mut self, enabled: bool) -> Self {
+        self.use_uv_for_workspace = enabled;
         self
     }
 
@@ -372,7 +376,7 @@ impl ProjectMetadata {
     }
 
     fn with_applied_options_from(mut self, previous: &Self) -> Self {
-        self.use_uv = previous.use_uv;
+        self.use_uv_for_workspace = previous.use_uv_for_workspace;
         self.override_options.clone_from(&previous.override_options);
         self.fallback_options.clone_from(&previous.fallback_options);
         self.user_configuration
@@ -388,9 +392,17 @@ impl ProjectMetadata {
         self.name.as_str()
     }
 
-    /// Returns which uv integrations are enabled for this project.
-    pub const fn use_uv(&self) -> UseUv {
-        self.use_uv
+    /// Whether ty should query uv for workspace metadata.
+    pub const fn uv_workspace_discovery_enabled(&self) -> bool {
+        self.use_uv_for_workspace
+    }
+
+    /// The `use-uv-for-scripts` override that takes precedence over inline and project settings.
+    pub fn script_uv_override(&self) -> Option<bool> {
+        self.override_options()?
+            .use_uv_for_scripts
+            .as_deref()
+            .copied()
     }
 
     pub(crate) fn options(&self) -> &Options {

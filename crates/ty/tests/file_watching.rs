@@ -526,7 +526,7 @@ where
     let SetupContext {
         options,
         config_file_override,
-        override_options,
+        mut override_options,
         fallback_options,
         included_paths,
         allow_invalid_settings,
@@ -550,16 +550,20 @@ where
         ProjectMetadata::from_config_file(config_file_override, &project_path, &system)?
     } else {
         ProjectMetadata::discover(&project_path, &system)?
-    }
-    .with_use_uv(UseUv::from_system(&system).unwrap_or_default());
+    };
     if let Some(fallback_options) = fallback_options {
         project.set_fallback_options(fallback_options);
     }
     project.apply_configuration_files(&system)?;
+    if let Some(mode) = UseUv::from_system(&system) {
+        project = project.with_uv_workspace_discovery(mode.workspace_discovery_enabled());
+        override_options.get_or_insert_default().use_uv_for_scripts =
+            Some(RangedValue::cli(mode.script_environments_enabled()));
+    }
     if let Some(override_options) = override_options {
         project.set_override_options(override_options);
     }
-    if project.use_uv().workspace_discovery_enabled() {
+    if project.uv_workspace_discovery_enabled() {
         let workspace = UvWorkspace::discover(&project_path, &system);
         project.apply_uv_workspace(&system, workspace)?;
     }

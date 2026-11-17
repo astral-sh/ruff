@@ -204,6 +204,25 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     ))
 }
 
+/// Whether to prepare and use uv's environment for this PEP 723 script.
+///
+/// `TY_UV` takes precedence over script and project settings so users can set `TY_UV=off`
+/// when they don't trust the configuration. A script with its own `[tool.ty]` table uses
+/// that table for `use-uv-for-scripts`. Otherwise, it inherits the project settings,
+/// including user configuration.
+pub(crate) fn use_uv_for_script(db: &dyn Db, file: File) -> bool {
+    let project = db.project().metadata(db);
+    if let Some(enabled) = project.script_uv_override() {
+        return enabled;
+    }
+
+    let options = inline_script_options(db, file).unwrap_or_else(|| project.options());
+    project
+        .options_in_precedence_order(options, None)
+        .find_map(|options| options.use_uv_for_scripts.as_deref().copied())
+        .unwrap_or(false)
+}
+
 /// Returns the script's inline `[tool.ty]` options unless `--config-file` takes precedence.
 ///
 /// Callers can read these unmerged options before indexing the project.

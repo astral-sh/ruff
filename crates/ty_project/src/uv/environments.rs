@@ -41,6 +41,12 @@
 //! file using ty's settings, so existing diagnostics stay visible. Once the file is saved and uv
 //! finishes synchronization, ty checks it again using the environment returned by uv.
 //!
+//! If a project reload enables `use-uv-for-scripts` for an open script, the language server
+//! waits for the next save or reopen to request synchronization. This avoids rereading open
+//! scripts on a configuration change to check whether their inline metadata has been saved.
+//! Disabling the setting takes effect immediately because ty checks it when looking up the
+//! script's environment.
+//!
 //! CLI watch mode also schedules requests in the background after filesystem changes, but delays
 //! the next check until those requests have completed. Repeated changes to a project or script
 //! are combined so only the latest requested update runs after the current one.
@@ -82,12 +88,12 @@ use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use salsa::Setter;
 
-use crate::script::script_tag;
+use crate::script::{script_tag, use_uv_for_script};
 use crate::uv::{
     MetadataTarget, ScriptSyncRequest, ScriptSyncTask, Uv, UvMetadata, UvMetadataError,
     UvMetadataResult, UvMetadataService, UvSyncTask, uv_executable_error,
 };
-use crate::{Db, ProjectReloadResult, ProjectSyncProgressFactory, UseUv, UvSyncProgress};
+use crate::{Db, ProjectReloadResult, ProjectSyncProgressFactory, UvSyncProgress};
 
 type ProgressFactory<'factory> =
     dyn Fn(&dyn Db, File) -> Option<Box<dyn UvSyncProgress>> + 'factory;
@@ -115,15 +121,6 @@ pub struct UvEnvironments {
 }
 
 impl UvEnvironments {
-    pub(crate) fn new(use_uv: UseUv) -> Self {
-        Self {
-            inner: Arc::new(UvEnvironmentsInner {
-                use_uv,
-                ..UvEnvironmentsInner::default()
-            }),
-        }
-    }
-
     /// Requests fresh workspace metadata for project rediscovery.
     pub fn request_project_sync(
         &self,
@@ -182,11 +179,10 @@ impl UvEnvironments {
     ///
     /// Salsa does not track changes to the pending state.
     pub(crate) fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
-        if !self.is_enabled() || script_tag(db, file).is_none() {
-            return false;
-        }
-
         self.existing_entry(file).is_some_and(|entry| {
+            if script_tag(db, file).is_none() || !use_uv_for_script(db, file) {
+                return false;
+            }
             matches!(
                 *entry.lock(),
                 ScriptEnvironmentState::Synchronizing {
@@ -218,10 +214,6 @@ impl UvEnvironments {
         availability: ScriptEnvironmentAvailability,
         make_progress: &ProgressFactory<'_>,
     ) {
-        if !self.is_enabled() {
-            return;
-        }
-
         let Some(task) = script_sync_task(db, file) else {
             return;
         };
@@ -461,7 +453,7 @@ impl UvEnvironments {
     }
 
     fn environment(&self, db: &dyn Db, file: File) -> Option<ScriptEnvironment> {
-        if !self.is_enabled() || file.path(db).as_system_path().is_none() {
+        if file.path(db).as_system_path().is_none() || !use_uv_for_script(db, file) {
             return None;
         }
 
@@ -477,10 +469,6 @@ impl UvEnvironments {
             ScriptEnvironmentState::Current { environment }
             | ScriptEnvironmentState::Synchronizing { environment, .. } => Some(environment),
         }
-    }
-
-    fn is_enabled(&self) -> bool {
-        self.inner.use_uv.script_environments_enabled()
     }
 
     fn existing_entry(&self, file: File) -> Option<Arc<ScriptEnvironmentEntry>> {
@@ -606,7 +594,6 @@ pub(crate) struct ScriptEnvironment {
 }
 
 struct UvEnvironmentsInner {
-    use_uv: UseUv,
     project: Mutex<Option<ProjectSync>>,
     scripts: FxDashMap<File, Arc<ScriptEnvironmentEntry>>,
     sync_service: UvMetadataService,
@@ -619,7 +606,6 @@ impl Default for UvEnvironmentsInner {
         let (results_sender, sync_results) = crossbeam::channel::unbounded();
         let (wake_sender, sync_wakeups) = crossbeam::channel::bounded(1);
         Self {
-            use_uv: UseUv::default(),
             project: Mutex::default(),
             scripts: FxDashMap::default(),
             sync_service: UvMetadataService::new(results_sender, wake_sender),
@@ -756,6 +742,12 @@ fn apply_sync_result(
 fn script_sync_task(db: &dyn Db, file: File) -> Option<ScriptSyncTask> {
     let path = file.path(db).as_system_path()?;
     let tag = script_tag(db, file)?;
+
+    // Bail if syncing is disabled at the project or script level.
+    if !use_uv_for_script(db, file) {
+        return None;
+    }
+
     let python = script_python(db);
 
     // Hash the metadata text directly to avoid parsing it solely to compute the cache key.
@@ -795,19 +787,22 @@ mod tests {
 
     use super::{UvMetadata, script_environment};
     use crate::db::testing::TestDb;
-    use crate::{Db as _, ProjectMetadata, UseUv};
+    use crate::{Db as _, ProjectMetadata};
 
     #[test]
     fn semantic_lookup_creates_a_stable_default_environment() -> anyhow::Result<()> {
         let root = SystemPath::new("/project").to_path_buf();
         let path = root.join("script.py");
-        let metadata = ProjectMetadata::new("test", root).with_use_uv(UseUv::Scripts);
+        let metadata = ProjectMetadata::new("test", root);
         let mut db = TestDb::new(metadata);
         db.write_dedented(
             path.as_str(),
             r#"
             # /// script
             # dependencies = []
+            #
+            # [tool.ty]
+            # use-uv-for-scripts = true
             # ///
             "#,
         )?;
@@ -843,13 +838,18 @@ mod tests {
         let indirect = r#"
             # /// script
             # dependencies = ['parent']
+            #
+            # [tool.ty]
+            # use-uv-for-scripts = true
+            #
             # [tool.ty.rules]
             # missing-direct-dependency = 'error'
             # ///
+
             import leaf
             "#;
         let declared = indirect.replace("['parent']", "['parent', 'leaf']");
-        let metadata = ProjectMetadata::new("test", root.to_path_buf()).with_use_uv(UseUv::Scripts);
+        let metadata = ProjectMetadata::new("test", root.to_path_buf());
         let mut db = TestDb::new(metadata);
         db.write_dedented(
             environment.join("pyvenv.cfg").as_str(),
@@ -953,7 +953,7 @@ mod tests {
 
         use super::super::{ScriptEnvironmentAvailability, UvSyncChanges, script_environment};
         use crate::db::testing::TestDb;
-        use crate::{Db as _, ProjectMetadata, UseUv, uv_test_env_vars};
+        use crate::{Db as _, ProjectMetadata, uv_test_env_vars};
 
         #[test]
         fn newer_project_refresh_discards_old_metadata() -> anyhow::Result<()> {
@@ -1029,7 +1029,11 @@ mod tests {
                 # /// script
                 # requires-python = ">=3.12"
                 # dependencies = ["attrs==25.4.0"]
+                #
+                # [tool.ty]
+                # use-uv-for-scripts = true
                 # ///
+
                 from attrs import define
                 "#,
             )?;
@@ -1057,7 +1061,11 @@ mod tests {
                 # /// script
                 # requires-python = ">=3.12"
                 # dependencies = ["attrs==25.4.0"]
+                #
+                # [tool.ty]
+                # use-uv-for-scripts = true
                 # ///
+
                 from attrs import define
                 "#,
             )?;
@@ -1094,7 +1102,11 @@ mod tests {
                 # /// script
                 # requires-python = ">=3.12"
                 # dependencies = ["attrs==25.4.0"]
+                #
+                # [tool.ty]
+                # use-uv-for-scripts = true
                 # ///
+
                 from attrs import define
                 "#,
             )?;
@@ -1133,7 +1145,11 @@ mod tests {
             # /// script
             # requires-python = ">=3.12"
             # dependencies = ["attrs==25.4.0"]
+            #
+            # [tool.ty]
+            # use-uv-for-scripts = true
             # ///
+
             from attrs import define
             "#;
             let mut case = UvTestCase::script(initial)?;
@@ -1153,7 +1169,11 @@ mod tests {
                 # /// script
                 # requires-python = ">=3.12"
                 # dependencies = ["anyio"]
+                #
+                # [tool.ty]
+                # use-uv-for-scripts = true
                 # ///
+
                 from attrs import define
                 "#,
             )?;
@@ -1196,6 +1216,9 @@ mod tests {
                 # /// script
                 # requires-python = ">=3.12"
                 # dependencies = []
+                #
+                # [tool.ty]
+                # use-uv-for-scripts = true
                 # ///
                 "#,
             )?;
@@ -1250,11 +1273,11 @@ mod tests {
 
         impl UvTestCase {
             fn script(source: &str) -> anyhow::Result<Self> {
-                Self::new("script.py", source, UseUv::Scripts)
+                Self::new("script.py", source, false)
             }
 
             fn project(source: &str) -> anyhow::Result<Self> {
-                let case = Self::new("pyproject.toml", source, UseUv::On)?;
+                let case = Self::new("pyproject.toml", source, true)?;
                 case.sync_workspace()?;
                 Ok(case)
             }
@@ -1323,13 +1346,18 @@ mod tests {
                 Ok(())
             }
 
-            fn new(file_name: &str, source: &str, use_uv: UseUv) -> anyhow::Result<Self> {
+            fn new(
+                file_name: &str,
+                source: &str,
+                uv_workspace_discovery: bool,
+            ) -> anyhow::Result<Self> {
                 let temp_dir = tempfile::tempdir()?;
                 let root = SystemPath::from_std_path(temp_dir.path())
                     .context("temporary directory is not a valid UTF-8 path")?;
                 // uv resolves symlinks, including macOS's symlinked temporary directory.
                 let root = OsSystem::default().canonicalize_path(root)?;
-                let metadata = ProjectMetadata::new("test", root.clone()).with_use_uv(use_uv);
+                let metadata = ProjectMetadata::new("test", root.clone())
+                    .with_uv_workspace_discovery(uv_workspace_discovery);
                 let mut db = TestDb::new(metadata);
                 db.use_system(OsSystem::new(&root));
                 db.test_system().clear_env_vars();
