@@ -28,8 +28,11 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Example
 /// ```python
 /// obj = {"a": 1, "b": 2}
-/// for key, value in obj.items():
+/// for _key, value in obj.items():
 ///     print(value)
+///
+/// for key, _value in obj.items():
+///     print(key)
 /// ```
 ///
 /// Use instead:
@@ -37,6 +40,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// obj = {"a": 1, "b": 2}
 /// for value in obj.values():
 ///     print(value)
+///
+/// for key in obj.keys():
+///     print(key)
 /// ```
 ///
 /// ## Fix safety
