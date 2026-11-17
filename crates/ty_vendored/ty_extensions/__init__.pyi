@@ -6,9 +6,9 @@ installing anything. However, if you rely on runtime evaluation of type annotati
 you should add the [`ty-extensions` package](https://pypi.org/project/ty-extensions/)
 as a dependency in your project:
 
-    ```bash
-    uv add ty-extensions
-    ```
+```bash
+uv add ty-extensions
+```
 """
 
 import collections.abc
@@ -28,9 +28,11 @@ def static_assert(condition: object, msg: LiteralString | None = None) -> None:
 
     Example:
 
-        static_assert(sys.version_info[:2] >= (3, 13), "Python 3.13 or higher is required")
+    ```python
+    static_assert(sys.version_info[:2] >= (3, 13), "Python 3.13 or higher is required")
+    ```
 
-    At runtime, a false condition raises AssertionError (even with Python optimization enabled)."""
+    At runtime, a false condition raises `AssertionError` (even with Python optimization enabled)."""
 
 # -------------
 # Special forms
