@@ -164,6 +164,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&MISSING_DIRECT_DEPENDENCY);
     registry.register_lint(&MISSING_PARAMETER_ANNOTATION);
+    registry.register_lint(&MISSING_RETURN_ANNOTATION);
     registry.register_lint(&MISSING_TYPE_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_CALLABLE_INIT_SUBCLASS);
@@ -922,6 +923,15 @@ declare_lint! {
     pub(crate) static MISSING_PARAMETER_ANNOTATION = {
         summary: "detects function parameters without type annotations",
         status: LintStatus::stable("0.0.99"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/missing-return-annotation.md")]
+    pub(crate) static MISSING_RETURN_ANNOTATION = {
+        summary: "detects functions and methods without return type annotations",
+        status: LintStatus::preview("0.0.99"),
         default_level: Level::Ignore,
     }
 }
