@@ -729,7 +729,8 @@ reveal_type(list(map(p, paths)))  # revealed: list[str]
 ### Binding a union to an overloaded keyword
 
 Each union member can match different overloads. Both `str` and `None` allow one positional
-argument. A second positional argument is only valid when the caller overrides `option` with `None`.
+argument, and the return type depends on the stored value unless the caller overrides `option`. A
+second positional argument is only valid when the caller overrides `option` with `None`.
 
 ```py
 from functools import partial
@@ -746,14 +747,19 @@ def f(value: int, extra: int = 0, /, *, option: str | None) -> str | int:
 
 def check(option: str | None):
     p = partial(f, option=option)
-    # TODO: should reveal `str | int` because the return type depends on the bound `option`.
-    reveal_type(p(1))  # revealed: str
+    reveal_type(p(1))  # revealed: str | int
     reveal_type(p(1, option="text"))  # revealed: str
     reveal_type(p(1, option=None))  # revealed: int
     p(1, 2)  # error: [no-matching-overload]
     reveal_type(p(1, 2, option=None))  # revealed: int
-    p()  # error: [no-matching-overload]
-    p("text")  # error: [no-matching-overload]
+
+    # TODO: Report a shared error only once when both possible partials reject the call.
+    # error: [no-matching-overload]
+    # error: [no-matching-overload]
+    p()
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    p("text")
 
     unary: Callable[[int], object] = p  # ok
     binary: Callable[[int, int], object] = p  # error: [invalid-assignment]

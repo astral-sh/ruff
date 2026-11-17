@@ -3838,7 +3838,7 @@ impl<'db> CallableBinding<'db> {
         if let Some(cases) = self.partial_keyword_cases() {
             return cases
                 .iter()
-                .map(|case| case.partial_callable(db, env, &signatures, bound_call_arguments))
+                .map(|case| case.partial_callable(db, &signatures, bound_call_arguments))
                 .collect();
         }
 
@@ -5049,50 +5049,25 @@ impl<'db> ExpandedCallEvaluation<'db> {
     fn partial_callable(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         signatures: &[(usize, Signature<'db>)],
         arguments: &CallArguments<'_, 'db>,
     ) -> Option<CallableType<'db>> {
-        let candidates = signatures
-            .iter()
-            .filter_map(|(index, signature)| {
-                let snapshots = &self.snapshot.matching_overloads;
+        let snapshots = &self.snapshot.matching_overloads;
+        CallableType::from_partial_overloads(
+            db,
+            signatures.iter().filter_map(|(index, signature)| {
                 let position = snapshots
                     .binary_search_by_key(index, |(index, _)| *index)
                     .ok()?;
-                let snapshot = &snapshots[position].1;
-                let overrides: SmallVec<[(&str, Type<'db>); 1]> = snapshot
+                let (_, snapshot) = &snapshots[position];
+                snapshot
                     .errors
                     .iter()
                     .filter(|error| error.is_relevant_for_partial_application())
-                    .map(|error| error.partial_keyword_override(db, arguments, signature))
-                    .collect::<Option<_>>()?;
-                Some((signature, overrides))
-            })
-            .collect_vec();
-
-        CallableType::from_partial_overloads(
-            db,
-            candidates.iter().filter_map(|(signature, overrides)| {
-                // Keep the existing overload when omitting this keyword adds no new calls.
-                // For example, both `(x: int, *, option: str)` and `(x: int, *, option: None)`
-                // accept exactly the same arguments once `option` is omitted.
-                if let [(name, _)] = overrides.as_slice() {
-                    let target = signature.inputs_without_keyword(db, name);
-                    if candidates.iter().any(|(other, required)| {
-                        required.is_empty()
-                            && other
-                                .inputs_without_keyword(db, name)
-                                .is_subtype_of(db, env, target)
-                    }) {
-                        return Some((*signature).clone());
-                    }
-                }
-
-                overrides
-                    .iter()
-                    .try_fold((*signature).clone(), |signature, (name, expected)| {
-                        signature.requiring_keyword(name, *expected)
+                    .try_fold(signature.clone(), |reduced, error| {
+                        let (name, expected) =
+                            error.partial_keyword_override(db, arguments, signature)?;
+                        reduced.requiring_keyword(name, expected)
                     })
             }),
         )

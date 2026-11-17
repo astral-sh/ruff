@@ -2279,23 +2279,6 @@ impl<'db> Signature<'db> {
         Some(self.with_parameters(parameters))
     }
 
-    /// Describes the inputs accepted when a partial's caller omits this keyword.
-    /// Use the same return type for every overload so subtyping compares only the parameters.
-    pub(super) fn inputs_without_keyword(&self, db: &'db dyn Db, name: &str) -> Type<'db> {
-        let parameters = self.parameters.with_transformed_parameters(
-            self.parameters
-                .iter()
-                .filter(|parameter| !parameter.callable_by_name(name))
-                .cloned(),
-        );
-        Type::Callable(CallableType::single(
-            db,
-            self.clone()
-                .with_parameters(parameters)
-                .with_return_type(Type::Never),
-        ))
-    }
-
     /// Returns the specialization used for the callable signature exposed by a partial object.
     ///
     /// Surviving type variables that still appear in the reduced parameter list may need a more
