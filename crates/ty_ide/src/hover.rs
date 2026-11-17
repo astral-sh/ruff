@@ -6377,8 +6377,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         ```
 
         In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax
-        when displaying intersection types. Note that either spelling will fail in runtime contexts or in
-        cases where an annotation expression could be evaluated.
+        when displaying intersection types. The operator form can raise an exception when Python evaluates
+        it, including in annotations. With `ty-extensions` installed, Python can evaluate and inspect
+        `Intersection[T1, T2]`.
 
         ---------------------------------------------
         ```xml
@@ -6404,8 +6405,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         ```<HB>
         <HB>
         In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax<HB>
-        when displaying intersection types. Note that either spelling will fail in runtime contexts or in<HB>
-        cases where an annotation expression could be evaluated.
+        when displaying intersection types. The operator form can raise an exception when Python evaluates<HB>
+        it, including in annotations. With `ty-extensions` installed, Python can evaluate and inspect<HB>
+        `Intersection[T1, T2]`.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:3:25
@@ -6459,8 +6461,8 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
 
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an
-        annotation expression could be evaluated.
+        negation types. The operator form can raise an exception when Python evaluates it, including in
+        annotations. With `ty-extensions` installed, Python can evaluate and inspect `Not[T]`.
 
         ---------------------------------------------
         ```xml
@@ -6470,8 +6472,8 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.<HB>
         <HB>
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying<HB>
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an<HB>
-        annotation expression could be evaluated.
+        negation types. The operator form can raise an exception when Python evaluates it, including in<HB>
+        annotations. With `ty-extensions` installed, Python can evaluate and inspect `Not[T]`.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:1:16
@@ -6511,8 +6513,8 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
 
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an
-        annotation expression could be evaluated.
+        negation types. The operator form can raise an exception when Python evaluates it, including in
+        annotations. With `ty-extensions` installed, Python can evaluate and inspect `Not[T]`.
 
         ---------------------------------------------
         ```xml
@@ -6522,8 +6524,8 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.<HB>
         <HB>
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying<HB>
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an<HB>
-        annotation expression could be evaluated.
+        negation types. The operator form can raise an exception when Python evaluates it, including in<HB>
+        annotations. With `ty-extensions` installed, Python can evaluate and inspect `Not[T]`.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:1:10
