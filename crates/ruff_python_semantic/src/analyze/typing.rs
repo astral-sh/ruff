@@ -1003,6 +1003,38 @@ impl TypeChecker for FastApiRouteChecker {
     }
 }
 
+/// Type checker for the `paramiko` classes that can run a remote command via `exec_command`.
+struct ParamikoCommandRunnerChecker;
+
+impl ParamikoCommandRunnerChecker {
+    fn is_paramiko_command_runner_class(semantic: &SemanticModel, expr: &Expr) -> bool {
+        let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+            return false;
+        };
+
+        matches!(
+            qualified_name.segments(),
+            ["paramiko", "SSHClient" | "Channel"]
+                | ["paramiko", "client", "SSHClient"]
+                | ["paramiko", "channel", "Channel"]
+        )
+    }
+}
+
+impl TypeChecker for ParamikoCommandRunnerChecker {
+    fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+        Self::is_paramiko_command_runner_class(semantic, annotation)
+    }
+
+    fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall { func, .. }) = initializer else {
+            return false;
+        };
+
+        Self::is_paramiko_command_runner_class(semantic, func)
+    }
+}
+
 struct TypeVarLikeChecker;
 
 impl TypeVarLikeChecker {
@@ -1143,6 +1175,18 @@ pub fn is_pathlib_path(binding: &Binding, semantic: &SemanticModel) -> bool {
 
 pub fn is_fastapi_route(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<FastApiRouteChecker>(binding, semantic)
+}
+
+/// Test whether the given binding can be considered a `paramiko.SSHClient` or a
+/// `paramiko.Channel`, the two `paramiko` classes that provide `exec_command`.
+pub fn is_paramiko_command_runner(binding: &Binding, semantic: &SemanticModel) -> bool {
+    check_type::<ParamikoCommandRunnerChecker>(binding, semantic)
+}
+
+/// Test whether the given expression constructs a `paramiko.SSHClient` or a
+/// `paramiko.Channel` (e.g., `paramiko.SSHClient()`).
+pub fn is_paramiko_command_runner_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
+    ParamikoCommandRunnerChecker::match_initializer(expr, semantic)
 }
 
 /// Test whether the given binding is for an old-style `TypeVar`, `TypeVarTuple` or a `ParamSpec`.

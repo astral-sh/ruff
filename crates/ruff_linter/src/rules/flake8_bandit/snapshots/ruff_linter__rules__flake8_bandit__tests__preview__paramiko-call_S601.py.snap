@@ -1,0 +1,94 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 8
+
+--- Added ---
+S601 Possible shell injection via Paramiko call; check inputs are properly sanitized
+ --> S601.py:7:1
+  |
+5 | # Errors (preview)
+6 | client = paramiko.SSHClient()
+7 | client.exec_command("echo $HOME")
+  | ^^^^^^^^^^^^^^^^^^^
+8 |
+9 | paramiko.SSHClient().exec_command("ls")
+  |
+
+
+S601 Possible shell injection via Paramiko call; check inputs are properly sanitized
+  --> S601.py:9:1
+   |
+ 7 | client.exec_command("echo $HOME")
+ 8 |
+ 9 | paramiko.SSHClient().exec_command("ls")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | annotated: paramiko.SSHClient = make_client()
+   |
+
+
+S601 Possible shell injection via Paramiko call; check inputs are properly sanitized
+  --> S601.py:12:1
+   |
+11 | annotated: paramiko.SSHClient = make_client()
+12 | annotated.exec_command("ls")
+   | ^^^^^^^^^^^^^^^^^^^^^^
+13 |
+14 | with paramiko.SSHClient() as managed:
+   |
+
+
+S601 Possible shell injection via Paramiko call; check inputs are properly sanitized
+  --> S601.py:15:5
+   |
+14 | with paramiko.SSHClient() as managed:
+15 |     managed.exec_command("ls")
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+
+S601 Possible shell injection via Paramiko call; check inputs are properly sanitized
+  --> S601.py:19:5
+   |
+18 | def run(ssh: paramiko.SSHClient, channel: paramiko.Channel):
+19 |     ssh.exec_command("ls")
+   |     ^^^^^^^^^^^^^^^^
+20 |     channel.exec_command("ls")
+   |
+
+
+S601 Possible shell injection via Paramiko call; check inputs are properly sanitized
+  --> S601.py:20:5
+   |
+18 | def run(ssh: paramiko.SSHClient, channel: paramiko.Channel):
+19 |     ssh.exec_command("ls")
+20 |     channel.exec_command("ls")
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+
+S601 Possible shell injection via Paramiko call; check inputs are properly sanitized
+  --> S601.py:26:1
+   |
+24 | from paramiko.channel import Channel
+25 |
+26 | SSHClient().exec_command("ls")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+27 | Channel(1).exec_command("ls")
+   |
+
+
+S601 Possible shell injection via Paramiko call; check inputs are properly sanitized
+  --> S601.py:27:1
+   |
+26 | SSHClient().exec_command("ls")
+27 | Channel(1).exec_command("ls")
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+28 |
+29 | # OK
+   |

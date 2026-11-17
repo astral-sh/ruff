@@ -548,6 +548,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
         ) => {
             call_with_qualified_name(checker, call);
 
+            if checker.is_rule_enabled(Rule::ParamikoCall) {
+                flake8_bandit::rules::paramiko_call(checker, call);
+            }
+
             if checker.any_rule_enabled(&[
                 // pylint
                 Rule::BadStringFormatCharacter,
@@ -1733,7 +1737,6 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::Jinja2AutoescapeFalse,
         Rule::MakoTemplates,
         Rule::RequestWithoutTimeout,
-        Rule::ParamikoCall,
         Rule::Debugger,
         Rule::PandasUseOfDotReadTable,
         Rule::CallDatetimeWithoutTzinfo,
@@ -1859,9 +1862,6 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
     }
     if checker.is_rule_enabled(Rule::RequestWithoutTimeout) {
         flake8_bandit::rules::request_without_timeout(checker, call, &qualified_name);
-    }
-    if checker.is_rule_enabled(Rule::ParamikoCall) {
-        flake8_bandit::rules::paramiko_call(checker, &call.func, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::Debugger) {
         flake8_debugger::rules::debugger_call(checker, call, &qualified_name);
