@@ -252,7 +252,7 @@ fn colour_science(bencher: Bencher) {
     run_single_threaded(bencher, &COLOUR_SCIENCE);
 }
 
-#[bench(sample_size = 1, sample_count = 5)]
+#[bench(sample_size = 1, sample_count = 2)]
 fn numpy(bencher: Bencher) {
     run_single_threaded(bencher, &NUMPY);
 }
