@@ -25,7 +25,10 @@ use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::script::ScriptTag;
+use ruff_ranged_value::RangedValue;
 use salsa::Database;
+use ty_combine::Combine;
+use ty_project::metadata::Options;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
@@ -158,17 +161,20 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
 
+    let use_uv = UseUv::from_system(&system);
     let mut project_metadata = match &config_file {
         Some(config_file) => {
             ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
         }
         None => ProjectMetadata::discover(&project_path, &system)?,
-    };
+    }
+    .with_uv_workspace_discovery(use_uv.is_some_and(UseUv::workspace_discovery_enabled));
 
     project_metadata.apply_configuration_files(&system)?;
 
-    project_metadata.set_override_options(args.into_options());
-    if project_metadata.use_uv() == UseUv::On
+    let env_options = Options::from_uv_mode(use_uv.map(RangedValue::cli));
+    project_metadata.set_override_options(env_options.combine(args.into_options()));
+    if project_metadata.uv_workspace_discovery_enabled()
         && let [path] = check_paths.as_slice()
         && system.is_file(path)
         && system
@@ -177,10 +183,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     {
         // A single PEP 723 script uses its own uv environment, even with an explicit ty
         // configuration file. The other explicit paths still discover workspace metadata.
-        project_metadata = project_metadata.with_use_uv(UseUv::Scripts);
+        project_metadata = project_metadata.with_uv_workspace_discovery(false);
     }
 
-    if project_metadata.use_uv().workspace_discovery_enabled() {
+    if project_metadata.uv_workspace_discovery_enabled() {
         let workspace = UvWorkspace::discover(&project_path, &system);
         project_metadata.apply_uv_workspace(&system, workspace)?;
     }

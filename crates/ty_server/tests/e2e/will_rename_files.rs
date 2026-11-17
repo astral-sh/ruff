@@ -1,7 +1,5 @@
 use lsp_types::{FileRename, Position, Range, TextEdit, Uri, WorkspaceEdit};
 use ruff_db::system::SystemPath;
-#[cfg(feature = "test-uv")]
-use ty_project::UseUv;
 use ty_server::ClientOptions;
 #[cfg(feature = "test-uv")]
 use ty_server::DiagnosticMode;
@@ -105,7 +103,7 @@ print(define)
             (pth, project_sources.as_str()),
             (
                 "workspace/ty.toml",
-                "[environment]\nroot = ['src']\npython = '../venv'\n",
+                "use-uv-for-scripts = true\n\n[environment]\nroot = ['src']\npython = '../venv'\n",
             ),
             ("workspace/src/attrs/__init__.py", ""),
             ("workspace/src/attrs/define.py", ""),
@@ -116,7 +114,7 @@ print(define)
             "venv/pyvenv.cfg",
             format!("home = {python_home}\nversion = 3.13\n"),
         )?
-        .with_real_uv(UseUv::Scripts)?
+        .with_real_uv()?
         .build()
         .wait_until_workspaces_are_initialized();
 

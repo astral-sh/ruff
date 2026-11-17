@@ -25,7 +25,7 @@ use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 #[cfg(unix)]
 use ty_project::watch::watch_paths;
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
-use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata, UvWorkspace};
+use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata, UseUv, UvWorkspace};
 use ty_python_core::platform::PythonPlatform;
 use ty_static::EnvVars;
 
@@ -526,7 +526,7 @@ where
     let SetupContext {
         options,
         config_file_override,
-        override_options,
+        mut override_options,
         fallback_options,
         included_paths,
         allow_invalid_settings,
@@ -555,10 +555,15 @@ where
         project.set_fallback_options(fallback_options);
     }
     project.apply_configuration_files(&system)?;
+    if let Some(mode) = UseUv::from_system(&system) {
+        project = project.with_uv_workspace_discovery(mode.workspace_discovery_enabled());
+        override_options.get_or_insert_default().use_uv_for_scripts =
+            Some(RangedValue::cli(mode.script_environments_enabled()));
+    }
     if let Some(override_options) = override_options {
         project.set_override_options(override_options);
     }
-    if project.use_uv().workspace_discovery_enabled() {
+    if project.uv_workspace_discovery_enabled() {
         let workspace = UvWorkspace::discover(&project_path, &system);
         project.apply_uv_workspace(&system, workspace)?;
     }

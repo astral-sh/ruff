@@ -72,6 +72,44 @@ If the same table specifies both a rule's current name and an alias, the current
 
 ---
 
+## `use-uv-for-scripts`
+
+Use [uv](https://docs.astral.sh/uv/) to install the dependencies declared in a script's
+PEP 723 inline metadata.
+Each script gets its own Python environment, which ty uses to resolve its imports.
+This feature requires uv 0.12.3 or newer.
+
+If a script has an inline `[tool.ty]` table, the script's `use-uv-for-scripts` setting
+takes precedence. Otherwise, the script inherits the project's value.
+
+When checking untrusted code with `ty check`, pass `--config use-uv-for-scripts=false`
+to override the project and script settings for that invocation. To disable all uv
+integration, set the `TY_UV` environment variable to `off`.
+
+`TY_UV` takes precedence over `--config`. `uv check` always enables uv for scripts
+by passing `TY_UV=1` to ty.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty]
+    use-uv-for-scripts = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    use-uv-for-scripts = true
+    ```
+
+---
+
 ## `analysis`
 
 ### `allowed-unresolved-imports`
