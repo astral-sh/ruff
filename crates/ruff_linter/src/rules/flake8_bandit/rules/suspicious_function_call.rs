@@ -12,6 +12,7 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_suspicious_function_reference_enabled;
+use crate::rules::flake8_bandit::rules::ExecBuiltin;
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.
@@ -982,6 +983,10 @@ pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
     );
 }
 
+pub(crate) fn suspicious_function_call_target(checker: &Checker, func: &Expr) {
+    suspicious_function(checker, func, None, func.range());
+}
+
 pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
     if !is_suspicious_function_reference_enabled(checker.settings()) {
         return;
@@ -1014,7 +1019,7 @@ pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
     suspicious_function(checker, func, None, func.range());
 }
 
-/// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
+/// S102, S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
 fn suspicious_function(
     checker: &Checker,
     func: &Expr,
@@ -1160,6 +1165,11 @@ fn suspicious_function(
         // Eval
         ["" | "builtins", "eval"] => {
             checker.report_diagnostic_if_enabled(SuspiciousEvalUsage, range)
+        }
+
+        // Exec
+        ["" | "builtins", "exec"] => {
+            checker.report_diagnostic_if_enabled(ExecBuiltin, func.range())
         }
 
         // MarkSafe
