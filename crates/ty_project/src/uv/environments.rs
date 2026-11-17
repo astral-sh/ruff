@@ -194,17 +194,16 @@ impl UvEnvironments {
         })
     }
 
-    /// Requests background synchronization for `file`'s environment.
+    /// Requests a background uv sync for `file` if its environment needs updating.
+    ///
+    /// This is a no-op for files that aren't scripts. This method cancels
+    /// any in-flight requests for files that used to be scripts or files
+    /// that changed their uv sync settings .
     ///
     /// On the first sync, `availability` controls when ty can report type errors. `Available`
     /// allows checking with the current Python version and import paths while uv runs. `Pending`
     /// defers those diagnostics until ty applies the uv result. During later syncs, ty keeps
     /// checking against the previous environment.
-    ///
-    /// If another synchronization is pending, records the latest request to run afterward and
-    /// cancels the queued job if it has not started. Running uv processes are allowed to finish.
-    /// The follow-up reuses the existing progress reporter. Otherwise, creates a new progress
-    /// reporter and submits the synchronization.
     ///
     /// Submission does not wait for uv or queue space.
     pub fn request_sync(
@@ -215,6 +214,21 @@ impl UvEnvironments {
         make_progress: &ProgressFactory<'_>,
     ) {
         let Some(task) = script_sync_task(db, file) else {
+            // This file doesn't need syncing (anymore)?...
+            if let Some(entry) = self.existing_entry(file)
+                && let ScriptEnvironmentState::Synchronizing { sync, .. } = &mut *entry.lock()
+            {
+                // ... but there's a pending in-flight sync. This can happen
+                // when a user removes the script block after requesting a sync
+                // or disables the uv sync with `use-uv-for-scripts = false`.
+                //
+                // Set `latest_request` to `None`, so that `poll_sync` knows that it should
+                // discard the result of the in-flight uv sync call without scheduling a new sync.
+                // This is necessary because cancellation only skips queued requests,
+                // but not requests that are already in flight.
+                sync.latest_request = None;
+                sync.cancellation.cancel();
+            }
             return;
         };
         let entry: Arc<ScriptEnvironmentEntry> = self.entry(file);
@@ -265,7 +279,7 @@ impl UvEnvironments {
             availability,
             sync: InFlightSync {
                 active_cache_key: task.request.cache_key(),
-                next_request: None,
+                latest_request: Some(task.request.clone()),
                 cancellation,
             },
         };
@@ -386,9 +400,19 @@ impl UvEnvironments {
                         request.path()
                     );
 
-                    let output = match (sync.next_request.take(), output) {
-                        (None, Some(output)) => output,
-                        (next, _) => {
+                    match (sync.latest_request.as_ref(), output) {
+                        // A saved edit or a configuration reload disabled uv sync for this script.
+                        (None, _) => {
+                            environment.set_synchronized_cache_key(db).to(None);
+                        }
+                        // The completed `uv sync` result is for the current script metadata
+                        (Some(latest), Some(output))
+                            if latest.cache_key() == request.cache_key() =>
+                        {
+                            apply_sync_result(db, *environment, &request, output);
+                        }
+                        // The script's metadata has changed...
+                        (Some(next), _) => {
                             // uv updates the same environment on disk for every version of this script. If the
                             // metadata changes A -> B -> A, the B synchronization may already have modified the
                             // environment. Run A again even though its cache key matches the last completed
@@ -396,7 +420,7 @@ impl UvEnvironments {
                             //
                             // A cancelled request can become current again after another edit. Retry it
                             // when there is no newer request; cancellation does not update the environment.
-                            let next = next.unwrap_or(request);
+                            let next = next.clone();
                             sync.active_cache_key = next.cache_key();
                             sync.cancellation = CancellationTokenSource::new();
                             let token = sync.cancellation.token();
@@ -419,11 +443,10 @@ impl UvEnvironments {
                             );
                             continue;
                         }
+                    }
+                    *state = ScriptEnvironmentState::Current {
+                        environment: *environment,
                     };
-
-                    let environment = *environment;
-                    apply_sync_result(db, environment, &request, output);
-                    *state = ScriptEnvironmentState::Current { environment };
                     changes.scripts.push(file);
                 }
             }
@@ -670,7 +693,8 @@ enum ScriptEnvironmentState {
 /// running, newer requests replace the pending request instead of accumulating in a queue.
 struct InFlightSync {
     active_cache_key: ScriptEnvironmentCacheKey,
-    next_request: Option<ScriptSyncRequest>,
+    /// The latest requested metadata, or `None` if synchronization was disabled.
+    latest_request: Option<ScriptSyncRequest>,
     /// Signals the worker to skip this request if it has not started.
     cancellation: CancellationTokenSource,
 }
@@ -678,25 +702,17 @@ struct InFlightSync {
 impl InFlightSync {
     /// Updates the synchronization to run after the active request.
     ///
-    /// If `request` matches the active synchronization, removes any previously requested follow-up.
-    /// Otherwise, replaces the follow-up with `request`. A changed request cancels the queued job;
-    /// an already running uv process is allowed to finish.
-    ///
-    /// Returns whether the requested synchronization changed.
+    /// A changed request cancels the queued job. An already running uv process can finish.
     fn update_next_request(&mut self, request: ScriptSyncRequest) -> bool {
-        let desired = self
-            .next_request
+        if self
+            .latest_request
             .as_ref()
-            .map_or(self.active_cache_key, ScriptSyncRequest::cache_key);
-        if desired == request.cache_key() {
+            .is_some_and(|latest| latest.cache_key() == request.cache_key())
+        {
             return false;
         }
 
-        self.next_request = if self.active_cache_key == request.cache_key() {
-            None
-        } else {
-            Some(request)
-        };
+        self.latest_request = Some(request);
         self.cancellation.cancel();
         true
     }
@@ -788,6 +804,36 @@ mod tests {
     use super::{UvMetadata, script_environment};
     use crate::db::testing::TestDb;
     use crate::{Db as _, ProjectMetadata};
+
+    #[test]
+    fn disabling_script_uv_discards_pending_synchronization() -> anyhow::Result<()> {
+        let root = SystemPath::new("/project");
+        let path = root.join("script.py");
+        let mut db = TestDb::new(ProjectMetadata::new("test", root.to_path_buf()));
+        let enabled = r"
+            # /// script
+            # [tool.ty]
+            # use-uv-for-scripts = true
+            # ///
+            ";
+        db.write_dedented(path.as_str(), enabled)?;
+        let file = system_path_to_file(&db, &path)?;
+        let environments = db.uv_environments().clone();
+        let availability = super::ScriptEnvironmentAvailability::Pending;
+
+        // The in-memory system returns a uv error. Leave it unpolled until the script opts out.
+        environments.request_sync(&mut db, file, availability, &|_, _| None);
+        assert!(environments.has_pending_synchronizations());
+        let environment = script_environment(&db, file).context("expected a script environment")?;
+
+        db.write_dedented(path.as_str(), &enabled.replace("true", "false"))?;
+        environments.request_sync(&mut db, file, availability, &|_, _| None);
+        environments.poll_sync(&mut db);
+
+        assert!(!environments.has_pending_synchronizations());
+        assert!(environment.initialization_error(&db).is_none());
+        Ok(())
+    }
 
     #[test]
     fn semantic_lookup_creates_a_stable_default_environment() -> anyhow::Result<()> {
