@@ -25,7 +25,7 @@ use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 #[cfg(unix)]
 use ty_project::watch::watch_paths;
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
-use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata, UvWorkspace};
+use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata, UseUv, UvWorkspace};
 use ty_python_core::platform::PythonPlatform;
 use ty_static::EnvVars;
 
@@ -550,7 +550,8 @@ where
         ProjectMetadata::from_config_file(config_file_override, &project_path, &system)?
     } else {
         ProjectMetadata::discover(&project_path, &system)?
-    };
+    }
+    .with_use_uv(UseUv::from_system(&system).unwrap_or_default());
     if let Some(fallback_options) = fallback_options {
         project.set_fallback_options(fallback_options);
     }
