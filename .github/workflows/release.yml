@@ -6,7 +6,7 @@
 #
 # CI that:
 #
-# * reads the release version from the Ruff crate manifest
+# * reads the release version from crates/ruff/Cargo.toml
 # * builds artifacts with dist (archives, installers, hashes)
 # * uploads those artifacts to temporary workflow zip
 # * on success, uploads the artifacts to a GitHub Release
@@ -17,7 +17,8 @@
 name: Release
 permissions: {}
 
-# Run after merging the release version bump.
+# Run after merging the release version bump. cargo-dist uses the Cargo-style
+# package version to identify prereleases.
 on:
   pull_request:
   workflow_dispatch:
@@ -103,24 +104,19 @@ jobs:
         with:
           name: cargo-dist-cache
           path: ~/.cargo/bin/dist
-      # sure would be cool if github gave us proper conditionals...
-      # so here's a doubly-nested ternary-via-truthiness to try to provide the best possible
-      # functionality based on whether this is a pull_request, and whether it's from a fork.
-      # (PRs run on the *source* but secrets are usually on the *target* -- that's *good*
-      # but also really annoying to build CI around when it needs secrets to work right.)
       - id: plan
         shell: bash
         run: |
           dist_args=(plan)
-          if [[ -n "$DIST_TAG_FLAG" ]]; then
-            dist_args=(host --steps=create "$DIST_TAG_FLAG")
+          if [[ -n "$RELEASE_TAG" ]]; then
+            dist_args=(host --steps=create "--tag=$RELEASE_TAG")
           fi
           dist "${dist_args[@]}" --output-format=json > plan-dist-manifest.json
           echo "dist ran successfully"
           cat plan-dist-manifest.json
           echo "manifest=$(jaq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
         env:
-          DIST_TAG_FLAG: ${{ steps.release-tag.outputs.tag && format('--tag={0}', steps.release-tag.outputs.tag) || '' }}
+          RELEASE_TAG: ${{ steps.release-tag.outputs.tag }}
       - name: "Upload dist-manifest.json"
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:

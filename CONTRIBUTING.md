@@ -528,8 +528,9 @@ review and remaining preparation steps below. To prepare the release locally, st
 
 1. Merge the PR
 
-1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yml) on
-    `main` with **Dry run** unchecked. The workflow reads the version from `crates/ruff/Cargo.toml`.
+1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yml) from
+    `main`. The workflow reads the version from `crates/ruff/Cargo.toml` and rejects versions that
+    already have a GitHub release. Enable **dry-run** to build release artifacts without publishing.
 
 1. Request a deployment approval from another team member
 
