@@ -88,8 +88,7 @@ class _:
     def _(*, a) -> TypeGuard[str]: ...
 ```
 
-For `TypeIs` functions, the narrowed type must be assignable to the declared type of that parameter,
-if any.
+The narrowed type in a `TypeIs` function must be assignable to the declared parameter type.
 
 ```pyi
 from typing import Any
@@ -100,12 +99,78 @@ def _(a: Any) -> TypeIs[str]: ...
 def _(a: tuple[object]) -> TypeIs[tuple[str]]: ...
 def _(a: str | Any) -> TypeIs[str]: ...
 def _(a) -> TypeIs[str]: ...
+```
 
-# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
+If the narrowed type is incompatible and disjoint from the parameter type, ty reports an error:
+
+```pyi
+# snapshot: disjoint-type-is-narrowing
 def _(a: int) -> TypeIs[str]: ...
+```
 
-# error: [invalid-type-guard-definition] "Narrowed type `int` is not assignable to the declared parameter type `bool | str`"
+```snapshot
+error[disjoint-type-is-narrowing]: Narrowed type `str` is disjoint from the declared parameter type `int`
+  --> src/mdtest_snippet.pyi:49:18
+   |
+49 | def _(a: int) -> TypeIs[str]: ...
+   |                  ^^^^^^^^^^^
+info: `int` is disjoint from `str`
+info: `str` and `int` are disjoint due to incompatible instance layouts
+```
+
+```pyi
+# snapshot: disjoint-type-is-narrowing
+def _(a: list[int]) -> TypeIs[list[str]]: ...
+```
+
+```snapshot
+error[disjoint-type-is-narrowing]: Narrowed type `list[str]` is disjoint from the declared parameter type `list[int]`
+  --> src/mdtest_snippet.pyi:51:24
+   |
+51 | def _(a: list[int]) -> TypeIs[list[str]]: ...
+   |                        ^^^^^^^^^^^^^^^^^
+info: `list[int]` is disjoint from `list[str]`
+info: `str` and `int` are not mutual subtypes of each other, but must be due to invariance
+```
+
+An incompatible narrowing to a type that can overlap the parameter type produces a warning. Here,
+`int` overlaps with `bool` but is too broad for the parameter:
+
+```pyi
+# snapshot: suspicious-type-is-narrowing
 def _(a: bool | str) -> TypeIs[int]: ...
+```
+
+```snapshot
+warning[suspicious-type-is-narrowing]: Narrowed type `int` is not assignable to the declared parameter type `bool | str`
+  --> src/mdtest_snippet.pyi:53:25
+   |
+53 | def _(a: bool | str) -> TypeIs[int]: ...
+   |                         ^^^^^^^^^^^
+info: This is not necessarily unsound, but may indicate a mistake in the signature
+```
+
+## `TypeIs` narrowing to or from `Never`
+
+`Never` is a subtype of every type, so `TypeIs[Never]` satisfies the assignability requirement for
+any parameter type. It can describe a predicate that always returns `False`.
+
+```pyi
+from typing_extensions import Never, TypeIs
+
+def always_false(a: int) -> TypeIs[Never]: ...  # ok
+def unreachable(a: Never) -> TypeIs[Never]: ...  # ok
+```
+
+A `Never` parameter follows the same assignability rule. `Any` is assignable to `Never` because it
+can materialize to `Never`.
+
+```pyi
+from typing import Any
+
+# error: [disjoint-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `Never`"
+def narrow_to_str(a: Never) -> TypeIs[str]: ...
+def narrow_to_any(a: Never) -> TypeIs[Any]: ...  # ok
 ```
 
 ## Overloaded definitions
@@ -115,20 +180,20 @@ diagnostic.
 
 ```pyi
 from typing import overload
-from typing_extensions import Never, TypeIs
+from typing_extensions import TypeIs
 
 @overload
-# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
-def one_invalid(value: Never) -> TypeIs[bool]: ...
+# error: [disjoint-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `int`"
+def one_invalid(value: int) -> TypeIs[str]: ...
 @overload
-def one_invalid(value: object) -> TypeIs[str]: ...
+def one_invalid(value: str) -> TypeIs[str]: ...
 
 # Two distinct invalid overloads should each report their own diagnostic.
 @overload
-# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
-def two_invalid(value: Never) -> TypeIs[bool]: ...
+# error: [disjoint-type-is-narrowing] "Narrowed type `int` is disjoint from the declared parameter type `str`"
+def two_invalid(value: str) -> TypeIs[int]: ...
 @overload
-# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
+# error: [disjoint-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `int`"
 def two_invalid(value: int) -> TypeIs[str]: ...
 ```
 
