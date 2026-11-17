@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for uses of `collections.namedtuple` in stub files.
+/// Checks for uses of `collections.namedtuple`.
 ///
 /// ## Why is this bad?
 /// `typing.NamedTuple` is the "typed version" of `collections.namedtuple`.
