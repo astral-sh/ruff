@@ -261,6 +261,8 @@ impl Options {
                 default
             });
 
+        // Scripts with uv enabled use only their own environment, even before sync or after
+        // sync fails. The setting does not affect environment discovery for the project.
         let allow_environment_fallback = !matches!(context, OptionsContext::Script(_))
             || self.use_uv_for_scripts.as_deref() != Some(&true);
         let python_environment = match self.python_environment(context.configuration_root(), system)
