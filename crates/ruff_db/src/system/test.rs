@@ -238,6 +238,10 @@ impl WritableSystem for TestSystem {
         self.system().write_file_bytes(path, content)
     }
 
+    fn write_file_atomic(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
+        self.system().write_file_atomic(path, content)
+    }
+
     fn remove_file(&self, path: &SystemPath) -> Result<()> {
         self.system().remove_file(path)
     }
@@ -478,6 +482,10 @@ impl WritableSystem for InMemorySystem {
     }
 
     fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
+        self.memory_fs.write_file(path, content)
+    }
+
+    fn write_file_atomic(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         self.memory_fs.write_file(path, content)
     }
 

@@ -314,7 +314,7 @@ impl BaselineFile {
                 .with_context(|| format!("Failed to create baseline directory `{parent}`"))?;
         }
         writable
-            .write_file(path, &serialized)
+            .write_file_atomic(path, serialized.as_bytes())
             .with_context(|| format!("Failed to write baseline `{path}`"))?;
         Ok(count)
     }
