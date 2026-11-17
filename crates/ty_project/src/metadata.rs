@@ -117,7 +117,7 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             uv_workspace: UvWorkspace::default(),
-            use_uv: UseUv::from_system(system),
+            use_uv: UseUv::Off,
         })
     }
 
@@ -191,7 +191,6 @@ impl ProjectMetadata {
             return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
         }
 
-        let use_uv = UseUv::from_system(system);
         let mut closest_project = None;
         for project_root in path.ancestors() {
             let Some(metadata) = Self::discover_in(project_root, system)? else {
@@ -200,7 +199,7 @@ impl ProjectMetadata {
 
             if matches!(metadata.configuration_source, ConfigurationSource::Ty) {
                 tracing::debug!("Found project at '{}'", project_root);
-                return Ok(metadata.with_use_uv(use_uv));
+                return Ok(metadata);
             }
 
             if closest_project.is_none() {
@@ -220,7 +219,7 @@ impl ProjectMetadata {
             );
             Self::new(path.file_name().unwrap_or("root"), path.to_path_buf())
         };
-        Ok(metadata.with_use_uv(use_uv))
+        Ok(metadata)
     }
 
     /// Applies a previously obtained uv workspace without invoking uv or checking [`Self::use_uv`].

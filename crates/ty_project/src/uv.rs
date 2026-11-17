@@ -46,11 +46,12 @@ pub enum UseUv {
 
 impl UseUv {
     /// Resolves the mode configured by the `TY_UV` environment variable.
-    pub fn from_system(system: &dyn System) -> Self {
+    pub fn from_system(system: &dyn System) -> Option<Self> {
         match system.env_var(EnvVars::TY_UV).as_deref() {
-            Ok("1" | "true") => Self::On,
-            Ok("scripts") => Self::Scripts,
-            _ => Self::Off,
+            Ok("1" | "true") => Some(Self::On),
+            Ok("scripts") => Some(Self::Scripts),
+            Err(std::env::VarError::NotPresent) => None,
+            _ => Some(Self::Off),
         }
     }
 
@@ -109,15 +110,15 @@ mod tests {
     #[test]
     fn use_uv_from_system() {
         let system = TestSystem::default();
-        assert_eq!(UseUv::from_system(&system), UseUv::Off);
+        assert_eq!(UseUv::from_system(&system), None);
 
         system.set_env_var(EnvVars::TY_UV, "scripts");
-        assert_eq!(UseUv::from_system(&system), UseUv::Scripts);
+        assert_eq!(UseUv::from_system(&system), Some(UseUv::Scripts));
 
         system.set_env_var(EnvVars::TY_UV, "true");
-        assert_eq!(UseUv::from_system(&system), UseUv::On);
+        assert_eq!(UseUv::from_system(&system), Some(UseUv::On));
 
         system.set_env_var(EnvVars::TY_UV, "off");
-        assert_eq!(UseUv::from_system(&system), UseUv::Off);
+        assert_eq!(UseUv::from_system(&system), Some(UseUv::Off));
     }
 }
