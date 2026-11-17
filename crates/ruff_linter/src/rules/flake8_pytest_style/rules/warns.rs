@@ -125,8 +125,9 @@ impl Violation for PytestWarnsTooBroad {
 /// Checks for `pytest.warns` calls without an expected warning.
 ///
 /// ## Why is this bad?
-/// `pytest.warns` expects to receive an expected warning as its first
-/// argument. If omitted, the `pytest.warns` call will fail at runtime.
+/// When called without arguments, `pytest.warns` defaults to `Warning`, accepting any warning type.
+/// Specifying the expected warning type makes the test more precise and prevents unrelated warnings
+/// from causing it to pass unexpectedly.
 ///
 /// ## Example
 /// ```python
