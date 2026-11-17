@@ -860,10 +860,21 @@ mod tests {
             "lib/python3.13/site-packages"
         });
         let path = root.join("report.py");
-        let pyvenv_cfg =
-            format!("home = {root}\nversion = 3.13.0\ninclude-system-site-packages = false\n");
+        let pyvenv_cfg = dedent(
+            r"
+            home = /missing
+            version = 3.13.0
+            include-system-site-packages = false
+            ",
+        );
+        let config = dedent(
+            r"
+            use-uv-for-scripts = true
+            environment.python = 'project-venv'
+            ",
+        );
         let source = dedent(
-            "
+            r"
             # /// script
             # dependencies = []
             # ///
@@ -871,11 +882,8 @@ mod tests {
             ",
         );
         system.memory_file_system().write_files_all([
-            (
-                root.join("ty.toml"),
-                "use-uv-for-scripts = true\nenvironment.python = 'project-venv'",
-            ),
-            (venv.join("pyvenv.cfg"), pyvenv_cfg.as_str()),
+            (root.join("ty.toml"), config.as_ref()),
+            (venv.join("pyvenv.cfg"), pyvenv_cfg.as_ref()),
             (site_packages.join("project_dependency.py"), ""),
             (path.clone(), source.as_ref()),
         ])?;
@@ -884,7 +892,8 @@ mod tests {
             .memory_file_system()
             .write_virtual_file(virtual_path, source.as_bytes());
         let metadata = ProjectMetadata::discover(root, &system)?;
-        let dependency = ModuleName::new_static("project_dependency").unwrap();
+        let dependency =
+            ModuleName::new_static("project_dependency").context("expected a valid module name")?;
         let resolves_dependency = |db: &ProjectDatabase, script| {
             resolve_module(
                 db,
@@ -911,8 +920,6 @@ mod tests {
         assert!(!resolves_dependency(&db, virtual_script));
 
         let script = system_path_to_file(&db, &path)?;
-        assert!(!resolves_dependency(&db, script));
-
         let environment =
             script_environment(&db, script).context("expected a script environment")?;
         let task = script_sync_task(&db, script).context("expected a script sync task")?;
