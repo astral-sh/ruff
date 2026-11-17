@@ -871,12 +871,15 @@ mod tests {
             ",
         );
         system.memory_file_system().write_files_all([
-            (root.join("ty.toml"), "environment.python = 'project-venv'"),
+            (
+                root.join("ty.toml"),
+                "use-uv-for-scripts = true\nenvironment.python = 'project-venv'",
+            ),
             (venv.join("pyvenv.cfg"), pyvenv_cfg.as_str()),
             (site_packages.join("project_dependency.py"), ""),
             (path.clone(), source.as_ref()),
         ])?;
-        let mut metadata = ProjectMetadata::discover(root, &system)?;
+        let metadata = ProjectMetadata::discover(root, &system)?;
         let dependency = ModuleName::new_static("project_dependency").unwrap();
         let resolves_dependency = |db: &ProjectDatabase, script| {
             resolve_module(
@@ -887,16 +890,17 @@ mod tests {
             .is_some()
         };
 
-        let without_uv = ProjectDatabase::fallible(metadata.clone(), system.clone())?;
+        let mut without_uv = metadata.clone();
+        without_uv.set_override_options(Options {
+            use_uv_for_scripts: Some(RangedValue::cli(false)),
+            ..Options::default()
+        });
+        let without_uv = ProjectDatabase::fallible(without_uv, system.clone())?;
         assert!(resolves_dependency(
             &without_uv,
             system_path_to_file(&without_uv, &path)?
         ));
 
-        metadata.set_override_options(Options {
-            use_uv_for_scripts: Some(RangedValue::cli(true)),
-            ..Options::default()
-        });
         let mut db = ProjectDatabase::fallible(metadata, system)?;
         let script = system_path_to_file(&db, &path)?;
         assert!(!resolves_dependency(&db, script));

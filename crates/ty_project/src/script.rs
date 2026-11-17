@@ -160,11 +160,12 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
         } else {
             // Respect a script's `requires-python` option
             metadata.apply_requires_python(file, &mut script_options, &mut diagnostics);
-            if let Some(mut environment) = project_metadata.options().environment.clone() {
+            let mut project_options = project_metadata.options().clone();
+            if let Some(environment) = &mut project_options.environment {
                 // Each script is a standalone program with its own first-party roots.
                 environment.root = None;
-                script_options.environment.combine_with(Some(environment));
             }
+            script_options.combine_with(project_options);
             &script_options
         };
 
@@ -173,21 +174,21 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
             project_metadata.root(),
         )
     };
-    let context = if let Some(environment) = environment {
+    if let Some(environment) = environment {
         // The configured interpreter can guide uv's interpreter selection. Only uv's result
         // supplies the script's environment, which may be absent before or after a sync attempt.
         options.environment.get_or_insert_default().python = environment
             .uv_metadata(db)
             .and_then(UvMetadata::environment)
             .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata));
-        OptionsContext::UvScript(root)
     } else {
-        OptionsContext::Script(root)
-    };
+        // Virtual documents cannot have a uv environment.
+        options.use_uv_for_scripts = None;
+    }
     let program_settings = resolve_script_program_settings(
         db,
         &options,
-        context,
+        OptionsContext::Script(root),
         project_metadata.name(),
         file,
         &mut diagnostics,

@@ -261,7 +261,8 @@ impl Options {
                 default
             });
 
-        let allow_environment_fallback = !matches!(context, OptionsContext::UvScript(_));
+        let allow_environment_fallback = !matches!(context, OptionsContext::Script(_))
+            || self.use_uv_for_scripts.as_deref() != Some(&true);
         let python_environment = match self.python_environment(context.configuration_root(), system)
         {
             Ok(None) if allow_environment_fallback => {
@@ -671,21 +672,19 @@ pub(crate) enum OptionsContext<'a> {
     Project(&'a SystemPath),
     /// The directory used to resolve relative settings for the script.
     Script(&'a SystemPath),
-    /// A script whose Python environment is provided by uv.
-    UvScript(&'a SystemPath),
 }
 
 impl<'a> OptionsContext<'a> {
     fn configuration_root(self) -> &'a SystemPath {
         match self {
-            Self::Project(root) | Self::Script(root) | Self::UvScript(root) => root,
+            Self::Project(root) | Self::Script(root) => root,
         }
     }
 
     fn project_root(self) -> Option<&'a SystemPath> {
         match self {
             Self::Project(root) => Some(root),
-            Self::Script(_) | Self::UvScript(_) => None,
+            Self::Script(_) => None,
         }
     }
 }
