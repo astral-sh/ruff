@@ -764,6 +764,8 @@ impl<'db> SignatureExtras<'db> {
 /// original types because assignability can discard gradual evidence before subtyping sees it.
 #[derive(Clone, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
 struct ReceiverConstraints<'db> {
+    /// Collected symbolically with all type variables inferable. The caller's actual scope is
+    /// applied when these constraints are loaded for a comparison or call.
     assignability: OwnedConstraintSet<'db>,
     relations: Box<[(Type<'db>, Type<'db>)]>,
 }
@@ -796,12 +798,11 @@ impl<'db> ReceiverConstraints<'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-        inferable: TypeVarSet<'db>,
     ) -> Option<Self> {
         let assignability =
             Signature::map_constraints(db, &self.assignability, type_mapping, tcx, visitor);
         let assignability = if assignability.query(|_builder, constraints| {
-            constraints.is_always_satisfied(db, visitor.env, inferable)
+            constraints.is_always_satisfied(db, visitor.env, TypeVarSet::All)
         }) {
             OwnedConstraintSet::always()
         } else {
@@ -2115,7 +2116,6 @@ impl<'db> Signature<'db> {
             TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
         let receiver_visitor = ApplyTypeMappingVisitor::new(env);
         let self_visitor = ApplyTypeMappingVisitor::new(env);
-        let inferable = self.inferable_typevars(db);
         let receiver_constraints = self
             .map_receiver_constraints(
                 db,
@@ -2129,7 +2129,6 @@ impl<'db> Signature<'db> {
                     &self_mapping,
                     TypeContext::default(),
                     &self_visitor,
-                    inferable,
                 )
             });
         if !self.needs_self_mapping(db, env, self.parameters.as_slice()) {
@@ -2202,13 +2201,8 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<ReceiverConstraints<'db>> {
-        self.receiver_constraints()?.apply_type_mapping(
-            db,
-            type_mapping,
-            tcx,
-            visitor,
-            self.inferable_typevars(db),
-        )
+        self.receiver_constraints()?
+            .apply_type_mapping(db, type_mapping, tcx, visitor)
     }
 
     fn map_constraints(
@@ -2436,7 +2430,7 @@ impl<'db> Signature<'db> {
         let checker = TypeRelationChecker::constraint_set_assignability_with_context(
             env,
             &constraints,
-            TypeVarSet::All,
+            TypeVarSet::None,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,

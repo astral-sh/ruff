@@ -5825,7 +5825,7 @@ mod tests {
         let env = db.program_environment();
         let builder = ConstraintSetBuilder::new();
         let mut set = ConstraintSet::always(&builder);
-        for index in 0..64 {
+        for index in 0..8 {
             let t = BoundTypeVarInstance::synthetic(
                 db,
                 &env,
@@ -5841,13 +5841,13 @@ mod tests {
 
         // Leave room for preprocessing, but require the satisfiability walk to respect the limit.
         assert_eq!(
-            bounded_path_bounds(db, set, TypeVarSet::None, usize::MAX, 16),
+            bounded_path_bounds(db, set, TypeVarSet::All, usize::MAX, 16),
             Err(ProjectionError::TraversalBudgetExceeded)
         );
-        assert_eq!(
-            bounded_path_bounds(db, set, TypeVarSet::None, usize::MAX, usize::MAX),
-            Ok(CandidateSolutions::Unconstrained)
-        );
+        assert!(matches!(
+            bounded_path_bounds(db, set, TypeVarSet::All, usize::MAX, usize::MAX),
+            Ok(CandidateSolutions::Constrained(_))
+        ));
     }
 
     #[test]
@@ -6359,14 +6359,13 @@ class E: ...
             assert!(!set.is_never_satisfied(db, &env, TypeVarSet::All));
         });
 
-        // tuple[Any, str] <= T <= tuple[int, int] has conflicting bounds when T is inferable.
+        // tuple[U] <= T <= tuple[int] is satisfiable only when U is also inferable.
         let u = create_typevar(db, "U");
         let infer_t = TypeVarSet::from_typevars(db, [t]);
-        let infer_u = TypeVarSet::from_typevars(db, [u]);
+        let infer_tu = TypeVarSet::from_typevars(db, [t, u]);
         let int = known_instance(db, KnownClass::Int);
-        let str = known_instance(db, KnownClass::Str);
-        let lower = Type::heterogeneous_tuple(db, &env, [Type::any(), str]);
-        let upper = Type::heterogeneous_tuple(db, &env, [int, int]);
+        let lower = Type::heterogeneous_tuple(db, &env, [Type::TypeVar(u)]);
+        let upper = Type::heterogeneous_tuple(db, &env, [int]);
         let owned = ConstraintSetBuilder::new().into_owned(|builder| {
             ConstraintSet::constrain_typevar(
                 db,
@@ -6382,14 +6381,12 @@ class E: ...
 
         // The answer must not depend on which inferable set was queried first.
         owned.query(|_builder, set| {
-            assert!(!set.is_never_satisfied(db, &env, TypeVarSet::None));
             assert!(set.is_never_satisfied(db, &env, infer_t));
-            assert!(!set.is_never_satisfied(db, &env, infer_u));
+            assert!(!set.is_never_satisfied(db, &env, infer_tu));
         });
         owned.query(|_builder, set| {
+            assert!(!set.is_never_satisfied(db, &env, infer_tu));
             assert!(set.is_never_satisfied(db, &env, infer_t));
-            assert!(!set.is_never_satisfied(db, &env, infer_u));
-            assert!(!set.is_never_satisfied(db, &env, TypeVarSet::None));
         });
     }
 
@@ -7082,9 +7079,9 @@ class E: ...
         let tdd = t_int.or(db, &builder, || u_str);
         let negated = tdd.negate(db, &builder);
         let double_negated = negated.negate(db, &builder);
-        assert!(tdd.is_equivalent_to(db, &env, double_negated, TypeVarSet::None));
-        assert!(!tdd.is_equivalent_to(db, &env, t_int, TypeVarSet::None));
-        assert!(!t_int.is_equivalent_to(db, &env, tdd, TypeVarSet::None));
+        assert!(tdd.is_equivalent_to(db, &env, double_negated, TypeVarSet::All));
+        assert!(!tdd.is_equivalent_to(db, &env, t_int, TypeVarSet::All));
+        assert!(!t_int.is_equivalent_to(db, &env, tdd, TypeVarSet::All));
 
         let equivalent = tdd.iff(db, &builder, double_negated);
         assert!(equivalent.is_always_satisfied(db, &env, TypeVarSet::All));

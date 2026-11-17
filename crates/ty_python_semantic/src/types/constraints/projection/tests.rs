@@ -351,7 +351,7 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
                 &env,
                 &builder,
                 ConstraintProvenance::INFERRED,
-                TypeVarSet::All,
+                inferable,
                 t,
                 ty,
             )
@@ -384,7 +384,7 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
                 &env,
                 &builder,
                 ConstraintProvenance::INFERRED,
-                TypeVarSet::All,
+                inferable,
                 t,
                 ty,
             )
@@ -407,13 +407,14 @@ fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
     let t = create_typevar(db, "T")
         .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
     let s = create_typevar(db, "S");
+    let inferable = TypeVarSet::from_typevars(db, [t]);
     let builder = ConstraintSetBuilder::new();
     let set = ConstraintSet::constrain_typevar_lower_bound(
         db,
         &env,
         &builder,
         ConstraintProvenance::INFERRED,
-        TypeVarSet::All,
+        inferable,
         t,
         str,
     )
@@ -423,13 +424,11 @@ fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
             &env,
             &builder,
             ConstraintProvenance::VALIDITY,
-            TypeVarSet::All,
+            inferable,
             t,
             Type::TypeVar(s),
         )
     });
-    let inferable = TypeVarSet::from_typevars(db, [t]);
-
     let result = set.solutions(db, &env, inferable);
     let Ok(Solutions::Unsatisfiable(paths)) = result else {
         panic!("expected invalid paths, got {result:?}");
