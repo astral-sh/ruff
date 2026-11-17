@@ -797,7 +797,7 @@ mod tests {
     use anyhow::Context;
     use ruff_db::Db as _;
     use ruff_db::files::{File, system_path_to_file};
-    use ruff_db::system::{DbWithWritableSystem, SystemPath, TestSystem};
+    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemVirtualPath, TestSystem};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_ranged_value::RangedValue;
     use salsa::Setter;
@@ -879,6 +879,10 @@ mod tests {
             (site_packages.join("project_dependency.py"), ""),
             (path.clone(), source.as_ref()),
         ])?;
+        let virtual_path = SystemVirtualPath::new("untitled:report.py");
+        system
+            .memory_file_system()
+            .write_virtual_file(virtual_path, source.as_bytes());
         let metadata = ProjectMetadata::discover(root, &system)?;
         let dependency = ModuleName::new_static("project_dependency").unwrap();
         let resolves_dependency = |db: &ProjectDatabase, script| {
@@ -902,6 +906,10 @@ mod tests {
         ));
 
         let mut db = ProjectDatabase::fallible(metadata, system)?;
+        let virtual_script = db.files().virtual_file(&db, virtual_path).file();
+        db.project().open_file(&mut db, virtual_script);
+        assert!(!resolves_dependency(&db, virtual_script));
+
         let script = system_path_to_file(&db, &path)?;
         assert!(!resolves_dependency(&db, script));
 

@@ -173,16 +173,12 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
             project_metadata.root(),
         )
     };
-    if let Some(environment) = environment {
-        // The configured interpreter can guide uv's interpreter selection. Only uv's result
-        // supplies the script's environment, which may be absent before or after a sync attempt.
+    if options.use_uv_for_scripts.as_deref() == Some(&true) {
+        // Until uv supplies a script environment, don't use an inherited Python environment.
         options.environment.get_or_insert_default().python = environment
-            .uv_metadata(db)
+            .and_then(|environment| environment.uv_metadata(db))
             .and_then(UvMetadata::environment)
             .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata));
-    } else {
-        // Virtual documents cannot have a uv environment.
-        options.use_uv_for_scripts = None;
     }
     let program_settings = resolve_script_program_settings(
         db,
