@@ -1043,6 +1043,12 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D(1))  # revealed: C[Unknown, int]
 ```
 
+Through `super(D, D)`, the inherited `__new__` infers the specialization from its `cls` argument.
+
+```py
+reveal_type(super(D, D).__new__(D[str]))  # revealed: C[str, int]
+```
+
 ### Explicit access to constructors of bare generic classes
 
 Bare `__new__` and `__init__` members retain the class type variables in their generic contexts.
@@ -1094,6 +1100,24 @@ reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(C(1, "str"))  # revealed: C[Literal[1], Literal["str"]]
 reveal_type(D(1, "str"))  # revealed: D[Literal[1], Literal["str"]]
+```
+
+Passing the bare class to `super` leaves the initializer unbound, so each call can infer its type
+arguments.
+
+```py
+def initialize(child: D[int, str]) -> None:
+    super(D, D).__init__(child, 1, "value")  # ok
+```
+
+Inside a class method, `super()` uses the specialization of `cls`. The initializer's `t` parameter
+expects `T`, which could be a type other than `int`.
+
+```py
+class Child[T](D[T, str]):
+    @classmethod
+    def initialize(cls, child: "Child[T]") -> None:
+        super().__init__(child, 1, "value")  # error: [invalid-argument-type] "Expected `T@Child`"
 ```
 
 ### Generic class inherits `__init__` from `dict`
@@ -1171,6 +1195,53 @@ reveal_type(C(1, True))  # revealed: C[int]
 
 # error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
+```
+
+### Calling a generic initializer on an existing instance
+
+An inherited initializer can infer its own type parameters from the arguments. Its explicit `self`
+annotation must also match the specialization of the receiver.
+
+```py
+from collections.abc import Callable
+
+type Factory[T] = Callable[[], T]
+
+class Either[T]:
+    value: T
+
+    def __init__[A, B](
+        self: "Either[A | B]",
+        first: type[A],
+        second: type[B],
+        default: A | B | Factory[A | B],
+    ) -> None: ...
+
+class TextOrNumber[T: str | int](Either[str | int]):
+    def initialize(self, default: T | Factory[T]) -> None:
+        super().__init__(str, int, default)  # ok
+        super().__init__(str, bytes, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+```
+
+An instance of `Either[T]` can accept values of type `T`. Even with the upper bound `str | int`, `T`
+could be `str` alone, so the initializer cannot assume it accepts both types.
+
+```py
+class Child[T: str | int](Either[T]):
+    def initialize(self, cls: type[T], default: T | Factory[T]) -> None:
+        super().__init__(cls, cls, default)  # ok
+        super().__init__(str, int, default)  # error: [invalid-argument-type] "Expected `Either[str | int]`"
+```
+
+For `Either[bytes]`, the receiver is incompatible whether it is bound implicitly or passed
+explicitly to the inherited method.
+
+```py
+class Bytes[T: str | int](Either[bytes]):
+    def initialize(self, default: T | Factory[T]) -> None:
+        super().__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+        self.__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+        Bytes.__init__(self, str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
 ```
 
 ### Class-scoped type variables in `__init__` receiver annotations
@@ -1394,6 +1465,10 @@ from ty_extensions._internal import generic_context, into_regular_callable
 @dataclass
 class A[T]:
     x: T
+
+    def reset(self, x: T) -> None:
+        self.__init__(x)  # ok
+        self.__init__(42)  # error: [invalid-argument-type]
 
 # revealed: ty_extensions._internal.GenericContext[T@A]
 reveal_type(generic_context(A))

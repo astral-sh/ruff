@@ -37,7 +37,7 @@ use crate::types::typevar::{
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    walk_type_with_recursion_guard,
+    any_over_type_including_alias_arguments, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -948,15 +948,7 @@ impl<'db> GenericContext<'db> {
             db,
             self,
             self.variables(db)
-                .map(|typevar| match typevar.kind(db) {
-                    TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
-                        Type::homogeneous_tuple(db, &env, Type::unknown())
-                    }
-                    TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
-                        Type::paramspec_value_callable(db, Parameters::unknown())
-                    }
-                    _ => Type::unknown(),
-                })
+                .map(|typevar| typevar.unknown_value(db, &env))
                 .collect::<Box<[_]>>(),
             None,
             (known_class == Some(KnownClass::Tuple))
@@ -1120,15 +1112,7 @@ impl<'db> GenericContext<'db> {
                     TypeContext::default(),
                 )
             } else {
-                match typevar.kind(db) {
-                    TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
-                        Type::homogeneous_tuple(db, &env, Type::unknown())
-                    }
-                    TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
-                        Type::paramspec_value_callable(db, Parameters::unknown())
-                    }
-                    _ => Type::unknown(),
-                }
+                typevar.unknown_value(db, &env)
             };
             expanded.push(ty);
         }
@@ -2932,10 +2916,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Option<&CandidateTypeVarSolution<'db>>,
         ) -> Option<PathBoundSolution<'db>>,
     ) -> PendingInference<'db, T> {
-        let merged_types = self
+        let mut merged_types = self
             .solve_hash_map_with(self.generic_context, &mut |typevar, bounds| {
                 choose(typevar, bounds).and_then(PathBoundSolution::as_type)
             });
+        if reason == TypeVarInferenceFallback::Unsatisfiable {
+            self.remove_expanding_cycles(&mut merged_types);
+        }
         PendingInference {
             merged_types,
             solutions: Err(reason),
@@ -3154,7 +3141,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // dependency resolver marks `T` and `U` unresolved while preserving independent bindings.
         if types
             .iter()
-            .any(|(identity, ty)| self.has_expanding_cycle(generic_context, types, *identity, *ty))
+            .any(|(identity, ty)| self.has_expanding_cycle(types, *identity, *ty))
         {
             inference.merged_types = self
                 .solve_hash_map_with(generic_context, &mut |typevar, bounds| {
@@ -3248,7 +3235,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
     fn has_expanding_cycle(
         &self,
-        generic_context: GenericContext<'db>,
         types: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
@@ -3267,62 +3253,45 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // Unions and intersections are flattened and deduplicated as they are constructed.
             // A cyclic reference directly inside one can add elements but cannot create
             // unbounded nesting. Keep looking inside its elements for a genuinely embedded edge.
-            Type::Union(union) => union.elements(db).iter().any(|element| {
-                self.has_expanding_cycle(generic_context, types, identity, *element)
-            }),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| self.has_expanding_cycle(types, identity, *element)),
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
                 .chain(intersection.iter_negative(db))
-                .any(|element| self.has_expanding_cycle(generic_context, types, identity, element)),
-            _ => any_over_type(db, self.env, ty, false, |nested| {
-                nested.as_typevar().is_some_and(|dependency| {
-                    let dependency = dependency.identity(db);
-                    dependency != identity
-                        && generic_context.contains(db, dependency)
-                        && self.reaches_pending_typevar(
-                            generic_context,
-                            types,
-                            dependency,
-                            identity,
-                            &RefCell::default(),
-                        )
-                })
-            }),
+                .any(|element| self.has_expanding_cycle(types, identity, element)),
+            _ => self.reaches_pending_typevar(types, identity, ty, identity, &RefCell::default()),
         }
     }
 
     fn reaches_pending_typevar(
         &self,
-        generic_context: GenericContext<'db>,
         types: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
-        identity: BoundTypeVarIdentity<'db>,
+        source: BoundTypeVarIdentity<'db>,
+        ty: Type<'db>,
         target: BoundTypeVarIdentity<'db>,
         visited: &RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
     ) -> bool {
         let db = self.db;
-        if identity == target {
-            return true;
-        }
-        if !visited.borrow_mut().insert(identity) {
-            return false;
-        }
-
-        types.get(&identity).is_some_and(|ty| {
-            any_over_type(db, self.env, *ty, false, |nested| {
-                nested.as_typevar().is_some_and(|dependency| {
-                    let dependency = dependency.identity(db);
-                    // Recursive specialization skips a typevar's own slot. Only references
-                    // through other mappings can recursively expand.
-                    dependency != identity
-                        && generic_context.contains(db, dependency)
-                        && self.reaches_pending_typevar(
-                            generic_context,
-                            types,
-                            dependency,
-                            target,
-                            visited,
-                        )
-                })
+        any_over_type_including_alias_arguments(db, self.env, ty, |nested| {
+            let Some(typevar) = nested.as_typevar() else {
+                return false;
+            };
+            let dependency = typevar.identity(db);
+            // Recursive specialization skips a typevar's own slot. Only references
+            // through other mappings can recursively expand.
+            if dependency == source || !self.generic_context.contains(db, dependency) {
+                return false;
+            }
+            if dependency == target {
+                return true;
+            }
+            if !visited.borrow_mut().insert(dependency) {
+                return false;
+            }
+            types.get(&dependency).is_some_and(|ty| {
+                self.reaches_pending_typevar(types, dependency, *ty, target, visited)
             })
         })
     }
@@ -3434,17 +3403,43 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .collect()
     }
 
+    /// Solving argument relations independently can introduce a cycle when their solutions are
+    /// merged. For example, if `A = int | list[B]` and `B = A`, keep the independent evidence
+    /// for `A` so we can still diagnose arguments that require an incompatible type.
+    fn remove_expanding_cycles(&self, types: &mut FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>) {
+        let db = self.db;
+        // Check every binding against the original map so recovery is independent of iteration order.
+        let mut replacements = Vec::new();
+        for (&identity, variable) in self.generic_context.variables_inner(db) {
+            let Some(&ty) = types.get(&identity) else {
+                continue;
+            };
+            let expands = |ty| self.has_expanding_cycle(types, identity, ty);
+            if !expands(ty) {
+                continue;
+            }
+            let replacement = if let Type::Union(union) = ty
+                && let retained = union.filter(db, |element| !expands(*element))
+                && !retained.is_never()
+            {
+                retained
+            } else {
+                variable.unknown_value(db, self.env)
+            };
+            replacements.push((identity, replacement));
+        }
+        types.extend(replacements);
+    }
+
     fn unknown_type_mappings(
         &self,
         generic_context: GenericContext<'db>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         let db = self.db;
-        let unknown = generic_context.unknown_specialization(db, None);
         generic_context
             .variables_inner(db)
-            .keys()
-            .copied()
-            .zip(unknown.types(db).iter().copied())
+            .iter()
+            .map(|(&identity, variable)| (identity, variable.unknown_value(db, self.env)))
             .collect()
     }
 

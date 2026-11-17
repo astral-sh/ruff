@@ -1121,6 +1121,19 @@ impl<'db> BoundTypeVarInstance<'db> {
         self.identity(db).kind(db)
     }
 
+    /// The type argument to use when this parameter has an unknown value.
+    pub(super) fn unknown_value(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self.kind(db) {
+            TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                Type::homogeneous_tuple(db, env, Type::unknown())
+            }
+            TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
+                Type::paramspec_value_callable(db, Parameters::unknown())
+            }
+            _ => Type::unknown(),
+        }
+    }
+
     pub(crate) fn domain(self, db: &'db dyn Db) -> TypeVarDomain {
         let identity = self.identity(db);
         let kind = identity.kind(db);

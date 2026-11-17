@@ -1385,16 +1385,14 @@ bitflags! {
         /// Likewise, a divergent marker from cyclic inference does not establish a concrete member.
         const REQUIRE_CONCRETE = 1 << 5;
 
-        /// Do not add the class's generic context to inherited member signatures.
+        /// Add the class's type variables to constructor signatures so they can be inferred
+        /// from the arguments. A method bound to an existing instance already has a fixed
+        /// class specialization, including when it is accessed through `super()`.
         ///
-        /// Constructor methods reached through a fixed class-object value such as `type[T]` use
-        /// the class's type variables, but those variables are not inference targets for the call.
-        /// A method's own generic context remains inferable.
-          ///
         /// TODO: Arguably this does not deserve to be a member lookup policy; instead, we should
         /// track the owned and inherited generic contexts separately in `Signature` and not
         /// preemptively merge them.
-        const NO_INHERITED_GENERIC_CONTEXT = 1 << 6;
+        const INHERIT_GENERIC_CONTEXT = 1 << 6;
     }
 }
 
@@ -1435,9 +1433,9 @@ impl MemberLookupPolicy {
         self.contains(Self::REQUIRE_CONCRETE)
     }
 
-    /// Do not add the class's generic context to inherited member signatures.
-    const fn no_inherited_generic_context(self) -> bool {
-        self.contains(Self::NO_INHERITED_GENERIC_CONTEXT)
+    /// Include the class's type variables when inferring a constructor signature.
+    const fn inherit_generic_context(self) -> bool {
+        self.contains(Self::INHERIT_GENERIC_CONTEXT)
     }
 }
 
@@ -8139,12 +8137,11 @@ impl<'db> Type<'db> {
             } else {
                 None
             };
-        let constructor_member_policy =
-            if class_generic_context.is_some() && inferable_class_context.is_none() {
-                MemberLookupPolicy::NO_INHERITED_GENERIC_CONTEXT
-            } else {
-                MemberLookupPolicy::default()
-            };
+        let constructor_member_policy = if inferable_class_context.is_some() {
+            MemberLookupPolicy::INHERIT_GENERIC_CONTEXT
+        } else {
+            MemberLookupPolicy::default()
+        };
 
         // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
         let fallback_bindings = || {
