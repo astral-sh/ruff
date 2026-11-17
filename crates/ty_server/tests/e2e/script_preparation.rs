@@ -5,7 +5,6 @@ use lsp_types::{
 };
 use ruff_db::system::SystemPath;
 use ruff_python_trivia::textwrap::dedent;
-use ty_project::UseUv;
 use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::TestServerBuilder;
@@ -21,16 +20,20 @@ fn script_syncs_on_open_without_workspace_diagnostics() -> Result<()> {
         # /// script
         # requires-python = ">=3.12"
         # dependencies = ["attrs==25.4.0"]
+        #
+        # [tool.ty]
+        # use-uv-for-scripts = true
         # ///
+
         import attrs
         missing
         "#,
     );
-    let attrs = lsp_types::Position::new(5, 7);
+    let attrs = lsp_types::Position::new(9, 7);
     let mut server = workspace_builder(DiagnosticMode::OpenFilesOnly)?
         .with_file(ordinary, "ordinary_missing")?
         .with_file(script, &source)?
-        .with_real_uv(UseUv::Scripts)?
+        .with_real_uv()?
         .enable_workspace_diagnostic_refresh(true)
         .enable_work_done_progress(true)
         .build()
@@ -41,10 +44,12 @@ fn script_syncs_on_open_without_workspace_diagnostics() -> Result<()> {
     assert!(server.goto_definition_request(script, attrs).is_none());
     server.write_file(
         "src/ty.toml",
-        r#"
-        [environment]
-        python-version = "3.12"
-        "#,
+        dedent(
+            r#"
+            [environment]
+            python-version = "3.12"
+            "#,
+        ),
     )?;
     server.did_change_watched_file("src/ty.toml", lsp_types::FileChangeType::Created);
     server.await_diagnostic_refresh();
@@ -74,13 +79,17 @@ fn closed_scripts_sync_at_startup_with_workspace_diagnostics() -> Result<()> {
                 # /// script
                 # requires-python = ">=3.12"
                 # dependencies = ["attrs==25.4.0"]
+                #
+                # [tool.ty]
+                # use-uv-for-scripts = true
                 # ///
+
                 import attrs
                 missing
                 "#,
             ),
         )?
-        .with_real_uv(UseUv::Scripts)?
+        .with_real_uv()?
         .enable_workspace_diagnostic_refresh(true)
         .build()
         .wait_until_workspaces_are_initialized();
@@ -92,7 +101,7 @@ fn closed_scripts_sync_at_startup_with_workspace_diagnostics() -> Result<()> {
     file://<temp_dir>/src/main.py
     	0:0..0:16[ERROR]: Name `ordinary_missing` used when not defined
     file://<temp_dir>/src/script.py
-    	6:0..6:7[ERROR]: Name `missing` used when not defined
+    	10:0..10:7[ERROR]: Name `missing` used when not defined
     ");
     Ok(())
 }
@@ -106,13 +115,17 @@ fn changed_dependencies_wait_for_reopen_in_open_files_only() -> Result<()> {
         # /// script
         # requires-python = ">=3.12"
         # dependencies = []
+        #
+        # [tool.ty]
+        # use-uv-for-scripts = true
         # ///
+
         import attrs
         "#,
     );
     let mut server = workspace_builder(DiagnosticMode::OpenFilesOnly)?
         .with_file(script, &initial)?
-        .with_real_uv(UseUv::Scripts)?
+        .with_real_uv()?
         .enable_work_done_progress(true)
         .build()
         .wait_until_workspaces_are_initialized();
@@ -126,7 +139,11 @@ fn changed_dependencies_wait_for_reopen_in_open_files_only() -> Result<()> {
         # /// script
         # requires-python = ">=3.12"
         # dependencies = ["attrs==25.4.0"]
+        #
+        # [tool.ty]
+        # use-uv-for-scripts = true
         # ///
+
         import attrs
         "#,
     );
@@ -140,7 +157,7 @@ fn changed_dependencies_wait_for_reopen_in_open_files_only() -> Result<()> {
     server.assert_work_done_progress("Synchronizing scripts")?;
     assert!(
         server
-            .goto_definition_request(script, lsp_types::Position::new(5, 7))
+            .goto_definition_request(script, lsp_types::Position::new(9, 7))
             .is_some(),
         "reopening should install attrs from the updated metadata"
     );
@@ -152,7 +169,7 @@ fn changed_dependencies_wait_for_reopen_in_open_files_only() -> Result<()> {
 fn created_closed_script_is_prepared_after_a_file_event() -> Result<()> {
     let script = SystemPath::new("src/script.py");
     let mut server = workspace_builder(DiagnosticMode::Workspace)?
-        .with_real_uv(UseUv::Scripts)?
+        .with_real_uv()?
         .enable_workspace_diagnostic_refresh(true)
         .build()
         .wait_until_workspaces_are_initialized();
@@ -164,7 +181,11 @@ fn created_closed_script_is_prepared_after_a_file_event() -> Result<()> {
             # /// script
             # requires-python = ">=3.12"
             # dependencies = ["attrs==25.4.0"]
+            #
+            # [tool.ty]
+            # use-uv-for-scripts = true
             # ///
+
             import attrs
             missing
             "#,
@@ -178,7 +199,7 @@ fn created_closed_script_is_prepared_after_a_file_event() -> Result<()> {
     let report = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(condensed_workspace_diagnostic_snapshot(report), @"
     file://<temp_dir>/src/script.py
-    	6:0..6:7[ERROR]: Name `missing` used when not defined
+    	10:0..10:7[ERROR]: Name `missing` used when not defined
     ");
     Ok(())
 }
@@ -191,7 +212,11 @@ fn exclude_scripts_uses_saved_contents_after_close() -> Result<()> {
         r"
         # /// script
         # dependencies = []
+        #
+        # [tool.ty]
+        # use-uv-for-scripts = false
         # ///
+
         unsaved_missing
         ",
     );
@@ -205,7 +230,6 @@ fn exclude_scripts_uses_saved_contents_after_close() -> Result<()> {
         )?
         .with_file(script, "saved_missing\n")?
         .with_file(ordinary, "ordinary_missing\n")?
-        .with_use_uv(UseUv::Off)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -240,7 +264,6 @@ fn non_python_overlay_does_not_block_workspace_diagnostics() -> Result<()> {
     let mut server = workspace_builder(DiagnosticMode::Workspace)?
         .with_file(script, "pass\n")?
         .with_file(main, "missing\n")?
-        .with_use_uv(UseUv::Scripts)
         .with_env_var("UV", "missing-script-preparation-uv")
         .enable_workspace_diagnostic_refresh(true)
         .build()
@@ -255,7 +278,11 @@ fn non_python_overlay_does_not_block_workspace_diagnostics() -> Result<()> {
                 r"
                 # /// script
                 # dependencies = []
+                #
+                # [tool.ty]
+                # use-uv-for-scripts = true
                 # ///
+
                 pass
                 ",
             )
