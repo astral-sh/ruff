@@ -986,7 +986,11 @@ mod uv_metadata {
             "
             # /// script
             # dependencies = ['not a valid requirement ???']
+            #
+            # [tool.ty]
+            # project-manager.script = 'uv'
             # ///
+
             value = 1
         ",
         );
@@ -996,7 +1000,7 @@ mod uv_metadata {
                 Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
             )?
             .with_file(script, &source)?
-            .with_real_uv(UseUv::Scripts)?
+            .with_real_uv()?
             .enable_work_done_progress(true)
             .enable_diagnostic_related_information(true)
             .enable_pull_diagnostics(false)
@@ -1049,7 +1053,8 @@ package = "invalid"
 "#
                 ),
             )?
-            .with_real_uv(UseUv::On)?
+            .with_real_uv()?
+            .with_env_var("TY_UV", "1")
             .enable_work_done_progress(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -1138,7 +1143,11 @@ package = "invalid"
             "
             # /// script
             # dependencies = []
+            #
+            # [tool.ty]
+            # project-manager.script = 'uv'
             # ///
+
             missing
             ",
         );
@@ -1155,7 +1164,6 @@ package = "invalid"
                 exclude-scripts = true
                 ",
             )?
-            .with_use_uv(UseUv::Scripts)
             .with_env_var("UV", "missing-ty-script-uv-executable")
             .enable_pull_diagnostics(false)
             .build()
