@@ -174,7 +174,8 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
         )
     };
     if options.use_uv_for_scripts.as_deref() == Some(&true) {
-        // Until uv supplies a script environment, don't use an inherited Python environment.
+        // Isolate the script from the project's Python environment, even before uv provides
+        // the script's own environment.
         options.environment.get_or_insert_default().python = environment
             .and_then(|environment| environment.uv_metadata(db))
             .and_then(UvMetadata::environment)
