@@ -145,10 +145,6 @@ impl<'db> Module<'db> {
     /// Returns `None` for a single-file module, a vendored module (whose package directories are
     /// not available on the local file system), or when configured search paths select a different
     /// module in this mode.
-    #[allow(
-        dead_code,
-        reason = "Package directory renames use this method in the next change."
-    )]
     pub fn package_directories(
         self,
         db: &'db dyn Db,
