@@ -34,36 +34,19 @@ impl<'a> JunitRenderer<'a> {
         diagnostics: &[Diagnostic],
     ) -> std::io::Result<()> {
         let mut xml = JunitWriter::new(output);
-        xml.writer
-            .write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
-
         let program = self.config.program;
         let package = format!("org.{program}");
-        let tests = diagnostics.len().max(1).to_string();
-        let failures = diagnostics.len().to_string();
-        xml.start(
-            "testsuites",
-            &[
-                ("name", program),
-                ("tests", &tests),
-                ("skipped", "0"),
-                ("failures", &failures),
-                ("errors", "0"),
-            ],
-        )?;
+        xml.start_report(program, diagnostics.len())?;
 
         if diagnostics.is_empty() {
-            xml.start_suite(program, "1", "0", &package)?;
-            xml.empty(
-                "testcase",
-                &[("name", "No errors found"), ("classname", program)],
-            )?;
-            xml.end("testsuite")?;
+            xml.start_suite(program, 1, 0, &package)?;
+            xml.write_success_case("No errors found", program)?;
+            xml.end_suite()?;
         } else {
             for (filename, diagnostics) in group_diagnostics_by_filename(diagnostics, self.resolver)
             {
-                let count = diagnostics.len().to_string();
-                xml.start_suite(filename, &count, &count, &package)?;
+                let count = diagnostics.len();
+                xml.start_suite(filename, count, count, &package)?;
                 let classname = Path::new(filename).with_extension("");
                 let classname = classname.to_str().unwrap_or(filename);
 
@@ -78,45 +61,18 @@ impl<'a> JunitRenderer<'a> {
                         diagnostic.secondary_code_or_id()
                     };
                     let name = format!("org.{program}.{code}");
-                    let mut attributes = vec![("name", name.as_str()), ("classname", classname)];
-                    let row;
-                    let column;
-                    if let Some(location) = location {
-                        row = location.line.to_string();
-                        column = location.column.to_string();
-                        attributes.extend([("line", row.as_str()), ("column", column.as_str())]);
-                    }
-                    xml.start("testcase", &attributes)?;
-                    xml.start("properties", &[])?;
-                    xml.empty(
-                        "property",
-                        &[
-                            ("name", "severity"),
-                            ("value", severity_name(diagnostic.severity())),
-                        ],
-                    )?;
-                    xml.end("properties")?;
-
-                    let message = diagnostic.concise_message();
-                    xml.start("failure", &[("message", &message.to_str())])?;
-                    let description = if let Some(location) = location {
-                        format!(
-                            "line {row}, col {col}, {message}",
-                            row = location.line,
-                            col = location.column
-                        )
-                    } else {
-                        message.to_string()
-                    };
-                    xml.text(&description)?;
-                    xml.end("failure")?;
-                    xml.end("testcase")?;
+                    xml.write_failure_case(FailureCase {
+                        name: &name,
+                        classname,
+                        location,
+                        severity: diagnostic.severity(),
+                        message: &diagnostic.concise_message().to_str(),
+                    })?;
                 }
-                xml.end("testsuite")?;
+                xml.end_suite()?;
             }
         }
-        xml.end("testsuites")?;
-        xml.writer.write_indent()
+        xml.finish()
     }
 }
 
@@ -127,6 +83,14 @@ impl Renderer for JunitRenderer<'_> {
             .map_err(|_| std::fmt::Error)?;
         writer.flush().map_err(|_| std::fmt::Error)
     }
+}
+
+struct FailureCase<'a> {
+    name: &'a str,
+    classname: &'a str,
+    location: Option<LineColumn>,
+    severity: Severity,
+    message: &'a str,
 }
 
 struct JunitWriter<W> {
@@ -140,45 +104,90 @@ impl<W: std::io::Write> JunitWriter<W> {
         }
     }
 
-    fn start_suite(
-        &mut self,
-        name: &str,
-        tests: &str,
-        failures: &str,
-        package: &str,
-    ) -> std::io::Result<()> {
+    fn start_report(&mut self, program: &str, failures: usize) -> std::io::Result<()> {
+        self.writer
+            .write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
         self.start(
-            "testsuite",
-            &[
-                ("name", name),
-                ("tests", tests),
-                ("skipped", "0"),
-                ("errors", "0"),
-                ("failures", failures),
-                ("package", package),
-            ],
+            XmlElement::new("testsuites")
+                .attr("name", program)
+                .attr("tests", &failures.max(1).to_string())
+                .attr("skipped", "0")
+                .attr("failures", &failures.to_string())
+                .attr("errors", "0"),
         )
     }
 
-    fn start(&mut self, name: &str, attributes: &[(&str, &str)]) -> std::io::Result<()> {
-        self.tag(name, attributes, false)
+    fn start_suite(
+        &mut self,
+        name: &str,
+        tests: usize,
+        failures: usize,
+        package: &str,
+    ) -> std::io::Result<()> {
+        self.start(
+            XmlElement::new("testsuite")
+                .attr("name", name)
+                .attr("tests", &tests.to_string())
+                .attr("skipped", "0")
+                .attr("errors", "0")
+                .attr("failures", &failures.to_string())
+                .attr("package", package),
+        )
     }
 
-    fn empty(&mut self, name: &str, attributes: &[(&str, &str)]) -> std::io::Result<()> {
-        self.tag(name, attributes, true)
+    fn write_success_case(&mut self, name: &str, classname: &str) -> std::io::Result<()> {
+        self.empty(
+            XmlElement::new("testcase")
+                .attr("name", name)
+                .attr("classname", classname),
+        )
     }
 
-    fn tag(&mut self, name: &str, attributes: &[(&str, &str)], empty: bool) -> std::io::Result<()> {
-        let mut tag = BytesStart::new(name);
-        for &(key, value) in attributes {
-            let value = xml_string(value);
-            tag.push_attribute((key, value.as_str()));
+    fn write_failure_case(&mut self, case: FailureCase<'_>) -> std::io::Result<()> {
+        let mut testcase = XmlElement::new("testcase")
+            .attr("name", case.name)
+            .attr("classname", case.classname);
+        if let Some(location) = case.location {
+            testcase = testcase
+                .attr("line", &location.line.to_string())
+                .attr("column", &location.column.to_string());
         }
-        self.writer.write_event(if empty {
-            Event::Empty(tag)
+        self.start(testcase)?;
+        self.start(XmlElement::new("properties"))?;
+        self.empty(
+            XmlElement::new("property")
+                .attr("name", "severity")
+                .attr("value", severity_name(case.severity)),
+        )?;
+        self.end("properties")?;
+        self.start(XmlElement::new("failure").attr("message", case.message))?;
+        if let Some(location) = case.location {
+            self.text(&format!(
+                "line {}, col {}, {}",
+                location.line, location.column, case.message
+            ))?;
         } else {
-            Event::Start(tag)
-        })
+            self.text(case.message)?;
+        }
+        self.end("failure")?;
+        self.end("testcase")
+    }
+
+    fn end_suite(&mut self) -> std::io::Result<()> {
+        self.end("testsuite")
+    }
+
+    fn finish(mut self) -> std::io::Result<()> {
+        self.end("testsuites")?;
+        self.writer.write_indent()
+    }
+
+    fn start(&mut self, element: XmlElement) -> std::io::Result<()> {
+        self.writer.write_event(Event::Start(element.0))
+    }
+
+    fn empty(&mut self, element: XmlElement) -> std::io::Result<()> {
+        self.writer.write_event(Event::Empty(element.0))
     }
 
     fn text(&mut self, value: &str) -> std::io::Result<()> {
@@ -191,7 +200,23 @@ impl<W: std::io::Write> JunitWriter<W> {
     }
 }
 
-/// Strip terminal escapes and characters disallowed in XML 1.0, matching JUnit report output.
+/// An XML element whose attribute values are sanitized before quick-xml escapes them.
+struct XmlElement(BytesStart<'static>);
+
+impl XmlElement {
+    fn new(name: &'static str) -> Self {
+        Self(BytesStart::new(name))
+    }
+
+    fn attr(mut self, key: &str, value: &str) -> Self {
+        let value = xml_string(value);
+        self.0.push_attribute((key, value.as_str()));
+        self
+    }
+}
+
+/// Preserve quick-junit's string sanitization. Filenames and diagnostic messages can contain
+/// terminal escapes; XML 1.0 forbids ESC, and removing the entire sequence avoids stray text.
 fn xml_string(value: &str) -> String {
     strip_ansi_escapes::strip_str(value).replace(
         |c| matches!(c, '\x00'..='\x08' | '\x0b' | '\x0c' | '\x0e'..='\x1f'),
