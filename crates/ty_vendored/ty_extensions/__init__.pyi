@@ -13,7 +13,14 @@ from ._internal import TypeOf as _TypeOf
 # Special operations
 # ------------------
 
-def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
+def static_assert(condition: object, msg: LiteralString | None = None) -> None:
+    """Make sure that a certain condition holds at type-check time.
+
+    Example:
+
+        static_assert(sys.version_info[:2] >= (3, 13), "Python 3.13 or higher is required")
+
+    At runtime, a false condition raises AssertionError (even with Python optimization enabled)."""
 
 # -------------
 # Special forms
@@ -129,12 +136,12 @@ context.
 literal strings, integers and bytestrings. It can also be inhabited by instances of classes
 with `__bool__` methods returning `Literal[True]`.
 
-In practice, most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`, since
-their boolean evaluation may be uncertain or depend on runtime state. For example, although
-an instance of *exactly* `object` is always truthy, a variable annotated as having type
-`object` could also be an instance of an arbitrary subclass of `object` that is always falsy.
-This means that the boolean evaluation of a variable inferred as `object` is uncertain, so
-`object` is not a subtype of `AlwaysTruthy`.
+In practice, most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`, since their
+boolean evaluation may be uncertain or depend on runtime state. For example, although an
+instance of *exactly* `object` is always truthy, a variable annotated as having type `object`
+could also be an instance of an arbitrary subclass of `object` that is always falsy. This means
+that the boolean evaluation of a variable inferred as `object` is uncertain, so `object` is
+not a subtype of `AlwaysTruthy`.
 """
 
 AlwaysFalsy: _SpecialForm
@@ -150,14 +157,27 @@ In practice, however, most Python objects inhabit neither `AlwaysTruthy` nor `Al
 since their boolean evaluation may be uncertain or depend on runtime state.
 """
 
-# ty treats annotations of `float` to mean `float | int`, and annotations of `complex`
-# to mean `complex | float | int`. This is to support a typing-system special case [1].
-# We therefore provide `JustFloat` and `JustComplex` to represent the "bare" `float` and
-# `complex` types, respectively.
-#
-# [1]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 type JustFloat = _TypeOf[1.0]
+"""
+`JustFloat` represents an instance of the class `float`. This can be used to circumvent
+the [type-system special case] that lets `float` annotations accept values of
+type `int` as well.
+
+At runtime, `JustFloat` is an alias for the built-in `float` class.
+
+[type-system special case]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+"""
+
 type JustComplex = _TypeOf[1.0j]
+"""
+`JustComplex` represents an instance of the class `complex`. This can be used to circumvent
+the [type-system special case] that lets `complex` annotations accept values of
+type `float` or `int` as well.
+
+At runtime, `JustComplex` is an alias for the built-in `complex` class.
+
+[type-system special case]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+"""
 
 class NamedTupleLike(Protocol):
     """
