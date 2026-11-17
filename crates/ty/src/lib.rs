@@ -364,7 +364,7 @@ impl MainLoop {
         let uv_sync_wakeups = db.uv_environments().sync_wakeups();
         let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
 
-        self.sender.send(MainLoopMessage::Start)?;
+        self.spawn_indexing_task(db);
 
         // Apply all queued changes before starting a pending check because every applied change
         // cancels the running check.
@@ -376,23 +376,6 @@ impl MainLoop {
             recv(check_receiver) -> request => request.map(|()| MainLoopMessage::CheckWorkspace),
         } {
             match message {
-                MainLoopMessage::Start => {
-                    let db = db.clone();
-                    let sender = self.sender.clone();
-                    let printer = self.printer;
-                    rayon::spawn(move || {
-                        // Every CLI check needs the file index. Build it here so the main loop
-                        // can handle Ctrl-C while walking the check paths.
-                        let reporter = IndicatifReporter::new(printer.progress_target());
-                        reporter.start_indexing();
-                        let indexed = salsa::Cancelled::catch(|| db.project().files(&db));
-                        // Indicatif skips terminal cleanup while unwinding.
-                        drop(reporter);
-                        if indexed.is_ok() {
-                            let _ = sender.send(MainLoopMessage::ProjectIndexed);
-                        }
-                    });
-                }
                 MainLoopMessage::ProjectIndexed => {
                     if watch {
                         self.start_watching(db)?;
@@ -610,6 +593,27 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+
+    /// Every CLI check needs the file index. Build it in the background so the main loop
+    /// can handle Ctrl-C while walking the check paths.
+    fn spawn_indexing_task(&self, db: &ProjectDatabase) {
+        let db = db.clone();
+        let sender = self.sender.clone();
+        let printer = self.printer;
+        rayon::spawn(move || {
+            let reporter = IndicatifReporter::new(printer.progress_target());
+            reporter.start_indexing();
+            let indexed = salsa::Cancelled::catch(|| db.project().files(&db));
+            // Indicatif skips terminal cleanup while unwinding.
+            drop(reporter);
+            if indexed.is_err() {
+                // On Ctrl-C, the main loop is already handling `Exit` and waiting
+                // for this worker to release its database handle.
+                return;
+            }
+            let _ = sender.send(MainLoopMessage::ProjectIndexed);
+        });
     }
 
     fn synchronize_environments(
@@ -964,7 +968,6 @@ impl MainLoopCancellationToken {
 /// Message sent from the orchestrator to the main loop.
 #[derive(Debug)]
 enum MainLoopMessage {
-    Start,
     ProjectIndexed,
     CheckWorkspace,
     CheckCompleted {
