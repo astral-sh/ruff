@@ -877,7 +877,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/disjoint-type-is-narrowing.md")]
     pub(crate) static DISJOINT_TYPE_IS_NARROWING = {
         summary: "detects incompatible `TypeIs` narrowings to disjoint types",
-        status: LintStatus::stable("0.0.105"),
+        status: LintStatus::stable("0.0.106"),
         default_level: Level::Error,
     }
 }
@@ -886,7 +886,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/suspicious-type-is-narrowing.md")]
     pub(crate) static SUSPICIOUS_TYPE_IS_NARROWING = {
         summary: "detects incompatible `TypeIs` narrowings to overlapping types",
-        status: LintStatus::stable("0.0.105"),
+        status: LintStatus::stable("0.0.106"),
         default_level: Level::Warn,
     }
 }

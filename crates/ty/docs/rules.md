@@ -768,7 +768,7 @@ soundness checks from their type checker, and it may have false positives in som
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.105">0.0.105</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.106">0.0.106</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22disjoint-type-is-narrowing%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L876" target="_blank">View source</a>
 </small>
@@ -821,7 +821,7 @@ two types are not disjoint, but where the narrowed type is [not assignable to] t
 
 
 - v0.0.1-alpha.11: First reported as part of [`invalid-type-guard-definition`](#invalid-type-guard-definition).
-- v0.0.105: Split out from [`invalid-type-guard-definition`](#invalid-type-guard-definition) as a standalone rule.
+- v0.0.106: Split out from [`invalid-type-guard-definition`](#invalid-type-guard-definition) as a standalone rule.
 
 [not assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 [typing specification]: https://typing.python.org/en/latest/spec/narrowing.html#typeis
@@ -4180,7 +4180,7 @@ class C:
 **Rule history**
 
 
-- v0.0.105: The checks for incompatible `TypeIs` narrowings moved to [`disjoint-type-is-narrowing`](#disjoint-type-is-narrowing)
+- v0.0.106: The checks for incompatible `TypeIs` narrowings moved to [`disjoint-type-is-narrowing`](#disjoint-type-is-narrowing)
     and [`suspicious-type-is-narrowing`](#suspicious-type-is-narrowing).
 
 ## `invalid-type-variable-bound`
@@ -7025,7 +7025,7 @@ class F(NamedTuple):
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.105">0.0.105</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.106">0.0.106</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22suspicious-type-is-narrowing%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L885" target="_blank">View source</a>
 </small>
@@ -7165,7 +7165,7 @@ def is_bar(value: Foo) -> TypeIs[Bar]:  # error: "`Bar` is not assignable to the
 
 
 - v0.0.1-alpha.11: First reported as part of [`invalid-type-guard-definition`](#invalid-type-guard-definition).
-- v0.0.105: Split out from [`invalid-type-guard-definition`](#invalid-type-guard-definition) as a standalone rule.
+- v0.0.106: Split out from [`invalid-type-guard-definition`](#invalid-type-guard-definition) as a standalone rule.
 
 [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 [typing specification]: https://typing.python.org/en/latest/spec/narrowing.html#typeis

@@ -126,7 +126,7 @@ def is_bar(value: Foo) -> TypeIs[Bar]:  # error: "`Bar` is not assignable to the
 ## Rule history
 
 - v0.0.1-alpha.11: First reported as part of `invalid-type-guard-definition`.
-- v0.0.105: Split out from `invalid-type-guard-definition` as a standalone rule.
+- v0.0.106: Split out from `invalid-type-guard-definition` as a standalone rule.
 
 [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 [typing specification]: https://typing.python.org/en/latest/spec/narrowing.html#typeis

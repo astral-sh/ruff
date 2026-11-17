@@ -59,9 +59,7 @@ pub(crate) fn check_type_guard_definition<'db>(
         return;
     };
     let param_ty = first_narrowed_param.annotated_type();
-    if narrowed_ty.is_assignable_to(db, env, param_ty)
-        || param_ty.is_equivalent_to(db, env, Type::Never)
-    {
+    if narrowed_ty.is_assignable_to(db, env, param_ty) {
         return;
     }
 

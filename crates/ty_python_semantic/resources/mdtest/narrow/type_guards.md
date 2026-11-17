@@ -88,21 +88,17 @@ class _:
     def _(*, a) -> TypeGuard[str]: ...
 ```
 
-The narrowed type in a `TypeIs` function must be assignable to the declared parameter type. A
-`TypeIs[Never]` function can express a check that always returns `False`. If the parameter type is
-`Never`, there are no arguments to narrow.
+The narrowed type in a `TypeIs` function must be assignable to the declared parameter type.
 
 ```pyi
 from typing import Any
-from typing_extensions import Never, TypeIs
+from typing_extensions import TypeIs
 
 def _(a: object) -> TypeIs[str]: ...
 def _(a: Any) -> TypeIs[str]: ...
 def _(a: tuple[object]) -> TypeIs[tuple[str]]: ...
 def _(a: str | Any) -> TypeIs[str]: ...
 def _(a) -> TypeIs[str]: ...
-def always_false(a: int) -> TypeIs[Never]: ...
-def unreachable(a: Never) -> TypeIs[str]: ...
 ```
 
 If the narrowed type is incompatible and disjoint from the parameter type, ty reports an error:
@@ -114,9 +110,9 @@ def _(a: int) -> TypeIs[str]: ...
 
 ```snapshot
 error[disjoint-type-is-narrowing]: Narrowed type `str` is disjoint from the declared parameter type `int`
-  --> src/mdtest_snippet.pyi:51:18
+  --> src/mdtest_snippet.pyi:49:18
    |
-51 | def _(a: int) -> TypeIs[str]: ...
+49 | def _(a: int) -> TypeIs[str]: ...
    |                  ^^^^^^^^^^^
 info: `int` is disjoint from `str`
 info: `str` and `int` are disjoint due to incompatible instance layouts
@@ -129,9 +125,9 @@ def _(a: list[int]) -> TypeIs[list[str]]: ...
 
 ```snapshot
 error[disjoint-type-is-narrowing]: Narrowed type `list[str]` is disjoint from the declared parameter type `list[int]`
-  --> src/mdtest_snippet.pyi:53:24
+  --> src/mdtest_snippet.pyi:51:24
    |
-53 | def _(a: list[int]) -> TypeIs[list[str]]: ...
+51 | def _(a: list[int]) -> TypeIs[list[str]]: ...
    |                        ^^^^^^^^^^^^^^^^^
 info: `list[int]` is disjoint from `list[str]`
 info: `str` and `int` are not mutual subtypes of each other, but must be due to invariance
@@ -147,11 +143,34 @@ def _(a: bool | str) -> TypeIs[int]: ...
 
 ```snapshot
 warning[suspicious-type-is-narrowing]: Narrowed type `int` is not assignable to the declared parameter type `bool | str`
-  --> src/mdtest_snippet.pyi:55:25
+  --> src/mdtest_snippet.pyi:53:25
    |
-55 | def _(a: bool | str) -> TypeIs[int]: ...
+53 | def _(a: bool | str) -> TypeIs[int]: ...
    |                         ^^^^^^^^^^^
 info: This is not necessarily unsound, but may indicate a mistake in the signature
+```
+
+## `TypeIs` narrowing to or from `Never`
+
+`Never` is a subtype of every type, so `TypeIs[Never]` satisfies the assignability requirement for
+any parameter type. It can describe a predicate that always returns `False`.
+
+```pyi
+from typing_extensions import Never, TypeIs
+
+def always_false(a: int) -> TypeIs[Never]: ...  # ok
+def unreachable(a: Never) -> TypeIs[Never]: ...  # ok
+```
+
+A `Never` parameter follows the same assignability rule. `Any` is assignable to `Never` because it
+can materialize to `Never`.
+
+```pyi
+from typing import Any
+
+# error: [disjoint-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `Never`"
+def narrow_to_str(a: Never) -> TypeIs[str]: ...
+def narrow_to_any(a: Never) -> TypeIs[Any]: ...  # ok
 ```
 
 ## Overloaded definitions

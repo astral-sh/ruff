@@ -39,7 +39,7 @@ two types are not disjoint, but where the narrowed type is [not assignable to] t
 ## Rule history
 
 - v0.0.1-alpha.11: First reported as part of `invalid-type-guard-definition`.
-- v0.0.105: Split out from `invalid-type-guard-definition` as a standalone rule.
+- v0.0.106: Split out from `invalid-type-guard-definition` as a standalone rule.
 
 [not assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 [typing specification]: https://typing.python.org/en/latest/spec/narrowing.html#typeis
