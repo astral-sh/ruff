@@ -1,8 +1,9 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::Modules;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -117,7 +118,11 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
     {
         let mut diagnostic = checker.report_diagnostic(HashlibDigestHex, call.range());
         if arguments.is_empty() {
-            let replacement_range = TextRange::new(value.end(), call.func.end());
+            let value_range =
+                parenthesized_range(value.as_ref().into(), call.into(), checker.tokens())
+                    .unwrap_or(value.range());
+            let replacement = format!("{}.hexdigest()", checker.locator().slice(value_range));
+            let replacement_range = call.range();
 
             let applicability = if checker.comment_ranges().intersects(replacement_range) {
                 Applicability::Unsafe
@@ -126,7 +131,7 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
             };
 
             diagnostic.set_fix(Fix::applicable_edit(
-                Edit::range_replacement(".hexdigest".to_string(), replacement_range),
+                Edit::range_replacement(replacement, replacement_range),
                 applicability,
             ));
         }

@@ -64,3 +64,38 @@ hashed = (
     )
     .hex()
 )
+
+
+# Parentheses around constructors, method attributes, and calls.
+(sha256()).digest().hex()
+(sha256().digest()).hex()
+(sha256().digest)().hex()
+(sha256().digest().hex)()
+((sha256().digest()).hex)()
+(((sha256()).digest)()).hex()
+((((((sha256()).digest)()).hex)()))
+
+hashed = (
+    hashlib.sha256(b"hello")
+    .digest()
+).hex()
+
+hashed = (
+    sha256()
+).digest().hex()
+
+
+# Comments in the constructor are preserved; comments between calls can be removed.
+sha256(
+    # Hash input.
+    b"hello"
+).digest().hex()
+
+hashed = (
+    sha256().digest()
+    # Convert the digest to hexadecimal.
+).hex()
+
+(sha256().digest().hex)(
+    # No hexadecimal separator.
+)

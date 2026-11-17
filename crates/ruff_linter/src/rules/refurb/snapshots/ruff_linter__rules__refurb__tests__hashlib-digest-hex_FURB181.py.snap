@@ -317,3 +317,236 @@ help: Replace with `.hexdigest()`
 62 | )
    |
 note: This is an unsafe fix and may change runtime behavior
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:70:1
+   |
+69 | # Parentheses around constructors, method attributes, and calls.
+70 | (sha256()).digest().hex()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+71 | (sha256().digest()).hex()
+72 | (sha256().digest)().hex()
+   |
+help: Replace with `.hexdigest()`
+   |
+69 | # Parentheses around constructors, method attributes, and calls.
+   - (sha256()).digest().hex()
+70 + (sha256()).hexdigest()
+71 | (sha256().digest()).hex()
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:71:1
+   |
+69 | # Parentheses around constructors, method attributes, and calls.
+70 | (sha256()).digest().hex()
+71 | (sha256().digest()).hex()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+72 | (sha256().digest)().hex()
+73 | (sha256().digest().hex)()
+   |
+help: Replace with `.hexdigest()`
+   |
+70 | (sha256()).digest().hex()
+   - (sha256().digest()).hex()
+71 + sha256().hexdigest()
+72 | (sha256().digest)().hex()
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:72:1
+   |
+70 | (sha256()).digest().hex()
+71 | (sha256().digest()).hex()
+72 | (sha256().digest)().hex()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+73 | (sha256().digest().hex)()
+74 | ((sha256().digest()).hex)()
+   |
+help: Replace with `.hexdigest()`
+   |
+71 | (sha256().digest()).hex()
+   - (sha256().digest)().hex()
+72 + sha256().hexdigest()
+73 | (sha256().digest().hex)()
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:73:1
+   |
+71 | (sha256().digest()).hex()
+72 | (sha256().digest)().hex()
+73 | (sha256().digest().hex)()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+74 | ((sha256().digest()).hex)()
+75 | (((sha256()).digest)()).hex()
+   |
+help: Replace with `.hexdigest()`
+   |
+72 | (sha256().digest)().hex()
+   - (sha256().digest().hex)()
+73 + sha256().hexdigest()
+74 | ((sha256().digest()).hex)()
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:74:1
+   |
+72 | (sha256().digest)().hex()
+73 | (sha256().digest().hex)()
+74 | ((sha256().digest()).hex)()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+75 | (((sha256()).digest)()).hex()
+76 | ((((((sha256()).digest)()).hex)()))
+   |
+help: Replace with `.hexdigest()`
+   |
+73 | (sha256().digest().hex)()
+   - ((sha256().digest()).hex)()
+74 + sha256().hexdigest()
+75 | (((sha256()).digest)()).hex()
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:75:1
+   |
+73 | (sha256().digest().hex)()
+74 | ((sha256().digest()).hex)()
+75 | (((sha256()).digest)()).hex()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+76 | ((((((sha256()).digest)()).hex)()))
+   |
+help: Replace with `.hexdigest()`
+   |
+74 | ((sha256().digest()).hex)()
+   - (((sha256()).digest)()).hex()
+75 + (sha256()).hexdigest()
+76 | ((((((sha256()).digest)()).hex)()))
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:76:3
+   |
+74 | ((sha256().digest()).hex)()
+75 | (((sha256()).digest)()).hex()
+76 | ((((((sha256()).digest)()).hex)()))
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+77 |
+78 | hashed = (
+   |
+help: Replace with `.hexdigest()`
+   |
+75 | (((sha256()).digest)()).hex()
+   - ((((((sha256()).digest)()).hex)()))
+76 + (((sha256()).hexdigest()))
+77 |
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:78:10
+   |
+76 |   ((((((sha256()).digest)()).hex)()))
+77 |
+78 |   hashed = (
+   |  __________^
+79 | |     hashlib.sha256(b"hello")
+80 | |     .digest()
+81 | | ).hex()
+   | |_______^
+82 |
+83 |   hashed = (
+   |
+help: Replace with `.hexdigest()`
+   |
+77 |
+   - hashed = (
+   -     hashlib.sha256(b"hello")
+   -     .digest()
+   - ).hex()
+78 + hashed = hashlib.sha256(b"hello").hexdigest()
+79 |
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:83:10
+   |
+81 |   ).hex()
+82 |
+83 |   hashed = (
+   |  __________^
+84 | |     sha256()
+85 | | ).digest().hex()
+   | |________________^
+help: Replace with `.hexdigest()`
+   |
+84 |     sha256()
+   - ).digest().hex()
+85 + ).hexdigest()
+86 |
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:89:1
+   |
+88 |   # Comments in the constructor are preserved; comments between calls can be removed.
+89 | / sha256(
+90 | |     # Hash input.
+91 | |     b"hello"
+92 | | ).digest().hex()
+   | |________________^
+93 |
+94 |   hashed = (
+   |
+help: Replace with `.hexdigest()`
+   |
+91 |     b"hello"
+   - ).digest().hex()
+92 + ).hexdigest()
+93 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:94:10
+   |
+92 |   ).digest().hex()
+93 |
+94 |   hashed = (
+   |  __________^
+95 | |     sha256().digest()
+96 | |     # Convert the digest to hexadecimal.
+97 | | ).hex()
+   | |_______^
+98 |
+99 |   (sha256().digest().hex)(
+   |
+help: Replace with `.hexdigest()`
+   |
+93 |
+   - hashed = (
+   -     sha256().digest()
+   -     # Convert the digest to hexadecimal.
+   - ).hex()
+94 + hashed = sha256().hexdigest()
+95 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+   --> FURB181.py:99:1
+    |
+ 97 |   ).hex()
+ 98 |
+ 99 | / (sha256().digest().hex)(
+100 | |     # No hexadecimal separator.
+101 | | )
+    | |_^
+help: Replace with `.hexdigest()`
+   |
+98 |
+   - (sha256().digest().hex)(
+   -     # No hexadecimal separator.
+   - )
+99 + sha256().hexdigest()
+   |
+note: This is an unsafe fix and may change runtime behavior
