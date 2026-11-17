@@ -254,8 +254,7 @@ fn colour_science(bencher: Bencher) {
 
 #[bench(sample_size = 1, sample_count = 5)]
 fn numpy(bencher: Bencher) {
-    // Checking NumPy and its tests on a single thread takes too long for CI.
-    run_multithreaded(bencher, &NUMPY);
+    run_single_threaded(bencher, &NUMPY);
 }
 
 #[bench(sample_size = 1, sample_count = 2)]
