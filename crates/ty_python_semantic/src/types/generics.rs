@@ -1271,7 +1271,7 @@ impl<'db> Specialization<'db> {
 
     /// Maps the specialization's types, returning [`Cow::Borrowed`] without allocating if every
     /// type is unchanged and [`Cow::Owned`] otherwise.
-    pub(super) fn map_types(
+    fn map_types(
         self,
         db: &'db dyn Db,
         mut map: impl FnMut(usize, BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
