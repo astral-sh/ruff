@@ -51,7 +51,8 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
+    StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, TypedDictType,
+    UnionType,
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use rustc_hash::FxHashSet;
@@ -456,6 +457,8 @@ impl<'db> Type<'db> {
 #[derive(Clone, Debug)]
 enum UnionElement<'db> {
     Type(Type<'db>),
+    /// A wide union containing only `TypedDict`s, retained in first-occurrence order.
+    TypedDicts(FxOrderSet<TypedDictType<'db>>),
     // A map from integer literals to their promotability.
     //
     // Note that an unpromotable literal takes higher precedence than the identical literal
@@ -473,6 +476,7 @@ impl<'db> UnionElement<'db> {
     fn type_count(&self) -> usize {
         match self {
             UnionElement::Type(_) => 1,
+            UnionElement::TypedDicts(typed_dicts) => typed_dicts.len(),
             UnionElement::IntLiterals(literals) => literals.len(),
             UnionElement::StringLiterals(literals) => literals.len(),
             UnionElement::BytesLiterals(literals) => literals.len(),
@@ -514,6 +518,9 @@ impl<'db> UnionElement<'db> {
                         .is_none_or(|instance| instance.class_literal(db, env) != *enum_class),
                 ),
                 UnionElement::Type(_) => unreachable!("ordinary types are handled before recovery"),
+                UnionElement::TypedDicts(_) => {
+                    unreachable!("TypedDict groups are expanded before mixed reduction")
+                }
             };
         }
 
@@ -621,6 +628,9 @@ impl<'db> UnionElement<'db> {
                 }
             }
             UnionElement::Type(_) => unreachable!("ordinary types are handled before reduction"),
+            UnionElement::TypedDicts(_) => {
+                unreachable!("TypedDict groups are expanded before mixed reduction")
+            }
         };
 
         if ignore {
@@ -655,6 +665,8 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
+/// Keep ordinary small unions allocation-free beyond their existing element vector.
+const MIN_GROUPED_TYPED_DICTS: usize = 8;
 #[derive(Clone)]
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
@@ -789,7 +801,7 @@ impl<'db> UnionBuilder<'db> {
                     let (enum_literal, _) = literals.first().unwrap();
                     replace_with.push(enum_literal.enum_class_instance(db, &self.env));
                 }
-                UnionElement::Type(_) => {}
+                UnionElement::Type(_) | UnionElement::TypedDicts(_) => {}
             }
         }
         for ty in replace_with {
@@ -809,7 +821,74 @@ impl<'db> UnionBuilder<'db> {
         self.add_in_place_impl(ty, &mut vec![]);
     }
 
+    /// Add a `TypedDict` to a wide homogeneous group without pairwise identity scans.
+    ///
+    /// The ordinary simplification loop retains distinct `TypedDict`s by exact identity. An
+    /// ordered set implements that same rule while preserving the first occurrence of each type.
+    fn add_grouped_typed_dict(&mut self, typed_dict: TypedDictType<'db>) -> bool {
+        if let [UnionElement::TypedDicts(typed_dicts)] = self.elements.as_mut_slice() {
+            typed_dicts.insert(typed_dict);
+            return true;
+        }
+
+        if self.elements.len() != MIN_GROUPED_TYPED_DICTS
+            || !self
+                .elements
+                .iter()
+                .all(|element| matches!(element, UnionElement::Type(Type::TypedDict(_))))
+        {
+            return false;
+        }
+
+        if self.elements.iter().any(|element| {
+            matches!(element, UnionElement::Type(Type::TypedDict(existing)) if *existing == typed_dict)
+        }) {
+            return true;
+        }
+
+        let mut typed_dicts: FxOrderSet<_> = self
+            .elements
+            .iter()
+            .filter_map(|element| match element {
+                UnionElement::Type(Type::TypedDict(existing)) => Some(*existing),
+                _ => None,
+            })
+            .collect();
+        typed_dicts.insert(typed_dict);
+        self.elements = vec![UnionElement::TypedDicts(typed_dicts)];
+        true
+    }
+
+    /// Restore an ordered `TypedDict` group before a non-dictionary member enters mixed union
+    /// simplification. This lets the existing pairwise rules remove, merge, or reorder members
+    /// exactly as they would for an ungrouped union. An incoming `object` collapses the union
+    /// directly outside cycle recovery, so it does not require expansion.
+    fn expand_typed_dict_group(&mut self, incoming: Type<'db>) {
+        if !matches!(self.elements.as_slice(), [UnionElement::TypedDicts(_)]) {
+            return;
+        }
+        if incoming.is_object() && !self.cycle_recovery {
+            return;
+        }
+        let Some(UnionElement::TypedDicts(typed_dicts)) = self.elements.pop() else {
+            return;
+        };
+        self.elements = typed_dicts
+            .into_iter()
+            .map(|typed_dict| UnionElement::Type(Type::TypedDict(typed_dict)))
+            .collect();
+    }
+
     fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        match ty {
+            Type::TypedDict(typed_dict) if self.add_grouped_typed_dict(typed_dict) => return,
+            // Wrappers do not add a member themselves; their expanded elements determine whether
+            // the group can remain homogeneous.
+            Type::TypedDict(_) | Type::Union(_) | Type::Never => {}
+            Type::TypeAlias(_) if self.unpack_aliases => {}
+            _ => self.expand_typed_dict_group(ty),
+        }
+
         let db = self.db;
         let cycle_recovery = self.cycle_recovery;
         // When preserving aliases in an annotation, defer comparisons with their bodies
@@ -830,7 +909,9 @@ impl<'db> UnionBuilder<'db> {
         match ty {
             Type::Union(union) => {
                 let new_elements = union.elements(db);
-                self.elements.reserve(new_elements.len());
+                if !matches!(self.elements.as_slice(), [UnionElement::TypedDicts(_)]) {
+                    self.elements.reserve(new_elements.len());
+                }
                 for element in new_elements {
                     self.add_in_place_impl(*element, seen_aliases);
                 }
@@ -842,7 +923,7 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::StringLiterals(literals) => acc + literals.len(),
                         UnionElement::BytesLiterals(literals) => acc + literals.len(),
                         UnionElement::EnumLiterals { literals, .. } => acc + literals.len(),
-                        UnionElement::Type(_) => acc,
+                        UnionElement::Type(_) | UnionElement::TypedDicts(_) => acc,
                     });
                     if should_widen(literals, self.recursively_defined) {
                         self.widen_literal_types(seen_aliases);
@@ -1477,6 +1558,9 @@ impl<'db> UnionBuilder<'db> {
                     }));
                 }
                 UnionElement::Type(ty) => types.push(ty),
+                UnionElement::TypedDicts(typed_dicts) => {
+                    types.extend(typed_dicts.into_iter().map(Type::TypedDict));
+                }
             }
         }
 
@@ -2703,8 +2787,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{
         IntersectionBuilder, IntersectionPolarity, MAX_NON_RECURSIVE_UNION_LITERALS,
-        MAX_RECURSIVE_UNION_LITERALS, RecursivelyDefined, Type, UnionBuilder, UnionType,
-        simplify_intersection_pair, simplify_intersection_pair_impl,
+        MAX_RECURSIVE_UNION_LITERALS, MIN_GROUPED_TYPED_DICTS, RecursivelyDefined, Type,
+        UnionBuilder, UnionElement, UnionType, simplify_intersection_pair,
+        simplify_intersection_pair_impl,
     };
 
     use crate::db::tests::{TestDb, setup_db};
@@ -2753,6 +2838,89 @@ mod tests {
         let union = UnionType::from_elements(db, &env, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(db), &[t0, t1]);
+    }
+
+    #[test]
+    fn grouped_typed_dicts_preserve_order_and_expand_mixed_tails() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let mut source = String::from("from typing import TypedDict\n");
+        for index in 0..=MIN_GROUPED_TYPED_DICTS {
+            source.push_str(&format!(
+                "class D{index}(TypedDict):\n    value: int\nd{index}: D{index}\n"
+            ));
+        }
+        source.push_str("type Alias = D0\n");
+        db.write_dedented("/src/dictionaries.py", &source)?;
+        let env = db.program_environment();
+        let file = ruff_db::files::system_path_to_file(&db, "/src/dictionaries.py")?;
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let dictionaries: Vec<_> = (0..=MIN_GROUPED_TYPED_DICTS)
+            .map(|index| {
+                global_symbol(&db, module, &format!("d{index}"))
+                    .place
+                    .expect_type()
+            })
+            .collect();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) =
+            global_symbol(&db, module, "Alias").place.expect_type()
+        else {
+            anyhow::bail!("Expected a type alias");
+        };
+
+        let nested = Type::Union(UnionType::new(
+            &db,
+            vec![dictionaries[MIN_GROUPED_TYPED_DICTS], dictionaries[0]].into_boxed_slice(),
+            RecursivelyDefined::Yes,
+        ));
+        let prefix = dictionaries[..MIN_GROUPED_TYPED_DICTS]
+            .iter()
+            .copied()
+            .fold(UnionBuilder::new(&db, &env), UnionBuilder::add)
+            .add(dictionaries[0]);
+        assert_eq!(prefix.elements.len(), MIN_GROUPED_TYPED_DICTS);
+        let grouped = prefix
+            .add(nested)
+            .add(Type::TypeAlias(alias))
+            .add(dictionaries[0]);
+        assert!(matches!(
+            grouped.elements.as_slice(),
+            [UnionElement::TypedDicts(_)]
+        ));
+        let union = grouped.clone().build().expect_union();
+        assert_eq!(union.elements(&db), dictionaries.as_slice());
+        assert_eq!(union.recursively_defined(&db), RecursivelyDefined::Yes);
+        assert_eq!(grouped.clone().add(Type::object()).build(), Type::object());
+        let recovering = grouped
+            .clone()
+            .cycle_recovery(true)
+            .add(Type::object())
+            .build()
+            .expect_union();
+        assert_eq!(recovering.elements(&db).last(), Some(&Type::object()));
+        let preserved_alias = grouped
+            .clone()
+            .unpack_aliases(false)
+            .add(Type::TypeAlias(alias))
+            .build()
+            .expect_union();
+        assert_eq!(
+            preserved_alias.elements(&db).last(),
+            Some(&Type::TypeAlias(alias))
+        );
+
+        let literal = LiteralValueType::promotable(1_i64);
+        let mixed = grouped
+            .add(Type::from(literal))
+            .add(dictionaries[0])
+            .build()
+            .expect_union();
+        let mut expected = dictionaries;
+        expected.push(Type::from(
+            literal.with_recursively_defined(RecursivelyDefined::Yes),
+        ));
+        assert_eq!(mixed.elements(&db), expected.as_slice());
+        assert_eq!(mixed.recursively_defined(&db), RecursivelyDefined::Yes);
+        Ok(())
     }
 
     #[test]
