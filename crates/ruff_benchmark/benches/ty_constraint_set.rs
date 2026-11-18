@@ -931,6 +931,52 @@ fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     });
 }
 
+/// An overloaded `__call__` can refer to the protocol itself in each receiver annotation. Checking
+/// the receiver can therefore encounter the same overloads again.
+fn benchmark_overloaded_protocol_receivers(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from __future__ import annotations
+
+        from collections.abc import Callable
+        from os import PathLike
+        from typing import Generic, ParamSpec, Protocol, TypeVar, overload
+
+        V = TypeVar("V", covariant=True)
+        A = TypeVar("A", contravariant=True)
+        P = ParamSpec("P")
+        T = TypeVar("T")
+        C = TypeVar("C", bound=type)
+
+        class Wrapper(Protocol, Generic[V, A]):
+            @overload
+            def __call__(
+                self: Wrapper[Callable[P, T], A], f: Callable[P, T], arg: A, /
+            ) -> Callable[P, T]: ...
+            @overload
+            def __call__(
+                self: Wrapper[classmethod[C, P, T], A], f: classmethod[C, P, T], arg: A, /
+            ) -> classmethod[C, P, T]: ...
+            @overload
+            def __call__(
+                self: Wrapper[staticmethod[P, T], A], f: staticmethod[P, T], arg: A, /
+            ) -> staticmethod[P, T]: ...
+            def __call__(self, f, arg, /): ...
+
+        def check(wrapper: Wrapper[object, str | PathLike[str]], f: Callable[P, T]) -> Callable[P, T]:
+            return wrapper(f, "arg")
+    "#;
+
+    criterion.bench_function("ty_micro[overloaded_protocol_receivers]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Repeated unions share source-order subtrees even after the TDD stops growing. Persisting each
 /// result must not expand those shared subtrees into exponentially many copies.
 fn benchmark_shared_source_order_compaction(criterion: &mut Criterion) {
@@ -979,6 +1025,7 @@ criterion_group!(
     benchmark_many_invariant_typevars,
     benchmark_mixed_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
+    benchmark_overloaded_protocol_receivers,
     benchmark_shared_source_order_compaction,
 );
 criterion_main!(constraint_set);
