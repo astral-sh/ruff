@@ -98,7 +98,7 @@ fn ty_uv_off_overrides_editor_settings() -> Result<()> {
     let mut server = workspace_builder(DiagnosticMode::OpenFilesOnly)?
         .with_file(script, &source)?
         .with_use_uv(UseUv::On)
-        .with_use_uv_for_scripts(true)
+        .with_uv_script_manager()
         .with_env_var("TY_UV", "off")
         .with_real_uv()?
         .enable_work_done_progress(true)

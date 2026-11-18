@@ -5,7 +5,7 @@ use divan::{Bencher, bench};
 use rayon::ThreadPoolBuilder;
 use ruff_db::system::{OsSystem, System, SystemPath, TestSystem};
 use ruff_ranged_value::RangedValue;
-use ty_project::metadata::Options;
+use ty_project::metadata::options::{Options, ProjectManagerOptions, ScriptProjectManager};
 use ty_project::{
     Db, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability, uv_test_env_vars,
 };
@@ -19,7 +19,9 @@ fn setup_iteration(root: &SystemPath, uv: &SystemPath) -> ProjectDatabase {
 
     let mut metadata = ProjectMetadata::discover(root, &system).unwrap();
     metadata.set_override_options(Options {
-        use_uv_for_scripts: Some(RangedValue::cli(true)),
+        project_manager: Some(ProjectManagerOptions {
+            script: Some(RangedValue::cli(ScriptProjectManager::Uv)),
+        }),
         ..Options::default()
     });
     ProjectDatabase::fallible(metadata, system).unwrap()

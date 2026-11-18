@@ -77,27 +77,10 @@ pub struct Options {
     )]
     pub baseline: Option<RelativePathBuf>,
 
-    /// Use [uv](https://docs.astral.sh/uv/) to install the dependencies declared in a script's
-    /// PEP 723 inline metadata.
-    /// Each script gets its own Python environment, which ty uses to resolve its imports.
-    /// This feature requires uv 0.12.3 or newer.
-    ///
-    /// If a script has an inline `[tool.ty]` table, the script's `use-uv-for-scripts` setting
-    /// takes precedence. Otherwise, the script inherits the project's value.
-    ///
-    /// When checking untrusted code with `ty check`, pass `--config use-uv-for-scripts=false`
-    /// to override the project and script settings for that invocation. To disable all uv
-    /// integration, set the `TY_UV` environment variable to `off`.
-    ///
-    /// `TY_UV` takes precedence over `--config`. `uv check` always enables uv for scripts
-    /// by passing `TY_UV=1` to ty.
+    /// Configures the project manager ty uses.
+    #[option_group]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[option(
-        default = "false",
-        value_type = "bool",
-        example = "use-uv-for-scripts = true"
-    )]
-    pub use_uv_for_scripts: Option<RangedValue<bool>>,
+    pub project_manager: Option<ProjectManagerOptions>,
 
     /// Configures the type checking environment.
     #[option_group]
@@ -157,9 +140,19 @@ impl Options {
     /// Translates an explicit uv mode into ty configuration overrides.
     pub fn from_uv_mode(mode: Option<RangedValue<UseUv>>) -> Self {
         Self {
-            use_uv_for_scripts: mode.map(|mode| mode.map_value(UseUv::script_environments_enabled)),
+            project_manager: mode.map(|mode| ProjectManagerOptions {
+                script: Some(mode.map_value(|mode| match mode {
+                    UseUv::On | UseUv::Scripts => ScriptProjectManager::Uv,
+                    UseUv::Off => ScriptProjectManager::None,
+                })),
+            }),
             ..Self::default()
         }
+    }
+
+    pub(crate) fn script_uses_uv(&self) -> Option<bool> {
+        let manager = self.project_manager.as_ref()?.script.as_deref()?;
+        Some(*manager == ScriptProjectManager::Uv)
     }
 
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
@@ -887,6 +880,61 @@ fn self_environment_search_paths(
 
     tracing::debug!("Using site-packages from ty's environment");
     Some((search_paths, is_virtual_env))
+}
+
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct ProjectManagerOptions {
+    /// The project manager to use for scripts with PEP 723 inline metadata.
+    ///
+    /// - With `"none"` (the default), ty looks for imported packages in your Python environment.
+    ///   Install any third-party packages the script needs in that environment.
+    /// - With `"uv"`, each script gets its own Python environment. ty uses
+    ///   [uv](https://docs.astral.sh/uv/) to install the script's declared dependencies there
+    ///   and resolves imports from that environment. This requires uv 0.12.3 or newer.
+    ///
+    /// If a script has an inline `[tool.ty]` table, its `project-manager.script` setting
+    /// takes precedence. Otherwise, the script inherits the project's value.
+    ///
+    /// When checking untrusted code with `ty check`, pass `--config 'project-manager.script="none"'`
+    /// to disable script synchronization. To disable both script synchronization and uv workspace
+    /// discovery, set the `TY_UV` environment variable to `off`. `TY_UV` takes precedence over
+    /// `--config`. If your editor marks the workspace as untrusted, ty disables both automatically.
+    ///
+    /// `uv check` sets `TY_UV=1`, so it always enables script synchronization.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#""none""#,
+        value_type = r#""uv" | "none""#,
+        example = r#"script = "uv""#
+    )]
+    pub script: Option<RangedValue<ScriptProjectManager>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, get_size2::GetSize)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum ScriptProjectManager {
+    /// Use the configured or discovered Python environment. Install the script's dependencies there.
+    None,
+    /// Use uv to synchronize a dedicated environment with the script's inline dependencies.
+    Uv,
+}
+
+impl Combine for ScriptProjectManager {
+    fn combine_with(&mut self, _other: Self) {}
 }
 
 #[derive(

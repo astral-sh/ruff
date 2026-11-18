@@ -1681,7 +1681,7 @@ mod uv_metadata {
                 Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
             )?
             .with_file(SystemPath::new("src/initial.py"), source)?
-            .with_use_uv_for_scripts(true)
+            .with_uv_script_manager()
             .build()
             .wait_until_workspaces_are_initialized();
 

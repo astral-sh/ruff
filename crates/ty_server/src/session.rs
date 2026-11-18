@@ -364,7 +364,7 @@ impl Session {
         for &file in scripts {
             // Open and save handle editor documents separately. Their metadata may contain
             // unsaved changes, including overlays that are not in the diagnostic open-file set.
-            // If a project reload enables `use-uv-for-scripts` for an open script, we accept that
+            // If a project reload selects uv for an open script, we accept that
             // a user must save or reopen the document to request a sync. This avoids rereading open scripts
             // on reload to check whether their inline metadata matches what uv will read from disk.
             if db.document(file).is_some() {
@@ -817,7 +817,7 @@ impl Session {
 
         // Untrusted workspaces disable uv. In trusted workspaces, `TY_UV` takes precedence
         // for both workspace discovery and scripts. When it is unset, discovery uses
-        // `experimental.useUv`. For scripts, `use-uv-for-scripts` in `ty.configuration` wins
+        // `experimental.useUv`. For scripts, `project-manager.script` in `ty.configuration` wins
         // over `experimental.useUv`, and either editor setting overrides script or project configuration.
         let uv_override = self.initialization_options.uv_override(&system);
         let legacy_uv = self.initialization_options.experimental_use_uv();

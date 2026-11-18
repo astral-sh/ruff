@@ -17,6 +17,7 @@ use ruff_db::system::{
 use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_ranged_value::{RangedValue, ValueSource};
+use ty_combine::Combine;
 use ty_module_resolver::{Module, ModuleName};
 use ty_project::metadata::options::{EnvironmentOptions, Options, OutputFormat, SrcOptions};
 use ty_project::metadata::pyproject::{PyProject, Tool};
@@ -557,8 +558,10 @@ where
     project.apply_configuration_files(&system)?;
     if let Some(mode) = UseUv::from_system(&system) {
         project = project.with_uv_workspace_discovery(mode.workspace_discovery_enabled());
-        override_options.get_or_insert_default().use_uv_for_scripts =
-            Some(RangedValue::cli(mode.script_environments_enabled()));
+        override_options = Some(
+            Options::from_uv_mode(Some(RangedValue::cli(mode)))
+                .combine(override_options.unwrap_or_default()),
+        );
     }
     if let Some(override_options) = override_options {
         project.set_override_options(override_options);

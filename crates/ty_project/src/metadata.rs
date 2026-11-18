@@ -397,12 +397,9 @@ impl ProjectMetadata {
         self.use_uv_for_workspace
     }
 
-    /// The `use-uv-for-scripts` override that takes precedence over inline and project settings.
+    /// The `project-manager.script` override that takes precedence over inline and project settings.
     pub fn script_uv_override(&self) -> Option<bool> {
-        self.override_options()?
-            .use_uv_for_scripts
-            .as_deref()
-            .copied()
+        self.override_options()?.script_uses_uv()
     }
 
     pub(crate) fn options(&self) -> &Options {

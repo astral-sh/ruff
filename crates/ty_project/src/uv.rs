@@ -59,11 +59,6 @@ impl UseUv {
     pub const fn workspace_discovery_enabled(self) -> bool {
         matches!(self, Self::On)
     }
-
-    /// Whether uv should prepare standalone script environments.
-    pub const fn script_environments_enabled(self) -> bool {
-        matches!(self, Self::Scripts | Self::On)
-    }
 }
 
 impl Combine for UseUv {

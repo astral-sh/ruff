@@ -1365,10 +1365,10 @@ impl TestServerBuilder {
         Ok(self.with_env_var("UV", uv.as_str()))
     }
 
-    /// Set the editor's `use-uv-for-scripts` configuration option.
-    pub(crate) fn with_use_uv_for_scripts(mut self, enabled: bool) -> Self {
+    /// Select uv as the script project manager in the editor configuration.
+    pub(crate) fn with_uv_script_manager(mut self) -> Self {
         let options = self.initialization_options.get_or_insert_with(|| json!({}));
-        options["configuration"]["use-uv-for-scripts"] = json!(enabled);
+        options["configuration"]["project-manager"]["script"] = json!("uv");
         self
     }
 

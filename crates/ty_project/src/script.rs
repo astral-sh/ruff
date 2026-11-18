@@ -208,7 +208,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 ///
 /// `TY_UV` takes precedence over script and project settings so users can set `TY_UV=off`
 /// when they don't trust the configuration. A script with its own `[tool.ty]` table uses
-/// that table for `use-uv-for-scripts`. Otherwise, it inherits the project settings,
+/// that table for `project-manager.script`. Otherwise, it inherits the project settings,
 /// including user configuration.
 pub(crate) fn use_uv_for_script(db: &dyn Db, file: File) -> bool {
     let project = db.project().metadata(db);
@@ -219,7 +219,7 @@ pub(crate) fn use_uv_for_script(db: &dyn Db, file: File) -> bool {
     let options = inline_script_options(db, file).unwrap_or_else(|| project.options());
     project
         .options_in_precedence_order(options, None)
-        .find_map(|options| options.use_uv_for_scripts.as_deref().copied())
+        .find_map(Options::script_uses_uv)
         .unwrap_or(false)
 }
 

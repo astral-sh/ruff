@@ -41,7 +41,7 @@
 //! file using ty's settings, so existing diagnostics stay visible. Once the file is saved and uv
 //! finishes synchronization, ty checks it again using the environment returned by uv.
 //!
-//! If a project reload enables `use-uv-for-scripts` for an open script, the language server
+//! If a project reload selects uv for an open script, the language server
 //! waits for the next save or reopen to request synchronization. This avoids rereading open
 //! scripts on a configuration change to check whether their inline metadata has been saved.
 //! Disabling the setting takes effect immediately because ty checks it when looking up the
@@ -220,7 +220,7 @@ impl UvEnvironments {
             {
                 // ... but there's a pending in-flight sync. This can happen
                 // when a user removes the script block after requesting a sync
-                // or disables the uv sync with `use-uv-for-scripts = false`.
+                // or disables the uv sync with `project-manager.script = "none"`.
                 //
                 // Set `latest_request` to `None`, so that `poll_sync` knows that it should
                 // discard the result of the in-flight uv sync call without scheduling a new sync.

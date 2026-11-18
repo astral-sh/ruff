@@ -70,7 +70,7 @@ impl EnvVars {
     /// environment.
     ///
     /// Set to `off` to disable all uv integration, including for scripts that set
-    /// `use-uv-for-scripts = true`. An explicit `TY_UV` takes precedence over ty configuration.
+    /// `project-manager.script = "uv"`. An explicit `TY_UV` takes precedence over ty configuration.
     pub const TY_UV: &'static str = "TY_UV";
 
     /// The path to the uv executable to use for workspace discovery and script environments.
