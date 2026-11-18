@@ -147,27 +147,6 @@ fn merge_receiver_constraints<'db>(
     }
 }
 
-/// The per-overload information needed to synthesize one reduced signature for
-/// `functools.partial(...)`.
-#[derive(Clone, Debug)]
-pub(crate) struct PartialSignatureApplication<'db> {
-    signature: Signature<'db>,
-    partial_application: PartialApplication<'db>,
-}
-
-impl<'db> PartialSignatureApplication<'db> {
-    /// Creates a new per-overload partial-application summary.
-    pub(crate) fn new(
-        signature: Signature<'db>,
-        partial_application: PartialApplication<'db>,
-    ) -> Self {
-        Self {
-            signature,
-            partial_application,
-        }
-    }
-}
-
 impl<'db> CallableSignature<'db> {
     pub(crate) fn single(signature: Signature<'db>) -> Self {
         Self {
@@ -256,28 +235,19 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
-    pub(crate) fn partially_apply(
-        db: &'db dyn Db,
-        overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
-    ) -> Option<Self> {
-        let mut new_overloads = Vec::new();
+    /// Keeps the first source declaration for each distinct reduced partial signature.
+    pub(super) fn from_partial_overloads(
+        overloads: impl IntoIterator<Item = Signature<'db>>,
+    ) -> Self {
         let mut seen_overloads = FxHashSet::default();
-
-        for overload in overloads {
-            let signature = overload
-                .signature
-                .partially_apply(db, &overload.partial_application);
-            let dedup_key = signature
-                .clone()
-                .with_definition(None)
-                .with_source_overload_index(None);
-            if seen_overloads.insert(dedup_key) {
-                new_overloads.push(signature);
-            }
-        }
-
-        (!new_overloads.is_empty()).then(|| Self::from_overloads(new_overloads))
+        Self::from_overloads(overloads.into_iter().filter(|signature| {
+            seen_overloads.insert(
+                signature
+                    .clone()
+                    .with_definition(None)
+                    .with_source_overload_index(None),
+            )
+        }))
     }
 
     pub(crate) fn cycle_normalized(
@@ -2213,7 +2183,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Reduces a specialized signature using bindings matched against that same signature.
-    fn partially_apply(
+    pub(crate) fn partially_apply(
         &self,
         db: &'db dyn Db,
         partial_application: &PartialApplication<'db>,
@@ -2276,6 +2246,37 @@ impl<'db> Signature<'db> {
         let reordered = remaining.with_transformed_parameters(reordered);
 
         self.clone().with_parameters(reordered)
+    }
+
+    /// Requires the caller to supply an override for a keyword bound by a partial.
+    pub(super) fn requiring_keyword(self, name: &str, expected: Type<'db>) -> Option<Self> {
+        let mut parameters = self.parameters.as_slice().to_vec();
+        let default = parameters
+            .iter_mut()
+            .find_map(|parameter| match &mut parameter.kind {
+                ParameterKind::PositionalOrKeyword {
+                    name: keyword,
+                    default_type,
+                }
+                | ParameterKind::KeywordOnly {
+                    name: keyword,
+                    default_type,
+                } if keyword == name => Some(default_type),
+                _ => None,
+            });
+        if let Some(default) = default {
+            *default = None;
+        } else if let Some((index, kwargs)) = self.parameters.keyword_variadic() {
+            let keyword = Parameter::keyword_only(Name::new(name))
+                .with_annotated_type(expected)
+                .with_definition(kwargs.definition())
+                .with_source_parameter_index(kwargs.source_parameter_index());
+            parameters.insert(index, keyword);
+        } else {
+            return None;
+        }
+        let parameters = self.parameters.with_transformed_parameters(parameters);
+        Some(self.with_parameters(parameters))
     }
 
     /// Returns the specialization used for the callable signature exposed by a partial object.

@@ -69,7 +69,7 @@ use crate::types::known_instance::{
 };
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
-    PartialApplication, PartialSignatureApplication,
+    PartialApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::walk_type_alias_arguments;
@@ -85,9 +85,9 @@ use crate::types::{
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, RecursiveType,
-    TypeAliasType, TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
-    is_property_method, list_members,
+    StringLiteralType, TypeAliasType, TypeContext, TypeIdentity, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -444,24 +444,18 @@ impl<'db> CallableItem<'db> {
         self.callable().is_callable()
     }
 
-    /// Returns the reduced callable synthesized from this callable item.
-    fn functools_partial_callable<'a>(
+    /// Returns the possible reduced callables for this item, one per distinct stored argument case.
+    fn functools_partial_callables<'a>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<CallableType<'db>> {
+    ) -> Option<SmallVec<[CallableType<'db>; 1]>> {
         match self {
-            CallableItem::Regular(binding) => CallableType::partially_apply(
-                db,
-                binding.partial_signature_applications(
-                    db,
-                    env,
-                    partial_overload,
-                    bound_call_arguments,
-                )?,
-            ),
+            CallableItem::Regular(binding) => {
+                binding.partially_applied_callables(db, env, partial_overload, bound_call_arguments)
+            }
             CallableItem::Constructor(_) => None,
         }
     }
@@ -1239,13 +1233,13 @@ impl<'db> Bindings<'db> {
         let (bound_call_arguments, can_synthesize_signature) =
             call_arguments.functools_partial_bound_arguments(db, env)?;
 
-        let mut partial_bindings =
-            wrapped_callable_ty
-                .bindings(db, env)
-                .match_parameters(db, env, &bound_call_arguments);
+        let mut partial_bindings = wrapped_callable_ty.bindings(db, env);
         for binding in partial_bindings.iter_flat_mut() {
-            binding.prepare_for_partial_application();
+            for overload in &mut binding.overloads {
+                overload.is_partial_application = true;
+            }
         }
+        partial_bindings = partial_bindings.match_parameters(db, env, &bound_call_arguments);
         for constructor in partial_bindings.iter_constructor_items_mut() {
             if let Some(downstream) = constructor.downstream_constructor_mut() {
                 downstream.clear_deferred_constructor_errors_for_partial_application();
@@ -1261,8 +1255,8 @@ impl<'db> Bindings<'db> {
     /// Synthesizes the precise `functools.partial(...)` type for the already-matched bindings.
     ///
     /// Wrapped unions and intersections keep their original callable structure by partially
-    /// applying each callable item independently. A single wrapped callable instead exposes one
-    /// reduced callable whose overload set is merged before being wrapped as `partial[...]`.
+    /// applying each callable item independently. Expanding a bound keyword can also produce a
+    /// union, since a later call must work for every value the partial could store.
     fn functools_partial_type<'a>(
         &self,
         db: &'db dyn Db,
@@ -1271,26 +1265,30 @@ impl<'db> Bindings<'db> {
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
     ) -> Type<'db> {
-        if wrapped_callable_ty.is_union() || wrapped_callable_ty.is_intersection() {
-            return self.map_item_types(db, env, |partial_item| {
-                partial_item
-                    .functools_partial_callable(db, env, partial_overload, bound_call_arguments)
-                    .map(|callable| {
+        let mut reduce = |item: &CallableItem<'db>| {
+            item.functools_partial_callables(db, env, partial_overload, bound_call_arguments)
+        };
+        if wrapped_callable_ty.is_union()
+            || wrapped_callable_ty.is_intersection()
+            || self
+                .iter_flat()
+                .any(|binding| binding.partial_keyword_cases().is_some())
+        {
+            return self.map_item_types(db, env, |item| {
+                Some(UnionType::from_elements(
+                    db,
+                    env,
+                    reduce(item)?.into_iter().map(|callable| {
                         callable.into_precise_functools_partial_instance(db, wrapped_callable_ty)
-                    })
+                    }),
+                ))
             });
         }
 
         let partial_callables: SmallVec<[CallableType<'db>; 1]> = self
             .iter_callable_items()
-            .filter_map(|partial_item| {
-                partial_item.functools_partial_callable(
-                    db,
-                    env,
-                    partial_overload,
-                    bound_call_arguments,
-                )
-            })
+            .filter_map(reduce)
+            .flatten()
             .collect();
 
         if partial_callables.is_empty() {
@@ -3709,16 +3707,6 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    /// Prepare these overloads for constructing `functools.partial(...)`.
-    ///
-    /// Partial application intentionally leaves some parameters unbound, so we still want to
-    /// type-check all explicitly bound arguments without treating unbound parameters as absent.
-    fn prepare_for_partial_application(&mut self) {
-        for overload in &mut self.overloads {
-            overload.prepare_for_partial_application();
-        }
-    }
-
     /// Ignore downstream constructor call-shape errors when constructing
     /// `functools.partial(...)`.
     ///
@@ -3768,78 +3756,66 @@ impl<'db> CallableBinding<'db> {
         })
     }
 
-    /// Returns the matching overload indexes when `functools.partial(...)` ignores errors that are
-    /// only relevant at invocation time.
-    fn matching_partial_overload_index(&self) -> MatchingOverloadIndex {
-        let mut matching_overloads = self.overloads.iter().enumerate().filter(|(_, overload)| {
-            !overload
-                .errors
-                .iter()
-                .any(BindingError::is_relevant_for_partial_application)
-        });
-        match matching_overloads.next() {
-            None => MatchingOverloadIndex::None,
-            Some((first, _)) => {
-                if let Some((second, _)) = matching_overloads.next() {
-                    let mut indexes = vec![first, second];
-                    for (index, _) in matching_overloads {
-                        indexes.push(index);
-                    }
-                    MatchingOverloadIndex::Multiple(indexes)
-                } else {
-                    MatchingOverloadIndex::Single(first)
-                }
-            }
-        }
+    /// The argument lists for the different values of a stored keyword.
+    fn partial_keyword_cases(&self) -> Option<&[ExpandedCallEvaluation<'db>]> {
+        let OverloadCallResult::ArgumentTypeExpansion(expanded) =
+            self.overload_call_result.as_ref()?
+        else {
+            return None;
+        };
+        expanded.expanded_partial_keyword.then_some(&expanded.cases)
     }
 
-    /// Selects the reduced signature applications for this `functools.partial(...)` binding.
-    ///
-    /// Diagnostics for invalid bound arguments are still reported back to the outer `partial(...)`
-    /// overload. Callable construction happens in the callable layer after this summary is built.
-    fn partial_signature_applications<'a>(
+    /// Reduces the compatible overloads and reports invalid bound arguments to the outer partial.
+    fn partially_applied_callables<'a>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<SmallVec<[PartialSignatureApplication<'db>; 1]>> {
+    ) -> Option<SmallVec<[CallableType<'db>; 1]>> {
         if self.overloads().is_empty() {
             return None;
         }
 
-        let selected_overload_indexes = match self.matching_partial_overload_index() {
-            MatchingOverloadIndex::Single(index) => vec![index],
-            MatchingOverloadIndex::Multiple(indexes) => indexes,
-            MatchingOverloadIndex::None => {
-                let source_overload_index = self
-                    .best_failing_overload_index(FailingOverloadSelection::ReportableForPartial)
-                    .unwrap_or(0);
-                let source_errors = &self.overloads()[source_overload_index].errors;
-                for error in source_errors {
-                    if error.is_relevant_for_partial_application() {
-                        let error = error.clone().maybe_apply_argument_index_offset(Some(1));
-                        if !partial_overload.errors.contains(&error) {
-                            partial_overload.errors.push(error);
-                        }
+        let mut selected_overload_indexes: SmallVec<[usize; 1]> = self
+            .overloads
+            .iter()
+            .positions(|overload| {
+                !overload
+                    .errors
+                    .iter()
+                    .any(BindingError::is_relevant_for_partial_application)
+            })
+            .collect();
+        if selected_overload_indexes.is_empty() {
+            let source_overload_index = self
+                .best_failing_overload_index(FailingOverloadSelection::ReportableForPartial)
+                .unwrap_or(0);
+            let source_errors = &self.overloads()[source_overload_index].errors;
+            for error in source_errors {
+                if error.is_relevant_for_partial_application() {
+                    let error = error.clone().maybe_apply_argument_index_offset(Some(1));
+                    if !partial_overload.errors.contains(&error) {
+                        partial_overload.errors.push(error);
                     }
                 }
-
-                // When no overload is compatible with the bound arguments, don't manufacture a
-                // precise reduced signature from an arbitrary overloaded callable shape.
-                if self.overloads().len() > 1 {
-                    return None;
-                }
-
-                vec![source_overload_index]
             }
-        };
+
+            // When no overload is compatible with the bound arguments, don't manufacture a
+            // precise reduced signature from an arbitrary overloaded callable shape.
+            if self.overloads().len() > 1 {
+                return None;
+            }
+
+            selected_overload_indexes.push(source_overload_index);
+        }
 
         let signature_arguments = bound_call_arguments.with_self(self.bound_type);
-        let applications: SmallVec<_> = selected_overload_indexes
+        let signatures: SmallVec<[(usize, Signature<'db>); 1]> = selected_overload_indexes
             .into_iter()
-            .filter_map(|index| self.overloads().get(index))
-            .map(|overload| {
+            .map(|index| {
+                let overload = &self.overloads()[index];
                 // TODO: Preserve intersected parameter lists when synthesizing partial signatures.
                 if let Some((_, paramspec)) =
                     overload.signature.parameters().as_paramspec_with_prefix()
@@ -3853,10 +3829,24 @@ impl<'db> CallableBinding<'db> {
                 {
                     return None;
                 }
-                Some(overload.partial_signature_application(db, env, signature_arguments.as_ref()))
+                Some((
+                    index,
+                    overload.partially_applied_signature(db, env, signature_arguments.as_ref()),
+                ))
             })
             .collect::<Option<_>>()?;
-        (!applications.is_empty()).then_some(applications)
+        if let Some(cases) = self.partial_keyword_cases() {
+            return cases
+                .iter()
+                .map(|case| case.partial_callable(db, &signatures, bound_call_arguments))
+                .collect();
+        }
+
+        CallableType::from_partial_overloads(
+            db,
+            signatures.into_iter().map(|(_, signature)| signature),
+        )
+        .map(|callable| smallvec_inline![callable])
     }
 
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
@@ -4028,45 +4018,7 @@ impl<'db> CallableBinding<'db> {
                     return;
                 }
                 MatchingOverloadIndex::Multiple(indexes) => {
-                    // If two or more candidate overloads remain, proceed to step 4.
-                    self.filter_overloads_containing_variadic(&indexes);
-
-                    tracing::trace!(
-                        target: "ty_python_semantic::types::call::bind",
-                        matching_overload_index = ?self.matching_overload_index(),
-                        "after step 4",
-                    );
-
-                    match self.matching_overload_index() {
-                        MatchingOverloadIndex::None => {
-                            // This shouldn't be possible because step 4 can only filter out overloads
-                            // when there _is_ a matching variadic argument.
-                            tracing::debug!("All overloads have been filtered out in step 4");
-                            return;
-                        }
-                        MatchingOverloadIndex::Single(_) => {
-                            // If only one candidate overload remains, it is the winning match.
-                            return;
-                        }
-                        MatchingOverloadIndex::Multiple(indexes) => {
-                            // If two or more candidate overloads remain, proceed to step 5.
-                            self.filter_overloads_using_any_or_unknown(
-                                db,
-                                env,
-                                constraints,
-                                call_arguments.as_ref(),
-                                &indexes,
-                            );
-
-                            tracing::trace!(
-                                target: "ty_python_semantic::types::call::bind",
-                                matching_overload_index = ?self.matching_overload_index(),
-                                "after step 5",
-                            );
-                        }
-                    }
-
-                    // This shouldn't lead to argument type expansion.
+                    self.disambiguate_overloads(db, env, constraints, &call_arguments, &indexes);
                     return;
                 }
             }
@@ -4206,41 +4158,15 @@ impl<'db> CallableBinding<'db> {
                     MatchingOverloadIndex::Single(index) => {
                         Some(self.overloads[index].return_type())
                     }
-                    MatchingOverloadIndex::Multiple(matching_overload_indexes) => {
-                        self.filter_overloads_containing_variadic(&matching_overload_indexes);
-
-                        tracing::trace!(
-                            target: "ty_python_semantic::types::call::bind",
-                            matching_overload_index = ?self.matching_overload_index(),
-                            "after step 4",
+                    MatchingOverloadIndex::Multiple(indexes) => {
+                        self.disambiguate_overloads(
+                            db,
+                            env,
+                            constraints,
+                            expanded_arguments,
+                            &indexes,
                         );
-
-                        match self.matching_overload_index() {
-                            MatchingOverloadIndex::None => {
-                                tracing::debug!(
-                                    "All overloads have been filtered out in step 4 during argument type expansion"
-                                );
-                                None
-                            }
-                            MatchingOverloadIndex::Single(_) => Some(self.return_type()),
-                            MatchingOverloadIndex::Multiple(indexes) => {
-                                self.filter_overloads_using_any_or_unknown(
-                                    db,
-                                    env,
-                                    constraints,
-                                    expanded_arguments,
-                                    &indexes,
-                                );
-
-                                tracing::trace!(
-                                    target: "ty_python_semantic::types::call::bind",
-                                    matching_overload_index = ?self.matching_overload_index(),
-                                    "after step 5",
-                                );
-
-                                Some(self.return_type())
-                            }
-                        }
+                        Some(self.return_type())
                     }
                 };
 
@@ -4276,6 +4202,17 @@ impl<'db> CallableBinding<'db> {
                 // cannot compensate for a different argument list with no matches.
                 self.overload_call_result = Some(OverloadCallResult::ArgumentTypeExpansion(
                     Box::new(ExpandedOverloadCall {
+                        expanded_partial_keyword: self.is_partial_application()
+                            && expanded_argument_lists.first().is_some_and(|expanded| {
+                                call_arguments.iter().zip(expanded.iter()).any(
+                                    |(original, value)| {
+                                        matches!(
+                                            original.kind(),
+                                            Argument::Keyword(_) | Argument::Keywords
+                                        ) && original != value
+                                    },
+                                )
+                            }),
                         return_type: UnionType::from_elements(
                             db,
                             env,
@@ -4352,6 +4289,44 @@ impl<'db> CallableBinding<'db> {
         self.overloads.len() > 1
             && self.matching_overloads().count() < self.overloads.len()
             && expansions.has_expandable_variadic()
+    }
+
+    /// Apply steps 4 and 5 of overload resolution when multiple overloads accept the arguments.
+    fn disambiguate_overloads(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        indexes: &[usize],
+    ) {
+        // A later call to a partial can select any overload compatible with its bound
+        // arguments. Keep those overloads for each expanded argument list as well.
+        if self.is_partial_application() {
+            return;
+        }
+
+        self.filter_overloads_containing_variadic(indexes);
+        tracing::trace!(
+            target: "ty_python_semantic::types::call::bind",
+            matching_overload_index = ?self.matching_overload_index(),
+            "after step 4",
+        );
+
+        if let MatchingOverloadIndex::Multiple(indexes) = self.matching_overload_index() {
+            self.filter_overloads_using_any_or_unknown(db, env, constraints, arguments, &indexes);
+            tracing::trace!(
+                target: "ty_python_semantic::types::call::bind",
+                matching_overload_index = ?self.matching_overload_index(),
+                "after step 5",
+            );
+        }
+    }
+
+    fn is_partial_application(&self) -> bool {
+        self.overloads
+            .first()
+            .is_some_and(|overload| overload.is_partial_application)
     }
 
     /// Filter overloads based on variadic argument to variadic parameter match.
@@ -5052,6 +5027,8 @@ enum OverloadCallResult<'db> {
 /// The combined return type and selected overloads from successful argument expansion.
 #[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct ExpandedOverloadCall<'db> {
+    /// At least one of the keywords stored by a partial was expanded into alternatives.
+    expanded_partial_keyword: bool,
     return_type: Type<'db>,
     cases: Box<[ExpandedCallEvaluation<'db>]>,
 }
@@ -5064,6 +5041,37 @@ struct ExpandedCallEvaluation<'db> {
     return_type: Type<'db>,
     selected_overloads: SmallVec<[usize; 2]>,
     snapshot: CallableBindingSnapshot<'db>,
+}
+
+impl<'db> ExpandedCallEvaluation<'db> {
+    /// A partial stores one of the expanded argument lists. For this list, an overload
+    /// that rejected a stored keyword is still available if the caller overrides it.
+    fn partial_callable(
+        &self,
+        db: &'db dyn Db,
+        signatures: &[(usize, Signature<'db>)],
+        arguments: &CallArguments<'_, 'db>,
+    ) -> Option<CallableType<'db>> {
+        let snapshots = &self.snapshot.matching_overloads;
+        CallableType::from_partial_overloads(
+            db,
+            signatures.iter().filter_map(|(index, signature)| {
+                let position = snapshots
+                    .binary_search_by_key(index, |(index, _)| *index)
+                    .ok()?;
+                let (_, snapshot) = &snapshots[position];
+                snapshot
+                    .errors
+                    .iter()
+                    .filter(|error| error.is_relevant_for_partial_application())
+                    .try_fold(signature.clone(), |reduced, error| {
+                        let (name, expected) =
+                            error.partial_keyword_override(db, arguments, signature)?;
+                        reduced.requiring_keyword(name, expected)
+                    })
+            }),
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -5088,6 +5096,7 @@ struct ArgumentMatcher<'a, 'db> {
     arguments: &'a CallArguments<'a, 'db>,
     parameters: &'a Parameters<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
+    is_partial_application: bool,
 
     argument_matches: Vec<MatchedArgument<'db>>,
     parameter_info: Vec<ParameterInfo>,
@@ -5110,6 +5119,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         arguments: &'a CallArguments<'a, 'db>,
         parameters: &'a Parameters<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
+        is_partial_application: bool,
     ) -> Self {
         let mut explicit_keyword_parameters: FxHashSet<usize> = arguments
             .iter()
@@ -5136,6 +5146,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             arguments,
             parameters,
             errors,
+            is_partial_application,
             argument_matches: vec![MatchedArgument::default(); arguments.len()],
             parameter_info: vec![ParameterInfo::default(); parameters.len()],
             next_positional: 0,
@@ -5214,7 +5225,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument: Argument<'a>,
         argument_type: Option<Type<'db>>,
-        provenance: InvalidArgumentTypeProvenance,
+        provenance: InvalidArgumentTypeProvenance<'db>,
         parameter_index: usize,
         parameter: &Parameter<'db>,
         positional: bool,
@@ -5298,6 +5309,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument: Argument<'a>,
         argument_type: Option<Type<'db>>,
         name: &str,
+        provenance: InvalidArgumentTypeProvenance<'db>,
     ) -> Result<(), ()> {
         let Some((parameter_index, parameter)) = self
             .parameters
@@ -5325,7 +5337,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             argument_index,
             argument,
             argument_type,
-            InvalidArgumentTypeProvenance::Argument,
+            provenance,
             parameter_index,
             parameter,
             false,
@@ -5495,12 +5507,25 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 
             // An unknown key must not prevent later keys from matching their parameters.
             for (name, unpacked_key) in unpacked.keys {
+                // A caller can override each stored keyword separately, even when several
+                // keys in a dictionary literal bind to the same **kwargs parameter.
+                let provenance = if self.is_partial_application
+                    && matches!(keywords, KeywordArgument::Known { .. })
+                {
+                    InvalidArgumentTypeProvenance::UnpackedKeyword(StringLiteralType::new(
+                        db,
+                        name.as_str(),
+                    ))
+                } else {
+                    InvalidArgumentTypeProvenance::Argument
+                };
                 matched &= self
                     .match_keyword(
                         argument_index,
                         Argument::Keywords,
                         Some(unpacked_key.value_ty),
                         name.as_str(),
+                        provenance,
                     )
                     .is_ok();
             }
@@ -5753,7 +5778,9 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             }
         }
         self.match_unpacked_variadic(db, env, &mut missing);
-        if !missing.is_empty() {
+        // Callers supply the remaining arguments when they invoke the partial. Defer this
+        // check on every match, including retries after overload argument expansion.
+        if !self.is_partial_application && !missing.is_empty() {
             self.errors.push(BindingError::MissingArguments {
                 parameters: ParameterContexts(missing),
                 paramspec,
@@ -7480,6 +7507,7 @@ impl<'db> CallInference<'_, 'db> {
                         .and_then(|(first, last)| (first == last).then_some(first)),
                     argument: Some(SpecializationErrorContext {
                         parameter_definition: parameter.definition(),
+                        provenance: InvalidArgumentTypeProvenance::Argument,
                         expected_ty: formal,
                         provided_ty: None,
                     }),
@@ -7704,6 +7732,7 @@ impl<'db> CallInference<'_, 'db> {
                         parameter_definition: self.signature.parameters()
                             [relation.matched_parameter.index]
                             .definition(),
+                        provenance: relation.matched_parameter.provenance,
                         expected_ty: relation.declared_type,
                         provided_ty: Some(relation.argument_type),
                     }),
@@ -8365,7 +8394,7 @@ pub struct MatchedParameter<'db> {
     expected_type: Option<Type<'db>>,
 
     /// Why this parameter match exists.
-    provenance: InvalidArgumentTypeProvenance,
+    provenance: InvalidArgumentTypeProvenance<'db>,
 }
 
 impl<'db> MatchedArgument<'db> {
@@ -9398,7 +9427,12 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_, 'db>,
     ) {
         let parameters = self.signature.parameters();
-        let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
+        let mut matcher = ArgumentMatcher::new(
+            arguments,
+            parameters,
+            &mut self.errors,
+            self.is_partial_application,
+        );
         let mut keywords_arguments = vec![];
         for (argument_index, argument) in arguments.iter().enumerate() {
             match argument {
@@ -9406,7 +9440,13 @@ impl<'db> Binding<'db> {
                     let _ = matcher.match_positional(argument_index, argument.kind(), None, false);
                 }
                 CallArgument::Keyword { name, .. } => {
-                    let _ = matcher.match_keyword(argument_index, argument.kind(), None, name);
+                    let _ = matcher.match_keyword(
+                        argument_index,
+                        argument.kind(),
+                        None,
+                        name,
+                        InvalidArgumentTypeProvenance::Argument,
+                    );
                 }
                 CallArgument::Variadic(variadic) => {
                     let _ = matcher.match_variadic(db, env, argument_index, variadic);
@@ -9630,13 +9670,6 @@ impl<'db> Binding<'db> {
         })
     }
 
-    /// `functools.partial(...)` is allowed to leave required parameters unbound.
-    fn prepare_for_partial_application(&mut self) {
-        self.is_partial_application = true;
-        self.errors
-            .retain(|error| !matches!(error, BindingError::MissingArguments { .. }));
-    }
-
     /// Downstream constructor validation is deferred until after partial signatures are merged.
     fn clear_deferred_constructor_errors_for_partial_application(&mut self) {
         self.is_partial_application = true;
@@ -9704,13 +9737,13 @@ impl<'db> Binding<'db> {
         partial_application
     }
 
-    /// Packages the information needed to synthesize this overload's reduced partial signature.
-    fn partial_signature_application(
+    /// Synthesizes this overload's reduced partial signature.
+    fn partially_applied_signature(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
-    ) -> PartialSignatureApplication<'db> {
+    ) -> Signature<'db> {
         let partial_application = self.partial_application(arguments);
         let signature = self.signature.specialize_for_partial_application(
             db,
@@ -9721,7 +9754,7 @@ impl<'db> Binding<'db> {
         );
 
         if signature.parameters() == self.signature.parameters() {
-            return PartialSignatureApplication::new(signature, partial_application);
+            return signature.partially_apply(db, &partial_application);
         }
 
         // Specializing `*args: *Ts` can replace one parameter with several positional parameters.
@@ -9730,7 +9763,7 @@ impl<'db> Binding<'db> {
         let mut binding = Self::single(self.signature_type, signature);
         binding.match_parameters(db, env, arguments);
         let partial_application = binding.partial_application(arguments);
-        PartialSignatureApplication::new(binding.signature, partial_application)
+        binding.signature.partially_apply(db, &partial_application)
     }
 
     /// Returns the bound type for the specified parameter, or `None` if no argument was matched to
@@ -10301,10 +10334,11 @@ impl<'db> ForwardedParameterSource<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
-pub(crate) enum InvalidArgumentTypeProvenance {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum InvalidArgumentTypeProvenance<'db> {
     Argument,
     OpenTypedDictExtraItems,
+    UnpackedKeyword(StringLiteralType<'db>),
 }
 
 /// A statically known combination of arguments that makes a stdlib `dataclass` decorator invalid.
@@ -10326,6 +10360,7 @@ pub(crate) enum InvalidDataclassArgument {
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct SpecializationErrorContext<'db> {
     parameter_definition: Option<Definition<'db>>,
+    provenance: InvalidArgumentTypeProvenance<'db>,
     expected_ty: Type<'db>,
     /// Absent when inference combines multiple arguments into a variadic tuple.
     provided_ty: Option<Type<'db>>,
@@ -10342,7 +10377,7 @@ pub(crate) enum BindingError<'db> {
         last_argument_index: Option<usize>,
         expected_ty: Type<'db>,
         provided_ty: Type<'db>,
-        provenance: InvalidArgumentTypeProvenance,
+        provenance: InvalidArgumentTypeProvenance<'db>,
         /// The callable that actually declared the parameter, when reached through a `ParamSpec`.
         parameter_source: Option<ForwardedParameterSource<'db>>,
     },
@@ -10580,6 +10615,45 @@ fn invalid_dataclass_target<'db>(
 }
 
 impl<'db> BindingError<'db> {
+    /// Which stored keyword must the caller replace to make this overload applicable?
+    /// A positional argument or an incompatible call shape cannot be repaired by an override.
+    fn partial_keyword_override<'a>(
+        &self,
+        db: &'db dyn Db,
+        arguments: &'a CallArguments<'_, 'db>,
+        signature: &Signature<'db>,
+    ) -> Option<(&'a str, Type<'db>)> {
+        let (index, provenance, expected) = match self {
+            Self::InvalidArgumentType {
+                argument_index: Some(index),
+                expected_ty,
+                provenance,
+                ..
+            } => (index, provenance, Some(*expected_ty)),
+            Self::SpecializationError {
+                argument_index: Some(index),
+                argument: Some(argument),
+                ..
+            } => (index, &argument.provenance, None),
+            _ => return None,
+        };
+        let name = match (arguments.get(*index)?.kind(), provenance) {
+            (Argument::Keyword(name), _) => name,
+            (Argument::Keywords, InvalidArgumentTypeProvenance::UnpackedKeyword(name)) => {
+                name.value(db)
+            }
+            _ => return None,
+        };
+        let expected = expected.or_else(|| {
+            let parameters = signature.parameters();
+            let (_, parameter) = parameters
+                .keyword_by_name(name)
+                .or_else(|| parameters.keyword_variadic())?;
+            Some(parameter.annotated_type())
+        })?;
+        Some((name, expected))
+    }
+
     /// Returns `true` if this error indicates the overload didn't match the call arguments.
     ///
     /// Returns `false` for semantic errors where the overload matched the types but the
