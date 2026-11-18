@@ -1,9 +1,10 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::io::{BufWriter, Write as _};
 use std::path::Path;
 
 use quick_xml::Writer;
-use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::events::{BytesDecl, BytesText, Event};
 
 use ruff_source_file::LineColumn;
 
@@ -33,23 +34,59 @@ impl<'a> JunitRenderer<'a> {
         output: impl std::io::Write,
         diagnostics: &[Diagnostic],
     ) -> std::io::Result<()> {
-        let mut xml = JunitWriter::new(output);
+        let mut writer = Writer::new_with_indent(output, b' ', 4);
+        writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
         let program = self.config.program;
         let package = format!("org.{program}");
-        xml.start_report(program, diagnostics.len())?;
+        writer
+            .create_element("testsuites")
+            .with_attribute(("name", xml_string(program).as_str()))
+            .with_attribute(("tests", diagnostics.len().max(1).to_string().as_str()))
+            .with_attribute(("skipped", "0"))
+            .with_attribute(("failures", diagnostics.len().to_string().as_str()))
+            .with_attribute(("errors", "0"))
+            .write_inner_content(|writer| {
+                if diagnostics.is_empty() {
+                    self.write_suite(writer, program, &package, &[])?;
+                } else {
+                    for (filename, diagnostics) in
+                        group_diagnostics_by_filename(diagnostics, self.resolver)
+                    {
+                        self.write_suite(writer, filename, &package, &diagnostics)?;
+                    }
+                }
+                Ok(())
+            })?;
+        writer.write_indent()
+    }
 
-        if diagnostics.is_empty() {
-            xml.start_suite(program, 1, 0, &package)?;
-            xml.write_success_case("No errors found", program)?;
-            xml.end_suite()?;
-        } else {
-            for (filename, diagnostics) in group_diagnostics_by_filename(diagnostics, self.resolver)
-            {
-                let count = diagnostics.len();
-                xml.start_suite(filename, count, count, &package)?;
+    fn write_suite<W: std::io::Write>(
+        &self,
+        writer: &mut Writer<W>,
+        filename: &str,
+        package: &str,
+        diagnostics: &[DiagnosticWithLocation<'_>],
+    ) -> std::io::Result<()> {
+        writer
+            .create_element("testsuite")
+            .with_attribute(("name", xml_string(filename).as_str()))
+            .with_attribute(("tests", diagnostics.len().max(1).to_string().as_str()))
+            .with_attribute(("skipped", "0"))
+            .with_attribute(("errors", "0"))
+            .with_attribute(("failures", diagnostics.len().to_string().as_str()))
+            .with_attribute(("package", xml_string(package).as_str()))
+            .write_inner_content(|writer| {
+                if diagnostics.is_empty() {
+                    writer
+                        .create_element("testcase")
+                        .with_attribute(("name", "No errors found"))
+                        .with_attribute(("classname", xml_string(filename).as_str()))
+                        .write_empty()?;
+                    return Ok(());
+                }
+
                 let classname = Path::new(filename).with_extension("");
                 let classname = classname.to_str().unwrap_or(filename);
-
                 for DiagnosticWithLocation {
                     diagnostic,
                     start_location: location,
@@ -60,19 +97,21 @@ impl<'a> JunitRenderer<'a> {
                     } else {
                         diagnostic.secondary_code_or_id()
                     };
-                    let name = format!("org.{program}.{code}");
-                    xml.write_failure_case(FailureCase {
-                        name: &name,
-                        classname,
-                        location,
-                        severity: diagnostic.severity(),
-                        message: &diagnostic.concise_message().to_str(),
-                    })?;
+                    let name = format!("org.{}.{code}", self.config.program);
+                    write_failure_case(
+                        writer,
+                        FailureCase {
+                            name: &name,
+                            classname,
+                            location: *location,
+                            severity: diagnostic.severity(),
+                            message: &diagnostic.concise_message().to_str(),
+                        },
+                    )?;
                 }
-                xml.end_suite()?;
-            }
-        }
-        xml.finish()
+                Ok(())
+            })?;
+        Ok(())
     }
 }
 
@@ -93,126 +132,45 @@ struct FailureCase<'a> {
     message: &'a str,
 }
 
-struct JunitWriter<W> {
-    writer: Writer<W>,
-}
-
-impl<W: std::io::Write> JunitWriter<W> {
-    fn new(output: W) -> Self {
-        Self {
-            writer: Writer::new_with_indent(output, b' ', 4),
-        }
+fn write_failure_case<W: std::io::Write>(
+    writer: &mut Writer<W>,
+    case: FailureCase<'_>,
+) -> std::io::Result<()> {
+    let mut testcase = writer
+        .create_element("testcase")
+        .with_attribute(("name", xml_string(case.name).as_str()))
+        .with_attribute(("classname", xml_string(case.classname).as_str()));
+    if let Some(location) = case.location {
+        testcase = testcase
+            .with_attribute(("line", location.line.to_string().as_str()))
+            .with_attribute(("column", location.column.to_string().as_str()));
     }
-
-    fn start_report(&mut self, program: &str, failures: usize) -> std::io::Result<()> {
-        self.writer
-            .write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
-        self.start(
-            XmlElement::new("testsuites")
-                .attr("name", program)
-                .attr("tests", &failures.max(1).to_string())
-                .attr("skipped", "0")
-                .attr("failures", &failures.to_string())
-                .attr("errors", "0"),
-        )
-    }
-
-    fn start_suite(
-        &mut self,
-        name: &str,
-        tests: usize,
-        failures: usize,
-        package: &str,
-    ) -> std::io::Result<()> {
-        self.start(
-            XmlElement::new("testsuite")
-                .attr("name", name)
-                .attr("tests", &tests.to_string())
-                .attr("skipped", "0")
-                .attr("errors", "0")
-                .attr("failures", &failures.to_string())
-                .attr("package", package),
-        )
-    }
-
-    fn write_success_case(&mut self, name: &str, classname: &str) -> std::io::Result<()> {
-        self.empty(
-            XmlElement::new("testcase")
-                .attr("name", name)
-                .attr("classname", classname),
-        )
-    }
-
-    fn write_failure_case(&mut self, case: FailureCase<'_>) -> std::io::Result<()> {
-        let mut testcase = XmlElement::new("testcase")
-            .attr("name", case.name)
-            .attr("classname", case.classname);
-        if let Some(location) = case.location {
-            testcase = testcase
-                .attr("line", &location.line.to_string())
-                .attr("column", &location.column.to_string());
-        }
-        self.start(testcase)?;
-        self.start(XmlElement::new("properties"))?;
-        self.empty(
-            XmlElement::new("property")
-                .attr("name", "severity")
-                .attr("value", severity_name(case.severity)),
-        )?;
-        self.end("properties")?;
-        self.start(XmlElement::new("failure").attr("message", case.message))?;
-        if let Some(location) = case.location {
-            self.text(&format!(
+    testcase.write_inner_content(|writer| {
+        writer
+            .create_element("properties")
+            .write_inner_content(|writer| {
+                writer
+                    .create_element("property")
+                    .with_attribute(("name", "severity"))
+                    .with_attribute(("value", severity_name(case.severity)))
+                    .write_empty()?;
+                Ok(())
+            })?;
+        let description = if let Some(location) = case.location {
+            Cow::Owned(format!(
                 "line {}, col {}, {}",
                 location.line, location.column, case.message
-            ))?;
+            ))
         } else {
-            self.text(case.message)?;
-        }
-        self.end("failure")?;
-        self.end("testcase")
-    }
-
-    fn end_suite(&mut self) -> std::io::Result<()> {
-        self.end("testsuite")
-    }
-
-    fn finish(mut self) -> std::io::Result<()> {
-        self.end("testsuites")?;
-        self.writer.write_indent()
-    }
-
-    fn start(&mut self, element: XmlElement) -> std::io::Result<()> {
-        self.writer.write_event(Event::Start(element.0))
-    }
-
-    fn empty(&mut self, element: XmlElement) -> std::io::Result<()> {
-        self.writer.write_event(Event::Empty(element.0))
-    }
-
-    fn text(&mut self, value: &str) -> std::io::Result<()> {
-        let value = xml_string(value);
-        self.writer.write_event(Event::Text(BytesText::new(&value)))
-    }
-
-    fn end(&mut self, name: &str) -> std::io::Result<()> {
-        self.writer.write_event(Event::End(BytesEnd::new(name)))
-    }
-}
-
-/// An XML element whose attribute values are sanitized before quick-xml escapes them.
-struct XmlElement(BytesStart<'static>);
-
-impl XmlElement {
-    fn new(name: &'static str) -> Self {
-        Self(BytesStart::new(name))
-    }
-
-    fn attr(mut self, key: &str, value: &str) -> Self {
-        let value = xml_string(value);
-        self.0.push_attribute((key, value.as_str()));
-        self
-    }
+            Cow::Borrowed(case.message)
+        };
+        writer
+            .create_element("failure")
+            .with_attribute(("message", xml_string(case.message).as_str()))
+            .write_text_content(BytesText::new(&xml_string(&description)))?;
+        Ok(())
+    })?;
+    Ok(())
 }
 
 /// Preserve quick-junit's string sanitization. Filenames and diagnostic messages can contain
@@ -295,6 +253,16 @@ mod tests {
         let report = env.render_diagnostics(&[]);
         assert!(report.contains("tests=\"1\" skipped=\"0\" failures=\"0\" errors=\"0\""));
         assert!(report.contains("<testcase name=\"No errors found\" classname=\"ty\"/>"));
+    }
+
+    #[test]
+    fn sanitizes_and_escapes_diagnostic_messages() {
+        let (env, mut diagnostics) = create_diagnostics(DiagnosticFormat::Junit);
+        diagnostics[0].set_concise_message("\x1b[31mred\x1b[0m & <\0");
+        let report = env.render_diagnostics(&diagnostics[..1]);
+        assert!(report.contains("message=\"red &amp; &lt;\""));
+        assert!(report.contains("red &amp; &lt;</failure>"));
+        assert!(!report.contains(['\x1b', '\0']));
     }
 
     #[test]
