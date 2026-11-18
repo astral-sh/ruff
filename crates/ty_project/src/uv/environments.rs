@@ -792,17 +792,26 @@ fn script_python(db: &dyn Db) -> Option<SystemPathBuf> {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use anyhow::Context;
     use ruff_db::Db as _;
     use ruff_db::files::{File, system_path_to_file};
-    use ruff_db::system::{DbWithWritableSystem, SystemPath};
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath};
     use salsa::Setter;
     use salsa::plumbing::AsId;
     use serde_json::{Value, json};
+    use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
     use ty_python_semantic::Db as _;
+    use ty_static::EnvVars;
 
-    use super::{UvMetadata, script_environment};
+    use super::{
+        UvMetadata, UvMetadataError, apply_sync_result, script_environment, script_sync_task,
+    };
     use crate::db::testing::TestDb;
+    use crate::metadata::Options;
+    use crate::metadata::options::EnvironmentOptions;
+    use crate::metadata::value::RelativePathBuf;
     use crate::{Db as _, ProjectMetadata};
 
     #[test]
@@ -832,6 +841,90 @@ mod tests {
 
         assert!(!environments.has_pending_synchronizations());
         assert!(environment.initialization_error(&db).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn uv_script_does_not_use_the_project_environment() -> anyhow::Result<()> {
+        let root = SystemPath::new(if cfg!(windows) {
+            "C:/project"
+        } else {
+            "/project"
+        });
+        let venv = root.join("project-venv");
+        let site_packages = venv.join(if cfg!(windows) {
+            "Lib/site-packages"
+        } else {
+            "lib/python3.13/site-packages"
+        });
+        let path = root.join("report.py");
+        let mut metadata = ProjectMetadata::new("test", root.to_path_buf());
+        metadata.set_fallback_options(Options {
+            environment: Some(EnvironmentOptions {
+                python: Some(RelativePathBuf::python_extension(&venv)),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        });
+        let mut db = TestDb::new(metadata);
+        db.test_system()
+            .set_env_var(EnvVars::VIRTUAL_ENV, venv.as_str());
+        db.write_dedented(
+            venv.join("pyvenv.cfg").as_str(),
+            r"
+            home = /missing
+            version = 3.13.0
+            include-system-site-packages = false
+            ",
+        )?;
+        db.write_file(site_packages.join("project_dependency.py"), "")?;
+        db.write_dedented(
+            path.as_str(),
+            r"
+            # /// script
+            # [tool.ty]
+            # project-manager.script = 'none'
+            # ///
+
+            import project_dependency
+            ",
+        )?;
+        let script = system_path_to_file(&db, &path)?;
+        let dependency =
+            ModuleName::new_static("project_dependency").context("expected a valid module name")?;
+        let resolves_dependency = |db: &TestDb, script| {
+            resolve_module(
+                db,
+                ImportingFile::ResolverFile(db.program_file(script).resolver_file(db)),
+                &dependency,
+            )
+            .is_some()
+        };
+
+        assert!(resolves_dependency(&db, script));
+
+        db.write_dedented(
+            path.as_str(),
+            r"
+            # /// script
+            # [tool.ty]
+            # project-manager.script = 'uv'
+            # ///
+
+            import project_dependency
+            ",
+        )?;
+
+        let environment =
+            script_environment(&db, script).context("expected a script environment")?;
+        let task = script_sync_task(&db, script).context("expected a script sync task")?;
+        apply_sync_result(
+            &mut db,
+            environment,
+            &task.request,
+            Err(UvMetadataError::Invocation(io::Error::other("uv failed"))),
+        );
+        assert!(!resolves_dependency(&db, script));
         Ok(())
     }
 

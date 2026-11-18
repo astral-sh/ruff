@@ -261,10 +261,16 @@ impl Options {
                 default
             });
 
+        // Scripts with uv enabled use only their own environment, even before sync or after
+        // sync fails. The setting does not affect environment discovery for the project.
+        let allow_environment_fallback =
+            !matches!(context, OptionsContext::Script(_)) || self.script_uses_uv() != Some(true);
         let python_environment = match self.python_environment(context.configuration_root(), system)
         {
-            Ok(None) => PythonEnvironment::discover(context.project_root(), system)
-                .map_err(ToProgramSettingsError::PythonEnvironmentDiscovery),
+            Ok(None) if allow_environment_fallback => {
+                PythonEnvironment::discover(context.project_root(), system)
+                    .map_err(ToProgramSettingsError::PythonEnvironmentDiscovery)
+            }
             configured => configured.map_err(ToProgramSettingsError::PythonEnvironment),
         };
 
@@ -283,13 +289,17 @@ impl Options {
             })?
             .flatten();
 
-        let self_environment = self_environment_search_paths(
-            python_environment
-                .as_ref()
-                .map(ty_python_semantic::PythonEnvironment::origin)
-                .cloned(),
-            system,
-        );
+        let self_environment = if allow_environment_fallback {
+            self_environment_search_paths(
+                python_environment
+                    .as_ref()
+                    .map(ty_python_semantic::PythonEnvironment::origin)
+                    .cloned(),
+                system,
+            )
+        } else {
+            None
+        };
 
         let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
             let site_packages_paths = python_environment

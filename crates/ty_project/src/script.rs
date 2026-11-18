@@ -14,9 +14,7 @@ use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, UseDef
 use ty_python_semantic::PythonVersionWithSource;
 use ty_python_semantic::dependency::DependencyMetadata;
 
-use crate::metadata::options::{
-    AnalysisOptionsContext, EnvironmentOptions, Options, OptionsContext,
-};
+use crate::metadata::options::{AnalysisOptionsContext, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
 use crate::metadata::value::RelativePathBuf;
 use crate::uv::{DependencyMetadataError, UvMetadata, script_environment};
@@ -108,7 +106,6 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     };
 
     let environment = script_environment(db, file);
-    let uv_metadata = environment.and_then(|environment| environment.uv_metadata(db));
 
     if let Some(diagnostic) =
         environment.and_then(|environment| environment.initialization_error(db))
@@ -123,12 +120,12 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     }
 
     let project_metadata = db.project().metadata(db);
-    let program_settings = if let Some(inline_options) = inline_script_options(db, file) {
+    let (mut options, root) = if let Some(inline_options) = inline_script_options(db, file) {
         // A script with it's own `tool.ty` table uses its own inline settings over the project settings.
         // Merge and validate the settings (`file_settings` can't report diagnostics).
         let mut script_options = inline_options.clone();
         metadata.apply_requires_python(file, &mut script_options, &mut diagnostics);
-        let options = merge_script_options(project_metadata, &script_options, uv_metadata);
+        let options = merge_script_options(project_metadata, &script_options);
 
         diagnostics.extend(
             inline_options
@@ -153,14 +150,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
             .and_then(|path| path.parent())
             .unwrap_or_else(|| db.system().current_directory());
 
-        resolve_script_program_settings(
-            db,
-            &options,
-            OptionsContext::Script(root),
-            project_metadata.name(),
-            file,
-            &mut diagnostics,
-        )
+        (options, root)
     } else {
         // A script without its own `tool.ty` table. Use the project settings instead.
         // The settings were already validated by the project.
@@ -170,25 +160,35 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
         } else {
             // Respect a script's `requires-python` option
             metadata.apply_requires_python(file, &mut script_options, &mut diagnostics);
-            if let Some(mut environment) = project_metadata.options().environment.clone() {
+            script_options.combine_with(project_metadata.options().clone());
+            if let Some(environment) = &mut script_options.environment {
                 // Each script is a standalone program with its own first-party roots.
                 environment.root = None;
-                script_options.environment.combine_with(Some(environment));
             }
             &script_options
         };
 
-        let options = merge_script_options(project_metadata, base_options, uv_metadata);
-
-        resolve_script_program_settings(
-            db,
-            &options,
-            OptionsContext::Script(project_metadata.root()),
-            project_metadata.name(),
-            file,
-            &mut diagnostics,
+        (
+            merge_script_options(project_metadata, base_options),
+            project_metadata.root(),
         )
     };
+    if options.script_uses_uv() == Some(true) {
+        // Isolate the script from the project's Python environment, even before uv provides
+        // the script's own environment.
+        options.environment.get_or_insert_default().python = environment
+            .and_then(|environment| environment.uv_metadata(db))
+            .and_then(UvMetadata::environment)
+            .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata));
+    }
+    let program_settings = resolve_script_program_settings(
+        db,
+        &options,
+        OptionsContext::Script(root),
+        project_metadata.name(),
+        file,
+        &mut diagnostics,
+    );
 
     program_settings.search_paths.try_register_static_roots(db);
 
@@ -295,31 +295,11 @@ fn script_metadata(db: &dyn Db, file: File) -> Option<Box<Result<ScriptMetadata,
     Some(Box::new(Ok(metadata)))
 }
 
-fn merge_script_options(
-    project_metadata: &ProjectMetadata,
-    base_options: &Options,
-    uv_metadata: Option<&UvMetadata>,
-) -> Options {
-    let uv_options = uv_metadata.map(|metadata| Options {
-        environment: Some(EnvironmentOptions {
-            python: metadata
-                .environment()
-                .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
-            ..EnvironmentOptions::default()
-        }),
-        ..Options::default()
-    });
-
+fn merge_script_options(project_metadata: &ProjectMetadata, base_options: &Options) -> Options {
     let mut options = Options::default();
     // Merge the options with CLI, LSP, user configuration, and fallback options
-    for layer in project_metadata.options_in_precedence_order(base_options, uv_options.as_ref()) {
+    for layer in project_metadata.options_in_precedence_order(base_options, None) {
         options.combine_with(layer.clone());
-    }
-
-    // An explicit Python environment selects uv's interpreter, not the script's site-packages.
-    if let Some(environment) = uv_metadata.and_then(UvMetadata::environment) {
-        options.environment.get_or_insert_default().python =
-            Some(RelativePathBuf::new(environment, ValueSource::UvMetadata));
     }
 
     // Unlike projects, standalone scripts default to `root = []`.
