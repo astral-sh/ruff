@@ -350,15 +350,17 @@ def update(items: list[Any], labels: set[Any]):
     reveal_type(labels)  # revealed: set[Any]
 ```
 
-A collection unpacked from an existing variable keeps its inferred type.
+A collection unpacked from an existing variable takes its type arguments from the target's
+declaration. A value that might be `None` keeps that possibility.
 
 ```py
 def reuse(source: dict[str, int], optional: dict[str, int] | None):
     first: dict[str, Any]
     second: dict[str, Any] | None
     first, second = source, optional
-    reveal_type(first)  # revealed: dict[str, int]
-    reveal_type(second)  # revealed: dict[str, int] | None
+    reveal_type(first)  # revealed: dict[str, Any]
+    reveal_type(second)  # revealed: dict[str, Any] | None
+    reveal_type(source)  # revealed: dict[str, int]
 ```
 
 An incompatible literal still produces an assignment error.

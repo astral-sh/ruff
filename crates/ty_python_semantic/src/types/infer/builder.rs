@@ -2026,9 +2026,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             || declared_ty
                                 .qualifiers()
                                 .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR))
-                        && declared_type.is_assignable_to(db, env, inferred_ty)
                     {
-                        declared_type
+                        if declared_type.is_assignable_to(db, env, inferred_ty) {
+                            declared_type
+                        } else {
+                            inferred_ty.prefer_declared_type_arguments(db, env, declared_type)
+                        }
                     } else {
                         inferred_ty
                     }
@@ -13754,6 +13757,23 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 
             // Allow declarations to override inference in case of invalid assignment.
             bound_ty = declared_ty;
+        } else if self.type_context.expected_type().is_some()
+            && self.type_context.should_prefer_expected_type()
+            && matches!(
+                self.node,
+                AnyNodeRef::ExprName(_) | AnyNodeRef::ExprAttribute(_)
+            )
+            && matches!(
+                self.binding.kind(db),
+                DefinitionKind::Assignment(_)
+                    | DefinitionKind::AugmentedAssignment(_)
+                    | DefinitionKind::NamedExpression(_)
+            )
+        {
+            // An earlier declaration can supply type arguments while the assigned value
+            // determines the outer type, e.g. `list[Any]` after assigning a `list[int]`
+            // to a name previously annotated as `list[Any] | None`.
+            bound_ty = inferred_ty.prefer_declared_type_arguments(db, env, declared_ty);
         }
         // In the following cases, the bound type may not be the same as the RHS value type.
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = self.node {

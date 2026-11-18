@@ -150,6 +150,79 @@ reveal_type(v4)  # revealed: list[int]
 invalid: list[str] = returns_list_int()
 ```
 
+## Type arguments in a narrower annotated assignment
+
+A tuple can have a narrower first element while its second element gets a type argument from the
+annotation. The assignment check and the reveal on the right-hand side use the original tuple type.
+
+```toml
+[rules]
+unsound-assignment = "error"
+```
+
+```py
+from collections.abc import Iterator
+from typing import Any
+
+def bind(values: Iterator[Any]):
+    # error: [unsound-assignment]
+    result: tuple[int, Iterator[str]] = reveal_type((0, values))  # revealed: tuple[Literal[0], Iterator[Any]]
+    reveal_type(result)  # revealed: tuple[Literal[0], Iterator[str]]
+```
+
+## Type arguments from an earlier annotation
+
+A subsequent assignment can use a type argument from the one matching member of a declared union.
+This preserves narrowing to the outer type of the value.
+
+```py
+from collections.abc import Callable, Generator
+from typing import Any
+
+def bind(items: list[Any] | None, integers: list[int], dynamic: Any):
+    items = integers
+    reveal_type(items)  # revealed: list[Any]
+
+    items = dynamic
+    reveal_type(items)  # revealed: Any
+
+    annotated: list[Any] | None = dynamic
+    reveal_type(annotated)  # revealed: list[Any] | None
+```
+
+A tuple's first element can identify the matching union member. If two members fit, the binding
+keeps the inferred type.
+
+```py
+def match_union_arms(values: list[Any]):
+    pair: tuple[int, list[str]] | tuple[str, list[bytes]]
+    pair = (0, values)
+    reveal_type(pair)  # revealed: tuple[Literal[0], list[str]]
+
+    result: list[int] | list[str]
+    result = values
+    reveal_type(result)  # revealed: list[Any]
+```
+
+The same preference applies to the contravariant send type of a generator.
+
+```py
+def bind_generator(source: Generator[None, int, None]):
+    target: Generator[None, Any, None]
+    target = source
+    reveal_type(target)  # revealed: Generator[None, Any, None]
+```
+
+The type argument can itself be a gradual callable. An unbounded tuple keeps its shape and uses the
+declared element type.
+
+```py
+def bind_callbacks(source: tuple[Callable[[int], int], ...]):
+    callbacks: tuple[Callable[..., int], ...] | None
+    callbacks = source
+    reveal_type(callbacks)  # revealed: tuple[(...) -> int, ...]
+```
+
 ## PEP-604 annotations are supported
 
 ```py
