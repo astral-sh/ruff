@@ -2653,19 +2653,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .collect();
                 Some((inferable, signatures))
             };
+            let check_capture =
+                |inferable, source: &[Signature<'db>], target: &[Signature<'db>]| {
+                    self.with_inferable(inferable)
+                        .check_callable_overloads(db, source, target)
+                        .reduce_uncaptured_typevars(db, self.env, self.inferable, inferable)
+                };
             if let Some((inferable, source)) = capture(source_overloads, target_overloads) {
-                return self.with_inferable(inferable).check_callable_overloads(
-                    db,
-                    &source,
-                    target_overloads,
-                );
+                return check_capture(inferable, &source, target_overloads);
             }
             if let Some((inferable, target)) = capture(target_overloads, source_overloads) {
-                return self.with_inferable(inferable).check_callable_overloads(
-                    db,
-                    source_overloads,
-                    &target,
-                );
+                return check_capture(inferable, source_overloads, &target);
             }
         }
         self.check_callable_overloads(db, source_overloads, target_overloads)
