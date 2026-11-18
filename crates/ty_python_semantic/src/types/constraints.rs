@@ -5260,7 +5260,7 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
-    use crate::types::generics::{ApplySpecialization, GenericContext};
+    use crate::types::generics::{AliasPolicy, ApplySpecialization, GenericContext};
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
         TypeVarInstance,
@@ -5424,7 +5424,11 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let mapped = set.apply_type_mapping_impl(
             db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(u, int)),
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                u,
+                int,
+                AliasPolicy::Expand,
+            )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(&env),
         );
@@ -5597,6 +5601,7 @@ mod tests {
             &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
                 t,
                 KnownClass::Int.to_instance(db, &env),
+                AliasPolicy::Expand,
             )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(&env),
@@ -5621,6 +5626,7 @@ mod tests {
             &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
                 t,
                 KnownClass::Str.to_instance(db, &env),
+                AliasPolicy::Expand,
             )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(&env),

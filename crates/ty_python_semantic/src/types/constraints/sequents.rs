@@ -17,6 +17,7 @@ use crate::types::constraints::{
     ALWAYS_FALSE, AtomicConstraintId, ConstraintSetBuilder, ConstraintSetStorage, Node,
     OwnedConstraintSet,
 };
+use crate::types::generics::AliasPolicy;
 use crate::types::signatures::CallableSignature;
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
@@ -909,6 +910,11 @@ impl<'db> AtomicConstraint<'db> {
             return None;
         }
 
+        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+            replacement_typevar,
+            replacement_bound,
+            AliasPolicy::Expand,
+        ));
         if replacement_source.provenance == ConstraintProvenance::VALIDITY
             && let Type::Callable(callable) = needle_bound
             && callable.kind(db) == CallableTypeKind::ParamSpecValue
@@ -917,10 +923,6 @@ impl<'db> AtomicConstraint<'db> {
             // those bounds for its local generic parameters would enumerate combinations of
             // specialized overloads without providing any new call-site evidence. Free typevars
             // still participate in substitution, as do evidence-backed bounds on local typevars.
-            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                replacement_typevar,
-                replacement_bound,
-            ));
             let visitor = ApplyTypeMappingVisitor::new(env);
             let signatures = CallableSignature::from_overloads(
                 callable.signatures(db).iter().flat_map(|signature| {
@@ -941,7 +943,7 @@ impl<'db> AtomicConstraint<'db> {
             return (replacement != needle_bound).then_some(replacement);
         }
 
-        Some(needle_bound.substitute_one_typevar(db, env, replacement_typevar, replacement_bound))
+        Some(needle_bound.apply_type_mapping(db, env, &mapping, TypeContext::default()))
     }
 
     fn add_covariant_lower_tightened_sequent(
@@ -2416,7 +2418,7 @@ mod tests {
         let expected = AtomicConstraint::from(ConcreteLowerBound::new(
             ConstraintProvenance::INFERRED | ConstraintProvenance::VALIDITY,
             p,
-            captured.substitute_one_typevar(db, &env, q, overloads),
+            captured.substitute_one_typevar(db, &env, q, overloads, AliasPolicy::Expand),
         ));
         let sequents = SequentMap::for_constraint_pair(db, &env, lower, replacement);
         assert!(sequents.is_some_and(|sequents| {

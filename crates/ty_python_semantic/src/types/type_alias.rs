@@ -11,7 +11,10 @@ use crate::{
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
-        generics::{ApplySpecialization, Specialization, bind_typevar, walk_specialization_types},
+        generics::{
+            AliasPolicy, ApplySpecialization, Specialization, bind_typevar,
+            walk_specialization_types,
+        },
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
@@ -785,6 +788,14 @@ impl<'db> TypeAliasType<'db> {
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
+            TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                ..,
+                AliasPolicy::Preserve,
+            )) => Type::TypeAlias(self.apply_specialization(db, |context| {
+                self.specialization(db)
+                    .unwrap_or_else(|| context.default_specialization(db, None))
+                    .apply_type_mapping_impl(db, type_mapping, &[], visitor)
+            })),
             TypeMapping::FreshenBoundTypeVars { .. } => {
                 visitor.visit(db, ty, type_mapping, || {
                     // Stored arguments account for the alias's own parameters, but its

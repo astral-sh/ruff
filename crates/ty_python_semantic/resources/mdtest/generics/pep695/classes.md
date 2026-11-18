@@ -3071,6 +3071,22 @@ def invalid() -> Nested:
     return Box("wrong")  # error: [invalid-explicit-return]
 ```
 
+## Inferring a recursive alias in a constructor receiver
+
+The element type inferred from the argument also specializes recursive references to `Tree`.
+
+```py
+type Tree[T] = T | list[Tree[T]]
+
+class Box[T]:
+    value: T
+
+    def __init__[A](self: "Box[Tree[A]]", values: list[A]) -> None: ...
+
+def from_values(values: list[int]) -> Tree[int]:
+    return Box(values).value
+```
+
 ## Multiple inherited recursive protocol methods
 
 A subclass with several inherited recursive methods satisfies the matching protocol specialization.

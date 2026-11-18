@@ -1015,6 +1015,9 @@ impl<'db> GenericContext<'db> {
     {
         let mut types = self.fill_in_defaults(db, types);
         let env = ProgramEnvironment::from_program(self.program(db));
+        let substitute = |ty: Type<'db>, var, replacement| {
+            ty.substitute_one_typevar(db, &env, var, replacement, AliasPolicy::Preserve)
+        };
 
         // A bare T = T preserves an unresolved variable. Elsewhere in its own binding, T
         // contributes the bottom of its domain. Do this before substituting peers, since
@@ -1024,10 +1027,8 @@ impl<'db> GenericContext<'db> {
             if *ty == Type::TypeVar(var) {
                 continue;
             }
-            let context = Self::from_typevar_instances(db, &env, [var]);
-            let bottom = context.specialize(db, &[var.domain(db).bottom(db)]);
-            *ty = ty.apply_specialization(db, bottom);
-            pending.push((i, var, context));
+            *ty = substitute(*ty, var, var.domain(db).bottom(db));
+            pending.push((i, var));
         }
 
         // Independent bindings, including types from the caller, are already stable under
@@ -1043,56 +1044,49 @@ impl<'db> GenericContext<'db> {
         // Eliminate one variable from the other bindings at a time. Repeatedly substituting
         // all of them at once can keep reintroducing the same union members in a different order.
         let mut alias_cycles = Vec::new();
-        while let Some(&(_, first, _)) = pending.first() {
+        while let Some(&(_, first)) = pending.first() {
             // With B = B & C and C = B, eliminating C leaves B free. Picking the
             // fixed point Never for B first would discard that solution. Try bindings
             // without self-references before choosing a fixed point for a cycle.
             let mut fixed_point = None;
-            let independent = pending
-                .iter()
-                .enumerate()
-                .find_map(|(slot, &(i, var, context))| {
-                    let binding = types[i];
-                    if binding == Type::TypeVar(var) {
-                        return Some((slot, binding));
-                    }
-                    let substitute =
-                        |value| binding.apply_specialization(db, context.specialize(db, &[value]));
-                    let candidate = substitute(var.domain(db).bottom(db));
-                    if candidate == binding {
-                        return Some((slot, binding));
-                    }
-                    if fixed_point.is_none()
-                        && candidate.is_equivalent_to(db, &env, substitute(candidate))
-                    {
-                        fixed_point = Some((slot, candidate));
-                    }
-                    None
-                });
+            let independent = pending.iter().enumerate().find_map(|(slot, &(i, var))| {
+                let binding = types[i];
+                if binding == Type::TypeVar(var) {
+                    return Some((slot, binding));
+                }
+                let candidate = substitute(binding, var, var.domain(db).bottom(db));
+                if candidate == binding {
+                    return Some((slot, binding));
+                }
+                if fixed_point.is_none()
+                    && candidate.is_equivalent_to(db, &env, substitute(binding, var, candidate))
+                {
+                    fixed_point = Some((slot, candidate));
+                }
+                None
+            });
             let (slot, solution) = independent
                 .or(fixed_point)
                 .unwrap_or_else(|| (0, first.unknown_value(db, &env)));
-            let (i, var, context) = pending.remove(slot);
+            let (i, var) = pending.remove(slot);
             types[i] = solution;
             if solution == Type::TypeVar(var) {
-                alias_cycles.push((var, context));
+                alias_cycles.push(var);
                 continue;
             }
-            let substitution = context.specialize(db, &[solution]);
             for (j, ty) in types.iter_mut().enumerate() {
                 if j != i {
-                    *ty = ty.apply_specialization(db, substitution);
+                    *ty = substitute(*ty, var, solution);
                 }
             }
         }
         // An indirect alias can acquire this binding on the last substitution. Choose
         // a representative after all such aliases, and their declared bounds, are known.
-        for (var, context) in alias_cycles {
+        for var in alias_cycles {
             let representative = self.alias_cycle_representative(db, &env, var, &types);
             if representative != var {
-                let substitution = context.specialize(db, &[Type::TypeVar(representative)]);
                 for ty in &mut types {
-                    *ty = ty.apply_specialization(db, substitution);
+                    *ty = substitute(*ty, var, Type::TypeVar(representative));
                 }
             }
         }
@@ -2306,6 +2300,20 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     }
 }
 
+/// How single-variable substitution handles a type alias such as `Tree[T]`.
+///
+/// TODO: Remove this enum and always use `Preserve`. Alias specializations need to record
+/// substitutions for captured variables, such as the enclosing `T` in `type Items = tuple[T, ...]`.
+/// Constraint propagation must also avoid reprocessing equivalent bounds when successive
+/// substitutions into a recursive alias produce structurally different types.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub enum AliasPolicy {
+    /// Keep the alias and substitute into its type arguments.
+    Preserve,
+    /// Expand the alias body to substitute occurrences of the variable there.
+    Expand,
+}
+
 /// A mapping between type variables and types.
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
@@ -2327,9 +2335,8 @@ pub enum ApplySpecialization<'a, 'db> {
         types: &'a [Type<'db>],
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
-    /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
-    /// substitute a typevar nested inside another constraint's bound.
-    Single(BoundTypeVarInstance<'db>, Type<'db>),
+    /// Maps a single type variable to its replacement.
+    Single(BoundTypeVarInstance<'db>, Type<'db>, AliasPolicy),
     /// Selects parameter lists for the current callable's outer signatures. Ordinary type
     /// variable lookups still use the underlying specialization.
     WithBindings {
@@ -2418,7 +2425,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
             ApplySpecialization::ReturnCallables(replacements) => {
                 replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
-            ApplySpecialization::Single(typevar, ty) => {
+            ApplySpecialization::Single(typevar, ty, _) => {
                 if bound_typevar.is_same_typevar_as(db, *typevar) {
                     Some(*ty)
                 } else {
@@ -2447,7 +2454,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
                         .collect::<Vec<_>>(),
                 ),
             ),
-            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
+            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(..) => None,
             ApplySpecialization::WithBindings { specialization, .. } => {
                 specialization.as_specialization(db)
             }
@@ -2462,6 +2469,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
         replacement: Type<'db>,
+        alias_policy: AliasPolicy,
     ) -> Type<'db> {
         self.apply_type_mapping(
             db,
@@ -2469,6 +2477,7 @@ impl<'db> Type<'db> {
             &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
                 bound_typevar,
                 replacement,
+                alias_policy,
             )),
             TypeContext::default(),
         )
