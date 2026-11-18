@@ -437,6 +437,74 @@ impl<'db> KeywordArgument<'db> {
     }
 }
 
+/// Contextual inference usually produces one type for an argument. Keep that pair inline, and
+/// promote to a map only when another distinct declared type is encountered.
+/// Entries are never removed, so `Many` always contains at least two distinct keys. This keeps
+/// derived equality equivalent to the map's order-independent equality.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+enum ContextualArgumentTypes<'db> {
+    #[default]
+    Empty,
+    One {
+        declared: Type<'db>,
+        inferred: Type<'db>,
+    },
+    Many(FxHashMap<Type<'db>, Type<'db>>),
+}
+
+impl<'db> ContextualArgumentTypes<'db> {
+    fn get(&self, declared: Type<'db>) -> Option<Type<'db>> {
+        match self {
+            Self::Empty => None,
+            Self::One {
+                declared: key,
+                inferred,
+            } => (*key == declared).then_some(*inferred),
+            Self::Many(types) => types.get(&declared).copied(),
+        }
+    }
+
+    fn insert(&mut self, declared: Type<'db>, inferred: Type<'db>) {
+        match self {
+            Self::Empty => *self = Self::One { declared, inferred },
+            Self::One {
+                declared: key,
+                inferred: value,
+            } => {
+                if *key == declared {
+                    *value = inferred;
+                } else {
+                    let mut types = FxHashMap::default();
+                    types.insert(*key, *value);
+                    types.insert(declared, inferred);
+                    *self = Self::Many(types);
+                }
+            }
+            Self::Many(types) => {
+                types.insert(declared, inferred);
+            }
+        }
+    }
+
+    fn common_inferred_type(&self) -> Option<Type<'db>> {
+        match self {
+            Self::Empty => None,
+            Self::One { inferred, .. } => Some(*inferred),
+            Self::Many(types) => types.values().all_equal_value().ok().copied(),
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (Type<'db>, Type<'db>)> + '_ {
+        match self {
+            Self::Empty => Either::Left(None.into_iter()),
+            Self::One { declared, inferred } => {
+                Either::Left(Some((*declared, *inferred)).into_iter())
+            }
+            Self::Many(types) => Either::Right(types.iter().map(|(key, value)| (*key, *value))),
+        }
+    }
+}
+
 /// Inferred types for a given argument.
 ///
 /// Note that a single argument may produce multiple distinct inferred types when inferred
@@ -444,14 +512,14 @@ impl<'db> KeywordArgument<'db> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
     fallback_type: Option<Type<'db>>,
-    types: FxHashMap<Type<'db>, Type<'db>>,
+    types: ContextualArgumentTypes<'db>,
 }
 
 impl<'db> CallArgumentTypes<'db> {
     fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
             fallback_type: fallback_ty,
-            types: FxHashMap::default(),
+            types: ContextualArgumentTypes::default(),
         }
     }
 
@@ -459,16 +527,7 @@ impl<'db> CallArgumentTypes<'db> {
     pub(crate) fn get_default(&self) -> Option<Type<'db>> {
         // If this type was inferred against exactly one declared type, or was inferred against
         // multiple, but resulted in a single inferred type, we have an exact type to return.
-        if let Ok(exact_ty) = self
-            .types
-            .values()
-            .exactly_one()
-            .or_else(|_| self.types.values().all_equal_value())
-        {
-            return Some(*exact_ty);
-        }
-
-        self.fallback_type
+        self.types.common_inferred_type().or(self.fallback_type)
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
@@ -476,7 +535,7 @@ impl<'db> CallArgumentTypes<'db> {
     /// If the type was not inferred against the declared type directly, this method will fall back to
     /// [`Self::get_default`].
     fn try_get_for_declared_type(&self, tcx: Type<'db>) -> Option<Type<'db>> {
-        self.types.get(&tcx).copied().or_else(|| self.get_default())
+        self.types.get(tcx).or_else(|| self.get_default())
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
@@ -501,7 +560,7 @@ impl<'db> CallArgumentTypes<'db> {
     fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
         self.types
             .iter()
-            .map(|(tcx, ty)| (TypeContext::preference(Some(*tcx)), *ty))
+            .map(|(tcx, ty)| (TypeContext::preference(Some(tcx)), ty))
             .chain(self.fallback_type.map(|ty| (TypeContext::default(), ty)))
     }
 }
