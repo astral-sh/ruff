@@ -2,24 +2,6 @@
 # requires-python = ">=3.13"
 # dependencies = []
 #
-# [tool.ty.analysis]
-# return-type-inference = "always"
-#
-# [tool.ty.rules]
-# truthiness-test-of-none-union = "warn"
-# blanket-ignore-comment = "warn"
-# missing-type-argument = "warn"
-# possibly-unresolved-reference = "warn"
-# unsound-return-statement = "warn"
-# unsound-yield = "warn"
-# unsupported-dynamic-base = "warn"
-# division-by-zero = "warn"
-# dynamic-function-decorator-return = "warn"
-# unsound-assignment = "warn"
-# redundant-condition-strict = "warn"
-# disjoint-cast = "warn"
-# missing-direct-dependency = "warn"
-#
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
@@ -66,7 +48,7 @@ def get_mapping_data() -> dict[str, list[int]]:
     # The content is a JSON object literal wrapped in a JSON string, so double decode:
     mapping_data = json.loads(json.loads(content))
     assert isinstance(mapping_data, dict)
-    return mapping_data  # ty: ignore[unsound-return-statement]
+    return mapping_data  # ty: ignore[unsound-return]
 
 
 def format_number(number: int) -> str:

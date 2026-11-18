@@ -136,21 +136,15 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
         }
 
         // Match against, e.g., `import_string("zerver.models.Attachment")`.
-        if let Some(qualified_name) = semantic.resolve_qualified_name(func.as_ref()) {
-            if matches!(
-                qualified_name.segments(),
-                ["django", "utils", "module_loading", "import_string"]
-            ) {
-                if let Some(argument) = arguments.find_argument_value("dotted_path", 0) {
-                    if let Some(string_literal) = argument.as_string_literal_expr() {
-                        if let Some((.., model)) = string_literal.value.to_str().rsplit_once('.') {
-                            if model == name {
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
+        if semantic.matches_qualified_name(
+            func,
+            &["django", "utils", "module_loading", "import_string"],
+        ) && let Some(argument) = arguments.find_argument_value("dotted_path", 0)
+            && let Some(string_literal) = argument.as_string_literal_expr()
+            && let Some((.., model)) = string_literal.value.to_str().rsplit_once('.')
+            && model == name
+        {
+            return true;
         }
 
         false

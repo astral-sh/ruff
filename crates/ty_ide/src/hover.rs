@@ -1,7 +1,8 @@
 use crate::annotation_expression::is_in_annotation_expression;
 use crate::docstring::{Docstring, DocstringFragment};
 use crate::goto::{
-    Definitions, GotoTarget, docstring_for_call_definition, find_goto_target, find_goto_target_impl,
+    Definitions, GotoTarget, docstring_for_call_definition, docstring_for_parameter_field,
+    find_goto_target, find_goto_target_impl,
 };
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::FileRange;
@@ -297,6 +298,8 @@ fn keyword_argument_hover_contents<'db>(
         .and_then(|docstring| documentation_for_parameter(&docstring, &parameter.name))
     {
         contents.push(HoverContent::DocstringFragment(documentation));
+    } else if let Some(docstring) = docstring_for_parameter_field(db, parameter.definition) {
+        contents.push(HoverContent::Docstring(docstring));
     }
 
     Some(contents)
@@ -507,8 +510,7 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
-        Severity, Span,
+        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Severity, Span,
     };
     use ruff_python_ast::PythonVersion;
     use ruff_text_size::{Ranged, TextRange};
@@ -2354,6 +2356,84 @@ mod tests {
            |      ^^^^^- Cursor offset
            |      |
            |      source
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_inherited_dataclass_field() {
+        let test = hover_test(
+            r#"
+            from dataclasses import dataclass
+
+            @dataclass
+            class Options:
+                verbose: bool
+                """Include debug messages."""
+
+            @dataclass
+            class LogOptions(Options):
+                pass
+
+            LogOptions(ver<CURSOR>bose=True)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) verbose: bool
+        ---------------------------------------------
+        Include debug messages.
+
+        ---------------------------------------------
+        ```python
+        (parameter) verbose: bool
+        ```
+        ---
+        Include debug messages.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:13:12
+           |
+        13 | LogOptions(verbose=True)
+           |            ^^^-^^^
+           |            |  |
+           |            |  Cursor offset
+           |            source
+        ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_named_tuple_field() {
+        let test = hover_test(
+            r#"
+            from typing import NamedTuple
+
+            class Point(NamedTuple):
+                x: int
+                """Horizontal coordinate."""
+
+            Point(x<CURSOR>=1)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        (parameter) x: int
+        ---------------------------------------------
+        Horizontal coordinate.
+
+        ---------------------------------------------
+        ```python
+        (parameter) x: int
+        ```
+        ---
+        Horizontal coordinate.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:8:7
+          |
+        8 | Point(x=1)
+          |       ^- Cursor offset
+          |       |
+          |       source
         ");
     }
 
@@ -6297,8 +6377,29 @@ Alias: TypeAlias = "int <CURSOR>& str"
         ```
 
         In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax
-        when displaying intersection types. Note that either spelling will fail in runtime contexts or in
-        cases where an annotation expression could be evaluated.
+        when displaying intersection types. While the experimental syntax will raise an exception in
+        runtime contexts or in cases where an annotation expression could be evaluated, however,
+        `Intersection[]` can be used in arbitrary contexts if the `ty-extensions` package is installed.
+
+        Nested intersections are flattened at runtime, and duplicate operands are removed using
+        runtime equality, keeping the first occurrence of each. A named alias created using the
+        `type` statement is always kept as an operand. Intersections are unordered types, so
+        nongeneric intersections always compare equal at runtime when they have the same
+        operands:
+
+        ```pycon
+        >>> from ty_extensions import Intersection
+        >>> Intersection[Intersection[str, int], str]
+        ty_extensions.Intersection[str, int]
+        >>> type Alias = Intersection[str, int]  # Python 3.12+
+        >>> Intersection[Alias, str]
+        ty_extensions.Intersection[Alias, str]
+        >>> Intersection[int, str] == Intersection[str, int]
+        True
+        >>> hash(Intersection[int, str]) == hash(Intersection[str, int])
+        True
+
+        ```
 
         ---------------------------------------------
         ```xml
@@ -6324,8 +6425,29 @@ Alias: TypeAlias = "int <CURSOR>& str"
         ```<HB>
         <HB>
         In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax<HB>
-        when displaying intersection types. Note that either spelling will fail in runtime contexts or in<HB>
-        cases where an annotation expression could be evaluated.
+        when displaying intersection types. While the experimental syntax will raise an exception in<HB>
+        runtime contexts or in cases where an annotation expression could be evaluated, however,<HB>
+        `Intersection[]` can be used in arbitrary contexts if the `ty-extensions` package is installed.<HB>
+        <HB>
+        Nested intersections are flattened at runtime, and duplicate operands are removed using<HB>
+        runtime equality, keeping the first occurrence of each. A named alias created using the<HB>
+        `type` statement is always kept as an operand. Intersections are unordered types, so<HB>
+        nongeneric intersections always compare equal at runtime when they have the same<HB>
+        operands:<HB>
+        <HB>
+        ```pycon
+        >>> from ty_extensions import Intersection
+        >>> Intersection[Intersection[str, int], str]
+        ty_extensions.Intersection[str, int]
+        >>> type Alias = Intersection[str, int]  # Python 3.12+
+        >>> Intersection[Alias, str]
+        ty_extensions.Intersection[Alias, str]
+        >>> Intersection[int, str] == Intersection[str, int]
+        True
+        >>> hash(Intersection[int, str]) == hash(Intersection[str, int])
+        True
+
+        ```
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:3:25
@@ -6379,8 +6501,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
 
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an
-        annotation expression could be evaluated.
+        negation types. While the experimental syntax will raise an exception in runtime contexts or in
+        cases where an annotation expression could be evaluated, however, `Not[]` can be used in arbitrary
+        contexts if the `ty-extensions` package is installed.
 
         ---------------------------------------------
         ```xml
@@ -6390,8 +6513,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.<HB>
         <HB>
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying<HB>
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an<HB>
-        annotation expression could be evaluated.
+        negation types. While the experimental syntax will raise an exception in runtime contexts or in<HB>
+        cases where an annotation expression could be evaluated, however, `Not[]` can be used in arbitrary<HB>
+        contexts if the `ty-extensions` package is installed.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:1:16
@@ -6431,8 +6555,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
 
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an
-        annotation expression could be evaluated.
+        negation types. While the experimental syntax will raise an exception in runtime contexts or in
+        cases where an annotation expression could be evaluated, however, `Not[]` can be used in arbitrary
+        contexts if the `ty-extensions` package is installed.
 
         ---------------------------------------------
         ```xml
@@ -6442,8 +6567,9 @@ Alias: TypeAlias = "int <CURSOR>& str"
         `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.<HB>
         <HB>
         In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying<HB>
-        negation types. Note that either spelling will fail in runtime contexts or in cases where an<HB>
-        annotation expression could be evaluated.
+        negation types. While the experimental syntax will raise an exception in runtime contexts or in<HB>
+        cases where an annotation expression could be evaluated, however, `Not[]` can be used in arbitrary<HB>
+        contexts if the `ty-extensions` package is installed.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:1:10
@@ -7451,10 +7577,7 @@ type U<CURSOR> = MyType
             )
             .unwrap();
 
-            let config = DisplayDiagnosticConfig::new("ty")
-                .color(false)
-                .context(0)
-                .format(DiagnosticFormat::Full);
+            let config = DisplayDiagnosticConfig::new("ty").color(false).context(0);
 
             let mut diagnostic = Diagnostic::new(
                 DiagnosticId::Lint(LintName::of("hover")),

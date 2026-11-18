@@ -196,7 +196,7 @@ pub fn match_file(
     if failures.is_empty() {
         // We need to re-sort the diagnostics because matching uses `swap_remove` internally, which can change ordering.
         snapshot_diagnostics
-            .sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
+            .sort_unstable_by(|a, b| a.rendering_sort_key(&db).cmp(&b.rendering_sort_key(&db)));
         Ok(snapshot_diagnostics)
     } else {
         Err(failures)

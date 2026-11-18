@@ -696,6 +696,70 @@ impl PlaceState {
             .merge(b.declarations, reachability_constraints);
     }
 
+    /// Return the sole binding and declaration if they share a reachability constraint and the
+    /// place has no separate narrowing constraint for an unbound name.
+    fn singleton(&self) -> Option<(&LiveBinding, &LiveDeclaration)> {
+        let [binding] = self.bindings.live_bindings.as_slice() else {
+            return None;
+        };
+        let [declaration] = self.declarations.live_declarations.as_slice() else {
+            return None;
+        };
+        (self.bindings.unbound_narrowing_constraint.is_none()
+            && binding.reachability_constraint == declaration.reachability_constraint)
+            .then_some((binding, declaration))
+    }
+
+    /// Return each branch's constraints if both branches retain the same binding and declaration.
+    /// Different places can reuse the merged constraints when these inputs and the pending paths
+    /// match. In this example, `x` and `y` keep their own definitions but follow the same paths.
+    ///
+    /// ```python
+    /// def f(flag: bool, x: int, y: str):
+    ///     if flag:
+    ///         pair = (x, y)
+    ///     else:
+    ///         pair = (y, x)
+    ///     return pair
+    /// ```
+    pub(super) fn singleton_merge_inputs(
+        &self,
+        other: &Self,
+    ) -> Option<(SingletonConstraints, SingletonConstraints)> {
+        let (left, left_decl) = self.singleton()?;
+        let (right, right_decl) = other.singleton()?;
+        (left.binding == right.binding && left_decl.declaration == right_decl.declaration)
+            .then(|| (left.into(), right.into()))
+    }
+
+    /// Merge a pair accepted by [`Self::singleton_merge_inputs`] after applying both branches'
+    /// pending paths. Each path applies the same reachability constraint to its binding and
+    /// declaration, so a single OR combines reachability for both.
+    pub(super) fn merge_singleton(
+        &mut self,
+        other: &Self,
+        narrowing: &mut NarrowingConstraintsBuilder,
+        reachability: &mut ReachabilityConstraintsBuilder,
+    ) -> SingletonConstraints {
+        let a = &self.bindings.live_bindings[0];
+        let b = &other.bindings.live_bindings[0];
+        let merged = SingletonConstraints {
+            narrowing: narrowing.add_or_constraint(a.narrowing_constraint, b.narrowing_constraint),
+            reachability: reachability
+                .add_or_constraint(a.reachability_constraint, b.reachability_constraint),
+        };
+        self.set_singleton_constraints(merged);
+        merged
+    }
+
+    /// Apply a merged result to a matching singleton, preserving this place's definition IDs.
+    pub(super) fn set_singleton_constraints(&mut self, constraints: SingletonConstraints) {
+        let binding = &mut self.bindings.live_bindings[0];
+        binding.narrowing_constraint = constraints.narrowing;
+        binding.reachability_constraint = constraints.reachability;
+        self.declarations.live_declarations[0].reachability_constraint = constraints.reachability;
+    }
+
     pub(super) fn bindings(&self) -> &Bindings {
         &self.bindings
     }
@@ -706,6 +770,22 @@ impl PlaceState {
 
     pub(super) fn into_parts(self) -> (Bindings, Declarations) {
         (self.bindings, self.declarations)
+    }
+}
+
+/// The binding's narrowing constraint and the reachability it shares with the declaration.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) struct SingletonConstraints {
+    narrowing: ScopedNarrowingConstraint,
+    reachability: ScopedReachabilityConstraintId,
+}
+
+impl From<&LiveBinding> for SingletonConstraints {
+    fn from(binding: &LiveBinding) -> Self {
+        Self {
+            narrowing: binding.narrowing_constraint,
+            reachability: binding.reachability_constraint,
+        }
     }
 }
 

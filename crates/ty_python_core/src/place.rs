@@ -236,6 +236,28 @@ impl PlaceTable {
         self.members.iter()
     }
 
+    /// Receiver attributes that this scope can define. A read of `self.value` alone
+    /// does not establish `value` as an implicit attribute.
+    pub fn defined_instance_attribute_names(&self) -> impl Iterator<Item = &str> {
+        self.members
+            .iter()
+            .filter(|member| member.is_bound() || member.is_declared())
+            .filter_map(Member::as_instance_attribute)
+    }
+
+    /// Receiver attributes declared in this scope, such as `self.value: int`.
+    pub fn declared_instance_attributes(&self) -> impl Iterator<Item = (ScopedMemberId, &str)> {
+        self.members.iter().enumerate().filter_map(|(id, member)| {
+            if !member.is_declared() {
+                return None;
+            }
+            Some((
+                ScopedMemberId::from_usize(id),
+                member.as_instance_attribute()?,
+            ))
+        })
+    }
+
     /// Looks up a symbol by its ID and returns a reference to it.
     ///
     /// ## Panics

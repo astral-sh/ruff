@@ -19,8 +19,16 @@ self-hosted-runner:
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
     - codspeed-macro
+    - codspeed-macro-x64-ryzen-9950x-ubuntu-24-04
 
 paths:
+  ".github/workflows/*.{yml,yaml}":
+    ignore:
+      # `actionlint` does not yet recognize GitHub's `$/` syntax.
+      # https://github.com/rhysd/actionlint/issues/711
+      - '^reusable workflow call "\$/\.github/workflows/[^"/]+\.ya?ml" at "uses" is not following the format '
+      - '^specifying action "\$/\.github/actions/setup-ruff-workspace" in invalid format because ref is missing\.'
+      - '^specifying action "\$/python/py-fuzzer" in invalid format because ref is missing\.'
   ".github/workflows/pull-request-reviewers.yml":
     ignore:
       # actionlint doesn't yet support concurrency queues. The schema hook validates them.
@@ -31,7 +39,7 @@ paths:
       - '^unexpected key "queue" for "concurrency" section\.'
       # actionlint doesn't yet recognize the reusable workflow's own revision context.
       - 'property "workflow_(repository|sha)" is not defined in object type'
-  ".github/workflows/{ty-ecosystem-report,ty-ecosystem-analyzer,memory_report,sync_typeshed}.yaml":
+  ".github/workflows/{ty-ecosystem-analyzer,memory_report,sync_typeshed}.yaml":
     ignore:
       # actionlint doesn't yet support the cache-mode feature.
       # The schema hook validates it.

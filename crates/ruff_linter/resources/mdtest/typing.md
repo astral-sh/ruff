@@ -16,8 +16,8 @@ Both `TypeForm[...]` and `TypeForm(...)` accept type expressions, so quoted type
 their imports as used even outside an annotation.
 
 ```py
-from decimal import Decimal  # no diagnostic
-from fractions import Fraction  # no diagnostic
+from decimal import Decimal  # ok
+from fractions import Fraction  # ok
 from typing import TypeForm
 
 DecimalForm = TypeForm["Decimal"]
@@ -29,8 +29,8 @@ form = TypeForm("Fraction")
 Both forms also work with the backport, including when imported under an alias.
 
 ```py
-from decimal import Decimal  # no diagnostic
-from pathlib import Path  # no diagnostic
+from decimal import Decimal  # ok
+from pathlib import Path  # ok
 from typing_extensions import TypeForm as TF
 
 DecimalForm = TF["Decimal"]
@@ -43,9 +43,9 @@ Quoted types in `TypeIs` and `TypeGuard` subscriptions also mark their imports a
 annotations. This includes the backports in `typing_extensions`.
 
 ```py
-from decimal import Decimal  # no diagnostic
-from fractions import Fraction  # no diagnostic
-from pathlib import Path  # no diagnostic
+from decimal import Decimal  # ok
+from fractions import Fraction  # ok
+from pathlib import Path  # ok
 from typing import TypeIs
 import typing_extensions
 
@@ -60,7 +60,7 @@ The `extra_items` argument to a `TypedDict` class is a type expression. Imports 
 this quoted argument are used.
 
 ```py
-from decimal import Decimal  # no diagnostic
+from decimal import Decimal  # ok
 from typing import TypedDict
 
 class Record(TypedDict, extra_items="Decimal"):
@@ -73,7 +73,7 @@ The backported `TypedDict` also accepts quoted types in `extra_items`, including
 an alias.
 
 ```py
-from decimal import Decimal  # no diagnostic
+from decimal import Decimal  # ok
 from typing_extensions import TypedDict as TD
 
 class Record(TD, extra_items="Decimal"):
@@ -85,7 +85,7 @@ class Record(TD, extra_items="Decimal"):
 Subclasses can specify the type of extra items, including when their base is a generic `TypedDict`.
 
 ```py
-from decimal import Decimal  # no diagnostic
+from decimal import Decimal  # ok
 from typing import TypedDict
 
 class Base[T](TypedDict):
@@ -101,7 +101,7 @@ A class can also inherit from a `TypedDict` defined with the functional syntax. 
 argument is still a type expression.
 
 ```py
-from decimal import Decimal  # no diagnostic
+from decimal import Decimal  # ok
 from typing import TypedDict
 
 Base = TypedDict("Base", {})
@@ -116,7 +116,7 @@ Stub files allow a base class to be defined later. Quoted extra item types still
 when the base is a `TypedDict`.
 
 ```pyi
-from decimal import Decimal  # no diagnostic
+from decimal import Decimal  # ok
 from typing import TypedDict
 
 class Record(Base, extra_items="Decimal"): ...
@@ -145,7 +145,7 @@ mark its import as used.
 ```py
 from decimal import Decimal  # error: [unused-import] "`decimal.Decimal` imported but unused"
 from fractions import Fraction  # error: [unused-import] "`fractions.Fraction` imported but unused"
-from pathlib import Path  # no diagnostic
+from pathlib import Path  # ok
 from typing import TypedDict
 
 Closed = TypedDict("Closed", {}, total="Decimal", closed="Fraction")
@@ -164,8 +164,8 @@ lint.select = ["F401"]
 ```
 
 ```py
-from decimal import Decimal  # no diagnostic
-from fractions import Fraction  # no diagnostic
+from decimal import Decimal  # ok
+from fractions import Fraction  # ok
 from pathlib import Path  # error: [unused-import] "`pathlib.Path` imported but unused"
 from typing import TypedDict
 

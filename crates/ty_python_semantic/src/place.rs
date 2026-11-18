@@ -15,7 +15,7 @@ use crate::reachability::{
     evaluate_reachability_with_cache,
 };
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
+    DeclaredType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
     UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
     may_exist_at_runtime,
 };
@@ -90,21 +90,6 @@ pub(crate) enum PublicTypePolicy {
     Promote,
 }
 
-impl PublicTypePolicy {
-    /// Apply the public-type policy to the raw type.
-    fn apply_if_needed<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-    ) -> Type<'db> {
-        match self {
-            Self::Raw => ty,
-            Self::Promote => ty.promote(db, env).promote_singletons(db, env),
-        }
-    }
-}
-
 /// The source definition provenance for a place.
 #[derive(
     Debug, Clone, Copy, Default, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue,
@@ -148,16 +133,16 @@ impl<'db> Provenance<'db> {
 
 /// A defined place with its raw type, origin, definedness, public-type policy, and provenance.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct DefinedPlace<'db> {
-    pub(crate) ty: Type<'db>,
+pub(crate) struct DefinedPlace<'db, T = Type<'db>> {
+    pub(crate) ty: T,
     pub(crate) origin: TypeOrigin,
     pub(crate) definedness: Definedness,
     pub(crate) public_type_policy: PublicTypePolicy,
     pub(crate) provenance: Provenance<'db>,
 }
 
-impl<'db> DefinedPlace<'db> {
-    fn new(ty: Type<'db>) -> Self {
+impl<'db, T> DefinedPlace<'db, T> {
+    fn new(ty: T) -> Self {
         Self {
             ty,
             origin: TypeOrigin::Inferred,
@@ -170,6 +155,16 @@ impl<'db> DefinedPlace<'db> {
     fn with_origin(mut self, origin: TypeOrigin) -> Self {
         self.origin = origin;
         self
+    }
+
+    fn with_type<U>(self, ty: U) -> DefinedPlace<'db, U> {
+        DefinedPlace {
+            ty,
+            origin: self.origin,
+            definedness: self.definedness,
+            public_type_policy: self.public_type_policy,
+            provenance: self.provenance,
+        }
     }
 
     pub(crate) fn with_definedness(mut self, definedness: Definedness) -> Self {
@@ -194,6 +189,15 @@ impl<'db> DefinedPlace<'db> {
 
     pub(crate) const fn is_definitely_defined(&self) -> bool {
         matches!(self.definedness, Definedness::AlwaysDefined)
+    }
+}
+
+impl<'db> DefinedPlace<'db> {
+    pub(crate) fn public_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self.public_type_policy {
+            PublicTypePolicy::Raw => self.ty,
+            PublicTypePolicy::Promote => self.ty.promote(db, env).promote_singletons(db, env),
+        }
     }
 }
 
@@ -558,7 +562,7 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    file.map(|file| {
+    file.map_or_default(|file| {
         let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
             if file.file(db).is_stub(db) {
                 RequiresExplicitReExport::Yes
@@ -575,7 +579,6 @@ pub(crate) fn imported_symbol<'db>(
             ConsideredDefinitions::EndOfScope,
         )
     })
-    .unwrap_or_default()
     .or_fall_back_to(db, env, || {
         match name {
             "__file__" => {
@@ -618,8 +621,7 @@ pub(crate) fn builtins_symbol<'db>(
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     builtins_symbol_impl(db, env, symbol, BuiltinVisibility::All)
-        .map(|(_, symbol)| symbol)
-        .unwrap_or_default()
+        .map_or_default(|(_, symbol)| symbol)
 }
 
 /// Looks up `symbol` for implicit builtin fallback.
@@ -640,8 +642,7 @@ pub(crate) fn implicit_builtins_symbol<'db>(
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly)
-        .map(|(_, symbol)| symbol)
-        .unwrap_or_default()
+        .map_or_default(|(_, symbol)| symbol)
 }
 
 /// Returns the module scope that supplies `symbol` through implicit builtin fallback.
@@ -816,6 +817,35 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     )
 }
 
+/// Check whether a member prefix has a binding without inferring its value when possible.
+pub(crate) fn has_bound_prefix<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bindings: BindingWithConstraintsIterator<'_, 'db>,
+    cache: Option<&ReachabilityEvaluationCache<'db>>,
+) -> bool {
+    let mut rows = bindings.clone();
+    if let Some(row) = rows.next()
+        && rows.next().is_none()
+    {
+        match row.binding {
+            DefinitionState::Undefined => return false,
+            DefinitionState::Defined(definition) => {
+                let kind = definition.kind(db);
+                if kind.is_user_visible() && !matches!(kind, DefinitionKind::DictKeyAssignment(_)) {
+                    // With no unbound or deleted alternative, even an unreachable binding gives
+                    // a defined place of type Never. Either way the outer prefix is shadowed.
+                    return true;
+                }
+            }
+            DefinitionState::Deleted => {}
+        }
+    }
+    !place_from_bindings_impl(db, env, bindings, RequiresExplicitReExport::No, cache)
+        .place
+        .is_undefined()
+}
+
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
 /// If there is only one declaration, or all declarations declare the same type, returns
@@ -848,15 +878,20 @@ pub(crate) fn place_from_declarations_with_reachability_cache<'db>(
 }
 
 type DeclaredTypeAndConflictingTypes<'db> = (
-    TypeAndQualifiers<'db>,
+    DeclaredType<'db>,
     Option<Box<indexmap::set::Slice<Type<'db>>>>,
 );
 
 /// The result of looking up a declared type from declarations; see [`place_from_declarations`].
 #[derive(Debug, Default)]
 pub(crate) struct PlaceFromDeclarationsResult<'db> {
-    place_and_quals: PlaceAndQualifiers<'db>,
+    /// A reachable declaration can supply qualifiers without specifying a type.
+    place: Option<DefinedPlace<'db, Option<Type<'db>>>>,
+    qualifiers: TypeQualifiers,
     conflicting_types: Option<Box<indexmap::set::Slice<Type<'db>>>>,
+    /// At least one reachable declaration supplies qualifiers without a type, even if other
+    /// declarations of the same place specify a type.
+    pub(crate) has_qualifier_only_declaration: bool,
     /// Contains the first reachable declaration for this place, if any.
     /// This field is used for backreferences in diagnostics.
     pub(crate) first_declaration: Option<Definition<'db>>,
@@ -864,19 +899,11 @@ pub(crate) struct PlaceFromDeclarationsResult<'db> {
 
 impl<'db> PlaceFromDeclarationsResult<'db> {
     pub(crate) fn qualifiers(&self) -> TypeQualifiers {
-        self.place_and_quals.qualifiers
+        self.qualifiers
     }
 
-    fn conflict(
-        place_and_quals: PlaceAndQualifiers<'db>,
-        conflicting_types: Box<indexmap::set::Slice<Type<'db>>>,
-        first_declaration: Option<Definition<'db>>,
-    ) -> Self {
-        PlaceFromDeclarationsResult {
-            place_and_quals,
-            conflicting_types: Some(conflicting_types),
-            first_declaration,
-        }
+    pub(crate) fn is_qualifier_only(&self) -> bool {
+        self.place.is_some_and(|place| place.ty.is_none())
     }
 
     /// Add any reachable imported `Final` qualifier without establishing a declared type.
@@ -930,8 +957,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
     ) -> Self {
         let predicates = candidates.predicates();
         let reachability_constraints = candidates.reachability_constraints();
-        let fallback_to_imported_type =
-            fallback_to_imported_type && self.place_and_quals.place.is_undefined();
+        let fallback_to_imported_type = fallback_to_imported_type && self.place.is_none();
 
         let mut first_imported_type = None;
         let mut imported_type_builder: Option<PublicTypeBuilder<'db>> = None;
@@ -969,9 +995,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
                 continue;
             }
 
-            self.place_and_quals
-                .qualifiers
-                .insert(TypeQualifiers::FINAL);
+            self.qualifiers.insert(TypeQualifiers::FINAL);
 
             // Public lookup must still regard this symbol as undeclared. Only assignment
             // inference without an annotation needs the imported source type as a constraint.
@@ -979,6 +1003,9 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
                 return self;
             }
 
+            let Some(imported_type) = declared_type.inner_type() else {
+                continue;
+            };
             imported_reachability = imported_reachability.or(static_reachability);
             let source_provenance = match declared_type.provenance() {
                 Provenance::Unknown => Provenance::SingleDefinition(definition),
@@ -986,7 +1013,6 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
             };
             imported_provenance = imported_provenance.or(source_provenance);
 
-            let imported_type = declared_type.inner_type();
             if let Some(builder) = &mut imported_type_builder {
                 builder.add(imported_type, static_reachability);
             } else if let Some((first, first_reachability)) = first_imported_type {
@@ -1008,8 +1034,8 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
             } else {
                 Definedness::PossiblyUndefined
             };
-            self.place_and_quals.place = Place::Defined(
-                DefinedPlace::new(imported_type)
+            self.place = Some(
+                DefinedPlace::new(Some(imported_type))
                     .with_definedness(definedness)
                     .with_provenance(imported_provenance),
             );
@@ -1018,8 +1044,12 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
         self
     }
 
-    pub(crate) fn ignore_conflicting_declarations(self) -> PlaceAndQualifiers<'db> {
-        self.place_and_quals
+    pub(crate) fn ignore_conflicting_declarations(&self) -> PlaceAndQualifiers<'db> {
+        self.place
+            .map_or(Place::Undefined, |place| {
+                Place::Defined(place.with_type(place.ty.unwrap_or_else(Type::unknown)))
+            })
+            .with_qualifiers(self.qualifiers)
     }
 
     pub(crate) fn into_place_and_conflicting_declarations(
@@ -1028,7 +1058,10 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
         PlaceAndQualifiers<'db>,
         Option<Box<indexmap::set::Slice<Type<'db>>>>,
     ) {
-        (self.place_and_quals, self.conflicting_types)
+        (
+            self.ignore_conflicting_declarations(),
+            self.conflicting_types,
+        )
     }
 }
 
@@ -1087,24 +1120,10 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::NOT_REQUIRED)
     }
 
-    /// Returns `true` if the place has a `ReadOnly` type qualifier.
+    /// Returns `true` if the place has a `ReadOnly` qualifier or is a nested class.
     pub(crate) fn is_read_only(&self) -> bool {
-        self.qualifiers.contains(TypeQualifiers::READ_ONLY)
-    }
-
-    /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
-    pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
-        match self {
-            PlaceAndQualifiers { place, qualifiers }
-                if (qualifiers.contains(TypeQualifiers::FINAL)
-                    && place
-                        .ignore_possibly_undefined()
-                        .is_some_and(|ty| ty.is_unknown())) =>
-            {
-                Some(*qualifiers)
-            }
-            _ => None,
-        }
+        self.qualifiers
+            .intersects(TypeQualifiers::READ_ONLY | TypeQualifiers::NESTED_CLASS)
     }
 
     #[must_use]
@@ -1134,7 +1153,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                 place: Place::Defined(place),
                 qualifiers,
             } => {
-                let ty = place.public_type_policy.apply_if_needed(db, env, place.ty);
+                let ty = place.public_type(db, env);
                 let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
                     .with_provenance(place.provenance);
                 match place.definedness {
@@ -1303,86 +1322,30 @@ pub(crate) fn place_by_id<'db>(
                 requires_explicit_reexport,
                 None,
                 false,
-            )
-            .ignore_conflicting_declarations();
+            );
 
     let all_considered_bindings = || match considered_definitions {
         ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(place_id),
         ConsideredDefinitions::AllReachable => use_def.reachable_bindings(place_id),
     };
 
-    // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
-    // inferred type, without unioning with `Unknown`, because it cannot be modified.
-    if let Some(qualifiers) = declared.is_bare_final() {
-        let bindings = all_considered_bindings();
-        return place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
-            .place
-            .with_qualifiers(qualifiers);
-    }
-
-    match declared {
-        // Handle bare `ClassVar` annotations by falling back to the union of `Unknown` and the
-        // inferred type.
-        PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    ty: Type::Dynamic(DynamicType::Unknown),
-                    origin,
-                    definedness,
-                    provenance: declared_provenance,
-                    ..
-                }),
-            qualifiers,
-        } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
-            let bindings = all_considered_bindings();
-            match place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
-                .place
-            {
-                Place::Defined(DefinedPlace {
-                    ty: inferred,
-                    origin,
-                    definedness: boundness,
-                    provenance: inferred_provenance,
-                    ..
-                }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_two_elements(db, &env, Type::unknown(), inferred),
-                    origin,
-                    definedness: boundness,
-                    public_type_policy: PublicTypePolicy::Raw,
-                    provenance: inferred_provenance.or(declared_provenance),
-                })
-                .with_qualifiers(qualifiers),
-                Place::Undefined => Place::Defined(DefinedPlace {
-                    ty: Type::unknown(),
-                    origin,
-                    definedness,
-                    public_type_policy: PublicTypePolicy::Raw,
-                    provenance: declared_provenance,
-                })
-                .with_qualifiers(qualifiers),
-            }
-        }
-        // Place is declared, trust the declared type
-        place_and_quals @ PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }),
-            qualifiers: _,
-        } => place_and_quals,
+    let qualifiers = declared.qualifiers();
+    match declared.place {
+        Some(
+            declaration @ DefinedPlace {
+                ty: Some(ty),
+                definedness: Definedness::AlwaysDefined,
+                ..
+            },
+        ) => Place::Defined(declaration.with_type(ty)).with_qualifiers(qualifiers),
         // Place is possibly declared
-        PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    ty: declared_ty,
-                    origin,
-                    definedness: Definedness::PossiblyUndefined,
-                    provenance: declared_provenance,
-                    ..
-                }),
-            qualifiers,
-        } => {
+        Some(DefinedPlace {
+            ty: Some(declared_ty),
+            origin,
+            definedness: Definedness::PossiblyUndefined,
+            provenance: declared_provenance,
+            ..
+        }) => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let inferred =
@@ -1424,16 +1387,26 @@ pub(crate) fn place_by_id<'db>(
 
             PlaceAndQualifiers { place, qualifiers }
         }
-        // Place is undeclared, infer the type from bindings
-        PlaceAndQualifiers {
-            place: Place::Undefined,
-            qualifiers,
-        } => {
+        // Without a declared type, infer the public type from bindings.
+        declaration => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let mut inferred =
                 place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
                     .place;
+
+            if let Some(declaration) = declaration {
+                if qualifiers.contains(TypeQualifiers::FINAL) {
+                    // A bare `Final` keeps its inferred literal type.
+                    return inferred.with_qualifiers(qualifiers);
+                }
+                // A bare `ClassVar` can declare a member before any value is available.
+                let Place::Defined(binding) = &mut inferred else {
+                    return Place::Defined(declaration.with_type(Type::unknown()))
+                        .with_qualifiers(qualifiers);
+                };
+                binding.provenance = binding.provenance.or(declaration.provenance);
+            }
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1619,7 +1592,7 @@ fn symbol_impl<'db>(
 
     place_table(db, scope)
         .symbol_id(name)
-        .map(|symbol| {
+        .map_or_default(|symbol| {
             place_by_id(
                 db,
                 scope,
@@ -1628,7 +1601,6 @@ fn symbol_impl<'db>(
                 considered_definitions,
             )
         })
-        .unwrap_or_default()
 }
 
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
@@ -2005,6 +1977,7 @@ fn place_from_bindings_impl<'db>(
                             binding.place(db),
                             binding_ty,
                         )
+                        .with_reachability_cache(reachability_cache, reachability_constraints)
                     })
                     .narrow(constraint, binding_ty),
             };
@@ -2164,35 +2137,31 @@ impl<'db> PublicTypeBuilder<'db> {
 
 /// Accumulates multiple (potentially conflicting) declared types and type qualifiers,
 /// and eventually builds a union from them.
+#[derive(Default)]
 struct DeclaredTypeBuilder<'db> {
-    inner: PublicTypeBuilder<'db>,
+    inner: Option<PublicTypeBuilder<'db>>,
     qualifiers: TypeQualifiers,
     first_type: Option<Type<'db>>,
     conflicting_types: FxOrderSet<Type<'db>>,
 }
 
 impl<'db> DeclaredTypeBuilder<'db> {
-    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
-        DeclaredTypeBuilder {
-            inner: PublicTypeBuilder::new(db, env),
-            qualifiers: TypeQualifiers::empty(),
-            first_type: None,
-            conflicting_types: FxOrderSet::default(),
-        }
-    }
-
     fn add(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        element: TypeAndQualifiers<'db>,
+        element: DeclaredType<'db>,
         reachability: Truthiness,
     ) {
-        debug_assert!(std::ptr::eq(db, self.inner.db));
-
-        let element_ty = element.inner_type();
-
-        if self.inner.add(element_ty, reachability) {
+        self.qualifiers |= element.qualifiers();
+        let Some(element_ty) = element.inner_type() else {
+            return;
+        };
+        let inner = self
+            .inner
+            .get_or_insert_with(|| PublicTypeBuilder::new(db, env));
+        debug_assert!(std::ptr::eq(db, inner.db));
+        if inner.add(element_ty, reachability) {
             if let Some(first_ty) = self.first_type {
                 if !first_ty.is_equivalent_to(db, env, element_ty) {
                     self.conflicting_types.insert(element_ty);
@@ -2201,25 +2170,20 @@ impl<'db> DeclaredTypeBuilder<'db> {
                 self.first_type = Some(element_ty);
             }
         }
-
-        self.qualifiers = self.qualifiers.union(element.qualifiers());
     }
 
     fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
-        let type_and_quals =
-            TypeAndQualifiers::new(self.inner.build(), TypeOrigin::Declared, self.qualifiers);
+        let ty = self.inner.map(PublicTypeBuilder::build);
+        let ty = DeclaredType::new(ty, TypeOrigin::Declared, self.qualifiers);
         if self.conflicting_types.is_empty() {
-            (type_and_quals, None)
+            (ty, None)
         } else {
             self.conflicting_types.insert_before(
                 0,
                 self.first_type
                     .expect("there must be a first type if there are conflicting types"),
             );
-            (
-                type_and_quals,
-                Some(self.conflicting_types.into_boxed_slice()),
-            )
+            (ty, Some(self.conflicting_types.into_boxed_slice()))
         }
     }
 }
@@ -2264,6 +2228,7 @@ fn place_from_declarations_impl<'db>(
     let mut first_declaration = None;
     let mut provenance = Provenance::Unknown;
     let mut all_declarations_definitely_reachable = true;
+    let mut has_qualifier_only_declaration = false;
 
     let mut types = declarations.filter_map(|declaration_with_constraint| {
         let DeclarationWithConstraint {
@@ -2292,6 +2257,7 @@ fn place_from_declarations_impl<'db>(
             None
         } else {
             let declared_type = inferred_declaration(db, declaration).declared()?;
+            has_qualifier_only_declaration |= declared_type.inner_type().is_none();
             first_declaration.get_or_insert(declaration);
             provenance = provenance.or(Provenance::SingleDefinition(declaration));
             all_declarations_definitely_reachable =
@@ -2303,7 +2269,7 @@ fn place_from_declarations_impl<'db>(
 
     if let Some((first, first_reachability)) = types.next() {
         let (declared, conflicting) = if let Some((second, second_reachability)) = types.next() {
-            let mut builder = DeclaredTypeBuilder::new(db, env);
+            let mut builder = DeclaredTypeBuilder::default();
             builder.add(db, env, first, first_reachability);
             builder.add(db, env, second, second_reachability);
             for (element, reachability) in types {
@@ -2314,24 +2280,25 @@ fn place_from_declarations_impl<'db>(
             (first, None)
         };
 
-        let boundness = boundness_evaluator.evaluate(db, all_declarations_definitely_reachable);
-
-        let place_and_quals = Place::Defined(
-            DefinedPlace::new(declared.inner_type())
-                .with_origin(TypeOrigin::Declared)
-                .with_definedness(boundness)
-                .with_provenance(provenance),
-        )
-        .with_qualifiers(declared.qualifiers());
-
-        if let Some(conflicting) = conflicting {
-            PlaceFromDeclarationsResult::conflict(place_and_quals, conflicting, first_declaration)
+        // When only some paths declare a type, public lookup also considers the inferred
+        // type of the bindings, just as it would for paths with no annotation at all.
+        let boundness = if has_qualifier_only_declaration && declared.inner_type().is_some() {
+            Definedness::PossiblyUndefined
         } else {
-            PlaceFromDeclarationsResult {
-                place_and_quals,
-                conflicting_types: None,
-                first_declaration,
-            }
+            boundness_evaluator.evaluate(db, all_declarations_definitely_reachable)
+        };
+
+        PlaceFromDeclarationsResult {
+            place: Some(
+                DefinedPlace::new(declared.inner_type())
+                    .with_origin(TypeOrigin::Declared)
+                    .with_definedness(boundness)
+                    .with_provenance(provenance),
+            ),
+            qualifiers: declared.qualifiers(),
+            conflicting_types: conflicting,
+            has_qualifier_only_declaration,
+            first_declaration,
         }
     } else {
         PlaceFromDeclarationsResult::default()

@@ -125,6 +125,7 @@ impl Workspace {
         let options = Options::deserialize_with(
             ValueSource::Cli,
             serde_wasm_bindgen::Deserializer::from(options),
+            ty_python_semantic::default_lint_registry(),
         )
         .map_err(into_error)?;
 
@@ -153,6 +154,7 @@ impl Workspace {
         let options = Options::deserialize_with(
             ValueSource::Cli,
             serde_wasm_bindgen::Deserializer::from(options),
+            self.db.lint_registry(),
         )
         .map_err(into_error)?;
 
@@ -553,7 +555,7 @@ impl Workspace {
                     );
                     TextEdit {
                         range,
-                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                        new_text: edit.content().map_or_default(ToString::to_string),
                     }
                 });
                 Completion {
@@ -1212,11 +1214,13 @@ pub enum Severity {
     Warning,
     Error,
     Fatal,
+    Hint,
 }
 
 impl From<diagnostic::Severity> for Severity {
     fn from(value: diagnostic::Severity) -> Self {
         match value {
+            diagnostic::Severity::Hint => Self::Hint,
             diagnostic::Severity::Info => Self::Info,
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,

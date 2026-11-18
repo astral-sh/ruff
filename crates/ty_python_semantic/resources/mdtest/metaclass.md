@@ -1038,7 +1038,7 @@ class Child(WeakSet[object]): ...
 reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
 
 def f(child: Child):
-    child.__abstractmethods__  # error: [unresolved-attribute]
+    child.__abstractmethods__  # error: [missing-attribute]
 ```
 
 The fallback also does not constrain the types of attributes defined in the class namespace. For
@@ -1142,7 +1142,7 @@ An unresolved superclass can also provide the required inheritance relationship.
 when the unknown base is inherited indirectly.
 
 ```py
-from missing import UnknownBase  # error: [unresolved-import]
+from missing import UnknownBase  # error: [import-not-found]
 
 class RootMeta(UnknownBase): ...
 class Meta(RootMeta): ...
@@ -1258,7 +1258,7 @@ def _(base1: Any, base2: Any, other_base: Any):
 ## Unknown
 
 ```py
-from nonexistent_module import UnknownClass  # error: [unresolved-import]
+from nonexistent_module import UnknownClass  # error: [import-not-found]
 
 class C(UnknownClass): ...
 
@@ -1348,7 +1348,7 @@ def _(meta: type[Meta]):
                 assert_never(cls)
 
     def as_int(cls: type[C]) -> int:
-        return cls  # error: [invalid-return-type]
+        return cls  # error: [invalid-explicit-return]
 ```
 
 ## Diagnostic range

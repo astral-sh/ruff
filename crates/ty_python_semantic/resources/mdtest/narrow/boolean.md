@@ -82,3 +82,17 @@ class A: ...
 def _(x: A | None | Literal[1]):
     isinstance(x, A) or x is not None and reveal_type(x)  # revealed: Literal[1]
 ```
+
+## Narrowing after a nested boolean expression
+
+A later operand sees the narrowing from earlier operands. After the expression, only the narrowing
+that preceded it still applies.
+
+```py
+def check(value: int | str | None, flag: bool):
+    if value is None:
+        return
+
+    isinstance(value, str) and (flag or reveal_type(value))  # revealed: str
+    reveal_type(value)  # revealed: int | str
+```

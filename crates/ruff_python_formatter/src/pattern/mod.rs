@@ -80,9 +80,7 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
 
             parenthesized("(", &format_pattern, ")")
                 .with_dangling_comments(
-                    open_parenthesis_comment
-                        .map(std::slice::from_ref)
-                        .unwrap_or_default(),
+                    open_parenthesis_comment.map_or_default(std::slice::from_ref),
                 )
                 .fmt(f)
         } else {

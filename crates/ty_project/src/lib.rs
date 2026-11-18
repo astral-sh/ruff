@@ -40,6 +40,7 @@ pub use uv::{
     uv_test_env_vars,
 };
 
+pub mod baseline;
 mod db;
 mod files;
 pub mod glob;
@@ -185,9 +186,10 @@ pub struct CollectReporter(std::sync::Mutex<Vec<Diagnostic>>);
 impl CollectReporter {
     pub fn into_sorted(self, db: &dyn Db) -> Vec<Diagnostic> {
         let mut diagnostics = self.0.into_inner().unwrap();
+        let resolver: &dyn ruff_db::Db = db;
         diagnostics.sort_by(|left, right| {
-            left.rendering_sort_key(db)
-                .cmp(&right.rendering_sort_key(db))
+            left.rendering_sort_key(&resolver)
+                .cmp(&right.rendering_sort_key(&resolver))
         });
         diagnostics
     }
@@ -547,6 +549,15 @@ impl Project {
             .for_each_with_project_db(db, |db, file| {
                 db.unwind_if_revision_cancelled();
 
+                if db.uv_environments().is_initialization_pending(db, file) {
+                    tracing::debug!(
+                        "Deferring diagnostics for `{}` until its first uv sync completes",
+                        file.path(db)
+                    );
+                    reporter.report_checked_file(db, file, &[]);
+                    return;
+                }
+
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
@@ -826,6 +837,16 @@ impl Project {
         }
     }
 
+    /// Returns the scripts whose uv environments need preparing at startup or after a reload.
+    pub fn scripts_to_synchronize(self, db: &dyn Db) -> Vec<File> {
+        // Discovering scripts reads every project file. Keep the index lazy when
+        // no environment synchronization will be requested.
+        if self.metadata(db).script_uv_override() == Some(false) {
+            return Vec::new();
+        }
+        self.script_files(db).iter().collect()
+    }
+
     fn reload_files(self, db: &mut dyn Db) {
         tracing::debug!("Reloading files for project `{}`", self.name(db));
 
@@ -856,6 +877,7 @@ impl Project {
             .iter()
             .map(OptionDiagnostic::to_diagnostic)
             .chain(uv_diagnostic)
+            .chain(baseline::settings_diagnostic(db))
             .collect()
     }
 }
@@ -880,7 +902,7 @@ impl ScriptFiles<'_> {
 }
 
 fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
-    if !db.should_check_file(file) {
+    if !db.should_check_file(file) || db.uv_environments().is_initialization_pending(db, file) {
         return Vec::new();
     }
 
@@ -893,8 +915,9 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 ///
 /// Scripts with invalid configuration still produce configuration diagnostics and retain a program
 /// for editor operations, but their semantic diagnostics must not be reported.
+/// Call this outside Salsa queries because uv initialization progress is untracked.
 pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
-    if !db.should_check_file(file) {
+    if !db.should_check_file(file) || db.uv_environments().is_initialization_pending(db, file) {
         return false;
     }
 
@@ -1032,7 +1055,10 @@ pub(crate) fn check_file_impl(
             diagnostics.extend(dependency_diagnostic);
             Ok(diagnostics.into_boxed_slice())
         }) {
-            Ok(result) => result,
+            Ok(result) => result.map(|mut diagnostics| {
+                baseline::demote_diagnostics(*db, source_file, &mut diagnostics);
+                diagnostics
+            }),
             Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
     }

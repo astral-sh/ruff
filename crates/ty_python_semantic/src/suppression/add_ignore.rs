@@ -229,8 +229,7 @@ fn line_start(tokens: &ruff_python_ast::token::Tokens, offset: TextSize) -> Text
                 TokenKind::Newline | TokenKind::NonLogicalNewline
             )
         })
-        .map(Ranged::end)
-        .unwrap_or_default()
+        .map_or_default(Ranged::end)
 }
 
 fn add_end_of_line_suppression(source: &str, codes: &[LintName], line_end: TextSize) -> Fix {
@@ -330,7 +329,7 @@ impl std::fmt::Display for Codes<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut joiner = f.join(", ");
 
-        let namespace = if self.0.is_type_ignore() { "ty:" } else { "" };
+        let namespace = self.0.code_prefix();
 
         for item in self.1 {
             joiner.entry(&format_args!("{namespace}{item}"));

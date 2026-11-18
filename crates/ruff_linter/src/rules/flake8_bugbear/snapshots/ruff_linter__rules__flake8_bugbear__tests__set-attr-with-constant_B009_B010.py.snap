@@ -122,3 +122,58 @@ help: Replace `setattr` with assignment
 82 |
    |
 note: This is an unsafe fix and may change runtime behavior
+
+B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   --> B009_B010.py:98:2
+    |
+ 96 | # Parenthesized `setattr` statements: the fix must drop the parentheses too,
+ 97 | # since `(foo.bar = None)` is a syntax error.
+ 98 | (setattr(foo, "bar", None))
+    |  ^^^^^^^^^^^^^^^^^^^^^^^^^
+ 99 | ((setattr(foo, "bar", None)))
+100 | (  # comment
+    |
+help: Replace `setattr` with assignment
+   |
+97 | # since `(foo.bar = None)` is a syntax error.
+   - (setattr(foo, "bar", None))
+98 + foo.bar = None
+99 | ((setattr(foo, "bar", None)))
+   |
+
+B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   --> B009_B010.py:99:3
+    |
+ 97 | # since `(foo.bar = None)` is a syntax error.
+ 98 | (setattr(foo, "bar", None))
+ 99 | ((setattr(foo, "bar", None)))
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^
+100 | (  # comment
+101 |     setattr(foo, "bar", None)
+    |
+help: Replace `setattr` with assignment
+    |
+98  | (setattr(foo, "bar", None))
+    - ((setattr(foo, "bar", None)))
+99  + foo.bar = None
+100 | (  # comment
+    |
+
+B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   --> B009_B010.py:101:5
+    |
+ 99 | ((setattr(foo, "bar", None)))
+100 | (  # comment
+101 |     setattr(foo, "bar", None)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+102 | )
+    |
+help: Replace `setattr` with assignment
+    |
+99  | ((setattr(foo, "bar", None)))
+    - (  # comment
+    -     setattr(foo, "bar", None)
+    - )
+100 + foo.bar = None
+    |
+note: This is an unsafe fix and may change runtime behavior

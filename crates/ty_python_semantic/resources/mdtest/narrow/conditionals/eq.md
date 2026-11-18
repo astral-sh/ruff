@@ -864,6 +864,29 @@ def loop_back():
             value = Integer.Y
 ```
 
+The comparison narrows a `str | int` to the matching builtin type. A plain string can equal
+`String.X` and reach the `.name` access.
+
+```py
+def compare_with_enum_member(value: str | int):
+    if value == String.X:
+        reveal_type(value)  # revealed: str
+        value.name  # error: [missing-attribute]
+
+    if Integer.X == value:
+        reveal_type(value)  # revealed: int
+```
+
+Members of other `IntEnum` classes can also compare equal to `Integer.X`.
+
+```py
+def compare_int_enums(value: IntEnum):
+    if value != Integer.X:
+        reveal_type(value)  # revealed: IntEnum & ~Literal[Integer.X]
+    else:
+        reveal_type(value)  # revealed: IntEnum
+```
+
 A custom `__new__` can replace the value declared in an `IntEnum` class body. We can still narrow
 the members of `Foo`, whose runtime values are known, but must preserve all of `Shifted` because its
 members' runtime values cannot be determined statically:
@@ -913,7 +936,7 @@ from enum import IntEnum
 from typing import Literal
 
 class AnnotatedShifted(IntEnum):
-    _value_: Literal[1]  # error: [invalid-mutable-override]
+    _value_: Literal[1]  # error: [incompatible-mutable-override]
 
     def __new__(cls, value: int) -> "AnnotatedShifted":
         member = int.__new__(cls, value + 1)
@@ -932,7 +955,7 @@ if AnnotatedShifted.MEMBER != Other.MEMBER:
     reveal_type(AnnotatedShifted.MEMBER)  # revealed: AnnotatedShifted
 
 class AnnotatedInitialized(IntEnum):
-    _value_: Literal[2]  # error: [invalid-mutable-override]
+    _value_: Literal[2]  # error: [incompatible-mutable-override]
 
     def __init__(self, value: int) -> None:
         self._value_ = 2
@@ -975,7 +998,7 @@ from enum import IntEnum, auto
 from typing import Literal
 
 class Generated(IntEnum):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def _generate_next_value_(name, start, count, last_values) -> Literal["1"]:
         return "1"
 
@@ -1501,6 +1524,27 @@ def correlated_materialized_pattern(left: Top[MaterializedT], right: Materialize
             return 1
 ```
 
+## `LiteralString` and string literals
+
+A comparison can narrow a `LiteralString` operand to a particular value or exclude that value. The
+concrete string keeps its type in either branch.
+
+```py
+from typing_extensions import LiteralString
+
+def compare(other: LiteralString):
+    value = "a"
+    if value != other:
+        reveal_type(value)  # revealed: Literal["a"]
+        reveal_type(other)  # revealed: LiteralString & ~Literal["a"]
+        value + 1  # error: [unsupported-operator]
+
+    if other == value:
+        reveal_type(other)  # revealed: Literal["a"]
+    else:
+        reveal_type(value)  # revealed: Literal["a"]
+```
+
 ## `LiteralString` and string-valued enums
 
 `LiteralString` can be narrowed by comparison with a string-valued enum member that inherits `str`'s
@@ -1517,6 +1561,7 @@ from typing_extensions import LiteralString
 
 class Color(StrEnum):
     RED = "red"
+    BLUE = "blue"
 
 def narrow_literal_string_with_enum(value: LiteralString | None):
     if value == Color.RED:
@@ -1528,6 +1573,15 @@ def narrow_literal_string_with_enum(value: LiteralString | None):
         reveal_type(value)  # revealed: (LiteralString & ~Literal["red"]) | None
     else:
         reveal_type(value)  # revealed: Literal["red"]
+```
+
+The enum member keeps its type when its value differs from the `LiteralString`.
+
+```py
+def compare_member(other: LiteralString):
+    color = Color.RED
+    if color != other:
+        reveal_type(color)  # revealed: Literal[Color.RED]
 ```
 
 ## Module literals
@@ -1740,7 +1794,7 @@ from ty_extensions import Intersection, Not
 def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
     if value == "hello":
         reveal_type(value)  # revealed: str & ~LiteralString
-        value.definitely_missing_attribute  # error: [unresolved-attribute]
+        value.definitely_missing_attribute  # error: [missing-attribute]
 
     if "hello" == value:
         reveal_type(value)  # revealed: str & ~LiteralString
@@ -1804,6 +1858,66 @@ def _(flag: bool):
         reveal_type(C)  # revealed: <class 'A'>
 ```
 
+## Equality between class objects and `type[...]` types
+
+A `type[...]` type includes arbitrary subclasses, which could have metaclasses with `__eq__`
+implementing arbitrary behavior, so in general it is not sound to assume that `cls == SomeClass`
+(where `cls` has a `type[...]` type) narrows.
+
+In practice, though, metaclasses that override `__eq__` are uncommon, and people do rely on this
+type of narrowing. In non-strict mode, when both known metaclasses use the default equality
+implementation, we optimistically assume that subclasses retain it and permit this narrowing.
+
+```py
+class Base: ...
+class Child(Base): ...
+
+def _(cls: type[Base]):
+    if cls == Child:
+        reveal_type(cls)  # revealed: <class 'Child'>
+```
+
+A class's own `__eq__` affects comparisons between its instances, not between class objects; it has
+no effect here.
+
+```py
+class ChildWithEq(Base):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def _(cls: type[Base]):
+    if cls == ChildWithEq:
+        reveal_type(cls)  # revealed: <class 'ChildWithEq'>
+```
+
+Distinct classes can compare equal when either metaclass defines or inherits an `__eq__` override.
+
+```py
+class EqualMeta(type):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class DerivedMeta(EqualMeta): ...
+class Custom(Base, metaclass=DerivedMeta): ...
+
+def compare(cls: type[Base], custom: type[Custom] | None):
+    if cls == Custom:
+        reveal_type(cls)  # revealed: type[Base]
+    if custom == Child:
+        reveal_type(custom)  # revealed: type[Custom]
+```
+
+The override also remains possible when the metaclass is selected at runtime.
+
+```py
+def choose(flag: bool, cls: type[Base]):
+    meta = EqualMeta if flag else type
+    class Candidate(Base, metaclass=meta): ...
+
+    if cls == Candidate:
+        reveal_type(cls)  # revealed: type[Base]
+```
+
 ## `x != y` where `y` has multiple literal options
 
 ```py
@@ -1814,6 +1928,50 @@ def _(x: Literal[1, 2], y: Literal[2, 3]):
         reveal_type(x)  # revealed: Literal[1, 2]
     else:
         reveal_type(x)  # revealed: Literal[2]
+```
+
+## Narrowing overlapping string, bytes, and integer literal unions
+
+Equality narrows each operand to the shared values. With very wide unions, applying that constraint
+can itself require comparing many pairs. In that case ty narrows to the builtin types of the shared
+values. For inequality, each value on either side can differ from some value on the other side.
+
+```py
+from typing import Literal
+
+def _(left: Literal["a", "b", "c"], right: Literal["b", "c", "d"]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal["b", "c"]
+        reveal_type(right)  # revealed: Literal["b", "c"]
+    else:
+        reveal_type(left)  # revealed: Literal["a", "b", "c"]
+        reveal_type(right)  # revealed: Literal["b", "c", "d"]
+
+    if left != right:
+        reveal_type(left)  # revealed: Literal["a", "b", "c"]
+        reveal_type(right)  # revealed: Literal["b", "c", "d"]
+    else:
+        reveal_type(left)  # revealed: Literal["b", "c"]
+        reveal_type(right)  # revealed: Literal["b", "c"]
+```
+
+Equality also preserves the order of the shared literals in bytes, integer, and mixed unions.
+
+```py
+def _(left: Literal[b"a", b"b", b"c"], right: Literal[b"c", b"b", b"d"]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[b"b", b"c"]
+        reveal_type(right)  # revealed: Literal[b"c", b"b"]
+
+def _(left: Literal[1, 2, 3], right: Literal[3, 2, 4]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[2, 3]
+        reveal_type(right)  # revealed: Literal[3, 2]
+
+def _(left: Literal[b"a", b"b", 0], right: Literal[0, b"b", b"c"]):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[b"b", 0]
+        reveal_type(right)  # revealed: Literal[0, b"b"]
 ```
 
 ## `==` with PEP 695 alias to a union of literals
@@ -2345,6 +2503,17 @@ def _(b: bool, i: Literal[1, 2]):
         reveal_type(i)  # revealed: Literal[1]
     else:
         reveal_type(i)  # revealed: Literal[2]
+```
+
+When two literal unions can compare equal because `True == 1`, each operand narrows to its own
+literal.
+
+```py
+def _(left: Literal[1, 2], right: Literal[True, 3]):
+    reveal_type(left == right)  # revealed: bool
+    if left == right:
+        reveal_type(left)  # revealed: Literal[1]
+        reveal_type(right)  # revealed: Literal[True]
 ```
 
 ## Integers and booleans with non-strict equality semantics
@@ -3235,6 +3404,43 @@ def tuple_union(value: Foo | None, other: tuple[int, ...]):
         reveal_type(value)  # revealed: Foo | None
     else:
         reveal_type(value)  # revealed: Foo | None
+```
+
+Strict mode accounts for a subclass that introduces a metaclass with custom equality.
+
+```py
+class Base: ...
+class Child(Base): ...
+
+def compare_classes(cls: type[Base], flag: bool):
+    if cls == Child:
+        reveal_type(cls)  # revealed: type[Base]
+
+    # A union of exact class objects can still narrow because their metaclasses are known.
+    either = Base if flag else Child
+    if either == Child:
+        reveal_type(either)  # revealed: <class 'Child'>
+```
+
+A final metaclass fixes the comparison method for every subclass. Equality on its own metaclass only
+affects comparisons with the metaclass itself, not class equality.
+
+```py
+from typing import final
+
+class MetaMeta(type):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+@final
+class Meta(type, metaclass=MetaMeta): ...
+
+class Parent(metaclass=Meta): ...
+class Derived(Parent): ...
+
+def compare_final_metaclass(cls: type[Parent]):
+    if cls == Derived:
+        reveal_type(cls)  # revealed: <class 'Derived'>
 ```
 
 ## The strict literal narrowing alias

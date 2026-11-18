@@ -1045,7 +1045,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let tcx_tuple = tcx
-            .annotation
+            .expected_type()
             .and_then(|annotation| {
                 annotation.known_specialization(db, visitor.env, KnownClass::Tuple)
             })
@@ -1062,7 +1062,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             Some(tuple) => Either::Left(
                 tuple
                     .iter_element_types(db)
-                    .map(|tcx| TypeContext::declared(Some(tcx))),
+                    .map(|tcx| TypeContext::preference(Some(tcx))),
             ),
         };
 
@@ -3160,7 +3160,8 @@ impl<'db> TupleSpecBuilder<'db> {
                 if our_elements.len() == new_elements.len() =>
             {
                 for (existing, new) in our_elements.iter_mut().zip(new_elements.all_elements()) {
-                    *existing = UnionType::from_elements_leave_aliases(db, env, [*existing, *new]);
+                    *existing =
+                        UnionType::from_two_elements_leave_aliases(db, env, *existing, *new);
                 }
                 self
             }

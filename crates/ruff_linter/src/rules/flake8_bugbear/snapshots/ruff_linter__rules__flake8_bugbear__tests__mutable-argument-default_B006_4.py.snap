@@ -12,8 +12,8 @@ B006 [*] Do not use mutable data structures for argument defaults
 help: Replace with `None`; initialize within function
    |
 6  | class FormFeedIndent:
-   -    def __init__(self, a=[]):
-7  +    def __init__(self, a=None):
+   -   ␌ def __init__(self, a=[]):
+7  +   ␌ def __init__(self, a=None):
 8  +         if a is None:
 9  +          a = []
 10 |         print(a)

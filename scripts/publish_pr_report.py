@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import logging
 import os
 import re
 import subprocess
@@ -19,6 +20,8 @@ from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+logger = logging.getLogger(__name__)
+
 REPOSITORY = "astral-sh/ruff"
 REPOSITORY_ID = 523043277
 API_ROOT = f"https://api.github.com/repos/{REPOSITORY}"
@@ -27,6 +30,37 @@ BOT_ID = 305554984  # astral-automations-bot
 MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
 MAX_REPORT_CHARACTERS = 60_000
+MAX_HTML_ARCHIVE_BYTES = 128 * 1024 * 1024
+MAX_HTML_REPORT_BYTES = 128 * 1024 * 1024
+
+
+def read_html_files(value: str) -> dict[str, tuple[str, str]]:
+    files = json.loads(value)
+    if not isinstance(files, dict):
+        raise TypeError("HTML files must be a JSON object keyed by filename.")
+    result: dict[str, tuple[str, str]] = {}
+    for filename, metadata in files.items():
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", filename):
+            raise ValueError(
+                "HTML filenames must be plain filenames without directories."
+            )
+        if not isinstance(metadata, dict) or metadata.keys() - {
+            "content-type",
+            "label",
+        }:
+            raise ValueError("HTML files accept a content-type and an optional label.")
+        content_type = metadata.get("content-type", "")
+        label = metadata.get("label", "")
+        if not isinstance(content_type, str) or not re.fullmatch(
+            r"[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+(?:; charset=utf-8)?", content_type
+        ):
+            raise ValueError("Invalid HTML report content type.")
+        if not isinstance(label, str) or not re.fullmatch(r"[^\r\n]{0,100}", label):
+            raise ValueError(
+                "HTML report labels must be at most 100 characters on one line."
+            )
+        result[filename] = (content_type, label)
+    return result
 
 
 def report_marker(report: str) -> str:
@@ -60,9 +94,9 @@ def api(
         raise
 
 
-def matches_comment(comment: dict, pull_request: int, marker: str) -> bool:
+def matches_comment(comment: dict[str, Any], pull_request: int, marker: str) -> bool:
     author = comment.get("user") or {}
-    return (
+    return bool(
         author.get("id") == BOT_ID
         and author.get("type") == "Bot"
         and comment.get("issue_url") == f"{API_ROOT}/issues/{pull_request}"
@@ -83,7 +117,7 @@ def read_comment_id(path: str) -> int | None:
 
 def find_report(
     pull_request: int, report: str, comment_id: int | None = None
-) -> dict | None:
+) -> dict[str, Any] | None:
     if comment_id is None:
         return None
     comment = api(f"issues/comments/{comment_id}", missing_ok=True)
@@ -96,7 +130,7 @@ def find_report(
     return comment
 
 
-def find_artifact(run_id: int, name: str) -> dict | None:
+def find_artifact(run_id: int, name: str) -> dict[str, Any] | None:
     matches = []
     page = 1
     while True:
@@ -115,8 +149,10 @@ def find_artifact(run_id: int, name: str) -> dict | None:
     return max(matches, key=lambda artifact: artifact["id"]) if matches else None
 
 
-def download_artifact(artifact: dict) -> bytes:
-    if artifact["size_in_bytes"] > MAX_ARCHIVE_BYTES:
+def download_artifact(
+    artifact: dict[str, Any], *, max_bytes: int = MAX_ARCHIVE_BYTES
+) -> bytes:
+    if artifact["size_in_bytes"] > max_bytes:
         raise ValueError("The report archive exceeds the download limit.")
     result = subprocess.run(
         [
@@ -128,35 +164,83 @@ def download_artifact(artifact: dict) -> bytes:
         stdout=subprocess.PIPE,
         timeout=120,
     )
-    if len(result.stdout) > MAX_ARCHIVE_BYTES:
+    if len(result.stdout) > max_bytes:
         raise ValueError("The report archive exceeds the download limit.")
     return result.stdout
 
 
-def read_report(archive_bytes: bytes, filename: str) -> str:
+def read_report(
+    archive_bytes: bytes, filename: str, *, max_bytes: int = MAX_REPORT_BYTES
+) -> str:
     # Read one fixed member in memory. Archive paths are never extracted, and
     # artifacts cannot replace the publisher or supply executable configuration.
     with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
         members = [info for info in archive.infolist() if info.filename == filename]
         if len(members) != 1 or members[0].is_dir():
             raise ValueError(f"Expected exactly one {filename} report in the archive.")
-        if members[0].file_size > MAX_REPORT_BYTES:
+        if members[0].file_size > max_bytes:
             raise ValueError("The uncompressed report exceeds the size limit.")
         with archive.open(members[0]) as member:
-            data = member.read(MAX_REPORT_BYTES + 1)
-        if len(data) > MAX_REPORT_BYTES:
+            data = member.read(max_bytes + 1)
+        if len(data) > max_bytes:
             raise ValueError("The uncompressed report exceeds the size limit.")
         return data.decode("utf-8")
+
+
+def upload_html_report(
+    files: dict[str, tuple[str, str]],
+    artifact: dict[str, Any],
+    *,
+    prefix: str,
+    bucket: str,
+    base_url: str,
+) -> str:
+    if not files or not base_url:
+        raise ValueError(
+            "HTML report files and their public base URL must be configured."
+        )
+    archive = download_artifact(artifact, max_bytes=MAX_HTML_ARCHIVE_BYTES)
+    reports = {}
+    total_bytes = 0
+    for filename in files:
+        contents = read_report(
+            archive, filename, max_bytes=MAX_HTML_REPORT_BYTES
+        ).encode()
+        total_bytes += len(contents)
+        if total_bytes > MAX_HTML_REPORT_BYTES:
+            raise ValueError("The uncompressed HTML report exceeds the size limit.")
+        reports[filename] = contents
+    for filename, contents in reports.items():
+        subprocess.run(
+            [
+                "aws",
+                "s3",
+                "cp",
+                "-",
+                f"s3://{bucket}/{prefix}/{filename}",
+                "--content-type",
+                files[filename][0],
+                "--cache-control",
+                "public, max-age=3600",
+                "--only-show-errors",
+            ],
+            input=contents,
+            check=True,
+            timeout=120,
+        )
+    return f"{base_url.rstrip('/')}/{prefix}"
 
 
 def render_report(
     report: str,
     contents: str,
-    run: dict,
-    artifact: dict,
+    run: dict[str, Any],
+    artifact: dict[str, Any],
     *,
     title: str = "",
-    full_report: dict | None = None,
+    full_report: dict[str, Any] | None = None,
+    full_report_url: str = "",
+    html_files: dict[str, tuple[str, str]] | None = None,
 ) -> str:
     if len(contents) > MAX_REPORT_CHARACTERS:
         artifact_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{artifact['id']}"
@@ -166,7 +250,17 @@ def render_report(
         )
     if title:
         contents = f"## {title}\n\n{contents}"
-    if full_report is not None:
+    if full_report_url:
+        links = []
+        for filename, (_, label) in (html_files or {}).items():
+            if label:
+                label = (
+                    label.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+                )
+                links.append(f"[{label}]({full_report_url}/{filename})")
+        if links:
+            contents = f"{contents.rstrip()}\n\n" + " · ".join(links)
+    elif full_report is not None:
         report_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{full_report['id']}"
         contents = (
             f"{contents.rstrip()}\n\n[Download the full report (ZIP)]({report_url})"
@@ -181,7 +275,7 @@ def render_report(
     )
 
 
-def report_run(comment: dict) -> tuple[int, int]:
+def report_run(comment: dict[str, Any]) -> tuple[int, int]:
     lines = comment["body"].splitlines()
     if len(lines) > 1 and (
         match := re.fullmatch(
@@ -194,7 +288,7 @@ def report_run(comment: dict) -> tuple[int, int]:
 
 def current_run(
     run_id: int, run_attempt: int, workflow_ref: str, pull_request: int
-) -> dict | None:
+) -> dict[str, Any] | None:
     run = api(f"actions/runs/{run_id}")
     if run["run_attempt"] != run_attempt:
         print("The workflow run has been rerun.", file=sys.stderr)
@@ -232,10 +326,16 @@ def publish(
     filename: str,
     title: str = "",
     full_report_artifact: str = "",
+    html_bucket: str = "",
+    html_base_url: str = "",
+    html_files: dict[str, tuple[str, str]] | None = None,
     stored_comment_id: int | None = None,
+    update_existing_only: bool = False,
     dry_run: bool = False,
 ) -> int | None:
-    if not (run := current_run(run_id, run_attempt, workflow_ref, pull_request)):
+    if update_existing_only and stored_comment_id is None:
+        return
+    if (run := current_run(run_id, run_attempt, workflow_ref, pull_request)) is None:
         return
     artifact = find_artifact(run_id, artifact_name)
     if artifact is None:
@@ -247,28 +347,53 @@ def publish(
     full_report = (
         find_artifact(run_id, full_report_artifact) if full_report_artifact else None
     )
+    full_report_url = ""
+    if full_report is not None and html_bucket and not dry_run:
+        try:
+            full_report_url = upload_html_report(
+                html_files or {},
+                full_report,
+                prefix=f"ruff/pull-requests/{pull_request}/{report}/{run_id}/{run_attempt}",
+                bucket=html_bucket,
+                base_url=html_base_url,
+            )
+        except Exception:
+            # An upload failure must not suppress the summary or artifact link.
+            logger.exception("Failed to upload the HTML report.")
     body = render_report(
-        report, contents, run, artifact, title=title, full_report=full_report
+        report,
+        contents,
+        run,
+        artifact,
+        title=title,
+        full_report=full_report,
+        full_report_url=full_report_url,
+        html_files=html_files,
     )
     if dry_run:
         print(body, end="")
         return
 
     # Recheck after downloading: the PR may have advanced or the run may have been retried.
-    if not current_run(run_id, run_attempt, workflow_ref, pull_request):
+    if current_run(run_id, run_attempt, workflow_ref, pull_request) is None:
         return
     existing = find_report(pull_request, report, stored_comment_id)
-    if existing and report_run(existing) > (run_id, run_attempt):
+    if existing is not None and report_run(existing) > (run_id, run_attempt):
         print("A newer run already published this report.", file=sys.stderr)
+        assert isinstance(existing["id"], int)
         return existing["id"]
-    if existing:
+    if existing is not None:
         comment_id = existing["id"]
+        assert isinstance(comment_id, int)
         if existing["body"] != body:
             api(f"issues/comments/{comment_id}", method="PATCH", body=body)
+    elif update_existing_only:
+        return None
     else:
-        comment_id = api(f"issues/{pull_request}/comments", method="POST", body=body)[
-            "id"
-        ]
+        created = api(f"issues/{pull_request}/comments", method="POST", body=body)
+        comment_id = created["id"]
+        assert isinstance(comment_id, int)
+
     print(f"Published {report} report: {comment_id}")
     return comment_id
 
@@ -284,7 +409,11 @@ def main() -> None:
     parser.add_argument("--filename", required=True)
     parser.add_argument("--title", default="")
     parser.add_argument("--full-report-artifact", default="")
+    parser.add_argument("--html-bucket", default="")
+    parser.add_argument("--html-base-url", default="")
+    parser.add_argument("--html-files", type=read_html_files, default="{}")
     parser.add_argument("--comment-id-file", dest="comment_id", type=read_comment_id)
+    parser.add_argument("--update-existing-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.run_id <= 0 or args.run_attempt <= 0:
@@ -301,10 +430,14 @@ def main() -> None:
         filename=args.filename,
         title=args.title,
         full_report_artifact=args.full_report_artifact,
+        html_bucket=args.html_bucket,
+        html_base_url=args.html_base_url,
+        html_files=args.html_files,
         stored_comment_id=args.comment_id,
+        update_existing_only=args.update_existing_only,
         dry_run=args.dry_run,
     )
-    if comment_id is not None and (output := os.environ.get("GITHUB_OUTPUT")):
+    if comment_id is not None and (output := os.environ.get("GITHUB_OUTPUT", "")):
         with Path(output).open("a") as file:
             file.write(f"comment-id={comment_id:d}\n")
 

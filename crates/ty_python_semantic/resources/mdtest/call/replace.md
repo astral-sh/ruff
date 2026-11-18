@@ -156,6 +156,6 @@ class ModelBase: ...
 class Model(ModelBase):
     value: int
 
-Model.__replace__  # error: [unresolved-attribute]
-Model(value=1).__replace__  # error: [unresolved-attribute]
+Model.__replace__  # error: [missing-attribute]
+Model(value=1).__replace__  # error: [missing-attribute]
 ```

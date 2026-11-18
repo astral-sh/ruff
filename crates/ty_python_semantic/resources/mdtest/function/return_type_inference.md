@@ -299,8 +299,7 @@ def returns_class():
 Inner1 = returns_class()
 Inner2 = returns_class()
 
-# TODO: This should be `bool` or `Literal[False]`, not `Literal[True]`
-reveal_type(Inner1 is Inner2)  # revealed: Literal[True]
+reveal_type(Inner1 is Inner2)  # revealed: bool
 
 # TODO: This should ideally be an error
 i: Inner1 = Inner2()
@@ -310,15 +309,13 @@ Therefore, the return type of `returns_class` cannot be `<class 'Inner'>`. Inste
 just treat it as `Unknown`.
 
 ```py
-# TODO: Should be `Unknown` or maybe `type`
-reveal_type(Inner1)  # revealed: <class 'Inner'>
+reveal_type(Inner1)  # revealed: Unknown
 ```
 
 Unfortunately, this means that we cannot infer precise types for attributes/methods on those types:
 
 ```py
-# TODO: Should be `Unknown`
-reveal_type(Inner1().attr)  # revealed: int
+reveal_type(Inner1().attr)  # revealed: Unknown
 ```
 
 If we wanted to improve this, we could return a synthetic protocol representing the structure of the
@@ -342,11 +339,9 @@ def returns_callable():
 callable1 = returns_callable()
 callable2 = returns_callable()
 
-# TODO: This should be `bool` or `Literal[False]`, not `Literal[True]`
-reveal_type(callable1 is callable2)  # revealed: Literal[True]
+reveal_type(callable1 is callable2)  # revealed: bool
 
-# TODO: should be `Callable[[], int]`
-reveal_type(callable1)  # revealed: def inner() -> int
+reveal_type(callable1)  # revealed: () -> int
 reveal_type(callable1())  # revealed: int
 ```
 
@@ -369,12 +364,11 @@ def returns_instance[T](x: T):
 def _(x: int):
     inner = returns_instance(x)
 
-    # TODO: `Inner` would probably be wrong here. Ideally, we would return a synthetic protocol
-    # with a type of `int` for the `attr` attribute.
-    reveal_type(inner)  # revealed: Inner
+    # TODO: Ideally, we would return a synthetic protocol with an `int` attribute.
+    reveal_type(inner)  # revealed: Unknown
 
     # TODO: should ideally be `int`
-    reveal_type(inner.attr)  # revealed: T@returns_instance
+    reveal_type(inner.attr)  # revealed: Unknown
 ```
 
 ## Generators
@@ -457,6 +451,28 @@ def returns_4_but_will_be_replaced():
     return 4
 
 reveal_type(returns_4_but_will_be_replaced())  # revealed: Literal["a"]
+```
+
+## Decorated classes
+
+When the inner decorator's return type is inferred, we still check the original class body. The
+decorated name takes the type returned by the outer decorator.
+
+```py
+from typing import Final
+
+def identity(cls: type):
+    return cls
+
+def replace(cls: type) -> type[bool]:
+    return bool
+
+@replace
+@identity
+class C:
+    value: Final[int]  # error: [final-without-value]
+
+reveal_type(C)  # revealed: <class 'bool'>
 ```
 
 ## Methods
@@ -561,7 +577,7 @@ subclass method returns an incompatible value:
 ```py
 class IncompatibleChild(Parent):
     def method(self):
-        # TODO: This should be an invalid-return-type error.
+        # TODO: This should be an invalid-explicit-return error.
         return "a"
 
 reveal_type(IncompatibleChild().method())  # revealed: int | None
@@ -838,7 +854,7 @@ class Box[T]:
         return value
 
 reveal_type(Box[int].identity(1))  # revealed: int | Unknown
-value: int = Box[int].identity(1)  # no diagnostic
+value: int = Box[int].identity(1)  # ok
 ```
 
 ## Overloaded functions
@@ -1025,8 +1041,7 @@ class C:
         return 42
 
 instance = C()
-# TODO: This shouldn't be an error
-instance.method()  # error: [missing-argument]
+instance.method()
 ```
 
 Calling `method` on the class object itself is also possible:

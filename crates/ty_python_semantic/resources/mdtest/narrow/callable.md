@@ -84,13 +84,13 @@ e.g., functions that take no arguments and functions that require arguments). Wh
 def f(f: object):
     if callable(f):
         reveal_type(f)  # revealed: Top[(...) -> object]
-        f(1, keyword="value")  # error: [call-top-callable]
+        f(1, keyword="value")  # error: [call-to-function-with-unknown-signature]
     else:
         reveal_type(f)  # revealed: ~Top[(...) -> object]
 
     if isinstance(f, Callable):
         reveal_type(f)  # revealed: Top[(...) -> object]
-        f(1, keyword="value")  # error: [call-top-callable]
+        f(1, keyword="value")  # error: [call-to-function-with-unknown-signature]
     else:
         reveal_type(f)  # revealed: ~Top[(...) -> object]
 ```
@@ -123,7 +123,7 @@ from typing import Callable
 def resolve(value: str):
     if callable(value):
         reveal_type(value)  # revealed: str & Top[(...) -> object]
-        # error: [call-top-callable]
+        # error: [call-to-function-with-unknown-signature]
         reveal_type(value())  # revealed: object
 ```
 
@@ -260,7 +260,7 @@ from collections import abc
 
 def accepts_type(x: type): ...
 
-accepts_type(abc.Callable)  # no diagnostic
+accepts_type(abc.Callable)  # ok
 
 def _(subj: None | abc.Callable[..., str]) -> None:
     match subj:

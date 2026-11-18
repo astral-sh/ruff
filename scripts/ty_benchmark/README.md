@@ -9,7 +9,7 @@
 1. Install Pyright: `npm ci --ignore-scripts`
 1. Run benchmarks: `uv run benchmark`
 
-Requires hyperfine 1.20 or newer.
+Requires hyperfine 2.0 or newer.
 
 ## Benchmarks
 
@@ -18,19 +18,21 @@ Requires hyperfine 1.20 or newer.
 Run with:
 
 ```shell
-uv run --python 3.14 benchmark
+uv run --python 3.15 benchmark
 ```
 
-Measures how long it takes to type check a project without a pre-existing cache.
+Measures elapsed time and peak resident set size (RSS) when type checking a project
+without a pre-existing cache.
 
-You can run the benchmark with `--single-threaded` to measure the check time when using a single thread only.
+Each checker discovers files from the project's configured directories and uses its
+default worker settings. Pass `--single-threaded` to limit checker parallelism.
 
 ### Warm check time
 
 Run with:
 
 ```shell
-uv run --python 3.14 benchmark --warm
+uv run --python 3.15 benchmark --warm
 ```
 
 Measures how long it takes to recheck a project if there were no changes.
@@ -39,12 +41,12 @@ Measures how long it takes to recheck a project if there were no changes.
 
 ### LSP: Time to first diagnostic
 
-Measures how long it takes for a newly started LSP to return the diagnostics for the files open in the editor.
+Measures how long it takes for a newly started LSP to return its first diagnostic response for each open file. A server can continue checking files in the background.
 
 Run with:
 
 ```bash
-uv run --python 3.14 pytest src/benchmark/test_lsp_diagnostics.py::test_fetch_diagnostics
+uv run --python 3.15 pytest src/benchmark/test_lsp_diagnostics.py::test_fetch_diagnostics
 ```
 
 **Note**: Use `-v -s` to see the set of diagnostics returned by each type checker.
@@ -56,10 +58,10 @@ Measure how long it takes to recheck all open files after making a single change
 Run with:
 
 ```bash
-uv run --python 3.14 pytest src/benchmark/test_lsp_diagnostics.py::test_incremental_edit
+uv run --python 3.15 pytest src/benchmark/test_lsp_diagnostics.py::test_incremental_edit
 ```
 
-> **Note**: This benchmark uses [pull diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics) for type checkers that support this operation (ty), and falls back to [publish diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) otherwise (Pyright, Pyrefly).
+> **Note**: This benchmark uses [pull diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics) for type checkers that support this operation (ty, Zuban), and falls back to [publish diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) otherwise (Pyright, Pyrefly).
 
 ## Known limitations
 

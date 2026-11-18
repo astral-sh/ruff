@@ -108,7 +108,7 @@ class Grandchild(OtherChild):
     # error: [override-of-final-method]
     def foo(): ...
     @property
-    # error: [invalid-property-type-override]
+    # error: [incompatible-property-override]
     # error: [override-of-final-method]
     def my_property1(self) -> str: ...
     # TODO: we should emit a Liskov violation here too
@@ -209,13 +209,13 @@ class Bad:
     def bar(self, x: str) -> str: ...
     @overload
     @final
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def bar(self, x: int) -> int: ...
     @overload
     def baz(self, x: str) -> str: ...
     @final
     @overload
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def baz(self, x: int) -> int: ...
 
 class ChildOfBad(Bad):
@@ -256,7 +256,7 @@ class ChildOfGood(Good):
 class Bad:
     @overload
     @final
-    def f(self, x: str) -> str: ...  # error: [invalid-overload]
+    def f(self, x: str) -> str: ...  # error: [misplaced-overload-decorator]
     @overload
     def f(self, x: int) -> int: ...
     def f(self, x: int | str) -> int | str:
@@ -264,7 +264,7 @@ class Bad:
 
     @final
     @overload
-    def g(self, x: str) -> str: ...  # error: [invalid-overload]
+    def g(self, x: str) -> str: ...  # error: [misplaced-overload-decorator]
     @overload
     def g(self, x: int) -> int: ...
     def g(self, x: int | str) -> int | str:
@@ -274,7 +274,7 @@ class Bad:
     def h(self, x: str) -> str: ...
     @overload
     @final
-    def h(self, x: int) -> int: ...  # error: [invalid-overload]
+    def h(self, x: int) -> int: ...  # error: [misplaced-overload-decorator]
     def h(self, x: int | str) -> int | str:
         return x
 
@@ -282,7 +282,7 @@ class Bad:
     def i(self, x: str) -> str: ...
     @final
     @overload
-    def i(self, x: int) -> int: ...  # error: [invalid-overload]
+    def i(self, x: int) -> int: ...  # error: [misplaced-overload-decorator]
     def i(self, x: int | str) -> int | str:
         return x
 
@@ -320,7 +320,7 @@ class B:
     method = A.method
 
 class C(B):
-    def method(self) -> None: ...  # no diagnostic here (see prose discussion above)
+    def method(self) -> None: ...  # ok here (see prose discussion above)
 ```
 
 ## Overriding a `@final` method by assigning a function to a class variable
@@ -354,6 +354,59 @@ from other import replacement_method
 
 class Derived(Base):
     method = replacement_method  # error: [override-of-final-method]
+```
+
+## A decorator can replace an overriding method with another function
+
+`handlers.py`:
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+F = TypeVar("F")
+
+def use_handler(handler: F) -> Callable[[object], F]:
+    return lambda original: handler
+
+def shared_handler(self: object) -> None: ...
+```
+
+`main.py`:
+
+```py
+from typing import final
+from handlers import shared_handler, use_handler
+
+class Base:
+    @final
+    def run(self) -> None: ...
+
+class Plugin(Base):
+    @use_handler(shared_handler)
+    def run(self) -> None: ...  # error: [override-of-final-method]
+
+class LocalPlugin(Base):
+    def local_handler(self) -> None: ...
+    @use_handler(local_handler)
+    # snapshot: override-of-final-method
+    def run(self) -> None: ...
+```
+
+```snapshot
+error[override-of-final-method]: Cannot override `Base.run`
+  --> src/main.py:16:9
+   |
+16 |     def run(self) -> None: ...
+   |         ^^^ Overrides a definition from superclass `Base`
+info: `Base.run` is decorated with `@final`, forbidding overrides
+ --> src/main.py:5:5
+  |
+5 |     @final
+  |     ------
+6 |     def run(self) -> None: ...
+  |         --- `Base.run` defined here
+help: Remove the override of `run`
 ```
 
 ## Constructor methods are also checked
@@ -1293,7 +1346,7 @@ class Base(ABC):
 @final
 # snapshot: abstract-method-in-final-class
 class Bad(Base):
-    method: int  # error: [invalid-attribute-override]
+    method: int  # error: [incompatible-attribute-override]
 ```
 
 ```snapshot
@@ -1313,7 +1366,7 @@ info: The instance-attribute annotation for `method` does not override the abstr
 help: Either assign a value or add `ClassVar` to this declaration
   --> src/mdtest_snippet.py:11:5
    |
-11 |     method: int  # error: [invalid-attribute-override]
+11 |     method: int  # error: [incompatible-attribute-override]
    |     ------ Instance-attribute declaration
 ```
 

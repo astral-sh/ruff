@@ -19,7 +19,7 @@ use crate::capabilities::ResolvedClientCapabilities;
 use crate::server::{SendRequest, publish_all_document_diagnostics};
 
 use super::{
-    Session,
+    Session, Workspaces,
     client::{Client, ClientResponseHandler},
 };
 
@@ -50,9 +50,17 @@ pub(super) struct LspFileWatcher {
     /// Registrations in the current reconciliation cycle, capped if refreshes keep changing paths.
     reconciliation_passes: u8,
 
-    /// Whether the client supports relative file watches. For the watcher,
-    /// this mainly defines whether the client supports watching paths outside the project's root.
-    supports_relative_file_watcher: bool,
+    registration_mode: RegistrationMode,
+}
+
+#[derive(Default, PartialEq, Eq)]
+enum RegistrationMode {
+    #[default]
+    Relative,
+    /// A single workspace-wide watch covers the session, even if search paths change.
+    Workspace,
+    /// The client rejected the workspace-wide watch. Keep any earlier registration active.
+    Failed,
 }
 
 impl LspFileWatcher {
@@ -66,7 +74,11 @@ impl LspFileWatcher {
         }
 
         Some(Self {
-            supports_relative_file_watcher: capabilities.supports_relative_file_watcher(),
+            registration_mode: if capabilities.supports_relative_file_watcher() {
+                RegistrationMode::Relative
+            } else {
+                RegistrationMode::Workspace
+            },
             ..Self::default()
         })
     }
@@ -93,7 +105,8 @@ impl LspFileWatcher {
     ) -> Option<FileWatcherUpdate> {
         // Wait for the client's response before preparing another registration;
         // its handler will reconcile the latest project paths.
-        if self.pending_registration.is_some() {
+        if self.pending_registration.is_some() || self.registration_mode == RegistrationMode::Failed
+        {
             return None;
         }
 
@@ -122,7 +135,7 @@ impl LspFileWatcher {
             .map(|db| (db, db.project().root(db), watch_paths(db, db.project())))
             .collect();
 
-        let (watchers, paths): (Vec<_>, Vec<_>) = if self.supports_relative_file_watcher {
+        let (watchers, paths) = if self.registration_mode == RegistrationMode::Relative {
             let watchers: IndexMap<_, _> = paths
                 .iter()
                 .flat_map(|(db, _, paths)| {
@@ -146,13 +159,12 @@ impl LspFileWatcher {
                 paths.paths().iter().find(|path| !path.starts_with(root))
             }) {
                 tracing::warn!(
-                    "Your LSP client doesn't support file watching outside the project: \
+                    "Using workspace-wide file watching: \
                      changes at or under `{unwatched_path}` may not be reported"
                 );
             }
             if self.registered_id.is_some() {
-                // Without relative patterns, changing an external search path cannot
-                // change the workspace-wide watch we registered with the client.
+                // Changing an external search path cannot change the workspace-wide watch.
                 self.cache_key = Some(cache_key);
                 return None;
             }
@@ -165,6 +177,46 @@ impl LspFileWatcher {
             )
         };
 
+        Some(self.registration(watchers, paths, cache_key))
+    }
+
+    fn fallback_registration(
+        &mut self,
+        workspaces: &Workspaces,
+        cache_key: u64,
+    ) -> Option<FileWatcherUpdate> {
+        match self.registration_mode {
+            RegistrationMode::Relative => self.registration_mode = RegistrationMode::Workspace,
+            RegistrationMode::Workspace => {
+                self.registration_mode = RegistrationMode::Failed;
+                return None;
+            }
+            RegistrationMode::Failed => return None,
+        }
+
+        tracing::warn!(
+            "Falling back to a single workspace-wide file watch; changes outside the workspace may be missed"
+        );
+        let roots = workspaces
+            .into_iter()
+            .map(|(root, _)| root.clone())
+            .collect();
+        Some(self.registration(
+            vec![FileSystemWatcher {
+                glob_pattern: GlobPattern::Pattern("**".into()),
+                kind: None,
+            }],
+            roots,
+            cache_key,
+        ))
+    }
+
+    fn registration(
+        &mut self,
+        watchers: Vec<FileSystemWatcher>,
+        paths: Vec<SystemPathBuf>,
+        cache_key: u64,
+    ) -> FileWatcherUpdate {
         // Refresh files in paths that weren't watched before. This is to handle
         // the case where a path was watched, then unwatched, and now gets watched again.
         // Files in that path might have changed while it was unwatched.
@@ -190,7 +242,7 @@ impl LspFileWatcher {
         self.next_registration_id += 1;
         self.reconciliation_passes += 1;
 
-        Some(FileWatcherUpdate {
+        FileWatcherUpdate {
             registration: Registration {
                 id: registration_id,
                 method: DidChangeWatchedFilesNotification::METHOD.into(),
@@ -202,7 +254,7 @@ impl LspFileWatcher {
             cache_key,
             paths,
             newly_covered_paths,
-        })
+        }
     }
 
     fn complete_registration(
@@ -218,7 +270,6 @@ impl LspFileWatcher {
                     error.code,
                     error.message
                 );
-                // Leave the old registration active. A later update can retry.
                 return None;
             }
             Ok(_) => {
@@ -268,12 +319,16 @@ impl FileWatcherUpdate {
                     registrations: vec![registration],
                 })
                 .expect("registration options are serializable"),
-                response_handler: ClientResponseHandler::new(|client, session, response| {
-                    let Some(completion) = session
-                        .file_watcher
-                        .as_mut()
-                        .and_then(|watcher| watcher.complete_registration(&response))
-                    else {
+                response_handler: ClientResponseHandler::new(move |client, session, response| {
+                    let Some(watcher) = session.file_watcher.as_mut() else {
+                        return;
+                    };
+                    let Some(completion) = watcher.complete_registration(&response) else {
+                        if let Some(fallback) =
+                            watcher.fallback_registration(&session.workspaces, cache_key)
+                        {
+                            fallback.apply(session, client);
+                        }
                         return;
                     };
                     completion.apply(session, client);

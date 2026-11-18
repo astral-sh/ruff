@@ -545,6 +545,12 @@ help: Remove unused suppression
    |
 ```
 
+```py
+# error: [unused-noqa] "non-enabled: `missing-return-type-undocumented-public-function`"
+def f():  # ruff:ignore[missing-return-type-undocumented-public-function]
+    pass
+```
+
 ## Nested comments
 
 ```toml

@@ -30,7 +30,7 @@ reads the dependency graph and module ownership returned by `uv workspace metada
 installed packages. uv may update the lockfile to match the current dependency declarations. uv
 0.12.3 or later is required.
 
-For PEP 723 scripts, enable uv script integration with `TY_UV=scripts` or `TY_UV=1`. ty synchronizes
+For PEP 723 scripts, set `project-manager.script = "uv"` in your ty configuration. ty synchronizes
 each script's environment and checks imports against its inline `dependencies` list. Declarations
 and environments from the enclosing workspace or other scripts do not apply.
 

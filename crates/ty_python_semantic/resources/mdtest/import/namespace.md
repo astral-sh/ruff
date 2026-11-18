@@ -81,7 +81,7 @@ two = 2
 ```py
 import parent.child.one
 
-import parent.child.two  # error: [unresolved-import]
+import parent.child.two  # error: [import-not-found]
 ```
 
 ## Priority between file and identically named namespace package
@@ -105,7 +105,7 @@ from foo import x
 
 reveal_type(x)  # revealed: Literal["module"]
 
-import foo.bar  # error: [unresolved-import]
+import foo.bar  # error: [import-not-found]
 ```
 
 ## `from` import with namespace package
@@ -180,7 +180,7 @@ extra-paths = ["/path-one", "/path-two"]
 
 ```py
 import mod
-import mod.sub1  # error: [unresolved-import]
+import mod.sub1  # error: [import-not-found]
 import mod.sub2
 ```
 
@@ -210,6 +210,6 @@ extra-paths = ["/path-two", "/path-one"]
 
 ```py
 import mod
-import mod.sub1  # error: [unresolved-import]
+import mod.sub1  # error: [import-not-found]
 import mod.sub2
 ```

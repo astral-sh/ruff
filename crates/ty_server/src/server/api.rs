@@ -115,6 +115,9 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::Worker
         ),
+        requests::WillRenameFilesHandler::METHOD => background_request_task::<
+            requests::WillRenameFilesHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::PrepareTypeHierarchyRequestHandler::METHOD => background_document_request_task::<
             requests::PrepareTypeHierarchyRequestHandler,
         >(
@@ -258,14 +261,16 @@ where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     let retry = R::RETRY_ON_CANCELLATION.then(|| req.clone());
-    let (id, params) = cast_request::<R>(req)?;
+    let (id, mut params) = cast_request::<R>(req)?;
 
-    Ok(Task::background(schedule, move |session: &Session| {
+    let build = move |session: &Session| -> Box<dyn FnOnce(&Client) + Send> {
         let cancellation_token = session
             .request_queue()
             .incoming()
             .cancellation_token(&id)
             .expect("request should have been tested for cancellation before scheduling");
+
+        R::prepare_params(session, &mut params);
 
         // SAFETY: The `snapshot` is safe to move across the unwind boundary because it is not used
         // after unwinding.
@@ -295,7 +300,12 @@ where
                 panic_response::<R>(&id, client, &error, retry, log_guidance);
             }
         })
-    }))
+    };
+    Ok(Task::background(
+        schedule,
+        Some(R::salsa_cancellation_error),
+        build,
+    ))
 }
 
 fn background_document_request_task<R: traits::BackgroundDocumentRequestHandler>(
@@ -308,7 +318,7 @@ where
     let retry = R::RETRY_ON_CANCELLATION.then(|| req.clone());
     let (id, params) = cast_request::<R>(req)?;
 
-    Ok(Task::background(schedule, move |session: &Session| {
+    let build = move |session: &Session| -> Box<dyn FnOnce(&Client) + Send> {
         let cancellation_token = session
             .request_queue()
             .incoming()
@@ -364,7 +374,12 @@ where
                 panic_response::<R>(&id, client, &error, retry, log_guidance);
             }
         })
-    }))
+    };
+    Ok(Task::background(
+        schedule,
+        Some(R::salsa_cancellation_error),
+        build,
+    ))
 }
 
 fn panic_response<R>(
@@ -439,7 +454,7 @@ where
     <<N as NotificationHandler>::NotificationType as Notification>::Params: UnwindSafe,
 {
     let (id, params) = cast_notification::<N>(req)?;
-    Ok(Task::background(schedule, move |session: &Session| {
+    let build = move |session: &Session| -> Box<dyn FnOnce(&Client) + Send> {
         let uri = N::document_uri(&params);
         // Requiring an open document here assumes the notification is invalid for closed documents.
         // TODO: Revisit this check before routing a notification that can target closed documents through
@@ -477,7 +492,8 @@ where
                 client.show_error_message(format!("ty encountered a problem. {log_guidance}"));
             }
         })
-    }))
+    };
+    Ok(Task::background(schedule, None, build))
 }
 
 /// Tries to cast a serialized request from the server into

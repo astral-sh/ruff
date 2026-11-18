@@ -1,8 +1,8 @@
 //! Sets up logging for ty
 
-use crate::args::TerminalColor;
 use anyhow::Context;
 use colored::Colorize;
+use ruff_command_line::TerminalColor;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, IsTerminal};
@@ -150,13 +150,9 @@ pub(crate) fn setup_tracing(
         .with(filter)
         .with(profiling_layer);
 
-    let ansi = match color {
-        TerminalColor::Auto => {
-            colored::control::SHOULD_COLORIZE.should_colorize() && std::io::stderr().is_terminal()
-        }
-        TerminalColor::Always => true,
-        TerminalColor::Never => false,
-    };
+    let ansi = color.as_override().unwrap_or_else(|| {
+        colored::control::SHOULD_COLORIZE.should_colorize() && std::io::stderr().is_terminal()
+    });
 
     if level.is_trace() {
         let subscriber = registry.with(

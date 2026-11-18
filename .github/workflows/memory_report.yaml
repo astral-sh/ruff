@@ -22,6 +22,7 @@ on:
       - "crates/ruff_python_parser/**"
       - "scripts/memory_report.py"
       - ".github/workflows/memory_report.yaml"
+      - ".github/actions/setup-ruff-workspace/action.yml"
       - "Cargo.lock"
       - "!**.md"
       - "!**.snap"
@@ -73,19 +74,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: $/.github/actions/setup-ruff-workspace
         with:
-          # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.4"
-          checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
           enable-cache: true
           save-cache: false
 
       - name: Install Rust toolchain
         run: rustup show
-
-      - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
       - name: Compute memory usage diff
         shell: bash
@@ -125,7 +120,7 @@ jobs:
           )
 
       - name: Upload diff
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: memory_report_diff
           path: memory_report_diff.diff

@@ -187,6 +187,20 @@ impl Violation for InvalidCharacterZeroWidthSpace {
     }
 }
 
+/// Helper that allows us to exit early before embarking on expensive walks
+/// of all tokens for various pylint rules.
+///
+/// Interpolation depth matters for fixes, so we avoid walking every token
+/// unless the source contains a character one of these rules could report.
+pub(crate) fn contains_invalid_string_character(source: &str) -> bool {
+    let bytes = source.as_bytes();
+    // Search for NUL (0), backspace (0x08), substitute (0x1a), escape (0x1b),
+    // and the UTF-8 encoding of zero-width space (U+200B).
+    memchr::memchr3(0, 0x08, 0x1a, bytes).is_some()
+        || memchr::memchr(0x1b, bytes).is_some()
+        || memchr::memmem::find(bytes, "\u{200b}".as_bytes()).is_some()
+}
+
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub(crate) fn invalid_string_characters(
     context: &LintContext,

@@ -1100,6 +1100,18 @@ def test_union_class_pattern_uses_members_from_matching_class(
             reveal_type(value)  # revealed: IndirectIntPattern
 ```
 
+Failing to match `PatternClass()` can leave an `IndirectPattern` instance because `PatternClass` may
+be a proper subclass.
+
+```py
+def match_possible_subclass(value: IndirectPattern, PatternClass: type[IndirectPattern]) -> None:
+    match value:
+        case PatternClass():
+            pass
+        case _:
+            reveal_type(value)  # revealed: IndirectPattern
+```
+
 ## Class pattern aliases
 
 The same rule applies outside sequence patterns. A class pattern keeps the generic arguments of a
@@ -1710,7 +1722,7 @@ def test_union_alias_capture(value: AliasPatternBase[Item]) -> None:
             # revealed: int | str
             reveal_type(item)
 
-            # error: [unresolved-attribute] "Object of type `int | str` has no attribute `nonexistent`"
+            # error: [missing-attribute] "Object of type `int | str` has no attribute `nonexistent`"
             item.nonexistent()
 ```
 
@@ -2075,7 +2087,7 @@ class GenericOverlapB(Generic[OverlapT]):
     member: OverlapT
 
 class GenericOverlapC(GenericOverlapB[str], GenericOverlapA):
-    member: str  # error: [invalid-attribute-override]
+    member: str  # error: [incompatible-attribute-override]
 
 class GenericListOverlapA: ...
 
@@ -2181,6 +2193,32 @@ def test_match_mapping_uses_get(value: CustomGet) -> None:
     match value:
         case {"item": item}:
             reveal_type(item)  # revealed: object
+```
+
+Narrowing a mapping preserves the type of its entries when it still uses the standard `get` method.
+A truthiness check can exclude empty dictionaries, and an `isinstance` check can add another class
+to the subject's type.
+
+```py
+def match_nonempty_dict(value: dict[str, int]) -> None:
+    if value:
+        match value:
+            case {"item": item}:
+                reveal_type(item)  # revealed: int
+
+class Tagged: ...
+
+def match_tagged_mapping(value: Mapping[str, bytes]) -> None:
+    if isinstance(value, Tagged):
+        match value:
+            case {"item": item}:
+                reveal_type(item)  # revealed: bytes
+
+def match_nonempty_custom_get(value: CustomGet) -> None:
+    if value:
+        match value:
+            case {"item": item}:
+                reveal_type(item)  # revealed: object
 ```
 
 A callable stored on the instance can also provide `get`. The captured value still has type
@@ -2669,7 +2707,7 @@ def intersected_typed_dict_mapping_is_exhaustive(
 
 def optional_key_is_not_exhaustive(
     value: OptionalPayload,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case {"value": _}:
@@ -2677,7 +2715,7 @@ def optional_key_is_not_exhaustive(
 
 def absent_key_is_not_exhaustive(
     value: RequiredPayload,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case {"missing": _}:
@@ -2685,7 +2723,7 @@ def absent_key_is_not_exhaustive(
 
 def non_string_key_is_not_exhaustive(
     value: RequiredPayload,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case {1: _}:
@@ -2776,7 +2814,7 @@ def builtin_subclass_positional_pattern_is_exhaustive(value: MyInt) -> int:
 
 def builtin_positional_literal_is_not_exhaustive(
     value: MyInt,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case MyInt(0):
@@ -2822,7 +2860,7 @@ class IntWithMissingMatchArg(int):
 
 def missing_match_arg_is_not_exhaustive(
     value: IntWithMissingMatchArg,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case IntWithMissingMatchArg(_):
@@ -2835,7 +2873,7 @@ class IntWithMetaclassMatchArgs(int, metaclass=MatchArgsMeta): ...
 
 def metaclass_match_args_is_not_exhaustive(
     value: IntWithMetaclassMatchArgs,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case IntWithMetaclassMatchArgs(_):
@@ -2847,7 +2885,7 @@ class WidenedMatchArgs:
 
 def widened_match_args_is_not_exhaustive(
     value: WidenedMatchArgs,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case WidenedMatchArgs(_):
@@ -2864,7 +2902,7 @@ class ConditionalIntMatchArgs(int):
 
 def conditional_match_args_disables_builtin_behavior(
     value: ConditionalIntMatchArgs,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case ConditionalIntMatchArgs(_):
@@ -2974,7 +3012,7 @@ class IntPlainChild(int, PlainBase): ...
 
 def builtin_positional_behavior_comes_from_pattern_class(
     value: IntPlainChild,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case PlainBase(_):  # error: [invalid-match-pattern]
@@ -3042,7 +3080,7 @@ class PossiblyMissingAttribute:
 
 def possibly_missing_attribute_is_not_exhaustive(
     value: PossiblyMissingAttribute,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case PossiblyMissingAttribute(x=_):
@@ -3164,7 +3202,7 @@ def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) 
 # Matching the element would succeed, but a one-element pattern cannot match a two-element tuple.
 def sequence_length_is_still_checked(
     value: tuple[HasX, HasX],
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case [HasX(x=_)]:
@@ -3545,6 +3583,95 @@ def match_tuple_expression_guard_rebinding(
             reveal_type(b)  # revealed: TupleSubjectB1
 ```
 
+## Captures of the subject across cases
+
+### Narrowing guards
+
+Capturing the subject under its original name keeps its value. If the guard fails, later patterns
+can still narrow that capture.
+
+```py
+def narrow_after_capture(value: int | str | bytes) -> None:
+    match value:
+        case value if isinstance(value, int):
+            reveal_type(value)  # revealed: int
+        case str():
+            reveal_type(value)  # revealed: str
+        case bytes():
+            reveal_type(value)  # revealed: bytes
+```
+
+### Constrained `as` patterns
+
+If the first pattern matches but its guard fails, the captured integer cannot reach the string case.
+
+```py
+def narrow_after_as_capture(value: int | str, flag: bool) -> None:
+    match value:
+        case int() as value if flag:
+            pass
+        case str():
+            reveal_type(value)  # revealed: str
+```
+
+### Or pattern alternatives
+
+Each alternative can capture the whole subject under its original name.
+
+```py
+def narrow_after_or_capture(value: int | str | bytes, flag: bool) -> None:
+    match value:
+        case (int() as value) | (str() as value) if flag:
+            pass
+        case str():
+            reveal_type(value)  # revealed: str
+```
+
+A capture can also refer to the whole subject in one alternative and an extracted element in
+another. Matching the original tuple in a later case does not make its captured integer unreachable.
+
+```py
+def mixed_or_captures(subject: int | tuple[int], flag: bool) -> None:
+    value = subject
+    match value:
+        case (int() as value) | [value] if flag:
+            pass
+        case tuple():
+            reveal_type(value)  # revealed: int
+```
+
+### Reassignment in guards
+
+A guard can assign a different value to the captured name. Later cases still match the saved
+subject, so their patterns do not narrow that assignment.
+
+```py
+def reassign_capture(value: int | str, flag: bool) -> None:
+    match value:
+        case value if (value := "changed") and flag:
+            pass
+        case int():
+            reveal_type(value)  # revealed: Literal["changed"]
+```
+
+### Member subjects
+
+Capturing an attribute under the name of its owner replaces the owner with the attribute value.
+Narrowing the saved attribute does not narrow this new binding of the owner's name.
+
+```py
+class Holder:
+    attr: int | str
+
+def capture_member(holder: Holder) -> None:
+    value = holder
+    match value.attr:
+        case value if False:
+            pass
+        case int():
+            reveal_type(value)  # revealed: int | str
+```
+
 ## Named-expression subjects
 
 A named expression creates a new binding for the subject. The successful pattern narrows that
@@ -3566,6 +3693,17 @@ def match_named_expression_subject_capture(value: tuple[int]) -> None:
     match subject := value:
         case [subject]:
             # The capture shadows the named-expression binding and receives the element type.
+            reveal_type(subject)  # revealed: int
+```
+
+Capturing the entire subject under its new name preserves narrowing in later cases.
+
+```py
+def match_named_expression_guarded_capture(value: int | str) -> None:
+    match subject := value:
+        case subject if False:
+            pass
+        case int():
             reveal_type(subject)  # revealed: int
 ```
 
@@ -3794,19 +3932,19 @@ class ReflexivePatternValues:
     TYPE_VAR = T
     NEW_TYPE = UserId
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def generic_alias_value_pattern() -> int:
     match list[int]:
         case ReflexivePatternValues.LIST_INT:
             return 1
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def cross_origin_generic_alias_value_pattern() -> int:
     match list[int]:
         case ReflexivePatternValues.LEGACY_LIST_INT:
             return 1
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def cross_origin_special_form_value_pattern() -> int:
     match Literal:
         case ReflexivePatternValues.EXTENSIONS_LITERAL:
@@ -3817,13 +3955,13 @@ def singleton_special_form_value_pattern() -> int:
         case ReflexivePatternValues.OPTIONAL:
             return 1
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def type_var_value_pattern() -> int:
     match T:
         case ReflexivePatternValues.TYPE_VAR:
             return 1
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def new_type_value_pattern() -> int:
     match UserId:
         case ReflexivePatternValues.NEW_TYPE:
@@ -3846,7 +3984,7 @@ def target(value: int) -> int:
 class PartialPatternValues:
     VALUE = partial(target, 1)
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def partial_value_pattern() -> int:
     match partial(target, 1):
         case PartialPatternValues.VALUE:
@@ -3931,6 +4069,12 @@ class Color(StrEnum):
     RED = "r"
     GREEN = "g"
     BLUE = "b"
+
+def match_string(value: str):
+    match value:
+        case Color.GREEN as captured:
+            reveal_type(value)  # revealed: str
+            reveal_type(captured)  # revealed: str
 
 def test_literal_as_enum(x: Literal["g"]) -> None:
     match x:

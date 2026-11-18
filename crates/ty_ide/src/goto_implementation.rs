@@ -173,13 +173,12 @@ fn definitions_to_implementation_targets(
 ) -> Vec<NavigationTarget> {
     Definitions::new(definitions)
         .map_stubs_for_implementation(db)
-        .map(|definitions| {
+        .map_or_default(|definitions| {
             definitions
                 .into_navigation_targets(db)
                 .into_iter()
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 #[cfg(test)]

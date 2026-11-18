@@ -14,6 +14,10 @@ use crate::system::System;
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
 #[salsa::tracked(returns(clone), heap_size=ruff_memory_usage::heap_size)]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
+    read_source_text(db, file)
+}
+
+pub(crate) fn read_source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
     let mut read_error = None;

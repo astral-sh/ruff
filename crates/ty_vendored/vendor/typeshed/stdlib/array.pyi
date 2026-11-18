@@ -46,6 +46,7 @@ class array(MutableSequence[_T]):
         'b'         signed integer     1
         'B'         unsigned integer   1
         'u'         Unicode character  2 (see note)
+        'w'         Py_UCS4            4
         'h'         signed integer     2
         'H'         unsigned integer   2
         'i'         signed integer     2

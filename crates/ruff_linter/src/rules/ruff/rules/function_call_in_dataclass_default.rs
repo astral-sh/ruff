@@ -171,7 +171,7 @@ fn any_annotated(class_body: &[Stmt]) -> bool {
 
 /// Checks that the passed function is an instantiation of the class,
 /// retrieves the ``StmtClassDef`` and verifies that it is a frozen dataclass
-fn is_frozen_dataclass_instantiation(
+pub(crate) fn is_frozen_dataclass_instantiation(
     func: &Expr,
     semantic: &SemanticModel,
     scope_id: ScopeId,

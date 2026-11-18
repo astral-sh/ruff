@@ -269,6 +269,7 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
         self.seen_typing()
+            && self.may_resolve_to_member(expr, target)
             && self
                 .resolve_qualified_name(expr)
                 .is_some_and(|qualified_name| {
@@ -282,21 +283,15 @@ impl<'a> SemanticModel<'a> {
         qualified_name: &QualifiedName,
         target: &str,
     ) -> bool {
-        if matches!(
-            qualified_name.segments(),
-            ["typing" | "_typeshed" | "typing_extensions", member] if *member == target
-        ) {
-            return true;
-        }
-
-        if self.typing_modules.iter().any(|module| {
-            let module = QualifiedName::user_defined(module);
-            qualified_name == &module.append_member(target)
-        }) {
-            return true;
-        }
-
-        false
+        let Some((member, module)) = qualified_name.segments().split_last() else {
+            return false;
+        };
+        *member == target
+            && (matches!(module, ["typing" | "_typeshed" | "typing_extensions"])
+                || self
+                    .typing_modules
+                    .iter()
+                    .any(|configured| configured.split('.').eq(module.iter().copied())))
     }
 
     /// Return an iterator over the set of `typing` modules allowed in the semantic model.
@@ -1170,6 +1165,36 @@ impl<'a> SemanticModel<'a> {
             let scope = &self.scopes[binding.scope];
             scope.shadowed_binding(*id).is_none()
         })
+    }
+
+    /// Returns whether `expr` resolves to exactly the given qualified-name segments.
+    #[inline]
+    pub fn matches_qualified_name(&self, expr: &Expr, target: &[&str]) -> bool {
+        let Some(&member) = target.last() else {
+            return false;
+        };
+
+        self.may_resolve_to_member(expr, member)
+            && self
+                .resolve_qualified_name(expr)
+                .is_some_and(|qualified_name| qualified_name.segments() == target)
+    }
+
+    /// Checks whether the spelling of `expr` can match the last segment of a qualified name.
+    #[inline]
+    fn may_resolve_to_member(&self, expr: &Expr, member: &str) -> bool {
+        match expr {
+            Expr::Attribute(attribute) => attribute.attr.as_str() == member,
+            // `from typing import Literal as L` allows `L` to match `Literal`.
+            // A name without a recorded binding still needs a scope lookup.
+            Expr::Name(name) => {
+                name.id.as_str() == member
+                    || self
+                        .resolve_name(name)
+                        .is_none_or(|id| self.binding(id).is_alias())
+            }
+            _ => false,
+        }
     }
 
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported

@@ -5,26 +5,28 @@ use std::path::Path;
 
 use ruff_db::panic::PanicError;
 use rustc_hash::FxHashMap;
+use strum::IntoEnumIterator;
 
+use ruff_db::diagnostic::render::{
+    AzureRenderer, ConciseRenderer, FullRenderer, GithubRenderer, GitlabRenderer, GroupedRenderer,
+    JsonLinesRenderer, JsonRenderer, JunitRenderer, PylintRenderer, RdjsonRenderer, Renderer,
+    SarifRenderer,
+};
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-    DisplayDiagnostics, FileResolver, Input, LintName, SecondaryCode, Severity, Span,
-    SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
+    Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, FileResolver, Input, LintName,
+    RuleMetadata, SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
 };
 use ruff_db::files::File;
 
-pub(crate) use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
-pub(crate) use sarif::SarifEmitter;
 
 use crate::Fix;
-use crate::registry::Rule;
-use crate::settings::types::{OutputFormat, RuffOutputFormat};
-
-mod grouped;
-mod sarif;
+use crate::registry::{Linter, Rule, RuleNamespace, RuleSet};
+use crate::rule_selector::PreviewOptions;
+use crate::settings::DEFAULT_SELECTORS;
+use crate::settings::types::OutputFormat;
 
 /// Create a `Diagnostic` from a panic.
 pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagnostic {
@@ -133,7 +135,7 @@ where
     diagnostic
 }
 
-impl FileResolver for EmitterContext<'_> {
+impl FileResolver for RenderContext<'_> {
     fn path(&self, _file: File) -> &str {
         unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
     }
@@ -165,169 +167,69 @@ impl FileResolver for EmitterContext<'_> {
     }
 }
 
-/// Display format for [`Diagnostic`]s.
-///
-/// The emitter serializes a slice of [`Diagnostic`]s and writes them to a [`Write`].
-pub(crate) trait Emitter {
-    /// Serializes the `diagnostics` and writes the output to `writer`.
-    fn emit(
-        &mut self,
-        writer: &mut dyn Write,
-        diagnostics: &[Diagnostic],
-        context: &EmitterContext,
-    ) -> anyhow::Result<()>;
+fn rule_metadata() -> FxHashMap<LintName, RuleMetadata> {
+    // Describe the defaults before configuration overrides such as preview.
+    let default_rules = DEFAULT_SELECTORS
+        .iter()
+        .flat_map(|selector| selector.rules(&PreviewOptions::default()))
+        .collect::<RuleSet>();
+
+    Rule::iter()
+        .map(|rule| {
+            let name = LintName::of(rule.into());
+            let linter = rule.noqa_code().and_then(|code| {
+                Linter::parse_code(&code.to_string()).map(|(linter, _)| linter.name())
+            });
+
+            (
+                name,
+                RuleMetadata {
+                    name,
+                    summary: rule.message_formats()[0],
+                    description: rule.explanation().into(),
+                    help_url: rule.url(),
+                    linter,
+                    default_severity: Some(Severity::Error),
+                    enabled_by_default: default_rules.contains(rule),
+                },
+            )
+        })
+        .collect()
 }
 
 /// Context used while rendering diagnostics.
-pub struct EmitterContext<'a> {
+pub struct RenderContext<'a> {
     notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
 }
 
-impl<'a> EmitterContext<'a> {
+impl<'a> RenderContext<'a> {
     pub fn new(notebook_indexes: &'a FxHashMap<String, NotebookIndex>) -> Self {
         Self { notebook_indexes }
-    }
-
-    fn notebook_index(&self, name: &str) -> Option<&NotebookIndex> {
-        self.notebook_indexes.get(name)
     }
 }
 
 pub fn render_diagnostics(
     writer: &mut dyn Write,
     format: OutputFormat,
-    config: DisplayDiagnosticConfig,
-    context: &EmitterContext<'_>,
+    config: &DisplayDiagnosticConfig,
+    context: &RenderContext<'_>,
     diagnostics: &[Diagnostic],
 ) -> std::io::Result<()> {
-    match DiagnosticFormat::try_from(format) {
-        Ok(format) => {
-            let config = config.format(format);
-            let value = DisplayDiagnostics::new(context, &config, diagnostics);
-            write!(writer, "{value}")?;
+    match format {
+        OutputFormat::Concise => ConciseRenderer::new(context, config).write(writer, diagnostics),
+        OutputFormat::Full => FullRenderer::new(context, config).write(writer, diagnostics),
+        OutputFormat::Json => JsonRenderer::new(context, config).write(writer, diagnostics),
+        OutputFormat::JsonLines => {
+            JsonLinesRenderer::new(context, config).write(writer, diagnostics)
         }
-        Err(RuffOutputFormat::Grouped) => {
-            GroupedEmitter::default()
-                .with_show_fix_status(config.show_fix_status())
-                .with_applicability(config.fix_applicability())
-                .with_preview(config.preview_enabled())
-                .with_prefer_rule_codes(config.is_prefer_rule_codes_enabled())
-                .emit(writer, diagnostics, context)
-                .map_err(std::io::Error::other)?;
-        }
-        Err(RuffOutputFormat::Sarif) => {
-            SarifEmitter::new(&config)
-                .emit(writer, diagnostics, context)
-                .map_err(std::io::Error::other)?;
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use rustc_hash::FxHashMap;
-
-    use ruff_db::diagnostic::Diagnostic;
-    use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
-    use ruff_source_file::SourceFileBuilder;
-    use ruff_text_size::{TextRange, TextSize};
-
-    use crate::codes::Rule;
-    use crate::message::{Emitter, EmitterContext, create_lint_diagnostic};
-    use crate::{Edit, Fix};
-
-    pub(super) fn create_syntax_error_diagnostics() -> Vec<Diagnostic> {
-        let source = r"from os import
-
-if call(foo
-    def bar():
-        pass
-";
-        let source_file = SourceFileBuilder::new("syntax_errors.py", source).finish();
-        parse_unchecked(source, ParseOptions::from(Mode::Module))
-            .errors()
-            .iter()
-            .map(|parse_error| {
-                Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
-            })
-            .collect()
-    }
-
-    pub(super) fn create_diagnostics() -> Vec<Diagnostic> {
-        let fib = r#"import os
-
-
-def fibonacci(n):
-    """Compute the nth number in the Fibonacci sequence."""
-    x = 1
-    if n == 0:
-        return 0
-    elif n == 1:
-        return 1
-    else:
-        return fibonacci(n - 1) + fibonacci(n - 2)
-"#;
-
-        let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
-
-        let unused_import_start = TextSize::from(7);
-        let unused_import = create_lint_diagnostic(
-            "`os` imported but unused",
-            Some("Remove unused import: `os`"),
-            TextRange::new(unused_import_start, TextSize::from(9)),
-            Some(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
-                TextSize::from(0),
-                TextSize::from(10),
-            )))),
-            None,
-            fib_source.clone(),
-            Some(unused_import_start),
-            Rule::UnusedImport,
-        );
-
-        let unused_variable_start = TextSize::from(94);
-        let unused_variable = create_lint_diagnostic(
-            "Local variable `x` is assigned to but never used",
-            Some("Remove assignment to unused variable `x`"),
-            TextRange::new(unused_variable_start, TextSize::from(95)),
-            Some(Fix::unsafe_edit(Edit::deletion(
-                TextSize::from(94),
-                TextSize::from(99),
-            ))),
-            None,
-            fib_source,
-            Some(unused_variable_start),
-            Rule::UnusedVariable,
-        );
-
-        let file_2 = r"if a == 1: pass";
-
-        let undefined_name_start = TextSize::from(3);
-        let undefined_name = create_lint_diagnostic(
-            "Undefined name `a`",
-            Option::<&'static str>::None,
-            TextRange::new(undefined_name_start, TextSize::from(4)),
-            None,
-            None,
-            SourceFileBuilder::new("undef.py", file_2).finish(),
-            Some(undefined_name_start),
-            Rule::UndefinedName,
-        );
-
-        vec![unused_import, unused_variable, undefined_name]
-    }
-
-    pub(super) fn capture_emitter_output(
-        emitter: &mut dyn Emitter,
-        diagnostics: &[Diagnostic],
-    ) -> String {
-        let notebook_indexes = FxHashMap::default();
-        let context = EmitterContext::new(&notebook_indexes);
-        let mut output: Vec<u8> = Vec::new();
-        emitter.emit(&mut output, diagnostics, &context).unwrap();
-
-        String::from_utf8(output).expect("Output to be valid UTF-8")
+        OutputFormat::Junit => JunitRenderer::new(context, config).write(writer, diagnostics),
+        OutputFormat::Github => GithubRenderer::new(context, config).write(writer, diagnostics),
+        OutputFormat::Gitlab => GitlabRenderer::new(context, config).write(writer, diagnostics),
+        OutputFormat::Pylint => PylintRenderer::new(context, config).write(writer, diagnostics),
+        OutputFormat::Rdjson => RdjsonRenderer::new(context, config).write(writer, diagnostics),
+        OutputFormat::Azure => AzureRenderer::new(context, config).write(writer, diagnostics),
+        OutputFormat::Grouped => GroupedRenderer::new(context, config).write(writer, diagnostics),
+        OutputFormat::Sarif => SarifRenderer::new(context, config, rule_metadata(), crate::VERSION)
+            .write(writer, diagnostics),
     }
 }

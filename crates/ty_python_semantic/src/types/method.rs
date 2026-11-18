@@ -144,9 +144,13 @@ impl<'db> BoundMethodType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        let func = self
-            .func(db)
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        let func = self.func(db);
+        // The function supplies the bound method's outer signature. Its receiver is a nested type.
+        let func = if type_mapping.without_bindings().is_some() {
+            func.map_type(db, type_mapping, tcx, visitor)
+        } else {
+            func.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+        };
         Self::new_internal(
             db,
             func,
@@ -410,6 +414,8 @@ pub enum KnownBoundMethodType<'db> {
     ConstraintSetSolutions(InternedConstraintSet<'db>),
     ConstraintSetIsAlwaysSatisfied(InternedConstraintSet<'db>),
     ConstraintSetIsNeverSatisfied(InternedConstraintSet<'db>),
+    ConstraintSetIsTriviallyAlwaysSatisfied(InternedConstraintSet<'db>),
+    ConstraintSetIsTriviallyNeverSatisfied(InternedConstraintSet<'db>),
     ConstraintSetWithDetailedDisplay(InternedConstraintSet<'db>),
 }
 
@@ -455,6 +461,8 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownBoundMethodType::ConstraintSetSolutions(_)
         | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
         | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+        | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+        | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
         | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {}
     }
 }
@@ -519,6 +527,8 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetSolutions(_)
             | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
             | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+            | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+            | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
             | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => Some(self),
         }
     }
@@ -547,6 +557,8 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetSolutions(_)
             | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
             | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+            | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+            | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
             | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                 KnownClass::ConstraintSet
             }
@@ -834,6 +846,14 @@ impl<'db> KnownBoundMethodType<'db> {
                 )))
             }
 
+            KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+            | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_) => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::empty(),
+                    KnownClass::Bool.to_instance(db, env),
+                )))
+            }
+
             KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::empty(),
@@ -946,6 +966,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_),
             )
             | (
+                KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_),
+                KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_),
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_),
+                KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_),
+            )
+            | (
                 KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
                 KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             ) => self.always(),
@@ -972,6 +1000,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::DunderCall(_)
@@ -994,6 +1024,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             ) => self.never(),
         }

@@ -1,0 +1,159 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/semicolon_before_match_statement.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..80,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 0..7,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 0..7,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 0..5,
+                                    id: Name("first"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 5..7,
+                                node_index: NodeIndex(None),
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Match(
+                StmtMatch {
+                    node_index: NodeIndex(None),
+                    range: 9..38,
+                    subject: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 15..20,
+                            id: Name("value"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 26..38,
+                            node_index: NodeIndex(None),
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    node_index: NodeIndex(None),
+                                    range: 31..32,
+                                    pattern: None,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 34..38,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 39..46,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 39..46,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 39..44,
+                                    id: Name("first"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 44..46,
+                                node_index: NodeIndex(None),
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Match(
+                StmtMatch {
+                    node_index: NodeIndex(None),
+                    range: 48..79,
+                    subject: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 55..60,
+                            id: Name("value"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 67..79,
+                            node_index: NodeIndex(None),
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    node_index: NodeIndex(None),
+                                    range: 72..73,
+                                    pattern: None,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 75..79,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | first(); match value:
+  |          ^^^^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
+2 |     case _: pass
+3 | first(); match (value):
+  |
+
+
+  |
+1 | first(); match value:
+2 |     case _: pass
+3 | first(); match (value):
+  |          ^^^^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
+4 |     case _: pass
+  |

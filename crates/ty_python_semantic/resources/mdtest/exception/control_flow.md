@@ -789,6 +789,41 @@ def unpacking(values: Iterable[int]) -> None:
         reveal_type(state)  # revealed: Literal[0]
 ```
 
+## Nested unpacking can raise after an earlier target is assigned
+
+Python assigns targets from left to right. If unpacking `pair` raises, `value` already holds
+`"bad"`, while `a` still holds its original value:
+
+```py
+def nested_unpacking(pair: tuple[int, ...]) -> None:
+    value = 1
+    a = 0
+    try:
+        value, (a, b) = "bad", pair
+    except ValueError:
+        reveal_type(value)  # revealed: Literal[1, "bad"]
+        reveal_type(a)  # revealed: Literal[0]
+```
+
+## An earlier chained target can mutate the unpacked value
+
+The setter clears the list inside the tuple. The next target assigns `x` before the nested unpack
+fails, so the handler must include the new value of `x`. The setter itself can also raise:
+
+```py
+class Sink:
+    def __setitem__(self, key: int, value: tuple[int, list[int]]) -> None:
+        value[1].clear()
+
+def chained(sink: Sink) -> None:
+    x = y = 0
+    try:
+        sink[0] = x, (y, z) = 1, [2, 3]
+    except ValueError:
+        reveal_type(x)  # revealed: Literal[0, 1]
+        reveal_type(y)  # revealed: Literal[0]
+```
+
 ## Awaiting and yielding can raise
 
 Awaiting can raise when a coroutine resumes:

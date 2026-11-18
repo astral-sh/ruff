@@ -2,24 +2,6 @@
 # requires-python = ">=3.12"
 # dependencies = []
 #
-# [tool.ty.analysis]
-# return-type-inference = "always"
-#
-# [tool.ty.rules]
-# truthiness-test-of-none-union = "warn"
-# blanket-ignore-comment = "warn"
-# missing-type-argument = "warn"
-# possibly-unresolved-reference = "warn"
-# unsound-return-statement = "warn"
-# unsound-yield = "warn"
-# unsupported-dynamic-base = "warn"
-# division-by-zero = "warn"
-# dynamic-function-decorator-return = "warn"
-# unsound-assignment = "warn"
-# redundant-condition-strict = "warn"
-# disjoint-cast = "warn"
-# missing-direct-dependency = "warn"
-#
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
@@ -534,6 +516,7 @@ def collect_ty_diagnostics(
             "--error=invalid-named-tuple-override",
             "--error=deprecated",
             "--error=redundant-final-classvar",
+            "--error=single-overload",
             "--exit-zero",
             *extra_search_path_args,
             *map(str, test_files),

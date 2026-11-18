@@ -540,11 +540,7 @@ pub fn project_files_in_path<'a>(
     builder.standard_filters(resolver.respect_gitignore());
     builder.hidden(false);
 
-    builder.threads(
-        std::thread::available_parallelism()
-            .map_or(1, std::num::NonZeroUsize::get)
-            .min(12),
-    );
+    builder.threads(ruff_db::max_parallelism().get().min(12));
 
     let walker = builder.build_parallel();
 

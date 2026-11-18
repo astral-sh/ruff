@@ -13,6 +13,7 @@ from ruff_ecosystem.format import (
     compare_format,
     markdown_format_result,
 )
+from ruff_ecosystem.html import render_html
 from ruff_ecosystem.projects import (
     Project,
     RuffCommand,
@@ -38,6 +39,8 @@ async def main(
     format_comparison: FormatComparison | None,
     max_parallelism: int = 50,
     raise_on_failure: bool = False,
+    html_output: Path | None = None,
+    html_title: str = "Ruff ecosystem report",
 ) -> None:
     logger.debug("Using command %s", command.value)
     logger.debug("Using baseline executable at %s", baseline_executable)
@@ -82,6 +85,12 @@ async def main(
             completed.append((target, comparison))
 
     result = Result(completed=completed, errored=errored)
+
+    if html_output is not None:
+        html_output.parent.mkdir(parents=True, exist_ok=True)
+        html_output.write_text(
+            render_html(result, command, html_title), encoding="utf-8"
+        )
 
     match format:
         case OutputFormat.json:

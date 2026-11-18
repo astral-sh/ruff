@@ -19,15 +19,14 @@ use crate::types::tuple::{
     VariableLengthTuple,
 };
 use crate::types::{
-    KnownClass, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
-    infer_expression_types,
+    KnownClass, Type, TypeContext, UnionBuilder, UnionType, infer_expression_types,
 };
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::ProgramFile;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
-use super::context::InferContext;
+use super::context::{InferContext, InferContextResult};
 use super::diagnostic::INVALID_ASSIGNMENT;
 
 /// Unpacks the value expression type to their respective targets.
@@ -358,7 +357,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
     pub(crate) fn finish(self) -> UnpackResult<'db> {
         UnpackResult {
-            diagnostics: self.context.finish(),
+            context: self.context.finish(),
             targets: FrozenMap::from(self.targets),
             cycle_recovery: None,
         }
@@ -368,7 +367,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 #[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UnpackResult<'db> {
     targets: FrozenMap<ExpressionNodeKey, Type<'db>>,
-    diagnostics: TypeCheckDiagnostics,
+    context: InferContextResult,
 
     /// The fallback type for missing expressions.
     ///
@@ -399,15 +398,15 @@ impl<'db> UnpackResult<'db> {
             .or(self.cycle_recovery)
     }
 
-    /// Returns the diagnostics in this unpacking assignment.
-    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
-        &self.diagnostics
+    /// Returns the diagnostics and semantic validity of this unpacking assignment.
+    pub(crate) fn context_result(&self) -> &InferContextResult {
+        &self.context
     }
 
     pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             targets: FrozenMap::default(),
-            diagnostics: TypeCheckDiagnostics::default(),
+            context: InferContextResult::default(),
             cycle_recovery: Some(cycle_recovery),
         }
     }
