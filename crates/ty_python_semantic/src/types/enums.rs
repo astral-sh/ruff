@@ -707,6 +707,10 @@ impl<'db> EnumComplementType<'db> {
         positive: &FxOrderSet<Type<'db>>,
         negative: &NegativeIntersectionElements<'db>,
     ) -> Option<Self> {
+        if negative.is_empty() {
+            return None;
+        }
+
         let mut enum_class = None;
         let mut rest = SmallVec::<[Type<'db>; 1]>::default();
         for positive in positive {
