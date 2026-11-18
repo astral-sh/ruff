@@ -5,13 +5,12 @@ assigned to. This rule also warns if ty cannot determine the value of a string n
 
 ## Why is this bad?
 
-The name argument sets the `TypedDict` class's `__name__`. A mismatch can make it harder to
-recognize the type in diagnostics.
+A mismatched name can be a typo and can make a `TypedDict`'s runtime representation confusing.
 
 ## Examples
 
 ```python
 from typing import TypedDict
 
-Movie = TypedDict("Film", {"title": str})  # error: [mismatched-typeddict-name]
+Movie = TypedDict("Film", {"title": str})  # error: [mismatched-typeddict-name] "Expected "Movie", got "Film""
 ```

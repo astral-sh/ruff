@@ -1316,7 +1316,7 @@
         },
         "mismatched-enum-name": {
           "title": "detects mismatched names in enum classes",
-          "description": "## What it does\n\nChecks whether the class name passed to a functional enum constructor, such as `Enum`, `IntEnum`,\nor `Flag`, differs from the assigned variable's name. The rule applies when ty infers a string\nliteral type for the class name argument.\n\n## Why is this bad?\n\nThe name argument becomes the enum class's `__name__`. A member's representation can therefore refer\nto a different class name than the one used in the source.\n\n## Default level\n\nThis rule is disabled by default because a functional enum can intentionally have a runtime name\nthat differs from its variable name.\n\n## Examples\n\n```python\nfrom enum import Enum\n\nColor = Enum(\"Colour\", \"RED BLUE\")  # error: [mismatched-enum-name]\n```",
+          "description": "## What it does\n\nChecks whether the class name passed to a functional enum constructor, such as `Enum`, `IntEnum`, or\n`Flag`, differs from the assigned variable's name.\n\nThis rule is only applied if ty infers a string literal type for the class name argument.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a enum's runtime representation confusing.\n\n## Default level\n\nThis rule is disabled by default because enum names are not required to match their assigned\nvariables, and sometimes the preferred `__repr__` for an enum may include non-identifier\ncharacters.\n\nEnable this rule to enforce consistent enum naming.\n\n## Examples\n\n```python\nfrom enum import Enum\n\nColor = Enum(\"Colour\", \"RED BLUE\")  # error: [mismatched-enum-name] \"Expected \"Color\", got \"Colour\"\"\n```",
           "default": "ignore",
           "oneOf": [
             {
@@ -1326,7 +1326,7 @@
         },
         "mismatched-namedtuple-name": {
           "title": "detects mismatched names in named tuples",
-          "description": "## What it does\n\nChecks whether the `typename` passed to `typing.NamedTuple` or `collections.namedtuple` differs from\nthe assigned variable's name. The rule applies when ty infers a string literal type for the\n`typename` argument.\n\n## Why is this bad?\n\nThe `typename` determines the class name shown when printing a named tuple. A different name in the\nsource makes it harder to identify the class that produced a value.\n\n## Default level\n\nThis rule is disabled by default because named tuple factories can intentionally give their classes\na different runtime name.\n\n## Examples\n\n```python\nfrom collections import namedtuple\nfrom typing import NamedTuple\n\nPoint = NamedTuple(\"Vector\", [(\"x\", int)])  # error: [mismatched-namedtuple-name]\nPair = namedtuple(\"Coordinates\", \"x y\")  # error: [mismatched-namedtuple-name]\n```",
+          "description": "## What it does\n\nChecks whether the `typename` passed to `typing.NamedTuple` or `collections.namedtuple` differs from\nthe assigned variable's name.\n\nThis rule is only applied if ty infers a string literal type for the `typename` argument.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a namedtuple's runtime representation confusing.\n\n## Default level\n\nThis rule is disabled by default because namedtuple names are not required to match their assigned\nvariables, and sometimes the preferred `__repr__` for a namedtuple may include non-identifier\ncharacters.\n\nEnable this rule to enforce consistent namedtuple naming.\n\n## Examples\n\n```python\nfrom collections import namedtuple\nfrom typing import NamedTuple\n\nPoint = NamedTuple(\"Vector\", [(\"x\", int)])  # error: [mismatched-namedtuple-name] \"Expected \"Point\", got \"Vector\"\"\nPair = namedtuple(\"Coordinates\", \"x y\")  # error: [mismatched-namedtuple-name] \"Expected \"Pair\", got \"Coordinates\"\"\n```",
           "default": "ignore",
           "oneOf": [
             {
@@ -1336,7 +1336,7 @@
         },
         "mismatched-newtype-name": {
           "title": "detects mismatched names in `NewType` definitions",
-          "description": "## What it does\n\nChecks whether the name passed to `NewType` differs from the assigned variable.\n\n## Why is this bad?\n\nThe name argument sets the new type's `__name__`. A typo can make the type appear under an\nunexpected name in diagnostics.\n\n## Examples\n\n```python\nfrom typing import NewType\n\nUserId = NewType(\"Id\", int)  # error: [mismatched-newtype-name]\n```",
+          "description": "## What it does\n\nChecks whether the name passed to `NewType` differs from the assigned variable.\n\n## Why is this bad?\n\nThe name argument sets the newtype's `__name__`. A typo can make the type appear under an\nunexpected name in diagnostics.\n\n## Examples\n\n```python\nfrom typing import NewType\n\nUserId = NewType(\"Id\", int)  # error: [mismatched-newtype-name] \"Expected \"UserId\", got \"Id\"\"\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -1346,7 +1346,7 @@
         },
         "mismatched-paramspec-name": {
           "title": "detects mismatched names in `ParamSpec` definitions",
-          "description": "## What it does\n\nChecks whether the name passed to `ParamSpec` differs from the assigned variable.\n\n## Why is this bad?\n\nThe name argument identifies the parameter specification in a callable's signature. A mismatch can\nmake it harder to connect that signature to the definition.\n\n## Examples\n\n```python\nfrom typing import ParamSpec\n\nP = ParamSpec(\"Q\")  # error: [mismatched-paramspec-name]\n```",
+          "description": "## What it does\n\nChecks whether the name passed to `ParamSpec` differs from the assigned variable.\n\n## Why is this bad?\n\nThe name argument identifies the parameter specification in a callable's signature. A mismatch can\nmake it harder to connect that signature to the definition.\n\n## Examples\n\n```python\nfrom typing import ParamSpec\n\nP = ParamSpec(\"Q\")  # error: [mismatched-paramspec-name] \"Expected \"P\", got \"Q\"\"\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -1366,7 +1366,7 @@
         },
         "mismatched-type-alias-name": {
           "title": "detects mismatched names in `TypeAliasType` definitions",
-          "description": "## What it does\n\nChecks whether the name passed to `TypeAliasType` differs from the assigned variable.\n\n## Why is this bad?\n\nThe name argument determines how the alias is displayed at runtime. A different name in the source\nmakes the alias harder to identify.\n\n## Examples\n\n```python\nfrom typing_extensions import TypeAliasType\n\nUserId = TypeAliasType(\"Id\", int)  # error: [mismatched-type-alias-name]\n```",
+          "description": "## What it does\n\nChecks whether the name passed to `TypeAliasType` differs from the assigned variable.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a type alias's runtime representation confusing.\n\n## Examples\n\n```python\nfrom typing_extensions import TypeAliasType\n\nUserId = TypeAliasType(\"Id\", int)  # error: [mismatched-type-alias-name] \"Expected \"UserId\", got \"Id\"\"\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -1376,7 +1376,7 @@
         },
         "mismatched-type-name": {
           "title": "detects functional typing definitions whose declared name does not match the assigned variable",
-          "description": "## Migration\n\nty now reports name mismatches under a separate rule for each kind of type:\n\n- `mismatched-enum-name`\n- `mismatched-namedtuple-name`\n- `mismatched-newtype-name`\n- `mismatched-paramspec-name`\n- `mismatched-type-alias-name`\n- `mismatched-typeddict-name`\n- `mismatched-typevar-name`\n- `mismatched-typevartuple-name`\n\nExisting configuration entries and ignore comments using `mismatched-type-name` still apply to all\neight rules. A specific rule takes precedence within the same table. For example, to keep a policy\nthat treats name mismatches as errors but allow named tuples to have a different runtime name, use\nthese settings in `ty.toml`:\n\n```toml\n[rules]\nmismatched-type-name = \"error\"\nmismatched-namedtuple-name = \"ignore\"\n```\n\nOn the command line, the last matching flag takes precedence.\n`ty check --error mismatched-type-name --ignore mismatched-namedtuple-name` applies the same policy.\n\n`mismatched-enum-name` and `mismatched-namedtuple-name` are disabled by default. An explicit setting\nfor `mismatched-type-name` still sets their severity.\n\nThe separate `mismatched-sentinel-name` rule remains opt-in.",
+          "description": "## Migration\n\nThis diagnostic code is deprecated. ty now reports name mismatches under a separate rule for each\nkind of type:\n\n- `mismatched-enum-name`\n- `mismatched-namedtuple-name`\n- `mismatched-newtype-name`\n- `mismatched-paramspec-name`\n- `mismatched-type-alias-name`\n- `mismatched-typeddict-name`\n- `mismatched-typevar-name`\n- `mismatched-typevartuple-name`\n\nExisting configuration entries and ignore comments using `mismatched-type-name` still apply to all\neight rules. However, users are encouraged to migrate to using the new rules in configuration files\nand suppression comments wherever possible.",
           "default": "warn",
           "deprecated": true,
           "oneOf": [
@@ -1387,7 +1387,7 @@
         },
         "mismatched-typeddict-name": {
           "title": "detects mismatched names in typed dictionaries",
-          "description": "## What it does\n\nChecks that the name passed to the functional form of `TypedDict` matches the variable it is\nassigned to. This rule also warns if ty cannot determine the value of a string name argument.\n\n## Why is this bad?\n\nThe name argument sets the `TypedDict` class's `__name__`. A mismatch can make it harder to\nrecognize the type in diagnostics.\n\n## Examples\n\n```python\nfrom typing import TypedDict\n\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-typeddict-name]\n```",
+          "description": "## What it does\n\nChecks that the name passed to the functional form of `TypedDict` matches the variable it is\nassigned to. This rule also warns if ty cannot determine the value of a string name argument.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a `TypedDict`'s runtime representation confusing.\n\n## Examples\n\n```python\nfrom typing import TypedDict\n\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-typeddict-name] \"Expected \"Movie\", got \"Film\"\"\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -1397,7 +1397,7 @@
         },
         "mismatched-typevar-name": {
           "title": "detects mismatched names in `TypeVar` definitions",
-          "description": "## What it does\n\nChecks whether the name passed to `TypeVar` differs from the assigned variable.\n\n## Why is this bad?\n\nThe name argument identifies the type variable in generic signatures. A mismatch can make a\nsignature refer to a type variable that appears nowhere in the source.\n\n## Examples\n\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"U\")  # error: [mismatched-typevar-name]\n```",
+          "description": "## What it does\n\nChecks whether the name passed to `TypeVar` differs from the assigned variable.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a `TypeVar`'s runtime representation confusing.\n\n## Examples\n\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"U\")  # error: [mismatched-typevar-name] \"Expected \"T\", got \"U\"\"\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -1407,7 +1407,7 @@
         },
         "mismatched-typevartuple-name": {
           "title": "detects mismatched names in `TypeVarTuple` definitions",
-          "description": "## What it does\n\nChecks whether the name passed to `TypeVarTuple` differs from the assigned variable.\n\n## Why is this bad?\n\nThe name argument identifies the variadic type variable in generic signatures. A mismatch makes it\nharder to trace a signature back to the variable's definition.\n\n## Examples\n\n```python\nfrom typing_extensions import TypeVarTuple\n\nTs = TypeVarTuple(\"Us\")  # error: [mismatched-typevartuple-name]\n```",
+          "description": "## What it does\n\nChecks whether the name passed to `TypeVarTuple` differs from the assigned variable.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a `TypeVarTuple`'s runtime representation confusing.\n\n## Examples\n\n```python\nfrom typing_extensions import TypeVarTuple\n\nTs = TypeVarTuple(\"Us\")  # error: [mismatched-typevartuple-name] \"Expected \"Ts\", got \"Us\"\"\n```",
           "default": "warn",
           "oneOf": [
             {

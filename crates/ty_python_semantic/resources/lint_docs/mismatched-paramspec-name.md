@@ -12,5 +12,5 @@ make it harder to connect that signature to the definition.
 ```python
 from typing import ParamSpec
 
-P = ParamSpec("Q")  # error: [mismatched-paramspec-name]
+P = ParamSpec("Q")  # error: [mismatched-paramspec-name] "Expected "P", got "Q""
 ```

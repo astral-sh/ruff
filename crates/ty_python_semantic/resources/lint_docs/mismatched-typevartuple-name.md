@@ -4,13 +4,12 @@ Checks whether the name passed to `TypeVarTuple` differs from the assigned varia
 
 ## Why is this bad?
 
-The name argument identifies the variadic type variable in generic signatures. A mismatch makes it
-harder to trace a signature back to the variable's definition.
+A mismatched name can be a typo and can make a `TypeVarTuple`'s runtime representation confusing.
 
 ## Examples
 
 ```python
 from typing_extensions import TypeVarTuple
 
-Ts = TypeVarTuple("Us")  # error: [mismatched-typevartuple-name]
+Ts = TypeVarTuple("Us")  # error: [mismatched-typevartuple-name] "Expected "Ts", got "Us""
 ```
