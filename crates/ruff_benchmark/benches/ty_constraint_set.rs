@@ -977,6 +977,31 @@ fn benchmark_overloaded_protocol_receivers(criterion: &mut Criterion) {
     });
 }
 
+/// Inferring the element type of this list checks whether a recursive alias and the type variables
+/// from `product` can satisfy both endpoints of an inference bound.
+fn benchmark_recursive_alias_product(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from collections.abc import Hashable, Sequence
+        from itertools import product
+        from typing import Union
+
+        Label = Union[Hashable, tuple["Label", ...]]
+
+        def check(values: tuple[Sequence[Label], ...]):
+            return list(product(*values))
+    "#;
+
+    criterion.bench_function("ty_micro[recursive_alias_product]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Repeated unions share source-order subtrees even after the TDD stops growing. Persisting each
 /// result must not expand those shared subtrees into exponentially many copies.
 fn benchmark_shared_source_order_compaction(criterion: &mut Criterion) {
@@ -1026,6 +1051,7 @@ criterion_group!(
     benchmark_mixed_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
     benchmark_overloaded_protocol_receivers,
+    benchmark_recursive_alias_product,
     benchmark_shared_source_order_compaction,
 );
 criterion_main!(constraint_set);
