@@ -7,7 +7,7 @@ use path_absolutize::path_dedot;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::pyproject::{self, find_fallback_target_version};
 use ruff_workspace::resolver::{
-    ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
+    ConfigurationOrigin, ConfigurationTransformer, PyprojectDiscoveryStrategy, RootSettings,
     resolve_root_settings,
 };
 
@@ -20,7 +20,7 @@ use crate::args::ConfigArguments;
 pub fn resolve(
     config_arguments: &ConfigArguments,
     stdin_filename: Option<&Path>,
-) -> Result<PyprojectConfig> {
+) -> Result<RootSettings> {
     let Ok(cwd) = std::env::current_dir() else {
         bail!("Working directory does not exist")
     };
@@ -30,7 +30,7 @@ pub fn resolve(
         let config = config_arguments.transform(Configuration::default());
         let settings = config.into_settings(&cwd)?;
         debug!("Isolated mode, not reading any pyproject.toml");
-        return Ok(PyprojectConfig::new(
+        return Ok(RootSettings::new(
             PyprojectDiscoveryStrategy::Fixed,
             settings,
             None,
@@ -50,7 +50,7 @@ pub fn resolve(
             "Using user-specified configuration file at: {}",
             pyproject.display()
         );
-        return Ok(PyprojectConfig::new(
+        return Ok(RootSettings::new(
             PyprojectDiscoveryStrategy::Fixed,
             settings,
             Some(pyproject.to_path_buf()),
@@ -69,7 +69,7 @@ pub fn resolve(
         );
         let settings =
             resolve_root_settings(&pyproject, config_arguments, ConfigurationOrigin::Ancestor)?;
-        return Ok(PyprojectConfig::new(
+        return Ok(RootSettings::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             settings,
             Some(pyproject),
@@ -110,7 +110,7 @@ pub fn resolve(
             },
             ConfigurationOrigin::UserSettings,
         )?;
-        return Ok(PyprojectConfig::new(
+        return Ok(RootSettings::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             settings,
             Some(pyproject),
@@ -137,7 +137,7 @@ pub fn resolve(
         config.target_version = fallback.map(ast::PythonVersion::from);
     }
     let settings = config.into_settings(&cwd)?;
-    Ok(PyprojectConfig::new(
+    Ok(RootSettings::new(
         PyprojectDiscoveryStrategy::Hierarchical,
         settings,
         None,

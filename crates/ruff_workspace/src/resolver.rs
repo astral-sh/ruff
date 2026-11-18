@@ -27,42 +27,44 @@ use crate::pyproject::settings_toml;
 use crate::settings::Settings;
 use crate::{FileResolverSettings, pyproject};
 
-/// The configuration information from a `pyproject.toml` file.
+/// The root settings and configuration discovery strategy for a Ruff invocation.
+///
+/// The root settings come from a selected configuration file, user-level configuration, or
+/// Ruff's defaults. With hierarchical discovery, a closer configuration can supply the settings
+/// for an individual input. For example, `ruff check .` uses `tests/ruff.toml` for files under
+/// `tests/` if it exists. With `--config <path>` or `--isolated`, the root settings apply to every
+/// input instead.
 #[derive(Debug)]
-pub struct PyprojectConfig {
-    /// The strategy used to discover the relevant `pyproject.toml` file for
-    /// each Python file.
+pub struct RootSettings {
+    /// Whether to look for a closer configuration file for each input.
     pub strategy: PyprojectDiscoveryStrategy,
-    /// All settings from the `pyproject.toml` file.
+    /// The resolved settings for the invocation's root configuration.
     pub settings: Settings,
-    /// Absolute path to the `pyproject.toml` file. This would be `None` when
-    /// either using the default settings or the `--isolated` flag is set.
-    pub path: Option<PathBuf>,
+    /// Absolute path to the selected configuration file, if one was loaded.
+    pub config_path: Option<PathBuf>,
 }
 
-impl PyprojectConfig {
+impl RootSettings {
     pub fn new(
         strategy: PyprojectDiscoveryStrategy,
         settings: Settings,
-        path: Option<PathBuf>,
+        config_path: Option<PathBuf>,
     ) -> Self {
         Self {
             strategy,
             settings,
-            path: path.map(fs::normalize_path),
+            config_path: config_path.map(fs::normalize_path),
         }
     }
 }
 
-/// The strategy used to discover the relevant `pyproject.toml` file for each
-/// Python file.
+/// How the resolver chooses a configuration for each input file.
 #[derive(Debug, Copy, Clone)]
 pub enum PyprojectDiscoveryStrategy {
-    /// Use a fixed `pyproject.toml` file for all Python files (i.e., one
-    /// provided on the command-line).
+    /// Use the root settings for every file, as with `--config <path>` or `--isolated`.
     Fixed,
-    /// Use the closest `pyproject.toml` file in the filesystem hierarchy, or
-    /// the default settings.
+    /// Use the closest configuration in the file's directory or its ancestors,
+    /// falling back to the root settings.
     Hierarchical,
 }
 
@@ -75,7 +77,7 @@ impl PyprojectDiscoveryStrategy {
 
 #[derive(Debug)]
 pub struct Resolver<'a> {
-    pyproject_config: &'a PyprojectConfig,
+    root_settings: &'a RootSettings,
     /// All [`Settings`] that have been added to the resolver, along with their config file paths.
     settings: Vec<ResolvedSettings>,
     /// A router from path to index into the `settings` vector.
@@ -83,40 +85,37 @@ pub struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-    /// Create a new [`Resolver`] for the given [`PyprojectConfig`].
-    pub fn new(pyproject_config: &'a PyprojectConfig) -> Self {
+    /// Create a new [`Resolver`] for the given [`RootSettings`].
+    pub fn new(root_settings: &'a RootSettings) -> Self {
         Self {
-            pyproject_config,
+            root_settings,
             settings: Vec::new(),
             router: Router::new(),
         }
     }
 
-    /// Return the [`Settings`] from the [`PyprojectConfig`].
+    /// Return the [`Settings`] from the [`RootSettings`].
     #[inline]
-    pub fn base_settings(&self) -> &Settings {
-        &self.pyproject_config.settings
+    pub fn root_settings(&self) -> &Settings {
+        &self.root_settings.settings
     }
 
     /// Return `true` if the [`Resolver`] is using a hierarchical discovery strategy.
     #[inline]
     fn is_hierarchical(&self) -> bool {
-        self.pyproject_config.strategy.is_hierarchical()
+        self.root_settings.strategy.is_hierarchical()
     }
 
     /// Return `true` if the [`Resolver`] should force-exclude files passed directly to the CLI.
     #[inline]
     pub fn force_exclude(&self) -> bool {
-        self.pyproject_config.settings.file_resolver.force_exclude
+        self.root_settings.settings.file_resolver.force_exclude
     }
 
     /// Return `true` if the [`Resolver`] should respect `.gitignore` files.
     #[inline]
     fn respect_gitignore(&self) -> bool {
-        self.pyproject_config
-            .settings
-            .file_resolver
-            .respect_gitignore
+        self.root_settings.settings.file_resolver.respect_gitignore
     }
 
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
@@ -154,10 +153,10 @@ impl<'a> Resolver<'a> {
 
     /// Return the appropriate [`Settings`] and config file path for a given [`Path`].
     pub fn resolve_with_path(&self, path: &Path) -> (&Settings, Option<&Path>) {
-        match self.pyproject_config.strategy {
+        match self.root_settings.strategy {
             PyprojectDiscoveryStrategy::Fixed => (
-                &self.pyproject_config.settings,
-                self.pyproject_config.path.as_deref(),
+                &self.root_settings.settings,
+                self.root_settings.config_path.as_deref(),
             ),
             PyprojectDiscoveryStrategy::Hierarchical => self
                 .router
@@ -167,8 +166,8 @@ impl<'a> Resolver<'a> {
                     (&entry.settings, Some(entry.config_path.as_path()))
                 })
                 .unwrap_or((
-                    &self.pyproject_config.settings,
-                    self.pyproject_config.path.as_deref(),
+                    &self.root_settings.settings,
+                    self.root_settings.config_path.as_deref(),
                 )),
         }
     }
@@ -244,7 +243,7 @@ impl<'a> Resolver<'a> {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        std::iter::once(&self.pyproject_config.settings)
+        std::iter::once(&self.root_settings.settings)
             .chain(self.settings.iter().map(|entry| &entry.settings))
     }
 }
@@ -462,19 +461,19 @@ impl ConfigurationOrigin {
 /// Find all project files in a set of paths, following configured include/exclude settings.
 pub fn project_files_in_path<'a>(
     paths: &[PathBuf],
-    pyproject_config: &'a PyprojectConfig,
+    root_settings: &'a RootSettings,
     transformer: &(dyn ConfigurationTransformer + Sync),
 ) -> Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
 
     // Search for `pyproject.toml` files in all parent directories.
-    let mut resolver = Resolver::new(pyproject_config);
+    let mut resolver = Resolver::new(root_settings);
     let mut seen = FxHashSet::default();
     let configuration_cache = ConfigurationCache::default();
 
     // Insert the path to the root configuration to avoid parsing the configuration a second time.
-    if let Some(config_path) = &pyproject_config.path {
+    if let Some(config_path) = &root_settings.config_path {
         seen.insert(config_path.parent().unwrap());
     }
 
@@ -993,8 +992,8 @@ mod tests {
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
-        ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
-        ResolvedFile, Resolver, is_file_excluded, match_exclusion, project_files_in_path,
+        ConfigurationOrigin, ConfigurationTransformer, PyprojectDiscoveryStrategy, ResolvedFile,
+        Resolver, RootSettings, is_file_excluded, match_exclusion, project_files_in_path,
         resolve_root_settings,
     };
     use crate::settings::Settings;
@@ -1011,7 +1010,7 @@ mod tests {
     #[test]
     fn rooted_exclusion() -> Result<()> {
         let package_root = test_resource_path("package");
-        let pyproject_config = PyprojectConfig::new(
+        let root_settings = RootSettings::new(
             PyprojectDiscoveryStrategy::Hierarchical,
             resolve_root_settings(
                 &find_settings_toml(&package_root)?.unwrap(),
@@ -1020,7 +1019,7 @@ mod tests {
             )?,
             None,
         );
-        let resolver = Resolver::new(&pyproject_config);
+        let resolver = Resolver::new(&root_settings);
         // src/app.py should not be excluded even if it lives in a hierarchy that should
         // be excluded by virtue of the pyproject.toml having `resources/*` in
         // it.
@@ -1058,7 +1057,7 @@ mod tests {
 
         let (paths, _) = project_files_in_path(
             &[root.to_path_buf()],
-            &PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, Settings::default(), None),
+            &RootSettings::new(PyprojectDiscoveryStrategy::Fixed, Settings::default(), None),
             &NoOpTransformer,
         )?;
         let paths = paths
