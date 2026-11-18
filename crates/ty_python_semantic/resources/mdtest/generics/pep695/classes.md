@@ -600,6 +600,36 @@ class D[T]:
         contextual: D[int] = D()
 ```
 
+## Constructor receivers preserve bounds and constraints
+
+An empty call supplies no concrete type for `S`, but its upper bound still constrains the items.
+
+```py
+class Bucket[T]:
+    items: tuple[T, ...]
+
+    def __init__[S: int](self: "Bucket[S]", *items: S) -> None:
+        self.items = items
+
+empty = Bucket()
+integers: tuple[int, ...] = empty.items
+strings: tuple[str, ...] = empty.items  # error: [invalid-assignment]
+reveal_type(Bucket(1, 2))  # revealed: Bucket[int]
+```
+
+The constructor narrows the class's three allowed types to `int` and `str`.
+
+```py
+class Choice[T: (int, str, bytes)]:
+    value: T
+
+    def __init__[S: (int, str)](self: "Choice[S]") -> None: ...
+
+value = Choice().value
+valid: int | str = value
+invalid: bytes = value  # error: [invalid-assignment]
+```
+
 ## Inferring generic class parameters from constructors
 
 If the type of a constructor parameter is a class typevar, we can use that to infer the type
@@ -3039,6 +3069,22 @@ def copy(value: Nested) -> Nested:
 
 def invalid() -> Nested:
     return Box("wrong")  # error: [invalid-explicit-return]
+```
+
+## Inferring a recursive alias in a constructor receiver
+
+The element type inferred from the argument also specializes recursive references to `Tree`.
+
+```py
+type Tree[T] = T | list[Tree[T]]
+
+class Box[T]:
+    value: T
+
+    def __init__[A](self: "Box[Tree[A]]", values: list[A]) -> None: ...
+
+def from_values(values: list[int]) -> Tree[int]:
+    return Box(values).value
 ```
 
 ## Multiple inherited recursive protocol methods

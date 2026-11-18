@@ -536,9 +536,8 @@ class Mapper(Generic[R]):
 
 values: Any
 
-# TODO: Preserve correlated overload solutions so dynamic values do not infer an extra
-# `frozenset` layer or an element type of `Never`.
-reveal_type(Mapper(callback, values))  # revealed: Mapper[frozenset[frozenset[Never]]]
+# TODO: Preserve correlated overload solutions when inferring the callback's return type.
+reveal_type(Mapper(callback, values))  # revealed: Mapper[Unknown]
 
 def wrap(function: Callable[P, R]) -> Callable[P, R]: ...
 
@@ -547,7 +546,7 @@ class Wrapped(Generic[R]):
     def __new__(cls, callback: Callable[[T], R], values: list[T]) -> Self: ...
 
 # TODO: Preserve the callback's correlated overload solutions through the decorator.
-reveal_type(Wrapped(callback, values))  # revealed: Wrapped[frozenset[frozenset[Never]]]
+reveal_type(Wrapped(callback, values))  # revealed: Wrapped[Unknown]
 ```
 
 A decorator can preserve `cls` explicitly with `Concatenate`, re-expressing the receiver with its
@@ -1881,6 +1880,15 @@ class Class7(Generic[T1, T2]):
 
 reveal_type(Class7(0, ""))  # revealed: Class7[str, int]
 reveal_type(Class7[str, int](0, ""))  # revealed: Class7[str, int]
+```
+
+The tuple's second element still needs specialization when its common element type is `object`.
+
+```py
+class Box(Generic[T1]):
+    def __init__(self: "Box[type[tuple[object, V1]]]", x: V1) -> None: ...
+
+reveal_type(Box(1))  # revealed: Box[type[tuple[object, Literal[1]]]]
 ```
 
 ## Constructor calls through `type[T]` with a bound TypeVar

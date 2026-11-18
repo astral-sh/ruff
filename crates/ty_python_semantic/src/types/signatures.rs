@@ -28,8 +28,8 @@ use crate::types::constraints::{
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
-    ApplySpecialization, GenericContext, Specialization, SpecializationBuilder, TypeVarInference,
-    walk_generic_context,
+    AliasPolicy, ApplySpecialization, GenericContext, Specialization, SpecializationBuilder,
+    TypeVarInference, walk_generic_context,
 };
 use crate::types::infer::{
     TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
@@ -1557,7 +1557,11 @@ impl<'db> Signature<'db> {
                         && typevar.typevar(db).is_self(db)
                 })
             {
-                TypeMapping::ApplySpecialization(ApplySpecialization::Single(typevar, self_type))
+                TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                    typevar,
+                    self_type,
+                    AliasPolicy::Expand,
+                ))
             } else {
                 TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context))
             }
@@ -1995,8 +1999,11 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let mapping =
-            TypeMapping::ApplySpecialization(ApplySpecialization::Single(self_typevar, self_type));
+        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+            self_typevar,
+            self_type,
+            AliasPolicy::Expand,
+        ));
         Some(self.apply_type_mapping_impl(
             db,
             &mapping,

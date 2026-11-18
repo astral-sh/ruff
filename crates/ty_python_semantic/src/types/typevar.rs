@@ -1166,6 +1166,36 @@ impl<'db> BoundTypeVarInstance<'db> {
             .unwrap_or_else(|| TypeVarBoundOrConstraints::UpperBound(self.domain(db).top(db)))
     }
 
+    /// Whether every valid specialization of this variable is also valid for `other`.
+    pub(super) fn can_specialize_typevar(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Self,
+    ) -> bool {
+        if self == other {
+            return true;
+        }
+        if self.domain(db) != other.domain(db) {
+            return false;
+        }
+        match other.typevar(db).bound_or_constraints(db, env) {
+            None => true,
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                // For example, `list[int]` is permitted by a `list[Any]` bound.
+                Type::TypeVar(self).is_subtype_of(db, env, bound.top_materialization(db, env))
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(allowed)) => {
+                let Some(TypeVarBoundOrConstraints::Constraints(actual)) =
+                    self.typevar(db).bound_or_constraints(db, env)
+                else {
+                    return false;
+                };
+                actual.is_subset_of(db, env, allowed)
+            }
+        }
+    }
+
     /// Returns a new bound typevar instance with the given `ParamSpec` attribute set.
     ///
     /// This method will also set an appropriate upper bound on the typevar, based on the

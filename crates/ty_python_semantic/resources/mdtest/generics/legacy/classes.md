@@ -1271,6 +1271,44 @@ def _(boxes: list[S], consumer: Consumer[S]) -> None:
     accept_consumer(consumer)  # error: [invalid-argument-type]
 ```
 
+## Constructor receivers preserve bounds and constraints
+
+An empty call supplies no concrete type for `S`, but its upper bound still constrains the items.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S", bound=int)
+
+class Bucket(Generic[T]):
+    items: tuple[T, ...]
+
+    def __init__(self: "Bucket[S]", *items: S) -> None:
+        self.items = items
+
+empty = Bucket()
+integers: tuple[int, ...] = empty.items
+strings: tuple[str, ...] = empty.items  # error: [invalid-assignment]
+reveal_type(Bucket(1, 2))  # revealed: Bucket[int]
+```
+
+The constructor narrows the class's three allowed types to `int` and `str`.
+
+```py
+Allowed = TypeVar("Allowed", int, str, bytes)
+Accepted = TypeVar("Accepted", int, str)
+
+class Choice(Generic[Allowed]):
+    value: Allowed
+
+    def __init__(self: "Choice[Accepted]") -> None: ...
+
+value = Choice().value
+valid: int | str = value
+invalid: bytes = value  # error: [invalid-assignment]
+```
+
 ## Inferring generic class parameters from constructors
 
 If the type of a constructor parameter is a class typevar, we can use that to infer the type

@@ -6042,6 +6042,70 @@ def example(output: list[Literal["a", "b"]]):
     run: Callable[[Wrap], None] = make_runner("a", output, lambda item: output.append(item))
 ```
 
+## Related type parameters in higher-order functions
+
+The output keeps its integer bound when the input tuple is empty.
+
+```py
+from typing import Callable, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+IntT = TypeVar("IntT", bound=int)
+Transform = Callable[[tuple[A, ...]], tuple[B, ...]]
+
+def decorate(f: Transform[A, IntT]) -> Transform[A, IntT]:
+    return f
+
+def identity(items: tuple[A, ...]) -> tuple[A, ...]:
+    return items
+
+integers: tuple[int, ...] = decorate(identity)(())
+```
+
+The identity function uses the same element type for its input and output. When both type parameters
+are constrained, the only choice they share is `int`.
+
+```py
+from typing_extensions import assert_type
+
+IntOrStr = TypeVar("IntOrStr", int, str)
+IntOrBytes = TypeVar("IntOrBytes", int, bytes)
+
+def common(f: Transform[IntOrBytes, IntOrStr]) -> Transform[IntOrBytes, IntOrStr]:
+    return f
+
+out = common(identity)(())
+assert_type(out, tuple[int, ...])
+```
+
+A decorator accepts a callback with an integer input and a result constrained to `int` or `str`.
+
+```py
+def decorate_value(f: Callable[[IntT], IntOrStr]) -> Callable[[IntT], IntOrStr]:
+    return f
+
+def identity_value(value: A) -> A:
+    return value
+
+# TODO: Since identity_value returns its argument, the decorated call should infer int.
+reveal_type(decorate_value(identity_value)(1))  # revealed: int | str
+```
+
+Composing two identity functions relates three type parameters without fixing a concrete element
+type.
+
+```py
+C = TypeVar("C")
+
+def compose(f: Transform[A, B], g: Transform[B, C]) -> Transform[A, C]:
+    return lambda items: g(f(items))
+
+# TODO: The shared element type should be bound by the returned callable.
+# revealed: (tuple[B@compose, ...], /) -> tuple[B@compose, ...]
+reveal_type(compose(identity, identity))
+```
+
 ## Dictionary value context containing a bounded type variable
 
 The return annotation lets `dict.fromkeys` initialize a dictionary of `T | str` with a string. An
