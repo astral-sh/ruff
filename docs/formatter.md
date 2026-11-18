@@ -429,7 +429,7 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`over-indented`](rules/over-indented.md) (`E117`)
 - [`incorrect-blank-line-before-class-docstring`](rules/incorrect-blank-line-before-class-docstring.md) (`D203`)
 - [`docstring-tab-indentation`](rules/docstring-tab-indentation.md) (`D206`)
-- [`incorrect-docstring-quotes`](rules/incorrect-docstring-quotes.md) (`D300`)
+- [`unconventional-docstring-quotes`](rules/unconventional-docstring-quotes.md) (`D300`)
 - [`bad-quotes-inline-string`](rules/bad-quotes-inline-string.md) (`Q000`)
 - [`bad-quotes-multiline-string`](rules/bad-quotes-multiline-string.md) (`Q001`)
 - [`bad-quotes-docstring`](rules/bad-quotes-docstring.md) (`Q002`)

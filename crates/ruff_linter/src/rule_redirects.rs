@@ -47,7 +47,7 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "surrounding-whitespace",
-        Rule::SurroundingWhitespaceInDocstring,
+        Rule::WhitespaceAroundDocstringText,
     ),
     (
         "blank-line-before-class",
@@ -55,18 +55,18 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "multi-line-summary-first-line",
-        Rule::BlankLineBeforeDocstringSummaryLine,
+        Rule::MultilineDocstringSummaryOnSeparateLine,
     ),
     (
         "multi-line-summary-second-line",
-        Rule::MissingBlankLineBeforeDocstringSummaryLine,
+        Rule::MultilineDocstringSummaryOnFirstLine,
     ),
     ("overindented-section", Rule::OverIndentedDocstringSection),
     (
         "overindented-section-underline",
         Rule::OverIndentedDocstringSectionUnderline,
     ),
-    ("triple-single-quotes", Rule::IncorrectDocstringQuotes),
+    ("triple-single-quotes", Rule::UnconventionalDocstringQuotes),
     (
         "missing-section-underline-after-name",
         Rule::BlankLineBeforeDocstringSectionUnderline,

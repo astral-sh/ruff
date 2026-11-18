@@ -1343,7 +1343,7 @@ fn preview_enabled_all() {
 
     ----- stderr -----
     warning: `incorrect-blank-line-before-class-docstring` (D203) and `blank-line-before-class-docstring` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class-docstring`.
-    warning: `blank-line-before-docstring-summary-line` (D212) and `missing-blank-line-before-docstring-summary-line` (D213) are incompatible. Ignoring `missing-blank-line-before-docstring-summary-line`.
+    warning: `multiline-docstring-summary-on-separate-line` (D212) and `multiline-docstring-summary-on-first-line` (D213) are incompatible. Ignoring `multiline-docstring-summary-on-first-line`.
     ");
 }
 

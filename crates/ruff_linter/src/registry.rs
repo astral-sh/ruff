@@ -424,11 +424,11 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
          Ignoring `incorrect-blank-line-before-class-docstring`.",
     ),
     (
-        Rule::BlankLineBeforeDocstringSummaryLine,
-        Rule::MissingBlankLineBeforeDocstringSummaryLine,
-        "`blank-line-before-docstring-summary-line` (D212) and \
-         `missing-blank-line-before-docstring-summary-line` (D213) are incompatible. \
-         Ignoring `missing-blank-line-before-docstring-summary-line`.",
+        Rule::MultilineDocstringSummaryOnSeparateLine,
+        Rule::MultilineDocstringSummaryOnFirstLine,
+        "`multiline-docstring-summary-on-separate-line` (D212) and \
+         `multiline-docstring-summary-on-first-line` (D213) are incompatible. \
+         Ignoring `multiline-docstring-summary-on-first-line`.",
     ),
 ];
 

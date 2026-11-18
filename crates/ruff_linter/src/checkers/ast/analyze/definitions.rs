@@ -48,8 +48,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::FirstWordUncapitalized,
         Rule::UnnecessaryMultilineDocstring,
         Rule::DocstringTabIndentation,
-        Rule::BlankLineBeforeDocstringSummaryLine,
-        Rule::MissingBlankLineBeforeDocstringSummaryLine,
+        Rule::MultilineDocstringSummaryOnSeparateLine,
+        Rule::MultilineDocstringSummaryOnFirstLine,
         Rule::MissingNewLineAfterLastDocstringParagraph,
         Rule::MissingNewLineAfterSectionName,
         Rule::BlankLineAfterFunctionDocstring,
@@ -67,8 +67,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::BlankLineBeforeDocstringSectionUnderline,
         Rule::MismatchedSectionUnderlineLength,
         Rule::OverIndentedDocstringSectionUnderline,
-        Rule::SurroundingWhitespaceInDocstring,
-        Rule::IncorrectDocstringQuotes,
+        Rule::WhitespaceAroundDocstringText,
+        Rule::UnconventionalDocstringQuotes,
         Rule::UnderIndentedDocstringLine,
         Rule::UndocumentedMagicMethod,
         Rule::UndocumentedParameter,
@@ -235,16 +235,16 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::MissingNewLineAfterLastDocstringParagraph) {
                 pydocstyle::rules::newline_after_last_paragraph(checker, &docstring);
             }
-            if checker.is_rule_enabled(Rule::SurroundingWhitespaceInDocstring) {
+            if checker.is_rule_enabled(Rule::WhitespaceAroundDocstringText) {
                 pydocstyle::rules::no_surrounding_whitespace(checker, &docstring);
             }
             if checker.any_rule_enabled(&[
-                Rule::BlankLineBeforeDocstringSummaryLine,
-                Rule::MissingBlankLineBeforeDocstringSummaryLine,
+                Rule::MultilineDocstringSummaryOnSeparateLine,
+                Rule::MultilineDocstringSummaryOnFirstLine,
             ]) {
                 pydocstyle::rules::multi_line_summary_start(checker, &docstring);
             }
-            if checker.is_rule_enabled(Rule::IncorrectDocstringQuotes) {
+            if checker.is_rule_enabled(Rule::UnconventionalDocstringQuotes) {
                 pydocstyle::rules::triple_quotes(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::EscapeSequenceInDocstring) {
@@ -289,7 +289,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 Rule::NonCapitalizedSectionName,
                 Rule::MissingDashedUnderlineAfterSection,
                 Rule::EmptyDocstringSection,
-                Rule::BlankLineBeforeDocstringSummaryLine,
+                Rule::MultilineDocstringSummaryOnSeparateLine,
                 Rule::MissingNewLineAfterSectionName,
                 Rule::MissingBlankLineAfterDocstringSection,
                 Rule::MissingBlankLineBeforeDocstringSection,

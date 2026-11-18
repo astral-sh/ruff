@@ -39,8 +39,8 @@ mod tests {
     #[test_case(Rule::UnnecessaryMultilineDocstring, Path::new("D.py"))]
     #[test_case(Rule::DocstringTabIndentation, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedMagicMethod, Path::new("D.py"))]
-    #[test_case(Rule::BlankLineBeforeDocstringSummaryLine, Path::new("D.py"))]
-    #[test_case(Rule::MissingBlankLineBeforeDocstringSummaryLine, Path::new("D.py"))]
+    #[test_case(Rule::MultilineDocstringSummaryOnSeparateLine, Path::new("D.py"))]
+    #[test_case(Rule::MultilineDocstringSummaryOnFirstLine, Path::new("D.py"))]
     #[test_case(Rule::MissingNewLineAfterLastDocstringParagraph, Path::new("D.py"))]
     #[test_case(Rule::MissingNewLineAfterSectionName, Path::new("sections.py"))]
     #[test_case(Rule::BlankLineAfterFunctionDocstring, Path::new("D.py"))]
@@ -54,7 +54,7 @@ mod tests {
     #[test_case(Rule::OverIndentedDocstringLine, Path::new("D208.py"))]
     #[test_case(Rule::SignatureInDocstring, Path::new("D.py"))]
     #[test_case(Rule::SignatureInDocstring, Path::new("D402.py"))]
-    #[test_case(Rule::SurroundingWhitespaceInDocstring, Path::new("D.py"))]
+    #[test_case(Rule::WhitespaceAroundDocstringText, Path::new("D.py"))]
     #[test_case(Rule::DocstringStartsWithThis, Path::new("D.py"))]
     #[test_case(Rule::UnderIndentedDocstringLine, Path::new("D.py"))]
     #[test_case(Rule::EmptyDocstring, Path::new("D.py"))]
@@ -106,8 +106,8 @@ mod tests {
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D.py"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D301.py"))]
     #[test_case(Rule::PropertyDocstringStartsWithVerb, Path::new("D421.py"))]
-    #[test_case(Rule::IncorrectDocstringQuotes, Path::new("D.py"))]
-    #[test_case(Rule::IncorrectDocstringQuotes, Path::new("D300.py"))]
+    #[test_case(Rule::UnconventionalDocstringQuotes, Path::new("D.py"))]
+    #[test_case(Rule::UnconventionalDocstringQuotes, Path::new("D300.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -131,7 +131,7 @@ mod tests {
     fn bom() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/bom.py"),
-            &settings::LinterSettings::for_rule(Rule::IncorrectDocstringQuotes),
+            &settings::LinterSettings::for_rule(Rule::UnconventionalDocstringQuotes),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())

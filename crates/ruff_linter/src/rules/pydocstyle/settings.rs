@@ -30,7 +30,7 @@ impl Convention {
             Convention::Google => &[
                 Rule::IncorrectBlankLineBeforeClassDocstring,
                 Rule::IncorrectBlankLineAfterClassDocstring,
-                Rule::MissingBlankLineBeforeDocstringSummaryLine,
+                Rule::MultilineDocstringSummaryOnFirstLine,
                 Rule::OverIndentedDocstringSectionUnderline,
                 Rule::MissingTrailingPeriod,
                 Rule::NonImperativeMood,
@@ -44,8 +44,8 @@ impl Convention {
             Convention::Numpy => &[
                 Rule::UndocumentedPublicInit,
                 Rule::IncorrectBlankLineBeforeClassDocstring,
-                Rule::BlankLineBeforeDocstringSummaryLine,
-                Rule::MissingBlankLineBeforeDocstringSummaryLine,
+                Rule::MultilineDocstringSummaryOnSeparateLine,
+                Rule::MultilineDocstringSummaryOnFirstLine,
                 Rule::SignatureInDocstring,
                 Rule::MissingBlankLineAfterLastDocstringSection,
                 Rule::MissingTerminalPunctuation,
@@ -54,8 +54,8 @@ impl Convention {
             ],
             Convention::Pep257 => &[
                 Rule::IncorrectBlankLineBeforeClassDocstring,
-                Rule::BlankLineBeforeDocstringSummaryLine,
-                Rule::MissingBlankLineBeforeDocstringSummaryLine,
+                Rule::MultilineDocstringSummaryOnSeparateLine,
+                Rule::MultilineDocstringSummaryOnFirstLine,
                 Rule::OverIndentedDocstringSection,
                 Rule::OverIndentedDocstringSectionUnderline,
                 Rule::DocstringStartsWithThis,

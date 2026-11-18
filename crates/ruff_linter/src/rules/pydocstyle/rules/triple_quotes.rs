@@ -49,11 +49,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.69", category = Category::Formatting)]
-pub(crate) struct IncorrectDocstringQuotes {
+pub(crate) struct UnconventionalDocstringQuotes {
     expected_quote: Quote,
 }
 
-impl Violation for IncorrectDocstringQuotes {
+impl Violation for UnconventionalDocstringQuotes {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -91,7 +91,7 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
         Quote::Single => {
             if !opener.ends_with("'''") {
                 let mut diagnostic = checker.report_diagnostic(
-                    IncorrectDocstringQuotes { expected_quote },
+                    UnconventionalDocstringQuotes { expected_quote },
                     docstring.range(),
                 );
 
@@ -107,7 +107,7 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
         Quote::Double => {
             if !opener.ends_with("\"\"\"") {
                 let mut diagnostic = checker.report_diagnostic(
-                    IncorrectDocstringQuotes { expected_quote },
+                    UnconventionalDocstringQuotes { expected_quote },
                     docstring.range(),
                 );
 

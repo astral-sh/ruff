@@ -38,9 +38,9 @@ use crate::rules::pydocstyle::helpers::ends_with_backslash;
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.68", category = Category::Formatting)]
-pub(crate) struct SurroundingWhitespaceInDocstring;
+pub(crate) struct WhitespaceAroundDocstringText;
 
-impl Violation for SurroundingWhitespaceInDocstring {
+impl Violation for WhitespaceAroundDocstringText {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -69,7 +69,7 @@ pub(crate) fn no_surrounding_whitespace(checker: &Checker, docstring: &Docstring
         return;
     }
     let mut diagnostic =
-        checker.report_diagnostic(SurroundingWhitespaceInDocstring, docstring.range());
+        checker.report_diagnostic(WhitespaceAroundDocstringText, docstring.range());
     let quote = docstring.quote_style().as_char();
     // If removing whitespace would lead to an invalid string of quote
     // characters, avoid applying the fix.

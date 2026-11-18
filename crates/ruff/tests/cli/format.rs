@@ -1397,7 +1397,7 @@ def say_hy(name: str):
 
     ----- stderr -----
     warning: `incorrect-blank-line-before-class-docstring` (D203) and `blank-line-before-class-docstring` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class-docstring`.
-    warning: `blank-line-before-docstring-summary-line` (D212) and `missing-blank-line-before-docstring-summary-line` (D213) are incompatible. Ignoring `missing-blank-line-before-docstring-summary-line`.
+    warning: `multiline-docstring-summary-on-separate-line` (D212) and `multiline-docstring-summary-on-first-line` (D213) are incompatible. Ignoring `multiline-docstring-summary-on-first-line`.
     warning: The following rule may cause conflicts when used with the formatter: `missing-trailing-comma` (`COM812`). To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
     ");
     Ok(())
