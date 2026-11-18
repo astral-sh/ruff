@@ -6662,6 +6662,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 MatchingArgumentTypeContext::Many(argument_tcx) => {
+                    // TODO: Preserve failed-call information for each inferred argument type so
+                    // union narrowing and overload resolution can reject candidates that depend
+                    // on error recovery.
+                    // https://github.com/astral-sh/ruff/pull/27942
                     let mut inferred_by_cache_key = FxHashMap::default();
 
                     // If there are multiple applicable type contexts and we are not in

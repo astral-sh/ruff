@@ -2818,6 +2818,29 @@ def read(value: T) -> T | None:
     return reveal_type(get(Box(value=value)))  # revealed: T@read | None
 ```
 
+## Nested calls through a callable union
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def wrap(value: T) -> list[T]:
+    return [value]
+
+def first(items: list[T]) -> T | None:
+    return items[0] if items else None
+
+def last(items: list[T]) -> T | None:
+    return items[-1] if items else None
+
+def choose(value: T, reverse: bool) -> None:
+    pick = last if reverse else first
+    # TODO: Reveal `T@choose | None` once failed-call information is preserved across callable
+    # union inference contexts. https://github.com/astral-sh/ruff/pull/27942
+    result: T | None = reveal_type(pick(wrap(value)))  # revealed: None
+```
+
 ## Suppressed argument errors do not justify union narrowing
 
 Disabling an argument diagnostic does not make a failed speculative specialization valid.
