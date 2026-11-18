@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator};
@@ -5,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::preview::is_fix_runtime_string_union_enabled;
 use crate::rules::flake8_type_checking::helpers::{
     quote_annotation, quotes_are_unremovable, unquote_annotation_string,
 };
@@ -66,7 +68,7 @@ use crate::{Fix, FixAvailability, Violation};
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.8.0", category = Category::Correctness)]
 pub(crate) struct RuntimeStringUnion {
-    strategy: Option<Strategy>,
+    strategy: Strategy,
 }
 
 impl Violation for RuntimeStringUnion {
@@ -78,16 +80,10 @@ impl Violation for RuntimeStringUnion {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Self {
-            strategy: Some(strategy),
-        } = self
-        else {
-            return None;
-        };
-        match strategy {
-            Strategy::RemoveQuotes => Some("Remove quotes".to_string()),
-            Strategy::ExtendQuotes => Some("Extend quotes".to_string()),
-        }
+        Some(match self.strategy {
+            Strategy::RemoveQuotes => "Remove quotes".to_string(),
+            Strategy::ExtendQuotes => "Extend quotes".to_string(),
+        })
     }
 }
 
@@ -112,16 +108,21 @@ pub(crate) fn runtime_string_union(
         return;
     };
 
-    if quotes_are_unremovable(checker.semantic(), expr, checker.target_version()) {
-        // extend the quotes
-        let mut diagnostic = checker.report_diagnostic(
-            RuntimeStringUnion {
-                strategy: Some(Strategy::ExtendQuotes),
-            },
-            annotation_expr.range(),
-        );
-        // the edit tells us where our extended expression starts
-        let edit = quote_annotation(
+    let strategy = if quotes_are_unremovable(checker.semantic(), expr, checker.target_version()) {
+        Strategy::ExtendQuotes
+    } else {
+        Strategy::RemoveQuotes
+    };
+
+    let mut diagnostic =
+        checker.report_diagnostic(RuntimeStringUnion { strategy }, annotation_expr.range());
+
+    if !is_fix_runtime_string_union_enabled(checker.settings()) {
+        return;
+    }
+
+    let edit = match strategy {
+        Strategy::ExtendQuotes => quote_annotation(
             checker
                 .semantic()
                 .current_expression_id()
@@ -130,34 +131,17 @@ pub(crate) fn runtime_string_union(
             checker.stylist(),
             checker.locator(),
             checker.default_string_flags(),
-        );
-        diagnostic.set_parent(edit.range().start());
-        if checker.settings().preview.is_enabled() {
-            let fix = if checker.comment_ranges().intersects(edit.range()) {
-                Fix::unsafe_edit(edit)
-            } else {
-                Fix::safe_edit(edit)
-            };
-            diagnostic.set_fix(fix);
-        }
-        return;
-    }
+        ),
+        Strategy::RemoveQuotes => unquote_annotation_string(expr, annotation_expr, checker),
+    };
 
-    // simply remove the quotes
-    let mut diagnostic = checker.report_diagnostic(
-        RuntimeStringUnion {
-            strategy: Some(Strategy::RemoveQuotes),
-        },
-        annotation_expr.range(),
-    );
-    if checker.settings().preview.is_enabled() {
-        let edit = unquote_annotation_string(expr, annotation_expr, checker);
-        if checker.comment_ranges().intersects(edit.range()) {
-            diagnostic.set_fix(Fix::unsafe_edit(edit));
-        } else {
-            diagnostic.set_fix(Fix::safe_edit(edit));
-        }
-    }
+    let applicability = if checker.comment_ranges().intersects(edit.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
