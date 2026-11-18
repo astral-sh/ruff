@@ -308,11 +308,37 @@ def _(top: Top[GradualParams], bottom: Bottom[GradualParams]) -> None:
     reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> int
 ```
 
+Explicit parameters still constrain calls to the bottom materialization. Their types materialize
+contravariantly, including those of keyword-only parameters after `*args`. The top materialization
+permits no calls because the gradual tail could require additional arguments.
+
+```py
+from typing import Concatenate
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def handle(value: Any, /, name: str = "", *items: Any, flag: Any, **options: Any) -> int:
+    return 1
+
+type Handle = RegularCallableTypeOf[handle]
+
+def fixed_parameters(bottom: Bottom[Handle], top: Top[Handle]) -> None:
+    # revealed: (value: object, /, name: str = "", *items: object, flag: object, **options: object) -> int
+    reveal_type(bottom)
+    bottom(object(), flag=True)  # ok
+    bottom(object())  # error: [missing-argument]
+    top(object(), flag=True)  # error: [call-to-function-with-unknown-signature]
+
+static_assert(is_assignable_to(Handle, Bottom[Handle]))
+static_assert(is_subtype_of(Bottom[Handle], Handle))
+
+def positional_prefix(bottom: Bottom[Callable[Concatenate[int, ...], str]]) -> None:
+    reveal_type(bottom)  # revealed: (int, /, *args: object, **kwargs: object) -> str
+```
+
 Materializing an overloaded callable materializes each overload separately.
 
 ```py
 from typing import overload
-from ty_extensions._internal import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> Any: ...
@@ -2448,6 +2474,51 @@ static_assert(is_subtype_of(Bottom[Source], Top[Target]))
 
 def invalid(source: Top[Source]) -> Bottom[Target]:
     return source  # error: [invalid-explicit-return]
+```
+
+### Methods with gradual variadics
+
+Narrowing to a recursive protocol in strict mode materializes its methods. The fixed `key` parameter
+of `handle` is retained when comparing the `Handler` accepted by `combine`.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Protocol, assert_type, overload, runtime_checkable
+
+@runtime_checkable
+class Handler[T](Protocol):
+    def handle(self, key: str, *args: Any, **kwargs: Any) -> None: ...
+    def combine(self, other: "Handler[T]") -> None: ...
+
+def narrowed(value: object) -> None:
+    if isinstance(value, Handler):
+        handler: Handler[Any] = value  # ok
+```
+
+Overload selection compares `process` with its top materialization, which bottom-materializes the
+`handler` parameter. The identity overload of `mark` still applies and preserves the return type.
+
+```py
+@overload
+def mark[T](value: T) -> T: ...
+@overload
+def mark(value: object) -> object: ...
+def mark(value: object) -> object:
+    return value
+
+@mark
+def process(handler: Handler[Any]) -> int:
+    return 1
+
+def use(handler: Handler[Any]) -> None:
+    assert_type(process(handler), int)
 ```
 
 ### Members outside the protocol interface

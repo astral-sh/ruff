@@ -111,13 +111,64 @@ from typing import Callable, Concatenate
 Short = Callable[Concatenate[int, ...], int]
 Long = Callable[Concatenate[int, str, ...], int]
 
-def _(f: Long | Short, g: Short | Long) -> None:
+def call_both(f: Long | Short, g: Short | Long) -> None:
     f(1, "two")  # ok
     f(1, 2)  # error: [invalid-argument-type]
     f(1)  # error: [missing-argument]
     g(1, "two")  # ok
     g(1, 2)  # error: [invalid-argument-type]
     g(1)  # error: [missing-argument]
+```
+
+The shorter prefix also admits an implementation that accepts just one argument.
+
+```py
+def takes_one(value: int) -> int:
+    return value
+
+call_both(takes_one, takes_one)  # ok
+```
+
+When one member has no fixed parameters, a zero-argument implementation is valid in either union
+order. A call through the union still requires the other member's string argument.
+
+```py
+AnyParameters = Callable[..., None]
+WithString = Callable[Concatenate[str, ...], None]
+
+def call(f: AnyParameters | WithString, g: WithString | AnyParameters) -> None:
+    f("value")  # ok
+    g("value")  # ok
+    f()  # error: [missing-argument]
+    g()  # error: [missing-argument]
+    f(1)  # error: [invalid-argument-type]
+    g(1)  # error: [invalid-argument-type]
+
+def no_arguments() -> None: ...
+
+call(no_arguments, no_arguments)  # ok
+```
+
+## Gradual callables with different keyword parameters
+
+Each protocol guarantees support for a different keyword. A function that accepts just one of those
+keywords satisfies the corresponding union member.
+
+```py
+from typing import Any, Protocol
+
+class ByName(Protocol):
+    def __call__(self, *args: Any, name: object = ..., **kwargs: Any) -> None: ...
+
+class ByIndex(Protocol):
+    def __call__(self, *args: Any, index: object = ..., **kwargs: Any) -> None: ...
+
+def by_name(*, name: object = None) -> None: ...
+def by_index(*, index: object = None) -> None: ...
+def accept(callback: ByName | ByIndex) -> None: ...
+
+accept(by_name)  # ok
+accept(by_index)  # ok
 ```
 
 ## Assigning function-literal unions to callables

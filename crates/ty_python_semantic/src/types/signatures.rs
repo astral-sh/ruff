@@ -2994,6 +2994,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
         let check_parameters_and_return = || {
             let result = checker.check_signature_pair_inner(db, source, target);
+            if matches!(checker.relation, TypeRelation::Redundancy { .. })
+                && source.parameters.is_gradual()
+                && target.parameters.is_gradual()
+            {
+                // Unrestricted tails tell us which calls each union member accepts. Also compare
+                // the fixed parameters alone: a zero-argument function can implement `(...)`
+                // but cannot implement `(str, /, ...)`.
+                let fixed = |signature: &Signature<'db>| {
+                    signature
+                        .clone()
+                        .with_parameters(signature.parameters.without_variadics())
+                };
+                return result.and(db, checker.constraints, || {
+                    checker.check_signature_pair_inner(db, &fixed(source), &fixed(target))
+                });
+            }
             if checker.typevar_evaluation == TypeVarEvaluation::Lazy
                 && target.parameters.is_gradual()
                 && !source.parameters.is_top()
@@ -3384,12 +3400,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && !(specialize_target_tail && target_parameters.is_fully_gradual()))
         .then(|| {
             if specialize_target_tail {
-                Parameters::standard(
-                    target_parameters
-                        .iter()
-                        .filter(|param| !param.is_variadic() && !param.is_keyword_variadic())
-                        .cloned(),
-                )
+                target_parameters.without_variadics()
             } else {
                 target_parameters.with_unrestricted_variadics()
             }
@@ -4101,8 +4112,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
             if source_is_gradual && !self.relation.is_assignability() {
                 if target_is_gradual && matches!(self.relation, TypeRelation::Redundancy { .. }) {
-                    // Both top parameter materializations permit no calls. To check redundancy,
-                    // compare the calls permitted when both gradual tails are unrestricted.
                     source_parameters = source_parameters.with_unrestricted_variadics();
                 } else {
                     // Some materialization of the source could require an extra argument.
@@ -5206,6 +5215,14 @@ impl<'db> Parameters<'db> {
         self.kind() == ParametersKind::Gradual && self.len() == 2
     }
 
+    fn without_variadics(&self) -> Self {
+        Self::standard(
+            self.iter()
+                .filter(|param| !param.is_variadic() && !param.is_keyword_variadic())
+                .cloned(),
+        )
+    }
+
     fn with_unrestricted_variadics(&self) -> Self {
         Self::standard(self.iter().cloned().map(|param| {
             if param.is_variadic() || param.is_keyword_variadic() {
@@ -5520,38 +5537,21 @@ impl<'db> Parameters<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        if let TypeMapping::Materialize(materialization_kind) = type_mapping
-            && matches!(
-                self.data.kind,
-                ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
-            )
+        let kind = if let TypeMapping::Materialize(materialization_kind) = type_mapping
+            && self.is_gradual()
         {
             match materialization_kind {
-                MaterializationKind::Bottom => {
-                    // The bottom materialization of the `...` parameters is `(*object, **object)`,
-                    // which accepts any call and is thus a subtype of all other parameters.
-                    return Parameters::bottom();
-                }
-                MaterializationKind::Top => {
-                    return Parameters::top();
-                }
+                // A gradual tail may require additional arguments, so no call is guaranteed.
+                MaterializationKind::Top => return Self::top(),
+                MaterializationKind::Bottom if self.is_fully_gradual() => return Self::bottom(),
+                // Materializing the parameter types below turns the gradual variadics into
+                // `*object, **object` and retains any explicit parameters.
+                MaterializationKind::Bottom => ParametersKind::Standard,
             }
-        }
-
-        // Parameters are in contravariant position, so we need to flip the type mapping.
-        let type_mapping = type_mapping.flip();
-
-        let value: Box<[_]> = self
-            .data
-            .value
-            .iter()
-            .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
-            .collect();
-
-        let kind = if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
+        } else if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
             let freshen = |paramspec| {
                 Type::TypeVar(paramspec)
-                    .apply_type_mapping_impl(db, &type_mapping, tcx, visitor)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                     .as_typevar()
                     .unwrap_or(paramspec)
             };
@@ -5568,6 +5568,13 @@ impl<'db> Parameters<'db> {
         } else {
             self.data.kind
         };
+
+        // Parameters are in contravariant position, so we need to flip the type mapping.
+        let type_mapping = type_mapping.flip();
+        let value: Box<[_]> = self
+            .iter()
+            .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
+            .collect();
         let parameters = Self::new(value, kind);
         if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. })
             && let Some((_, variadic)) = parameters.variadic()
