@@ -728,6 +728,10 @@ C1.meta_data_descriptor = 1
 
 # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor` on type `<class 'C1'>`"
 C1.meta_data_descriptor = "invalid"
+
+def write_through_metaclass(cls: Meta1) -> None:
+    cls.meta_data_descriptor = 1  # ok
+    cls.meta_data_descriptor = "invalid"  # error: [invalid-assignment]
 ```
 
 When writing to a class-level data descriptor from the class object itself, the descriptor protocol

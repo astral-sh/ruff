@@ -3297,6 +3297,31 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
+    /// Is this a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
+    ///
+    /// This does not include all types that are subtypes of `builtins.type`! The semantic
+    /// distinction that matters here is not whether this type is a subtype of `type`, but whether
+    /// it constrains the class or the metaclass of its inhabitants.
+    ///
+    /// The type `type[C]` and the type `ABCMeta` are both subtypes of `builtins.type`, but they
+    /// constrain their inhabitants in different domains. `type[C]` constrains in the regular-class
+    /// domain (it describes a regular class object and all its subclasses). A metaclass instance
+    /// like `ABCMeta` constrains in the metaclass domain: its inhabitants can be class objects
+    /// that are unrelated to each other in the regular-class domain (they do not inherit each
+    /// other or any other common base), but they are all constrained to have a metaclass that
+    /// inherits from `ABCMeta`.
+    fn is_metaclass_instance(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        self.as_nominal_instance().is_some_and(|instance| {
+            KnownClass::Type
+                .try_to_class_literal(db, env)
+                .is_some_and(|type_class| {
+                    instance
+                        .class(db, env)
+                        .is_subtype_of_class_literal(db, ClassLiteral::Static(type_class))
+                })
+        })
+    }
+
     const fn as_literal_value(self) -> Option<LiteralValueType<'db>> {
         match self {
             Type::LiteralValue(literal) => Some(literal),
@@ -4512,11 +4537,10 @@ impl<'db> Type<'db> {
                 .to_class_literal(db, env)
                 .find_name_in_mro_with_policy(db, env, name, policy),
 
-            // We eagerly normalize type[object], i.e. Type::SubclassOf(object) to `type`,
-            // i.e. Type::NominalInstance(type). So looking up a name in the MRO of
-            // `Type::NominalInstance(type)` is equivalent to looking up the name in the
-            // MRO of the class `object`.
-            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+            // `type[object]` normalizes to the nominal instance `type`. Instances of its
+            // subclasses also represent classes whose only known common base is `object`.
+            // Their metaclass members are looked up separately by `class_member`.
+            Type::NominalInstance(_) if self.is_metaclass_instance(db, env) => {
                 if policy.mro_no_object_fallback() {
                     Some(Place::Undefined.into())
                 } else {
@@ -4854,6 +4878,54 @@ impl<'db> Type<'db> {
         } else {
             metaclass_attr.or_fall_back_to(db, env, || class_attr)
         }
+    }
+
+    /// Read a member from the represented class's MRO without binding an instance argument.
+    /// Apply descriptors before combining intersection alternatives: distinct classmethod
+    /// objects can expose compatible bound methods even though the descriptors are disjoint.
+    fn class_mro_member_lookup(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+        receiver: Type<'db>,
+    ) -> MemberLookupResult<'db> {
+        let mut error = None;
+        let mut lookup = |ty: &Type<'db>| {
+            let result = ty.class_mro_member_lookup(db, env, name, policy, receiver);
+            error = error.or_else(|| result.err().map(|error| error.kind(db)));
+            result
+                .unwrap_or_else(|error| error.fallback_member(db))
+                .member(db)
+        };
+        let combined = match self {
+            Type::Union(union) => {
+                Some(union.map_with_boundness_and_qualifiers(db, env, &mut lookup))
+            }
+            Type::Intersection(intersection) => {
+                Some(intersection.map_with_boundness_and_qualifiers(db, env, &mut lookup))
+            }
+            _ => None,
+        };
+        if let Some(combined) = combined {
+            return member_lookup_result(db, combined, error, None);
+        }
+        let self_instance = receiver
+            .to_instance_approximation(db, env)
+            .unwrap_or_else(Type::object);
+        let class_attr_plain = self
+            .find_name_in_mro_with_policy(db, env, name, policy)
+            .unwrap_or_default()
+            .map_type(|ty| ty.bind_self_typevars(db, env, self_instance));
+        let (class_attr_fallback, _, class_attr_error) =
+            Type::try_call_dunder_get_on_attribute(db, env, class_attr_plain, None, receiver);
+        member_lookup_result(
+            db,
+            class_attr_fallback,
+            class_attr_error.map(MemberLookupErrorKind::DescriptorGet),
+            None,
+        )
     }
 
     fn with_definedness(
@@ -6261,16 +6333,42 @@ impl<'db> Type<'db> {
                     return Place::bound(member).into();
                 }
 
-                let fallback = this.instance_member(db, env, name_str);
+                // An intersection can establish that an otherwise instance-like alternative
+                // describes a class object. Keep that alternative's metaclass members, but let
+                // the represented class's namespace shadow its non-data descriptors.
+                let instance_fallback = this.instance_member(db, env, name_str);
+                let (fallback, shadowing) = if (this.is_metaclass_instance(db, env)
+                    || receiver != this)
+                    && receiver.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env))
+                    && !Type::instance_lookup_class_member_with_policy(db, env, key, receiver)
+                        .qualifiers
+                        .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR)
+                {
+                    let class_mro = receiver
+                        .to_instance_approximation(db, env)
+                        .unwrap_or_else(Type::object)
+                        .to_meta_type(db, env);
+                    (
+                        member_lookup_or_fall_back_to(db, env, instance_fallback.into(), || {
+                            class_mro.class_mro_member_lookup(
+                                db,
+                                env,
+                                name_str,
+                                key.policy(db),
+                                receiver,
+                            )
+                        }),
+                        InstanceFallbackShadowsNonDataDescriptor::Yes,
+                    )
+                } else {
+                    (
+                        instance_fallback.into(),
+                        InstanceFallbackShadowsNonDataDescriptor::No,
+                    )
+                };
 
-                let result = Type::invoke_descriptor_protocol(
-                    db,
-                    env,
-                    key,
-                    receiver,
-                    fallback.into(),
-                    InstanceFallbackShadowsNonDataDescriptor::No,
-                );
+                let result =
+                    Type::invoke_descriptor_protocol(db, env, key, receiver, fallback, shadowing);
 
                 if result
                     .unwrap_or_else(|error| error.fallback_member(db))

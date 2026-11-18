@@ -655,9 +655,15 @@ fn instance_attribute_write_requirement<'db>(
             receiver_fallback,
         }) => (member, receiver_fallback),
         Some(&AssignmentAttributeMembers::ReceiverMember(member)) => {
-            return instance(InstanceAttributeWriteMember::Instance(
-                fallback_requirement(member),
-            ));
+            // A nominal metaclass instance is still evaluated as an instance of its metaclass
+            // (including `ClassVar` and `__setattr__` restrictions), but this member belongs to
+            // the represented class's MRO. Its methods remain unbound when replaced.
+            let fallback = if object_ty.is_metaclass_instance(db, env) {
+                class_fallback_write_requirement(db, env, object_ty, Type::object(), member)
+            } else {
+                fallback_requirement(member)
+            };
+            return instance(InstanceAttributeWriteMember::Instance(fallback));
         }
         None => return instance(InstanceAttributeWriteMember::SetAttr),
     };
@@ -1171,7 +1177,23 @@ fn class_object_assignment_members<'db>(
     if !matches!(
         object_ty,
         Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..)
-    ) {
+    ) && !object_ty.is_metaclass_instance(db, env)
+    {
+        return None;
+    }
+
+    // A metaclass's instance declarations describe storage on the class object. Preserve those
+    // contracts (for example, `type.__dict__` is a final mapping proxy) instead of replacing them
+    // with the less precise declarations inherited from `object` by the represented class.
+    if object_ty.is_metaclass_instance(db, env)
+        && (type_member
+            .qualifiers
+            .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR)
+            || !object_ty
+                .instance_member(db, env, attribute)
+                .place
+                .is_undefined())
+    {
         return None;
     }
 

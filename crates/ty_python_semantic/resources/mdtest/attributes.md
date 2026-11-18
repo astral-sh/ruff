@@ -1183,6 +1183,20 @@ class Subclass(C):
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
 
+A class object is an instance of its metaclass, so it cannot overwrite a `ClassVar` declared on that
+metaclass:
+
+```py
+class Meta(type):
+    value: ClassVar[int] = 1
+
+def set_value(cls: Meta) -> None:
+    reveal_type(cls.value)  # revealed: int
+    cls.value = 2  # error: [invalid-attribute-access]
+
+Meta.value = 2  # ok
+```
+
 A `Final` class variable with no explicit type argument keeps its literal type.
 
 ```py
@@ -1774,6 +1788,49 @@ DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
 DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
 ```
 
+## Replacing initializers through class-object types
+
+`type` and `type[object]` describe class objects. Replacing their initializer uses the class's
+initializer contract, rather than the metaclass constructor that creates the class.
+
+```py
+def reset(cls: type) -> None:
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = object.__init__  # ok
+    cls.__init__ = None  # error: [invalid-assignment]
+
+def reset_object(cls: type[object]) -> None:
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = object.__init__  # ok
+    cls.__init__ = None  # error: [invalid-assignment]
+```
+
+The same distinction applies when the metaclass is known. Its constructor accepts the class name,
+bases, and namespace; those parameters do not describe how instances of the class are initialized.
+
+```py
+class Meta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None: ...
+
+def reset_custom(cls: Meta) -> None:
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = object.__init__  # ok
+    cls.__init__ = Meta.__init__  # error: [invalid-assignment]
+```
+
+Narrowing the metaclass preserves the initializer of a known instance class:
+
+```py
+class Known:
+    def __init__(self, value: int) -> None: ...
+
+def reset_known(cls: type[Known]) -> None:
+    if isinstance(cls, Meta):
+        reveal_type(cls.__init__)  # revealed: def __init__(self, value: int) -> None
+        cls.__init__ = cls.__init__  # ok
+        cls.__init__ = Meta.__init__  # error: [invalid-assignment]
+```
+
 ## Shadowing static methods on instances
 
 ### Nominal instances
@@ -1912,6 +1969,15 @@ class Meta1:
 class C1(metaclass=Meta1): ...
 
 reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
+```
+
+The built-in metaclass exposes a read-only class namespace. Its `Final` declaration takes precedence
+over the writable instance dictionary declared on `object`:
+
+```py
+def class_namespace(cls: type) -> None:
+    reveal_type(cls.__dict__)  # revealed: MappingProxyType[str, Any]
+    cls.__dict__ = cls.__dict__  # error: [invalid-assignment] "Cannot assign to final attribute `__dict__`"
 ```
 
 A dynamically-created metaclass can define methods with the same names as methods in the class it
@@ -2182,7 +2248,25 @@ def read_generated(value: TGenerated) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
-This also lets a generic metaclass method rely on a protocol describing the classes it accepts:
+An inherited `Self` annotation in metaclass instance storage refers to the class object, not an
+instance constructed by that class:
+
+```py
+from typing_extensions import Self
+
+class PeerStorage:
+    peer: Self
+
+class PeerMeta(PeerStorage, type): ...
+
+def reset_peer(cls: PeerMeta) -> None:
+    reveal_type(cls.peer)  # revealed: PeerMeta
+    cls.peer = cls  # ok
+    cls.peer = object()  # error: [invalid-assignment]
+```
+
+Metaclass instance storage also lets a generic method rely on a protocol describing the classes it
+accepts:
 
 ```py
 from typing import Iterator, Protocol, TypeVar
@@ -4974,6 +5058,15 @@ Frozen.new = 1  # error: [invalid-assignment] "Cannot assign to unresolved attri
 
 # TODO: terminal setters should also prevent writes to declared attributes.
 Frozen.existing = 2
+```
+
+Through a metaclass instance annotation, the terminal setter blocks both new attributes and
+replacements of inherited attributes:
+
+```py
+def set_frozen(cls: FrozenMeta) -> None:
+    cls.new = 1  # error: [invalid-assignment]
+    cls.__init__ = object.__init__  # error: [invalid-assignment]
 ```
 
 A class without a custom metaclass still produces an error for an unknown attribute:

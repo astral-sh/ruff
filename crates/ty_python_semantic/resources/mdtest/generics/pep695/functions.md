@@ -4660,6 +4660,42 @@ def writable[T: Writable](obj: T):
     obj.__module__ = "custom"  # no diagnostic
 ```
 
+## Class-object writes after narrowing
+
+Narrowing a type variable to a class object permits replacing its initializer, including when the
+type variable is bounded by `Callable`. The initializer still requires a callable value.
+
+```py
+from collections.abc import Callable
+
+def narrowed[T](obj: T) -> None:
+    if isinstance(obj, type):
+        reveal_type(obj.__init__)  # revealed: def __init__(self) -> None
+        obj.__init__ = obj.__init__  # ok
+        obj.__init__ = None  # error: [invalid-assignment]
+
+def narrowed_callable[F: Callable[..., object]](obj: F) -> None:
+    if isinstance(obj, type):
+        reveal_type(obj.__init__)  # revealed: def __init__(self) -> None
+        obj.__init__ = obj.__init__  # ok
+        obj.__init__ = None  # error: [invalid-assignment]
+
+def class_object[T](cls: type[T]) -> None:
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = None  # error: [invalid-assignment]
+```
+
+A metaclass bound already establishes that the receiver is a class object:
+
+```py
+class Meta(type): ...
+
+def metaclass_bound[M: Meta](cls: M) -> None:
+    reveal_type(cls.__init__)  # revealed: def __init__(self) -> None
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = None  # error: [invalid-assignment]
+```
+
 ## Attribute access on TypeVars bounded by `type[...]`
 
 Regression test for <https://github.com/astral-sh/ty/issues/3782>.
