@@ -231,7 +231,7 @@ pub fn check_path(
                     package,
                     source_type,
                     cell_offsets,
-                    target_version.linter_version(),
+                    target_version,
                     &context,
                 );
             }

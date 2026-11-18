@@ -3292,6 +3292,61 @@ lambda: fu
                 .with_target_version(ruff_python_ast::PythonVersion::PY312),
         );
         assert_eq!(diagnostics.len(), 2);
+
+        // When target-version is unset, syntax checking and future-import classification default
+        // to the latest Python version, so relative imports from `.__future__` are treated as
+        // ordinary imports (reporting F401 for unused names).
+        let diagnostics = test_snippet(
+            r"
+            from .__future__ import division
+            ",
+            &LinterSettings::for_rule(Rule::UnusedImport),
+        );
+        assert_eq!(diagnostics.len(), 1);
+
+        // On Python 3.12, relative imports from `__future__` are future imports, so F401 is not triggered.
+        let diagnostics = test_snippet(
+            r"
+            from .__future__ import division
+            ",
+            &LinterSettings::for_rule(Rule::UnusedImport)
+                .with_target_version(ruff_python_ast::PythonVersion::PY312),
+        );
+        assert!(diagnostics.is_empty());
+
+        // On Python 3.12, with a relative future required import, I002 and PYI044 agree that stubs
+        // are exempt from `__future__` imports, avoiding autofix loops.
+        let source_kind = SourceKind::Python {
+            code: "x: int\n".to_string(),
+            is_stub: true,
+        };
+        let (diagnostics, _) = test_contents(
+            &source_kind,
+            Path::new("test.pyi"),
+            &LinterSettings {
+                isort: crate::rules::isort::settings::Settings {
+                    required_imports: std::collections::BTreeSet::from_iter([
+                        ruff_python_semantic::NameImport::ImportFrom(
+                            ruff_python_semantic::MemberNameImport {
+                                module: Some("__future__".to_string()),
+                                name: ruff_python_semantic::Alias {
+                                    name: "annotations".to_string(),
+                                    as_name: None,
+                                },
+                                level: 1,
+                            },
+                        ),
+                    ]),
+                    ..crate::rules::isort::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules([
+                    Rule::MissingRequiredImport,
+                    Rule::FutureAnnotationsInStub,
+                ])
+                .with_target_version(ruff_python_ast::PythonVersion::PY312)
+            },
+        );
+        assert!(diagnostics.is_empty());
     }
 
     #[test]

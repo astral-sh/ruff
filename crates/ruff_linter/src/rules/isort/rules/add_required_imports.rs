@@ -111,7 +111,7 @@ fn add_required_import(
     }
 
     // We don't need to add `__future__` imports to stubs.
-    if source_type.is_stub() && required_import.is_future_import() {
+    if source_type.is_stub() && required_import.is_future_import(target_version) {
         return;
     }
 

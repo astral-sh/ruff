@@ -39,7 +39,7 @@ impl Violation for FutureAnnotationsInStub {
 
 /// PYI044
 pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
-    if !target.is_future_import(checker.target_version()) {
+    if !target.is_future_import(checker.parser_version()) {
         return;
     }
 
