@@ -6293,6 +6293,19 @@ assert_type(out, tuple[int, ...])
 assert_type(swapped_out, tuple[int, ...])
 ```
 
+A decorator accepts a callback with an integer input and a result constrained to `int` or `str`.
+
+```py
+def decorate_value[A: int, B: (int, str)](f: Callable[[A], B]) -> Callable[[A], B]:
+    return f
+
+def identity_value[T](value: T) -> T:
+    return value
+
+# TODO: Since identity_value returns its argument, the decorated call should infer int.
+reveal_type(decorate_value(identity_value)(1))  # revealed: int | str
+```
+
 Composing two identity functions relates three type parameters without fixing a concrete element
 type.
 

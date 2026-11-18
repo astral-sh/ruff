@@ -5948,6 +5948,19 @@ out = common(identity)(())
 assert_type(out, tuple[int, ...])
 ```
 
+A decorator accepts a callback with an integer input and a result constrained to `int` or `str`.
+
+```py
+def decorate_value(f: Callable[[IntT], IntOrStr]) -> Callable[[IntT], IntOrStr]:
+    return f
+
+def identity_value(value: A) -> A:
+    return value
+
+# TODO: Since identity_value returns its argument, the decorated call should infer int.
+reveal_type(decorate_value(identity_value)(1))  # revealed: int | str
+```
+
 Composing two identity functions relates three type parameters without fixing a concrete element
 type.
 
