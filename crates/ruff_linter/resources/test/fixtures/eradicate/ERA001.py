@@ -113,3 +113,9 @@ print(1)
 def foo():
 	# testing: Foo Bar Baz
 	...
+
+
+# Compact dependency version notes should pass. Spaced comparisons still trigger ERA001.
+# django>=4.2
+# django<=4.2
+# django >= 4.2

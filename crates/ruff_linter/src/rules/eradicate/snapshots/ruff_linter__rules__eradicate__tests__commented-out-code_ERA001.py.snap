@@ -326,3 +326,17 @@ help: Remove commented-out code
 78 |
    |
 note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+ERA001 [*] Found commented-out code
+   --> ERA001.py:121:1
+    |
+119 | # django>=4.2
+120 | # django<=4.2
+121 | # django >= 4.2
+    | ^^^^^^^^^^^^^^^
+help: Remove commented-out code
+    |
+120 | # django<=4.2
+    - # django >= 4.2
+    |
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically

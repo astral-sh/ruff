@@ -52,6 +52,11 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             #   not declared here since we use `.is_match()`.
         |   language=[-_.a-zA-Z0-9]+
 
+            # Compact dependency constraints such as `django>=4.2` also parse as
+            # Python comparisons. Match the whole comment to keep detecting
+            # spaced comparisons and larger expressions.
+        |   [A-Za-z][A-Za-z0-9_]*[<>]=[0-9]+(?:\.[0-9]+)+\z
+
         )
         ",
     )
@@ -275,6 +280,22 @@ mod tests {
         assert!(!comment_contains_code("#coding= utf-8", &[]));
         assert!(!comment_contains_code("# coding: utf-8", &[]));
         assert!(!comment_contains_code("# encoding: utf8", &[]));
+    }
+
+    #[test]
+    fn comment_contains_compact_version_constraints() {
+        assert!(!comment_contains_code("# django>=4.2", &[]));
+        assert!(!comment_contains_code("# django<=4.2", &[]));
+        assert!(!comment_contains_code("# typing_extensions>=4.2", &[]));
+
+        assert!(comment_contains_code("# django >= 4.2", &[]));
+        assert!(comment_contains_code("# django >=4.2", &[]));
+        assert!(comment_contains_code("# django>= 4.2", &[]));
+        assert!(comment_contains_code("# retries>=3", &[]));
+        assert!(comment_contains_code("# django=4.2", &[]));
+        assert!(comment_contains_code("# django==4.2", &[]));
+        assert!(comment_contains_code("# settings.django>=4.2", &[]));
+        assert!(comment_contains_code("# django>=4.2 or fallback()", &[]));
     }
 
     #[test]
