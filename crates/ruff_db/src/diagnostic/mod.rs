@@ -970,8 +970,8 @@ pub enum DiagnosticId {
     /// A PEP 723 script contains invalid metadata or configuration.
     InvalidScriptMetadata,
 
-    /// Metadata could not be loaded from uv.
-    UvMetadata,
+    /// The project manager could not provide the Python environment or dependency metadata.
+    ProjectManager,
 
     /// An `include` glob without any patterns.
     ///
@@ -1106,7 +1106,7 @@ impl DiagnosticId {
             DiagnosticId::RenamedRule => "renamed-rule",
             DiagnosticId::InvalidGlob => "invalid-glob",
             DiagnosticId::InvalidScriptMetadata => "invalid-script-metadata",
-            DiagnosticId::UvMetadata => "uv-metadata",
+            DiagnosticId::ProjectManager => "project-manager",
             DiagnosticId::EmptyInclude => "empty-include",
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",

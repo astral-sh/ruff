@@ -967,6 +967,7 @@ mod uv_metadata {
     #[cfg(feature = "test-uv")]
     use lsp_types::Message;
     use lsp_types::{Code, PublishDiagnosticsNotification};
+    use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::system::SystemPath;
     use ruff_python_trivia::textwrap::dedent;
     use serde_json::json;
@@ -1066,7 +1067,7 @@ package = "invalid"
         assert_eq!(diagnostics[&event.uri].len(), 1);
         assert_eq!(
             diagnostics[&event.uri][0].code,
-            Some(Code::String("uv-metadata".into()))
+            Some(Code::String(DiagnosticId::ProjectManager.as_str().into()))
         );
 
         server.write_file("src/pyproject.toml", manifest)?;
@@ -1120,7 +1121,7 @@ package = "invalid"
 
         server.open_text_document(script, source, 1);
 
-        // An attempted synchronization would replace this with a `uv-metadata` error.
+        // An attempted synchronization would replace this with a `project-manager` error.
         let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
         assert_eq!(diagnostics.uri, server.file_uri(script));
         assert_eq!(
@@ -1177,7 +1178,7 @@ package = "invalid"
 
         let synchronized = server.await_notification::<PublishDiagnosticsNotification>();
         assert!(synchronized.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == Some(Code::String("uv-metadata".to_string()))
+            diagnostic.code == Some(Code::String(DiagnosticId::ProjectManager.as_str().into()))
         }));
         assert!(!synchronized.diagnostics.iter().any(|diagnostic| {
             diagnostic.code == Some(Code::String("unresolved-reference".to_string()))

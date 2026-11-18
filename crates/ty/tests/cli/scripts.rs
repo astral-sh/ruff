@@ -1536,7 +1536,7 @@ fn unavailable_uv_reports_metadata_error() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[uv-metadata]: Failed to invoke `uv workspace metadata`: No such file or directory (os error 2)
+    error[project-manager]: Failed to invoke `uv workspace metadata`: No such file or directory (os error 2)
     --> script.py:3:1
 
     Found 1 diagnostic
@@ -2151,7 +2151,7 @@ mod uv_metadata {
         success: false
         exit_code: 1
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with `exit status: 1`
+        error[project-manager]: `uv workspace metadata` failed with `exit status: 1`
         --> script.py:2:1
         info: No solution found when resolving dependencies
           cause: Because missing-script-dependency was not found in the cache and you require missing-script-dependency==99.0.0, we can conclude that your requirements are unsatisfiable.

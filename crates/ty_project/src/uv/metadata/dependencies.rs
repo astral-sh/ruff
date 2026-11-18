@@ -303,7 +303,7 @@ pub(crate) enum DependencyMetadataError {
 impl DependencyMetadataError {
     pub(crate) fn to_diagnostic(&self, kind: DependencyProjectKind) -> Diagnostic {
         let mut diagnostic = Diagnostic::new(
-            DiagnosticId::UvMetadata,
+            DiagnosticId::ProjectManager,
             Severity::Warning,
             "Failed to load uv dependency metadata",
         );

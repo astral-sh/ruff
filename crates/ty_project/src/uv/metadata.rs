@@ -132,7 +132,7 @@ impl UvMetadataError {
         match self {
             Self::CommandFailed { status, stderr } => {
                 let mut diagnostic = Diagnostic::new(
-                    DiagnosticId::UvMetadata,
+                    DiagnosticId::ProjectManager,
                     severity,
                     format_args!("`uv workspace metadata` failed with `{status}`"),
                 );
@@ -148,7 +148,7 @@ impl UvMetadataError {
                 }
                 diagnostic
             }
-            _ => Diagnostic::new(DiagnosticId::UvMetadata, severity, self.to_string()),
+            _ => Diagnostic::new(DiagnosticId::ProjectManager, severity, self.to_string()),
         }
     }
 }

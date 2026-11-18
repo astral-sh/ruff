@@ -1172,7 +1172,7 @@ unclosed table, expected `]`
 
         let diagnostics = db.project().check_settings(&db);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::ProjectManager);
         assert_eq!(diagnostics[0].severity(), Severity::Warning);
         assert_eq!(
             diagnostics[0].concise_message().to_string(),
@@ -1496,7 +1496,7 @@ unclosed table, expected `]`
         system.memory_file_system().create_directory_all(&root)?;
         let mut workspace = uv_workspace(&root, &system)?;
         workspace.error = Some(Diagnostic::new(
-            DiagnosticId::UvMetadata,
+            DiagnosticId::ProjectManager,
             Severity::Warning,
             "uv metadata refresh failed",
         ));
@@ -1512,7 +1512,7 @@ unclosed table, expected `]`
         assert!(project.metadata(&db).uv_workspace_metadata().is_some());
         let diagnostics = project.check_settings(&db);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::ProjectManager);
         assert_eq!(diagnostics[0].severity(), Severity::Warning);
         assert_eq!(
             diagnostics[0].concise_message().to_string(),
