@@ -6,7 +6,7 @@ use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{
-    KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
+    KnownModule, Module, ModuleName, ResolverEnvironment, file_to_module, resolve_module_confident,
 };
 
 use crate::dunder_all::dunder_all_names;
@@ -663,6 +663,34 @@ enum BuiltinVisibility {
     RuntimeOnly,
 }
 
+/// Resolves the project builtin module, or the standard builtin module when no project override exists.
+///
+/// The returned modules are mutually exclusive. When a project override exists, resolve standard
+/// builtins only if a requested symbol requires fallback.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn resolve_builtins_modules<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+) -> (Option<Module<'db>>, Option<Module<'db>>) {
+    let project_builtins = ModuleName::new_static("__builtins__")
+        .and_then(|name| resolve_module_confident(db, resolver_environment, &name));
+    let standard_builtins = if project_builtins.is_none() {
+        resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
+    } else {
+        None
+    };
+    (project_builtins, standard_builtins)
+}
+
+/// Resolves standard builtins only when a project override does not supply a requested symbol.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn fallback_builtins_module<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+) -> Option<Module<'db>> {
+    resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
+}
+
 /// Resolves project-level builtins before standard builtins and optionally hides typing-only names.
 ///
 /// Returns the supplying module's scope together with the symbol so inference and IDE lookups can
@@ -704,16 +732,13 @@ fn builtins_symbol_impl<'db>(
         Some((scope, found_symbol))
     };
     // If this symbol is not present in project-level builtins, search in the default ones.
-    resolve_module_confident(
-        db,
-        resolver_environment,
-        &ModuleName::new_static("__builtins__").unwrap(),
-    )
-    .and_then(resolver)
-    .or_else(|| {
-        resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
-            .and_then(resolver)
-    })
+    let (project_builtins, standard_builtins) = resolve_builtins_modules(db, resolver_environment);
+    if let Some(project_builtins) = project_builtins {
+        resolver(project_builtins)
+            .or_else(|| fallback_builtins_module(db, resolver_environment).and_then(resolver))
+    } else {
+        standard_builtins.and_then(resolver)
+    }
 }
 
 /// Lookup the type of `symbol` in a given known module.

@@ -1157,6 +1157,37 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
 }
 
 #[test]
+fn builtin_override_updates_incrementally() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/main.py", "value = ord('a')\nfallback = len('a')\n")?;
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    let assert_types = |db: &TestDb, expected_value: &str| {
+        for (name, expected) in [("value", expected_value), ("fallback", "Literal[1]")] {
+            let ty = global_symbol(db, main, name).place.expect_type();
+            assert_eq!(
+                ty.display(db, &db.program_environment()).to_string(),
+                expected
+            );
+        }
+    };
+
+    assert_types(&db, "int");
+    let original = "def ord(value: str) -> str: ...\n";
+    db.write_file("/src/__builtins__.pyi", original)?;
+    assert_types(&db, "str");
+    db.write_file(
+        "/src/__builtins__.pyi",
+        "def ord(value: str) -> bool: ...\n",
+    )?;
+    assert_types(&db, "bool");
+    db.write_file("/src/__builtins__.pyi", original)?;
+    assert_types(&db, "str");
+    db.remove_file("/src/__builtins__.pyi")?;
+    assert_types(&db, "int");
+    Ok(())
+}
+
+#[test]
 fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_files([
