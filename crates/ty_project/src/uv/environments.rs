@@ -883,7 +883,7 @@ mod tests {
             r"
             # /// script
             # [tool.ty]
-            # use-uv-for-scripts = false
+            # project-manager.script = 'none'
             # ///
 
             import project_dependency
@@ -908,7 +908,7 @@ mod tests {
             r"
             # /// script
             # [tool.ty]
-            # use-uv-for-scripts = true
+            # project-manager.script = 'uv'
             # ///
 
             import project_dependency

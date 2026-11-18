@@ -154,7 +154,7 @@ fn closed_script_import_is_preserved_before_uv_sync() -> anyhow::Result<()> {
             "workspace/ty.toml",
             dedent(
                 r"
-                use-uv-for-scripts = true
+                project-manager.script = 'uv'
 
                 [environment]
                 root = ['src']
