@@ -123,7 +123,7 @@ def call_both(f: Long | Short, g: Short | Long) -> None:
 A function that takes just one `int` is assignable to `Short`, so either union accepts it. The `...`
 in `Short` allows `f(1, "two")` to type-check even though `takes_one(1, "two")` would raise
 `TypeError`. Conversely, `takes_one(1)` succeeds, but `f(1)` is rejected because `f` could be
-`Long`.
+`Long`, which requires two arguments.
 
 ```py
 def takes_one(value: int) -> int:
