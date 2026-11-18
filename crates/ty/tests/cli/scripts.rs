@@ -1536,18 +1536,23 @@ fn unavailable_uv_reports_metadata_error() -> anyhow::Result<()> {
 
     let mut command = case.command();
     command.arg("script.py").env("PATH", "");
-    assert_cmd_snapshot!(command, @"
+    assert_cmd_snapshot!(command, @r#"
     success: false
     exit_code: 1
     ----- stdout -----
     error[project-manager]: Setting up the Python environment with uv failed: could not find `uv` on `PATH`
     --> script.py:2:1
+    info: ty uses uv to install this script's dependencies because `project-manager.script` is set to `"uv"`
+     --> script.py:5:28
+      |
+    5 | # project-manager.script = "uv"
+      |                            ^^^^ configured here
     info: To install uv, see https://docs.astral.sh/uv/
 
     Found 1 diagnostic
 
     ----- stderr -----
-    ");
+    "#);
 
     command.env(EnvVars::UV, "missing-uv-executable");
     assert_cmd_snapshot!(command, @"

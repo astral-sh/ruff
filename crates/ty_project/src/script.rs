@@ -17,7 +17,7 @@ use ty_python_semantic::dependency::DependencyMetadata;
 use crate::metadata::options::{AnalysisOptionsContext, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
 use crate::metadata::value::RelativePathBuf;
-use crate::uv::{DependencyMetadataError, UvMetadata, script_environment};
+use crate::uv::{DependencyMetadataError, UvMetadata, add_uv_setting_info, script_environment};
 use crate::{Db, ProjectMetadata};
 
 /// A standalone PEP 723 script and its resolved settings.
@@ -88,7 +88,7 @@ impl get_size2::GetSize for Script<'_> {}
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     // Ordinary files must not depend on project membership.
-    script_tag(db, file)?;
+    let tag = script_tag(db, file)?;
     if !crate::is_project_file(db, file) {
         return None;
     }
@@ -106,18 +106,6 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     };
 
     let environment = script_environment(db, file);
-
-    if let Some(diagnostic) =
-        environment.and_then(|environment| environment.initialization_error(db))
-    {
-        let mut diagnostic = diagnostic.clone();
-        if let Some(tag) = script_tag(db, file) {
-            let mut annotation = Annotation::primary(Span::from(file).with_range(tag.range()));
-            annotation.hide_snippet(true);
-            diagnostic.annotate(annotation);
-        }
-        diagnostics.report_invalid(diagnostic);
-    }
 
     let project_metadata = db.project().metadata(db);
     let (mut options, root) = if let Some(inline_options) = inline_script_options(db, file) {
@@ -173,6 +161,25 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
             project_metadata.root(),
         )
     };
+    if let Some(error) = environment.and_then(|environment| environment.initialization_error(db)) {
+        let mut diagnostic = error.diagnostic.clone();
+        if error.explain_uv_setting
+            && let Some(setting) = options.script_project_manager()
+        {
+            add_uv_setting_info(
+                db,
+                &mut diagnostic,
+                setting,
+                "project-manager.script",
+                "install this script's dependencies",
+            );
+        }
+        let mut annotation = Annotation::primary(Span::from(file).with_range(tag.range()));
+        annotation.hide_snippet(true);
+        diagnostic.annotate(annotation);
+        diagnostics.report_invalid(diagnostic);
+    }
+
     if options.script_uses_uv() == Some(true) {
         // Isolate the script from the project's Python environment, even before uv provides
         // the script's own environment.

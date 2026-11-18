@@ -616,7 +616,14 @@ pub(crate) struct ScriptEnvironment {
     ///
     /// `None` if synchronization has not completed or completed successfully.
     #[returns(as_ref)]
-    pub(crate) initialization_error: Option<Diagnostic>,
+    pub(crate) initialization_error: Option<ScriptInitializationError>,
+}
+
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) struct ScriptInitializationError {
+    pub(crate) diagnostic: Diagnostic,
+    /// The setting's source can move without another uv synchronization.
+    pub(crate) explain_uv_setting: bool,
 }
 
 struct UvEnvironmentsInner {
@@ -736,10 +743,16 @@ fn apply_sync_result(
         Ok(metadata) => (Some(metadata), None),
         Err(error) => (
             None,
-            Some(error.to_diagnostic(
-                Severity::Error,
-                "Setting up the Python environment with uv failed",
-            )),
+            Some(ScriptInitializationError {
+                diagnostic: error.to_diagnostic(
+                    Severity::Error,
+                    "Setting up the Python environment with uv failed",
+                ),
+                explain_uv_setting: matches!(
+                    error,
+                    UvMetadataError::Lookup(_) | UvMetadataError::UnsupportedVersion { .. }
+                ),
+            }),
         ),
     };
 

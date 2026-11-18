@@ -150,9 +150,13 @@ impl Options {
         }
     }
 
+    pub(crate) fn script_project_manager(&self) -> Option<&RangedValue<ScriptProjectManager>> {
+        self.project_manager.as_ref()?.script.as_ref()
+    }
+
     pub(crate) fn script_uses_uv(&self) -> Option<bool> {
-        let manager = self.project_manager.as_ref()?.script.as_deref()?;
-        Some(*manager == ScriptProjectManager::Uv)
+        self.script_project_manager()
+            .map(|manager| **manager == ScriptProjectManager::Uv)
     }
 
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
