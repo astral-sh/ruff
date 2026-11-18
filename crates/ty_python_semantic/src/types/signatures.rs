@@ -782,8 +782,7 @@ impl<'db> ReceiverConstraints<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
-        provenance: ConstraintProvenance,
+        compare: impl Fn(Type<'db>, Type<'db>) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         if self.impossible {
             return ConstraintSet::from_bool(builder, false);
@@ -804,10 +803,7 @@ impl<'db> ReceiverConstraints<'db> {
                 }) {
                     ConstraintSet::from_bool(builder, false)
                 } else {
-                    // The cached query evaluates recursive receiver relations coinductively.
-                    let when = receiver
-                        .when_constraint_set_assignable_to_owned(db, env, annotation, inferable);
-                    builder.load_with_provenance(db, env, &when, provenance)
+                    compare(receiver, annotation)
                 }
             })
     }
@@ -1692,13 +1688,13 @@ impl<'db> Signature<'db> {
 
         let inferable = self.inferable_typevars(db);
         let constraints = ConstraintSetBuilder::new();
-        let when = receiver_constraints.when_assignable(
-            db,
-            env,
-            &constraints,
-            inferable,
-            ConstraintProvenance::INFERRED,
-        );
+        let when =
+            receiver_constraints.when_assignable(db, env, &constraints, |receiver, annotation| {
+                // A stand-alone receiver check has no active signature comparison to reuse.
+                let when = receiver
+                    .when_constraint_set_assignable_to_owned(db, env, annotation, inferable);
+                constraints.load_with_provenance(db, env, &when, ConstraintProvenance::INFERRED)
+            });
 
         match when.solutions(db, env, inferable) {
             Ok(Solutions::Unsatisfiable(_)) => return None,
@@ -2085,12 +2081,35 @@ impl<'db> Signature<'db> {
         let Some(constraints) = self.receiver_constraints() else {
             return checker.always();
         };
+        // A receiver can refer to the protocol whose method we are comparing. Keep these checks
+        // in the same relation so the receiver does not restart comparisons of those signatures.
+        let mut assignability_checker = checker.clone();
+        assignability_checker.relation = TypeRelation::Assignability;
+        assignability_checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         let assignability = constraints.when_assignable(
             db,
             checker.env,
             checker.constraints,
-            checker.inferable,
-            checker.provenance,
+            |receiver, annotation| {
+                // Computing receiver eligibility is silent. Isolate it while collecting
+                // diagnostics so its recursive comparisons cannot change the explanation.
+                if checker.is_context_collection_enabled() {
+                    let when = receiver.when_constraint_set_assignable_to_owned(
+                        db,
+                        checker.env,
+                        annotation,
+                        checker.inferable,
+                    );
+                    checker.constraints.load_with_provenance(
+                        db,
+                        checker.env,
+                        &when,
+                        checker.provenance,
+                    )
+                } else {
+                    assignability_checker.check_type_pair(db, receiver, annotation)
+                }
+            },
         );
         if checker.relation == TypeRelation::Assignability {
             return assignability;
