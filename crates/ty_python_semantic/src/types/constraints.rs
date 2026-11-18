@@ -3403,6 +3403,7 @@ struct InteriorNodeData {
 struct CandidateTypeVarSolver<'db> {
     lower: FxIndexSet<(ConstraintProvenance, Type<'db>)>,
     upper: UpperBound<'db>,
+    equivalence: Option<(ConstraintProvenance, Type<'db>)>,
     has_declared_evidence: bool,
     has_declared_lower_evidence: bool,
 }
@@ -3425,6 +3426,8 @@ impl<'db> CandidateTypeVarSolver<'db> {
             }
             AtomicConstraint::ConcreteEquivalence(equivalence) => {
                 debug_assert!(bound_typevar.is_same_typevar_as(db, equivalence.typevar));
+                self.equivalence
+                    .get_or_insert((equivalence.provenance, equivalence.bound));
                 self.add_lower(equivalence.provenance, equivalence.bound);
                 self.add_upper(equivalence.provenance, equivalence.bound);
             }
@@ -3482,6 +3485,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
         let Self {
             lower,
             mut upper,
+            equivalence,
             has_declared_evidence,
             has_declared_lower_evidence,
         } = self;
@@ -3550,6 +3554,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
             declared_lower,
             validity_lower,
             upper,
+            equivalence,
             has_declared_evidence,
             has_only_non_concrete_evidence,
             selected_declared_constraint: None,
@@ -3646,6 +3651,8 @@ pub(crate) struct CandidateTypeVarSolution<'db> {
     declared_lower: Option<Type<'db>>,
     validity_lower: Type<'db>,
     upper: UpperBound<'db>,
+    // Retain an explicit equivalence even if derived lower bounds widen its syntactic union.
+    equivalence: Option<(ConstraintProvenance, Type<'db>)>,
     /// Whether any bound originates from declared evidence.
     has_declared_evidence: bool,
     /// Whether every original evidence bound is gradual or another `TypeVar`.
@@ -3668,6 +3675,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
             declared_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
+            equivalence: Some((ConstraintProvenance::INFERRED, ty)),
             has_declared_evidence: false,
             has_only_non_concrete_evidence: None,
             selected_declared_constraint: None,
@@ -4654,6 +4662,19 @@ impl<'db> CandidateSolutions<'db> {
         // should only be used as a fallback when no concrete type was inferred.
         if path_bound.lower_bound(source).is_some() {
             let lower = path_bound.effective_lower(db, env, source);
+            // An explicit static equivalence fixes the candidate. Choosing the aggregate lower
+            // bound instead can introduce redundant alternatives containing other inferable
+            // typevars, which can then be promoted independently of those typevars' solutions.
+            // Preserve gradual evidence rather than replacing it with a static equivalence.
+            if let Some((provenance, exact)) = path_bound.equivalence
+                && source.includes(provenance)
+                && exact != lower
+                && exact.is_fully_static(db, env)
+                && lower.is_fully_static(db, env)
+                && path_bound.accepts_candidate(db, env, builder, exact)
+            {
+                return PathBoundSolution::Solved(exact);
+            }
             if !path_bound.upper.is_satisfied_by(db, env, source, lower) {
                 let mut storage = builder.storage.borrow_mut();
                 let (when_upper, source_order) =
@@ -6234,6 +6255,7 @@ mod tests {
             declared_lower: None,
             validity_lower: Type::Never,
             upper: UpperBound::unconstrained(),
+            equivalence: None,
             has_declared_evidence: false,
             has_only_non_concrete_evidence: None,
             selected_declared_constraint: None,
