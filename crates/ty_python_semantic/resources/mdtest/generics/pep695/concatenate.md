@@ -872,3 +872,30 @@ def pick(f):
 def check[**P](callback: Callable[Concatenate[str, P], None]) -> None:
     reveal_type(pick(callback))  # revealed: None
 ```
+
+### Matching generic callbacks with `Concatenate`
+
+A generic wrapper accepts the leading `int` and can specialize its remaining arguments to match the
+parameter list required by the decorator.
+
+```py
+from typing import Callable, Concatenate
+
+def register[**P](wrapper: Callable[Concatenate[int, P], int]) -> Callable[P, int]:
+    raise NotImplementedError
+
+@register  # ok
+def invoke[**Q](value: int, /, *args: Q.args, **kwargs: Q.kwargs) -> int:
+    return value
+```
+
+A callback whose leading parameter is bounded by `int` cannot accept the required `str`. The
+remaining parameter list does not affect the mismatch.
+
+```py
+def accepts_str[**P](callback: Callable[Concatenate[str, P], int]) -> None: ...
+def identity[T: int](value: T, /) -> T:
+    return value
+
+accepts_str(identity)  # error: [invalid-argument-type]
+```

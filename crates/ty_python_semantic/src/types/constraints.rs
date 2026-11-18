@@ -859,6 +859,32 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node == other.node || (is_subset(self, other) && is_subset(other, self))
     }
 
+    /// Projects out callable-local typevars that the outer solve cannot recover from a captured
+    /// ParamSpec. A failed prefix check or a relation between two ParamSpecs can produce
+    /// constraints without a captured signature.
+    pub(super) fn reduce_uncaptured_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        outer: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Self {
+        if self.node.is_terminal() || inferable == outer {
+            return self;
+        }
+        let captured_scope = {
+            let storage = self.builder.storage.borrow();
+            outer.with_captured_paramspecs(db, &storage, || self.node.atomic_constraints(&storage))
+        };
+        let to_remove = TypeVarSet::from_typevars(
+            db,
+            inferable
+                .iter(db)
+                .filter(|typevar| !typevar.is_inferable(db, captured_scope)),
+        );
+        self.reduce_inferable(db, env, self.builder, to_remove, inferable)
+    }
+
     /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
     /// were inferable when this constraint set was created, and which should be abstracted away.
     /// Those typevars will be removed from the constraint set, and the constraint set will return

@@ -1555,6 +1555,39 @@ def check(callback: Callable[Concatenate[str, P], None]) -> None:
     reveal_type(pick(callback))  # revealed: None
 ```
 
+### Matching generic callbacks with `Concatenate`
+
+A decorator can accept a generic wrapper that forwards its remaining arguments to a callback.
+
+```py
+from typing import Callable, Concatenate, ParamSpec
+
+P = ParamSpec("P")
+Q = ParamSpec("Q")
+
+def register(wrapper: Callable[Concatenate[Callable[..., int], P], int]) -> Callable[P, int]:
+    raise NotImplementedError
+
+@register  # ok
+def invoke(callback: Callable[Q, int], /, *args: Q.args, **kwargs: Q.kwargs) -> int:
+    return callback(*args, **kwargs)
+```
+
+A callback whose leading parameter is bounded by `int` cannot accept the required `str`. The
+remaining parameter list does not affect the mismatch.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=int)
+
+def accepts_str(callback: Callable[Concatenate[str, P], int]) -> None: ...
+def identity(value: T, /) -> T:
+    return value
+
+accepts_str(identity)  # error: [invalid-argument-type]
+```
+
 ### Parameter lists inferred from consumers
 
 A consumer of a callback supplies an upper bound on the callback's parameter list.
