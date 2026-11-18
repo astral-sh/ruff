@@ -1596,6 +1596,27 @@ update(FrozenField(value=1))  # error: [invalid-argument-type]
 read(FrozenField(value=1))  # ok
 ```
 
+## Frozen models and variance
+
+### Python 3.13 and later
+
+On Python 3.13 and later, the synthesized `__replace__` method takes field values as arguments. A
+frozen model is therefore invariant in the type of its generic field.
+
+```py
+from pydantic import BaseModel, ConfigDict
+
+class Animal(BaseModel): ...
+class Dog(Animal): ...
+
+class Frozen[T](BaseModel):
+    model_config = ConfigDict(frozen=True)
+    value: T
+
+def check(dog: Frozen[Dog]):
+    animal: Frozen[Animal] = dog  # error: [invalid-assignment]
+```
+
 ## Validation of default values
 
 At runtime, default values are *not* validated against the field type annotation, unless

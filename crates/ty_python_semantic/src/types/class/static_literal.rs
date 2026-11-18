@@ -3679,11 +3679,11 @@ impl<'db> StaticClassLiteral<'db> {
             // not considered here, since they don't use field types in their signatures. TODO:
             // ideally we'd have a single source of truth for information about synthesized
             // methods, so we just look them up normally and don't hardcode this knowledge here.
-            let is_frozen_dataclass_prior_to_313 = python_version <= PythonVersion::PY312
+            let is_frozen_prior_to_313 = python_version <= PythonVersion::PY312
                 && CodeGeneratorKind::from_static_class(db, self)
-                    .is_some_and(|kind| self.has_dataclass_param(db, kind, DataclassFlags::FROZEN));
+                    .is_some_and(|kind| kind.is_frozen(db, &env, self));
 
-            if is_namedtuple || is_frozen_dataclass_prior_to_313 {
+            if is_namedtuple || is_frozen_prior_to_313 {
                 TypeVarVariance::Covariant
             } else {
                 TypeVarVariance::Invariant

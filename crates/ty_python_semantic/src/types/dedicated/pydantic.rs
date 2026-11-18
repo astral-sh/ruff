@@ -86,7 +86,7 @@ impl<'db> ModelMetadata<'db> {
         field.or(self.config(db).strict).is_enabled()
     }
 
-    fn is_frozen(self, db: &'db dyn Db) -> bool {
+    pub(in crate::types) fn is_frozen(self, db: &'db dyn Db) -> bool {
         self.config(db).frozen.is_enabled()
     }
 
@@ -644,6 +644,35 @@ pub(in crate::types) fn setattr_behavior(
     let field_policy = CodeGeneratorKind::from_class(db, class.into())?;
     let metadata = field_policy.pydantic_metadata()?;
 
+    if !uses_base_model_setattr(db, env, class)? {
+        return Some(SetAttrBehavior::CustomSetAttr);
+    }
+
+    // Pydantic only checks the field's own `frozen` setting if the model is not frozen,
+    // so `Field(frozen=False)` cannot make a field of a frozen model mutable. Private
+    // attributes are not model fields, so their assignments are never checked.
+    let is_frozen = metadata.is_frozen(db)
+        || !is_private_attribute(attribute)
+            && class
+                .fields(db, None, field_policy)
+                .get(attribute)
+                .is_some_and(|field| {
+                    matches!(field.kind, FieldKind::Pydantic { frozen: true, .. })
+                });
+    Some(if is_frozen {
+        SetAttrBehavior::Frozen
+    } else {
+        SetAttrBehavior::NonFrozen
+    })
+}
+
+/// Check whether attribute assignments use Pydantic's setter. Return `None` if the MRO does not
+/// resolve to a known setter.
+pub(in crate::types) fn uses_base_model_setattr<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+) -> Option<bool> {
     // Pydantic checks the receiver's effective config in `BaseModel.__setattr__` rather than
     // generating a setter on each frozen model. A custom setter can replace that behavior.
     for base in class.iter_mro(db, None) {
@@ -653,28 +682,13 @@ pub(in crate::types) fn setattr_behavior(
         let base_class = base.into_class()?;
         let (base, _) = base_class.static_class_literal(db)?;
         if base.is_known(db, KnownClass::PydanticBaseModel) {
-            // Pydantic only checks the field's own `frozen` setting if the model is not frozen,
-            // so `Field(frozen=False)` cannot make a field of a frozen model mutable. Private
-            // attributes are not model fields, so their assignments are never checked.
-            let is_frozen = metadata.is_frozen(db)
-                || !is_private_attribute(attribute)
-                    && class
-                        .fields(db, None, field_policy)
-                        .get(attribute)
-                        .is_some_and(|field| {
-                            matches!(field.kind, FieldKind::Pydantic { frozen: true, .. })
-                        });
-            return Some(if is_frozen {
-                SetAttrBehavior::Frozen
-            } else {
-                SetAttrBehavior::NonFrozen
-            });
+            return Some(true);
         }
         if !base_class
             .own_class_member(db, env, None, "__setattr__")
             .is_undefined()
         {
-            return Some(SetAttrBehavior::CustomSetAttr);
+            return Some(false);
         }
     }
     None
