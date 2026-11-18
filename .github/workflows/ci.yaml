@@ -491,8 +491,6 @@ jobs:
         run: uv run --quiet --project=./scripts/ty_benchmark cargo run --quiet -p ty check --project=./scripts/ty_benchmark --color=always
       - name: Dogfood ty on scripts
         env:
-          # Enable experimental support for installing PEP 723 script dependencies.
-          TY_UV: scripts
           UV_LOCKED: "true"
           # Set `UV_PYTHON` to select the configured Python version for both the
           # uv command below and the uv subprocesses ty uses to install script

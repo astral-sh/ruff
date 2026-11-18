@@ -376,6 +376,9 @@ combine-as-imports = true
 "crates/ty_vendored/ty_extensions/*.pyi" = "py312"
 "scripts/*.py" = "py312"
 
+[tool.ty.project-manager]
+script = "uv"
+
 [[tool.ty.overrides]]
 include = [
     "scripts/*.py",
