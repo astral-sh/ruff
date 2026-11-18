@@ -55,8 +55,8 @@ use crate::types::attribute_write::{
     AssignmentAttributeMembers, assignment_attribute_members, nested_class_instance_override,
 };
 use crate::types::call::bind::{
-    ArgumentContextCache, ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
-    inferable_typevar_occurrences, requires_overload_evaluation,
+    ArgumentContextCache, ArgumentTypeContext, BindingError, CallableDescription, CheckTypesMode,
+    OverloadSet, inferable_typevar_occurrences, requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
@@ -6101,11 +6101,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             overload_candidates.push(candidate_overload_indices);
         });
 
+        let mut deferred_lambdas = SmallVec::<[usize; 2]>::new();
+        if fixpoint_iteration_limit > 0 {
+            for (index, (arg, &is_generic)) in
+                ast_arguments.clone().zip(&generic_arguments).enumerate()
+            {
+                if is_generic
+                    && let Some(parameters) = arg
+                        .value()
+                        .as_lambda_expr()
+                        .and_then(|lambda| lambda.parameters.as_deref())
+                    && (!parameters.posonlyargs.is_empty() || !parameters.args.is_empty())
+                {
+                    deferred_lambdas.push(index);
+                }
+            }
+        }
+
         let generic_arguments: SmallVec<_> = generic_arguments
             .into_iter()
             .enumerate()
             .filter_map(|(index, is_generic)| is_generic.then_some(index))
             .collect();
+
+        // Deferring every generic argument would leave no sibling to infer from.
+        if deferred_lambdas.len() == generic_arguments.len() {
+            deferred_lambdas.clear();
+        }
 
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets = call_expression_tcx
@@ -6169,6 +6191,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         &generic_arguments,
                         fixpoint_iteration_limit,
                         &overload_candidates,
+                        &deferred_lambdas,
                     )
                 }
             };
@@ -6421,6 +6444,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         generic_arguments: &SmallVec<[usize; 4]>,
         fixpoint_iteration_limit: usize,
         candidates: &OverloadSet,
+        deferred_lambdas: &[usize],
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let requires_overload_evaluation = requires_overload_evaluation(candidates);
@@ -6437,6 +6461,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut next_bindings = bindings.clone();
         let mut prev_argument_types = argument_types.clone();
 
+        // In `apply[T](f: Callable[[T], T], value: T)`, the expected return type can
+        // supply a guess for the lambda parameter that the inferred lambda signature then
+        // reinforces. Infer `value` first so the lambda can use its type for `T`.
+        let mut inferring_siblings = !deferred_lambdas.is_empty();
+        for &index in deferred_lambdas {
+            arguments_tcx[index] = None;
+        }
+
         let (converged_builder, converged_argument_types) = loop {
             let mut next_argument_types = argument_types.clone();
 
@@ -6447,10 +6479,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &mut next_argument_types,
                 &arguments_tcx,
                 infer_argument_ty,
-                if requires_overload_evaluation {
-                    // If there are multiple matching overloads, we will re-infer with the final set
-                    // of matching overloads after overload evaluation, and so can avoid the default
-                    // inference here.
+                if inferring_siblings || requires_overload_evaluation {
+                    // The sibling-only pass and overload evaluation both re-infer
+                    // the arguments before committing diagnostics.
                     CallArgumentInferenceMode::Speculate
                 } else {
                     CallArgumentInferenceMode::Commit
@@ -6481,7 +6512,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // The number of occurrences of inferable typevars forms an upper bound for the number
             // of fixpoint iterations, and so if the types have converged, or we have reached the
             // upper bound, we are done.
-            if inferred_types_converged || iteration == fixpoint_iteration_limit {
+            if !inferring_siblings
+                && (inferred_types_converged || iteration == fixpoint_iteration_limit)
+            {
                 break (speculative_builder, next_argument_types);
             }
 
@@ -6496,14 +6529,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // If the argument constraints have converged, the inferred types will be identical,
             // and so we can exit early.
-            if generic_arguments
-                .iter()
-                .all(|&index| arguments_tcx.get(index) == next_arguments_tcx.get(index))
+            if !inferring_siblings
+                && generic_arguments
+                    .iter()
+                    .all(|&index| arguments_tcx.get(index) == next_arguments_tcx.get(index))
             {
                 break (speculative_builder, next_argument_types);
             }
 
-            iteration += 1;
+            if inferring_siblings {
+                inferring_siblings = false;
+            } else {
+                iteration += 1;
+            }
             arguments_tcx = next_arguments_tcx;
             prev_argument_types = next_argument_types;
         };
@@ -6515,6 +6553,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &converged_argument_types,
             &self.dataclass_field_specifiers,
         );
+
+        // A callback can also widen `T`. For example, `apply(lambda _: None, "x")`
+        // admits a union even though `None` is incompatible with the initial `str`.
+        // Retry with all arguments contributing together if a deferred argument
+        // rejected that specialization. An unrelated error should preserve the
+        // parameter types already inferred for the lambda body.
+        if result.is_err() && !deferred_lambdas.is_empty() {
+            let mut retry = false;
+            next_bindings.visit_overload_set(candidates, &mut |overload, _| {
+                retry |= overload.errors().iter().any(|error| {
+                    matches!(
+                        error,
+                        BindingError::InvalidArgumentType { argument_index: Some(index), .. }
+                            | BindingError::SpecializationError { argument_index: Some(index), .. }
+                            if deferred_lambdas.contains(index)
+                    )
+                });
+            });
+            if retry {
+                return self.infer_and_check_argument_types_unified(
+                    ast_arguments,
+                    argument_types,
+                    infer_argument_ty,
+                    bindings,
+                    constraints,
+                    call_expression_tcx,
+                    generic_arguments,
+                    fixpoint_iteration_limit,
+                    candidates,
+                    &[],
+                );
+            }
+        }
 
         // If the set of candidate bindings contained multiple matching overloads, re-infer the argument
         // types against the final set of matching overloads, such that only the relevant diagnostics
