@@ -36,43 +36,43 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::MissingBlankLineAfterLastDocstringSection,
         Rule::IncorrectBlankLineAfterDocstringSummary,
         Rule::BlankLineBeforeClassDocstring,
-        Rule::BlankLinesBetweenHeaderAndContent,
-        Rule::NonCapitalizedSectionName,
-        Rule::MissingDashedUnderlineAfterSection,
+        Rule::BlankLinesBetweenDocstringSectionHeaderAndContent,
+        Rule::NonCapitalizedDocstringSectionName,
+        Rule::MissingDocstringSectionUnderline,
         Rule::DocstringStartsWithThis,
         Rule::EmptyDocstring,
         Rule::EmptyDocstringSection,
-        Rule::MissingTrailingPeriod,
-        Rule::MissingTerminalPunctuation,
+        Rule::MissingDocstringSummaryPeriod,
+        Rule::MissingDocstringSummaryPunctuation,
         Rule::EscapeSequenceInDocstring,
-        Rule::FirstWordUncapitalized,
+        Rule::UncapitalizedFirstWordOfDocstring,
         Rule::UnnecessaryMultilineDocstring,
         Rule::DocstringTabIndentation,
         Rule::MultilineDocstringSummaryOnSeparateLine,
         Rule::MultilineDocstringSummaryOnFirstLine,
         Rule::MissingNewLineAfterLastDocstringParagraph,
-        Rule::MissingNewLineAfterSectionName,
+        Rule::MissingNewLineAfterDocstringSectionName,
         Rule::BlankLineAfterFunctionDocstring,
         Rule::MissingBlankLineAfterDocstringSection,
         Rule::BlankLineBeforeFunctionDocstring,
         Rule::MissingBlankLineBeforeDocstringSection,
         Rule::SignatureInDocstring,
-        Rule::NonImperativeMood,
+        Rule::NonImperativeDocstringSummary,
         Rule::IncorrectBlankLineAfterClassDocstring,
         Rule::IncorrectBlankLineBeforeClassDocstring,
         Rule::OverIndentedDocstringLine,
         Rule::OverloadWithDocstring,
-        Rule::MissingSectionNameColon,
+        Rule::MissingDocstringSectionNameColon,
         Rule::OverIndentedDocstringSection,
         Rule::BlankLineBeforeDocstringSectionUnderline,
-        Rule::MismatchedSectionUnderlineLength,
+        Rule::MismatchedDocstringSectionUnderlineLength,
         Rule::OverIndentedDocstringSectionUnderline,
         Rule::WhitespaceAroundDocstringText,
         Rule::UnconventionalDocstringQuotes,
         Rule::UnderIndentedDocstringLine,
         Rule::UndocumentedMagicMethod,
         Rule::UndocumentedParameter,
-        Rule::IncorrectSectionOrder,
+        Rule::IncorrectDocstringSectionOrder,
         Rule::PropertyDocstringStartsWithVerb,
         Rule::UndocumentedPublicClass,
         Rule::UndocumentedPublicFunction,
@@ -250,10 +250,10 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::EscapeSequenceInDocstring) {
                 pydocstyle::rules::backslashes(checker, &docstring);
             }
-            if checker.is_rule_enabled(Rule::MissingTrailingPeriod) {
+            if checker.is_rule_enabled(Rule::MissingDocstringSummaryPeriod) {
                 pydocstyle::rules::ends_with_period(checker, &docstring);
             }
-            if checker.is_rule_enabled(Rule::NonImperativeMood) {
+            if checker.is_rule_enabled(Rule::NonImperativeDocstringSummary) {
                 pydocstyle::rules::non_imperative_mood(
                     checker,
                     &docstring,
@@ -270,13 +270,13 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::SignatureInDocstring) {
                 pydocstyle::rules::no_signature(checker, &docstring);
             }
-            if checker.is_rule_enabled(Rule::FirstWordUncapitalized) {
+            if checker.is_rule_enabled(Rule::UncapitalizedFirstWordOfDocstring) {
                 pydocstyle::rules::capitalized(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::DocstringStartsWithThis) {
                 pydocstyle::rules::starts_with_this(checker, &docstring);
             }
-            if checker.is_rule_enabled(Rule::MissingTerminalPunctuation) {
+            if checker.is_rule_enabled(Rule::MissingDocstringSummaryPunctuation) {
                 pydocstyle::rules::ends_with_punctuation(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::OverloadWithDocstring) {
@@ -285,21 +285,21 @@ pub(crate) fn definitions(checker: &mut Checker) {
 
             let enforce_sections = checker.any_rule_enabled(&[
                 Rule::MissingBlankLineAfterLastDocstringSection,
-                Rule::BlankLinesBetweenHeaderAndContent,
-                Rule::NonCapitalizedSectionName,
-                Rule::MissingDashedUnderlineAfterSection,
+                Rule::BlankLinesBetweenDocstringSectionHeaderAndContent,
+                Rule::NonCapitalizedDocstringSectionName,
+                Rule::MissingDocstringSectionUnderline,
                 Rule::EmptyDocstringSection,
                 Rule::MultilineDocstringSummaryOnSeparateLine,
-                Rule::MissingNewLineAfterSectionName,
+                Rule::MissingNewLineAfterDocstringSectionName,
                 Rule::MissingBlankLineAfterDocstringSection,
                 Rule::MissingBlankLineBeforeDocstringSection,
-                Rule::MissingSectionNameColon,
+                Rule::MissingDocstringSectionNameColon,
                 Rule::OverIndentedDocstringSection,
                 Rule::BlankLineBeforeDocstringSectionUnderline,
-                Rule::MismatchedSectionUnderlineLength,
+                Rule::MismatchedDocstringSectionUnderlineLength,
                 Rule::OverIndentedDocstringSectionUnderline,
                 Rule::UndocumentedParameter,
-                Rule::IncorrectSectionOrder,
+                Rule::IncorrectDocstringSectionOrder,
             ]);
             if enforce_sections || enforce_pydoclint {
                 let section_contexts = pydocstyle::helpers::get_section_contexts(
