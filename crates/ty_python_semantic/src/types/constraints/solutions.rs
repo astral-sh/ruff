@@ -954,11 +954,21 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        path: &PathAssignments,
         constraints: impl Iterator<Item = AtomicConstraintId>,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<CandidateTypeVarSolution<'db>> {
         let mut evidence = CandidateTypeVarSolver::default();
         for constraint in constraints {
+            // A witness is local to its existential body. Like final solution construction,
+            // candidate evidence must use the derived outer constraints instead of retaining
+            // bounds that mention that witness.
+            if path
+                .quantified_typevars
+                .overlaps_with(storage.constraint_support(constraint.into_inner()))
+            {
+                continue;
+            }
             let constraint = storage.atomic_constraint_data(constraint);
             if constraint.provides_bound_for(db, bound_typevar)
                 && constraint.provides_candidate_evidence(
@@ -1377,6 +1387,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             db,
             env,
             storage,
+            path,
             path.positive_constraints()
                 .map(|(constraint, _)| constraint),
             bound_typevar,
@@ -1959,6 +1970,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 db,
                 env,
                 storage,
+                path,
                 inference_constraints
                     .iter()
                     .map(|(constraint, _)| *constraint),
