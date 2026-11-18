@@ -962,6 +962,25 @@ def f(value: IntOrStr) -> None:
     reveal_type(value)  # revealed: int | str
 ```
 
+Diagnostics can refer to the alias by its assigned name.
+
+```py
+def as_int_or_str(value: bytes) -> IntOrStr:
+    # snapshot: invalid-explicit-return
+    return value
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+  --> src/mdtest_snippet.py:13:12
+   |
+11 | def as_int_or_str(value: bytes) -> IntOrStr:
+   |                                    -------- Expected `IntOrStr` because of return type
+12 |     # snapshot: invalid-explicit-return
+13 |     return value
+   |            ^^^^^ expected `IntOrStr`, found `bytes`
+```
+
 #### Name does not match variable
 
 ```py

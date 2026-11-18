@@ -178,7 +178,8 @@ def g(x: RegularCallableTypeOf[j]):
 ## Names passed through a variable
 
 When the name argument has type `str`, `mismatched-newtype-name` reports that ty cannot verify that
-it matches the assignment target. The assigned variable still defines a new type.
+it matches the assignment target. The assigned variable still defines a new type, and diagnostics
+display it using the assigned name.
 
 ```py
 from typing_extensions import NewType
@@ -186,6 +187,21 @@ from typing_extensions import NewType
 def _(name: str) -> None:
     UserId = NewType(name, int)  # error: [mismatched-newtype-name]
     reveal_type(UserId(1))  # revealed: UserId
+
+    def as_user_id(value: int) -> UserId:
+        # snapshot: invalid-explicit-return
+        return value
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+ --> src/mdtest_snippet.py:9:16
+  |
+7 |     def as_user_id(value: int) -> UserId:
+  |                                   ------ Expected `UserId` because of return type
+8 |         # snapshot: invalid-explicit-return
+9 |         return value
+  |                ^^^^^ expected `UserId`, found `int`
 ```
 
 If ty infers a string literal type for the name argument, it can compare the value with the assigned

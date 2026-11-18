@@ -78,6 +78,34 @@ warning[mismatched-typevartuple-name]: The name passed to `TypeVarTuple` must ma
   |                    ^^^^^ Expected "Ts2", got "Ts3"
 ```
 
+### Name supplied at runtime
+
+When ty cannot verify the name match, it displays the `TypeVarTuple` using the assignment target.
+
+```py
+from typing_extensions import TypeVarTuple
+
+def runtime_name() -> str:
+    return "Ts"
+
+Ts = TypeVarTuple(runtime_name())  # error: [mismatched-typevartuple-name]
+
+def as_ints(values: tuple[*Ts]) -> tuple[int, ...]:
+    # snapshot: invalid-explicit-return
+    return values
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+  --> src/mdtest_snippet.py:10:12
+   |
+ 8 | def as_ints(values: tuple[*Ts]) -> tuple[int, ...]:
+   |                                    --------------- Expected `tuple[int, ...]` because of return type
+ 9 |     # snapshot: invalid-explicit-return
+10 |     return values
+   |            ^^^^^^ expected `tuple[int, ...]`, found `tuple[*Ts@as_ints]`
+```
+
 ### Bounds and constraints
 
 The `bound` parameter was added to `typing.TypeVarTuple` in Python 3.15. On older Python versions,

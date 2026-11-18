@@ -81,6 +81,36 @@ warning[mismatched-paramspec-name]: The name passed to `ParamSpec` must match th
   |                ^^^^ Expected "P2", got "P3"
 ```
 
+### Name supplied at runtime
+
+When ty cannot verify the name match, it displays the `ParamSpec` using the assignment target.
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec
+
+def runtime_name() -> str:
+    return "P"
+
+P = ParamSpec(runtime_name())  # error: [mismatched-paramspec-name]
+
+def as_unary(callback: Callable[P, int]) -> Callable[[int], int]:
+    # snapshot: invalid-explicit-return
+    return callback
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+  --> src/mdtest_snippet.py:11:12
+   |
+ 9 | def as_unary(callback: Callable[P, int]) -> Callable[[int], int]:
+   |                                             -------------------- Expected `(int, /) -> int` because of return type
+10 |     # snapshot: invalid-explicit-return
+11 |     return callback
+   |            ^^^^^^^^ expected `(int, /) -> int`, found `(**P@as_unary) -> int`
+info: the first parameter has an incompatible type: `int` is not assignable to `P@as_unary.args`
+```
+
 ### Bounds and constraints
 
 `ParamSpec` does not allow defining bounds or constraints.

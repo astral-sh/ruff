@@ -82,6 +82,34 @@ class Box(Generic[T]): ...
 reveal_type(Box[int]())  # revealed: Box[int]
 ```
 
+### Name supplied at runtime
+
+When ty cannot verify the name match, it displays the `TypeVar` using the assignment target.
+
+```py
+from typing import TypeVar
+
+def runtime_name() -> str:
+    return "T"
+
+T = TypeVar(runtime_name())  # error: [mismatched-typevar-name]
+
+def as_text(value: T) -> str:
+    # snapshot: invalid-explicit-return
+    return value
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+  --> src/mdtest_snippet.py:10:12
+   |
+ 8 | def as_text(value: T) -> str:
+   |                          --- Expected `str` because of return type
+ 9 |     # snapshot: invalid-explicit-return
+10 |     return value
+   |            ^^^^^ expected `str`, found `T@as_text`
+```
+
 ### Shadowing checks use the binding name
 
 <!-- snapshot-diagnostics -->
