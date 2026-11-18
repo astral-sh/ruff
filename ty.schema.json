@@ -46,6 +46,17 @@
         }
       ]
     },
+    "project-manager": {
+      "description": "Configures the project manager ty uses.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ProjectManagerOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "rules": {
       "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n\nBy default, ty exits with code 1 if it emits any warning or error diagnostics.\nSet `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.\n\nIf the same table specifies both a rule's current name and an alias, the current name takes precedence.",
       "anyOf": [
@@ -326,6 +337,23 @@
       "items": {
         "$ref": "#/definitions/OverrideOptions"
       }
+    },
+    "ProjectManagerOptions": {
+      "type": "object",
+      "properties": {
+        "script": {
+          "description": "The project manager to use for scripts with PEP 723 inline metadata.\n\n- With `\"none\"` (the default), ty looks for imported packages in your Python environment.\n  Install any third-party packages the script needs in that environment.\n- With `\"uv\"`, each script gets its own Python environment. ty uses\n  [uv](https://docs.astral.sh/uv/) to install the script's declared dependencies there\n  and resolves imports from that environment. This requires uv 0.12.3 or newer.\n\nIf a script has an inline `[tool.ty]` table, its `project-manager.script` setting\ntakes precedence. Otherwise, the script inherits the project's value.\n\nWhen checking untrusted code with `ty check`, pass `--config 'project-manager.script=\"none\"'`\nto disable script synchronization. To disable both script synchronization and uv workspace\ndiscovery, set the `TY_UV` environment variable to `off`. `TY_UV` takes precedence over\n`--config`. If your editor marks the workspace as untrusted, ty disables both automatically.\n\n`uv check` sets `TY_UV=1`, so it always enables script synchronization.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ScriptProjectManager"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "PythonPlatform": {
       "description": "The target platform to assume when resolving types.\n",
@@ -1338,7 +1366,7 @@
         },
         "missing-direct-dependency": {
           "title": "detects imports of dependencies that are not declared directly",
-          "description": "## What it does\n\nChecks for imports from installable packages that the current project or PEP 723 script does not\ndeclare as direct dependencies.\n\nThe name used in dependency declarations can differ from the import name: for example, the `pillow`\npackage is imported as `PIL`.\n\n## Why is this bad?\n\nA dependency can be installed because another package requires it. Importing that dependency without\ndeclaring it makes your code rely on another package's dependency list. If that package removes the\ndependency, your imports can fail.\n\nDeclare the packages that provide your imports in `project.dependencies` or\n`project.optional-dependencies` in `pyproject.toml`. Non-package files, such as tests and\ndevelopment scripts, can also use dependencies declared in dependency groups.\n\nSee uv's [guide to managing dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/)\nfor how to add these declarations.\n\n## Rule status\n\nThis rule is disabled by default and requires uv integration.\n\nFor projects, enable uv workspace integration (`TY_UV=1`) and use an existing, synchronized\nenvironment. Running [`uv check`](https://docs.astral.sh/uv/reference/cli/#uv-check) synchronizes\nthe environment automatically before invoking ty, unless `--no-sync` is passed. For these checks, ty\nreads the dependency graph and module ownership returned by `uv workspace metadata` without changing\ninstalled packages. uv may update the lockfile to match the current dependency declarations. uv\n0.12.3 or later is required.\n\nFor PEP 723 scripts, enable uv script integration with `TY_UV=scripts` or `TY_UV=1`. ty synchronizes\neach script's environment and checks imports against its inline `dependencies` list. Declarations\nand environments from the enclosing workspace or other scripts do not apply.\n\n## Known limitations\n\nImports guarded by `TYPE_CHECKING` are not reported because they are not executed at runtime. They\ncan use development-only dependencies, such as type stub packages, without requiring those packages\nas runtime dependencies.\n\nStandard-library imports and imports whose owning package cannot be identified unambiguously are\nalso not reported.\n\nImports of [namespace packages](https://docs.python.org/3/reference/import.html#namespace-packages)\nthemselves, such as `import ns`, are not reported: the namespace can contain modules from several\ninstallable packages. Imports of their submodules, such as `import ns.child`, are checked when the\nowning package is known. An `__init__.pyi` stub does not change this distinction.\n\nNative packages that ty can resolve only as namespace packages at runtime are also skipped. For\nother native modules, ty can use stubs to resolve the import and uv's ownership map to identify\nwhich package to declare.\n\nSome editable installations add the whole project directory to Python's import path, making both\npackage code and files such as `tests/test_app.py` importable. If uv does not identify which modules\nbelong to the installable package, ty allows dependency-group imports throughout that directory,\nincluding in package code, to avoid incorrectly flagging imports in tests and scripts.\n\n## Examples\n\nWith `requests` as a direct dependency, `urllib3` may also be installed because `requests` depends\non it:\n\n```python {data-mdtest=\"ignore\"}\nimport requests\nimport urllib3  # error: [missing-direct-dependency]\n```\n\nAdd `urllib3` to `project.dependencies` if your code imports it directly.",
+          "description": "## What it does\n\nChecks for imports from installable packages that the current project or PEP 723 script does not\ndeclare as direct dependencies.\n\nThe name used in dependency declarations can differ from the import name: for example, the `pillow`\npackage is imported as `PIL`.\n\n## Why is this bad?\n\nA dependency can be installed because another package requires it. Importing that dependency without\ndeclaring it makes your code rely on another package's dependency list. If that package removes the\ndependency, your imports can fail.\n\nDeclare the packages that provide your imports in `project.dependencies` or\n`project.optional-dependencies` in `pyproject.toml`. Non-package files, such as tests and\ndevelopment scripts, can also use dependencies declared in dependency groups.\n\nSee uv's [guide to managing dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/)\nfor how to add these declarations.\n\n## Rule status\n\nThis rule is disabled by default and requires uv integration.\n\nFor projects, enable uv workspace integration (`TY_UV=1`) and use an existing, synchronized\nenvironment. Running [`uv check`](https://docs.astral.sh/uv/reference/cli/#uv-check) synchronizes\nthe environment automatically before invoking ty, unless `--no-sync` is passed. For these checks, ty\nreads the dependency graph and module ownership returned by `uv workspace metadata` without changing\ninstalled packages. uv may update the lockfile to match the current dependency declarations. uv\n0.12.3 or later is required.\n\nFor PEP 723 scripts, set `project-manager.script = \"uv\"` in your ty configuration. ty synchronizes\neach script's environment and checks imports against its inline `dependencies` list. Declarations\nand environments from the enclosing workspace or other scripts do not apply.\n\n## Known limitations\n\nImports guarded by `TYPE_CHECKING` are not reported because they are not executed at runtime. They\ncan use development-only dependencies, such as type stub packages, without requiring those packages\nas runtime dependencies.\n\nStandard-library imports and imports whose owning package cannot be identified unambiguously are\nalso not reported.\n\nImports of [namespace packages](https://docs.python.org/3/reference/import.html#namespace-packages)\nthemselves, such as `import ns`, are not reported: the namespace can contain modules from several\ninstallable packages. Imports of their submodules, such as `import ns.child`, are checked when the\nowning package is known. An `__init__.pyi` stub does not change this distinction.\n\nNative packages that ty can resolve only as namespace packages at runtime are also skipped. For\nother native modules, ty can use stubs to resolve the import and uv's ownership map to identify\nwhich package to declare.\n\nSome editable installations add the whole project directory to Python's import path, making both\npackage code and files such as `tests/test_app.py` importable. If uv does not identify which modules\nbelong to the installable package, ty allows dependency-group imports throughout that directory,\nincluding in package code, to avoid incorrectly flagging imports in tests and scripts.\n\n## Examples\n\nWith `requests` as a direct dependency, `urllib3` may also be installed because `requests` depends\non it:\n\n```python {data-mdtest=\"ignore\"}\nimport requests\nimport urllib3  # error: [missing-direct-dependency]\n```\n\nAdd `urllib3` to `project.dependencies` if your code imports it directly.",
           "default": "ignore",
           "oneOf": [
             {
@@ -1951,6 +1979,20 @@
         "$ref": "#/definitions/Level"
       }
     },
+    "ScriptProjectManager": {
+      "oneOf": [
+        {
+          "description": "Use the configured or discovered Python environment. Install the script's dependencies there.",
+          "type": "string",
+          "const": "none"
+        },
+        {
+          "description": "Use uv to synchronize a dedicated environment with the script's inline dependencies.",
+          "type": "string",
+          "const": "uv"
+        }
+      ]
+    },
     "SrcOptions": {
       "type": "object",
       "properties": {
@@ -1967,9 +2009,13 @@
         },
         "exclude-scripts": {
           "description": "Whether to exclude files containing PEP 723 inline script metadata unless they are\nexplicitly passed on the command line.",
-          "type": [
-            "boolean",
-            "null"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/boolean"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "include": {
@@ -2070,6 +2116,9 @@
         }
       },
       "additionalProperties": false
+    },
+    "boolean": {
+      "type": "boolean"
     },
     "string": {
       "type": "string"

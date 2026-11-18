@@ -841,7 +841,7 @@ impl Project {
     pub fn scripts_to_synchronize(self, db: &dyn Db) -> Vec<File> {
         // Discovering scripts reads every project file. Keep the index lazy when
         // no environment synchronization will be requested.
-        if !self.metadata(db).use_uv().script_environments_enabled() {
+        if self.metadata(db).script_uv_override() == Some(false) {
             return Vec::new();
         }
         self.script_files(db).iter().collect()

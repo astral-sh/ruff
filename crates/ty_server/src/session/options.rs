@@ -99,17 +99,24 @@ impl InitializationOptions {
         }
     }
 
-    pub(crate) fn use_uv(&self, system: &dyn System) -> UseUv {
+    /// Returns the uv mode that overrides editor, project, and script settings.
+    /// Untrusted workspaces always force [`UseUv::Off`]. In a trusted workspace,
+    /// this returns the mode from `TY_UV`, or `None` if the variable is unset.
+    pub(super) fn uv_override(&self, system: &dyn System) -> Option<RangedValue<UseUv>> {
         if self.workspace_trust == WorkspaceTrust::Untrusted {
-            return UseUv::Off;
+            Some(RangedValue::new(UseUv::Off, ValueSource::Editor))
+        } else {
+            UseUv::from_system(system).map(RangedValue::cli)
         }
+    }
 
+    pub(super) fn experimental_use_uv(&self) -> Option<RangedValue<UseUv>> {
         self.options
             .global
             .experimental
             .as_ref()
             .and_then(|experimental| experimental.use_uv)
-            .unwrap_or_else(|| UseUv::from_system(system))
+            .map(|mode| RangedValue::new(mode, ValueSource::Editor))
     }
 }
 
@@ -501,6 +508,7 @@ impl Combine for DiagnosticMode {
 pub struct Experimental {
     /// Controls which uv integrations ty uses.
     ///
+    /// Deprecated for script environments. Set `project-manager.script` in the ty configuration instead.
     /// This setting is resolved during initialization. Changing it requires restarting the server.
     /// All uv integrations are disabled in untrusted workspaces.
     pub use_uv: Option<UseUv>,

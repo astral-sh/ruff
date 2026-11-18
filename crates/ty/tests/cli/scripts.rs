@@ -1600,6 +1600,37 @@ fn disabled_integration_does_not_initialize_scripts() -> anyhow::Result<()> {
 }
 
 #[test]
+fn ty_uv_off_overrides_script_and_cli_settings() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r"
+        # /// script
+        # [tool.ty]
+        # project-manager.script = 'uv'
+        # ///
+        ",
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("script.py")
+            .args(["--config", "project-manager.script='uv'"])
+            .env(EnvVars::TY_UV, "off")
+            .env(EnvVars::UV, "missing-uv-executable"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
 fn excluded_scripts_do_not_initialize_their_environments() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("ty.toml", "[src]\nexclude-scripts = true\n"),

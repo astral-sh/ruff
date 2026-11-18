@@ -42,6 +42,9 @@ impl ChangeResult {
     /// Callers must defer environment synchronization until those changes are saved:
     /// uv reads the file from disk, not the editor buffer.
     pub fn scripts_to_synchronize(&self, db: &dyn Db) -> Vec<File> {
+        if db.project().metadata(db).script_uv_override() == Some(false) {
+            return Vec::new();
+        }
         match &self.changed_files {
             ChangedFiles::Unindexed => Vec::new(),
             ChangedFiles::Known(changed_files) => {
@@ -97,7 +100,7 @@ impl ProjectDatabase {
         let metadata = project.metadata(self);
         let configuration_paths = ConfigurationPaths::from_metadata(metadata);
         // The initial uv metadata request may have failed before a workspace could be discovered.
-        let uv_enabled = metadata.use_uv().workspace_discovery_enabled();
+        let uv_workspace_discovery_enabled = metadata.uv_workspace_discovery_enabled();
         let resolved_environment = project
             .program_settings(self)
             .last_usable_python_environment()
@@ -164,7 +167,7 @@ impl ProjectDatabase {
 
             // Recreating an environment can change uv's reported interpreter and installed
             // module ownership without changing the lockfile.
-            if uv_enabled
+            if uv_workspace_discovery_enabled
                 && !reload_project
                 && (environment_changed || affects_uv_metadata(self, change))
             {
@@ -369,7 +372,7 @@ impl ProjectDatabase {
                 .find(|path| self.system().is_directory(path))
                 .unwrap_or(&project_root);
             let metadata = project.metadata(self);
-            if metadata.use_uv().workspace_discovery_enabled() {
+            if metadata.uv_workspace_discovery_enabled() {
                 result.project_sync_path = Some(path.to_path_buf());
             } else {
                 // We're not refreshing uv metadata, so use the existing workspace.

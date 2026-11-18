@@ -92,9 +92,6 @@ pub(crate) struct Session {
     /// Initialization options that were provided by the client during server initialization.
     initialization_options: InitializationOptions,
 
-    /// The uv integrations enabled for the lifetime of this server.
-    use_uv: UseUv,
-
     /// Shares one progress indicator while script synchronization requests are outstanding.
     script_progress: ScriptProgress,
 
@@ -184,8 +181,6 @@ impl Session {
             workspaces.register(uri)?;
         }
 
-        let use_uv = initialization_options.use_uv(&*native_system);
-
         Ok(Self {
             native_system,
             position_encoding,
@@ -194,7 +189,6 @@ impl Session {
             deferred_messages: VecDeque::new(),
             index: Some(index),
             initialization_options,
-            use_uv,
             script_progress: ScriptProgress::default(),
             global_settings: Arc::new(GlobalSettings::default()),
             projects: BTreeMap::new(),
@@ -370,6 +364,9 @@ impl Session {
         for &file in scripts {
             // Open and save handle editor documents separately. Their metadata may contain
             // unsaved changes, including overlays that are not in the diagnostic open-file set.
+            // If a project reload selects uv for an open script, we accept that
+            // a user must save or reopen the document to request a sync. This avoids rereading open scripts
+            // on reload to check whether their inline metadata matches what uv will read from disk.
             if db.document(file).is_some() {
                 continue;
             }
@@ -798,8 +795,7 @@ impl Session {
             )
         } else {
             ProjectMetadata::discover(workspace_directory, &system)
-        }
-        .map(|metadata| metadata.with_use_uv(self.use_uv));
+        };
 
         let (mut metadata, discovery_result) =
             match metadata.context("Failed to discover project configuration") {
@@ -811,7 +807,7 @@ impl Session {
                         None,
                         &UseDefaultStrategy,
                     );
-                    (metadata.with_use_uv(self.use_uv), Err(err))
+                    (metadata, Err(err))
                 }
             };
 
@@ -819,8 +815,29 @@ impl Session {
             metadata.set_fallback_options(fallback_options.clone());
         }
 
-        if let Some(override_options) = workspace.settings.override_options() {
-            metadata.set_override_options(override_options.clone());
+        // Untrusted workspaces disable uv. In trusted workspaces, `TY_UV` takes precedence
+        // for both workspace discovery and scripts. When it is unset, discovery uses
+        // `experimental.useUv`. For scripts, `project-manager.script` in `ty.configuration` wins
+        // over `experimental.useUv`, and either editor setting overrides script or project configuration.
+        let uv_override = self.initialization_options.uv_override(&system);
+        let legacy_uv = self.initialization_options.experimental_use_uv();
+        let uv_workspace_discovery = uv_override
+            .as_deref()
+            .or(legacy_uv.as_deref())
+            .copied()
+            .is_some_and(UseUv::workspace_discovery_enabled);
+        metadata = metadata.with_uv_workspace_discovery(uv_workspace_discovery);
+
+        let editor_options = workspace
+            .settings
+            .override_options()
+            .cloned()
+            .unwrap_or_default();
+        let overrides = Options::from_uv_mode(uv_override)
+            .combine(editor_options)
+            .combine(Options::from_uv_mode(legacy_uv));
+        if overrides != Options::default() {
+            metadata.set_override_options(overrides);
         }
 
         // Load user configuration even if project discovery failed.
@@ -831,7 +848,7 @@ impl Session {
                     .context("Failed to apply configuration files"),
             )
             .and_then(|()| {
-                if metadata.use_uv().workspace_discovery_enabled() {
+                if metadata.uv_workspace_discovery_enabled() {
                     let workspace = UvWorkspace::discover(workspace_directory, &system);
                     metadata
                         .apply_uv_workspace(&system, workspace)
@@ -1368,8 +1385,7 @@ impl Session {
         // Request synchronization before installing the editor contents because uv reads the
         // script from disk. This ensures both use the saved metadata, so saving changed metadata
         // requests another synchronization.
-        if self.use_uv != UseUv::Off
-            && language_id == LanguageId::Python
+        if language_id == LanguageId::Python
             && document.notebook().is_none()
             && let DocumentKey::File(system_path) = DocumentKey::from_uri(document.uri())
         {
@@ -1377,19 +1393,21 @@ impl Session {
             let script_progress = self.script_progress.clone();
             let db = self.project_db_mut(&AnySystemPath::System(system_path.clone()));
 
-            // Refresh any cached disk revision before reading the script tag. A filesystem
-            // change may not have reached the watcher yet, and the later open event will
-            // refresh the file from the editor contents instead.
-            File::sync_path(db, &system_path);
-            if let Ok(file) = system_path_to_file(db, &system_path) {
-                Self::request_script_sync(
-                    db,
-                    file,
-                    client,
-                    capabilities,
-                    ScriptEnvironmentAvailability::Pending,
-                    &script_progress,
-                );
+            if db.project().metadata(db).script_uv_override() != Some(false) {
+                // Refresh any cached disk revision before reading the script tag. A filesystem
+                // change may not have reached the watcher yet, and the later open event will
+                // refresh the file from the editor contents instead.
+                File::sync_path(db, &system_path);
+                if let Ok(file) = system_path_to_file(db, &system_path) {
+                    Self::request_script_sync(
+                        db,
+                        file,
+                        client,
+                        capabilities,
+                        ScriptEnvironmentAvailability::Pending,
+                        &script_progress,
+                    );
+                }
             }
         }
         let handle = self.index_mut().open_text_document(document);

@@ -1119,6 +1119,50 @@ Defaults to `false`.
 
 ---
 
+## `project-manager`
+
+### `script`
+
+The project manager to use for scripts with PEP 723 inline metadata.
+
+- With `"none"` (the default), ty looks for imported packages in your Python environment.
+  Install any third-party packages the script needs in that environment.
+- With `"uv"`, each script gets its own Python environment. ty uses
+  [uv](https://docs.astral.sh/uv/) to install the script's declared dependencies there
+  and resolves imports from that environment. This requires uv 0.12.3 or newer.
+
+If a script has an inline `[tool.ty]` table, its `project-manager.script` setting
+takes precedence. Otherwise, the script inherits the project's value.
+
+When checking untrusted code with `ty check`, pass `--config 'project-manager.script="none"'`
+to disable script synchronization. To disable both script synchronization and uv workspace
+discovery, set the `TY_UV` environment variable to `off`. `TY_UV` takes precedence over
+`--config`. If your editor marks the workspace as untrusted, ty disables both automatically.
+
+`uv check` sets `TY_UV=1`, so it always enables script synchronization.
+
+**Default value**: `"none"`
+
+**Type**: `"uv" | "none"`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.project-manager]
+    script = "uv"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [project-manager]
+    script = "uv"
+    ```
+
+---
+
 ## `src`
 
 ### `exclude`
