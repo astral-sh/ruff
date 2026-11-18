@@ -711,8 +711,10 @@ class Counter:
         return 1
 
     def text(self) -> str:
-        # error: [invalid-argument-type]
-        # error: [unsound-return]
+        # TODO: Infer `int` for `next(self)` and report a single `invalid-explicit-return` error
+        # for returning `int` where `str` is expected.
+        # error: [invalid-argument-type] "Expected `SupportsNext[str]`, found `Self@text`"
+        # error: [unsound-return] "`Unknown`"
         return next(self)
 
     def read(self) -> int | None:
