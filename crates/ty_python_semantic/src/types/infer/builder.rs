@@ -135,6 +135,7 @@ use crate::types::unpacker::{
     UnpackResult, fixed_sequence_elements, sequence_from_literal_elements,
     tuple_literal_needs_promotion,
 };
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     ClassType, DeclaredType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet,
@@ -6146,7 +6147,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             |builder: &mut Self,
              arguments: &mut CallArguments<'call, 'db>,
              bindings: &mut Bindings<'db>,
-             tcx| {
+             tcx,
+             narrowing| {
                 if fixpoint_iteration_limit == 0 {
                     builder.infer_and_check_argument_types_simple(
                         ast_arguments.clone(),
@@ -6157,6 +6159,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         &constraints,
                         tcx,
                         &overload_candidates,
+                        narrowing,
                     )
                 } else {
                     builder.infer_and_check_argument_types_unified(
@@ -6169,6 +6172,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         &generic_arguments,
                         fixpoint_iteration_limit,
                         &overload_candidates,
+                        narrowing,
                     )
                 }
             };
@@ -6217,8 +6221,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &mut speculative_argument_types,
                 &mut speculative_bindings,
                 target_tcx,
+                true,
             )
             .ok()?;
+
+            // Nested calls can return recovery types after binding fails. Those types can make
+            // this call appear compatible with the target, but do not justify committing to it.
+            if speculative_builder.context.has_failed_call() {
+                return None;
+            }
 
             if !speculative_bindings
                 .return_type(db, env)
@@ -6301,6 +6312,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     argument_types,
                     &mut bindings,
                     call_expression_tcx,
+                    false,
                 ) {
                     Ok(()) => Ok(CallArgumentInference::new(bindings, argument_types)),
                     Err(error) => Err(CallError(error, Box::new(bindings))),
@@ -6326,6 +6338,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
         candidates: &OverloadSet,
+        narrowing: bool,
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let env = self.program_environment();
@@ -6346,7 +6359,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 argument_types,
                 &arguments_tcx,
                 infer_argument_ty,
-                CallArgumentInferenceMode::Commit,
+                CallArgumentInferenceMode::commit_for(candidates, narrowing),
             );
 
             return bindings.check_types_impl(
@@ -6421,6 +6434,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         generic_arguments: &SmallVec<[usize; 4]>,
         fixpoint_iteration_limit: usize,
         candidates: &OverloadSet,
+        narrowing: bool,
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let requires_overload_evaluation = requires_overload_evaluation(candidates);
@@ -6453,7 +6467,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // inference here.
                     CallArgumentInferenceMode::Speculate
                 } else {
-                    CallArgumentInferenceMode::Commit
+                    CallArgumentInferenceMode::commit_for(candidates, narrowing)
                 },
             );
 
@@ -6651,11 +6665,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             match argument_tcx {
                 MatchingArgumentTypeContext::Unique(argument_tcx) => {
                     let tcx = argument_tcx.map_or_default(ArgumentTypeContext::type_context);
+                    let had_failed_call = self.context.has_failed_call();
                     let inferred_ty = infer_argument_ty(self, (argument_index, ast_argument, tcx));
+                    // If this parameter cannot constrain the call's specialization and its
+                    // context is independent of the proposed return type, then keep its
+                    // diagnostics, but do not let its recovery invalidate union narrowing.
+                    if !had_failed_call
+                        && self.context.has_failed_call()
+                        && matches!(mode, CallArgumentInferenceMode::CommitSingleSignature)
+                        && let Some(ArgumentTypeContext::Standard {
+                            raw_parameter_type, ..
+                        }) = *argument_tcx
+                        && !any_over_type_expanding_aliases(
+                            self.db(),
+                            self.program_environment(),
+                            raw_parameter_type,
+                            Type::is_type_var,
+                        )
+                    {
+                        self.context.clear_failed_call();
+                    }
                     insert_argument_ty(argument_index, inferred_ty, argument_tcx, argument_types);
                 }
 
                 MatchingArgumentTypeContext::Many(argument_tcx) => {
+                    // TODO: Preserve failed-call information for each inferred argument type so
+                    // union narrowing and overload resolution can reject candidates that depend
+                    // on error recovery.
+                    // https://github.com/astral-sh/ruff/pull/27942
                     let mut inferred_by_cache_key = FxHashMap::default();
 
                     // If there are multiple applicable type contexts and we are not in
@@ -10215,6 +10252,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inferred = match bindings_result {
             Ok(inferred) => inferred,
             Err(CallError(_, bindings)) => {
+                self.context.mark_failed_call(call_expression);
                 bindings.report_diagnostics(&self.context, call_expression.into());
                 return bindings.return_type(db, env);
             }
@@ -12524,11 +12562,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (1, None) if !deferred.is_empty() => Some(Box::new(
                 DefinitionInferenceExtra::Deferred(deferred.into_boxed_slice()),
             )),
-            (1, None) if !context.is_empty() => Some(Box::new(if context.diagnostics.is_empty() {
-                DefinitionInferenceExtra::InvalidTypeForm
-            } else {
-                DefinitionInferenceExtra::Context(Box::new(context))
-            })),
+            (1, None) if !context.is_empty() => Some(Box::new(
+                if context.diagnostics.is_empty() && !context.has_failed_call {
+                    DefinitionInferenceExtra::InvalidTypeForm
+                } else {
+                    DefinitionInferenceExtra::Context(Box::new(context))
+                },
+            )),
             (1, None) if !called_functions.is_empty() => {
                 Some(Box::new(DefinitionInferenceExtra::CalledFunctions(
                     called_functions
@@ -13230,11 +13270,22 @@ enum CallArgumentInferenceMode {
     /// Commit a default inference without type context, if there are multiple
     /// applicable type contexts.
     Commit,
+
+    /// Commit arguments for a call with exactly one candidate signature.
+    CommitSingleSignature,
 }
 
 impl CallArgumentInferenceMode {
     fn requires_default_inference(self) -> bool {
-        matches!(self, Self::Commit)
+        !matches!(self, Self::Speculate)
+    }
+
+    fn commit_for(candidates: &OverloadSet, narrowing: bool) -> Self {
+        if narrowing && matches!(candidates.as_slice(), [overloads] if overloads.len() == 1) {
+            Self::CommitSingleSignature
+        } else {
+            Self::Commit
+        }
     }
 }
 

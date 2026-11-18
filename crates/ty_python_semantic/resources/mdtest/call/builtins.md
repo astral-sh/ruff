@@ -694,3 +694,40 @@ from collections import OrderedDict
 items = [OrderedDict([["key", 1.0]])]  # error: [no-matching-overload]
 OrderedDict(zip(["name"], items))
 ```
+
+## Contextual inference for `next`
+
+An incompatible return context does not make an invalid iterator argument valid. An optional context
+also preserves the concrete return type of a valid iterator.
+
+```toml
+[rules]
+unsound-return = "error"
+```
+
+```py
+class Counter:
+    def __next__(self) -> int:
+        return 1
+
+    def text(self) -> str:
+        # TODO: Infer `int` for `next(self)` and report a single `invalid-explicit-return` error
+        # for returning `int` where `str` is expected.
+        # error: [invalid-argument-type] "Expected `SupportsNext[str]`, found `Self@text`"
+        # error: [unsound-return] "`Unknown`"
+        return next(self)
+
+    def read(self) -> int | None:
+        return reveal_type(next(self))  # revealed: int
+```
+
+## Unreachable nested calls in a union context
+
+A failed call in an unreachable branch does not prevent narrowing the return context of `list`.
+
+```py
+def takes_no_parameters() -> None: ...
+
+# revealed: list[int | str] | list[int | None]
+result: list[int | str] | list[int | None] = reveal_type(list((1, 2, 3) if True else takes_no_parameters(1)))
+```
