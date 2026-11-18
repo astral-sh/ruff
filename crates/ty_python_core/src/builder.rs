@@ -3427,19 +3427,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 let hash = FxBuildHasher.hash_one(&table);
-                if let Some(existing) = interned_place_tables.get(&hash).and_then(|candidates| {
-                    candidates
-                        .iter()
-                        .find(|candidate| candidate.as_ref() == &table)
-                }) {
+                let candidates = interned_place_tables.entry(hash).or_default();
+                if let Some(existing) = candidates
+                    .iter()
+                    .find(|candidate| candidate.as_ref() == &table)
+                {
                     return Arc::clone(existing);
                 }
 
                 let table = Arc::new(table);
-                interned_place_tables
-                    .entry(hash)
-                    .or_default()
-                    .push(Arc::clone(&table));
+                candidates.push(Arc::clone(&table));
                 table
             })
             .collect();
