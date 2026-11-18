@@ -381,6 +381,7 @@ include = [
     "scripts/*.py",
     "crates/ruff_python_ast/generate.py",
     "crates/ty_python_semantic/mdtest.py",
+    "python/py-fuzzer/prepare_corpus.py",
 ]
 
 [tool.ty.overrides.analysis]
