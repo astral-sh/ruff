@@ -54,6 +54,7 @@ mod workspace_folders;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::num::NonZeroUsize;
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, OnceLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -229,6 +230,7 @@ impl TestServer {
         capabilities: ClientCapabilities,
         initialization_options: Option<Value>,
         env_vars: Vec<(String, Option<String>)>,
+        directory_walk_count: Option<Arc<AtomicUsize>>,
     ) -> Self {
         setup_tracing();
 
@@ -240,7 +242,10 @@ impl TestServer {
         let os_system = OsSystem::new(test_context.root());
 
         // Create test system and set environment variable overrides
-        let test_system = Arc::new(TestSystem::new(os_system));
+        let mut test_system = TestSystem::new(os_system);
+        if let Some(count) = directory_walk_count {
+            test_system.count_directory_walks(count);
+        }
         test_system.clear_env_vars();
         for (name, value) in env_vars {
             match value {
@@ -250,6 +255,7 @@ impl TestServer {
                 None => test_system.remove_env_var(name),
             }
         }
+        let test_system = Arc::new(test_system);
 
         // Start the server in a separate thread
         let server_thread = std::thread::spawn(move || {
@@ -1309,6 +1315,7 @@ pub(crate) struct TestServerBuilder {
     initialization_options: Option<Value>,
     client_capabilities: ClientCapabilities,
     env_vars: Vec<(String, Option<String>)>,
+    directory_walk_count: Option<Arc<AtomicUsize>>,
 }
 
 impl TestServerBuilder {
@@ -1342,6 +1349,7 @@ impl TestServerBuilder {
             initialization_options: None,
             client_capabilities,
             env_vars: Vec::new(),
+            directory_walk_count: None,
         })
     }
 
@@ -1353,6 +1361,11 @@ impl TestServerBuilder {
     /// Set raw initialization JSON for malformed or startup-only settings.
     pub(crate) fn with_raw_initialization_options(mut self, options: Value) -> Self {
         self.initialization_options = Some(options);
+        self
+    }
+
+    pub(crate) fn with_directory_walk_count(mut self, count: Arc<AtomicUsize>) -> Self {
+        self.directory_walk_count = Some(count);
         self
     }
 
@@ -1655,6 +1668,7 @@ impl TestServerBuilder {
             self.client_capabilities,
             self.initialization_options,
             self.env_vars,
+            self.directory_walk_count,
         )
     }
 }

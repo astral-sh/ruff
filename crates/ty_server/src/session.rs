@@ -21,12 +21,13 @@ use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf, SystemVirtualPath};
 use ruff_python_ast::PySourceType;
+use salsa::Database as _;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, DeletedKind};
 use ty_project::{
-    ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
-    ScriptEnvironmentAvailability, UseUv, UvSyncChanges, UvWorkspace,
+    ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectIndexing, ProjectMetadata,
+    ProjectReloadResult, ScriptEnvironmentAvailability, UseUv, UvSyncChanges, UvWorkspace,
 };
 
 use index::DocumentError;
@@ -141,6 +142,9 @@ pub(crate) struct Session {
 
 /// LSP State for a Project
 pub(crate) struct ProjectState {
+    /// Whether the project belongs to the fallback workspace.
+    is_fallback: bool,
+
     /// Files that we have outstanding otherwise-untracked pushed diagnostics for.
     ///
     /// In `CheckMode::OpenFiles` we still read some files that the client hasn't
@@ -180,8 +184,16 @@ impl Session {
         let mut workspaces = Workspaces::default();
         // Register workspaces with default settings - they'll be initialized with real settings
         // when workspace/configuration response is received
-        for uri in workspace_uris {
-            workspaces.register(uri)?;
+        if workspace_uris.is_empty() {
+            let current_dir = native_system.current_directory();
+            let uri = Uri::from_file_path(current_dir.as_std_path())
+                .map_err(|()| anyhow!("Failed to create a workspace URI for {current_dir}"))?;
+            tracing::info!("Using {current_dir} to discover configuration for standalone files");
+            workspaces.register(uri, true)?;
+        } else {
+            for uri in workspace_uris {
+                workspaces.register(uri, false)?;
+            }
         }
 
         let use_uv = initialization_options.use_uv(&*native_system);
@@ -661,6 +673,7 @@ impl Session {
         // Note that this is a divergence from previous behavior:
         // https://github.com/astral-sh/ruff/pull/19614
         let mut global_options: Option<GlobalOptions> = None;
+        let mut promoted_fallback = false;
 
         for (uri, options) in workspace_folders {
             // Last setting wins.
@@ -674,7 +687,7 @@ impl Session {
             if !options.unknown.is_empty() {
                 warn_about_unknown_options(client, Some(&uri), &options.unknown);
             }
-            self.initialize_workspace_folder(client, &uri, options.workspace);
+            promoted_fallback |= self.initialize_workspace_folder(client, &uri, options.workspace);
         }
 
         if let Some(global_options) = global_options {
@@ -685,9 +698,13 @@ impl Session {
         if let Some(check_mode) = diagnostic_mode.to_check_mode() {
             for project in self.projects.values_mut() {
                 let db = &mut project.db;
-                db.set_check_mode(check_mode);
+                db.set_check_mode(if project.is_fallback {
+                    CheckMode::OpenFiles
+                } else {
+                    check_mode
+                });
                 // A new folder's settings can enable workspace diagnostics for existing projects.
-                if diagnostic_mode.is_workspace() {
+                if diagnostic_mode.is_workspace() && !project.is_fallback {
                     let scripts = db.project().scripts_to_synchronize(db);
                     Self::synchronize_closed_scripts(
                         db,
@@ -701,6 +718,12 @@ impl Session {
         }
 
         self.register_capabilities(client);
+
+        if promoted_fallback {
+            self.bump_revision();
+            self.resume_suspended_workspace_diagnostic_request(client);
+            publish_all_document_diagnostics(self, client);
+        }
 
         // New workspace settings can affect diagnostics in existing workspaces. Re-registering
         // diagnostic support does not invalidate the client's cached results. There are no
@@ -723,12 +746,13 @@ impl Session {
     ///
     /// The client provided is used to show error messages and publish
     /// diagnostics related to configuration.
+    /// Returns whether initialization replaced the fallback project.
     fn initialize_workspace_folder(
         &mut self,
         client: &Client,
         uri: &Uri,
         options: WorkspaceOptions,
-    ) {
+    ) -> bool {
         let options = self
             .initialization_options
             .options
@@ -740,7 +764,7 @@ impl Session {
 
         let Ok(root) = uri.to_file_path() else {
             tracing::debug!("Ignoring workspace with non-path root: {uri}");
-            return;
+            return false;
         };
 
         // Realistically I don't think this can fail because we got the path from a Uri
@@ -751,7 +775,7 @@ impl Session {
                     "Ignoring workspace with non-UTF8 root: {root}",
                     root = root.display()
                 );
-                return;
+                return false;
             }
         };
 
@@ -769,14 +793,14 @@ impl Session {
         let settings = options.into_settings(workspace_directory, client, &*self.native_system);
         let Some(workspace) = self.workspaces.workspaces.get_mut(&root) else {
             tracing::debug!("Ignoring workspace `{uri}` since it was not registered");
-            return;
+            return false;
         };
         if workspace.is_initialized() {
             tracing::debug!(
                 "Ignoring workspace initialization for `{uri}` \
                  since it has already been initialized"
             );
-            return;
+            return false;
         }
         workspace.initialize(settings);
 
@@ -840,7 +864,7 @@ impl Session {
                 ProjectDatabase::fallible(metadata.clone(), system.clone())
             });
 
-        let db = project.unwrap_or_else(|err| {
+        let mut db = project.unwrap_or_else(|err| {
             tracing::error!(
                 "Failed to load project for workspace `{uri}`: {err:#}. \
                  Continuing with valid settings"
@@ -852,25 +876,62 @@ impl Session {
             ProjectDatabase::use_defaults(metadata, system)
         });
 
+        let is_fallback = workspace.is_fallback;
+        if is_fallback {
+            // Looking up scripts can trigger a recursive walk of the project root.
+            db.project()
+                .set_indexing(&mut db, ProjectIndexing::Disabled);
+        }
+
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);
-        let untracked =
-            previous.map_or_default(|state| state.untracked_files_with_pushed_diagnostics);
+        let replaced_fallback = previous.as_ref().is_some_and(|project| project.is_fallback);
+        let untracked = previous.map_or_default(|mut state| {
+            // Release snapshots that still hold the editor index before dropping the database.
+            state.db.trigger_cancellation();
+            state.untracked_files_with_pushed_diagnostics
+        });
         self.projects.insert(
             root.clone(),
             ProjectState {
+                is_fallback,
                 db,
                 untracked_files_with_pushed_diagnostics: untracked,
             },
         );
 
+        if replaced_fallback {
+            self.reopen_workspace_documents(client, &root);
+        }
         publish_settings_diagnostics(self, client, root);
+        replaced_fallback
+    }
+
+    fn reopen_workspace_documents(&mut self, client: &Client, root: &SystemPath) {
+        let documents: Vec<_> = self
+            .index()
+            .file_documents()
+            .filter_map(|document| {
+                let language_id = match document {
+                    Document::Text(text) => Some(text.language_id()),
+                    Document::Notebook(_) => None,
+                };
+                let handle = OpenDocumentHandle::from_document(document);
+                let (workspace_root, _) =
+                    self.project_state_for_document(handle.notebook_or_file_path())?;
+                (workspace_root == root).then_some((handle, language_id))
+            })
+            .collect();
+
+        for (document, language_id) in documents {
+            self.open_document_in_db(client, &document, language_id);
+        }
     }
 
     /// Adds an uninitialized workspace to this session.
     ///
-    /// This returns `true` when this workspace is added and `false`
-    /// when it has already been added.
+    /// Returns `true` when the workspace is added or replaces the fallback at the same path.
+    /// Returns `false` when the workspace is already registered.
     ///
     /// If there was a problem adding the workspace folder (e.g., the
     /// path derived from the given URI is not valid UTF-8), then an
@@ -880,7 +941,7 @@ impl Session {
     /// a request for workspace folder configuration via
     /// `Session::request_uninitialized_workspace_folder_configuration`.
     pub(crate) fn register_workspace_folder(&mut self, uri: Uri) -> anyhow::Result<bool> {
-        self.workspaces.register(uri)
+        self.workspaces.register(uri, false)
     }
 
     /// Requests configuration for each registered but uninitialized
@@ -1423,9 +1484,7 @@ impl Session {
                     Ok(file) => {
                         let project = db.project();
 
-                        // Only mark this file as open if it's part of the project.
-                        // This ensures that we don't show diagnostics for files outside the project.
-                        if project.is_file_included(db, system_path).is_included() {
+                        if project.should_check_open_path(db, system_path) {
                             project.open_file(db, file);
                         }
                     }
@@ -1748,8 +1807,7 @@ pub(crate) struct Workspaces {
 impl Workspaces {
     /// Registers a new workspace with the given URI and default settings for the workspace.
     ///
-    /// This returns `true` when this workspace is added and `false`
-    /// when it has already been added.
+    /// A client workspace can replace the fallback at the same path.
     ///
     /// It's the caller's responsibility to later call
     /// [`Session::request_uninitialized_workspace_folder_configurations`] with
@@ -1758,7 +1816,7 @@ impl Workspaces {
     /// to the server during the `initialize` request, but the resolved
     /// settings are only available after the client has responded to the
     /// `workspace/configuration` request.
-    fn register(&mut self, uri: Uri) -> anyhow::Result<bool> {
+    fn register(&mut self, uri: Uri, is_fallback: bool) -> anyhow::Result<bool> {
         let path = uri
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URI is not a file or directory: {uri:?}"))?;
@@ -1767,7 +1825,9 @@ impl Workspaces {
         let system_path = SystemPathBuf::from_path_buf(path)
             .map_err(|_| anyhow!("Workspace URI is not valid UTF8"))?;
 
-        if self.workspaces.contains_key(&system_path) {
+        if let Some(workspace) = self.workspaces.get(&system_path)
+            && (!workspace.is_fallback || is_fallback)
+        {
             return Ok(false);
         }
 
@@ -1775,6 +1835,7 @@ impl Workspaces {
             system_path,
             Workspace {
                 uri,
+                is_fallback,
                 settings: Arc::new(WorkspaceSettings::default()),
                 initialized: false,
             },
@@ -1824,8 +1885,10 @@ impl<'a> IntoIterator for &'a Workspaces {
 
 #[derive(Debug)]
 pub(crate) struct Workspace {
-    /// The workspace root URI as sent by the client during initialization.
+    /// The workspace URI from the client or the server's working directory at folderless startup.
     uri: Uri,
+    /// Whether the server registered this workspace for folderless startup.
+    is_fallback: bool,
     /// The settings for this workspace.
     ///
     /// The settings here have already been "combined" with the initialization
@@ -2179,6 +2242,9 @@ impl OpenDocumentHandle {
             // Closing a notebook cell clears its diagnostics but leaves its notebook open.
             None => true,
             Some(AnySystemPath::System(path)) => {
+                let is_fallback = session
+                    .project_state(self.notebook_or_file_path())
+                    .is_fallback;
                 let is_deleted = self.close_system_file(session, client, path, &removed_document);
 
                 // For non-virtual files, we clear diagnostics if:
@@ -2187,7 +2253,9 @@ impl OpenDocumentHandle {
                 // 2. The file does not belong to any workspace e.g., opening a random file from
                 //    outside the workspace because closing it acts like the file doesn't exist
                 // 3. The diagnostic mode is set to open-files only
+                // 4. The project is a folderless fallback
                 is_deleted
+                    || is_fallback
                     || session.workspaces().for_path(path).is_none()
                     || session
                         .global_settings()

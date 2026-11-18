@@ -7,7 +7,7 @@ use crate::session::{ClientName, InitializationOptions, Session, warn_about_unkn
 use anyhow::Context;
 use lsp_server::{Connection, ErrorCode, Message, Response};
 use lsp_types::{
-    ClientCapabilities, InitializeParams, MessageType, Uri, WorkspaceFolders,
+    ClientCapabilities, InitializeParams, MessageType, WorkspaceFolders,
     WorkspaceFoldersInitializeParams,
 };
 use ruff_db::system::System;
@@ -126,43 +126,12 @@ impl Server {
             warn_about_unknown_options(&client, None, unknown_options);
         }
 
-        // Get workspace URLs without settings - settings will come from workspace/configuration
-        let workspace_urls = workspace_folders
-            .and_then(|folders| {
-                if let WorkspaceFolders::WorkspaceFolderList(folders) = folders
-                    && !folders.is_empty()
-                {
-                    Some(folders)
-                } else {
-                    None
-                }
-            })
-            .map(|folders| {
-                folders
-                    .into_iter()
-                    .map(|folder| folder.uri)
-                    .collect::<Vec<_>>()
-            })
-            .or_else(|| {
-                let current_dir = native_system
-                    .current_directory()
-                    .as_std_path()
-                    .to_path_buf();
-                tracing::warn!(
-                    "No workspace(s) were provided during initialization. \
-                    Using the current working directory from the fallback system as a \
-                    default workspace: {}",
-                    current_dir.display()
-                );
-                let uri = Uri::from_file_path(current_dir).ok()?;
-                Some(vec![uri])
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Failed to get the current working directory while creating a \
-                    default workspace."
-                )
-            })?;
+        let workspace_uris = match workspace_folders {
+            Some(WorkspaceFolders::WorkspaceFolderList(folders)) => {
+                folders.into_iter().map(|folder| folder.uri).collect()
+            }
+            _ => Vec::new(),
+        };
 
         Ok(Self {
             connection,
@@ -172,7 +141,7 @@ impl Server {
             session: Session::new(
                 resolved_client_capabilities,
                 position_encoding,
-                workspace_urls,
+                workspace_uris,
                 initialization_options,
                 native_system,
                 ClientName::from(client_info),

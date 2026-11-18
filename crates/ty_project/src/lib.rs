@@ -388,6 +388,24 @@ impl Project {
             .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
+    /// Returns whether to check an explicitly opened system path.
+    ///
+    /// When indexing is disabled, the source filters still apply inside the project root.
+    /// Explicitly opened files outside the root can also be checked.
+    pub fn should_check_open_path(self, db: &dyn Db, path: &SystemPath) -> bool {
+        if matches!(self.indexing_mode(db), ProjectIndexing::Disabled) {
+            return !path.starts_with(self.root(db))
+                || self
+                    .settings(db)
+                    .src()
+                    .files
+                    .is_file_included(path, GlobFilterCheckMode::Adhoc)
+                    .is_included();
+        }
+
+        self.is_file_included(db, path).is_included()
+    }
+
     fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
         matches!(
             ProjectFilesFilter::from_project(db, self)
