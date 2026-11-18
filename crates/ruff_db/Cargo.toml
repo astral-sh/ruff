@@ -35,7 +35,7 @@ ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
 path-slash = { workspace = true }
 pathdiff = { workspace = true }
-quick-junit = { workspace = true, optional = true }
+quick-xml = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 same-file = { workspace = true, optional = true }
@@ -43,6 +43,7 @@ schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 similar = { workspace = true }
+strip-ansi-escapes = { workspace = true, optional = true }
 supports-hyperlinks = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -63,7 +64,7 @@ tempfile = { workspace = true }
 
 [features]
 cache = ["ruff_cache"]
-junit = ["dep:quick-junit"]
+junit = ["dep:quick-xml", "dep:strip-ansi-escapes"]
 os = ["ignore", "dep:etcetera", "dep:same-file", "dep:which"]
 serde = [
     "camino/serde1",

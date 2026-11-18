@@ -30,6 +30,7 @@ ruff_workspace = { workspace = true }
 anyhow = { workspace = true }
 crossbeam = { workspace = true }
 ignore = { workspace = true }
+jiff = { workspace = true }
 jod-thread = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
@@ -42,7 +43,7 @@ thiserror = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
 tracing-log = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["chrono"] }
+tracing-subscriber = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 libc = { workspace = true }

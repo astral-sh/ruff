@@ -26,7 +26,6 @@ allow-build-scripts = [
     "fs-err",
     "generic-array",
     "getrandom",
-    "iana-time-zone-haiku",
     "icu_normalizer_data",
     "icu_properties_data",
     "libc",
