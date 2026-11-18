@@ -1212,7 +1212,6 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         Option<(FileScopeId, ConstraintKey)>,
     )> {
         let scope = self.scope;
-        let table = self.index.place_table(scope);
         let use_def = self.index.use_def_map(scope);
 
         match self.mode {
@@ -1241,7 +1240,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                 let source = self
                     .local_operand
                     .map(|op| op.place)
-                    .or_else(|| table.place_id(place_expr))
+                    .or_else(|| self.index.place_table(scope).place_id(place_expr))
                     .map(|id| PlaceLoadSourceKind::Bindings(use_def.reachable_bindings(id)));
                 assert!(
                     source.is_some() || matches!(self.mode, PlaceLoadMode::StringAnnotation),
