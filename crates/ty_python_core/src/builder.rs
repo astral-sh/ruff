@@ -4288,9 +4288,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
                     self.has_future_annotations |= !node.is_lazy
-                        && (node.level == 0 || self.python_version() < PythonVersion::PY313)
-                        && alias.name.id == "annotations"
-                        && node.module.as_deref() == Some("__future__");
+                        && node.is_future_import(self.python_version())
+                        && alias.name.id == "annotations";
 
                     let symbol = self.add_symbol(symbol_name.clone());
 

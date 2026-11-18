@@ -1,4 +1,4 @@
-use ruff_python_ast::{PythonVersion, StmtImportFrom};
+use ruff_python_ast::StmtImportFrom;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -39,28 +39,15 @@ impl Violation for FutureAnnotationsInStub {
 
 /// PYI044
 pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
-    let StmtImportFrom {
-        range,
-        module: Some(module_name),
-        level,
-        names,
-        ..
-    } = target
-    else {
-        return;
-    };
-
-    let is_future = module_name == "__future__"
-        && (*level == 0 || checker.target_version() < PythonVersion::PY313);
-    if !is_future {
+    if !target.is_future_import(checker.target_version()) {
         return;
     }
 
-    if names.iter().all(|alias| &*alias.name != "annotations") {
+    if target.names.iter().all(|alias| &*alias.name != "annotations") {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, *range);
+    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, target.range);
 
     let stmt = checker.semantic().current_statement();
 

@@ -78,14 +78,15 @@ impl SemanticSyntaxChecker {
 
     fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
-            Stmt::ImportFrom(StmtImportFrom {
-                range,
-                module,
-                level,
-                names,
-                is_lazy,
-                ..
-            }) => {
+            Stmt::ImportFrom(import_from) => {
+                let StmtImportFrom {
+                    range,
+                    module,
+                    level,
+                    names,
+                    is_lazy,
+                    ..
+                } = import_from;
                 let mut handled_lazy_error = false;
 
                 if *is_lazy {
@@ -142,9 +143,7 @@ impl SemanticSyntaxChecker {
                 if handled_lazy_error {
                     // Skip the regular `from`-import validations after reporting the lazy-specific
                     // syntax error with the highest precedence.
-                } else if matches!(module.as_deref(), Some("__future__"))
-                    && (*level == 0 || ctx.python_version() < PythonVersion::PY313)
-                {
+                } else if import_from.is_future_import(ctx.python_version()) {
                     for name in names {
                         if !is_known_future_feature(&name.name) {
                             // test_ok valid_future_feature
@@ -891,17 +890,10 @@ impl SemanticSyntaxChecker {
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
                 if !self.seen_module_docstring_boundary && value.is_string_literal_expr() => {}
-            Stmt::ImportFrom(StmtImportFrom {
-                module,
-                is_lazy,
-                level,
-                ..
-            }) => {
+            Stmt::ImportFrom(import_from) => {
                 // Allow eager `__future__` imports until we see any other import. Lazy imports,
                 // including `lazy from __future__ import ...`, always close the boundary.
-                let is_future = matches!(module.as_deref(), Some("__future__"))
-                    && (*level == 0 || ctx.python_version() < PythonVersion::PY313);
-                if *is_lazy || !is_future {
+                if import_from.is_lazy || !import_from.is_future_import(ctx.python_version()) {
                     self.seen_futures_boundary = true;
                 }
             }
