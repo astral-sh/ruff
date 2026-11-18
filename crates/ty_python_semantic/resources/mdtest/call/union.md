@@ -100,6 +100,26 @@ def _(flag: bool):
     reveal_type(x)  # revealed: int | str
 ```
 
+## Gradual callables with different positional prefixes
+
+A call must satisfy the fixed parameters of every union member. Here the longer prefix requires a
+second argument of type `str`.
+
+```py
+from typing import Callable, Concatenate
+
+Short = Callable[Concatenate[int, ...], int]
+Long = Callable[Concatenate[int, str, ...], int]
+
+def _(f: Long | Short, g: Short | Long) -> None:
+    f(1, "two")  # ok
+    f(1, 2)  # error: [invalid-argument-type]
+    f(1)  # error: [missing-argument]
+    g(1, "two")  # ok
+    g(1, 2)  # error: [invalid-argument-type]
+    g(1)  # error: [missing-argument]
+```
+
 ## Assigning function-literal unions to callables
 
 A union of function literals must satisfy the target callable with every element.

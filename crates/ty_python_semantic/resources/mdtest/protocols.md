@@ -7187,11 +7187,24 @@ def use_static(callback: StaticCallback[CallbackT]) -> CallbackT:
 def use_class(callback: ClassCallback[CallbackT]) -> CallbackT:
     raise NotImplementedError
 
+class IntCallback:
+    @staticmethod
+    def __call__(value: int) -> int:
+        return value
+
+reveal_type(use_static(IntCallback()))  # revealed: int
+reveal_type(use_class(IntCallback()))  # revealed: int
+```
+
+Both protocols allow `type(callback).__call__(value=1)`. A plain function supports
+`callback(value=1)`, but its class's `__call__` requires a function as its first argument.
+
+```py
 def identity(value: int) -> int:
     return value
 
-reveal_type(use_static(identity))  # revealed: int
-reveal_type(use_class(identity))  # revealed: int
+use_static(identity)  # error: [invalid-argument-type]
+use_class(identity)  # error: [invalid-argument-type]
 ```
 
 Class-literals and generic aliases can also be subtypes of callback protocols:

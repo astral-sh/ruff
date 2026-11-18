@@ -4945,6 +4945,15 @@ reveal_type(invoke(accepts_int))  # revealed: int
 reveal_type(invoke(needs_str))  # revealed: int
 ```
 
+A compatible callback can also determine the type of the required parameter.
+
+```py
+def infer_prefix[T](callback: Callable[Concatenate[T, ...], int]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer_prefix(needs_str))  # revealed: str
+```
+
 ### Inferring uninhabited keyword types
 
 Inferring a keyword type as `Never` can eliminate a collision with an occupied positional parameter.
