@@ -148,16 +148,16 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     // Break ties in the event of overlapping rules, for some specific combinations.
     .then_with(|| {
         let rules = (name1, name2);
-        // Apply `MissingTrailingPeriod` fixes before `MissingNewLineAfterLastDocstringParagraph` fixes.
-        let missing_trailing_period = Rule::MissingTrailingPeriod.name().as_str();
+        // Apply `D400` fixes before `D209` fixes.
+        let summary_period = Rule::MissingDocstringSummaryPeriod.name().as_str();
         let newline_after_last_paragraph = Rule::MissingNewLineAfterLastDocstringParagraph
             .name()
             .as_str();
         let if_else_instead_of_dict_get = Rule::IfElseBlockInsteadOfDictGet.name().as_str();
         let if_else_instead_of_if_exp = Rule::IfElseAssignmentToSameVariable.name().as_str();
-        if rules == (missing_trailing_period, newline_after_last_paragraph) {
+        if rules == (summary_period, newline_after_last_paragraph) {
             std::cmp::Ordering::Less
-        } else if rules == (newline_after_last_paragraph, missing_trailing_period) {
+        } else if rules == (newline_after_last_paragraph, summary_period) {
             std::cmp::Ordering::Greater
         }
         // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseAssignmentToSameVariable` fixes.

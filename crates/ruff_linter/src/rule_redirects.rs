@@ -68,8 +68,33 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     ("triple-single-quotes", Rule::UnconventionalDocstringQuotes),
     (
+        "missing-trailing-period",
+        Rule::MissingDocstringSummaryPeriod,
+    ),
+    ("non-imperative-mood", Rule::NonImperativeDocstringSummary),
+    (
+        "first-word-uncapitalized",
+        Rule::UncapitalizedFirstWordOfDocstring,
+    ),
+    (
+        "non-capitalized-section-name",
+        Rule::NonCapitalizedDocstringSectionName,
+    ),
+    (
+        "missing-new-line-after-section-name",
+        Rule::MissingNewLineAfterDocstringSectionName,
+    ),
+    (
+        "missing-dashed-underline-after-section",
+        Rule::MissingDocstringSectionUnderline,
+    ),
+    (
         "missing-section-underline-after-name",
         Rule::BlankLineBeforeDocstringSectionUnderline,
+    ),
+    (
+        "mismatched-section-underline-length",
+        Rule::MismatchedDocstringSectionUnderlineLength,
     ),
     (
         "no-blank-line-after-section",
@@ -80,10 +105,26 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         Rule::MissingBlankLineBeforeDocstringSection,
     ),
     (
+        "blank-lines-between-header-and-content",
+        Rule::BlankLinesBetweenDocstringSectionHeaderAndContent,
+    ),
+    (
         "missing-blank-line-after-last-section",
         Rule::MissingBlankLineAfterLastDocstringSection,
     ),
+    (
+        "missing-terminal-punctuation",
+        Rule::MissingDocstringSummaryPunctuation,
+    ),
+    (
+        "missing-section-name-colon",
+        Rule::MissingDocstringSectionNameColon,
+    ),
     ("undocumented-param", Rule::UndocumentedParameter),
+    (
+        "incorrect-section-order",
+        Rule::IncorrectDocstringSectionOrder,
+    ),
     ("get-attr-with-constant", Rule::GetattrWithConstant),
     ("set-attr-with-constant", Rule::SetattrWithConstant),
     ("del-attr-with-constant", Rule::DelattrWithConstant),
