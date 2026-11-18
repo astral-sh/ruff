@@ -1536,8 +1536,9 @@ fn unavailable_uv_reports_metadata_error() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[project-manager]: Failed to invoke `uv workspace metadata`: No such file or directory (os error 2)
+    error[project-manager]: Setting up the Python environment with uv failed
     --> script.py:3:1
+    error: Failed to run `uv workspace metadata`: No such file or directory (os error 2)
 
     Found 1 diagnostic
 
@@ -2141,8 +2142,7 @@ mod uv_metadata {
             # ///
             print(missing)
             ",
-        )?
-        .with_filter(r"exit code: (\d+)", "exit status: $1");
+        )?;
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .arg("script.py")
@@ -2151,12 +2151,13 @@ mod uv_metadata {
         success: false
         exit_code: 1
         ----- stdout -----
-        error[project-manager]: `uv workspace metadata` failed with `exit status: 1`
+        error[project-manager]: Setting up the Python environment with uv failed
         --> script.py:2:1
-        info: No solution found when resolving dependencies
+        error: No solution found when resolving dependencies
           cause: Because missing-script-dependency was not found in the cache and you require missing-script-dependency==99.0.0, we can conclude that your requirements are unsatisfiable.
 
         hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
+        error: `uv workspace metadata` exited with status 1
 
         Found 1 diagnostic
 

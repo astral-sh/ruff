@@ -3,7 +3,9 @@ use std::path::PathBuf;
 
 use char_str::CharStr;
 use pep440_rs::Version;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
+};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use serde::Deserialize;
 use thiserror::Error;
@@ -102,7 +104,7 @@ pub(crate) enum UvMetadataError {
         version: Version,
     },
 
-    #[error("Failed to invoke `uv workspace metadata`: {0}")]
+    #[error("Failed to run `uv workspace metadata`: {0}")]
     Invocation(#[source] std::io::Error),
 
     #[error("`uv workspace metadata` failed with `{status}`: {stderr}")]
@@ -128,29 +130,44 @@ pub(crate) enum UvMetadataError {
 }
 
 impl UvMetadataError {
-    pub(crate) fn to_diagnostic(&self, severity: Severity) -> Diagnostic {
+    pub(super) fn to_diagnostic(&self, severity: Severity, headline: &str) -> Diagnostic {
+        let mut diagnostic = Diagnostic::new(DiagnosticId::ProjectManager, severity, headline);
         match self {
+            Self::UnsupportedVersion { .. } => diagnostic.set_headline_message(self),
             Self::CommandFailed { status, stderr } => {
-                let mut diagnostic = Diagnostic::new(
-                    DiagnosticId::ProjectManager,
-                    severity,
-                    format_args!("`uv workspace metadata` failed with `{status}`"),
-                );
-                let stderr = stderr.trim();
-                let stderr = stderr.strip_prefix("error:").unwrap_or(stderr).trim_start();
-                // Concise output omits subdiagnostics, so use uv's first stderr line as a
-                // summary. This is a heuristic: uv's errors are unstructured, and the first
-                // line may need context from later lines. Full output retains the whole message.
-                if let Some(summary) = stderr.lines().next() {
-                    diagnostic
-                        .set_concise_message(format_args!("Failed to load uv metadata: {summary}"));
-                    diagnostic.info(stderr);
+                let failure = match status.code() {
+                    Some(code) => format!("`uv workspace metadata` exited with status {code}"),
+                    None => format!("`uv workspace metadata` failed with {status}"),
+                };
+                // Concise output uses uv's first error line as a summary. Keep the original
+                // stderr in full output so multiline explanations and code frames stay intact.
+                let stderr = stderr.trim_end();
+                let summary = uv_error_summary(stderr).unwrap_or(&failure);
+                diagnostic.set_concise_message(format_args!("{headline}: {summary}"));
+                if !stderr.is_empty() {
+                    // The subdiagnostic supplies uv's leading `error: ` label.
+                    let message = stderr.strip_prefix("error: ").unwrap_or(stderr);
+                    diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Error, message));
                 }
-                diagnostic
+                diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Error, failure));
             }
-            _ => Diagnostic::new(DiagnosticId::ProjectManager, severity, self.to_string()),
+            _ => {
+                diagnostic.set_concise_message(format_args!("{headline}: {self}"));
+                diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Error, self));
+            }
         }
+        diagnostic
     }
+}
+
+fn uv_error_summary(stderr: &str) -> Option<&str> {
+    let stderr = stderr.trim_start();
+    stderr
+        .strip_prefix("error:")
+        .unwrap_or(stderr)
+        .trim_start()
+        .lines()
+        .next()
 }
 
 fn existing_directory(

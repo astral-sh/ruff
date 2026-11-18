@@ -1017,19 +1017,17 @@ mod uv_metadata {
         let Message::String(message) = &diagnostic.message else {
             anyhow::bail!("expected a plain-text diagnostic: {diagnostic:?}");
         };
-        let mut settings = insta::Settings::clone_current();
-        settings.add_filter(r"exit code: (\d+)", "exit status: $1");
-        let _settings = settings.bind_to_scope();
         insta::assert_snapshot!(message, @"
-        `uv workspace metadata` failed with `exit status: 2`
+        Setting up the Python environment with uv failed
 
-        info: TOML parse error at line 1, column 17
+        error: TOML parse error at line 1, column 17
           |
         1 | dependencies = ['not a valid requirement ???']
           |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         Expected one of `@`, `(`, `<`, `=`, `>`, `~`, `!`, `;`, found `a`
         not a valid requirement ???
             ^
+        error: `uv workspace metadata` exited with status 2
         ");
         Ok(())
     }

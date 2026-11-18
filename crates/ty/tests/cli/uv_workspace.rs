@@ -430,7 +430,7 @@ fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> 
     exit_code: 1
     ----- stdout -----
     member.py:1:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
-    pyproject.toml: warning[project-manager] Failed to load uv metadata: No solution found when resolving dependencies
+    pyproject.toml: warning[project-manager] Failed to load project metadata from uv: No solution found when resolving dependencies
     Found 2 diagnostics
 
     ----- stderr -----
@@ -788,7 +788,7 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    pyproject.toml: warning[project-manager] Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
+    pyproject.toml: warning[project-manager] Failed to load project metadata from uv: Failed to run `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
     Found 1 diagnostic
 
     ----- stderr -----
@@ -800,8 +800,9 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[project-manager]: Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
+    warning[project-manager]: Failed to load project metadata from uv
     --> pyproject.toml:1:1
+    error: Failed to run `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
 
     Found 1 diagnostic
 

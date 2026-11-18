@@ -675,7 +675,7 @@ mod tests {
     use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
     use ruff_db::Db as _;
-    use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+    use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, SubDiagnosticSeverity};
     use ruff_db::files::File;
     #[cfg(unix)]
     use ruff_db::system::{OsSystem, System, SystemPath, WritableSystem};
@@ -1174,6 +1174,10 @@ unclosed table, expected `]`
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].id(), DiagnosticId::ProjectManager);
         assert_eq!(diagnostics[0].severity(), Severity::Warning);
+        assert_eq!(
+            diagnostics[0].sub_diagnostics()[0].severity(),
+            SubDiagnosticSeverity::Error
+        );
         assert_eq!(
             diagnostics[0].concise_message().to_string(),
             "Failed to load uv dependency metadata: uv did not provide a Python environment"

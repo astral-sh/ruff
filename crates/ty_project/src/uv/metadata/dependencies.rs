@@ -310,10 +310,7 @@ impl DependencyMetadataError {
         diagnostic.set_concise_message(format_args!(
             "Failed to load uv dependency metadata: {self}"
         ));
-        diagnostic.sub(SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            self.to_string(),
-        ));
+        diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Error, self));
         match self {
             Self::MissingModuleOwnership
             | Self::MissingEnvironment

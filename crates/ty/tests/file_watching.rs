@@ -3373,7 +3373,7 @@ mod uv_metadata {
         let diagnostics = case.db().check();
         assert_snapshot!(
             case.render_diagnostics(&diagnostics),
-            @"pyproject.toml: warning[project-manager] Failed to load uv metadata: Failed to parse: pyproject.toml"
+            @"pyproject.toml: warning[project-manager] Failed to load project metadata from uv: Failed to parse: pyproject.toml"
         );
         assert_eq!(project.program_settings(case.db()), &program_settings);
 
@@ -3417,7 +3417,7 @@ mod uv_metadata {
         let diagnostics = case.db().check();
         assert_snapshot!(
             case.render_diagnostics(&diagnostics),
-            @"warning[project-manager] Failed to load uv metadata: No `pyproject.toml` found in current directory or any parent directory"
+            @"warning[project-manager] Failed to load project metadata from uv: No `pyproject.toml` found in current directory or any parent directory"
         );
 
         std::fs::write(case.project_path("pyproject.toml").as_std_path(), MANIFEST)?;
@@ -3808,7 +3808,7 @@ mod uv_metadata {
         apply_changes_and_synchronize_project(&mut case, &changes)?;
         assert_snapshot!(
             case.render_diagnostics(&case.db().check()),
-            @"<temp_dir>/pyproject.toml: warning[project-manager] Failed to load uv metadata: Failed to build `example @ file://<temp_dir>/project`"
+            @"<temp_dir>/pyproject.toml: warning[project-manager] Failed to load project metadata from uv: Failed to build `example @ file://<temp_dir>/project`"
         );
         Ok(())
     }
@@ -3869,7 +3869,7 @@ mod uv_metadata {
         })?;
         assert_snapshot!(
             case.render_diagnostics(&case.db().check()),
-            @"pyproject.toml: warning[project-manager] Failed to load uv metadata: Failed to build `example @ file://<temp_dir>/project`"
+            @"pyproject.toml: warning[project-manager] Failed to load project metadata from uv: Failed to build `example @ file://<temp_dir>/project`"
         );
 
         // Move the complete member into place without editing either manifest.
@@ -3939,7 +3939,7 @@ mod uv_metadata {
         apply_changes_and_synchronize_project(&mut case, &deleted)?;
         assert_snapshot!(
             case.render_diagnostics(&case.db().check()),
-            @"pyproject.toml: warning[project-manager] Failed to load uv metadata: Failed to build `example @ file://<temp_dir>/project`"
+            @"pyproject.toml: warning[project-manager] Failed to load project metadata from uv: Failed to build `example @ file://<temp_dir>/project`"
         );
         Ok(())
     }
@@ -4336,7 +4336,7 @@ mod uv_metadata {
 
         assert_snapshot!(
             case.render_diagnostics(&case.db().check()),
-            @"script.py:2:1: error[project-manager] Failed to load uv metadata: TOML parse error at line 2, column 17"
+            @"script.py:2:1: error[project-manager] Setting up the Python environment with uv failed: TOML parse error at line 2, column 17"
         );
 
         update_and_synchronize_script(

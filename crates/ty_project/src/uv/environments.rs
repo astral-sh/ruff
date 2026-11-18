@@ -549,10 +549,14 @@ impl UvWorkspace {
                 metadata: Some(metadata),
                 error: None,
             },
-            Err(error) => Self {
-                metadata: None,
-                error: Some(error.to_diagnostic(Severity::Warning)),
-            },
+            Err(error) => {
+                let diagnostic = error
+                    .to_diagnostic(Severity::Warning, "Failed to load project metadata from uv");
+                Self {
+                    metadata: None,
+                    error: Some(diagnostic),
+                }
+            }
         }
     }
 }
@@ -731,7 +735,13 @@ fn apply_sync_result(
 ) {
     let (uv_metadata, initialization_error) = match Uv::parse_metadata_output(db.system(), output) {
         Ok(metadata) => (Some(metadata), None),
-        Err(error) => (None, Some(error.to_diagnostic(Severity::Error))),
+        Err(error) => (
+            None,
+            Some(error.to_diagnostic(
+                Severity::Error,
+                "Setting up the Python environment with uv failed",
+            )),
+        ),
     };
 
     if environment.uv_metadata(db) != uv_metadata.as_ref() {
