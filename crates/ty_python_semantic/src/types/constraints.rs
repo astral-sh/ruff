@@ -111,7 +111,8 @@ use crate::types::constraints::support::{Support, SupportId};
 use crate::types::generics::Specialization;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarSet};
 use crate::types::visitor::{
-    NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases, walk_non_atomic_type,
+    NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
+    may_contain_typevar_matching, walk_non_atomic_type,
 };
 use crate::types::{
     BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
@@ -2033,6 +2034,60 @@ impl<'db> UpperBound<'db> {
         self.clauses.shrink_to_fit();
     }
 
+    /// Try one common specialization for the unbounded variables in the bound comparison.
+    ///
+    /// For example, `A | T | U <= A & T & U` has a solution with `T = U = A`. Asking the
+    /// solver to relate each variable to all the others can recursively recreate the same
+    /// compatibility problem.
+    fn has_common_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        source: EvidenceSource,
+        lower: UnionType<'db>,
+    ) -> bool {
+        let is_unbounded_variable = |variable: BoundTypeVarInstance<'db>| {
+            variable.is_inferable(db, inferable)
+                && !variable.is_paramspec(db)
+                && !variable.is_typevartuple(db)
+                && variable.typevar(db).bound_or_constraints(db, env).is_none()
+        };
+        let mut saw_variable = false;
+        let mut fixed_members = SmallVec::<[Type<'db>; 2]>::new();
+        for &element in lower.elements(db) {
+            if element.as_typevar().is_some_and(is_unbounded_variable) {
+                saw_variable = true;
+            } else {
+                fixed_members.push(element);
+            }
+        }
+        if !saw_variable
+            || fixed_members.iter().any(|&element| {
+                may_contain_typevar_matching(db, env, element, is_unbounded_variable)
+            })
+        {
+            return false;
+        }
+
+        // Assigning the union of the fixed members to each direct variable makes the entire
+        // union equal to that witness.
+        // Every other upper clause must accept it with its existing type variables held fixed.
+        let witness = UnionType::from_elements(db, env, fixed_members);
+        let accepts_witness = |clause: Type<'db>| {
+            clause.as_typevar().is_some_and(is_unbounded_variable)
+                || witness
+                    .when_constraint_set_assignable_to_owned(db, env, clause, TypeVarSet::None)
+                    .query(|_, when| when.is_always_satisfied(db, env, TypeVarSet::None))
+        };
+        self.iter_clauses(source).all(|clause| match clause {
+            Type::Intersection(intersection) if intersection.negative(db).is_empty() => {
+                intersection.iter_positive(db).all(accepts_witness)
+            }
+            _ => accepts_witness(clause),
+        })
+    }
+
     /// Returns whether `lower` can satisfy all upper clauses together.
     fn permits_lower_bound(
         &self,
@@ -2043,6 +2098,13 @@ impl<'db> UpperBound<'db> {
         source: EvidenceSource,
         lower: Type<'db>,
     ) -> bool {
+        if inferable != TypeVarSet::None
+            && let Type::Union(lower) = lower
+            && self.has_common_specialization(db, env, inferable, source, lower)
+        {
+            return true;
+        }
+
         if self.iter_clauses(source).all(|clause| {
             lower
                 .when_constraint_set_assignable_to_owned(db, env, clause, inferable)
