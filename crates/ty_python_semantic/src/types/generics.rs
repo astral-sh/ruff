@@ -3707,8 +3707,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     && let Some(bound) = bounds.protocol_upper_bound(db)
                     && bound != protocol
                 {
-                    // Infer the target's type arguments from the bound's members. A constraint
-                    // on the caller's type variable alone says nothing about those arguments.
+                    // The cached relation below records `variable <= target` because a later
+                    // solve may specialize `variable`. Here the caller fixes `variable`, so
+                    // matching the bound's members with `Self = variable` lets us infer the
+                    // target's type arguments.
                     return TypeRelationChecker::constraint_set_assignability(
                         self.env,
                         self.constraints,
