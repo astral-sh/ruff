@@ -46,3 +46,42 @@ F823 Local variable `sys` referenced before assignment
 63 |
 64 |     for sys in range(5):
    |
+
+F823 Local variable `my_var` referenced before assignment
+  --> F823.py:87:11
+   |
+85 | # https://github.com/astral-sh/ruff/issues/30224
+86 | def f():
+87 |     print(my_var)
+   |           ^^^^^^
+88 |     my_var = 1
+89 |     my_var = 2
+   |
+
+F823 Local variable `my_var` referenced before assignment
+  --> F823.py:93:5
+   |
+92 | def f():
+93 |     my_var += 1
+   |     ^^^^^^
+94 |     my_var += 1
+   |
+
+F823 Local variable `my_var` referenced before assignment
+   --> F823.py:99:9
+    |
+ 97 | def f():
+ 98 |     if True:
+ 99 |         my_var += 1
+    |         ^^^^^^
+100 |     if False:
+101 |         my_var += 1
+    |
+
+F823 Local variable `my_var` referenced before assignment
+   --> F823.py:118:11
+    |
+116 |     except Exception as my_var:
+117 |         pass
+118 |     print(my_var)
+    |           ^^^^^^

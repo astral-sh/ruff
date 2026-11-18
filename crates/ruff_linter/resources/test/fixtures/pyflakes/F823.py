@@ -80,3 +80,39 @@ def f():
     import sklearn
 
     mlflow
+
+
+# https://github.com/astral-sh/ruff/issues/30224
+def f():
+    print(my_var)
+    my_var = 1
+    my_var = 2
+
+
+def f():
+    my_var += 1
+    my_var += 1
+
+
+def f():
+    if True:
+        my_var += 1
+    if False:
+        my_var += 1
+
+
+# OK: the read comes after the first local binding.
+def f():
+    my_var = 1
+    print(my_var)
+    my_var = 2
+
+
+# `except ... as my_var` makes `my_var` local, and it's unbound again after the
+# handler, so this read always raises an `UnboundLocalError`.
+def f():
+    try:
+        pass
+    except Exception as my_var:
+        pass
+    print(my_var)

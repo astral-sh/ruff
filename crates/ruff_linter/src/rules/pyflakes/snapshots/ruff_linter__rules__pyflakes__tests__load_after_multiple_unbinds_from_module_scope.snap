@@ -34,3 +34,10 @@ help: Remove assignment to unused variable `x`
 12 +     except ValueError:
 13 |         pass
    |
+
+F823 Local variable `x` referenced before assignment
+  --> <filename>:16:11
+   |
+15 |     # This should resolve to the `x` in `x = 1`.
+16 |     print(x)
+   |           ^
