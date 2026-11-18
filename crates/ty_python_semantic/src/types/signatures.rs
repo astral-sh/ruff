@@ -2993,11 +2993,43 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }) {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
+        let check_parameters_and_return = || {
+            let result = checker.check_signature_pair_inner(db, source, target);
+            if matches!(checker.relation, TypeRelation::Redundancy { .. })
+                && source.parameters.is_gradual()
+                && target.parameters.is_gradual()
+            {
+                // Unrestricted tails tell us which calls each union member accepts. Also compare
+                // the fixed parameters alone: a zero-argument function can implement `(...)`
+                // but cannot implement `(str, /, ...)`.
+                let fixed = |signature: &Signature<'db>| {
+                    signature
+                        .clone()
+                        .with_parameters(signature.parameters.without_variadics())
+                };
+                return result.and(db, checker.constraints, || {
+                    checker.check_signature_pair_inner(db, &fixed(source), &fixed(target))
+                });
+            }
+            if checker.typevar_evaluation == TypeVarEvaluation::Lazy
+                && target.parameters.is_gradual()
+                && !source.parameters.is_top()
+                && result.is_never_satisfied(db, env, checker.inferable)
+            {
+                // Preserve return-type inference for an incompatible object-variadic callback.
+                // A compatible prefix contributes its own inference bounds in the comparison above.
+                let parameters = source.parameters.expand_starred_variadic_annotations(db);
+                if parameters.has_unrestricted_variadics(db) {
+                    return checker.check_signature_return_pair(db, source, target);
+                }
+            }
+            result
+        };
         let when = checker.with_signature_recursion_guard(source, target, || {
             // A target that permits no calls imposes no receiver requirements. Still compare
             // return types so that their constraints contribute to inference.
             if target.parameters.is_top() {
-                return checker.check_signature_pair_inner(db, source, target);
+                return check_parameters_and_return();
             }
 
             source
@@ -3008,14 +3040,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // receiver restriction. Parameter and return types still contribute
                     // inference bounds.
                     if source.parameters.is_bottom() {
-                        return checker.check_signature_pair_inner(db, source, target);
+                        return check_parameters_and_return();
                     }
 
                     target
                         .receiver_constraints_when_satisfied(db, &checker)
-                        .and(db, self.constraints, || {
-                            checker.check_signature_pair_inner(db, source, target)
-                        })
+                        .and(db, self.constraints, check_parameters_and_return)
                 })
         });
 
@@ -3355,9 +3385,52 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Concrete target keywords can collide with a fixed source prefix even when the source
         // has a gradual or ParamSpec tail. Check them before those specialized paths can return.
         let mut keyword_collision_checks = true;
-        if (source_has_unpacked_suffix || target_has_unpacked_suffix)
-            && target_parameters.is_standard()
+        let source_is_gradual = source_parameters.is_gradual();
+        let target_is_gradual = target_parameters.is_gradual();
+        // A bottom-materialized gradual tail accepts arbitrary positional and keyword arguments.
+        // Its fixed parameters can bind the same calls as in the original signature.
+        let match_variadic_prefix = source_is_gradual
+            || target_is_gradual
+            || source_parameters.has_unrestricted_variadics(db);
+        let specialize_target_tail = target_is_gradual && self.relation.is_assignability();
+        // Keep every fixed parameter for both keyword collisions and ordinary matching. A
+        // gradual target can specialize its tail to the source's remaining parameters. Strict
+        // subtyping must also hold when the tail accepts unrestricted arguments.
+        let gradual_target = (target_is_gradual
+            && !(specialize_target_tail && target_parameters.is_fully_gradual()))
+        .then(|| {
+            if specialize_target_tail {
+                target_parameters.without_variadics()
+            } else {
+                target_parameters.with_unrestricted_variadics()
+            }
+        });
+        if (target_parameters.is_standard()
+            && (source_has_unpacked_suffix || target_has_unpacked_suffix || match_variadic_prefix))
+            || gradual_target.is_some()
         {
+            let target_parameters = gradual_target.as_ref().unwrap_or(&target_parameters);
+            let target_variadic = target_parameters.variadic();
+            let keyword_variadic = target_parameters.keyword_variadic();
+            let positional_count = target_parameters.positional().count();
+            let positional_limit = LazyCell::new(|| {
+                let is_never = |parameter: &Parameter<'db>| {
+                    parameter.annotated_type().resolve_type_alias(db).is_never()
+                };
+                if let Some(index) = target_parameters.positional().position(is_never) {
+                    return Some(index);
+                }
+                // A `*args: Never` segment is empty, but its required suffix still binds.
+                if target_variadic.is_some_and(|(_, variadic)| is_never(variadic)) {
+                    return Some(
+                        target_parameters
+                            .iter()
+                            .filter(|p| p.is_positional())
+                            .count(),
+                    );
+                }
+                None
+            });
             // A target call can fill a source parameter positionally and also pass its name as a
             // keyword. A matching target prefix protects that name only when the same call must
             // already have filled the target parameter, including every prefix before a suffix.
@@ -3366,9 +3439,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     continue;
                 };
 
-                if target_parameters.variadic().is_none()
-                    && source_index >= target_parameters.positional().count()
-                {
+                if target_variadic.is_none() && source_index >= positional_count {
                     continue;
                 }
 
@@ -3380,16 +3451,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     continue;
                 }
 
-                let Some((_, keyword)) =
-                    target_keyword.or_else(|| target_parameters.keyword_variadic())
-                else {
+                let Some((_, keyword)) = target_keyword.or(keyword_variadic) else {
                     continue;
                 };
 
-                // The keyword must be uninhabited to avoid the collision. Keep this as a
-                // constraint so gradual types can materialize to `Never` and inferable type
-                // variables can be constrained to it.
-                let no_collision = self.check_type_pair(db, keyword.annotated_type(), Type::Never);
+                // Beyond an uninhabited positional parameter, the keyword can only bind by name.
+                // Otherwise the keyword must be uninhabited to avoid binding the source twice.
+                let keyword_type = if positional_limit.is_some_and(|limit| source_index >= limit) {
+                    source_parameter.annotated_type()
+                } else {
+                    Type::Never
+                };
+                let no_collision = self.check_type_pair(db, keyword.annotated_type(), keyword_type);
                 if result
                     .intersect(db, self.constraints, no_collision)
                     .is_never_satisfied(db, env, self.inferable)
@@ -4036,23 +4109,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
-        // **kwargs: object).
-        if target_parameters.is_gradual()
-            && (matches!(target_parameters.kind(), ParametersKind::Gradual)
-                || self.typevar_evaluation == TypeVarEvaluation::Lazy)
-            && !source_parameters.is_top()
-            && source_parameters
-                .variadic()
-                .is_some_and(|(_, param)| param.annotated_type().is_object())
-            && source_parameters
-                .keyword_variadic()
-                .is_some_and(|(_, param)| param.annotated_type().is_object())
-        {
-            return result;
-        }
-
-        if source_parameters.is_top() && !target_parameters.is_gradual() {
+        if source_parameters.is_top() {
+            if target_is_gradual {
+                return if self.relation == TypeRelation::Assignability {
+                    result
+                } else {
+                    self.never()
+                };
+            }
             if let Some(context) = self.report_context() {
                 context.push(ErrorContext::TopCallableAssignedToNonTop {
                     return_type: source.return_ty,
@@ -4061,225 +4125,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         }
 
-        // If either of the parameter lists is gradual (`...`), then it is assignable to and from
-        // any other parameter list, but not a subtype or supertype of any other parameter list. An
-        // unpacked target TypeVarTuple instead continues to the ordinary parameter comparison so it
-        // can be constrained from the source parameters.
-        if target_typevartuple.is_none()
-            && (source_parameters.is_gradual() || target_parameters.is_gradual())
-        {
-            match (source_parameters.kind(), target_parameters.kind()) {
-                // Both parameter lists are `Concatenate` with gradual forms. All prefix parameters
-                // are going to be positional-only.
-                (
-                    ParametersKind::Concatenate(ConcatenateTail::Gradual),
-                    ParametersKind::Concatenate(ConcatenateTail::Gradual),
-                ) => {
-                    let source_prefix_params =
-                        &source_parameters.as_slice()[..source_parameters.len().saturating_sub(2)];
-                    let target_prefix_params =
-                        &target_parameters.as_slice()[..target_parameters.len().saturating_sub(2)];
-
-                    for (target_index, (source_param, target_param)) in source_prefix_params
-                        .iter()
-                        .zip(target_prefix_params.iter())
-                        .enumerate()
-                    {
-                        if !check_types(
-                            &mut result,
-                            target_param.annotated_type(),
-                            source_param.annotated_type(),
-                            target_param.name(),
-                            target_index,
-                        ) {
-                            return result;
-                        }
-                    }
-                }
-
-                // Self is a `Concatenate` with gradual form while other is a regular non-gradual
-                // callable
-                (
-                    ParametersKind::Concatenate(ConcatenateTail::Gradual),
-                    ParametersKind::Standard,
-                ) => {
-                    let source_prefix_params =
-                        &source_parameters.as_slice()[..source_parameters.len().saturating_sub(2)];
-
-                    for (target_index, param) in source_prefix_params
-                        .iter()
-                        .zip_longest(target_parameters.iter())
-                        .enumerate()
-                    {
-                        match param {
-                            EitherOrBoth::Left(_) => {
-                                // Concatenate (self) has additional positional-only parameters but
-                                // other does not.
-                                return self.never();
-                            }
-                            EitherOrBoth::Right(_) => {
-                                // Once the left (self) iterator is exhausted, all the remaining
-                                // parameters in other will be consumed by the gradual form of
-                                // `Concatenate`.
-                                break;
-                            }
-                            EitherOrBoth::Both(source_param, target_param) => {
-                                if let (
-                                    ParameterKind::PositionalOnly { .. },
-                                    ParameterKind::PositionalOnly {
-                                        default_type: target_default,
-                                        ..
-                                    },
-                                ) = (source_param.kind(), target_param.kind())
-                                {
-                                    // `self`'s default is always going to be `None` because it comes
-                                    // from the `Concatenate` form which cannot have default value.
-                                    if target_default.is_some() {
-                                        return self.never();
-                                    }
-                                    if !check_types(
-                                        &mut result,
-                                        target_param.annotated_type(),
-                                        source_param.annotated_type(),
-                                        target_param.name(),
-                                        target_index,
-                                    ) {
-                                        return result;
-                                    }
-                                } else {
-                                    return self.never();
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Only the fixed prefix of a parameter list ending in a caller-owned
-                // ParamSpec is guaranteed to accept positional arguments.
-                (_, ParametersKind::Concatenate(ConcatenateTail::Gradual))
-                    if let Some(source_prefix) = match source_parameters.kind() {
-                        ParametersKind::Standard => Some(source_parameters.as_slice()),
-                        _ => source_parameters.as_paramspec_with_prefix().and_then(
-                            |(prefix, tail)| {
-                                (!tail.is_inferable(db, self.inferable)).then_some(prefix)
-                            },
-                        ),
-                    } =>
-                {
-                    let target_prefix_params =
-                        &target_parameters.as_slice()[..target_parameters.len().saturating_sub(2)];
-
-                    let mut parameters = ParametersZip {
-                        current_source: None,
-                        current_target: None,
-                        source_iter: source_prefix.iter(),
-                        target_iter: target_prefix_params.iter(),
-                    };
-
-                    let mut target_index = 0usize;
-                    while let Some(parameter) = parameters.next() {
-                        match parameter {
-                            EitherOrBoth::Left(_) => {
-                                // Once the right (other) iterator is exhausted, all the remaining
-                                // parameters in self will be consumed by the gradual form of
-                                // `Concatenate`.
-                                break;
-                            }
-                            EitherOrBoth::Right(_) => {
-                                // Concatenate (other) has additional positional-only parameters but
-                                // self does not.
-                                return self.never();
-                            }
-                            EitherOrBoth::Both(source_param, target_param) => {
-                                match source_param.kind() {
-                                    ParameterKind::PositionalOnly {
-                                        default_type: source_default,
-                                        ..
-                                    }
-                                    | ParameterKind::PositionalOrKeyword {
-                                        default_type: source_default,
-                                        ..
-                                    } => {
-                                        if source_default.is_none() && target_param.has_default() {
-                                            return self.never();
-                                        }
-                                        if !check_types(
-                                            &mut result,
-                                            target_param.annotated_type(),
-                                            source_param.annotated_type(),
-                                            target_param.name(),
-                                            target_index,
-                                        ) {
-                                            return result;
-                                        }
-                                    }
-                                    ParameterKind::Variadic { .. } => {
-                                        if !check_types(
-                                            &mut result,
-                                            target_param.annotated_type(),
-                                            source_param.annotated_type(),
-                                            target_param.name(),
-                                            target_index,
-                                        ) {
-                                            return result;
-                                        }
-
-                                        while let Some(target_param) = parameters.peek_target() {
-                                            target_index += 1;
-                                            if !check_types(
-                                                &mut result,
-                                                target_param.annotated_type(),
-                                                source_param.annotated_type(),
-                                                target_param.name(),
-                                                target_index,
-                                            ) {
-                                                return result;
-                                            }
-                                            parameters.next_target();
-                                        }
-                                    }
-                                    _ => {
-                                        // self has other parameter kinds but other only has
-                                        // positional-only parameters, so they cannot be compatible.
-                                        return self.never();
-                                    }
-                                }
-                            }
-                        }
-                        target_index += 1;
-                    }
-
-                    // Once every fixed source parameter matches the target prefix, an
-                    // object-variadic tail accepts every materialization of the gradual remainder.
-                    // Reject additional fixed or keyword-only parameters: they would make the
-                    // source more restrictive than at least one possible target signature.
-                    if let [source_prefix @ .., variadic, keyword_variadic] =
-                        source_parameters.as_slice()
-                        && source_prefix.len() <= target_prefix_params.len()
-                        && variadic.is_variadic()
-                        && variadic.annotated_type().is_object()
-                        && keyword_variadic.is_keyword_variadic()
-                        && keyword_variadic.annotated_type().is_object()
-                    {
-                        return result;
-                    }
-                }
-
-                _ => {}
+        // Keep an unpacked target TypeVarTuple for the parameter loop so it can infer the pack.
+        if target_typevartuple.is_none() {
+            if self.relation.is_assignability()
+                && (source_parameters.is_fully_gradual() || target_parameters.is_fully_gradual())
+            {
+                return result;
             }
-
-            return match self.relation {
-                TypeRelation::Subtyping => self.never(),
-                TypeRelation::Redundancy { .. } => result.intersect(
-                    db,
-                    self.constraints,
-                    ConstraintSet::from_bool(
-                        self.constraints,
-                        source_parameters.is_gradual() && target_parameters.is_gradual(),
-                    ),
-                ),
-                TypeRelation::Assignability => result,
-            };
+            if source_is_gradual && !self.relation.is_assignability() {
+                if target_is_gradual && matches!(self.relation, TypeRelation::Redundancy { .. }) {
+                    source_parameters = source_parameters.with_unrestricted_variadics();
+                } else {
+                    // Some materialization of the source could require an extra argument.
+                    return self.never();
+                }
+            }
+            if let Some(parameters) = gradual_target {
+                target_parameters = parameters;
+                if specialize_target_tail
+                    && let Some((prefix, tail)) = source_parameters.as_paramspec_with_prefix()
+                    && !tail.is_inferable(db, self.inferable)
+                {
+                    // Only the fixed prefix of a caller-owned ParamSpec is guaranteed.
+                    source_parameters = Parameters::standard(prefix.iter().cloned());
+                }
+            }
         }
 
         // Align the fixed target prefix and suffix before entering the parameter loop so that the
@@ -4343,8 +4213,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target_iter: target_parameters.iter(),
         };
 
-        // Collect all the standard parameters that have only been matched against a variadic
-        // parameter which means that the keyword variant is still unmatched.
+        // Target parameters whose positional form has matched but whose keyword form
+        // binds a different source parameter.
         let mut target_keywords = Vec::new();
         let mut target_index = 0usize;
         let mut reuse_current_source = false;
@@ -4361,9 +4231,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // In either case, `source` is a subtype of `target`.
                     return result;
                 }
-                // There are keyword parameters in `target` that were only matched positionally
-                // against a variadic parameter in `source`. We need to verify that they can also
-                // be matched as keyword arguments, which is done after this loop.
+                // Check the remaining keyword forms by name below.
                 break;
             };
 
@@ -4392,7 +4260,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // For `source <: target` to be valid, if there are no more parameters
                             // in `target`, then the non-variadic parameters in `source` must have a
                             // default value.
-                            if default_type.is_none() {
+                            if default_type.is_none() && !specialize_target_tail {
                                 if let Some(context) = self.report_context() {
                                     let parameter = ParameterDescription::new(
                                         target_index,
@@ -4460,60 +4328,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 EitherOrBoth::Both(source_param, target_param) => {
                     match (source_param.kind(), target_param.kind()) {
                         (
-                            ParameterKind::PositionalOnly {
-                                default_type: source_default,
-                                ..
-                            }
-                            | ParameterKind::PositionalOrKeyword {
-                                default_type: source_default,
-                                ..
-                            },
-                            ParameterKind::PositionalOnly {
-                                default_type: target_default,
-                                ..
-                            },
-                        ) => {
-                            if source_default.is_none() && target_default.is_some() {
-                                if let Some(context) = self.report_context() {
-                                    context.push(parameter_must_have_default(
-                                        source_param,
-                                        target_index,
-                                    ));
+                            _,
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. },
+                        ) if source_param.is_positional() => {
+                            if let Some(target_name) = target_param.keyword_name()
+                                && source_param.keyword_name() != Some(target_name)
+                            {
+                                if !source_param.has_default() || !match_variadic_prefix {
+                                    if let Some(context) = self.report_context() {
+                                        context.push(match source_param.keyword_name() {
+                                            Some(name) => ErrorContext::ParameterNameMismatch {
+                                                source_name: name.clone(),
+                                                target_name: target_name.clone(),
+                                            },
+                                            None => {
+                                                ErrorContext::ParameterMustAcceptKeywordArguments {
+                                                    source_name: source_param.name().cloned(),
+                                                    target_name: target_name.clone(),
+                                                }
+                                            }
+                                        });
+                                    }
+                                    return self.never();
                                 }
-                                return self.never();
+                                // Positional calls bind this slot. Keyword calls omit it and
+                                // must be accepted by a different slot or by **kwargs.
+                                target_keywords.push(target_param);
                             }
-                            if !check_types(
-                                &mut result,
-                                target_param.annotated_type(),
-                                source_param.annotated_type(),
-                                target_param.name(),
-                                target_index,
-                            ) {
-                                return result;
-                            }
-                        }
-
-                        (
-                            ParameterKind::PositionalOrKeyword {
-                                name: source_name,
-                                default_type: source_default,
-                            },
-                            ParameterKind::PositionalOrKeyword {
-                                name: target_name,
-                                default_type: target_default,
-                            },
-                        ) => {
-                            if source_name != target_name {
-                                if let Some(context) = self.report_context() {
-                                    context.push(ErrorContext::ParameterNameMismatch {
-                                        source_name: source_name.clone(),
-                                        target_name: target_name.clone(),
-                                    });
-                                }
-                                return self.never();
-                            }
-                            // The following checks are the same as positional-only parameters.
-                            if source_default.is_none() && target_default.is_some() {
+                            if !source_param.has_default() && target_param.has_default() {
                                 if let Some(context) = self.report_context() {
                                     context.push(parameter_must_have_default(
                                         source_param,
@@ -4664,6 +4507,45 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 continue;
                             }
 
+                            let target_suffix_len = parameters
+                                .target_iter
+                                .as_slice()
+                                .iter()
+                                .take_while(|parameter| parameter.is_positional())
+                                .count();
+                            let mut source_param = source_param;
+                            let mut prefix_len = 0;
+                            while match_variadic_prefix
+                                && !source_has_unpacked_suffix
+                                && source_param.is_positional()
+                                && (prefix_len < target_suffix_len || source_param.has_default())
+                            {
+                                // The suffix sets the minimum number of remaining positional
+                                // arguments. Each source slot can receive a variadic element or
+                                // any suffix element up to the same position.
+                                prefix_len += 1;
+                                let suffix = parameters
+                                    .target_iter
+                                    .clone()
+                                    .take(prefix_len.min(target_suffix_len));
+                                for (offset, argument) in
+                                    std::iter::once(target_param).chain(suffix).enumerate()
+                                {
+                                    if !check_types(
+                                        &mut result,
+                                        argument.annotated_type(),
+                                        source_param.annotated_type(),
+                                        argument.name(),
+                                        target_index + offset,
+                                    ) {
+                                        return result;
+                                    }
+                                }
+                                let Some(next) = parameters.next_source() else {
+                                    return self.never();
+                                };
+                                source_param = next;
+                            }
                             if !source_param.is_variadic() {
                                 if let Some(context) = self.report_context()
                                     && target_parameters.as_paramspec_with_prefix().is_none()
@@ -4695,12 +4577,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .iter()
                                 .take_while(|parameter| parameter.is_positional())
                                 .count();
-                            let target_suffix_len = parameters
-                                .target_iter
-                                .as_slice()
-                                .iter()
-                                .take_while(|parameter| parameter.is_positional())
-                                .count();
                             for _ in source_suffix_len..target_suffix_len {
                                 let Some(target_parameter) = parameters.peek_target() else {
                                     break;
@@ -4717,21 +4593,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }
                                 parameters.next_target();
                             }
-                        }
-
-                        (
-                            ParameterKind::PositionalOnly { name, .. },
-                            ParameterKind::PositionalOrKeyword {
-                                name: target_name, ..
-                            },
-                        ) => {
-                            if let Some(context) = self.report_context() {
-                                context.push(ErrorContext::ParameterMustAcceptKeywordArguments {
-                                    source_name: name.clone(),
-                                    target_name: target_name.clone(),
-                                });
-                            }
-                            return self.never();
                         }
 
                         (
@@ -4794,7 +4655,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // previous loop. They cannot be matched against any parameter in `target` which
                     // only contains keyword-only and keyword-variadic parameters. However, if the
                     // parameter has a default, it's valid because callers don't need to provide it.
-                    if default_type.is_none() {
+                    if default_type.is_none() && !specialize_target_tail {
                         if let Some(context) = self.report_context() {
                             if let Some(source_name) = source_param.name()
                                 && target_parameters
@@ -4828,14 +4689,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     name: target_name,
                     default_type: target_default,
                 } => {
-                    if let Some(source_param) = source_keywords.remove(&**target_name) {
-                        // The suffix forces a target prefix to be positional, so it cannot
-                        // provide a source parameter that must be supplied by keyword.
-                        if target_has_unpacked_suffix
-                            && source_param.is_keyword_only()
-                            && !source_param.has_default()
-                            && !target_param.is_keyword_only()
-                        {
+                    let source_param = source_keywords.remove(&**target_name).or_else(|| {
+                        // For a deferred keyword, its destination may already have been
+                        // compared positionally with a different target parameter.
+                        if target_param.is_positional() {
+                            source_parameters
+                                .keyword_by_name(target_name)
+                                .map(|(_, param)| param)
+                        } else {
+                            None
+                        }
+                    });
+                    if let Some(source_param) = source_param {
+                        // The positional form of this call fills a different source slot.
+                        if !source_param.has_default() && target_param.is_positional() {
                             if let Some(context) = self.report_context() {
                                 context.push(ErrorContext::ExtraRequiredParameter {
                                     parameter: ParameterDescription::new(
@@ -4959,7 +4826,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             reason = "any required unmatched keyword parameter makes the relation invalid"
         )]
         for (_, source_param) in source_keywords {
-            if !source_param.has_default() {
+            if !source_param.has_default() && !specialize_target_tail {
                 if let Some(context) = self.report_context() {
                     let parameter = ParameterDescription::new(target_index, source_param.name());
                     context.push(ErrorContext::ExtraRequiredParameter { parameter });
@@ -4997,14 +4864,11 @@ pub(crate) enum ParametersKind<'db> {
     #[default]
     Standard,
 
-    /// Represents a gradual parameter list using `...` as the only parameter.
+    /// A parameter list with a gradual variadic pair, optionally alongside fixed parameters.
     ///
-    /// Per [the typing specification], any signature with a variadic and a keyword-variadic
-    /// argument, both annotated (explicitly or implicitly) as `Any` or `Unknown`, is considered
-    /// equivalent to `...`.
-    ///
-    /// The display implementation utilizes this flag to use `...` instead of displaying the
-    /// individual variadic and keyword-variadic parameters.
+    /// Per [the typing specification], the pair `*args: Any, **kwargs: Any` is equivalent to
+    /// `...`. Other parameters retain their names, kinds, types, and defaults. A positional-only
+    /// prefix followed by the pair is represented by `Concatenate(ConcatenateTail::Gradual)`.
     ///
     /// Note: This flag can also result from invalid forms of `Callable` annotations.
     ///
@@ -5358,13 +5222,45 @@ impl<'db> Parameters<'db> {
         self.with_transformed_parameters(self.iter().skip(1).cloned())
     }
 
-    /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter
-    /// or a `Concatenate` form with `...` as the last argument.
+    /// Returns whether the parameter list contains a gradual variadic pair.
     pub(crate) fn is_gradual(&self) -> bool {
         matches!(
             self.data.kind,
             ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
         )
+    }
+
+    /// Returns whether the entire parameter list is gradual, with no fixed parameters.
+    fn is_fully_gradual(&self) -> bool {
+        self.kind() == ParametersKind::Gradual && self.len() == 2
+    }
+
+    fn without_variadics(&self) -> Self {
+        Self::standard(
+            self.iter()
+                .filter(|param| !param.is_variadic() && !param.is_keyword_variadic())
+                .cloned(),
+        )
+    }
+
+    fn with_unrestricted_variadics(&self) -> Self {
+        Self::standard(self.iter().cloned().map(|param| {
+            if param.is_variadic() || param.is_keyword_variadic() {
+                param.with_annotated_type(Type::object())
+            } else {
+                param
+            }
+        }))
+    }
+
+    fn has_unrestricted_variadics(&self, db: &'db dyn Db) -> bool {
+        let is_object = |(_, parameter): (usize, &Parameter<'db>)| {
+            parameter
+                .annotated_type()
+                .resolve_type_alias(db)
+                .is_object()
+        };
+        self.variadic().is_some_and(is_object) && self.keyword_variadic().is_some_and(is_object)
     }
 
     pub(crate) fn is_top(&self) -> bool {
@@ -5671,38 +5567,21 @@ impl<'db> Parameters<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        if let TypeMapping::Materialize(materialization_kind) = type_mapping
-            && matches!(
-                self.data.kind,
-                ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
-            )
+        let kind = if let TypeMapping::Materialize(materialization_kind) = type_mapping
+            && self.is_gradual()
         {
             match materialization_kind {
-                MaterializationKind::Bottom => {
-                    // The bottom materialization of the `...` parameters is `(*object, **object)`,
-                    // which accepts any call and is thus a subtype of all other parameters.
-                    return Parameters::bottom();
-                }
-                MaterializationKind::Top => {
-                    return Parameters::top();
-                }
+                // A gradual tail may require additional arguments, so no call is guaranteed.
+                MaterializationKind::Top => return Self::top(),
+                MaterializationKind::Bottom if self.is_fully_gradual() => return Self::bottom(),
+                // Materializing the parameter types below turns the gradual variadics into
+                // `*object, **object` and retains any explicit parameters.
+                MaterializationKind::Bottom => ParametersKind::Standard,
             }
-        }
-
-        // Parameters are in contravariant position, so we need to flip the type mapping.
-        let type_mapping = type_mapping.flip();
-
-        let value: Box<[_]> = self
-            .data
-            .value
-            .iter()
-            .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
-            .collect();
-
-        let kind = if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
+        } else if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
             let freshen = |paramspec| {
                 Type::TypeVar(paramspec)
-                    .apply_type_mapping_impl(db, &type_mapping, tcx, visitor)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                     .as_typevar()
                     .unwrap_or(paramspec)
             };
@@ -5719,6 +5598,13 @@ impl<'db> Parameters<'db> {
         } else {
             self.data.kind
         };
+
+        // Parameters are in contravariant position, so we need to flip the type mapping.
+        let type_mapping = type_mapping.flip();
+        let value: Box<[_]> = self
+            .iter()
+            .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
+            .collect();
         let parameters = Self::new(value, kind);
         if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. })
             && let Some((_, variadic)) = parameters.variadic()

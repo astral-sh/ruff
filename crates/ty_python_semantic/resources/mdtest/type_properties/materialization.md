@@ -308,11 +308,92 @@ def _(top: Top[GradualParams], bottom: Bottom[GradualParams]) -> None:
     reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> int
 ```
 
+Explicit parameters still constrain calls to the bottom materialization. Their types materialize
+contravariantly, including those of keyword-only parameters after `*args`. The top materialization
+permits no calls because the gradual tail could require additional arguments.
+
+```py
+from typing import Concatenate
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def handle(value: Any, /, name: str = "", *items: Any, flag: Any, **options: Any) -> int:
+    return 1
+
+type Handle = RegularCallableTypeOf[handle]
+
+def fixed_parameters(bottom: Bottom[Handle], top: Top[Handle]) -> None:
+    # revealed: (value: object, /, name: str = "", *items: object, flag: object, **options: object) -> int
+    reveal_type(bottom)
+    bottom(object(), flag=True)  # ok
+    bottom(object())  # error: [missing-argument]
+    top(object(), flag=True)  # error: [call-to-function-with-unknown-signature]
+
+static_assert(is_assignable_to(Handle, Bottom[Handle]))
+static_assert(is_subtype_of(Bottom[Handle], Handle))
+
+def positional_prefix(bottom: Bottom[Callable[Concatenate[int, ...], str]]) -> None:
+    reveal_type(bottom)  # revealed: (int, /, *args: object, **kwargs: object) -> str
+```
+
+A defaulted parameter in the bottom materialization can receive a positional argument or be omitted
+when the caller passes a differently named keyword. A call that binds the parameter twice is
+invalid.
+
+```py
+def named(value: str = "", *args: Any, **kwargs: Any) -> None: ...
+def positional(value: str = "", /, *args: Any, **kwargs: Any) -> None: ...
+def required(value: str, *args: Any, **kwargs: Any) -> None: ...
+def explicit_keyword(value: str = "", *args: Any, other: int = 0, **kwargs: Any) -> None: ...
+def other(other: str) -> None: ...
+def strings(*args: str) -> None: ...
+def integers(*args: int) -> None: ...
+def both(other: str, /, *, value: str) -> None: ...
+def _(
+    named_bottom: Bottom[RegularCallableTypeOf[named]],
+    positional_bottom: Bottom[RegularCallableTypeOf[positional]],
+    required_bottom: Bottom[RegularCallableTypeOf[required]],
+    explicit_bottom: Bottom[RegularCallableTypeOf[explicit_keyword]],
+) -> None:
+    renamed: RegularCallableTypeOf[other] = named_bottom  # ok
+    renamed = required_bottom  # error: [invalid-assignment]
+    renamed = explicit_bottom  # error: [invalid-assignment]
+    many_strings: RegularCallableTypeOf[strings] = positional_bottom  # ok
+    many_strings = required_bottom  # error: [invalid-assignment]
+    many_integers: RegularCallableTypeOf[integers] = positional_bottom  # error: [invalid-assignment]
+    duplicate: RegularCallableTypeOf[both] = named_bottom  # error: [invalid-assignment]
+```
+
+The same binding rules apply when the unrestricted variadics are written with an alias for `object`.
+
+```py
+type Obj = object
+
+def aliased(value: str = "", *args: Obj, **kwargs: Obj) -> None: ...
+
+renamed: RegularCallableTypeOf[other] = aliased  # ok
+```
+
+A `Never` positional argument cannot bind `value`. A call can still pass `value` by keyword, or fill
+it positionally from a required suffix after an empty variadic segment.
+
+```py
+from typing import cast
+
+def placeholder(unused: Never = cast(Never, None), /, **kw: str) -> None: ...
+def wrong_keyword(unused: Never = cast(Never, None), /, **kw: int) -> None: ...
+def empty_variadic(*args: Never, **kw: str) -> None: ...
+def with_suffix(*args: *tuple[*tuple[Never, ...], str], **kw: str) -> None: ...
+def _(bottom: Bottom[RegularCallableTypeOf[named]]) -> None:
+    keywords: RegularCallableTypeOf[placeholder] = bottom  # ok
+    integers: RegularCallableTypeOf[wrong_keyword] = bottom  # error: [invalid-assignment]
+    empty: RegularCallableTypeOf[empty_variadic] = bottom  # ok
+    duplicate: RegularCallableTypeOf[with_suffix] = bottom  # error: [invalid-assignment]
+```
+
 Materializing an overloaded callable materializes each overload separately.
 
 ```py
 from typing import overload
-from ty_extensions._internal import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> Any: ...
@@ -2448,6 +2529,51 @@ static_assert(is_subtype_of(Bottom[Source], Top[Target]))
 
 def invalid(source: Top[Source]) -> Bottom[Target]:
     return source  # error: [invalid-explicit-return]
+```
+
+### Methods with gradual variadics
+
+Narrowing to a recursive protocol in strict mode materializes its methods. The fixed `key` parameter
+of `handle` is retained when comparing the `Handler` accepted by `combine`.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Protocol, assert_type, overload, runtime_checkable
+
+@runtime_checkable
+class Handler[T](Protocol):
+    def handle(self, key: str, *args: Any, **kwargs: Any) -> None: ...
+    def combine(self, other: "Handler[T]") -> None: ...
+
+def narrowed(value: object) -> None:
+    if isinstance(value, Handler):
+        handler: Handler[Any] = value  # ok
+```
+
+Overload selection compares `process` with its top materialization, which bottom-materializes the
+`handler` parameter. The identity overload of `mark` still applies and preserves the return type.
+
+```py
+@overload
+def mark[T](value: T) -> T: ...
+@overload
+def mark(value: object) -> object: ...
+def mark(value: object) -> object:
+    return value
+
+@mark
+def process(handler: Handler[Any]) -> int:
+    return 1
+
+def use(handler: Handler[Any]) -> None:
+    assert_type(process(handler), int)
 ```
 
 ### Members outside the protocol interface

@@ -397,13 +397,12 @@ info: the signature must accept arbitrary positional arguments
 info: This violates the Liskov Substitution Principle
 ```
 
-Finally, this is not a Liskov violation because this is a gradual callable. It contains both `*args`
-and `**kwargs` without annotations, so it is compatible with any signature of `method` on the
-superclass.
+The base method accepts a call with no arguments. An override with unannotated variadics still has
+to accept that call, so it cannot introduce required parameters.
 
 ```pyi
 class Sub23(Super4):
-    def method(self, x, *args, y, **kwargs): ...
+    def method(self, x, *args, y, **kwargs): ...  # error: [incompatible-method-override]
 ```
 
 ## Dropping a positional parameter's keyword name

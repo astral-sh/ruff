@@ -1277,6 +1277,87 @@ static_assert(is_assignable_to(RegularCallableTypeOf[keyword_variadic], Callable
 static_assert(is_assignable_to(RegularCallableTypeOf[mixed], Callable[..., None]))
 ```
 
+### Explicit parameters alongside gradual variadics
+
+An explicit parameter keeps its type when the variadic parameters have explicit or implicit `Any`
+annotations.
+
+```py
+from typing import Any, Callable, Concatenate
+from ty_extensions._internal import RegularCallableTypeOf
+
+def takes_str(value: str, *args: Any, **kwargs: Any) -> None: ...
+def implicit(value: str, *args, **kwargs) -> None: ...
+
+one_int: Callable[[int], None] = takes_str  # error: [invalid-assignment]
+one_int = implicit  # error: [invalid-assignment]
+one_str: Callable[[str], None] = takes_str  # ok
+one_str = implicit  # ok
+
+starts_with_int: Callable[Concatenate[int, ...], None] = takes_str  # error: [invalid-assignment]
+starts_with_str: Callable[[str, int], None] = takes_str  # ok
+```
+
+Calling with `other=""` sends `other` to `**kwargs`, so `value` needs a default.
+
+```py
+def takes_other(other: str) -> None: ...
+def optional_value(value: str = "", *args: Any, **kwargs: Any) -> None: ...
+def optional_positional(value: str = "", /, *args: Any, debug: bool = False, **kwargs: Any) -> None: ...
+
+named: RegularCallableTypeOf[takes_other] = takes_str  # error: [invalid-assignment]
+named = optional_value  # ok
+named = optional_positional  # ok
+```
+
+If the source also declares `other`, it receives the keyword argument and must accept a string.
+
+```py
+def keyword_str(value: str = "", *args: Any, other: str = "", **kwargs: Any) -> None: ...
+def keyword_int(value: str = "", *args: Any, other: int = 0, **kwargs: Any) -> None: ...
+def second_str(value: str = "", other: str = "", *args: Any, **kwargs: Any) -> None: ...
+
+named = keyword_str  # ok
+named = keyword_int  # error: [invalid-assignment]
+named = second_str  # ok
+```
+
+The first positional argument still binds to `value` when the target accepts arbitrary positional
+arguments.
+
+```py
+def strings(*args: str) -> None: ...
+def integers(*args: int) -> None: ...
+
+all_strings: RegularCallableTypeOf[strings] = optional_value  # ok
+all_ints: RegularCallableTypeOf[integers] = optional_value  # error: [invalid-assignment]
+```
+
+Both targets admit the call `callback("one", value="two")`, which binds `value` twice in
+`takes_str`.
+
+```py
+def two_args(other: str, /, *, value: str) -> None: ...
+def gradual_two_args(other: str, /, *args: Any, value: str, **kwargs: Any) -> None: ...
+
+fixed: RegularCallableTypeOf[two_args] = takes_str  # error: [invalid-assignment]
+gradual: RegularCallableTypeOf[gradual_two_args] = takes_str  # error: [invalid-assignment]
+```
+
+A gradual target can accommodate additional required parameters in the source. An explicit
+keyword-only parameter still constrains its type and how it can be passed.
+
+```py
+def keyword_only(*args: Any, value: str, **kwargs: Any) -> None: ...
+def extra(*, value: str, width: int) -> None: ...
+def wrong_type(*, value: int) -> None: ...
+def by_position_or_keyword(value: str) -> None: ...
+
+keyword: RegularCallableTypeOf[keyword_only] = extra  # ok
+keyword = wrong_type  # error: [invalid-assignment]
+either: RegularCallableTypeOf[by_position_or_keyword] = keyword_only  # error: [invalid-assignment]
+```
+
 ### Unpacked positional parameters with a required suffix
 
 A variadic positional parameter can accept both the unpacked tuple and a required positional
@@ -1323,6 +1404,33 @@ static_assert(
         Callable[[Unpack[tuple[str, ...]], None], None],
     )
 )
+```
+
+An optional positional prefix can receive a variadic argument or the first argument in the required
+suffix. With two optional parameters, the second can also receive the second suffix argument.
+
+```py
+def optional_string(first: str = "", /, *args: Any, **kwargs: Any) -> None: ...
+def two_optional_strings(first: str = "", second: str = "", /, *args: Any, **kwargs: Any) -> None: ...
+
+strings: Callable[[*tuple[str, ...], str], None] = optional_string
+strings_then_int: Callable[[*tuple[str, ...], str, int], None] = optional_string
+strings_then_int = two_optional_strings  # error: [invalid-assignment]
+wrong_element: Callable[[*tuple[int, ...], str], None] = optional_string  # error: [invalid-assignment]
+wrong_suffix: Callable[[*tuple[str, ...], int], None] = optional_string  # error: [invalid-assignment]
+```
+
+Each required suffix element guarantees one positional argument, even when the variadic tuple is
+empty.
+
+```py
+def required_string(first: str, *args: Any, **kwargs: Any) -> None: ...
+def two_required(first: str, second: str | int, *args: Any, **kwargs: Any) -> None: ...
+
+strings = required_string  # ok
+maybe_empty: Callable[[*tuple[str, ...]], None] = required_string  # error: [invalid-assignment]
+strings_then_int = two_required  # ok
+strings = two_required  # error: [invalid-assignment]
 ```
 
 A required keyword-only parameter cannot be supplied by the positional callback signature.
