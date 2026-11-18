@@ -1374,12 +1374,19 @@ impl<'db> ConstraintSetStorage<'db> {
             return *id;
         }
 
-        let mut support = Support::default();
-        support |= self.constraint_support(data.constraint);
-        support |= self.node_support(data.if_true);
-        support |= self.node_support(data.if_uncertain);
-        support |= self.node_support(data.if_false);
-        let support = self.intern_support(support);
+        let support = if data.if_true.is_terminal()
+            && data.if_uncertain.is_terminal()
+            && data.if_false.is_terminal()
+        {
+            self.constraint_support_id(data.constraint)
+        } else {
+            let mut support = Support::default();
+            support |= self.constraint_support(data.constraint);
+            support |= self.node_support(data.if_true);
+            support |= self.node_support(data.if_uncertain);
+            support |= self.node_support(data.if_false);
+            self.intern_support(support)
+        };
 
         let id = self.nodes.push(data);
         self.node_supports.push(support);
