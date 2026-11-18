@@ -1098,6 +1098,27 @@ class Derived(Base):
     NOT_FINAL = 4  # No error: not declared as Final
 ```
 
+### Overriding `Final` with `ClassVar` or `Final`
+
+Overriding a `Final` class variable with a mutable `ClassVar` or another `Final` attribute emits
+`override-of-final-variable` without a duplicate `incompatible-attribute-override` diagnostic.
+
+```py
+from typing import ClassVar, Final
+
+class FinalBase:
+    a: Final[int] = 1
+    b: Final = 1
+
+class MutableClassVarOverride(FinalBase):
+    a: ClassVar[int] = 2  # error: [override-of-final-variable]
+    b: ClassVar = "two"  # error: [override-of-final-variable]
+
+class BareFinalOverride(FinalBase):
+    a: Final = 2  # error: [override-of-final-variable]
+    b: Final = "two"  # error: [override-of-final-variable]
+```
+
 ### Diamond inheritance
 
 When a `Final` variable is inherited through a diamond, only one error should be reported,

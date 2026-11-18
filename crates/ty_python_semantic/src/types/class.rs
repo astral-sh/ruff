@@ -3145,11 +3145,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }
                 ClassBase::Class(class) => {
                     let member = class.own_instance_member(db, &self.env, name);
-                    let definitely_declared = matches!(
-                        member.inner.place,
-                        Place::Defined(place) if place.is_definitely_defined()
-                            && (place.origin.is_declared() || member.qualifiers().contains(TypeQualifiers::FINAL))
-                    );
+                    let definitely_declared = member.inner.is_declared_or_final()
+                        && member.inner.place.is_definitely_bound();
                     if definitely_declared {
                         let overriding_class_default =
                             definitely_bound_member.is_some_and(|previous| {

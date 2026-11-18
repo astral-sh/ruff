@@ -13,7 +13,7 @@ use ty_python_core::{
 use crate::{
     Db, Program, ProgramEnvironment,
     lint::LintMetadata,
-    place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
+    place::{DefinedPlace, Place, PlaceAndQualifiers},
     types::{
         ClassBase, ClassLiteral, ClassType, InstanceFallbackShadowsNonDataDescriptor,
         IntersectionType, KnownInstanceType, MemberLookupPolicy, StaticClassLiteral, Type,
@@ -36,9 +36,11 @@ use crate::{
 struct AttributeContract<'db> {
     /// A descriptor whose getter rejects the receiver provides no read on that receiver.
     instance_read: Option<Type<'db>>,
-    /// A `ClassVar` also promises reads through the class, where `__get__` receives `None`.
+    /// A class variable (or class-body `Final` attribute) also promises reads through the class,
+    /// where `__get__` receives `None`.
     class_read: Option<Type<'db>>,
     write: Option<Type<'db>>,
+    is_class_attribute: bool,
     is_property: bool,
     method_kind: AttributeMethodKind,
     is_frozen_field: bool,
@@ -65,6 +67,7 @@ struct UnboundAttribute<'db> {
     ty: Type<'db>,
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
+    is_class_attribute: bool,
     is_descriptor: bool,
     is_method: bool,
 }
@@ -151,6 +154,74 @@ fn member_contract<'db>(
     }
 }
 
+fn resolved_instance_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    owner: ClassType<'db>,
+    name: &str,
+    class_member: PlaceAndQualifiers<'db>,
+) -> PlaceAndQualifiers<'db> {
+    if matches!(
+        class_member.ignore_possibly_undefined(),
+        Some(Type::SlotDescriptor(_))
+    ) {
+        // A slot provides storage without replacing an inherited annotation:
+        //
+        // ```python
+        // class Base:
+        //     value: int
+        //
+        // class Slotted(Base):
+        //     __slots__ = ("value",)
+        //
+        //     def set_value(self, value):
+        //         self.value = value
+        //
+        // class Child(Slotted):
+        //     value: str  # Incompatible with Base.value.
+        // ```
+        //
+        // For `owner = Slotted`, looking only at its own assignments would infer `Unknown`
+        // for `value`. Full instance lookup preserves the inherited `int` annotation.
+        owner.instance_member(db, env, name)
+    } else {
+        owner.own_instance_member(db, env, name).inner
+    }
+}
+
+fn has_final_class_storage(
+    db: &dyn Db,
+    literal: StaticClassLiteral<'_>,
+    name: &str,
+    class_member: PlaceAndQualifiers<'_>,
+    instance_member: PlaceAndQualifiers<'_>,
+    qualifiers: TypeQualifiers,
+) -> bool {
+    // Outside protocols and dataclasses, a class-body `Final` binding without instance storage
+    // lives on the class object like a read-only `ClassVar`.
+    qualifiers.contains(TypeQualifiers::FINAL)
+        && !class_member.is_undefined()
+        && instance_member.is_undefined()
+        && !literal.is_protocol(db)
+        && !literal.is_own_dataclass_instance_field(db, name)
+}
+
+/// Whether `owner`'s `Final` attribute `name` is stored on the class object rather than instances.
+pub(super) fn is_final_class_attribute<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    owner: ClassType<'db>,
+    name: &str,
+    class_member: PlaceAndQualifiers<'db>,
+) -> bool {
+    let Some((literal, _)) = owner.static_class_literal(db) else {
+        return false;
+    };
+    let instance_member = resolved_instance_member(db, env, owner, name, class_member);
+    let qualifiers = class_member.qualifiers | instance_member.qualifiers;
+    has_final_class_storage(db, literal, name, class_member, instance_member, qualifiers)
+}
+
 fn unbound_member_contract<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -178,37 +249,13 @@ fn unbound_member_contract<'db>(
     } else {
         owner.own_class_member(db, env, None, name).inner
     };
-    let instance_member = if matches!(
-        class_member.ignore_possibly_undefined(),
-        Some(Type::SlotDescriptor(_))
-    ) {
-        // A slot provides storage without replacing an inherited annotation:
-        //
-        // ```python
-        // class Base:
-        //     value: int
-        //
-        // class Slotted(Base):
-        //     __slots__ = ("value",)
-        //
-        //     def set_value(self, value):
-        //         self.value = value
-        //
-        // class Child(Slotted):
-        //     value: str  # Incompatible with Base.value.
-        // ```
-        //
-        // For `owner = Slotted`, looking only at its own assignments would infer `Unknown`
-        // for `value`. Full instance lookup preserves the inherited `int` annotation.
-        owner.instance_member(db, env, name)
-    } else {
-        owner.own_instance_member(db, env, name).inner
-    };
-    let has_receiver_declaration = matches!(
-        instance_member.place,
-        Place::Defined(DefinedPlace { origin: TypeOrigin::Declared, provenance, .. })
-            if provenance.definition().is_some_and(|definition| definition.place(db).is_member())
-    );
+    let instance_member = resolved_instance_member(db, env, owner, name, class_member);
+    let has_receiver_declaration = instance_member.is_declared_or_final()
+        && matches!(
+            instance_member.place,
+            Place::Defined(DefinedPlace { provenance, .. })
+                if provenance.definition().is_some_and(|definition| definition.place(db).is_member())
+        );
     // An annotation such as `type[Any]` permits values that act as descriptors, but it
     // still declares a writable attribute unless its type supplies a descriptor method.
     let has_descriptor_method = !class_member.is_class_var()
@@ -219,7 +266,9 @@ fn unbound_member_contract<'db>(
         });
     if kind == AttributeContractKind::Inherited
         && has_receiver_declaration
-        && !class_member.is_class_var()
+        && !class_member
+            .qualifiers
+            .intersects(TypeQualifiers::CLASS_VAR | TypeQualifiers::FINAL)
         && !has_descriptor_method
     {
         // An unannotated default may inherit an ancestor's type. It must not hide the
@@ -235,11 +284,14 @@ fn unbound_member_contract<'db>(
     }
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
-    let is_descriptor = has_descriptor_method && !is_class_var;
+    let is_class_attribute = is_class_var
+        || has_final_class_storage(db, literal, name, class_member, instance_member, qualifiers);
+    let is_descriptor = has_descriptor_method && !is_class_attribute;
     let ty = if own_place.origin.is_declared() || is_descriptor {
         own_place.ty
-    } else if is_class_var && !qualifiers.contains(TypeQualifiers::FINAL) {
-        // A bare mutable `ClassVar` promises the public type inferred from its initializer.
+    } else if is_class_var || qualifiers.contains(TypeQualifiers::FINAL) {
+        // A bare `ClassVar` or `Final` attribute promises the public type inferred from its
+        // initializer.
         own_place.public_type(db, env)
     } else {
         return Some(MemberContract::Inferred(own_place.ty));
@@ -251,6 +303,7 @@ fn unbound_member_contract<'db>(
         ty,
         class_member,
         instance_member,
+        is_class_attribute,
         is_descriptor,
         is_method: is_method_type(db, own_place.ty),
     }))
@@ -269,6 +322,7 @@ fn bind_attribute<'db>(
         ty,
         class_member,
         instance_member,
+        is_class_attribute,
         is_descriptor,
         is_method,
     } = *attribute;
@@ -276,9 +330,10 @@ fn bind_attribute<'db>(
     let is_nested_class = qualifiers.contains(TypeQualifiers::NESTED_CLASS);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let is_method_wrapper = matches!(ty, Type::KnownInstance(KnownInstanceType::MethodWrapper(_)));
-    let (instance_read, class_read, write) = if is_class_var {
-        // A class variable has no instance storage. Both reads bind its descriptor, but
-        // assignment through the class replaces the stored value without calling its setter.
+    let (instance_read, class_read, write) = if is_class_attribute {
+        // A class variable (or class-body `Final` attribute) has no instance storage. Both reads
+        // bind its descriptor, while assignment through the class replaces the stored value without
+        // calling its setter (and is disallowed for `Final`).
         let stored = ty.bind_self_typevars(db, env, receiver);
         let owner = receiver.to_meta_type(db, env);
         let read = |instance| stored.class_variable_read_type(db, env, instance, owner);
@@ -363,6 +418,7 @@ fn bind_attribute<'db>(
         } else {
             write
         },
+        is_class_attribute,
         is_property: alternatives.iter().any(Type::is_property_instance),
         method_kind: if is_method {
             AttributeMethodKind::Method
@@ -475,12 +531,14 @@ fn attribute_violation<'db>(
     }
     let source_is_method = source.method_kind == AttributeMethodKind::Method;
     let target_is_method = target.method_kind == AttributeMethodKind::Method;
+    let source_is_final = source.qualifiers.contains(TypeQualifiers::FINAL);
     if source_is_method && target_is_method
         || target.qualifiers.contains(TypeQualifiers::FINAL)
         || !source.is_property
             && !target.is_property
             && !source_is_method
             && !target_is_method
+            && !source_is_final
             && source.qualifiers.contains(TypeQualifiers::CLASS_VAR)
                 != target.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     {
@@ -489,7 +547,7 @@ fn attribute_violation<'db>(
     for access in [ReadAccess::Instance, ReadAccess::Class] {
         let (source, target) = match access {
             ReadAccess::Instance => (source.instance_read, target.instance_read),
-            ReadAccess::Class if source.qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
+            ReadAccess::Class if source.is_class_attribute => {
                 (source.class_read, target.class_read)
             }
             ReadAccess::Class => continue,
@@ -826,23 +884,21 @@ pub(super) fn check_instance_overrides<'db>(
                 .filter_map(|base| base.into_class())
                 .find(|base| {
                     !base.own_class_member(db, env, None, name).is_undefined()
-                        || matches!(
-                            base.own_instance_member(db, env, name).inner.place,
-                            Place::Defined(DefinedPlace {
-                                origin: TypeOrigin::Declared,
-                                ..
-                            })
-                        )
+                        || base
+                            .own_instance_member(db, env, name)
+                            .inner
+                            .is_declared_or_final()
                 })
         else {
             continue;
         };
-        let Place::Defined(place) = class.own_instance_member(db, env, name).inner.place else {
-            continue;
-        };
-        if place.origin != TypeOrigin::Declared {
+        let instance_member = class.own_instance_member(db, env, name).inner;
+        if !instance_member.is_declared_or_final() {
             continue;
         }
+        let Place::Defined(place) = instance_member.place else {
+            continue;
+        };
         let Some(definition) = place.provenance.definition() else {
             continue;
         };
@@ -917,6 +973,7 @@ fn already_inherited<'db>(
             inherited.instance_read == source.instance_read
                 && inherited.class_read == source.class_read
                 && inherited.write == source.write
+                && inherited.is_class_attribute == source.is_class_attribute
                 && inherited.is_frozen_field == source.is_frozen_field
                 && inherited.qualifiers == source.qualifiers
         })

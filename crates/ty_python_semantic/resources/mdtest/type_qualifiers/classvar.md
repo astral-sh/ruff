@@ -138,6 +138,22 @@ class Narrower(Base):
     count: ClassVar[bool] = True  # error: [incompatible-mutable-override]
 ```
 
+A subclass also cannot replace a writable `ClassVar` with `Final`, whether `Final` has an explicit
+type argument or infers its type from the initializer.
+
+```py
+from typing import Final
+
+class FinalReadOnly(Base):
+    count: Final[int] = 1  # error: [incompatible-attribute-override]
+
+class BareFinalReadOnly(Base):
+    count: Final = 1  # error: [incompatible-attribute-override]
+
+class BareFinalWrongType(Base):
+    count: Final = "one"  # error: [incompatible-attribute-override]
+```
+
 Without an initializer the base supplies only the qualifier. A subclass can supply the first value.
 
 ```py

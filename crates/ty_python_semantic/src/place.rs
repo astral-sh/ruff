@@ -1126,6 +1126,19 @@ impl<'db> PlaceAndQualifiers<'db> {
             .intersects(TypeQualifiers::READ_ONLY | TypeQualifiers::NESTED_CLASS)
     }
 
+    /// Returns `true` if the place has a declared type or a `Final` qualifier.
+    ///
+    /// A bare `Final` annotation infers its type from an initializer (`TypeOrigin::Inferred`),
+    /// so callers that handle explicit declarations often need to include `Final` places
+    /// alongside declared ones.
+    pub(crate) fn is_declared_or_final(&self) -> bool {
+        matches!(
+            self.place,
+            Place::Defined(place)
+                if place.origin.is_declared() || self.qualifiers.contains(TypeQualifiers::FINAL)
+        )
+    }
+
     #[must_use]
     pub(crate) fn map_type(
         self,

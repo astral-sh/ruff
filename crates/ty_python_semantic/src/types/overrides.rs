@@ -190,8 +190,10 @@ fn check_inherited_conflicts<'db>(
         declared_instance_attribute_names(db, class.body_scope(db))
             .iter()
             .filter(|name| {
-                matches!(class_type.own_instance_member(db, env, name).inner.place,
-                    Place::Defined(place) if place.origin == TypeOrigin::Declared)
+                class_type
+                    .own_instance_member(db, env, name)
+                    .inner
+                    .is_declared_or_final()
             })
             .cloned(),
     );
@@ -1092,16 +1094,10 @@ fn check_class_declaration<'db>(
                 && configuration.check_liskov_violations()
                 && member.name != "__hash__"
                 && (!own_class_member.is_undefined()
-                    || matches!(
-                        superclass
-                            .own_instance_member(db, env, &member.name)
-                            .inner
-                            .place,
-                        Place::Defined(DefinedPlace {
-                            origin: TypeOrigin::Declared,
-                            ..
-                        })
-                    ))
+                    || superclass
+                        .own_instance_member(db, env, &member.name)
+                        .inner
+                        .is_declared_or_final())
             {
                 inherited_member_owner = Some(superclass);
             }
@@ -1168,6 +1164,8 @@ fn check_class_declaration<'db>(
                         variable_kind(
                             db,
                             env,
+                            class,
+                            &member.name,
                             class.own_class_member(db, env, None, &member.name).inner,
                             *subclass_instance_member,
                         )
@@ -1748,6 +1746,8 @@ pub(super) fn effective_superclass_variable_kind<'db>(
         let superclass_variable_kind = variable_kind(
             db,
             env,
+            superclass,
+            &name,
             class_member,
             superclass.own_instance_member(db, env, &name).inner,
         );
@@ -1813,6 +1813,8 @@ fn is_function_definition<'db>(
 fn variable_kind<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    name: &str,
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
 ) -> Option<VariableKind> {
@@ -1820,9 +1822,13 @@ fn variable_kind<'db>(
         return Some(VariableKind::Class);
     }
 
-    // A `Final` attribute behaves like a class variable, but final overrides are diagnosed by
-    // `override-of-final-variable` instead of this rule.
-    if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
+    // Only a class-body `Final` binding without instance storage behaves as a class variable,
+    // where overrides are checked by `override-of-final-variable` and attribute contracts.
+    // Instance-level `Final` attributes (in dataclasses, protocols, or initialized only on
+    // instances) remain instance variables for `ClassVar` checks.
+    if class_member.qualifiers.contains(TypeQualifiers::FINAL)
+        && attributes::is_final_class_attribute(db, env, class, name, class_member)
+    {
         return None;
     }
 

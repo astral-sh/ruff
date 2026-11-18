@@ -4112,6 +4112,12 @@ class ReadOnly(Base):
 class FinalOverride(Base):
     value: Final[int] = 0  # error: [incompatible-attribute-override]
 
+class BareFinalOverride(Base):
+    value: Final = 0  # error: [incompatible-attribute-override]
+
+class IncompatibleBareFinalOverride(Base):
+    value: Final = "zero"  # error: [incompatible-attribute-override]
+
 class Writable(Base):
     @property
     def value(self) -> int:
@@ -4119,6 +4125,333 @@ class Writable(Base):
 
     @value.setter
     def value(self, value: int) -> None: ...
+```
+
+A getter-only property has no write contract, so a subclass can replace it with a `Final` attribute
+whose value is assignable to the property's return type.
+
+```py
+from typing import Final
+
+class ReadOnlyBase:
+    @property
+    def value(self) -> int:
+        return 0
+
+class CompatibleTypedFinal(ReadOnlyBase):
+    value: Final[int] = 1  # ok
+
+class CompatibleBareFinal(ReadOnlyBase):
+    value: Final = 1  # ok
+
+class IncompatibleBareFinal(ReadOnlyBase):
+    value: Final = "one"  # error: [incompatible-property-override]
+```
+
+## Overriding class variables with `Final`
+
+A writable `ClassVar` requires subclasses to keep the attribute writable through the class with a
+compatible type. Overriding it with `Final` violates that contract, whether `Final` carries a type
+argument or infers its type from an initializer.
+
+```py
+from typing import ClassVar, Final
+
+class Base:
+    count: ClassVar[int] = 0
+
+class WrongType(Base):
+    count: Final = "one"  # snapshot: incompatible-attribute-override
+```
+
+```snapshot
+error[incompatible-attribute-override]: Invalid override of attribute `count`
+ --> src/mdtest_snippet.py:7:5
+  |
+4 |     count: ClassVar[int] = 0
+  |     ----- `Base.count` declared here
+5 |
+6 | class WrongType(Base):
+7 |     count: Final = "one"  # snapshot: incompatible-attribute-override
+  |     ^^^^^ Type `Literal["one"]` is not assignable to inherited type `int`
+```
+
+```py
+class SameTypeTyped(Base):
+    count: Final[int] = 1  # snapshot: incompatible-attribute-override
+```
+
+```snapshot
+error[incompatible-attribute-override]: Invalid override of attribute `count`
+ --> src/mdtest_snippet.py:9:5
+  |
+4 |     count: ClassVar[int] = 0
+  |     ----- `Base.count` declared here
+5 |
+6 | class WrongType(Base):
+7 |     count: Final = "one"  # snapshot: incompatible-attribute-override
+8 | class SameTypeTyped(Base):
+9 |     count: Final[int] = 1  # snapshot: incompatible-attribute-override
+  |     ^^^^^ Read-only attribute overrides a writable attribute
+```
+
+```py
+class SameTypeBare(Base):
+    count: Final = 1  # snapshot: incompatible-attribute-override
+```
+
+```snapshot
+error[incompatible-attribute-override]: Invalid override of attribute `count`
+  --> src/mdtest_snippet.py:11:5
+   |
+11 |     count: Final = 1  # snapshot: incompatible-attribute-override
+   |     ^^^^^ Read-only attribute overrides a writable attribute
+   |
+  ::: src/mdtest_snippet.py:4:5
+   |
+ 4 |     count: ClassVar[int] = 0
+   |     ----- `Base.count` declared here
+```
+
+The same check applies when the base class defines a bare `ClassVar` or inherits through an
+intermediate subclass.
+
+```py
+class BareBase:
+    count: ClassVar = 0
+
+class Intermediate(Base):
+    count = 1
+
+class WrongBareOverride(BareBase):
+    count: Final = "one"  # error: [incompatible-attribute-override]
+
+class ReadOnlyBareOverride(BareBase):
+    count: Final = 1  # error: [incompatible-attribute-override]
+
+class DeepOverride(Intermediate):
+    count: Final = "one"  # error: [incompatible-attribute-override]
+
+class TransitiveFinalChild(SameTypeBare):
+    count: Final = 2  # error: [override-of-final-variable]
+```
+
+A `Final` attribute without a class-body default is initialized per instance in `__init__`, so it
+cannot override a `ClassVar`. Replacing a getter-only property with an instance-initialized `Final`
+remains valid when the value type matches.
+
+```py
+class InstanceFinalChild(Base):
+    # error: [incompatible-attribute-override] "instance variable cannot override class variable `Base.count`"
+    count: Final[int]
+
+    def __init__(self) -> None:
+        self.count = 1
+
+class ReadOnlyPropBase:
+    @property
+    def count(self) -> int:
+        return 0
+
+class InstanceFinalPropChild(ReadOnlyPropBase):
+    count: Final[int]  # ok
+
+    def __init__(self) -> None:
+        self.count = 1
+
+class IncompatibleInstanceFinalPropChild(ReadOnlyPropBase):
+    count: Final[str]  # error: [incompatible-property-override]
+
+    def __init__(self) -> None:
+        self.count = "one"
+```
+
+Combining a `ClassVar` base with an incompatible or read-only `Final` attribute through multiple
+inheritance also fails on the subclass definition.
+
+```py
+class FinalValue:
+    count: Final = 1
+
+class WrongTypeFinalValue:
+    count: Final = "one"
+
+class CombinedReadOnly(FinalValue, Base): ...  # error: [incompatible-attribute-override]
+class CombinedWrongType(WrongTypeFinalValue, Base): ...  # error: [incompatible-attribute-override]
+```
+
+## `Final` descriptors replacing properties and class variables
+
+A descriptor stored in a `Final` attribute on a class body resolves reads through both instances and
+the class, matching `ClassVar` descriptor binding. Replacing a getter-only property only requires a
+compatible instance read, while replacing a writable `ClassVar` preserves class read and write
+checks.
+
+```py
+from typing import ClassVar, Final, overload
+from typing_extensions import Self
+
+class IntDescriptor:
+    @overload
+    def __get__(self, instance: None, owner: type) -> Self: ...
+    @overload
+    def __get__(self, instance: object, owner: type) -> int: ...
+    def __get__(self, instance: object, owner: type) -> Self | int:
+        return self if instance is None else 1
+
+class ClassOnly:
+    def __get__(self, instance: None, owner: type) -> int:
+        return 1
+
+class InstanceOnly:
+    def __get__(self, instance: "BothClassVarBase", owner: type) -> int:
+        return 1
+
+class Both:
+    def __get__(self, instance: object | None, owner: type) -> int:
+        return 1
+
+class PropertyBase:
+    @property
+    def value(self) -> int:
+        return 1
+
+class CompatibleDescriptor(PropertyBase):
+    value: Final = IntDescriptor()  # ok
+
+class UnreadableInstance(PropertyBase):
+    # error: [incompatible-property-override] "Attribute cannot be read through an instance"
+    value: Final = ClassOnly()
+
+class BothClassVarBase:
+    value: ClassVar = Both()
+
+class LosesClassRead(BothClassVarBase):
+    # error: [incompatible-attribute-override] "Attribute cannot be read through the class"
+    value: Final = InstanceOnly()
+
+class ReadOnlyClassVarDescriptor(BothClassVarBase):
+    # error: [incompatible-attribute-override] "Read-only attribute overrides a writable attribute"
+    value: Final = Both()
+```
+
+## `Final` overrides with `Self`
+
+A `Final` override also binds `Self` when overriding `ClassVar[Self]`.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import ClassVar, Final, Self
+
+class Saved:
+    latest: ClassVar[Self]
+
+class SavedChild(Saved):
+    # error: [incompatible-attribute-override]
+    latest: Final = "not_saved"
+```
+
+## `Final` overrides with dataclasses
+
+A frozen dataclass field has no write contract, so a subclass can preserve it with `Final` if its
+type matches.
+
+```py
+from dataclasses import dataclass
+from typing import Final
+
+@dataclass(frozen=True)
+class FrozenRecord:
+    value: int
+
+class FrozenChild(FrozenRecord):
+    value: Final = 1  # ok
+
+class FrozenIncompatible(FrozenRecord):
+    value: Final = "one"  # error: [incompatible-attribute-override]
+```
+
+In a dataclass, a `Final` field without `ClassVar` is an instance variable, while
+`ClassVar[Final[...]]` declares a read-only class variable. Neither can satisfy a mutable `ClassVar`
+on a base class.
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar, Final
+
+class ClassVarBase:
+    count: ClassVar[int] = 0
+
+@dataclass
+class DataclassField(ClassVarBase):
+    # error: [incompatible-attribute-override] "instance variable cannot override class variable `ClassVarBase.count`"
+    count: Final[int] = 1
+
+@dataclass
+class DataclassBareField(ClassVarBase):
+    # error: [incompatible-attribute-override] "instance variable cannot override class variable `ClassVarBase.count`"
+    count: Final = 1
+
+@dataclass
+class DataclassClassVarFinal(ClassVarBase):
+    # error: [incompatible-attribute-override] "Read-only attribute overrides a writable attribute"
+    count: ClassVar[Final[int]] = 1
+```
+
+## `Final` overrides with protocols
+
+Sub-protocols and nominal subclasses must also preserve inherited `ClassVar` mutability and class
+storage.
+
+```py
+from typing import ClassVar, Final, Protocol
+
+class ClassVarProtocol(Protocol):
+    count: ClassVar[int]
+
+class ProtocolSub(ClassVarProtocol, Protocol):
+    # error: [incompatible-attribute-override] "instance variable cannot override class variable `ClassVarProtocol.count`"
+    count: Final[int]
+
+class ProtocolSubclass(ClassVarProtocol):
+    count: Final = 1  # error: [incompatible-attribute-override]
+```
+
+## `Final` overrides of class variables in stubs
+
+In `.pyi` stubs, a class-body `Final` attribute cannot replace a writable `ClassVar`, whether it
+provides an initializer or only an annotation. Declaring `__slots__` makes it an instance attribute,
+which still cannot override a `ClassVar`.
+
+```pyi
+from typing import ClassVar, Final
+
+class StubBase:
+    count: ClassVar[int]
+
+class StubWrongType(StubBase):
+    count: Final = "one"  # error: [incompatible-attribute-override]
+
+class StubPlaceholder(StubBase):
+    # error: [incompatible-attribute-override] "Read-only attribute overrides a writable attribute"
+    count: Final = ...
+
+class StubTypedPlaceholder(StubBase):
+    # error: [incompatible-attribute-override] "Read-only attribute overrides a writable attribute"
+    count: Final[int] = ...
+
+class StubTyped(StubBase):
+    # error: [incompatible-attribute-override] "Read-only attribute overrides a writable attribute"
+    count: Final[int]
+
+class StubSlotted(StubBase):
+    __slots__ = ("count",)
+    # error: [incompatible-attribute-override] "instance variable cannot override class variable `StubBase.count`"
+    count: Final[int]
 ```
 
 ## Frozen fields overriding neutral dataclass-transform bases
@@ -4527,6 +4860,36 @@ class Base:
 class Child(Base):
     def __init__(self) -> None:
         self.value: bool = True  # error: [incompatible-mutable-override]
+```
+
+A bare `Final` annotation on `self.value` is also checked against inherited writable attributes and
+class variables.
+
+```py
+from typing import ClassVar, Final
+
+class AttributeBase:
+    value: int
+
+class FinalInitReadOnly(AttributeBase):
+    def __init__(self) -> None:
+        self.value: Final = 1  # error: [incompatible-attribute-override]
+
+class FinalInitWrongType(AttributeBase):
+    def __init__(self) -> None:
+        self.value: Final = "one"  # error: [incompatible-attribute-override]
+
+class ClassVarAttrBase:
+    value: ClassVar[int] = 0
+
+class FinalInitOverClassVar(ClassVarAttrBase):
+    def __init__(self) -> None:
+        # error: [incompatible-attribute-override] "Read-only attribute overrides a writable attribute"
+        self.value: Final = 1
+
+class FinalInitWrongTypeOverClassVar(ClassVarAttrBase):
+    def __init__(self) -> None:
+        self.value: Final = "one"  # error: [incompatible-attribute-override]
 ```
 
 ## Method annotations alongside slots and class defaults
