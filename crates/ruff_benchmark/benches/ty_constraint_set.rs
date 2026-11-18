@@ -270,6 +270,64 @@ fn benchmark_constructor_literal_alias(criterion: &mut Criterion) {
     }
 }
 
+/// These constructors used to hang because recursive substitution kept reordering union
+/// members in their inferred type arguments (ty#5057).
+fn benchmark_constructor_union_specialization(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for (name, parameters, example) in [
+        (
+            "instances",
+            "first: PropertyArg[A], second: PropertyArg[B], third: PropertyArg[C]",
+            r#"
+            result = Either(
+                Property[Literal["start", "center", "end"]](),
+                Property[Literal["left", "center", "right"]](),
+                Property[float](),
+            )
+            assert_type(result, Either[Literal["start", "center", "end", "left", "right"] | float])
+            "#,
+        ),
+        (
+            "classes",
+            "first: type[Property[A]], second: type[Property[B]], third: type[Property[C]]",
+            "
+            result = Either(Property[float], Property[str | None], Property[bytes])
+            assert_type(result, Either[float | str | None | bytes])
+            ",
+        ),
+    ] {
+        for (suffix, typevars) in [("", "A, B, C"), ("_reversed", "C, B, A")] {
+            let code = format!(
+                r#"
+            from typing import Literal, assert_type
+
+            class Property[T]:
+                value: T
+
+            type PropertyArg[T] = type[Property[T]] | Property[T]
+
+            class Either[T](Property[T]):
+                def __init__[{typevars}](
+                    self: "Either[A | B | C]", {parameters}
+                ) -> None: ...
+            {example}
+            "#
+            );
+            criterion.bench_function(
+                &format!("ty_micro[constructor_union_specialization/{name}{suffix}]"),
+                |b| {
+                    b.iter_batched_ref(
+                        || setup_micro_case(&code),
+                        |Case { db }| assert_eq!(db.check().len(), 0),
+                        BatchSize::SmallInput,
+                    );
+                },
+            );
+        }
+    }
+}
+
 /// Rejecting `T <= int` contradicts `T <= bool`. Trying to disprove the expression on that
 /// branch can exhaust every combination of unrelated choices for `V`.
 fn benchmark_counterexample_behind_implied_bound(criterion: &mut Criterion) {
@@ -906,6 +964,7 @@ criterion_group!(
     benchmark_bottom_and_top_signature_comparisons,
     benchmark_factored_upper_bounds,
     benchmark_constructor_literal_alias,
+    benchmark_constructor_union_specialization,
     benchmark_counterexample_behind_implied_bound,
     benchmark_many_upper_bound_callbacks,
     benchmark_incompatible_lower_bound_alternatives,

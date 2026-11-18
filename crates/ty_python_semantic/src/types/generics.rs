@@ -1,6 +1,7 @@
 use crate::{Program, ProgramEnvironment};
 use std::borrow::Cow;
 use std::cell::{Cell, LazyCell, RefCell};
+use std::collections::VecDeque;
 use std::collections::hash_map::Entry;
 
 use itertools::Itertools;
@@ -1013,55 +1014,67 @@ impl<'db> GenericContext<'db> {
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
-        let types = self.fill_in_defaults(db, types);
-        self.specialize_from_types_recursive(db, types)
-    }
-
-    /// Builds a specialization and recursively resolves references between the chosen types.
-    fn specialize_from_types_recursive(
-        self,
-        db: &'db dyn Db,
-        mut types: Box<[Type<'db>]>,
-    ) -> Specialization<'db> {
+        let mut types = self.fill_in_defaults(db, types);
         let env = ProgramEnvironment::from_program(self.program(db));
-        let len = types.len();
-        let variables = self.variables(db).collect_vec();
-        loop {
-            let mut any_changed = false;
-            for i in 0..len {
-                // Preserve identity mappings for unresolved type variables.
-                if types[i] == Type::TypeVar(variables[i]) {
-                    continue;
-                }
 
-                let specialization = ApplySpecialization::Partial {
-                    generic_context: self,
-                    types: &types,
-                    // Don't recursively substitute type[i] in itself. Ideally, we could instead
-                    // check if the result is self-referential after we're done applying the
-                    // partial specialization. But when we apply a paramspec, we don't use the
-                    // callable that it maps to directly; we create a new callable that reuses
-                    // parts of it. That means we can't look for the previous type directly.
-                    // Instead we use this to skip specializing the type in itself in the first
-                    // place.
-                    skip: Some(i),
-                };
-                let updated = types[i].apply_type_mapping(
-                    db,
-                    &env,
-                    &TypeMapping::ApplySpecialization(specialization),
-                    TypeContext::default(),
-                );
-                if updated != types[i] {
-                    types[i] = updated;
-                    any_changed = true;
-                }
+        // A bare T = T preserves an unresolved variable. Elsewhere in its own binding, T
+        // contributes the bottom of its domain. Do this before substituting peers, since
+        // applying a ParamSpec can rebuild the callable that contains it.
+        let mut pending = VecDeque::new();
+        for (i, (var, ty)) in self.variables(db).zip(&mut types).enumerate() {
+            if *ty == Type::TypeVar(var) {
+                continue;
             }
+            let context = Self::from_typevar_instances(db, &env, [var]);
+            let bottom = context.specialize(db, &[var.domain(db).bottom(db)]);
+            *ty = ty.apply_specialization(db, bottom);
+            pending.push_back((i, var, context));
+        }
 
-            if !any_changed {
-                return Specialization::new(db, self, types, None, None);
+        // Independent bindings, including types from the caller, are already stable under
+        // substitution. Checking them together avoids visiting every pair of bindings.
+        let specialization = self.specialize(db, types.as_ref());
+        if types
+            .iter()
+            .all(|ty| ty.apply_specialization(db, specialization) == *ty)
+        {
+            return specialization;
+        }
+
+        // Eliminate one variable from the other bindings at a time. Repeatedly substituting
+        // all of them at once can keep reintroducing the same union members in a different order.
+        let mut deferred = 0;
+        while let Some((i, var, context)) = pending.pop_front() {
+            let binding = types[i];
+            if binding == Type::TypeVar(var) {
+                continue;
+            }
+            // For T = T | int, substituting Never yields the fixed point int. For
+            // T = list[T], list[Never] fails the same check. A peer can still resolve
+            // the cycle, so only recover with Unknown after an entire pass stalls.
+            let substitute =
+                |value| binding.apply_specialization(db, context.specialize(db, &[value]));
+            let candidate = substitute(var.domain(db).bottom(db));
+            types[i] = if candidate == binding
+                || candidate.is_equivalent_to(db, &env, substitute(candidate))
+            {
+                candidate
+            } else if deferred < pending.len() {
+                pending.push_back((i, var, context));
+                deferred += 1;
+                continue;
+            } else {
+                var.unknown_value(db, &env)
+            };
+            deferred = 0;
+            let substitution = context.specialize(db, &[types[i]]);
+            for (j, ty) in types.iter_mut().enumerate() {
+                if j != i {
+                    *ty = ty.apply_specialization(db, substitution);
+                }
             }
         }
+        Specialization::new(db, self, types, None, None)
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
@@ -1103,7 +1116,6 @@ impl<'db> GenericContext<'db> {
                 let specialization = ApplySpecialization::Partial {
                     generic_context: self,
                     types: &expanded,
-                    skip: None,
                 };
                 default.apply_type_mapping(
                     db,
@@ -2268,9 +2280,6 @@ pub enum ApplySpecialization<'a, 'db> {
     Partial {
         generic_context: GenericContext<'db>,
         types: &'a [Type<'db>],
-        /// An optional typevar to _not_ substitute when applying the specialization. We use this to
-        /// avoid recursively substituting a type inside of itself.
-        skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
     /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
@@ -2355,14 +2364,10 @@ impl<'db> ApplySpecialization<'_, 'db> {
             ApplySpecialization::Partial {
                 generic_context,
                 types,
-                skip,
             } => {
                 let index = generic_context
                     .variables_inner(db)
                     .get_index_of(&bound_typevar.identity(db))?;
-                if skip.is_some_and(|skip| skip == index) {
-                    return Some(Type::Never);
-                }
                 types.get(index).copied()
             }
             ApplySpecialization::ReturnCallables(replacements) => {
@@ -3118,7 +3123,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
             Ok(SolutionProjection::Constrained(inference)) => inference,
         };
-        let types = &mut inference.merged_types;
 
         // Sequent-map transitivity can add relationships between inferable typevars to path
         // bounds. Those relationships are important while solving, but should not become recursive
@@ -3129,24 +3133,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // constraint-set solution extraction layer, taking an explicit domain of typevars to solve
         // for and existentially quantifying away the other typevars in that domain.
         for (identity, variable) in generic_context.variables_inner(db) {
-            if let Some(ty) = types.get_mut(identity) {
+            if let Some(ty) = inference.merged_types.get_mut(identity) {
                 *ty = self.remove_inferable_typevar_artifacts_from_solution(*variable, *ty);
             }
-        }
-
-        // `merged_types` is consumed by `specialize_recursive`, which substitutes bindings
-        // repeatedly. For `T = list[U], U = T`, each pass adds another `list` layer.
-        // Use the legacy type map (or `Unknown` if unavailable) for `merged_types` to avoid
-        // that infinite loop. Keep the individual alternatives in `solutions`: their
-        // dependency resolver marks `T` and `U` unresolved while preserving independent bindings.
-        if types
-            .iter()
-            .any(|(identity, ty)| self.has_expanding_cycle(types, *identity, *ty))
-        {
-            inference.merged_types = self
-                .solve_hash_map_with(generic_context, &mut |typevar, bounds| {
-                    choose(typevar, bounds).and_then(PathBoundSolution::as_type)
-                });
         }
 
         Ok(inference)
@@ -5128,6 +5117,43 @@ mod tests {
     }
 
     #[test]
+    fn recursive_specialization_uses_concrete_peers_before_cycle_recovery() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let [a, b, c] = create_typevars(db, ["A", "B", "C"]);
+        // C = object forces A = ~B | C and B = A to both be object.
+        let a_value = UnionType::from_two_elements(
+            db,
+            &env,
+            Type::TypeVar(b).negate(db, &env),
+            Type::TypeVar(c),
+        );
+        let bindings = [(a, a_value), (b, Type::TypeVar(a)), (c, Type::object())];
+        for order in bindings.into_iter().permutations(3) {
+            let vars = order.iter().map(|(var, _)| *var);
+            let context = GenericContext::from_typevar_instances(db, &env, vars);
+            let result = context.specialize_recursive(db, order.iter().map(|(_, ty)| Some(*ty)));
+            assert_eq!(result.types(db), [Type::object(); 3]);
+        }
+    }
+
+    #[test]
+    fn recursive_specialization_preserves_independent_bindings_on_a_cycle() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let variables @ [a, b, independent] = create_typevars(db, ["A", "B", "C"]);
+        let context = GenericContext::from_typevar_instances(db, &env, variables);
+        let int = KnownClass::Int.to_instance(db, &env);
+        // A = ~B and B = A have no fixed point.
+        let types = [Type::TypeVar(b).negate(db, &env), Type::TypeVar(a), int];
+        let specialization = context.specialize_recursive(db, types.map(Some));
+        assert_eq!(specialization.get(db, b), Some(Type::unknown()));
+        assert_eq!(specialization.get(db, independent), Some(int));
+    }
+
+    #[test]
     fn inference_preserves_correlated_alternatives() -> anyhow::Result<()> {
         let db = setup_db();
         let db = &db;
@@ -5699,7 +5725,7 @@ mod tests {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
-        let typevars @ [t, u, _] = create_typevars(db, ["T", "U", "V"]);
+        let typevars @ [t, u, v] = create_typevars(db, ["T", "U", "V"]);
         let context = GenericContext::from_typevar_instances(db, &env, typevars);
         let constraints = ConstraintSetBuilder::new();
         let int = KnownClass::Int.to_instance(db, &env);
@@ -5720,6 +5746,7 @@ mod tests {
                 }
             })
             .map_err(|_| anyhow::anyhow!("a cyclic alternative remains satisfiable"))?;
+        assert_eq!(inference.merged_specialization(db).get(db, v), Some(int));
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
             anyhow::bail!("expected a retained cyclic alternative");
         };
