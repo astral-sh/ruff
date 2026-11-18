@@ -10,7 +10,7 @@ use tracing::{Event, Subscriber};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::format::Writer;
-use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
+use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields, MakeWriter};
 use tracing_subscriber::registry::LookupSpan;
 use ty_static::EnvVars;
 
@@ -109,6 +109,7 @@ impl VerbosityLevel {
 pub(crate) fn setup_tracing(
     level: VerbosityLevel,
     color: TerminalColor,
+    writer: impl for<'a> MakeWriter<'a> + Send + Sync + 'static,
 ) -> anyhow::Result<TracingGuard> {
     use tracing_subscriber::prelude::*;
 
@@ -160,7 +161,7 @@ pub(crate) fn setup_tracing(
                 .event_format(tracing_subscriber::fmt::format().pretty())
                 .with_thread_ids(true)
                 .with_ansi(ansi)
-                .with_writer(std::io::stderr),
+                .with_writer(writer),
         );
 
         subscriber.init();
@@ -173,7 +174,7 @@ pub(crate) fn setup_tracing(
                     show_spans: false,
                 })
                 .with_ansi(ansi)
-                .with_writer(std::io::stderr),
+                .with_writer(writer),
         );
 
         subscriber.init();
