@@ -1027,11 +1027,7 @@ pub fn collect_import_from_member<'a>(
     member: &'a str,
 ) -> QualifiedName<'a> {
     let mut qualified_name_builder = QualifiedNameBuilder::with_capacity(
-        level as usize
-            + module
-                .map(|module| module.split('.').count())
-                .unwrap_or_default()
-            + 1,
+        level as usize + module.map_or_default(|module| module.split('.').count()) + 1,
     );
 
     // Include the dots as standalone segments.
@@ -1147,29 +1143,20 @@ impl<'a> Visitor<'a> for StoredNameFinder<'a> {
     }
 }
 
-/// A [`Visitor`] that collects all `return` statements in a function or method.
+/// A [`StatementVisitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<&'a ast::StmtReturn>,
-    pub is_generator: bool,
 }
 
-impl<'a> Visitor<'a> for ReturnStatementVisitor<'a> {
+impl<'a> StatementVisitor<'a> for ReturnStatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 // Don't recurse.
             }
             Stmt::Return(stmt) => self.returns.push(stmt),
-            _ => crate::visitor::walk_stmt(self, stmt),
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
-            self.is_generator = true;
-        } else {
-            crate::visitor::walk_expr(self, expr);
+            _ => crate::statement_visitor::walk_stmt(self, stmt),
         }
     }
 }

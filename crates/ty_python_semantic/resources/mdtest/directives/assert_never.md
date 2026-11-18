@@ -240,3 +240,27 @@ def match_singletons_error(obj: Literal[1, "a"] | None):
             # error: [type-assertion-failure] "Type `Literal["a"]` is not equivalent to `Never`"
             assert_never(obj)
 ```
+
+## Argument type context
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+The declared parameter type of the value argument to `assert_never` should not be used as type
+context when inferring the value expression. Doing so could influence the type inferred by a nested
+generic call and incorrectly silence the assertion.
+
+```py
+from collections.abc import Iterator
+from typing import Never, assert_never
+
+def _(items: Iterator[Never]):
+    assert_never(next(items))  # ok
+
+def result[T = Never]() -> T:
+    raise NotImplementedError
+
+assert_never(result())  # ok
+```

@@ -111,8 +111,7 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
 
     if !checker
         .semantic()
-        .resolve_qualified_name(left)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "platform"]))
+        .matches_qualified_name(left, &["sys", "platform"])
     {
         return;
     }

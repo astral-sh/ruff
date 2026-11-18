@@ -84,7 +84,7 @@ class LambdaNew:
     __new__ = lambda cls: object.__new__(cls)
 
 reveal_type(LambdaNew())  # revealed: LambdaNew
-LambdaNew().missing_attribute  # error: [unresolved-attribute]
+LambdaNew().missing_attribute  # error: [missing-attribute]
 ```
 
 ## `__new__` with an invalid decorator and unresolved return annotation
@@ -102,7 +102,7 @@ from typing_extensions import deprecated
 
 class C:
     @deprecated  # error: [invalid-argument-type] "LiteralString"
-    def __new__() -> T:  # error: [empty-body] "TypeVar"
+    def __new__() -> T:  # error: [invalid-implicit-return-in-function-with-stub-body] "TypeVar"
         pass
 
 C()
@@ -702,11 +702,11 @@ def _(flag: bool) -> None:
     class Foo:
         __new__ = Callable()
 
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo(1))  # revealed: Foo
     # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
     # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo())  # revealed: Foo
 ```
 
@@ -1680,6 +1680,30 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+## Reconstructing a generic receiver through a union parameter
+
+A mapping matches the constructor's mapping protocol; its keys do not also have to be key-value
+pairs. Reconstructing the receiver preserves `Self` and the enclosing key type.
+
+```py
+from collections.abc import Iterable, Mapping
+from typing import Generic, Protocol, TypeVar
+from typing_extensions import Self
+
+K = TypeVar("K")
+
+class Maplike(Protocol[K]):
+    def keys(self) -> Iterable[K]: ...
+    def __getitem__(self, key: K, /) -> int: ...
+
+class Container(Generic[K]):
+    def __init__(self, value: Maplike[K] | Iterable[tuple[K, int]]) -> None: ...
+    def copy(self, other: Mapping[K, int]) -> Self:
+        result = self.__class__(other)
+        reveal_type(result)  # revealed: Self@copy
+        return result
+```
+
 ## Generic constructor inference from overloaded `__init__` self types
 
 ```py
@@ -1792,6 +1816,18 @@ class C[T: (str | None, int | None)]:
 
 reveal_type(C("a"))  # revealed: C[str | None]
 reveal_type(C(1))  # revealed: C[int | None]
+```
+
+## Variadic receiver annotations
+
+A variadic parameter can accept both the receiver and the explicit constructor arguments.
+
+```py
+class Plain:
+    def __init__(*args: *tuple[object, ...]) -> None: ...
+
+Plain()  # ok
+Plain(1, "a")  # ok
 ```
 
 ## Union `self` annotations with variadic constructor parameters
@@ -2189,11 +2225,11 @@ def _(flag: bool) -> None:
     class Foo:
         __init__ = Callable()
 
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo(1))  # revealed: Foo
     # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
     # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo())  # revealed: Foo
 ```
 

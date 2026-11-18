@@ -1,4 +1,7 @@
-use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, render::FileResolver};
+use crate::diagnostic::{
+    Diagnostic, DisplayDiagnosticConfig,
+    render::{FileResolver, Renderer},
+};
 
 /// Generate violations in Pylint format.
 ///
@@ -9,42 +12,35 @@ use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, render::FileResolve
 /// ```
 ///
 /// See: [Flake8 documentation](https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter)
-pub(super) struct PylintRenderer<'a> {
+pub struct PylintRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> PylintRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
 }
 
-impl PylintRenderer<'_> {
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for PylintRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         for diagnostic in diagnostics {
-            let (filename, row) = diagnostic
-                .primary_span_ref()
-                .map(|span| {
-                    let file = span.file();
+            let (filename, row) = diagnostic.primary_span_ref().map_or_default(|span| {
+                let file = span.file();
 
-                    let row = span
-                        .range()
-                        .filter(|_| !self.resolver.is_notebook(file))
-                        .map(|range| {
-                            file.diagnostic_source(self.resolver)
-                                .as_source_code()
-                                .line_column(range.start())
-                                .line
-                        });
+                let row = span
+                    .range()
+                    .filter(|_| !self.resolver.is_notebook(file))
+                    .map(|range| {
+                        file.diagnostic_source(self.resolver)
+                            .as_source_code()
+                            .line_column(range.start())
+                            .line
+                    });
 
-                    (file.relative_path(self.resolver).to_string_lossy(), row)
-                })
-                .unwrap_or_default();
+                (file.relative_path(self.resolver).to_string_lossy(), row)
+            });
 
             let code = if self.config.preview && !self.config.prefer_rule_codes {
                 diagnostic.id().as_str()
@@ -68,9 +64,8 @@ impl PylintRenderer<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, TestEnvironment, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]

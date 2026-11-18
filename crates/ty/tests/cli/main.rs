@@ -1,4 +1,5 @@
 mod analysis_options;
+mod baseline;
 mod config_option;
 mod exit_code;
 mod file_selection;
@@ -16,6 +17,7 @@ pub mod common;
 use std::fmt::Write;
 
 use insta_cmd::assert_cmd_snapshot;
+use test_case::test_case;
 
 use common::{CliTest, user_config_directory_env_var};
 
@@ -271,7 +273,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `utils`
+    error[import-not-found]: Cannot resolve imported module `utils`
      --> test.py:2:6
       |
     2 | from utils import add
@@ -458,13 +460,13 @@ fn check_specific_paths() -> anyhow::Result<()> {
         (
             "project/tests/test_main.py",
             r#"
-            import does_not_exist  # error: unresolved-import
+            import does_not_exist  # error: import-not-found
             "#,
         ),
         (
             "project/other.py",
             r#"
-            from main2 import z  # error: unresolved-import
+            from main2 import z  # error: import-not-found
 
             print(z)
             "#,
@@ -477,20 +479,20 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `main2`
+    error[import-not-found]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
-    2 | from main2 import z  # error: unresolved-import
+    2 | from main2 import z  # error: import-not-found
       |      ^^^^^
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `does_not_exist`
+    error[import-not-found]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
-    2 | import does_not_exist  # error: unresolved-import
+    2 | import does_not_exist  # error: import-not-found
       |        ^^^^^^^^^^^^^^
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -511,20 +513,20 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `main2`
+    error[import-not-found]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
-    2 | from main2 import z  # error: unresolved-import
+    2 | from main2 import z  # error: import-not-found
       |      ^^^^^
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `does_not_exist`
+    error[import-not-found]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
-    2 | import does_not_exist  # error: unresolved-import
+    2 | import does_not_exist  # error: import-not-found
       |        ^^^^^^^^^^^^^^
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
@@ -638,6 +640,38 @@ fn concise_diagnostics() -> anyhow::Result<()> {
     ");
 
     Ok(())
+}
+
+/// Check which CLI and environment settings force ANSI styling in a piped diagnostic.
+#[test_case(None,           &[]                                             => false; "automatic detection")]
+#[test_case(None,           &[("FORCE_COLOR", "0")]                         => true;  "force color")]
+#[test_case(None,           &[("FORCE_COLOR", ""), ("CLICOLOR_FORCE", "0")] => true;  "empty force color defers")]
+#[test_case(None,           &[("CLICOLOR_FORCE", "")]                       => false; "empty clicolor force")]
+#[test_case(None,           &[("CLICOLOR", "1")]                            => false; "clicolor requires a terminal")]
+#[test_case(None,           &[("NO_COLOR", "0"), ("CLICOLOR_FORCE", "1")]   => false; "no color beats clicolor force")]
+#[test_case(None,           &[("NO_COLOR", "0"), ("FORCE_COLOR", "0")]      => false; "no color wins")]
+#[test_case(Some("auto"),   &[("NO_COLOR", ""), ("FORCE_COLOR", "0")]       => true;  "empty no color")]
+#[test_case(Some("always"), &[("NO_COLOR", "0")]                            => true;  "explicit always")]
+#[test_case(Some("never"),  &[("FORCE_COLOR", "0")]                         => false; "explicit never")]
+fn color_in_piped_diagnostics(flag: Option<&str>, env: &[(&str, &str)]) -> bool {
+    let case = CliTest::with_file("test.py", "x: int = 'wrong'").unwrap();
+    let mut command = case.command();
+    if let Some(flag) = flag {
+        command.args(["--color", flag]);
+    }
+    let output = command
+        .arg("--output-format=concise")
+        .envs(env.iter().copied())
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let diagnostic = stdout
+        .lines()
+        .find(|line| line.contains("invalid-assignment"))
+        .unwrap();
+    diagnostic.contains("\x1b[")
 }
 
 #[test]
@@ -763,6 +797,248 @@ fn github_diagnostics() -> anyhow::Result<()> {
 
     ----- stderr -----
     ");
+
+    Ok(())
+}
+
+#[test]
+fn sarif_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            division-by-zero = "warn"
+            unused-ignore-comment = "error"
+
+            [[overrides]]
+            include = ["a.py"]
+
+            [overrides.rules]
+            unresolved-reference = "warn"
+            "#,
+        ),
+        ("a.py", "print(x)"),
+        (
+            "b.py",
+            r#"
+            print(x)
+            1 / 0  # ty: ignore[unresolved-reference]
+            "#,
+        ),
+    ])?
+    .with_filter(
+        r#"("fullDescription": \{\s*"text": ")[^\n]*(")"#,
+        "$1[DESCRIPTION]$2",
+    )
+    .with_filter(r#"(?m)^(\s{10}"version": ")[^"]+"#, "$1[VERSION]")
+    .with_filter(r#"file://[^"]*/project/"#, "file://<temp_dir>/");
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=sarif"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    {
+      "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+      "runs": [
+        {
+          "results": [
+            {
+              "level": "warning",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/a.py"
+                    },
+                    "region": {
+                      "endColumn": 8,
+                      "endLine": 1,
+                      "startColumn": 7,
+                      "startLine": 1
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Name `x` used when not defined"
+              },
+              "ruleId": "unresolved-reference"
+            },
+            {
+              "level": "error",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 8,
+                      "endLine": 2,
+                      "startColumn": 7,
+                      "startLine": 2
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Name `x` used when not defined"
+              },
+              "ruleId": "unresolved-reference"
+            },
+            {
+              "level": "warning",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 6,
+                      "endLine": 3,
+                      "startColumn": 1,
+                      "startLine": 3
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Cannot divide object of type `Literal[1]` by zero"
+              },
+              "ruleId": "division-by-zero"
+            },
+            {
+              "fixes": [
+                {
+                  "artifactChanges": [
+                    {
+                      "artifactLocation": {
+                        "uri": "file://<temp_dir>/b.py"
+                      },
+                      "replacements": [
+                        {
+                          "deletedRegion": {
+                            "endColumn": 42,
+                            "endLine": 3,
+                            "startColumn": 6,
+                            "startLine": 3
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "description": {
+                    "text": "Remove the unused suppression comment"
+                  }
+                }
+              ],
+              "level": "error",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 42,
+                      "endLine": 3,
+                      "startColumn": 8,
+                      "startLine": 3
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Unused `ty: ignore` directive"
+              },
+              "ruleId": "unused-ignore-comment"
+            }
+          ],
+          "tool": {
+            "driver": {
+              "informationUri": "https://github.com/astral-sh/ty",
+              "name": "ty",
+              "rules": [
+                {
+                  "defaultConfiguration": {
+                    "enabled": false
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects division by zero"
+                  },
+                  "helpUri": "https://ty.dev/rules#division-by-zero",
+                  "id": "division-by-zero",
+                  "properties": {
+                    "id": "division-by-zero",
+                    "kind": null,
+                    "name": "division-by-zero",
+                    "problem.severity": "warning"
+                  },
+                  "shortDescription": {
+                    "text": "detects division by zero"
+                  }
+                },
+                {
+                  "defaultConfiguration": {
+                    "enabled": true,
+                    "level": "error"
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects references to names that are not defined"
+                  },
+                  "helpUri": "https://ty.dev/rules#unresolved-reference",
+                  "id": "unresolved-reference",
+                  "properties": {
+                    "id": "unresolved-reference",
+                    "kind": null,
+                    "name": "unresolved-reference",
+                    "problem.severity": "error"
+                  },
+                  "shortDescription": {
+                    "text": "detects references to names that are not defined"
+                  }
+                },
+                {
+                  "defaultConfiguration": {
+                    "enabled": true,
+                    "level": "warning"
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects unused `ty: ignore` comments"
+                  },
+                  "helpUri": "https://ty.dev/rules#unused-ignore-comment",
+                  "id": "unused-ignore-comment",
+                  "properties": {
+                    "id": "unused-ignore-comment",
+                    "kind": null,
+                    "name": "unused-ignore-comment",
+                    "problem.severity": "error"
+                  },
+                  "shortDescription": {
+                    "text": "detects unused `ty: ignore` comments"
+                  }
+                }
+              ],
+              "version": "[VERSION]"
+            }
+          }
+        }
+      ],
+      "version": "2.1.0"
+    }
+    ----- stderr -----
+    "#);
 
     Ok(())
 }

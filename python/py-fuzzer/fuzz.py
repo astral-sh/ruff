@@ -17,7 +17,8 @@ run ID from the workflow URL; GitHub Actions sets them automatically.
 
 On normal completion, the fuzzer exits with status 0 when it checks every seed
 and finds no bugs, 1 when it checks every seed and finds bugs, and 2 when it
-leaves seeds unchecked.
+leaves seeds unchecked. When minimizing previously reported failures, it exits
+with status 0 after processing all of them.
 
 Example invocations of the script using `uv`:
 - Run the fuzzer on Ruff's parser using seeds 0, 1, 2, 78 and 93 to generate the code:
@@ -37,6 +38,7 @@ import argparse
 import ast
 import concurrent.futures
 import contextlib
+import dataclasses
 import enum
 import json
 import multiprocessing
@@ -49,7 +51,7 @@ import sys
 import tempfile
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import KW_ONLY, dataclass
 from pathlib import Path
 from typing import Final, NamedTuple, NewType, NoReturn, assert_never
@@ -64,6 +66,7 @@ Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
 TY_TARGET_PLATFORM: Final = "linux"
+CHECK_TIMEOUT_SECONDS: Final = 5
 
 # Reserve time within the budget for CI job setup before the first step,
 # the final summary and any issue report, and steps after fuzzing.
@@ -88,15 +91,34 @@ class MinimizationTimedOut(Exception):
     """The fuzzing deadline was reached or the run was cancelled during minimization."""
 
 
-def run_executable(command: Sequence[str | Path], *, input: str | None = None) -> int:
-    """Run a command with a five-second timeout and return its exit code.
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Success:
+    elapsed_seconds: float
+
+
+class Failure(enum.Enum):
+    ERROR = "error"
+    TIMEOUT = "timeout"
+
+
+def run_executable(
+    command: Sequence[str | Path],
+    *,
+    successful_exit_codes: Collection[int],
+    input: str | None = None,
+) -> Success | Failure:
+    """Run a command with a five-second timeout and classify its outcome.
+
+    Return `Success` with the elapsed time for exit codes in
+    `successful_exit_codes`, `Failure.ERROR` for other exit codes, and
+    `Failure.TIMEOUT` if the command times out. The elapsed time excludes
+    process startup.
 
     Send `input` to standard input if provided; otherwise, inherit standard
     input from the caller. Standard output and standard error are discarded.
     On POSIX, start the command in a new session and, on timeout, kill its
     process group to terminate any children in that group without killing
-    the caller. On other platforms, kill only the command. Then raise
-    `subprocess.TimeoutExpired`.
+    the caller. On other platforms, kill only the command.
 
     For other errors or interruptions while communicating with the command,
     terminate it if it is still running and wait for it to exit, then re-raise
@@ -114,16 +136,18 @@ def run_executable(command: Sequence[str | Path], *, input: str | None = None) -
         text=True,
         start_new_session=os.name == "posix",
     ) as process:
+        started = time.monotonic()
         try:
-            process.communicate(input=input, timeout=5)
+            process.communicate(input=input, timeout=CHECK_TIMEOUT_SECONDS)
         except BaseException as error:
+            timed_out = isinstance(error, subprocess.TimeoutExpired)
             # Ctrl+C can interrupt communicate() while the checker is still running;
             # on POSIX, the checker is in a separate session and doesn't receive the signal.
             # `poll()` returns `None` when the checker is still running, so we can kill it
             # before re-raising the interruption.
             # On POSIX, a timeout may leave children in the checker's process group
             # even after the checker exits, so we try to kill the group regardless.
-            if isinstance(error, subprocess.TimeoutExpired) or process.poll() is None:
+            if timed_out or process.poll() is None:
                 if os.name == "posix":
                     # The process group may have disappeared
                     # if its members exited, leaving nothing in the group to kill.
@@ -136,12 +160,19 @@ def run_executable(command: Sequence[str | Path], *, input: str | None = None) -
                     # https://github.com/python/cpython/blob/v3.12.0/Lib/subprocess.py#L1518-L1532
                     process.kill()
                 process.wait()
+            if timed_out:
+                return Failure.TIMEOUT
             raise
-        return process.wait()
+        if process.returncode in successful_exit_codes:
+            return Success(elapsed_seconds=time.monotonic() - started)
+        return Failure.ERROR
 
 
-def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
-    """Return `True` if the code triggers a panic in type-checking code."""
+def check_ty(code: str, *, ty_executable: Path) -> Success | Failure:
+    """Type-check the input with ty and return its outcome.
+
+    A completed check can report diagnostics and still count as successful.
+    """
     with tempfile.TemporaryDirectory() as tempdir:
         input_file = Path(tempdir, "input.py")
         input_file.write_text(code)
@@ -154,15 +185,11 @@ def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
             "--python-platform",
             TY_TARGET_PLATFORM,
         ]
-        try:
-            returncode = run_executable(command)
-        except subprocess.TimeoutExpired:
-            return True
-    return returncode not in {0, 1, 2}
+        return run_executable(command, successful_exit_codes=(0, 1, 2))
 
 
-def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
-    """Return `True` if the code triggers a parser error."""
+def check_ruff(code: str, *, ruff_executable: Path) -> Success | Failure:
+    """Run Ruff on the input with lint rules disabled and return its outcome."""
     command: list[str | Path] = [
         ruff_executable,
         "check",
@@ -176,49 +203,90 @@ def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
         "--preview",
         "-",
     ]
-    try:
-        returncode = run_executable(command, input=code)
-    except subprocess.TimeoutExpired:
-        return True
-    return returncode != 0
+    return run_executable(command, successful_exit_codes=(0,), input=code)
 
 
-def contains_bug(code: str, *, executable: Executable, executable_path: Path) -> bool:
-    """Return `True` if the code triggers an error."""
+def check_code(
+    code: str, *, executable: Executable, executable_path: Path
+) -> Success | Failure:
+    """Return the outcome of checking the input with Ruff or ty."""
     match executable:
         case Executable.RUFF:
-            return ruff_contains_bug(code, ruff_executable=executable_path)
+            return check_ruff(code, ruff_executable=executable_path)
         case Executable.TY:
-            return ty_contains_bug(code, ty_executable=executable_path)
+            return check_ty(code, ty_executable=executable_path)
         case _ as unreachable:
             assert_never(unreachable)
 
 
-def contains_new_bug(
-    code: str,
-    *,
-    executable: Executable,
-    test_executable_path: Path,
-    baseline_executable_path: Path,
-) -> bool:
-    """Return `True` if the code triggers a *new* parser error.
+class ReportKind(enum.Enum):
+    DAILY_FUZZ_ISSUE = "daily fuzz issue"
+    PULL_REQUEST_COMMENT = "pull request comment"
 
-    A "new" parser error is one that exists with `test_executable`,
-    but did not exist with `baseline_executable`.
-    """
-    return contains_bug(
-        code, executable=executable, executable_path=test_executable_path
-    ) and not contains_bug(
-        code, executable=executable, executable_path=baseline_executable_path
-    )
+    def template_name(self) -> str:
+        """Return the Jinja template filename for this report kind."""
+        match self:
+            case ReportKind.DAILY_FUZZ_ISSUE:
+                return "daily_fuzz_issue.md.jinja"
+            case ReportKind.PULL_REQUEST_COMMENT:
+                return "fuzz_reproducers.md.jinja"
+            case _ as unreachable:
+                assert_never(unreachable)
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class DetectedFailure:
+    """A failure on the test build and the baseline's elapsed time, if recorded."""
+
+    kind: Failure
+    baseline_seconds: float | None
+
+    @classmethod
+    def read(cls, path: Path) -> DetectedFailure | None:
+        """Read a JSON failure record, returning `None` if the file does not exist."""
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return None
+        return cls(
+            kind=Failure(data["kind"]), baseline_seconds=data["baseline_seconds"]
+        )
+
+    def write(self, path: Path) -> None:
+        """Save the failure kind and baseline duration as JSON."""
+        data = {"kind": self.kind.value, "baseline_seconds": self.baseline_seconds}
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+    def describe(self, executable: Executable) -> str:
+        """Format the recorded failure as Markdown.
+
+        For a timeout, include the cutoff and any recorded baseline duration.
+        """
+        if self.kind is Failure.TIMEOUT:
+            tool_name = "Ruff" if executable is Executable.RUFF else "ty"
+            description = f"{tool_name} **timed out** on this seed ({CHECK_TIMEOUT_SECONDS} s cutoff)."
+            # Runs that check a single build, such as the daily Ruff job,
+            # have no baseline duration to report.
+            if self.baseline_seconds is not None:
+                description += (
+                    f" The baseline build completed in {self.baseline_seconds:.3f} s."
+                )
+            return description
+        if executable is Executable.TY:
+            return "ty **panicked or overflowed** on this seed."
+        return "Ruff reported a **parser error** on this seed."
 
 
 @dataclass(slots=True, kw_only=True, frozen=True)
 class Bug:
-    """A bug reproducer and whether minimization succeeded."""
+    """A bug reproducer, its minimization status, and the original input's failure.
+
+    Older saved inputs may have no recorded failure.
+    """
 
     source: str
     minimization_succeeded: bool
+    failure: DetectedFailure | None
 
 
 @dataclass(slots=True, frozen=True)
@@ -270,22 +338,26 @@ class FuzzResult:
             print(flush=True)
 
 
-def contains_reportable_bug(code: str, args: ResolvedCliArgs) -> bool:
-    """Return whether the test executable finds a bug in the code.
-
-    If a baseline executable is provided, only return `True` if the baseline
-    does not find a bug in the code.
-    """
-    if args.baseline_executable_path is None:
-        return contains_bug(
-            code, executable=args.executable, executable_path=args.test_executable_path
-        )
-    return contains_new_bug(
-        code,
-        executable=args.executable,
-        test_executable_path=args.test_executable_path,
-        baseline_executable_path=args.baseline_executable_path,
+def find_reportable_failure(code: str, args: ResolvedCliArgs) -> DetectedFailure | None:
+    """Return a failure if the test executable fails and any configured baseline passes."""
+    test = check_code(
+        code, executable=args.executable, executable_path=args.test_executable_path
     )
+    if isinstance(test, Success):
+        return None
+
+    baseline_seconds = None
+    if args.baseline_executable_path is not None:
+        baseline = check_code(
+            code,
+            executable=args.executable,
+            executable_path=args.baseline_executable_path,
+        )
+        if isinstance(baseline, Failure):
+            return None
+        baseline_seconds = baseline.elapsed_seconds
+
+    return DetectedFailure(kind=test, baseline_seconds=baseline_seconds)
 
 
 def fuzz_code(
@@ -294,25 +366,55 @@ def fuzz_code(
     deadline: float | None,
     cancelled: threading.Event,
 ) -> FuzzResult | None:
-    """Check one seed and minimize any failure, or return None if it was not checked."""
+    """Process one seed, or return None if it was not checked."""
     if cancelled.is_set() or (deadline is not None and time.monotonic() >= deadline):
         return None
 
-    code = generate_random_code(seed)
+    failure = None
+    if args.corpus_dir is None:
+        code = generate_random_code(seed)
+    else:
+        input_path = args.corpus_dir / f"{seed}.py"
+        code = input_path.read_text(encoding="utf-8")
+        if args.minimize_failures:
+            failure = DetectedFailure.read(input_path.with_suffix(".json"))
 
     if cancelled.is_set() or (deadline is not None and time.monotonic() >= deadline):
         return None
 
-    if not contains_reportable_bug(code, args):
-        return FuzzResult(
-            seed,
-            None,
-            args.executable,
-            only_new_bugs=args.baseline_executable_path is not None,
-            minimization_timed_out=False,
-        )
+    bug = None
+    if not args.minimize_failures:
+        failure = find_reportable_failure(code, args)
+    # Saved inputs already failed during detection. Keep the original source in
+    # the report if an intermittent failure stops reproducing during minimization.
+    if args.minimize_failures or failure is not None:
+        if args.output_format is OutputFormat.GITHUB and not args.minimize_failures:
+            print(
+                f"::error::{args.executable} fuzzing failed on seed {seed}", flush=True
+            )
+        bug = Bug(source=code, minimization_succeeded=False, failure=failure)
+        if args.save_failures is None:
+            return minimize_failure(seed, bug, args, deadline, cancelled)
+        assert failure is not None
+        failure.write(args.save_failures / f"{seed}.json")
+        (args.save_failures / f"{seed}.py").write_text(code, encoding="utf-8")
 
-    maybe_bug = Bug(source=code, minimization_succeeded=False)
+    return FuzzResult(
+        seed,
+        bug,
+        args.executable,
+        only_new_bugs=args.baseline_executable_path is not None,
+        minimization_timed_out=False,
+    )
+
+
+def minimize_failure(
+    seed: Seed,
+    bug: Bug,
+    args: ResolvedCliArgs,
+    deadline: float | None,
+    cancelled: threading.Event,
+) -> FuzzResult:
     minimization_timed_out = False
 
     if not args.quiet:
@@ -328,7 +430,7 @@ def fuzz_code(
             deadline is not None and time.monotonic() >= deadline
         ):
             raise MinimizationTimedOut
-        found = contains_reportable_bug(candidate, args)
+        found = find_reportable_failure(candidate, args) is not None
         if cancelled.is_set() or (
             deadline is not None and time.monotonic() >= deadline
         ):
@@ -336,13 +438,13 @@ def fuzz_code(
         return found
 
     try:
-        minimized = minimize_repro(code, bounded_callback)
+        minimized = minimize_repro(bug.source, bounded_callback)
     except CouldNotMinimize as e:
         # This is to double-check that there isn't a bug in
         # `pysource-minimize`/`pysource-codegen`.
         # `pysource-minimize` *should* never produce code that's invalid syntax.
         try:
-            ast.parse(code)
+            ast.parse(bug.source)
         except SyntaxError:
             raise e from None
         if not args.quiet:
@@ -360,11 +462,11 @@ def fuzz_code(
         if not args.quiet:
             print(f"Could not minimize seed {seed}: {e}", file=sys.stderr, flush=True)
     else:
-        maybe_bug = Bug(source=minimized, minimization_succeeded=True)
+        bug = dataclasses.replace(bug, source=minimized, minimization_succeeded=True)
 
     return FuzzResult(
         seed=seed,
-        maybe_bug=maybe_bug,
+        maybe_bug=bug,
         executable=args.executable,
         only_new_bugs=args.baseline_executable_path is not None,
         minimization_timed_out=minimization_timed_out,
@@ -381,7 +483,7 @@ class FuzzRunResult(NamedTuple):
 def run_fuzzer_concurrently(
     args: ResolvedCliArgs, deadline: float | None
 ) -> FuzzRunResult:
-    """Check seeds concurrently and minimize failures, returning failures and unchecked seeds."""
+    """Process seeds concurrently, returning failures and unchecked seeds."""
     num_seeds = len(args.seeds)
     print(
         f"Concurrently running the fuzzer on "
@@ -420,7 +522,7 @@ def run_fuzzer_concurrently(
 def run_fuzzer_sequentially(
     args: ResolvedCliArgs, *, deadline: float | None
 ) -> FuzzRunResult:
-    """Check seeds sequentially and minimize failures, returning failures and unchecked seeds."""
+    """Process seeds sequentially, returning failures and unchecked seeds."""
     num_seeds = len(args.seeds)
     print(
         f"Sequentially running the fuzzer on "
@@ -449,6 +551,7 @@ class RenderableReproducer:
     seed: Seed
     bug: Bug
     fence: str
+    failure_description: str | None
 
 
 def render_issue_body(
@@ -461,11 +564,7 @@ def render_issue_body(
     run_url: str,
     fuzzer_revision: str,
 ) -> str:
-    """Render a GitHub issue body containing reproducers and unchecked seeds.
-
-    Omit reproducers or unchecked seeds when including them alongside omission
-    notices would exceed the issue body size limit.
-    """
+    """Render the daily fuzz issue with instructions for reproducing its failures."""
     match executable:
         case Executable.RUFF:
             failure_description = (
@@ -489,6 +588,27 @@ def render_issue_body(
         case _ as unreachable:
             assert_never(unreachable)
 
+    return render_github_report(
+        ReportKind.DAILY_FUZZ_ISSUE,
+        bugs,
+        unchecked_seeds,
+        run_url=run_url,
+        fuzzer_revision=fuzzer_revision,
+        executable=executable,
+        executable_revision=executable_revision,
+        failure_description=failure_description,
+        reproduction_command=reproduction_command,
+        seed_rerun_command=rerun_command,
+    )
+
+
+def render_github_report(
+    report_kind: ReportKind,
+    bugs: list[FuzzResult],
+    unchecked_seeds: list[Seed],
+    **context: str,
+) -> str:
+    """Render reproducers and unchecked seeds within GitHub's size limit."""
     environment = Environment(
         loader=FileSystemLoader(Path(__file__).parent),
         undefined=StrictUndefined,
@@ -497,26 +617,20 @@ def render_issue_body(
         lstrip_blocks=True,
     )
 
-    template = environment.get_template("daily_fuzz_issue.md.jinja")
+    template = environment.get_template(report_kind.template_name())
     unchecked_seeds = sorted(unchecked_seeds)
     selected_seeds: list[Seed] = []
 
     def render(reproducers: list[RenderableReproducer], *, omitted: bool) -> str:
         """Render selected reproducers and unchecked seeds with any omission notices."""
         return template.render(
-            run_url=run_url,
-            fuzzer_revision=fuzzer_revision,
-            executable=executable,
-            executable_revision=executable_revision,
-            failure_description=failure_description,
-            reproduction_command=reproduction_command,
             reproducers=reproducers,
             omitted=omitted,
             unchecked_count=len(unchecked_seeds),
             unchecked_seeds=selected_seeds,
             seeds_omitted=len(selected_seeds) < len(unchecked_seeds),
-            seed_rerun_command=rerun_command,
-        ).removesuffix("\n")
+            **context,
+        ).strip()
 
     reproducers: list[RenderableReproducer] = []
     omitted = False
@@ -526,6 +640,7 @@ def render_issue_body(
     # issue body fills up.
     for result in sorted(bugs, key=operator.attrgetter("seed")):
         assert result.maybe_bug is not None
+        failure = result.maybe_bug.failure
         longest_fence = max(
             (len(run) for run in re.findall(r"`+", result.maybe_bug.source)), default=0
         )
@@ -533,6 +648,9 @@ def render_issue_body(
             seed=result.seed,
             bug=result.maybe_bug,
             fence="`" * max(3, longest_fence + 1),
+            failure_description=(
+                failure.describe(result.executable) if failure is not None else None
+            ),
         )
         candidate = render([*reproducers, renderable], omitted=True)
         if len(candidate.encode("utf-8")) <= MAX_GITHUB_ISSUE_BODY_BYTES:
@@ -599,6 +717,9 @@ def write_github_issue_body(
 
 
 def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
+    if args.save_failures is not None:
+        # An earlier run's failures must not be passed to the minimizer.
+        args.save_failures.mkdir()
     deadline = None
     if args.budget_minutes is not None and args.job_started_at is not None:
         remaining = (
@@ -608,7 +729,10 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
         )
         deadline = time.monotonic() + remaining
 
-    if len(args.seeds) <= 5:
+    # Starting a process pool costs more than checking a few seeds, but each
+    # known failure can take minutes to minimize.
+    sequential_limit = 1 if args.minimize_failures else 5
+    if len(args.seeds) <= sequential_limit:
         run_result = run_fuzzer_sequentially(args, deadline=deadline)
     else:
         run_result = run_fuzzer_concurrently(args, deadline=deadline)
@@ -650,11 +774,16 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
             write_github_issue_body(
                 run_result, args, args.github_issue_path, rerun_command=rerun_command
             )
+        elif args.github_comment_path is not None:
+            body = render_github_report(
+                ReportKind.PULL_REQUEST_COMMENT, bugs, unchecked
+            )
+            args.github_comment_path.write_text(body, encoding="utf-8")
 
     if unchecked:
         return ExitCode(2)
 
-    return ExitCode(1 if bugs else 0)
+    return ExitCode(1 if bugs and not args.minimize_failures else 0)
 
 
 def absolute_path(p: str) -> Path:
@@ -684,9 +813,29 @@ def parse_seed_argument(arg: str) -> int | range:
     return int(arg)
 
 
+def generate_corpus() -> None:
+    """Write the Python source for each requested seed to a directory."""
+    parser = argparse.ArgumentParser(description=generate_corpus.__doc__)
+    parser.add_argument("seeds", type=parse_seed_argument)
+    parser.add_argument("directory", type=Path)
+    args = parser.parse_args()
+    seeds = [args.seeds] if isinstance(args.seeds, int) else args.seeds
+    args.directory.mkdir(exist_ok=True)
+    with concurrent.futures.ProcessPoolExecutor() as pool:
+        for seed, source in zip(
+            seeds, pool.map(generate_random_code, seeds, chunksize=16), strict=True
+        ):
+            (args.directory / f"{seed}.py").write_text(source, encoding="utf-8")
+
+
 class Executable(enum.StrEnum):
     RUFF = "ruff"
     TY = "ty"
+
+
+class OutputFormat(enum.StrEnum):
+    GITHUB = "github"
+    TEXT = "text"
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
@@ -697,9 +846,14 @@ class ResolvedCliArgs:
     test_executable_path: Path
     baseline_executable_path: Path | None
     quiet: bool
+    output_format: OutputFormat
     github_issue_path: Path | None
+    github_comment_path: Path | None
     budget_minutes: float | None
     job_started_at: float | None
+    corpus_dir: Path | None
+    save_failures: Path | None
+    minimize_failures: bool
 
 
 def parse_args() -> ResolvedCliArgs:
@@ -710,8 +864,29 @@ def parse_args() -> ResolvedCliArgs:
     parser.add_argument(
         "seeds",
         type=parse_seed_argument,
-        nargs="+",
+        nargs="*",
         help="Either a single seed, or an inclusive range of seeds in the format `0-5`",
+    )
+    parser.add_argument(
+        "--corpus-dir",
+        type=Path,
+        help="Read the generated source for each seed from <seed>.py in this directory.",
+    )
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument(
+        "--save-failures",
+        type=Path,
+        metavar="DIR",
+        help=(
+            "Save each reported input as <seed>.py and its detection result as "
+            "<seed>.json in DIR. DIR must not already exist. Skip minimization."
+        ),
+    )
+    modes.add_argument(
+        "--minimize-failures",
+        type=Path,
+        metavar="DIR",
+        help="Minimize the inputs saved by --save-failures.",
     )
     parser.add_argument(
         "--only-new-bugs",
@@ -726,6 +901,12 @@ def parse_args() -> ResolvedCliArgs:
         "--quiet",
         action="store_true",
         help="Print fewer things to the terminal while running the fuzzer",
+    )
+    parser.add_argument(
+        "--output-format",
+        choices=[member.value for member in OutputFormat],
+        default=OutputFormat.TEXT.value,
+        help="Use 'github' to emit GitHub Actions error annotations for detected failures (default: text).",
     )
     parser.add_argument(
         "--budget-minutes",
@@ -753,11 +934,18 @@ def parse_args() -> ResolvedCliArgs:
             "before fuzzing begins."
         ),
     )
-    parser.add_argument(
+    reports = parser.add_mutually_exclusive_group()
+    reports.add_argument(
         "--write-github-issue",
         type=Path,
         metavar="PATH",
         help="Write a GitHub issue body to PATH if bugs are found or seeds are unchecked (intended for CI workflows)",
+    )
+    reports.add_argument(
+        "--write-github-comment",
+        type=Path,
+        metavar="PATH",
+        help="Write reproducers and unchecked seeds to PATH for a pull request comment.",
     )
     parser.add_argument(
         "--test-executable",
@@ -784,6 +972,19 @@ def parse_args() -> ResolvedCliArgs:
     )
 
     args = parser.parse_args()
+
+    if args.minimize_failures is not None:
+        if args.seeds or args.corpus_dir is not None:
+            parser.error(
+                "--minimize-failures supplies both the seeds and their sources"
+            )
+        args.corpus_dir = args.minimize_failures
+        try:
+            args.seeds = [int(path.stem) for path in args.corpus_dir.glob("*.py")]
+        except ValueError:
+            parser.error("--minimize-failures expects files named <seed>.py")
+    if not args.seeds:
+        parser.error("no seeds to check")
 
     if (args.budget_minutes is None) != (args.job_started_at is None):
         parser.error(
@@ -867,12 +1068,17 @@ def parse_args() -> ResolvedCliArgs:
     return ResolvedCliArgs(
         seeds=sorted(map(Seed, seen_seeds)),
         quiet=args.quiet,
+        output_format=OutputFormat(args.output_format),
         executable=executable,
         test_executable_path=args.test_executable,
         baseline_executable_path=args.baseline_executable,
         github_issue_path=args.write_github_issue,
+        github_comment_path=args.write_github_comment,
         budget_minutes=args.budget_minutes,
         job_started_at=args.job_started_at,
+        corpus_dir=args.corpus_dir,
+        save_failures=args.save_failures,
+        minimize_failures=args.minimize_failures is not None,
     )
 
 

@@ -10,7 +10,7 @@ use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use ty_ide::{
     CompletionCapabilities, CompletionCommand, CompletionInsertTextFormat, CompletionKind,
-    completion,
+    MarkupKind, completion,
 };
 use ty_project::{ProjectDatabase, SemanticDb as _};
 use ty_python_semantic::ProgramEnvironment;
@@ -91,7 +91,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         .local_range();
                     Some(TextEdit {
                         range,
-                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                        new_text: edit.content().map_or_default(ToString::to_string),
                     })
                 });
 
@@ -120,11 +120,14 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         .resolved_client_capabilities()
                         .prefers_markdown_in_completion()
                     {
-                        (lsp_types::MarkupKind::Markdown, docstring.render_markdown())
+                        (
+                            lsp_types::MarkupKind::Markdown,
+                            docstring.render(MarkupKind::Markdown),
+                        )
                     } else {
                         (
                             lsp_types::MarkupKind::PlainText,
-                            docstring.render_plaintext(),
+                            docstring.render(MarkupKind::PlainText),
                         )
                     };
 

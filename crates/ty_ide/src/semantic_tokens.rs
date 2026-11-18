@@ -441,7 +441,10 @@ impl<'db> SemanticTokenVisitor<'db> {
                     };
 
                     if let Some((type_var, is_cls)) = type_var
-                        && matches!(type_var.typevar(db).kind(db), TypeVarKind::TypingSelf)
+                        && matches!(
+                            type_var.typevar(db).kind(db),
+                            TypeVarKind::TypingSelf { .. }
+                        )
                     {
                         let kind = if is_cls {
                             SemanticTokenType::ClsParameter

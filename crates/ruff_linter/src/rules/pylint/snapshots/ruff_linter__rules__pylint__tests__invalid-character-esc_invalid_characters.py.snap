@@ -48,8 +48,8 @@ PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
 help: Replace with escape sequence
    |
 54 |
-   - nested_fstrings = f'␈{f'{f'␛'}'}'
-55 + nested_fstrings = f'␈{f'{f'\x1b'}'}'
+   - nested_fstrings = f'␈{f'␚{f'␛'}'}'
+55 + nested_fstrings = f'␈{f'␚{f'\x1b'}'}'
 56 |
    |
 
@@ -128,7 +128,7 @@ help: Replace with escape sequence
 78 | # tstrings
    - esc = t'esc esc ␛'
 79 + esc = t'esc esc \x1b'
-80 | nested_tstrings = t'␈{t'{t'␛'}'}'
+80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
    |
 
 PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
@@ -143,9 +143,9 @@ PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
 help: Replace with escape sequence
    |
 79 | esc = t'esc esc ␛'
-   - nested_tstrings = t'␈{t'{t'␛'}'}'
-80 + nested_tstrings = t'␈{t'{t'\x1b'}'}'
-81 | nested_ftstrings = t'␈{f'{t'␛'}'}'
+   - nested_tstrings = t'␈{t'␚{t'␛'}'}'
+80 + nested_tstrings = t'␈{t'␚{t'\x1b'}'}'
+81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
    |
 
 PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
@@ -157,8 +157,8 @@ PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
    |                              ^
 help: Replace with escape sequence
    |
-80 | nested_tstrings = t'␈{t'{t'␛'}'}'
-   - nested_ftstrings = t'␈{f'{t'␛'}'}'
-81 + nested_ftstrings = t'␈{f'{t'\x1b'}'}'
+80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
+   - nested_ftstrings = t'␈{f'␚{t'␛'}'}'
+81 + nested_ftstrings = t'␈{f'␚{t'\x1b'}'}'
 82 |
    |

@@ -36,6 +36,9 @@ pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the module docstring boundary (i.e. seen any statement in the
     /// module).
     seen_module_docstring_boundary: bool,
+
+    /// Range of the target of the augmented-assignment statement currently being visited, if any
+    augmented_assignment_target: Option<TextRange>,
 }
 
 impl SemanticSyntaxChecker {
@@ -873,6 +876,8 @@ impl SemanticSyntaxChecker {
         self.check_stmt(stmt, ctx);
 
         // update internal state
+        self.augmented_assignment_target = None;
+
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
                 if !self.seen_module_docstring_boundary && value.is_string_literal_expr() => {}
@@ -900,6 +905,10 @@ impl SemanticSyntaxChecker {
                         }
                     }
                 }
+                self.seen_futures_boundary = true;
+            }
+            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+                self.augmented_assignment_target = Some(target.range());
                 self.seen_futures_boundary = true;
             }
             _ => {
@@ -993,9 +1002,7 @@ impl SemanticSyntaxChecker {
                             if version >= PythonVersion::PY39 {
                                 Self::add_error(
                                     ctx,
-                                    SemanticSyntaxErrorKind::WriteToDebug(
-                                        WriteToDebugKind::Delete(version),
-                                    ),
+                                    SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Delete),
                                     *range,
                                 );
                             }
@@ -1026,6 +1033,40 @@ impl SemanticSyntaxChecker {
                     Self::invalid_star_expression(value, ctx);
                 }
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
+            }
+            Expr::Attribute(ast::ExprAttribute {
+                attr,
+                range,
+                ctx: expr_ctx,
+                ..
+            }) if attr == "__debug__" => {
+                // test_err write_to_debug_attribute_py313
+                // # parse_options: {"target-version": "3.13"}
+                // x.__debug__ = x.__debug__
+                // x.__debug__ += 1
+                // del x.__debug__
+                // x.y += [z for a.__debug__ in c]
+
+                // test_err write_to_debug_attribute_py314
+                // # parse_options: {"target-version": "3.14"}
+                // x.__debug__ = x.__debug__
+                // x.__debug__ += 1
+                // del x.__debug__
+
+                let version = ctx.python_version();
+                let kind = match expr_ctx {
+                    ExprContext::Store if self.augmented_assignment_target != Some(*range) => {
+                        WriteToDebugKind::Store
+                    }
+                    ExprContext::Store if version >= PythonVersion::PY314 => {
+                        WriteToDebugKind::AugAssignAttribute
+                    }
+                    ExprContext::Del if version >= PythonVersion::PY314 => {
+                        WriteToDebugKind::DeleteAttribute
+                    }
+                    _ => return,
+                };
+                Self::add_error(ctx, SemanticSyntaxErrorKind::WriteToDebug(kind), *range);
             }
             Expr::YieldFrom(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
@@ -1386,12 +1427,21 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::WriteToDebug(kind) => match kind {
                 WriteToDebugKind::Store => f.write_str("cannot assign to `__debug__`"),
-                WriteToDebugKind::Delete(python_version) => {
-                    write!(
-                        f,
-                        "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)"
-                    )
-                }
+                WriteToDebugKind::Delete => write!(
+                    f,
+                    "cannot delete `__debug__` on Python {} (syntax was removed in 3.9)",
+                    self.python_version,
+                ),
+                WriteToDebugKind::DeleteAttribute => write!(
+                    f,
+                    "cannot delete `__debug__` on Python {} (syntax was removed in 3.14)",
+                    self.python_version,
+                ),
+                WriteToDebugKind::AugAssignAttribute => write!(
+                    f,
+                    "cannot assign to `__debug__` on Python {} (syntax was removed in 3.14)",
+                    self.python_version,
+                ),
             },
             SemanticSyntaxErrorKind::InvalidExpression(kind, position) => {
                 write!(f, "{kind} cannot be used within a {position}")
@@ -2060,8 +2110,35 @@ impl Display for InvalidExpressionKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum WriteToDebugKind {
+    /// An assignment to `__debug__`, invalid on all Python versions:
+    ///
+    /// ```py
+    /// __debug__ = 1
+    /// __debug__ += 1
+    /// x.__debug__ = 1
+    /// ```
     Store,
-    Delete(PythonVersion),
+
+    /// A deletion of `__debug__`, invalid since Python 3.9:
+    ///
+    /// ```py
+    /// del __debug__
+    /// ```
+    Delete,
+
+    /// A deletion of a `__debug__` attribute, invalid since Python 3.14:
+    ///
+    /// ```py
+    /// del x.__debug__
+    /// ```
+    DeleteAttribute,
+
+    /// An augmented assignment to a `__debug__` attribute, also invalid since Python 3.14:
+    ///
+    /// ```py
+    /// x.__debug__ += 1
+    /// ```
+    AugAssignAttribute,
 }
 
 fn comprehension_target_names(

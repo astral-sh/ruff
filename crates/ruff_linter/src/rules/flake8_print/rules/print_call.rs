@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -121,12 +122,8 @@ impl Violation for PPrint {
 }
 
 /// T201, T203
-pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall, qualified_name: &QualifiedName) {
     let semantic = checker.semantic();
-
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
-        return;
-    };
 
     let diagnostic = match qualified_name.segments() {
         ["" | "builtins", "print"] => {

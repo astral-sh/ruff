@@ -152,6 +152,39 @@ less useful in practice, and Pydantic relies on the behavior we implement.
 reveal_type(RegistryMeta.__init__)
 ```
 
+### Metaclass with an aliased `builtins.type`
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class _type: ...
+
+type = _type
+```
+
+`/typeshed/stdlib/typing.pyi`:
+
+```pyi
+def dataclass_transform(): ...
+```
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform()
+class ModelMeta(type): ...
+
+class RegistryMeta(ModelMeta): ...
+
+RegistryMeta.__dataclass_fields__  # error: [missing-attribute]
+```
+
 ### Decorating a base class
 
 ```py
@@ -480,7 +513,7 @@ reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["value"]]
 class WithoutSlots:
     value: int
 
-WithoutSlots.__slots__  # error: [unresolved-attribute]
+WithoutSlots.__slots__  # error: [missing-attribute]
 ```
 
 Conversely, an explicit `slots=True` overrides `slots_default=False`:
@@ -493,7 +526,7 @@ def unslotted_model(*, slots: bool = False): ...
 class WithoutSlots:
     value: int
 
-WithoutSlots.__slots__  # error: [unresolved-attribute]
+WithoutSlots.__slots__  # error: [missing-attribute]
 
 @unslotted_model(slots=True)
 class WithSlots:
@@ -525,7 +558,7 @@ reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["value"]]
 class WithoutSlots(ModelBase, slots=False):
     value: int
 
-WithoutSlots.__slots__  # error: [unresolved-attribute]
+WithoutSlots.__slots__  # error: [missing-attribute]
 ```
 
 #### Base-class-based transformers
@@ -547,7 +580,7 @@ reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["value"]]
 class WithoutSlots(ModelBase, slots=False):
     value: int
 
-WithoutSlots.__slots__  # error: [unresolved-attribute]
+WithoutSlots.__slots__  # error: [missing-attribute]
 ```
 
 #### Overriding abstract properties
@@ -571,7 +604,7 @@ class Abstract(ABC):
 class Concrete(Abstract):
     value: int
 
-Concrete(1)  # no diagnostic
+Concrete(1)  # ok
 ```
 
 A transformer on a base class can also generate the slot that implements the property:
@@ -584,7 +617,7 @@ class ModelBase(Abstract):
 class ConcreteFromBase(ModelBase):
     value: int
 
-ConcreteFromBase(1)  # no diagnostic
+ConcreteFromBase(1)  # ok
 ```
 
 Disabling slot generation leaves the inherited property abstract:
@@ -593,7 +626,7 @@ Disabling slot generation leaves the inherited property abstract:
 class StillAbstract(ModelBase, slots=False):
     value: int
 
-StillAbstract(1)  # error: [call-non-callable]
+StillAbstract(1)  # error: [abstract-class-instantiation]
 ```
 
 #### Before Python 3.10
@@ -1100,7 +1133,7 @@ def fancy_model(*, slots: bool = False) -> Callable[[T], T]:
 class NoSlots:
     name: str
 
-NoSlots.__slots__  # error: [unresolved-attribute]
+NoSlots.__slots__  # error: [missing-attribute]
 
 @fancy_model(slots=True)
 class WithSlots:
@@ -1125,7 +1158,7 @@ class FancyBase(metaclass=FancyMeta): ...
 class NoSlots(FancyBase):
     name: str
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 NoSlots.__slots__
 
 class WithSlots(FancyBase, slots=True):
@@ -1148,7 +1181,7 @@ class FancyBase:
 class NoSlots(FancyBase):
     name: str
 
-NoSlots.__slots__  # error: [unresolved-attribute]
+NoSlots.__slots__  # error: [missing-attribute]
 
 class WithSlots(FancyBase, slots=True):
     name: str
@@ -1739,11 +1772,11 @@ class ValidModelWithInitFalse:
 @create_model
 class InvalidModel:
     x: int = 1
-    y: str  # error: [dataclass-field-order]
+    y: str  # error: [invalid-dataclass-field-order]
 
 @create_model
 class InvalidInheritedModel(ValidModel):
-    z: bytes  # error: [dataclass-field-order]
+    z: bytes  # error: [invalid-dataclass-field-order]
 
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 def create_kwonly_default_model[T](cls: type[T]) -> type[T]:
@@ -1764,7 +1797,7 @@ class AlsoValidKWOnlyDefaultModel:
 class InvalidKWOnlyDefaultModel:
     x: int
     y: str = field(kw_only=False, default="default")
-    z: bytes = field(kw_only=False)  # error: [dataclass-field-order]
+    z: bytes = field(kw_only=False)  # error: [invalid-dataclass-field-order]
 ```
 
 ### Keyword-only field specifiers before Python 3.10
@@ -1806,7 +1839,7 @@ Child("value", 2.0)  # error: [too-many-positional-arguments]
 @custom_dataclass
 class InvalidChild(Base):
     positional_default: str = custom_field(default="default", kw_only=False)
-    required: int  # error: [dataclass-field-order]
+    required: int  # error: [invalid-dataclass-field-order]
 ```
 
 ### For metaclass-based transformers
@@ -1835,7 +1868,7 @@ class ValidModelWithInitFalse(ModelBase):
 
 class InvalidModel(ModelBase):
     x: int = 1
-    y: str  # error: [dataclass-field-order]
+    y: str  # error: [invalid-dataclass-field-order]
 
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 class KWOnlyDefaultModelMeta(type): ...
@@ -1853,7 +1886,7 @@ class AlsoValidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
 class InvalidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
     x: int
     y: str = field(kw_only=False, default="default")
-    z: bytes = field(kw_only=False)  # error: [dataclass-field-order]
+    z: bytes = field(kw_only=False)  # error: [invalid-dataclass-field-order]
 ```
 
 ### For base-class-based transformers
@@ -1883,7 +1916,7 @@ class ValidModelWithInitFalse(ModelBase):
 
 class InvalidModel(ModelBase):
     x: int = 1
-    y: str  # error: [dataclass-field-order]
+    y: str  # error: [invalid-dataclass-field-order]
 
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 class KWOnlyDefaultModelBase:
@@ -1902,7 +1935,7 @@ class AlsoValidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
 class InvalidKWOnlyDefaultModel(KWOnlyDefaultModelBase):
     x: int
     y: str = field(kw_only=False, default="default")
-    z: bytes = field(kw_only=False)  # error: [dataclass-field-order]
+    z: bytes = field(kw_only=False)  # error: [invalid-dataclass-field-order]
 ```
 
 ### Use cases
@@ -2182,7 +2215,7 @@ reveal_type(C)  # revealed: <class 'C'>
 reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
 
 # TODO: Decide whether the explicit `Wrapped` return type should replace the public binding here.
-C.f()  # error: [unresolved-attribute]
+C.f()  # error: [missing-attribute]
 ```
 
 ## `__dataclass_transform__` compatibility
@@ -2190,6 +2223,11 @@ C.f()  # error: [unresolved-attribute]
 For backwards compatibility with pre-3.11 Python, ty recognizes any function named
 `__dataclass_transform__` as equivalent to `typing.dataclass_transform`, regardless of which module
 it is defined in. This matches [pyright's behavior].
+
+```toml
+[environment]
+python-version = "3.10"
+```
 
 ```py
 from typing import TypeVar, Callable, Any

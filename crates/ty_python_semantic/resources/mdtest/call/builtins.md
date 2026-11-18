@@ -220,15 +220,15 @@ def reveal_unsupported_tuple_results(x: A | B, items: list[int]):
     reveal_type(isinstance(x, (A | B,)))  # revealed: bool
     reveal_type(isinstance(items, (List,)))  # revealed: bool
 
-def partial_tuple(x: A | B) -> bool:  # error: [invalid-return-type]
+def partial_tuple(x: A | B) -> bool:  # error: [invalid-implicit-return]
     if isinstance(x, (A, bytes)):
         return True
 
-def variadic_tuple(x: A, targets: tuple[type[A], ...]) -> bool:  # error: [invalid-return-type]
+def variadic_tuple(x: A, targets: tuple[type[A], ...]) -> bool:  # error: [invalid-implicit-return]
     if isinstance(x, targets):
         return True
 
-def subclass_target(x: A, target: type[A]) -> bool:  # error: [invalid-return-type]
+def subclass_target(x: A, target: type[A]) -> bool:  # error: [invalid-implicit-return]
     if isinstance(x, (target,)):
         return True
 ```
@@ -392,7 +392,7 @@ def accepts_mutually_recursive_alias(x: RecursiveA) -> bool:
     if isinstance(x, (A, B)):
         return True
 
-def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [invalid-return-type]
+def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [invalid-implicit-return]
     reveal_type(isinstance(x, (A, B)))  # revealed: bool
     if isinstance(x, (A, B)):
         return True
@@ -414,7 +414,9 @@ def _(xs: Unknown):
 
     reveal_type(map("{}".format, xs))  # revealed: map[str]
 
-    reveal_type("".join(map("{}".format, xs)))  # revealed: str
+    # TODO: This should reveal `str`. See https://github.com/astral-sh/ty/issues/4536.
+    # The lack of gradual constraints allows the `LiteralString` overload to be selected.
+    reveal_type("".join(map("{}".format, xs)))  # revealed: LiteralString
 ```
 
 ## Mapping methods accept arbitrary object types
@@ -445,12 +447,12 @@ def _(mapping: Mapping[str, int], dictionary: dict[str, int], key: object) -> No
 
 ```py
 def _():
-    # snapshot: call-non-callable
+    # snapshot: not-callable
     raise NotImplemented()
 ```
 
 ```snapshot
-error[call-non-callable]: `NotImplemented` is not callable
+error[not-callable]: `NotImplemented` is not callable
  --> src/mdtest_snippet.py:3:11
   |
 3 |     raise NotImplemented()
@@ -459,7 +461,7 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           Did you mean `NotImplementedError`?
 help: Use `NotImplementedError` instead
   |
-2 |     # snapshot: call-non-callable
+2 |     # snapshot: not-callable
   -     raise NotImplemented()
 3 +     raise NotImplementedError()
 4 | def _():
@@ -469,12 +471,12 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```py
 def _():
-    # snapshot: call-non-callable
+    # snapshot: not-callable
     raise NotImplemented("this module is not implemented yet!!!")
 ```
 
 ```snapshot
-error[call-non-callable]: `NotImplemented` is not callable
+error[not-callable]: `NotImplemented` is not callable
  --> src/mdtest_snippet.py:6:11
   |
 6 |     raise NotImplemented("this module is not implemented yet!!!")
@@ -483,7 +485,7 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           Did you mean `NotImplementedError`?
 help: Use `NotImplementedError` instead
   |
-5 |     # snapshot: call-non-callable
+5 |     # snapshot: not-callable
   -     raise NotImplemented("this module is not implemented yet!!!")
 6 +     raise NotImplementedError("this module is not implemented yet!!!")
 7 | def _(NotImplementedError: object):
@@ -496,12 +498,12 @@ not necessarily produce an exception, so we omit the fix.
 
 ```py
 def _(NotImplementedError: object):
-    # snapshot: call-non-callable
+    # snapshot: not-callable
     raise NotImplemented()
 ```
 
 ```snapshot
-error[call-non-callable]: `NotImplemented` is not callable
+error[not-callable]: `NotImplemented` is not callable
  --> src/mdtest_snippet.py:9:11
   |
 9 |     raise NotImplemented()
@@ -571,7 +573,9 @@ from collections.abc import Mapping
 
 def copy(value: object) -> dict[str, str]:
     if isinstance(value, Mapping):
-        return dict(value)  # error: [no-matching-overload]
+        # TODO: This should error. See https://github.com/astral-sh/ty/issues/4645.
+        return dict(value)
+
     return {}
 ```
 
@@ -590,7 +594,8 @@ from collections.abc import Mapping
 
 def clean(value: dict[str, int] | str | None) -> None:
     if isinstance(value, Mapping):
-        value = dict(value)  # error: [no-matching-overload]
+        # TODO: This should error. See https://github.com/astral-sh/ty/issues/4645.
+        value = dict(value)
         for key, item in value.items():
             value[key] = item
 ```
@@ -688,4 +693,41 @@ from collections import OrderedDict
 
 items = [OrderedDict([["key", 1.0]])]  # error: [no-matching-overload]
 OrderedDict(zip(["name"], items))
+```
+
+## Contextual inference for `next`
+
+An incompatible return context does not make an invalid iterator argument valid. An optional context
+also preserves the concrete return type of a valid iterator.
+
+```toml
+[rules]
+unsound-return = "error"
+```
+
+```py
+class Counter:
+    def __next__(self) -> int:
+        return 1
+
+    def text(self) -> str:
+        # TODO: Infer `int` for `next(self)` and report a single `invalid-explicit-return` error
+        # for returning `int` where `str` is expected.
+        # error: [invalid-argument-type] "Expected `SupportsNext[str]`, found `Self@text`"
+        # error: [unsound-return] "`Unknown`"
+        return next(self)
+
+    def read(self) -> int | None:
+        return reveal_type(next(self))  # revealed: int
+```
+
+## Unreachable nested calls in a union context
+
+A failed call in an unreachable branch does not prevent narrowing the return context of `list`.
+
+```py
+def takes_no_parameters() -> None: ...
+
+# revealed: list[int | str] | list[int | None]
+result: list[int | str] | list[int | None] = reveal_type(list((1, 2, 3) if True else takes_no_parameters(1)))
 ```

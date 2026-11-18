@@ -69,9 +69,12 @@ pub(crate) fn banned_attribute_access(checker: &Checker, expr: &Expr) {
             .semantic()
             .resolve_qualified_name(expr)
             .and_then(|qualified_name| {
-                banned_api.iter().find(|(banned_path, ..)| {
-                    qualified_name == QualifiedName::from_dotted_name(banned_path)
-                })
+                // Preserve the empty leading segment for attributes of implicit builtins.
+                banned_api
+                    .get_key_value(&qualified_name.segments().join("."))
+                    .filter(|(banned_path, ..)| {
+                        qualified_name == QualifiedName::from_dotted_name(banned_path)
+                    })
             })
     {
         checker.report_diagnostic(

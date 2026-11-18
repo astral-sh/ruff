@@ -121,23 +121,25 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     // attribute syntax (e.g., `obj.attr = value`) would normalize the name and potentially change
     // program behavior.
     let attr_name = name.to_str();
-    let has_comments = checker.comment_ranges().intersects(expr.range());
-    let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
 
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `Stmt::Expr`).
     if let Stmt::Expr(ast::StmtExpr {
         value: child,
-        range: _,
+        range: statement_range,
         node_index: _,
     }) = checker.semantic().current_statement()
     {
         if expr == child.as_ref() {
+            // Replace the whole statement rather than just the call, so that any parentheses
+            // around the call are removed too: `(obj.attr = value)` is a syntax error.
+            let has_comments = checker.comment_ranges().intersects(*statement_range);
+            let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
             let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
             let edit = Edit::range_replacement(
                 assignment(obj, name.to_str(), value, checker.generator()),
-                expr.range(),
+                *statement_range,
             );
             let fix = if is_unsafe {
                 Fix::unsafe_edit(edit)

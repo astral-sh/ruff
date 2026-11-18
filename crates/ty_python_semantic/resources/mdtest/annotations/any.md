@@ -175,7 +175,7 @@ non-final classes, but not to final classes:
 ```py
 from typing import final
 
-from somewhere import UnknownBase  # error: [unresolved-import]
+from somewhere import UnknownBase  # error: [import-not-found]
 
 class Arbitrary: ...
 
@@ -308,7 +308,7 @@ def f(x: Any[int]):
 `Any` cannot be called (this leads to a `TypeError` at runtime):
 
 ```py
-Any()  # error: [call-non-callable] "Object of type `<special-form 'typing.Any'>` is not callable"
+Any()  # error: [not-callable] "Object of type `<special-form 'typing.Any'>` is not callable"
 ```
 
 `Any` also cannot be used as a metaclass (under the hood, this leads to an implicit call to `Any`):

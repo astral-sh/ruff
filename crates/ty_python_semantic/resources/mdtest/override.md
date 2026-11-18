@@ -143,18 +143,18 @@ class Invalid:
 class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     @property
-    def foo(self) -> int: ...  # error: [invalid-property-type-override]
+    def foo(self) -> int: ...  # error: [incompatible-property-override]
     @override
-    def my_property1(self) -> int: ...  # error: [invalid-property-type-override]
+    def my_property1(self) -> int: ...  # error: [incompatible-property-override]
 
     # Class and static methods can override each other when "bound" signatures match,
     # but here, we deliberately add a new parameter to introduce a Liskov violation
     @staticmethod
     @override
-    def class_method1(x: int) -> int: ...  # error: [invalid-method-override]
+    def class_method1(x: int) -> int: ...  # error: [incompatible-method-override]
     @classmethod
     @override
-    def static_method1(cls, x: int) -> int: ...  # error: [invalid-method-override]
+    def static_method1(cls, x: int) -> int: ...  # error: [incompatible-method-override]
 
 # Diagnostic edge case: `override` is very far away from the method definition in the source code:
 
@@ -221,9 +221,9 @@ marked as an override:
 ```pyi
 class Incompatible(Parent):
     @override
-    def __init__(self, value: str) -> None: ...  # error: [invalid-method-override]
+    def __init__(self, value: str) -> None: ...  # error: [incompatible-method-override]
     @override
-    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [incompatible-method-override]
 ```
 
 The same signatures are allowed without `@override`:
@@ -249,14 +249,14 @@ class Parent:
 
 class ImplicitReceiver(Parent):
     @override
-    # TODO: This should report `invalid-method-override`. We incorrectly bind inherited
+    # TODO: This should report `incompatible-method-override`. We incorrectly bind inherited
     # `Self` to the subclass. See https://github.com/astral-sh/ty/issues/2255 and
     # https://github.com/astral-sh/ty/issues/4133 for the related generic method subtyping gap.
     def __init__(self, other: Self) -> None: ...
 
 class ExplicitReceiver(Parent):
     @override
-    # TODO: This should report `invalid-method-override`.
+    # TODO: This should report `incompatible-method-override`.
     def __init__(self: Self, other: Self) -> None: ...
 ```
 
@@ -265,7 +265,7 @@ A constructor that instead accepts an unrelated type is incompatible:
 ```pyi
 class Incompatible(Parent):
     @override
-    def __init__(self, other: int) -> None: ...  # error: [invalid-method-override]
+    def __init__(self, other: int) -> None: ...  # error: [incompatible-method-override]
 ```
 
 ## Generic constructor overrides
@@ -290,7 +290,7 @@ class Compatible(Parent[int]):
 
 class Incompatible(Parent[int]):
     @override
-    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Self: ...  # error: [incompatible-method-override]
 ```
 
 ## Constructor overloads with specialized receivers
@@ -327,7 +327,7 @@ The override must still accept the arguments of the applicable overload:
 ```pyi
 class Incompatible(Parent[int]):
     @override
-    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [incompatible-method-override]
 ```
 
 ## Decorated constructor overrides
@@ -355,7 +355,7 @@ class Compatible(Parent):
 
 class Incompatible(Parent):
     @override
-    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Self: ...  # error: [incompatible-method-override]
 ```
 
 ## Constructor overrides with signature-changing decorators
@@ -384,7 +384,7 @@ class Compatible(Parent):
 
 class Incompatible(Parent):
     @override
-    def __new__(cls, value: int) -> Self: ...  # error: [invalid-method-override]
+    def __new__(cls, value: int) -> Self: ...  # error: [incompatible-method-override]
 ```
 
 ## Overrides of callable-instance constructors
@@ -408,7 +408,7 @@ class Compatible(Parent):
 
 class Incompatible(Parent):
     @override
-    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [incompatible-method-override]
 ```
 
 ## Constructor overrides with callback-protocol decorators
@@ -439,7 +439,7 @@ class Compatible(Parent):
 
 class Incompatible(Parent):
     @override
-    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Self: ...  # error: [incompatible-method-override]
 ```
 
 ## Overrides of classmethod constructors
@@ -461,7 +461,7 @@ class Compatible(Parent):
 
 class Incompatible(Parent):
     @override
-    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Self: ...  # error: [incompatible-method-override]
 ```
 
 The overriding constructor can also be a classmethod, with both receivers supplied implicitly:
@@ -475,7 +475,7 @@ class CompatibleClassMethod(Parent):
 class IncompatibleClassMethod(Parent):
     @classmethod
     @override
-    def __new__(cls, constructed_class: type[Self], value: str) -> Self: ...  # error: [invalid-method-override]
+    def __new__(cls, constructed_class: type[Self], value: str) -> Self: ...  # error: [incompatible-method-override]
 ```
 
 ## Overrides of decorated classmethod constructors
@@ -505,7 +505,7 @@ class Compatible(Parent):
 
 class Incompatible(Parent):
     @override
-    def __new__(cls, value: str) -> Incompatible: ...  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Incompatible: ...  # error: [incompatible-method-override]
 ```
 
 `type[Self]` annotates each implicit class receiver, while the return `Self` denotes an instance.
@@ -539,7 +539,7 @@ class Compatible(Parent):
 
 class Incompatible(Parent):
     @override
-    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override]
+    def __new__(cls, value: str) -> Self: ...  # error: [incompatible-method-override]
 ```
 
 ## Overrides of functional `NamedTuple` constructors
@@ -558,7 +558,7 @@ class Compatible(Parent):
 
 class Incompatible(Parent):
     @override
-    def __new__(cls, value: str) -> Self: ...  # error: [invalid-method-override] "Parent.__new__"
+    def __new__(cls, value: str) -> Self: ...  # error: [incompatible-method-override] "Parent.__new__"
 ```
 
 ## Constructor overrides with inherited incompatibilities
@@ -598,14 +598,14 @@ class Parent(Grandparent):
 
 class Child(Parent):
     @override
-    def __init__(self, x: str) -> None: ...  # snapshot: invalid-method-override
+    def __init__(self, x: str) -> None: ...  # snapshot: incompatible-method-override
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `__init__`
+error[incompatible-method-override]: Invalid override of method `__init__`
   --> src/mdtest_snippet.pyi:12:9
    |
-12 |     def __init__(self, x: str) -> None: ...  # snapshot: invalid-method-override
+12 |     def __init__(self, x: str) -> None: ...  # snapshot: incompatible-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Grandparent.__init__`
    |
   ::: src/mdtest_snippet.pyi:5:9
@@ -633,7 +633,7 @@ class Parent(Grandparent):
 
 class Child(Parent):
     @override
-    def __new__(cls) -> Parent: ...  # error: [invalid-method-override]
+    def __new__(cls) -> Parent: ...  # error: [incompatible-method-override]
 ```
 
 ## Wrapped classmethods with inherited `Self` incompatibilities
@@ -654,7 +654,7 @@ class Factory:
     def __call__(self, cls: type[Grandparent]) -> Grandparent: ...
 
 class Parent(Grandparent):
-    make = classmethod(Factory())  # error: [invalid-attribute-override]
+    make = classmethod(Factory())  # error: [incompatible-attribute-override]
 
 class Child(Parent):
     @classmethod
@@ -771,7 +771,7 @@ class ExplicitChild(Parent):
 class OverrideOnOverload(Parent):
     @overload
     @override
-    def overloaded(self, value: int) -> int: ...  # error: [invalid-overload]
+    def overloaded(self, value: int) -> int: ...  # error: [misplaced-overload-decorator]
     @overload
     def overloaded(self, value: str) -> str: ...
     def overloaded(self, value: int | str) -> int | str:  # error: [missing-override-decorator]
@@ -1019,7 +1019,7 @@ class OverrideOnSecondOverload(StubParent):
     def method(self, value: int) -> int: ...  # error: [missing-override-decorator]
     @overload
     @override
-    def method(self, value: str) -> str: ...  # error: [invalid-overload]
+    def method(self, value: str) -> str: ...  # error: [misplaced-overload-decorator]
 
 class OverrideOnFirstOverload(StubParent):
     @overload
@@ -1027,6 +1027,30 @@ class OverrideOnFirstOverload(StubParent):
     def method(self, value: int) -> int: ...
     @overload
     def method(self, value: str) -> str: ...
+
+# With an overload implementation, `@override` belongs on the implementation, including in stubs.
+class OverrideOnStubImplementation(StubParent):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    @override
+    def method(self, value: int | str) -> int | str: ...  # ok
+
+class MissingOverrideOnStubImplementation(StubParent):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    def method(self, value: int | str) -> int | str: ...  # error: [missing-override-decorator]
+
+class OverrideOnStubOverloadWithImplementation(StubParent):
+    @overload
+    @override
+    def method(self, value: int) -> int: ...  # error: [misplaced-overload-decorator]
+    @overload
+    def method(self, value: str) -> str: ...
+    def method(self, value: int | str) -> int | str: ...  # error: [missing-override-decorator]
 
 class StubProtocolInterface(Protocol):
     def method(self) -> int: ...
@@ -1078,7 +1102,7 @@ Decorating or suppressing one accessor does not hide diagnostics on the others.
 class PartiallyDecorated(Parent):
     @property
     @override
-    def attr(self) -> int:  # no diagnostic
+    def attr(self) -> int:  # ok
         return 1
 
     @attr.setter
@@ -1347,7 +1371,7 @@ class Child(Parent):
 
 The typing spec states that for an overloaded method, `@override` should only be applied to the
 implementation function. However, we nonetheless respect the decorator in this situation, even
-though we may also emit `invalid-overload` on these methods.
+though we may also emit `misplaced-overload-decorator` on these methods.
 
 ```py
 from typing_extensions import Any, Callable, override, overload
@@ -1366,11 +1390,11 @@ class Spam:
 
     @overload
     @override
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
+    # error: [misplaced-overload-decorator] "`@override` decorator should be applied only to the overload implementation"
     def bar(self, x: str) -> str: ...
     @overload
     @override
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
+    # error: [misplaced-overload-decorator] "`@override` decorator should be applied only to the overload implementation"
     def bar(self, x: int) -> int: ...
     @override
     # error: [invalid-explicit-override]
@@ -1379,7 +1403,7 @@ class Spam:
 
     @overload
     @override
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
+    # error: [misplaced-overload-decorator] "`@override` decorator should be applied only to the overload implementation"
     def baz(self, x: str) -> str: ...
     @overload
     def baz(self, x: int) -> int: ...
@@ -1389,7 +1413,7 @@ class Spam:
 
     @overload
     @override
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
+    # error: [misplaced-overload-decorator] "`@override` decorator should be applied only to the overload implementation"
     def quux(self, x: str) -> str: ...
     @overload
     def quux(self, x: int) -> int: ...
@@ -1399,8 +1423,9 @@ class Spam:
         return x
 ```
 
-In a stub file, `@override` should always be applied to the first overload. Even if it isn't, we
-always emit `invalid-explicit-override` diagnostics on the first overload.
+Without an implementation, `@override` should be applied to the first overload. Even if it isn't, we
+emit `invalid-explicit-override` diagnostics on the first overload. When an implementation is
+present, the diagnostic points to it, including in stub files.
 
 `module.pyi`:
 
@@ -1412,20 +1437,26 @@ class Spam:
     def foo(self, x: str) -> str: ...  # error: [invalid-explicit-override]
     @overload
     @override
-    # error: [invalid-overload]  "`@override` decorator should be applied only to the first overload"
+    # error: [misplaced-overload-decorator]  "`@override` decorator should be applied only to the first overload"
     def foo(self, x: int) -> int: ...
     @overload
     @override
     def bar(self, x: str) -> str: ...  # error: [invalid-explicit-override]
     @overload
     @override
-    # error: [invalid-overload]  "`@override` decorator should be applied only to the first overload"
+    # error: [misplaced-overload-decorator]  "`@override` decorator should be applied only to the first overload"
     def bar(self, x: int) -> int: ...
     @overload
     @override
     def baz(self, x: str) -> str: ...  # error: [invalid-explicit-override]
     @overload
     def baz(self, x: int) -> int: ...
+    @overload
+    def quux(self, x: str) -> str: ...
+    @overload
+    def quux(self, x: int) -> int: ...
+    @override
+    def quux(self, x: str | int) -> str | int: ...  # error: [invalid-explicit-override]
 ```
 
 ## Overloads in statically-known branches in stub files
@@ -1467,7 +1498,7 @@ class Foo:
 
 ```py
 from typing_extensions import Any, override
-from does_not_exist import SomethingUnknown  # error: [unresolved-import]
+from does_not_exist import SomethingUnknown  # error: [import-not-found]
 
 class Parent1(Any): ...
 class Parent2(SomethingUnknown): ...
@@ -1601,9 +1632,9 @@ class DeferredBase:
     def method(self, extra: str = "") -> None: ...
 
 class DeferredChild1(DeferredBase):
-    def method(self) -> None: ...  # error: [invalid-method-override]
+    def method(self) -> None: ...  # error: [incompatible-method-override]
 
-# TODO: A strict Liskov check would emit an `invalid-method-override`
+# TODO: A strict Liskov check would emit an `incompatible-method-override`
 # diagnostic here too. A subclass could inherit from both `DeferredChild1`
 # and `DeferredChild2`, making the receiver-specific overload applicable.
 class DeferredChild2(DeferredBase):

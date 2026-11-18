@@ -1154,6 +1154,10 @@ impl<'m> ContextCursor<'m> {
     /// E.g. naming a parameter, type parameter, or `for` `<name>`).
     fn is_in_variable_binding(&self) -> bool {
         self.covering_node.ancestors().any(|node| match node {
+            ast::AnyNodeRef::Alias(alias) => alias
+                .asname
+                .as_ref()
+                .is_some_and(|name| name.range.contains_range(self.range)),
             ast::AnyNodeRef::Parameter(param) => param.name.range.contains_range(self.range),
             ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
                 type_param.name.range.contains_range(self.range)
@@ -2229,13 +2233,12 @@ fn detect_set_function_args<'m>(cursor: &ContextCursor<'m>) -> FxHashSet<&'m str
             ast::AnyNodeRef::Arguments(args) => Some(args),
             _ => None,
         })
-        .map(|args| {
+        .map_or_default(|args| {
             args.keywords
                 .iter()
                 .filter_map(|kw| kw.arg.as_ref().map(|ident| ident.id.as_str()))
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 pub(crate) struct ImportEdit {
@@ -2830,6 +2833,8 @@ impl<'a> ImportStatement<'a> {
         // Usually either `from foo imp<CURSOR>`
         // or `import foo a<CURSOR>`.
         let mut incomplete_as_or_import = false;
+        // Whether the cursor is at the name being defined by `as`.
+        let mut completing_alias = false;
         for token in cursor.tokens_before.iter().rev().take(Self::LIMIT) {
             if token.kind().is_trivia() {
                 continue;
@@ -2854,7 +2859,10 @@ impl<'a> ImportStatement<'a> {
                 (S::Start | S::FirstName | S::AdjacentName, TK::Comma) => S::NameList,
                 (S::Start | S::FirstName | S::AdjacentName, TK::Dot) => S::InitialDot,
                 (S::Start | S::FirstName | S::AdjacentName, TK::Ellipsis) => S::FromEllipsisName,
-                (S::Start | S::FirstName, TK::As) => S::As,
+                (S::Start | S::FirstName, TK::As) => {
+                    completing_alias = true;
+                    S::As
+                }
                 (S::Start | S::AdjacentName, TK::From) => S::From,
                 (S::FirstName, TK::From) => S::From,
                 (S::FirstName, TK::Identifier) => S::AdjacentName,
@@ -2903,6 +2911,7 @@ impl<'a> ImportStatement<'a> {
                 (S::AsName, TK::Dot) => S::AsDottedNameDot,
                 (S::AsName, TK::Import) => S::Import,
                 (S::AsName, TK::Comma) => S::NameList,
+                (S::AsName, TK::Lpar) if !completing_alias => S::FromLpar,
 
                 // This is the mini state machine for handling
                 // `dotted_as_names`. We enter it when we see
@@ -3423,6 +3432,7 @@ mod tests {
     use ruff_python_ast::helpers::is_dunder;
     use ruff_python_ast::token::{TokenKind, Tokens};
     use ruff_python_parser::{Mode, ParseOptions};
+    use ruff_python_trivia::textwrap::dedent;
     use ty_module_resolver::ModuleName;
 
     use crate::CompletionCapabilities;
@@ -5511,6 +5521,29 @@ foo(b<CURSOR>
     }
 
     #[test]
+    fn call_keyword_argument_specialized_in_unmatched_overload() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal, overload
+
+@overload
+def select[T](key: Literal["number"], value: T, *, fallback: T | None = None) -> T: ...
+@overload
+def select(key: Literal["text"], value: str) -> str: ...
+def select(key, value, *, fallback=None): return value
+
+def use(value: str):
+    select("text", value, <CURSOR>)
+"#,
+        );
+
+        assert_snapshot!(
+            builder.filter(|c| c.name == "fallback").type_signatures().build().snapshot(),
+            @"fallback= :: str | None"
+        );
+    }
+
+    #[test]
     fn call_multiple_keyword_arguments_some_set() {
         let builder = completion_test_builder(
             "\
@@ -6702,6 +6735,37 @@ from sys import (
 ",
         );
         builder.build().contains("getsizeof");
+    }
+
+    #[test]
+    fn parenthesized_import_after_alias_completes_without_import_edit() {
+        let builder = completion_test_builder(&dedent(
+            "
+            from datetime import (
+                date as _date,
+                timede<CURSOR>
+            )
+            ",
+        ))
+        .imports()
+        .filter(|completion| completion.name == "timedelta");
+
+        assert_snapshot!(builder.build().snapshot(), @"timedelta :: <no import edit>");
+    }
+
+    #[test]
+    fn parenthesized_import_alias_on_next_line_does_not_complete_members() {
+        let builder = completion_test_builder(&dedent(
+            "
+            from datetime import (
+                date as
+                timede<CURSOR>
+            )
+            ",
+        ))
+        .skip_auto_import();
+
+        builder.build().not_contains("timedelta");
     }
 
     #[test]
@@ -8800,6 +8864,20 @@ from collections import defaultdict as f<CURSOR>
             builder.build().snapshot(),
             @"<No completions found>",
         );
+    }
+
+    #[test]
+    fn typing_import_alias_on_next_line_suppresses_completions() {
+        let builder = completion_test_builder(&ruff_python_trivia::textwrap::dedent(
+            "
+            from datetime import (
+                date as
+                timede<CURSOR>
+            )
+            ",
+        ));
+
+        assert_snapshot!(builder.build().snapshot(), @"<No completions found>");
     }
 
     #[test]

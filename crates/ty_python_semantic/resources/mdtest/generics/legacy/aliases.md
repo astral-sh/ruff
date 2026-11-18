@@ -28,6 +28,24 @@ def _(value: Any):
     reveal_type(growing(value))  # revealed: tuple[Unknown, list[Unknown]]
 ```
 
+## Recursive calls returning a generic alias
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Chain = TypeAliasType("Chain", "tuple[T, Chain[T] | None]", type_params=(T,))
+
+def chain(value: T, recurse: bool) -> Chain[T]:
+    if recurse:
+        _, tail = chain(1, False)
+        if tail is not None:
+            # revealed: Literal[1]
+            reveal_type(tail[0])
+    return value, (value, None)
+```
+
 ## Negation after specializing a recursive alias
 
 Substituting `object` for `T` makes `A[T]` equal to `object`, even though its definition is
@@ -152,4 +170,82 @@ TrueLiteral = TypeAliasType("TrueLiteral", Literal[True])
 
 def f(x: Minus[Boolean, TrueLiteral]):
     reveal_type(x)  # revealed: Literal[False]
+```
+
+## Capturing an enclosing type parameter
+
+An alias defined inside a generic function refers to that function's type parameter.
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+def outer(value: T) -> T:
+    Captured = TypeAliasType("Captured", T)
+
+    def identity(other: Captured) -> Captured:
+        return other
+
+    return identity(value)  # ok
+```
+
+The alias can also have its own parameters. Specializing them preserves the captured parameter.
+
+```py
+U = TypeVar("U")
+
+def generic_outer(value: T) -> tuple[T, int]:
+    Pair = TypeAliasType("Pair", tuple[T, U], type_params=(U,))
+
+    def integers(other: Pair[int]) -> Pair[int]:
+        return other
+
+    def strings(other: Pair[str]) -> Pair[str]:
+        return other
+
+    strings((value, "text"))  # ok
+    integers((value, "text"))  # error: [invalid-argument-type]
+    return integers((value, 1))  # ok
+```
+
+## Constructor inference through captured alias parameters
+
+A class-local alias captures its class's type parameter. Constructing another instance inside the
+class infers a new specialization without constraining the enclosing instance's type parameter.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    Items = TypeAliasType("Items", list[T])
+
+    def __init__(self, value: Items) -> None: ...
+    def copy(self, value: list[T]) -> None:
+        # revealed: Box[T@Box]
+        reveal_type(Box(value))
+        # revealed: Box[int]
+        reveal_type(Box([1]))
+```
+
+The alias's own parameters retain their specialization while its captured class parameter is
+inferred for the new instance.
+
+```py
+U = TypeVar("U")
+
+class PairBox(Generic[T]):
+    Pair = TypeAliasType("Pair", tuple[T, U], type_params=(U,))
+
+    def __init__(self, value: Pair[int]) -> None: ...
+    def copy(self, value: T) -> None:
+        # revealed: PairBox[T@PairBox]
+        reveal_type(PairBox((value, 1)))
+        # revealed: PairBox[str]
+        reveal_type(PairBox(("text", 1)))
+        PairBox((value, "wrong"))  # error: [invalid-argument-type]
 ```

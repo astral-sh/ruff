@@ -23,7 +23,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::MissingReturnTypePrivateFunction,
         Rule::MissingReturnTypeSpecialMethod,
         Rule::MissingReturnTypeStaticMethod,
-        Rule::MissingReturnTypeUndocumentedPublicFunction,
+        Rule::MissingReturnTypePublicFunction,
         Rule::MissingTypeArgs,
         Rule::MissingTypeFunctionArgument,
         Rule::MissingTypeKwargs,

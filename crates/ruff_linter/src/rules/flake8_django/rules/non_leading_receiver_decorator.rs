@@ -63,13 +63,7 @@ pub(crate) fn non_leading_receiver_decorator(checker: &Checker, decorator_list: 
         let is_receiver = decorator.expression.as_call_expr().is_some_and(|call| {
             checker
                 .semantic()
-                .resolve_qualified_name(&call.func)
-                .is_some_and(|qualified_name| {
-                    matches!(
-                        qualified_name.segments(),
-                        ["django", "dispatch", "receiver"]
-                    )
-                })
+                .matches_qualified_name(&call.func, &["django", "dispatch", "receiver"])
         });
         if i > 0 && is_receiver && !seen_receiver {
             checker.report_diagnostic(DjangoNonLeadingReceiverDecorator, decorator.range());

@@ -26,6 +26,7 @@ _blake2: 3.6-
 _bz2: 3.3-
 _codecs: 3.0-
 _collections_abc: 3.3-
+_colorize: 3.13-
 _compat_pickle: 3.1-
 _compression: 3.5-3.13
 _contextvars: 3.7-

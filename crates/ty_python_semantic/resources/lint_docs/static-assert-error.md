@@ -18,3 +18,6 @@ static_assert(1 + 1 == 3)  # error
 # does not have a statically known truthiness
 static_assert(int(2.0 * 3.0) == 6)  # error
 ```
+
+Note that running this example would require the
+[`ty-extensions`](https://pypi.org/project/ty-extensions/) package.

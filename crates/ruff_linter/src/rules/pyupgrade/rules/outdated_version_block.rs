@@ -452,12 +452,8 @@ fn extract_version(elts: &[Expr]) -> Option<Vec<Int>> {
 /// - Subscript access: `sys.version_info[:2]`, `sys.version_info[0]`
 /// - Major version attribute: `sys.version_info.major`
 fn is_valid_version_info(semantic: &SemanticModel, left: &Expr) -> bool {
-    semantic
-        .resolve_qualified_name(map_subscript(left))
-        .is_some_and(|name| matches!(name.segments(), ["sys", "version_info"]))
-        || semantic
-            .resolve_qualified_name(left)
-            .is_some_and(|name| matches!(name.segments(), ["sys", "version_info", "major"]))
+    semantic.matches_qualified_name(map_subscript(left), &["sys", "version_info"])
+        || semantic.matches_qualified_name(left, &["sys", "version_info", "major"])
 }
 
 #[cfg(test)]

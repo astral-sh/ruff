@@ -2,6 +2,7 @@ use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -49,28 +50,26 @@ impl AlwaysFixableViolation for DecimalFromFloatLiteral {
 }
 
 /// RUF032: `Decimal()` called with float literal argument
-pub(crate) fn decimal_from_float_literal_syntax(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn decimal_from_float_literal_syntax(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     let Some(arg) = call.arguments.args.first() else {
         return;
     };
 
-    if let Some(float) = extract_float_literal(arg, Sign::Positive) {
-        if checker
-            .semantic()
-            .resolve_qualified_name(call.func.as_ref())
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["decimal", "Decimal"])
-            })
-        {
-            checker
-                .report_diagnostic(DecimalFromFloatLiteral, arg.range())
-                .set_fix(fix_float_literal(
-                    arg.range(),
-                    float,
-                    checker.locator(),
-                    checker.stylist(),
-                ));
-        }
+    if matches!(qualified_name.segments(), ["decimal", "Decimal"])
+        && let Some(float) = extract_float_literal(arg, Sign::Positive)
+    {
+        checker
+            .report_diagnostic(DecimalFromFloatLiteral, arg.range())
+            .set_fix(fix_float_literal(
+                arg.range(),
+                float,
+                checker.locator(),
+                checker.stylist(),
+            ));
     }
 }
 

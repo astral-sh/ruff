@@ -87,6 +87,10 @@ invalid_module_self_forms: tuple[TypeForm[Any], ...] = module_self_forms  # erro
 
 bad_forms: list[TypeForm[int]] = [str]  # error: [invalid-assignment]
 bad_config: Config = {"form": str}  # error: [invalid-argument-type]
+
+# Bare `Literal` prevents the stored union from denoting a type.
+invalid_union_forms = (bytes | Literal | str,)
+type_forms: tuple[TypeForm[object], ...] = invalid_union_forms  # error: [invalid-assignment]
 ```
 
 `TypeForm` is covariant in its type argument:
@@ -204,7 +208,7 @@ from typing_extensions import TypeForm
 
 def unwrap(form: TypeForm):
     while True:
-        # error: [unresolved-attribute]
+        # error: [missing-union-attribute]
         form = form.__supertype__
         unwrap(form)
 ```
@@ -217,7 +221,7 @@ class Wrapper: ...
 
 def unwrap_alias(form: Wrapper) -> TypeForm:
     while True:
-        # error: [unresolved-attribute]
+        # error: [missing-union-attribute]
         form = form.__value__
         if form:
             return form
@@ -359,7 +363,7 @@ def returned_union() -> TypeForm[int | str]:
     return identity(int | str)
 
 def returned_incompatible_class() -> TypeForm[str]:
-    return identity(int)  # error: [invalid-return-type]
+    return identity(int)  # error: [invalid-explicit-return]
 
 async def async_identity[T](value: T) -> T:
     return value
@@ -493,6 +497,13 @@ reveal_type(foo(str))  # revealed: str
 foo(float)  # error: [no-matching-overload]
 ```
 
+An invalid union operator still produces a diagnostic when the argument matches an overload.
+
+```py
+# error: [unsupported-operator]
+reveal_type(foo("bool" | "int" | bool))  # revealed: int
+```
+
 ## Narrowing to runtime classes
 
 A `TypeForm[T]` value may or may not be a runtime class object. An `isinstance(..., type)` check can
@@ -539,7 +550,7 @@ def is_bare_runtime_type(value: TypeForm[Any]) -> TypeIs[type]:
 
 def reject_broad_runtime_type_narrowing(
     value: TypeForm[str],
-) -> TypeIs[type]:  # error: [invalid-type-guard-definition]
+) -> TypeIs[type]:  # error: [suspicious-type-is-narrowing]
     return isinstance(value, type)
 
 class A: ...

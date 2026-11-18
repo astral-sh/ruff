@@ -72,7 +72,7 @@ class XMLReader:
         """Sets the value of a SAX2 property."""
 
 class IncrementalParser(XMLReader):
-    """This interface adds three extra methods to the XMLReader
+    """This interface adds four extra methods to the XMLReader
     interface that allow XML parsers to support incremental
     parsing. Support for this interface is optional, since not all
     underlying XML parsers support this functionality.
@@ -87,7 +87,7 @@ class IncrementalParser(XMLReader):
     is, after parse has been called and before it returns.
 
     By default, the class also implements the parse method of the XMLReader
-    interface using the feed, close and reset methods of the
+    interface using the prepareParser, feed and close methods of the
     IncrementalParser interface as a convenience to SAX 2.0 driver
     writers.
     """

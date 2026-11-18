@@ -34,7 +34,7 @@ pub fn goto_definition(
 #[cfg(test)]
 pub(super) mod test {
 
-    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
+    use crate::tests::{CursorTest, IntoDiagnostic, SitePackagesCursorTestBuilder, cursor_test};
     use crate::{NavigationTargets, RangedValue, goto_definition};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
@@ -133,10 +133,9 @@ def f(items):
         ");
     }
 
-    #[test]
-    fn goto_definition_uses_pytest_fixture_binding() {
+    fn pytest_cursor_test_builder() -> SitePackagesCursorTestBuilder {
         let mut builder = CursorTest::builder().with_site_packages();
-        let test = builder
+        builder
             .site_packages(
                 "_pytest/__init__.pyi",
                 r#"
@@ -159,7 +158,13 @@ def f(items):
                 r#"
                 from _pytest.fixtures import fixture as fixture
                 "#,
-            )
+            );
+        builder
+    }
+
+    #[test]
+    fn goto_definition_uses_pytest_fixture_binding() {
+        let test = pytest_cursor_test_builder()
             .source(
                 "test_example.py",
                 r#"
@@ -184,6 +189,44 @@ def f(items):
           |
         5 | def implementation(): ...
           |     --------------
+        ");
+    }
+
+    #[test]
+    fn goto_definition_uses_pytest_plugins() {
+        let test = pytest_cursor_test_builder()
+            .source(
+                "conftest.py",
+                r#"
+                pytest_plugins = ["tests.fixtures"]
+                "#,
+            )
+            .source(
+                "tests/fixtures.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource(): ...
+                "#,
+            )
+            .source(
+                "tests/test_example.py",
+                "def test_use(resource<CURSOR>): ...",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> src/tests/test_example.py:1:14
+          |
+        1 | def test_use(resource): ...
+          |              ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> src/tests/fixtures.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
         ");
     }
 

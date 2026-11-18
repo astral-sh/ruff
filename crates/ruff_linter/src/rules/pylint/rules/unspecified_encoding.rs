@@ -115,11 +115,7 @@ enum Callee<'a> {
 impl<'a> Callee<'a> {
     fn is_pathlib_path_call(expr: &Expr, semantic: &SemanticModel) -> bool {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            semantic
-                .resolve_qualified_name(func)
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["pathlib", "Path"])
-                })
+            semantic.matches_qualified_name(func, &["pathlib", "Path"])
         } else {
             false
         }

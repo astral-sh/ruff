@@ -1212,4 +1212,63 @@ UP031 Use format specifiers instead of percent format
 170 |
 171 | "%(and)s" % {"and": 2}
     | ^^^^^^^^^
+172 |
+173 | # Each closing parenthesis around the format string must be kept exactly once.
+    |
 help: Replace with format specifiers
+
+UP031 [*] Use format specifiers instead of percent format
+   --> UP031_0.py:174:1
+    |
+173 | # Each closing parenthesis around the format string must be kept exactly once.
+174 | (("%s")) % (x,)
+    | ^^^^^^^^^^^^^^^
+175 | ((("%s" "%s"))) % (x, y)
+176 | (  # comment
+    |
+help: Replace with format specifiers
+    |
+173 | # Each closing parenthesis around the format string must be kept exactly once.
+    - (("%s")) % (x,)
+174 + (("{}")).format(x)
+175 | ((("%s" "%s"))) % (x, y)
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP031 [*] Use format specifiers instead of percent format
+   --> UP031_0.py:175:1
+    |
+173 | # Each closing parenthesis around the format string must be kept exactly once.
+174 | (("%s")) % (x,)
+175 | ((("%s" "%s"))) % (x, y)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+176 | (  # comment
+177 |     "%s"
+    |
+help: Replace with format specifiers
+    |
+174 | (("%s")) % (x,)
+    - ((("%s" "%s"))) % (x, y)
+175 + ((("{}" "{}"))).format(x, y)
+176 | (  # comment
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP031 [*] Use format specifiers instead of percent format
+   --> UP031_0.py:176:1
+    |
+174 |   (("%s")) % (x,)
+175 |   ((("%s" "%s"))) % (x, y)
+176 | / (  # comment
+177 | |     "%s"
+178 | | ) % (x,)
+    | |________^
+help: Replace with format specifiers
+    |
+176 | (  # comment
+    -     "%s"
+    - ) % (x,)
+177 +     "{}"
+178 + ).format(x)
+    |
+note: This is an unsafe fix and may change runtime behavior

@@ -20,7 +20,7 @@ def func(a, b):
 
 
 def test_error_nested_in_with():
-    with pytest.raises(ValueError, "oops"):  # no diagnostic
+    with pytest.raises(ValueError, "oops"):  # ok
         pytest.raises(ZeroDivisionError, func, 1, b=0)  # error: [legacy-form-pytest-raises]
 ```
 
@@ -31,7 +31,7 @@ import pytest
 
 
 def test_ok_positional_args():
-    with pytest.warns(UserWarning, "oops"):  # no diagnostic
+    with pytest.warns(UserWarning, "oops"):  # ok
         pass
 ```
 
@@ -42,6 +42,6 @@ import pytest
 
 
 def test_ok_positional_args():
-    with pytest.deprecated_call("oops"):  # no diagnostic
+    with pytest.deprecated_call("oops"):  # ok
         pass
 ```

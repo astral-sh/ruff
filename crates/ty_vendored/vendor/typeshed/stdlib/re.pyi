@@ -577,10 +577,13 @@ def subn(
     flags: _FlagsType = 0,
 ) -> tuple[bytes, int]: ...
 
+@overload
 def escape(pattern: AnyStr) -> AnyStr:
     """
     Escape special characters in a string.
     """
+@overload
+def escape(pattern: ReadableBuffer) -> bytes: ...
 
 def purge() -> None:
     """Clear the regular expression caches"""

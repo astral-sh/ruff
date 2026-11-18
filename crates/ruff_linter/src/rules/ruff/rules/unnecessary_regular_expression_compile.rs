@@ -33,7 +33,7 @@ use crate::codes::Category;
 /// ## References
 /// - [Python documentation: `re.compile`](https://docs.python.org/3/library/re.html#re.compile)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Complexity)]
+#[violation_metadata(preview_since = "0.17.2", category = Category::Complexity)]
 pub(crate) struct UnnecessaryRegularExpressionCompile {
     re_func: &'static str,
 }
@@ -112,7 +112,5 @@ fn reducible_re_method(attr: &str, arguments: &Arguments) -> Option<&'static str
 
 /// Returns `true` if `func` resolves to `re.compile`.
 fn is_re_compile(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["re", "compile"]))
+    semantic.matches_qualified_name(func, &["re", "compile"])
 }

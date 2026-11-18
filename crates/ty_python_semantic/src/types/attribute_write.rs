@@ -17,13 +17,15 @@ use super::class::FrozenDataclassDispatch;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension};
 use super::dedicated::pydantic;
 use super::relation::TypeRelationChecker;
+use super::visitor::may_contain_typevar_from;
 use super::{
-    BindingContext, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
-    PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping, TypeQualifiers,
-    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    BindingContext, ClassBase, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    Parameter, PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping,
+    TypeQualifiers, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol, place_from_bindings,
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_symbol,
+    place_from_bindings,
 };
 use crate::{Program, ProgramEnvironment};
 
@@ -50,10 +52,10 @@ pub(super) enum AttributeWriteRequirement<'db> {
     Unconstrained,
     /// The attribute cannot be assigned.
     CannotAssign,
-    /// A module symbol, with its declared type when the symbol is known.
+    /// A module symbol, with its type and origin when the symbol is known.
     ///
     /// `None` represents an unresolved module attribute rather than an unconstrained write.
-    Module(Option<Type<'db>>),
+    Module(Option<(Type<'db>, TypeOrigin)>),
     /// The effective instance-write requirement of a declared protocol member.
     ///
     /// `write` is `None` for a read-only member. Qualifiers are retained so assignment inference
@@ -245,6 +247,7 @@ pub(super) enum ExplicitAttributeWriteRequirement<'db> {
     /// Check the assigned value directly against the member's effective write type.
     AssignableTo {
         ty: Type<'db>,
+        origin: TypeOrigin,
         qualifiers: TypeQualifiers,
     },
 }
@@ -264,6 +267,7 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
     /// Check the value against `ty`, retaining whether the declaration may be absent at runtime.
     AssignableTo {
         ty: Type<'db>,
+        origin: TypeOrigin,
         qualifiers: TypeQualifiers,
         possibly_missing: bool,
     },
@@ -313,16 +317,19 @@ impl<'db> AssignmentAttributeMembers<'db> {
         }
     }
 
+    pub(super) fn receiver_member(&self) -> Option<&PlaceAndQualifiers<'db>> {
+        match self {
+            Self::ReceiverMember(member) => Some(member),
+            Self::TypeMember {
+                receiver_fallback, ..
+            } => receiver_fallback.as_ref(),
+        }
+    }
+
     /// Iterate over every member that can govern the write at runtime.
     pub(super) fn effective_members(self) -> impl Iterator<Item = PlaceAndQualifiers<'db>> {
-        let members = match self {
-            Self::TypeMember {
-                member,
-                receiver_fallback,
-            } => [Some(member), receiver_fallback],
-            Self::ReceiverMember(member) => [Some(member), None],
-        };
-        members.into_iter().flatten()
+        let receiver_member = self.receiver_member().copied();
+        [self.type_member(), receiver_member].into_iter().flatten()
     }
 }
 
@@ -396,7 +403,7 @@ pub(super) fn attribute_write_requirement<'db>(
                         receiver: Some(receiver.unwrap_or(object_ty)),
                     }
                 }
-                _ => instance_attribute_write_requirement(db, env, object_ty, attribute, receiver),
+                _ => member_attribute_write_requirement(db, env, object_ty, attribute, receiver),
             }
         }
 
@@ -413,12 +420,12 @@ pub(super) fn attribute_write_requirement<'db>(
             .interface(db)
             .instance_write_requirement(db, env, receiver.unwrap_or(object_ty), attribute)
             .map_or_else(
-                || instance_attribute_write_requirement(db, env, object_ty, attribute, receiver),
+                || member_attribute_write_requirement(db, env, object_ty, attribute, receiver),
                 |(write, qualifiers)| {
                     // `Final` permits initialization by its owner. Retain the declaration so
                     // normal assignment validation can distinguish that from a later write.
                     if qualifiers.contains(TypeQualifiers::FINAL) {
-                        return instance_attribute_write_requirement(
+                        return member_attribute_write_requirement(
                             db, env, object_ty, attribute, receiver,
                         );
                     }
@@ -468,13 +475,13 @@ pub(super) fn attribute_write_requirement<'db>(
         | Type::TypeForm(_)
         | Type::TypedDict(_)
         | Type::NewTypeInstance(_) => {
-            instance_attribute_write_requirement(db, env, object_ty, attribute, receiver)
+            member_attribute_write_requirement(db, env, object_ty, attribute, receiver)
         }
 
         Type::SubclassOf(subclass_of) => subclass_of
             .meta_write_requirement(db, env, attribute)
             .map_or_else(
-                || class_attribute_write_requirement(db, env, object_ty, attribute),
+                || member_attribute_write_requirement(db, env, object_ty, attribute, None),
                 |(write_ty, qualifiers)| AttributeWriteRequirement::ProtocolMember {
                     receiver_ty: object_ty,
                     write: write_ty.map(ProtocolMemberWriteRequirement::AssignableTo),
@@ -483,7 +490,7 @@ pub(super) fn attribute_write_requirement<'db>(
             ),
 
         Type::ClassLiteral(..) | Type::GenericAlias(..) => {
-            class_attribute_write_requirement(db, env, object_ty, attribute)
+            member_attribute_write_requirement(db, env, object_ty, attribute, None)
         }
 
         Type::ModuleLiteral(module) => {
@@ -499,27 +506,110 @@ pub(super) fn attribute_write_requirement<'db>(
                     .map_or_else(|_| Place::Undefined.into(), |member| member.member(db))
             };
             AttributeWriteRequirement::Module(match symbol.place {
-                Place::Defined(DefinedPlace { ty, .. }) => Some(ty),
+                Place::Defined(DefinedPlace { ty, origin, .. }) => Some((ty, origin)),
                 Place::Undefined => None,
             })
         }
     }
 }
 
-fn instance_attribute_write_requirement<'db>(
+fn member_attribute_write_requirement<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
     receiver: Option<Type<'db>>,
 ) -> AttributeWriteRequirement<'db> {
-    AttributeWriteRequirement::Instance {
-        object_ty,
-        receiver,
-        member: instance_attribute_write_member_requirement(
-            db, env, object_ty, attribute, receiver,
-        ),
+    let members = assignment_attribute_members(db, env, object_ty, attribute);
+    // A conditional nested class can dispatch to a descriptor setter on one branch and
+    // ordinary storage on another. Conservatively reject the write when those paths differ.
+    if let Some(AssignmentAttributeMembers::TypeMember { member, .. }) = &members
+        && member.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+        && let Some(ty) = member.ignore_possibly_undefined()
+        && ty.resolve_type_alias(db).is_union()
+        && ty.may_be_data_descriptor(db, env)
+        && !ty.is_data_descriptor(db, env)
+    {
+        return AttributeWriteRequirement::CannotAssign;
     }
+    if matches!(
+        object_ty,
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+    ) {
+        class_attribute_write_requirement(db, env, object_ty, attribute, members)
+    } else {
+        instance_attribute_write_requirement(
+            db,
+            env,
+            object_ty,
+            attribute,
+            receiver,
+            members.as_ref(),
+        )
+    }
+}
+
+/// Return a receiver annotation that redeclares an inherited nested class as instance storage.
+/// Class objects use receiver annotations declared on their metaclass.
+/// The caller has resolved the attribute to a nested class on the receiver's type and excluded
+/// data descriptors.
+///
+/// A subclass can add writes while preserving the inherited read type:
+///
+/// ```python
+/// class Base:
+///     class Meta: ...
+///
+/// class Child(Base):
+///     def __init__(self):
+///         self.Meta: type[Base.Meta] = Base.Meta
+/// ```
+///
+/// A nearer nested class definition restores the read-only contract, including when the receiver
+/// annotation and nested class definition belong to the same class.
+pub(super) fn nested_class_instance_override<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    object_ty: Type<'db>,
+    attribute: &str,
+    receiver: Option<Type<'db>>,
+) -> Option<PlaceAndQualifiers<'db>> {
+    let class = match object_ty {
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => object_ty
+            .to_meta_type(db, env)
+            .to_instance_approximation(db, env)?
+            .nominal_class(db, env)?,
+        _ => object_ty.nominal_class(db, env)?,
+    };
+    for owner in class.iter_mro(db).filter_map(ClassBase::into_class) {
+        let class_member = owner.own_class_member(db, env, None, attribute).inner;
+        if class_member
+            .qualifiers
+            .intersects(TypeQualifiers::NESTED_CLASS | TypeQualifiers::CLASS_VAR)
+        {
+            return None;
+        }
+        let member = owner.own_instance_member(db, env, attribute).inner;
+        if matches!(
+            member.place,
+            Place::Defined(DefinedPlace {
+                origin: TypeOrigin::Declared,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            })
+        ) {
+            return Some(member.map_type(|ty| {
+                bind_attribute_self_typevars(
+                    db,
+                    env,
+                    ty,
+                    Type::instance(db, env, owner),
+                    Some(receiver.unwrap_or(object_ty)),
+                )
+            }));
+        }
+    }
+    None
 }
 
 /// Resolve the declared member that governs an instance attribute write.
@@ -527,40 +617,64 @@ fn instance_attribute_write_requirement<'db>(
 /// The returned requirement preserves a possibly-defined class member and its instance fallback,
 /// because both runtime paths must accept the write. If neither exists, the caller must evaluate
 /// `__setattr__`.
-fn instance_attribute_write_member_requirement<'db>(
+fn instance_attribute_write_requirement<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
     receiver: Option<Type<'db>>,
-) -> InstanceAttributeWriteMember<'db> {
-    let Some(members) = assignment_attribute_members(db, env, object_ty, attribute) else {
-        return InstanceAttributeWriteMember::SetAttr;
+    members: Option<&AssignmentAttributeMembers<'db>>,
+) -> AttributeWriteRequirement<'db> {
+    let instance = |member| AttributeWriteRequirement::Instance {
+        object_ty,
+        receiver,
+        member,
+    };
+    let fallback_requirement = |member| {
+        instance_fallback_write_requirement(db, env, object_ty, attribute, member, receiver)
     };
     let (type_member, receiver_fallback) = match members {
-        AssignmentAttributeMembers::TypeMember {
+        Some(&AssignmentAttributeMembers::TypeMember {
             member,
             receiver_fallback,
-        } => (member, receiver_fallback),
-        AssignmentAttributeMembers::ReceiverMember(member) => {
-            return InstanceAttributeWriteMember::Instance(instance_fallback_write_requirement(
-                db, env, object_ty, attribute, member, receiver,
+        }) => (member, receiver_fallback),
+        Some(&AssignmentAttributeMembers::ReceiverMember(member)) => {
+            return instance(InstanceAttributeWriteMember::Instance(
+                fallback_requirement(member),
             ));
         }
+        None => return instance(InstanceAttributeWriteMember::SetAttr),
     };
 
-    match type_member {
+    let member = match type_member {
         type_member if type_member.is_class_var() => InstanceAttributeWriteMember::ClassVar,
         PlaceAndQualifiers {
-            place: Place::Defined(DefinedPlace { ty, .. }),
+            place: Place::Defined(DefinedPlace { ty, origin, .. }),
             qualifiers,
         } => {
+            // A receiver annotation can make an inherited nested class writable, but it cannot
+            // bypass a data descriptor's setter or provide storage omitted by `__slots__`.
+            let instance_override = if qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+                && !ty.is_data_descriptor(db, env)
+            {
+                let Some(member) =
+                    nested_class_instance_override(db, env, object_ty, attribute, receiver)
+                else {
+                    return AttributeWriteRequirement::CannotAssign;
+                };
+                Some(member)
+            } else {
+                None
+            };
             let member = explicit_attribute_write_requirement(
                 db,
                 env,
                 object_ty,
                 attribute,
-                bind_attribute_self_typevars(db, env, ty, object_ty, receiver),
+                (
+                    bind_attribute_self_typevars(db, env, ty, object_ty, receiver),
+                    origin,
+                ),
                 qualifiers,
                 receiver,
             );
@@ -576,16 +690,14 @@ fn instance_attribute_write_member_requirement<'db>(
                     .and_then(|class| class.static_class_literal(db))
                     .is_some_and(|(class, _)| class.lacks_instance_storage(db, attribute))
             {
-                return InstanceAttributeWriteMember::SetAttr;
-            }
-
-            InstanceAttributeWriteMember::Explicit {
-                member,
-                fallback: receiver_fallback.map(|fallback| {
-                    instance_fallback_write_requirement(
-                        db, env, object_ty, attribute, fallback, receiver,
-                    )
-                }),
+                InstanceAttributeWriteMember::SetAttr
+            } else if let Some(instance_override) = instance_override {
+                InstanceAttributeWriteMember::Instance(fallback_requirement(instance_override))
+            } else {
+                InstanceAttributeWriteMember::Explicit {
+                    member,
+                    fallback: receiver_fallback.map(fallback_requirement),
+                }
             }
         }
         PlaceAndQualifiers {
@@ -597,12 +709,11 @@ fn instance_attribute_write_member_requirement<'db>(
                     place: Place::Defined(_),
                     ..
                 },
-            ) => InstanceAttributeWriteMember::Instance(instance_fallback_write_requirement(
-                db, env, object_ty, attribute, fallback, receiver,
-            )),
+            ) => InstanceAttributeWriteMember::Instance(fallback_requirement(fallback)),
             _ => InstanceAttributeWriteMember::SetAttr,
         },
-    }
+    };
+    instance(member)
 }
 
 /// Resolve a class-object write against the metaclass and then the class object's attributes.
@@ -614,16 +725,17 @@ fn class_attribute_write_requirement<'db>(
     env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
+    members: Option<AssignmentAttributeMembers<'db>>,
 ) -> AttributeWriteRequirement<'db> {
-    if object_ty
-        .find_name_in_mro(db, env, attribute)
-        .is_some_and(|member| member.is_read_only())
+    let Some(members) = members else {
+        return AttributeWriteRequirement::Unconstrained;
+    };
+    if members
+        .receiver_member()
+        .is_some_and(PlaceAndQualifiers::is_read_only)
     {
         return AttributeWriteRequirement::CannotAssign;
     }
-    let Some(members) = assignment_attribute_members(db, env, object_ty, attribute) else {
-        return AttributeWriteRequirement::Unconstrained;
-    };
     let Some(class_attr_self_ty) = object_ty.to_instance_approximation(db, env) else {
         return AttributeWriteRequirement::Unconstrained;
     };
@@ -656,13 +768,30 @@ fn class_attribute_write_requirement<'db>(
             let descriptor_ty = receiver_fallback
                 .and_then(|_| possible_class_attribute_descriptor(db, env, place))
                 .unwrap_or(ty);
+            if qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+                && !descriptor_ty.is_data_descriptor(db, env)
+            {
+                let Some(member) =
+                    nested_class_instance_override(db, env, object_ty, attribute, None)
+                else {
+                    return AttributeWriteRequirement::CannotAssign;
+                };
+                return AttributeWriteRequirement::Class {
+                    object_ty,
+                    member: ClassAttributeWriteMember::ClassAttribute(
+                        instance_fallback_write_requirement(
+                            db, env, object_ty, attribute, member, None,
+                        ),
+                    ),
+                };
+            }
             ClassAttributeWriteMember::Explicit {
                 member: explicit_attribute_write_requirement(
                     db,
                     env,
                     object_ty,
                     attribute,
-                    descriptor_ty,
+                    (descriptor_ty, place.origin),
                     qualifiers,
                     None,
                 ),
@@ -758,13 +887,13 @@ fn explicit_attribute_write_requirement<'db>(
     env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
-    attr_ty: Type<'db>,
+    (attr_ty, origin): (Type<'db>, TypeOrigin),
     qualifiers: TypeQualifiers,
     receiver: Option<Type<'db>>,
 ) -> ExplicitAttributeWriteRequirement<'db> {
     if matches!(attr_ty, Type::SlotDescriptor(_))
         && let PlaceAndQualifiers {
-            place: Place::Defined(DefinedPlace { ty, .. }),
+            place: Place::Defined(DefinedPlace { ty, origin, .. }),
             qualifiers: storage_qualifiers,
         } = object_ty.instance_member(db, env, attribute)
     {
@@ -776,6 +905,7 @@ fn explicit_attribute_write_requirement<'db>(
                 attribute,
                 bind_attribute_self_typevars(db, env, ty, object_ty, receiver),
             ),
+            origin,
             qualifiers: qualifiers.union(storage_qualifiers),
         };
     }
@@ -800,8 +930,11 @@ fn explicit_attribute_write_requirement<'db>(
                 env,
                 object_ty,
                 attribute,
-                shadowed_descriptor_write_type(db, env, attr_ty),
+                attr_ty
+                    .method_shadowing_contract(db, env, receiver.unwrap_or(object_ty))
+                    .unwrap_or_else(|| shadowed_descriptor_write_type(db, env, attr_ty)),
             ),
+            origin,
             qualifiers,
         }
     }
@@ -845,9 +978,13 @@ fn instance_fallback_write_requirement<'db>(
     receiver: Option<Type<'db>>,
 ) -> FallbackAttributeWriteRequirement<'db> {
     let PlaceAndQualifiers {
-        place: Place::Defined(DefinedPlace {
-            ty, definedness, ..
-        }),
+        place:
+            Place::Defined(DefinedPlace {
+                ty,
+                origin,
+                definedness,
+                ..
+            }),
         qualifiers,
     } = fallback
     else {
@@ -856,6 +993,7 @@ fn instance_fallback_write_requirement<'db>(
     let ty = bind_attribute_self_typevars(db, env, ty, object_ty, receiver);
     FallbackAttributeWriteRequirement::AssignableTo {
         ty: effective_write_type(db, env, object_ty, attribute, ty),
+        origin,
         qualifiers,
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
@@ -908,9 +1046,13 @@ fn class_fallback_write_requirement<'db>(
     fallback: PlaceAndQualifiers<'db>,
 ) -> FallbackAttributeWriteRequirement<'db> {
     let PlaceAndQualifiers {
-        place: Place::Defined(DefinedPlace {
-            ty, definedness, ..
-        }),
+        place:
+            Place::Defined(DefinedPlace {
+                ty,
+                origin,
+                definedness,
+                ..
+            }),
         qualifiers,
     } = fallback
     else {
@@ -927,6 +1069,7 @@ fn class_fallback_write_requirement<'db>(
     };
     FallbackAttributeWriteRequirement::AssignableTo {
         ty,
+        origin,
         qualifiers,
         possibly_missing: definedness == Definedness::PossiblyUndefined,
     }
@@ -1294,7 +1437,7 @@ fn descriptor_setter_signature_domain<'db>(
     let receiver_parameter = receiver_parameter
         .annotated_type()
         .bind_self_typevars(db, env, self_ty);
-    if contains_signature_typevar(db, env, signature, receiver_parameter) {
+    if may_contain_signature_typevar(db, env, signature, receiver_parameter) {
         return DescriptorSetterSignatureDomain::Deferred;
     }
     if !receiver_ty.is_assignable_to(db, env, receiver_parameter) {
@@ -1307,7 +1450,7 @@ fn descriptor_setter_signature_domain<'db>(
     let write_ty = write_parameter
         .annotated_type()
         .bind_self_typevars(db, env, self_ty);
-    if !contains_signature_typevar(db, env, signature, write_ty) {
+    if !may_contain_signature_typevar(db, env, signature, write_ty) {
         return DescriptorSetterSignatureDomain::Known(write_ty);
     }
 
@@ -1334,17 +1477,15 @@ fn descriptor_setter_signature_domain<'db>(
     }
 }
 
-fn contains_signature_typevar<'db>(
+fn may_contain_signature_typevar<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     signature: &Signature<'db>,
     ty: Type<'db>,
 ) -> bool {
-    signature.generic_context.is_some_and(|generic_context| {
-        super::visitor::any_over_type(db, env, ty, true, |ty| {
-            matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
-        })
-    })
+    signature
+        .generic_context
+        .is_some_and(|generic_context| may_contain_typevar_from(db, env, ty, generic_context))
 }
 
 /// Union the value parameter types accepted by a property's setter overloads.
@@ -1488,7 +1629,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
             AttributeWriteRequirement::Unconstrained => self.always(),
             AttributeWriteRequirement::CannotAssign => self.never(),
-            AttributeWriteRequirement::Module(Some(write_ty)) => {
+            AttributeWriteRequirement::Module(Some((write_ty, _))) => {
                 self.check_type_pair(db, value_ty, *write_ty)
             }
             AttributeWriteRequirement::ProtocolMember {

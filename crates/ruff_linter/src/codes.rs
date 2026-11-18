@@ -381,6 +381,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pylint, "E0116") => rules::pylint::rules::ContinueInFinally,
         (Pylint, "E0117") => rules::pylint::rules::NonlocalWithoutBinding,
         (Pylint, "E0118") => rules::pylint::rules::LoadBeforeGlobalDeclaration,
+        (Pylint, "E0211") => rules::pylint::rules::NoMethodArgument,
         (Pylint, "E0237") => rules::pylint::rules::NonSlotAssignment,
         (Pylint, "E0241") => rules::pylint::rules::DuplicateBases,
         (Pylint, "E0302") => rules::pylint::rules::UnexpectedSpecialMethodSignature,
@@ -495,6 +496,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Async, "240") => rules::flake8_async::rules::BlockingPathMethodInAsyncFunction,
         (Flake8Async, "250") => rules::flake8_async::rules::BlockingInputInAsyncFunction,
         (Flake8Async, "251") => rules::flake8_async::rules::BlockingSleepInAsyncFunction,
+        (Flake8Async, "401") => rules::flake8_async::rules::PytestRaisesExceptionGroup,
 
         // flake8-builtins
         (Flake8Builtins, "001") => rules::flake8_builtins::rules::BuiltinVariableShadowing,
@@ -626,7 +628,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Annotations, "101") => rules::flake8_annotations::rules::MissingTypeSelf,
         #[allow(deprecated)]
         (Flake8Annotations, "102") => rules::flake8_annotations::rules::MissingTypeCls,
-        (Flake8Annotations, "201") => rules::flake8_annotations::rules::MissingReturnTypeUndocumentedPublicFunction,
+        (Flake8Annotations, "201") => rules::flake8_annotations::rules::MissingReturnTypePublicFunction,
         (Flake8Annotations, "202") => rules::flake8_annotations::rules::MissingReturnTypePrivateFunction,
         (Flake8Annotations, "204") => rules::flake8_annotations::rules::MissingReturnTypeSpecialMethod,
         (Flake8Annotations, "205") => rules::flake8_annotations::rules::MissingReturnTypeStaticMethod,
@@ -1237,6 +1239,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
         (Ruff, "201") => rules::ruff::rules::RuleCodesInSelectors,
+        (Ruff, "202") => rules::ruff::rules::RenamedRule,
 
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => rules::ruff::rules::StableTestRule,
@@ -1371,6 +1374,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // Rules that belong only to categories, without linter groups or codes.
         () => rules::ruff::rules::PytestFixtureAutouse,
+        () => rules::ruff::rules::SharedClockMock,
+        () => rules::ruff::rules::TarfileIgnoreZerosTrue,
         () => rules::ruff::rules::UnnecessaryRegularExpressionCompile,
 
         _ => return None,

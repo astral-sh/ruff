@@ -163,14 +163,10 @@ where
 /// Returns `true` if the function is decorated with `contextlib.asynccontextmanager`.
 fn is_async_context_manager(function_def: &ast::StmtFunctionDef, semantic: &SemanticModel) -> bool {
     function_def.decorator_list.iter().any(|decorator| {
-        semantic
-            .resolve_qualified_name(&decorator.expression)
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["contextlib", "asynccontextmanager"]
-                )
-            })
+        semantic.matches_qualified_name(
+            &decorator.expression,
+            &["contextlib", "asynccontextmanager"],
+        )
     })
 }
 

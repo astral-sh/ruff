@@ -87,6 +87,36 @@ def _(x: Literal["a", "b", "c", 1]):
         reveal_type(x)  # revealed: Literal[1]
 ```
 
+## Class objects in a tuple
+
+With ordinary metaclasses, a successful membership test identifies one of the exact class objects in
+the tuple.
+
+```py
+class Base: ...
+class Child(Base): ...
+class OtherChild(Base): ...
+
+def matches(cls: type[Base]):
+    if cls in (Child, OtherChild):
+        reveal_type(cls)  # revealed: <class 'Child'> | <class 'OtherChild'>
+```
+
+Even a class outside the tuple can satisfy the membership test if one element's metaclass overrides
+equality.
+
+```py
+class EqualMeta(type):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class Custom(Base, metaclass=EqualMeta): ...
+
+def matches_custom(cls: type[Base]):
+    if cls in (Child, Custom):
+        reveal_type(cls)  # revealed: type[Base]
+```
+
 ## `in` for inline list and set literals
 
 Inline list and set literals are consumed immediately, so membership can use their precise element
@@ -282,6 +312,18 @@ def broad_tuple_element(x: Bar | None, value: tuple[int, ...], values: list[tupl
         reveal_type(x)  # revealed: Bar | None
     if x in values:
         reveal_type(x)  # revealed: Bar | None
+```
+
+In strict mode, a subclass's metaclass could make it compare equal to either tuple element.
+
+```py
+class Base: ...
+class Child(Base): ...
+class OtherChild(Base): ...
+
+def matches(cls: type[Base]):
+    if cls in (Child, OtherChild):
+        reveal_type(cls)  # revealed: type[Base]
 ```
 
 ## `in` for `str` and literal strings
@@ -550,7 +592,7 @@ class AlwaysEqual:
 def unrelated_typevar(x: AlwaysEqual, y: U) -> U:
     if x in (y,):
         reveal_type(x)  # revealed: AlwaysEqual
-        # error: [invalid-return-type] "Return type does not match returned value: expected `U@unrelated_typevar`, found `AlwaysEqual`"
+        # error: [invalid-explicit-return] "Return type does not match returned value: expected `U@unrelated_typevar`, found `AlwaysEqual`"
         return x
     return y
 ```
@@ -1440,6 +1482,19 @@ def selected_colors(colors: list[Color]) -> list[SelectedColor]:
 def _(colors: list[Color]):
     inline = [color for color in colors if color in (Color.RED, Color.GREEN)]
     reveal_type(inline)  # revealed: list[Color]
+```
+
+Membership succeeds for the plain integer `1` as well as for the enum member `Code.OK`.
+
+```py
+from enum import IntEnum
+
+class Code(IntEnum):
+    OK = 1
+
+def check_membership(value: int):
+    if value in (Code.OK,):
+        reveal_type(value)  # revealed: int
 ```
 
 An enum that can have additional runtime members can still be narrowed by a membership test against

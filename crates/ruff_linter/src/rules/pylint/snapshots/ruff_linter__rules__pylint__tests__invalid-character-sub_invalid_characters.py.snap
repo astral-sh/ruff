@@ -13,9 +13,9 @@ PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
 help: Replace with escape sequence
    |
 23 |
-   - sub = 'sub '
+   - sub = 'sub ␚'
 24 + sub = 'sub \x1a'
-25 | sub = f'sub '
+25 | sub = f'sub ␚'
    |
 
 PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
@@ -29,8 +29,8 @@ PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
    |
 help: Replace with escape sequence
    |
-24 | sub = 'sub '
-   - sub = f'sub '
+24 | sub = 'sub ␚'
+   - sub = f'sub ␚'
 25 + sub = f'sub \x1a'
 26 |
    |
@@ -48,7 +48,7 @@ PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
 help: Replace with escape sequence
    |
 54 |
-   - nested_fstrings = f'␈{f'{f'␛'}'}'
+   - nested_fstrings = f'␈{f'␚{f'␛'}'}'
 55 + nested_fstrings = f'␈{f'\x1a{f'␛'}'}'
 56 |
    |
@@ -65,7 +65,7 @@ PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
 help: Replace with escape sequence
    |
 57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
-   - x = f"""}}ab"""
+   - x = f"""}}a␚b"""
 58 + x = f"""}}a\x1ab"""
 59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
    |
@@ -128,9 +128,9 @@ PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
 help: Replace with escape sequence
    |
 79 | esc = t'esc esc ␛'
-   - nested_tstrings = t'␈{t'{t'␛'}'}'
+   - nested_tstrings = t'␈{t'␚{t'␛'}'}'
 80 + nested_tstrings = t'␈{t'\x1a{t'␛'}'}'
-81 | nested_ftstrings = t'␈{f'{t'␛'}'}'
+81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
    |
 
 PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
@@ -142,8 +142,8 @@ PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
    |                          ^
 help: Replace with escape sequence
    |
-80 | nested_tstrings = t'␈{t'{t'␛'}'}'
-   - nested_ftstrings = t'␈{f'{t'␛'}'}'
+80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
+   - nested_ftstrings = t'␈{f'␚{t'␛'}'}'
 81 + nested_ftstrings = t'␈{f'\x1a{t'␛'}'}'
 82 |
    |

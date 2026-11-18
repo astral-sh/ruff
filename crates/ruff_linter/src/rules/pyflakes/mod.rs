@@ -11,7 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::{Diagnostic, DummyFileResolver};
     use ruff_python_parser::ParseOptions;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
@@ -1023,7 +1023,10 @@ mod tests {
             target_version,
             &suppressions,
         );
-        messages.sort_by(Diagnostic::ruff_start_ordering);
+        messages.sort_by(|a, b| {
+            a.rendering_sort_key(&DummyFileResolver)
+                .cmp(&b.rendering_sort_key(&DummyFileResolver))
+        });
         let actual = messages
             .iter()
             .filter(|msg| !msg.is_invalid_syntax())
@@ -2704,7 +2707,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         ",
-            &[Rule::UnusedVariable, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
         );
     }
 

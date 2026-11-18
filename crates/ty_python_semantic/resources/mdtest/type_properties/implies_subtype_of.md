@@ -595,6 +595,25 @@ def quantifies_callable_typevars_together[V]():
     static_assert(actual == expected)
 ```
 
+A decorator's `ParamSpec` can specialize to the enclosing parameter list `Q`. Its result then
+constrains `R` to be a supertype of `Callable[Q, str]`, even when the return annotation uses an
+alias.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
+
+type Callback[**P] = Callable[P, str]
+
+def decorate[**P](f: Callable[P, str], /) -> Callback[P]:
+    return f
+
+def specialize_decorator[**Q, R]() -> None:
+    actual = ConstraintSet.always().implies_subtype_of(RegularCallableTypeOf[decorate], Callable[[Callable[Q, str]], R])
+    static_assert(actual == ConstraintSet.lower_bound(Callable[Q, str], R))
+```
+
 Invariant generic classes in a generic callable's return type preserve cross-typevar constraints
 that remain after the callable's own typevars are quantified away. Here, `listify` can be used as a
 `Callable[[U], list[V]]` because the surrounding constraints imply `U ≤ int ≤ V`.
@@ -747,7 +766,8 @@ def lower_bound[T, U]():
 ### Substituting gradual equivalences into nested bounds
 
 Substituting a gradual equivalence into a lower bound preserves assignability, but does not
-establish subtyping.
+establish subtyping. This also holds for equivalence bounds: separate occurrences of `Any` in a
+subtype comparison can materialize to different types.
 
 ```py
 from typing import Any
@@ -765,8 +785,9 @@ def equivalence_into_lower[T, U]():
 
 def equivalence_into_equality[T, U]():
     constraints = ConstraintSet.equality(T, Any) & ConstraintSet.equality(U, Covariant[T])
-    static_assert(constraints.implies_subtype_of(Covariant[Any], U))
-    static_assert(constraints.implies_subtype_of(U, Covariant[Any]))
+    static_assert(constraints.satisfies(ConstraintSet.equality(U, Covariant[Any])))
+    static_assert(not constraints.implies_subtype_of(Covariant[Any], U))
+    static_assert(not constraints.implies_subtype_of(U, Covariant[Any]))
 ```
 
 ### Gradual range substitutions do not preserve correlation

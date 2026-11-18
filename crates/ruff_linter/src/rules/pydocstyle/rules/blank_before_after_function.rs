@@ -129,7 +129,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
 
         let mut lines = UniversalNewlineIterator::with_offset(before, function.start()).rev();
         let mut blank_lines_before = 0usize;
-        let mut blank_lines_start = lines.next().map(|l| l.end()).unwrap_or_default();
+        let mut blank_lines_start = lines.next().map_or_default(|l| l.end());
         let mut start_is_line_continuation = false;
 
         for line in lines {
@@ -178,7 +178,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
         let mut lines = UniversalNewlineIterator::with_offset(after, docstring.end()).peekable();
         let first_line = lines.next();
         let first_line_line_continuation = first_line.as_ref().is_some_and(|l| l.ends_with('\\'));
-        let first_line_end = first_line.map(|l| l.end()).unwrap_or_default();
+        let first_line_end = first_line.map_or_default(|l| l.end());
         let mut blank_lines_end = first_line_end;
 
         while let Some(line) = lines.peek() {

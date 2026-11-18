@@ -240,11 +240,45 @@ def f(x: A[int] | B):
 
 ## `type(x) == C`, `type(x) != C`
 
-No narrowing can occur for equality comparisons, since there might be a custom `__eq__`
-implementation on the metaclass.
+Classes with ordinary metaclasses compare by identity. A successful comparison with `Child` narrows
+the instance to `Child`. A failed comparison still allows instances of its subclasses.
 
-TODO: Narrowing might be possible in some cases where the classes themselves are `@final` or their
-metaclass is `@final`.
+```py
+class Base: ...
+class Child(Base): ...
+
+def _(x: Base):
+    if type(x) == Child:
+        reveal_type(x)  # revealed: Child
+    else:
+        reveal_type(x)  # revealed: Base
+
+    if Child != x.__class__:
+        reveal_type(x)  # revealed: Base
+    else:
+        reveal_type(x)  # revealed: Child
+```
+
+If the comparison reassigns the variable after reading its type, the branch sees the new value.
+
+```py
+def rebind(x: object):
+    if type(x) == (x := Child):
+        reveal_type(x)  # revealed: <class 'Child'>
+```
+
+A failed comparison with a final class excludes its instances.
+
+```py
+def _(y: object):
+    if type(y) == bool:
+        reveal_type(y)  # revealed: bool
+    else:
+        reveal_type(y)  # revealed: ~bool
+```
+
+A metaclass can make distinct classes compare equal. Instances whose classes use that metaclass
+remain possible on either branch.
 
 ```py
 class IsEqualToEverything(type):
@@ -254,17 +288,43 @@ class IsEqualToEverything(type):
 class A(metaclass=IsEqualToEverything): ...
 class B(metaclass=IsEqualToEverything): ...
 
-def _(x: A | B, y: object):
+def _(x: A | B):
     if type(x) == A:
         reveal_type(x)  # revealed: A | B
 
     if type(x) != A:
         reveal_type(x)  # revealed: A | B
 
-    if type(y) == bool:
-        reveal_type(y)  # revealed: object
-    else:
-        reveal_type(y)  # revealed: object
+def _(x: Base | A):
+    if type(x) == Child:
+        reveal_type(x)  # revealed: Child | A
+```
+
+Comparing with an unspecialized generic class preserves the instance's type arguments.
+
+```py
+def _(x: list[int] | None):
+    if type(x) == list:
+        reveal_type(x)  # revealed: list[int]
+```
+
+## Class equality with strict equality semantics
+
+A subclass of `Base` may use a different metaclass from `Base`. Strict equality semantics account
+for an equality override on that metaclass.
+
+```toml
+[analysis]
+strict-equality-semantics = true
+```
+
+```py
+class Base: ...
+class Child(Base): ...
+
+def _(x: Base):
+    if type(x) == Child:
+        reveal_type(x)  # revealed: Base
 ```
 
 ## No narrowing for custom `type` callable

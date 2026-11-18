@@ -70,15 +70,16 @@ enum Reason {
 }
 
 /// S103
-pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn bad_file_permissions(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     if !checker.semantic().seen_module(Modules::OS) {
         return;
     }
 
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "chmod"]))
+    if matches!(qualified_name.segments(), ["os", "chmod"])
         && let Some(mode_arg) = call.arguments.find_argument_value("mode", 1)
     {
         let known = parse_mask(mode_arg, checker.semantic());

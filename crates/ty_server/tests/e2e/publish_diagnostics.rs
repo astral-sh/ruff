@@ -968,12 +968,13 @@ mod uv_metadata {
     use lsp_types::Message;
     use lsp_types::{Code, PublishDiagnosticsNotification};
     use ruff_db::system::SystemPath;
-    #[cfg(feature = "test-uv")]
     use ruff_python_trivia::textwrap::dedent;
     use serde_json::json;
     use ty_project::UseUv;
     #[cfg(feature = "test-uv")]
     use ty_project::uv_test_env_vars;
+    #[cfg(feature = "test-uv")]
+    use ty_server::{ClientOptions, DiagnosticMode};
 
     use crate::TestServerBuilder;
 
@@ -985,19 +986,28 @@ mod uv_metadata {
             "
             # /// script
             # dependencies = ['not a valid requirement ???']
+            #
+            # [tool.ty]
+            # project-manager.script = 'uv'
             # ///
+
             value = 1
         ",
         );
         let mut server = TestServerBuilder::new()?
-            .with_workspace(SystemPath::new("src"), None)?
+            .with_workspace(
+                SystemPath::new("src"),
+                Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+            )?
             .with_file(script, &source)?
-            .with_real_uv(UseUv::Scripts)?
+            .with_real_uv()?
+            .enable_work_done_progress(true)
             .enable_diagnostic_related_information(true)
             .enable_pull_diagnostics(false)
             .build()
             .wait_until_workspaces_are_initialized();
 
+        server.assert_work_done_progress("Synchronizing scripts")?;
         server.open_text_document(script, source, 1);
         let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
         let [diagnostic] = diagnostics.diagnostics.as_slice() else {
@@ -1043,7 +1053,8 @@ package = "invalid"
 "#
                 ),
             )?
-            .with_real_uv(UseUv::On)?
+            .with_real_uv()?
+            .with_env_var("TY_UV", "1")
             .enable_work_done_progress(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -1087,11 +1098,18 @@ package = "invalid"
     fn untrusted_workspace_keeps_semantic_diagnostics() -> Result<()> {
         let workspace_root = SystemPath::new("src");
         let script = SystemPath::new("src/script.py");
-        let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+        let source = dedent(
+            "
+            # /// script
+            # dependencies = []
+            # ///
+            missing
+            ",
+        );
 
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
-            .with_file(script, source)?
+            .with_file(script, &source)?
             .with_raw_initialization_options(json!({"untrustedWorkspace": true}))
             .with_use_uv(UseUv::On)
             .with_env_var("TY_UV", "true")
@@ -1118,21 +1136,44 @@ package = "invalid"
     }
 
     #[test]
-    fn pushed_diagnostics_wait_for_the_initial_environment() -> Result<()> {
+    fn pushes_empty_diagnostics_while_the_initial_environment_is_pending() -> Result<()> {
         let workspace_root = SystemPath::new("src");
         let script = SystemPath::new("src/script.py");
-        let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+        let source = dedent(
+            "
+            # /// script
+            # dependencies = []
+            #
+            # [tool.ty]
+            # project-manager.script = 'uv'
+            # ///
+
+            missing
+            ",
+        );
 
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
-            .with_file(script, source)?
-            .with_use_uv(UseUv::Scripts)
+            .with_file(script, &source)?
+            // Exclude the script from discovery so `didOpen` starts its first sync.
+            // `didOpen` publishes before the main loop can apply the sync result.
+            .with_file(
+                "src/ty.toml",
+                r"
+                [src]
+                exclude-scripts = true
+                ",
+            )?
             .with_env_var("UV", "missing-ty-script-uv-executable")
             .enable_pull_diagnostics(false)
             .build()
             .wait_until_workspaces_are_initialized();
 
         server.open_text_document(script, source, 1);
+
+        let pending = server.await_notification::<PublishDiagnosticsNotification>();
+        assert_eq!(pending.uri, server.file_uri(script));
+        assert!(pending.diagnostics.is_empty());
 
         let synchronized = server.await_notification::<PublishDiagnosticsNotification>();
         assert!(synchronized.diagnostics.iter().any(|diagnostic| {

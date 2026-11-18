@@ -52,7 +52,15 @@ pub(crate) fn undefined_local(checker: &Checker, scope_id: ScopeId, scope: &Scop
     if scope.kind.is_function() {
         for (name, binding_id) in scope.bindings() {
             // If the variable shadows a binding in a parent scope...
-            if let Some(shadowed_id) = checker.semantic().shadowed_binding(binding_id) {
+            //
+            // Only the first binding of a name in this scope is linked to the binding that it
+            // shadows in a parent scope. Later bindings shadow the earlier bindings in this scope
+            // instead. For example, in `print(x); x = 1; x = 2`, `x = 2` shadows `x = 1`, and only
+            // `x = 1` shadows the global `x`, so walk back through the bindings in this scope.
+            if let Some(shadowed_id) = scope
+                .shadowed_bindings(binding_id)
+                .find_map(|binding_id| checker.semantic().shadowed_binding(binding_id))
+            {
                 let shadowed = checker.semantic().binding(shadowed_id);
                 // And that binding was referenced in the current scope...
                 if let Some(range) = shadowed.references().find_map(|reference_id| {

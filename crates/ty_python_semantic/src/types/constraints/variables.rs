@@ -15,35 +15,64 @@ use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
 use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
 use crate::{Db, ProgramEnvironment};
 
-/// The _provenance_ of a BDD constraint.
-///
-/// Most bounds come from specific relationships found at the call site — for instance, the
-/// relationship between the argument type and parameter annotation when invoking a generic
-/// function. These bounds express actual user intent, and are called _evidence_ bounds.
-///
-/// Other bounds are background limitations on which specializations are valid — for instance, a
-/// typevar's declared `bound_or_constraints`. These are called _validity_ bounds. Importantly, we
-/// don't want to choose a validity bound as a solution unless we have no other choice. There is
-/// often an evidence bound that is a better choice.
-///
-/// When we derive a new constraint from both an evidence constraint and a validity constraint, we
-/// produce a _mixed_ constraint. Sometimes we will need to treat that derived constraint the same
-/// as a validity constraint; other times we will need to treat it like an evidence constraint.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum ConstraintProvenance {
-    Validity,
-    Mixed,
-    Evidence,
+/// The solver policy for handling unspecialized type variables as inference evidence.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::SalsaValue)]
+pub(super) enum UnspecializedTypeVarPolicy {
+    Retain,
+    Ignore,
 }
+
+impl UnspecializedTypeVarPolicy {
+    fn should_retain_constraint<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound: Option<Type<'db>>,
+    ) -> bool {
+        match self {
+            UnspecializedTypeVarPolicy::Retain => true,
+            UnspecializedTypeVarPolicy::Ignore => {
+                bound.is_none_or(|bound| !bound.has_unspecialized_type_var(db, env))
+            }
+        }
+    }
+}
+
+bitflags::bitflags! {
+    /// The _provenance_ of a BDD constraint.
+    ///
+    /// Most bounds come from specific relationships found at the call site. For example, the
+    /// relationship between the argument type and parameter annotation when invoking a generic
+    /// function is an _inferred_ bound. On the other hand, the relationship between the return type
+    /// of the function and the declared type of the call expression is a _declared_ bound. Both
+    /// inferred and declared bounds are types of _evidence_ bounds, as they express actual
+    /// user intent, although the solver may prefer one source of evidence over another based on
+    /// heuristics.
+    ///
+    /// Other bounds are background limitations on which specializations are valid, such as a
+    /// typevar's declared `bound_or_constraints`. These are called _validity_ bounds. Importantly, we
+    /// don't want to choose a validity bound as a solution unless we have no other choice, as there is
+    /// often an evidence bound that is a better choice.
+    ///
+    /// Derived constraints retain the union of their inputs' provenance.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::SalsaValue)]
+    pub(crate) struct ConstraintProvenance: u8 {
+        const INFERRED = 1 << 0;
+        const DECLARED = 1 << 1;
+        const VALIDITY = 1 << 2;
+    }
+}
+
+impl get_size2::GetSize for ConstraintProvenance {}
 
 impl ConstraintProvenance {
     /// Returns the provenance of a constraint derived from two existing constraints.
     pub(super) const fn derived(left: Self, right: Self) -> Self {
-        match (left, right) {
-            (Self::Evidence, Self::Evidence) => Self::Evidence,
-            (Self::Validity, Self::Validity) => Self::Validity,
-            _ => Self::Mixed,
-        }
+        left.union(right)
+    }
+
+    pub(super) const fn is_evidence(self) -> bool {
+        self.intersects(Self::INFERRED.union(Self::DECLARED))
     }
 
     /// Returns the provenance of a bound produced by simplifying two existing bounds.
@@ -447,6 +476,38 @@ impl<'db> AtomicConstraint<'db> {
         }
     }
 
+    /// Whether this constraint provides useful inference evidence.
+    pub(super) fn provides_candidate_evidence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound: Option<Type<'db>>,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
+    ) -> bool {
+        // Validity bounds are never used as inference evidence.
+        if self.provenance().contains(ConstraintProvenance::VALIDITY) {
+            return false;
+        }
+
+        unspecialized_type_var_policy.should_retain_constraint(db, env, bound)
+    }
+
+    /// Whether this constraint provides a useful bound to the solver.
+    pub(super) fn provides_candidate_bound(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound: Option<Type<'db>>,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
+    ) -> bool {
+        // Validity constraints are retained even if they contain unspecialized type variables.
+        if self.provenance().contains(ConstraintProvenance::VALIDITY) {
+            return true;
+        }
+
+        unspecialized_type_var_policy.should_retain_constraint(db, env, bound)
+    }
+
     pub(super) fn with_provenance(mut self, provenance: ConstraintProvenance) -> Self {
         match &mut self {
             AtomicConstraint::ConcreteLower(this) => this.provenance = provenance,
@@ -458,15 +519,36 @@ impl<'db> AtomicConstraint<'db> {
         self
     }
 
-    pub(super) fn is_reflexive_typevar_relation(self, db: &'db dyn Db) -> bool {
+    /// Detect self-relations that hold for every specialization, such as `T & X ≤ T` or
+    /// `T ≤ T | X`. Propagation can introduce these even though the constraint constructors
+    /// discard them. Retaining them as inference evidence can produce a self-referential solution.
+    pub(super) fn is_trivial_self_relation(self, db: &'db dyn Db) -> bool {
+        let is_same_typevar = |typevar: BoundTypeVarInstance<'db>, bound: Type<'db>| {
+            bound
+                .as_typevar()
+                .is_some_and(|bound| typevar.is_same_typevar_as(db, bound))
+        };
         match self {
             AtomicConstraint::TypeVarRange(this) => this.left.is_same_typevar_as(db, this.right),
             AtomicConstraint::TypeVarEquivalence(this) => {
                 this.left.is_same_typevar_as(db, this.right)
             }
-            AtomicConstraint::ConcreteLower(_)
-            | AtomicConstraint::ConcreteUpper(_)
-            | AtomicConstraint::ConcreteEquivalence(_) => false,
+            AtomicConstraint::ConcreteLower(this) => match this.bound {
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .any(|element| is_same_typevar(this.typevar, element)),
+                bound => is_same_typevar(this.typevar, bound),
+            },
+            AtomicConstraint::ConcreteUpper(this) => match this.bound {
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .any(|element| is_same_typevar(this.typevar, *element)),
+                bound => is_same_typevar(this.typevar, bound),
+            },
+            AtomicConstraint::ConcreteEquivalence(this) => {
+                is_same_typevar(this.typevar, this.bound)
+            }
         }
     }
 

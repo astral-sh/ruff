@@ -36,13 +36,13 @@ However, when we create an instance of this dataclass, the `db` attribute is not
 db = Database()
 alice = Person(db, "Alice", 30)
 
-alice.db  # error: [unresolved-attribute]
+alice.db  # error: [missing-attribute]
 ```
 
 The `db` attribute is also not accessible on the class itself:
 
 ```py
-Person.db  # error: [unresolved-attribute]
+Person.db  # error: [missing-attribute]
 ```
 
 Other fields can still be accessed normally:
@@ -166,7 +166,7 @@ class AlsoWrong:
 # revealed: (self: AlsoWrong, x: Unknown) -> None
 reveal_type(AlsoWrong.__init__)
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(AlsoWrong(42).x)  # revealed: Unknown
 ```
 

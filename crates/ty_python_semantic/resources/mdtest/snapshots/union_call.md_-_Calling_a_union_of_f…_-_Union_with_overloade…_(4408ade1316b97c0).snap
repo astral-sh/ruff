@@ -15,14 +15,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.m
 ```
 1 | def _(x: bytes | str | int):
 2 |     # error: [invalid-argument-type]
-3 |     # error: [unresolved-attribute]
+3 |     # error: [missing-union-attribute]
 4 |     x.split(" ")
 ```
 
 # Diagnostics
 
 ```
-error[unresolved-attribute]: Attribute `split` is not defined on `int` in union `bytes | str | int`
+error[missing-union-attribute]: Attribute `split` is not defined on `int` in union `bytes | str | int`
  --> src/mdtest_snippet.py:4:5
   |
 4 |     x.split(" ")

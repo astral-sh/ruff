@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
     Arguments, CmpOp, Expr, ExprAttribute, ExprBytesLiteral, ExprCall, ExprCompare, ExprContext,
     ExprStringLiteral, ExprUnaryOp, Identifier, UnaryOp,
@@ -79,17 +80,17 @@ const METACHARACTERS: [char; 12] = ['.', '^', '$', '*', '+', '?', '{', '[', '\\'
 const ESCAPABLE_SINGLE_CHARACTERS: &str = "abfnrtv";
 
 /// RUF055
-pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall) {
+pub(crate) fn unnecessary_regular_expression(
+    checker: &Checker,
+    call: &ExprCall,
+    qualified_name: &QualifiedName,
+) {
     // adapted from unraw_re_pattern
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::RE) {
         return;
     }
-
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
-        return;
-    };
 
     let ["re", func] = qualified_name.segments() else {
         return;

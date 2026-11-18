@@ -104,6 +104,7 @@ export default function SourceEditor({
 
   return (
     <MonacoEditor
+      className="monaco-component"
       onMount={handleMount}
       options={{
         fixedOverflowWidgets: true,

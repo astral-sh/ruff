@@ -14,7 +14,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::message::{EmitterContext, render_diagnostics};
+use ruff_linter::message::{RenderContext, render_diagnostics};
 use ruff_linter::notify_user;
 use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::settings::flags::{self};
@@ -239,7 +239,7 @@ impl Printer {
             return Ok(());
         }
 
-        let context = EmitterContext::new(&diagnostics.notebook_indexes);
+        let context = RenderContext::new(&diagnostics.notebook_indexes);
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
         let config = DisplayDiagnosticConfig::new("ruff")
@@ -250,7 +250,7 @@ impl Printer {
             .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
             .with_fix_applicability(self.unsafe_fixes.required_applicability());
 
-        render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
+        render_diagnostics(writer, self.format, &config, &context, &diagnostics.inner)?;
 
         if matches!(
             self.format,
@@ -351,10 +351,7 @@ impl Printer {
 
                 // By default, we mimic Flake8's `--statistics` format.
                 for statistic in &statistics {
-                    let code = statistic
-                        .code
-                        .map(SecondaryCode::as_str)
-                        .unwrap_or_default();
+                    let code = statistic.code.map_or_default(SecondaryCode::as_str);
                     let padding_width = code_width - code.len();
 
                     writeln!(
@@ -427,7 +424,7 @@ impl Printer {
                 writeln!(writer)?;
             }
 
-            let context = EmitterContext::new(&diagnostics.notebook_indexes);
+            let context = RenderContext::new(&diagnostics.notebook_indexes);
             let config = DisplayDiagnosticConfig::new("ruff")
                 .preview(preview.is_enabled())
                 .prefer_rule_codes(prefer_rule_codes)
@@ -435,7 +432,7 @@ impl Printer {
                 .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_fix_applicability(self.unsafe_fixes.required_applicability());
-            render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
+            render_diagnostics(writer, self.format, &config, &context, &diagnostics.inner)?;
         }
         writer.flush()?;
 

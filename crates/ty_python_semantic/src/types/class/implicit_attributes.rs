@@ -1,12 +1,16 @@
 //! Implicit instance and class attributes inferred from method assignments.
 
+use std::{convert::Infallible, ops::ControlFlow, sync::Arc};
+
 use super::{MethodDecorator, static_literal::StaticClassLiteral};
 use crate::{
     Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
     place::{Place, Provenance},
     reachability::binding_reachability,
     types::{
-        KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
+        KnownClass, Truthiness, Type, TypeContext, UnionBuilder,
+        annotation_target::is_final_attribute_initializer,
+        definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
         infer::infer_unpack_types,
         infer_expression_type, inferred_declaration,
@@ -19,26 +23,12 @@ use ty_python_core::{
     attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
-    scope::{Scope, ScopeId},
+    scope::ScopeId,
     semantic_index, use_def_map,
 };
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
-    /// Tries to find declarations/bindings of an attribute named `name` that are only
-    /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of this class.
-    /// The `target_method_decorator` parameter is used to skip methods that do not have the
-    /// expected decorator.
-    pub(super) fn implicit_attribute(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        target_method_decorator: MethodDecorator,
-    ) -> Member<'db> {
-        self.implicit_attribute_bindings(db, name, target_method_decorator)
-            .member
-    }
-
     /// Separate assignments that establish an attribute from assignments that must first read it.
     ///
     /// ```python
@@ -55,27 +45,35 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
-        let class_body_scope = self.body_scope(db);
-        // Collect names in a tracked query so unrelated edits can preserve dependent member
-        // lookups, and avoid retaining query entries for names that no method can define.
-        let names = implicit_attribute_names(db, class_body_scope);
-        let Ok(name_index) = names.binary_search_by(|candidate| candidate.as_str().cmp(name))
-        else {
-            return ImplicitAttribute {
-                member: Member::unbound(),
-                augmented_bindings: None,
-            };
-        };
+        self.member_sources(db)
+            .implicit_attribute_name(db, name, target_method_decorator, false)
+            .map_or_else(
+                || ImplicitAttribute {
+                    member: Member::unbound(),
+                    augmented_bindings: None,
+                },
+                |attribute| Self::implicit_attribute_inner(db, attribute),
+            )
+    }
 
-        Self::implicit_attribute_inner(
-            db,
-            ImplicitAttributeName::new(
-                db,
-                class_body_scope,
-                &names[name_index],
-                target_method_decorator,
-            ),
-        )
+    /// Names assigned to a method's receiver, in sorted order.
+    pub(in crate::types) fn implicit_attribute_definition_names(
+        self,
+        db: &'db dyn Db,
+    ) -> &'db [Name] {
+        &self.member_sources(db).implicit_names
+    }
+
+    /// The class-body table and receiver assignments used by lookups on this class.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    pub(super) fn member_sources(self, db: &'db dyn Db) -> ClassMemberSources<'db> {
+        let scope = self.body_scope(db);
+        let index = semantic_index(db, scope.program_file(db));
+        ClassMemberSources {
+            scope,
+            table: index.shared_place_table(scope.file_scope_id(db)),
+            implicit_names: collect_implicit_attribute_names(db, scope, true),
+        }
     }
 
     #[salsa::tracked(
@@ -93,13 +91,31 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
     ) -> ImplicitAttribute<'db> {
-        Self::implicit_attribute_impl(db, attribute)
+        let ControlFlow::Continue(result) =
+            Self::implicit_attribute_impl(db, attribute, |binding| {
+                ControlFlow::<Infallible, _>::Continue(implicit_attribute_binding_type(db, binding))
+            });
+        result
     }
 
-    fn implicit_attribute_impl(
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+    fn has_implicit_attribute_inner(
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
-    ) -> ImplicitAttribute<'db> {
+    ) -> bool {
+        match Self::implicit_attribute_impl(db, attribute, |_| ControlFlow::Break(())) {
+            ControlFlow::Break(()) => true,
+            ControlFlow::Continue(result) => !result.member.is_undefined(),
+        }
+    }
+
+    /// An ordinary reachable assignment establishes the attribute even when its value's type
+    /// is unknown. Callers that only need presence can stop before inferring that value.
+    fn implicit_attribute_impl<B>(
+        db: &'db dyn Db,
+        attribute: ImplicitAttributeName<'db>,
+        mut binding_type: impl FnMut(Definition<'db>) -> ControlFlow<B, Option<Type<'db>>>,
+    ) -> ControlFlow<B, ImplicitAttribute<'db>> {
         let class_body_scope = attribute.class_body_scope(db);
         let name = attribute.name(db).as_str();
         let target_method_decorator = attribute.target_method_decorator(db);
@@ -121,8 +137,22 @@ impl<'db> StaticClassLiteral<'db> {
         let index = semantic_index(db, program_file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
-        let is_valid_scope = |method_scope: &Scope| {
-            let Some(method_def) = method_scope.node().as_function() else {
+        // Receiver assignments can also occur in eager scopes inside the method, such as
+        // comprehensions. A nested function or lambda is a separate execution scope.
+        let enclosing_method = |scope_id| {
+            index
+                .ancestor_scopes(scope_id)
+                .find(|(_, scope)| !scope.is_eager())
+                .and_then(|(_, scope)| scope.node().as_function())
+        };
+        let initializer_only = attribute.initializer_only(db);
+        let is_valid_scope = |method_scope_id| {
+            let method_def = if initializer_only {
+                enclosing_method(method_scope_id)
+            } else {
+                index.scope(method_scope_id).node().as_function()
+            };
+            let Some(method_def) = method_def else {
                 return true;
             };
 
@@ -130,6 +160,9 @@ impl<'db> StaticClassLiteral<'db> {
             // is a classmethod or staticmethod. This is more reliable than checking the
             // final evaluated type, which may be wrapped by other decorators like @cache.
             let function_node = method_def.node(&module);
+            if initializer_only && !is_final_attribute_initializer(db, index, function_node) {
+                return false;
+            }
             let definition = index.expect_single_definition(method_def);
 
             let mut is_classmethod = false;
@@ -167,8 +200,7 @@ impl<'db> StaticClassLiteral<'db> {
         for (attribute_declarations, method_scope_id) in
             attribute_declarations(db, class_body_scope, name)
         {
-            let method_scope = index.scope(method_scope_id);
-            if !is_valid_scope(method_scope) {
+            if !is_valid_scope(method_scope_id) {
                 continue;
             }
 
@@ -191,95 +223,63 @@ impl<'db> StaticClassLiteral<'db> {
                 let Some(annotation) = inferred_declaration(db, declaration).declared() else {
                     continue;
                 };
-                let annotation = Place::declared(annotation.inner)
-                    .with_definition(declaration)
-                    .with_qualifiers(
-                        annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
-                    );
+                let all_qualifiers =
+                    annotation.qualifiers() | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
-                if let Some(all_qualifiers) = annotation.is_bare_final() {
-                    if let Some(value) = assignment.value(&module) {
-                        // If we see an annotated assignment with a bare `Final` as in
-                        // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
-                        // on the right-hand side.
-
-                        let inferred_ty = infer_expression_type(
-                            db,
-                            index.expression(value),
-                            TypeContext::default(),
-                        );
-                        return ImplicitAttribute {
-                            member: Member {
-                                inner: Place::bound(inferred_ty)
-                                    .with_definition(declaration)
-                                    .with_qualifiers(all_qualifiers),
-                            },
-                            augmented_bindings: None,
-                        };
-                    }
-
-                    // If there is no right-hand side, just record that we saw a `Final` qualifier
-                    qualifiers |= all_qualifiers;
-                    continue;
-                }
-
-                return ImplicitAttribute {
-                    member: Member { inner: annotation },
-                    augmented_bindings: None,
+                let place = if annotation.is_bare_final() {
+                    let Some(value) = assignment.value(&module) else {
+                        // A separate assignment supplies the type for this final attribute.
+                        qualifiers |= all_qualifiers;
+                        continue;
+                    };
+                    // In `self.SOME_CONSTANT: Final = 1`, infer the type from the right-hand side.
+                    Place::bound(infer_expression_type(
+                        db,
+                        index.expression(value),
+                        TypeContext::default(),
+                    ))
+                } else {
+                    Place::declared(annotation.inner_type_or_unknown())
                 };
+
+                return ControlFlow::Continue(ImplicitAttribute {
+                    member: Member {
+                        inner: place
+                            .with_definition(declaration)
+                            .with_qualifiers(all_qualifiers),
+                    },
+                    augmented_bindings: None,
+                });
             }
         }
 
         for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, name)
         {
-            let binding_scope = index.scope(attribute_binding_scope_id);
-            if !is_valid_scope(binding_scope) {
+            if !is_valid_scope(attribute_binding_scope_id) {
                 continue;
             }
 
-            let scope_for_reachability_analysis = {
-                if binding_scope.node().as_function().is_some() {
-                    binding_scope
-                } else if binding_scope.is_eager() {
-                    let mut eager_scope_parent = binding_scope;
-                    while eager_scope_parent.is_eager()
-                        && let Some(parent) = eager_scope_parent.parent()
-                    {
-                        eager_scope_parent = index.scope(parent);
-                    }
-                    eager_scope_parent
-                } else {
-                    binding_scope
-                }
-            };
-
             // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable =
-                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
-                    let method = index.expect_single_definition(method_def);
-                    let method_place = class_table
-                        .symbol_id(&method_def.node(&module).name)
-                        .unwrap();
-                    class_map
-                        .reachable_symbol_bindings(method_place)
-                        .find_map(|bind| {
-                            (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| binding_reachability(db, class_map, &bind))
-                        })
-                        .unwrap_or(Truthiness::AlwaysFalse)
-                } else {
-                    Truthiness::AlwaysFalse
-                };
+            let Some(method_def) = enclosing_method(attribute_binding_scope_id) else {
+                continue;
+            };
+            let Some(method_place) = class_table.symbol_id(&method_def.node(&module).name) else {
+                continue;
+            };
+            let method = index.expect_single_definition(method_def);
+            let is_method_reachable = class_map
+                .reachable_symbol_bindings(method_place)
+                .find_map(|bind| {
+                    (bind.binding.is_defined_and(|def| def == method))
+                        .then(|| binding_reachability(db, class_map, &bind))
+                })
+                .unwrap_or(Truthiness::AlwaysFalse);
             if is_method_reachable.is_always_false() {
                 continue;
             }
 
             for attribute_assignment in attribute_assignments {
-                if let DefinitionState::Undefined = attribute_assignment.binding {
-                    continue;
-                }
-
                 let DefinitionState::Defined(binding) = attribute_assignment.binding else {
                     continue;
                 };
@@ -289,11 +289,9 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 }
 
-                if !is_method_reachable.is_always_false() {
-                    is_attribute_bound = true;
-                }
+                is_attribute_bound = true;
 
-                let inferred_ty = implicit_attribute_binding_type(db, binding);
+                let inferred_ty = binding_type(binding)?;
 
                 if let Some(inferred_ty) = inferred_ty {
                     provenance = provenance.or(Provenance::SingleDefinition(binding));
@@ -317,11 +315,11 @@ impl<'db> StaticClassLiteral<'db> {
             Member::unbound()
         };
 
-        ImplicitAttribute {
+        ControlFlow::Continue(ImplicitAttribute {
             member,
             augmented_bindings: (!augmented_bindings.is_empty())
                 .then(|| AugmentedBindings::new(db, augmented_bindings.into_boxed_slice())),
-        }
+        })
     }
 }
 
@@ -356,6 +354,8 @@ struct ImplicitAttributeName<'db> {
     name: Name,
     #[returns(copy)]
     target_method_decorator: MethodDecorator,
+    #[returns(copy)]
+    initializer_only: bool,
 }
 
 // The Salsa heap is tracked separately.
@@ -463,16 +463,90 @@ pub(super) fn implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {
+    collect_implicit_attribute_names(db, class_body_scope, false)
+}
+
+/// Syntax-derived sources for an explicit class member or an implicit receiver attribute.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ClassMemberSources<'db> {
+    pub(super) scope: ScopeId<'db>,
+    pub(super) table: Arc<ty_python_core::place::PlaceTable>,
+    implicit_names: Box<[Name]>,
+}
+
+impl<'db> ClassMemberSources<'db> {
+    fn implicit_attribute_name(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+        decorator: MethodDecorator,
+        initializer_only: bool,
+    ) -> Option<ImplicitAttributeName<'db>> {
+        let index = self
+            .implicit_names
+            .binary_search_by(|candidate| candidate.as_str().cmp(name))
+            .ok()?;
+        Some(ImplicitAttributeName::new(
+            db,
+            self.scope,
+            &self.implicit_names[index],
+            decorator,
+            initializer_only,
+        ))
+    }
+
+    /// Does a method establish instance storage for an attribute already typed by the class?
+    pub(super) fn has_implicit_instance_attribute(&self, db: &'db dyn Db, name: &str) -> bool {
+        self.implicit_attribute_name(db, name, MethodDecorator::None, false)
+            .is_some_and(|attribute| {
+                StaticClassLiteral::has_implicit_attribute_inner(db, attribute)
+            })
+    }
+
+    /// Tries to find declarations/bindings of an attribute named `name` that are only
+    /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of this class.
+    /// The `target_method_decorator` parameter is used to skip methods that do not have the
+    /// expected decorator.
+    pub(super) fn implicit_attribute(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+        decorator: MethodDecorator,
+    ) -> Member<'db> {
+        self.implicit_attribute_name(db, name, decorator, false)
+            .map_or_else(Member::unbound, |attribute| {
+                StaticClassLiteral::implicit_attribute_inner(db, attribute).member
+            })
+    }
+
+    /// Writes outside the initializer cannot establish the type of a class-body `Final`.
+    pub(super) fn final_initializer(&self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        self.implicit_attribute_name(db, name, MethodDecorator::None, true)
+            .map_or_else(Member::unbound, |attribute| {
+                StaticClassLiteral::implicit_attribute_inner(db, attribute).member
+            })
+    }
+}
+
+fn collect_implicit_attribute_names<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    defined_only: bool,
+) -> Box<[Name]> {
     let index = semantic_index(db, class_body_scope.program_file(db));
     let mut names = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {
-        names.extend(
-            index
-                .place_table(function_scope_id)
-                .members()
-                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-        );
+        let table = index.place_table(function_scope_id);
+        if defined_only {
+            names.extend(table.defined_instance_attribute_names().map(Name::new));
+        } else {
+            names.extend(
+                table
+                    .members()
+                    .filter_map(|member| member.as_instance_attribute().map(Name::new)),
+            );
+        }
     }
 
     names.sort_unstable();
