@@ -34,6 +34,15 @@
     {
       "caller": "ruff",
       "environment": "automations",
+      "caller_ref": "refs/heads/main",
+      "caller_workflow": "pull-request-labels-and-title.yml",
+      "on": ["workflow_dispatch"],
+      "permissions": { "pull_requests": "write" },
+      "target": "ruff"
+    },
+    {
+      "caller": "ruff",
+      "environment": "automations",
       "caller_ref": "refs/pull/*/merge",
       "caller_workflow": "ty-ecosystem-analyzer.yaml",
       "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@refs/heads/main",
@@ -100,7 +109,7 @@
       "environment": "automations",
       "caller_ref": "refs/pull/*/merge",
       "caller_workflow": "ci.yaml",
-      "reusable_workflow": "astral-sh/github-actions/.github/workflows/pull-request-security-review.yml@f11dbff15181b71f2cc5e8487b1ac7d7bb03ea7d",
+      "reusable_workflow": "astral-sh/github-actions/.github/workflows/pull-request-security-review.yml@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889",
       "on": ["pull_request"],
       "permissions": { "pull_requests": "write" },
       "target": "ruff"

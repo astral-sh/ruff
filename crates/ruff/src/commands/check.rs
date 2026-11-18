@@ -9,11 +9,10 @@ use ignore::Error;
 use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff_linter::message::create_panic_diagnostic;
+use ruff_linter::message::{RenderContext, create_panic_diagnostic};
 use ruff_python_ast::{SourceType, TomlSourceType};
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::Diagnostic;
 use ruff_db::panic::catch_unwind;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
@@ -177,9 +176,11 @@ pub(crate) fn check(
             |a, b| (a.0 + b.0, a.1 + b.1),
         );
 
-    all_diagnostics
-        .inner
-        .sort_by(Diagnostic::ruff_start_ordering);
+    let context = RenderContext::new(&all_diagnostics.notebook_indexes);
+    all_diagnostics.inner.sort_by(|a, b| {
+        a.rendering_sort_key(&context)
+            .cmp(&b.rendering_sort_key(&context))
+    });
 
     // Store the caches.
     caches.persist()?;

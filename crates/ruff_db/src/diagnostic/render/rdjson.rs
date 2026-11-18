@@ -81,7 +81,7 @@ fn diagnostic_to_rdjson<'a>(
         RdjsonLocation { path, range }
     });
 
-    let edits = diagnostic.fix().map(Fix::edits).unwrap_or_default();
+    let edits = diagnostic.fix().map_or_default(Fix::edits);
 
     RdjsonDiagnostic {
         message: diagnostic.concise_message(),

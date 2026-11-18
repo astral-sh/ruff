@@ -11,9 +11,11 @@ use crate::checkers::ast::LintContext;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::{FixTable, MAX_ITERATIONS, report_failed_to_converge_error};
 use crate::registry::Rule;
-use crate::rules::ruff::rules::{invalid_pyproject_toml, rule_codes_in_selectors};
+use crate::rules::ruff::rules::invalid_pyproject_toml;
 use crate::settings::LinterSettings;
 use crate::settings::types::UnsafeFixes;
+
+mod rule_selectors;
 
 pub struct TomlFixerResult<'a> {
     pub diagnostics: Vec<Diagnostic>,
@@ -31,10 +33,10 @@ pub fn lint_toml(
 
     let document = DeTable::parse(contents);
 
-    if context.is_rule_enabled(Rule::RuleCodesInSelectors)
+    if context.any_rule_enabled(&[Rule::RuleCodesInSelectors, Rule::RenamedRule])
         && let Ok(document) = &document
     {
-        rule_codes_in_selectors(&context, document.get_ref(), source_type);
+        rule_selectors::check_rule_selectors(&context, document.get_ref(), source_type);
     }
 
     if source_type.is_pyproject() && context.is_rule_enabled(Rule::InvalidPyprojectToml) {

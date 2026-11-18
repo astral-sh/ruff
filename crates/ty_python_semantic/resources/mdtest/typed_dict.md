@@ -931,10 +931,10 @@ def return_unpack(src: TD) -> TD:
     return dict(**src)
 
 def return_invalid_literal() -> TD:
-    # TODO: ideally, this would only emit the first error, but not `invalid-return-type` (like the
-    # `return_invalid_dict` case below).
+    # TODO: ideally, this would only emit the first error, but not `invalid-explicit-return` (like
+    # the `return_invalid_dict` case below).
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return {}
 
 def return_invalid_dict() -> TD:
@@ -1023,6 +1023,11 @@ class Bar(TypedDict):
 x2: Foo | Bar = {"foo": 1}
 reveal_type(x2)  # revealed: Foo
 
+# The literal matches `Foo`, but its value expression still has an error.
+def _(text: str) -> Foo | Bar:
+    # error: [too-many-positional-arguments] "Too many positional arguments to function `len`"
+    return {"foo": len(text, text)}
+
 x3: Foo | Bar = {"bar": 1}
 reveal_type(x3)  # revealed: Bar
 
@@ -1048,6 +1053,14 @@ class FooBar3(TypedDict):
     foo: int
     bar: int
     baz: NotRequired[int]
+
+# Both unpacks contribute different keys; the first candidate rejects the second key.
+def _(left: Foo, right: Bar):
+    merged: Foo | FooBar1 = {**left, **right}
+    reveal_type(merged)  # revealed: FooBar1
+
+    # error: [invalid-assignment]
+    neither: Foo | Bar = {**left, **right}
 
 x6: FooBar1 | FooBar2 = {"foo": 1, "bar": 1}
 reveal_type(x6)  # revealed: FooBar1 | FooBar2
@@ -2157,10 +2170,11 @@ def b_from_c(c: C) -> B:
     return c  # allowed
 
 def a_from_b(b: B) -> A:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `A`, found `B`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `A`, found `B`"
     return b
 
-# The [invalid-return-type] error above is the only thing that keeps us from corrupting the type of c['y'].
+# The [invalid-explicit-return] error above is the only thing that keeps us from corrupting the
+# type of c['y'].
 c: C = {"x": 1, "y": "hello"}
 a: A = a_from_b(b_from_c(c))
 a["y"] = 42
@@ -2185,7 +2199,7 @@ class A3(TypedDict):
     y: NotRequired[ReadOnly[int]]  # not assignable from `object`
 
 def a3_from_b(b: B) -> A3:
-    return b  # error: [invalid-return-type]
+    return b  # error: [invalid-explicit-return]
 ```
 
 ## Structural assignability supports `TypedDict`s that contain other `TypedDict`s
@@ -3183,7 +3197,7 @@ def _(v: OptionalX | RequiredX) -> None:
     # TODO: it's correct that we emit an error,
     # but this is a terrible error message:
     #
-    # error: [call-non-callable] "Object of type `Overload[]` is not callable"
+    # error: [not-callable] "Object of type `Overload[]` is not callable"
     reveal_type(v.pop("x"))  # revealed: int | Unknown
 
 def union_pop_with_default(u: OptionalX | OptStrX) -> None:
@@ -9529,7 +9543,7 @@ def as_mapping(value: Recursive) -> Mapping[str, object]:
     return value
 
 def as_dict(value: Recursive) -> dict[str, bool]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-explicit-return]
 
 def update(value: Recursive) -> None:
     value.update({"child": value})

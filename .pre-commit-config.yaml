@@ -38,7 +38,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: 00f422f3b19c57bc6338715ebfe3316d38768461 # frozen: v1.50.3
+    rev: 7f9d0819ca1c008ade73f4b41fa9d258d48f605b # frozen: v1.51.1
     hooks:
       - id: typos
         priority: 0
@@ -53,7 +53,7 @@ repos:
         priority: 0
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: ef4a397f916211b4a39ccf9d3d9cbb6562157251 # frozen: v3.9.9
+    rev: 331f33fa4dfbcbca7c3da3620c137fde0faab273 # frozen: v3.9.10
     hooks:
       - id: prettier
         types: [yaml]
@@ -62,7 +62,7 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: fa412071e4f5d44d44f9e365f4676f9df92456a2 # frozen: v1.30.1
+    rev: c92afdf2c6ca336aaa8f39e2bd8d48f62dbd8e1f # frozen: v1.31.1
     hooks:
       - id: zizmor
         priority: 0
@@ -117,14 +117,14 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: d1df990f871e616da38bb602a2671d5e840b9989 # frozen: 0.13.7
+    rev: 00eaed0068329eb6ca6bcb8de7b46c372d8d1c19 # frozen: 0.13.9
     hooks:
       - id: uv-lock
         priority: 0
         args: [--default-index=https://pypi.org/simple, --check, --refresh]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 25bcf95026b96e2dd3c0aec3090c3d6ef6ca2e6c # frozen: v0.17.3
+    rev: ef6cf06c079dd6b299dfc720b0f14400c9d168e1 # frozen: v0.17.5
     hooks:
       - id: ruff-format
         types_or: [python, pyi, jupyter]
@@ -133,7 +133,7 @@ repos:
 
   # Priority 1: Second-pass fixers (e.g., markdownlint-fix runs after mdformat).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 25bcf95026b96e2dd3c0aec3090c3d6ef6ca2e6c # frozen: v0.17.3
+    rev: ef6cf06c079dd6b299dfc720b0f14400c9d168e1 # frozen: v0.17.5
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
@@ -156,7 +156,7 @@ repos:
 
   # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 25bcf95026b96e2dd3c0aec3090c3d6ef6ca2e6c # frozen: v0.17.3
+    rev: ef6cf06c079dd6b299dfc720b0f14400c9d168e1 # frozen: v0.17.5
     hooks:
       - id: ruff-format
         name: mdtest format

@@ -453,6 +453,28 @@ def returns_4_but_will_be_replaced():
 reveal_type(returns_4_but_will_be_replaced())  # revealed: Literal["a"]
 ```
 
+## Decorated classes
+
+When the inner decorator's return type is inferred, we still check the original class body. The
+decorated name takes the type returned by the outer decorator.
+
+```py
+from typing import Final
+
+def identity(cls: type):
+    return cls
+
+def replace(cls: type) -> type[bool]:
+    return bool
+
+@replace
+@identity
+class C:
+    value: Final[int]  # error: [final-without-value]
+
+reveal_type(C)  # revealed: <class 'bool'>
+```
+
 ## Methods
 
 ### Overrides
@@ -555,7 +577,7 @@ subclass method returns an incompatible value:
 ```py
 class IncompatibleChild(Parent):
     def method(self):
-        # TODO: This should be an invalid-return-type error.
+        # TODO: This should be an invalid-explicit-return error.
         return "a"
 
 reveal_type(IncompatibleChild().method())  # revealed: int | None

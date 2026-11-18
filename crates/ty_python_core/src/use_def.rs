@@ -874,10 +874,105 @@ pub struct UseDefMap<'db> {
 pub(super) struct UseDefMapInterner {
     bindings: FxHashSet<Arc<RetainedBindings>>,
     declarations: FxHashSet<Arc<RetainedDeclarations>>,
+    stub_layouts: FxHashMap<SmallVec<[bool; 8]>, StubParameterLayout>,
+}
+
+/// Binding and declaration tables for a function whose body contains only `pass` or `...`.
+/// Each distinct parameter binds its symbol once. An annotated parameter also declares it.
+/// These functions share a layout because the tables refer to definitions by scope-local index.
+///
+/// ```python
+/// def first(x: int, y): ...
+/// def second(a: str, b): pass
+/// ```
+struct StubParameterLayout {
+    bindings: Arc<RetainedBindings>,
+    declarations: Arc<RetainedDeclarations>,
+    symbols: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub(super) struct StubParameter<'db> {
+    pub(super) symbol: ScopedSymbolId,
+    pub(super) definition: Definition<'db>,
+    pub(super) annotated: bool,
+}
+
+impl StubParameterLayout {
+    /// Returns the annotation pattern in definition order. A repeated symbol shadows an
+    /// earlier parameter, so the annotation pattern alone cannot describe that scope.
+    fn key(parameters: &[StubParameter<'_>]) -> Option<SmallVec<[bool; 8]>> {
+        let mut key = SmallVec::with_capacity(parameters.len());
+        for (index, parameter) in parameters.iter().enumerate() {
+            if parameter.symbol.index() != index {
+                return None;
+            }
+            key.push(parameter.annotated);
+        }
+        Some(key)
+    }
+
+    /// Pairs the shared tables with the definitions their indices refer to in this function.
+    /// The function also keeps its own reachability information for source ranges.
+    fn instantiate<'db>(
+        &self,
+        parameters: Vec<StubParameter<'db>>,
+        builder: &mut UseDefMapBuilder<'db>,
+    ) -> UseDefMap<'db> {
+        UseDefMap {
+            all_definitions: RetainedDefinitions {
+                states: parameters
+                    .into_iter()
+                    .map(|p| DefinitionEntry::Unused(p.definition))
+                    .collect(),
+            },
+            constraint_tables: None,
+            interned_bindings: Arc::clone(&self.bindings),
+            interned_declarations: Arc::clone(&self.declarations),
+            range_reachability: builder.finish_ranges(),
+            definitions_by_definition: FrozenMap::default(),
+            symbol_states: self.symbols.clone(),
+            extra: None,
+            end_of_scope_reachability: builder.reachability,
+        }
+    }
 }
 
 impl UseDefMapInterner {
-    pub(super) fn intern<'db>(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
+    /// Reuses the layout of an earlier stub in this file when the same parameter positions
+    /// have annotations. The first occurrence and signatures with duplicate names build
+    /// their binding and declaration tables from the individual parameters.
+    pub(super) fn finish<'db>(
+        &mut self,
+        mut builder: Box<UseDefMapBuilder<'db>>,
+    ) -> Arc<UseDefMap<'db>> {
+        let Some(parameters) = builder.stub_parameters.take() else {
+            return self.intern(builder.finish());
+        };
+        let shape = StubParameterLayout::key(&parameters);
+        if let Some(layout) = shape
+            .as_ref()
+            .and_then(|shape| self.stub_layouts.get(shape))
+        {
+            return Arc::new(layout.instantiate(parameters, &mut builder));
+        }
+
+        builder.record_stub_parameters(parameters);
+        let map = self.intern(builder.finish());
+        if let Some(shape) = shape {
+            self.stub_layouts.insert(
+                shape,
+                StubParameterLayout {
+                    bindings: Arc::clone(&map.interned_bindings),
+                    declarations: Arc::clone(&map.interned_declarations),
+                    symbols: map.symbol_states.clone(),
+                },
+            );
+        }
+        map
+    }
+
+    fn intern<'db>(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
         map.interned_bindings = Self::intern_table(&mut self.bindings, map.interned_bindings);
         map.interned_declarations =
             Self::intern_table(&mut self.declarations, map.interned_declarations);
@@ -2088,6 +2183,7 @@ pub(super) struct SingleSymbolSnapshot {
 
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
+    pub(super) stub_parameters: Option<Vec<StubParameter<'db>>>,
     /// Append-only history of declarations and bindings, including their usage state.
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionEntry<'db>>,
 
@@ -2174,6 +2270,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new(scope_kind: ScopeKind) -> Self {
         Self {
+            stub_parameters: None,
             all_definitions: IndexVec::from_iter([DefinitionEntry::Undefined]),
             predicates: PredicatesBuilder::default(),
             predicate_narrowing_targets: Vec::new(),
@@ -3189,7 +3286,47 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.checkpoint_flow, snapshot.checkpoint_flow);
     }
 
+    /// Records deferred stub parameters in definition order so duplicate names retain
+    /// their earlier bindings and declarations during construction.
+    fn record_stub_parameters(&mut self, parameters: Vec<StubParameter<'db>>) {
+        for StubParameter {
+            symbol,
+            definition,
+            annotated,
+        } in parameters
+        {
+            let place = symbol.into();
+            if symbol == self.symbol_states.next_index() {
+                self.add_place(place);
+            }
+            if annotated {
+                self.record_combined_definition(
+                    place,
+                    definition,
+                    DefinitionCategory::DeclarationAndBinding,
+                );
+            } else {
+                self.record_binding(
+                    place,
+                    definition,
+                    PreviousDefinitions::AreShadowed,
+                    FutureDefinitions::ShadowThisOne,
+                    ImportedQualifierAction::Preserve,
+                );
+            }
+        }
+    }
+
+    /// Drops the default ranges that served as barriers between non-contiguous ranges
+    /// with the same reachability while building the map.
+    fn finish_ranges(&mut self) -> Box<[(TextRange, RangeInfo)]> {
+        let mut ranges = std::mem::take(&mut self.range_reachability);
+        ranges.retain(|(_, info)| *info != RangeInfo::default());
+        ranges.into_boxed_slice()
+    }
+
     pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
+        let range_reachability = self.finish_ranges();
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
@@ -3297,12 +3434,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.reachability_constraints,
             );
         }
-        // Keep default entries while building so they remain barriers between non-contiguous
-        // ranges with the same metadata. Once construction is complete, absence represents the
-        // default of reachable code outside a `TYPE_CHECKING` block.
-        self.range_reachability
-            .retain(|(_, info)| *info != RangeInfo::default());
-        for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
+        for &(_, RangeInfo { reachability, .. }) in &range_reachability {
             self.reachability_constraints.mark_used(reachability);
         }
         for enclosing_snapshot in &enclosing_snapshots {
@@ -3356,7 +3488,7 @@ impl<'db> UseDefMapBuilder<'db> {
             constraint_tables,
             interned_bindings: Arc::new(interned_bindings),
             interned_declarations: Arc::new(interned_declarations),
-            range_reachability: self.range_reachability.into_boxed_slice(),
+            range_reachability,
             symbol_states,
             definitions_by_definition,
             extra,

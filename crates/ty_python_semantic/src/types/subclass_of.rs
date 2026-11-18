@@ -273,10 +273,14 @@ impl<'db> SubclassOfType<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        if let SubclassOfInner::Protocol(protocol) = self.subclass_of
-            && let Some(member) = protocol.interface(db).meta_member(db, env, name)
-        {
-            return Some(member);
+        if let SubclassOfInner::Protocol(protocol) = self.subclass_of {
+            let interface = protocol.interface(db);
+            if let Some(member) = interface.meta_member(db, env, name) {
+                return Some(member);
+            }
+            if name == "__hash__" && interface.includes_member(db, "__eq__") {
+                return Some(Type::unspecified_protocol_hash(db, env, policy));
+            }
         }
 
         let class_like = match self.subclass_of.with_transposed_type_var(db, env) {

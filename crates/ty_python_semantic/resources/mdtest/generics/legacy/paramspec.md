@@ -940,7 +940,7 @@ as a wrapper around a callback that accepts no arguments.
 
 ```py
 def erase_parameters(job: Job[P]) -> Job[[]]:
-    return job  # error: [invalid-return-type]
+    return job  # error: [invalid-explicit-return]
 ```
 
 The same restriction applies in the other direction when a class consumes callbacks. A consumer of
@@ -953,7 +953,7 @@ class CallbackConsumer(Generic[P_co]):
     def consume(self, callback: Callable[P_co, None]) -> None: ...
 
 def broaden_parameters(consumer: CallbackConsumer[[]]) -> CallbackConsumer[P_co]:
-    return consumer  # error: [invalid-return-type]
+    return consumer  # error: [invalid-explicit-return]
 ```
 
 ## Inferring an invariant `ParamSpec` through `Concatenate`
@@ -1397,6 +1397,47 @@ wrapped(1)
 wrapped(1, label="label", enabled=True)
 wrapped(1, enabled="yes")  # error: [invalid-argument-type]
 wrapped()  # error: [missing-argument]
+```
+
+### Assignability to a callable with a gradual tail
+
+If the target requires an initial `int`, the callback must accept it before `P`. The caller can
+specialize `P` to an empty parameter list.
+
+```py
+from typing import Callable, Concatenate, ParamSpec
+
+P = ParamSpec("P")
+
+def takes_int(callback: Callable[Concatenate[int, ...], None]) -> None: ...
+def check(
+    bare: Callable[P, None],
+    accepts_int: Callable[Concatenate[int, P], None],
+    accepts_str: Callable[Concatenate[str, P], None],
+) -> None:
+    takes_int(bare)  # error: [invalid-argument-type]
+    takes_int(accepts_int)  # ok
+    takes_int(accepts_str)  # error: [invalid-argument-type]
+```
+
+### Matching overloads by prefix length
+
+Only the second overload applies when the callback guarantees one positional parameter.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, overload
+
+P = ParamSpec("P")
+
+@overload
+def pick(f: Callable[Concatenate[str, str, P], None]) -> str: ...
+@overload
+def pick(f: Callable[Concatenate[str, P], None]) -> None: ...
+def pick(f):
+    raise NotImplementedError
+
+def check(callback: Callable[Concatenate[str, P], None]) -> None:
+    reveal_type(pick(callback))  # revealed: None
 ```
 
 ### Parameter lists inferred from consumers

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::Result;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_linter::message::RenderContext;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging;
 use ruff_linter::settings::flags;
@@ -53,8 +53,10 @@ pub(crate) fn check_stdin(
         noqa,
         fix_mode,
     )?;
-    diagnostics
-        .inner
-        .sort_unstable_by(Diagnostic::ruff_start_ordering);
+    let context = RenderContext::new(&diagnostics.notebook_indexes);
+    diagnostics.inner.sort_unstable_by(|a, b| {
+        a.rendering_sort_key(&context)
+            .cmp(&b.rendering_sort_key(&context))
+    });
     Ok(diagnostics)
 }

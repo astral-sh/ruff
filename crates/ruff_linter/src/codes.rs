@@ -628,7 +628,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Annotations, "101") => rules::flake8_annotations::rules::MissingTypeSelf,
         #[allow(deprecated)]
         (Flake8Annotations, "102") => rules::flake8_annotations::rules::MissingTypeCls,
-        (Flake8Annotations, "201") => rules::flake8_annotations::rules::MissingReturnTypeUndocumentedPublicFunction,
+        (Flake8Annotations, "201") => rules::flake8_annotations::rules::MissingReturnTypePublicFunction,
         (Flake8Annotations, "202") => rules::flake8_annotations::rules::MissingReturnTypePrivateFunction,
         (Flake8Annotations, "204") => rules::flake8_annotations::rules::MissingReturnTypeSpecialMethod,
         (Flake8Annotations, "205") => rules::flake8_annotations::rules::MissingReturnTypeStaticMethod,
@@ -1239,6 +1239,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
         (Ruff, "201") => rules::ruff::rules::RuleCodesInSelectors,
+        (Ruff, "202") => rules::ruff::rules::RenamedRule,
 
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => rules::ruff::rules::StableTestRule,

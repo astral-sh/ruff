@@ -510,7 +510,7 @@ as a wrapper around a callback that accepts no arguments.
 
 ```py
 def erase_parameters[**P](job: Job[P]) -> Job[[]]:
-    return job  # error: [invalid-return-type]
+    return job  # error: [invalid-explicit-return]
 ```
 
 The same restriction applies in the other direction when a class consumes callbacks. A consumer of
@@ -521,7 +521,7 @@ class CallbackConsumer[**P]:
     def consume(self, callback: Callable[P, None]) -> None: ...
 
 def broaden_parameters[**P](consumer: CallbackConsumer[[]]) -> CallbackConsumer[P]:
-    return consumer  # error: [invalid-return-type]
+    return consumer  # error: [invalid-explicit-return]
 ```
 
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
@@ -2754,7 +2754,7 @@ class Container[**P]:
         return f
 
     def try_assign[**Q](self, f: Callable[Q, None]) -> Callable[Q, None]:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `(**Q@try_assign) -> None`, found `(**P@Container) -> None`"
+        # error: [invalid-explicit-return] "Return type does not match returned value: expected `(**Q@try_assign) -> None`, found `(**P@Container) -> None`"
         # error: [invalid-argument-type] "Argument to bound method `Container.method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
         return self.method(f)
 ```

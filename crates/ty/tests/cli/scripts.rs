@@ -1309,8 +1309,9 @@ fn invalid_python_requirement_reports_configuration_error() -> anyhow::Result<()
     Ok(())
 }
 
+// TODO: Consider warning that the entire `.src` table is unused.
 #[test]
-fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
+fn invalid_inline_src_glob_does_not_prevent_checking_script() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
             "pyproject.toml",
@@ -1338,14 +1339,14 @@ fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    error[invalid-glob]: Invalid pattern
-     --> script.py:4:14
-      |
-    4 | # include = ["src/**test/"]
-      |              ^^^^^^^^^^^^^ Too many stars at position 5
+    info[revealed-type]: Revealed type
+      --> script.py:12:13
+       |
+    12 | reveal_type(sys.platform)
+       |             ^^^^^^^^^^^^ `Literal["win32"]`
 
     Found 1 diagnostic
 
@@ -1356,7 +1357,7 @@ fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
 }
 
 #[test]
-fn invalid_glob_in_script_analysis_override_is_a_warning() -> anyhow::Result<()> {
+fn invalid_glob_in_script_analysis_override_is_ignored() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "script.py",
         r#"
@@ -1373,13 +1374,12 @@ fn invalid_glob_in_script_analysis_override_is_a_warning() -> anyhow::Result<()>
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().args(["--exit-zero-on-warning", "--output-format=concise"]), @"
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    script.py:6:33: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
     script.py:11:13: info[revealed-type] Revealed type: `Literal[1]`
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     ");
@@ -1585,6 +1585,37 @@ fn disabled_integration_does_not_initialize_scripts() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case.command()
             .arg("script.py")
+            .env(EnvVars::UV, "missing-uv-executable"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn ty_uv_off_overrides_script_and_cli_settings() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r"
+        # /// script
+        # [tool.ty]
+        # project-manager.script = 'uv'
+        # ///
+        ",
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("script.py")
+            .args(["--config", "project-manager.script='uv'"])
+            .env(EnvVars::TY_UV, "off")
             .env(EnvVars::UV, "missing-uv-executable"),
         @"
     success: true

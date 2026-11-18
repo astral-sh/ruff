@@ -58,8 +58,7 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
+        .matches_qualified_name(&call.func, &["subprocess", "run"])
     {
         let Some(kwarg) = call.arguments.find_keyword("universal_newlines") else {
             return;

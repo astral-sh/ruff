@@ -50,7 +50,7 @@ pub use types::ide_support::{
 pub use types::{
     DisplaySettings, FixtureBinding, FixtureExposure, FixtureNameSource, ProgramEnvironment,
     PytestTest, TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
-    pytest_global_plugin_files, pytest_tests_in_file,
+    pytest_global_plugin_files, pytest_registered_plugin_files, pytest_tests_in_file,
 };
 
 mod db;
@@ -270,7 +270,11 @@ pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]
 
     diagnostics.extend(check_types(db, file));
 
-    diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
+    let resolver: &dyn ruff_db::Db = db;
+    diagnostics.sort_unstable_by(|a, b| {
+        a.rendering_sort_key(&resolver)
+            .cmp(&b.rendering_sort_key(&resolver))
+    });
 
     Ok(diagnostics.into_boxed_slice())
 }

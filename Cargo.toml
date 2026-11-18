@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.97"
+rust-version = "1.98"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -14,55 +14,52 @@ license = "MIT"
 
 [workspace.dependencies]
 char_str = { version = "0.0.4", default-features = false, features = ["std"] }
-ruff = { version = "0.17.4", path = "crates/ruff" }
-ruff_annotate_snippets = { version = "0.0.21", path = "crates/ruff_annotate_snippets" }
-ruff_cache = { version = "0.0.21", path = "crates/ruff_cache" }
-ruff_command_line = { version = "0.0.21", path = "crates/ruff_command_line" }
-ruff_db = { version = "0.0.21", path = "crates/ruff_db", default-features = false }
-ruff_diagnostics = { version = "0.0.21", path = "crates/ruff_diagnostics" }
-ruff_formatter = { version = "0.0.21", path = "crates/ruff_formatter" }
-ruff_graph = { version = "0.0.21", path = "crates/ruff_graph" }
-ruff_index = { version = "0.0.21", path = "crates/ruff_index" }
-ruff_linter = { version = "0.17.4", path = "crates/ruff_linter" }
-ruff_macros = { version = "0.0.21", path = "crates/ruff_macros" }
-ruff_markdown = { version = "0.0.21", path = "crates/ruff_markdown" }
-ruff_memory_usage = { version = "0.0.21", path = "crates/ruff_memory_usage" }
-ruff_notebook = { version = "0.0.21", path = "crates/ruff_notebook" }
-ruff_options_metadata = { version = "0.0.21", path = "crates/ruff_options_metadata" }
-ruff_python_ast = { version = "0.0.21", path = "crates/ruff_python_ast" }
-ruff_python_codegen = { version = "0.0.21", path = "crates/ruff_python_codegen" }
-ruff_python_edits = { version = "0.0.21", path = "crates/ruff_python_edits" }
-ruff_python_formatter = { version = "0.0.21", path = "crates/ruff_python_formatter" }
-ruff_python_importer = { version = "0.0.21", path = "crates/ruff_python_importer" }
-ruff_python_index = { version = "0.0.21", path = "crates/ruff_python_index" }
-ruff_python_literal = { version = "0.0.21", path = "crates/ruff_python_literal" }
-ruff_python_parser = { version = "0.0.21", path = "crates/ruff_python_parser" }
-ruff_python_semantic = { version = "0.0.21", path = "crates/ruff_python_semantic" }
-ruff_python_stdlib = { version = "0.0.21", path = "crates/ruff_python_stdlib" }
-ruff_python_trivia = { version = "0.0.21", path = "crates/ruff_python_trivia" }
-ruff_server = { version = "0.0.21", path = "crates/ruff_server" }
-ruff_source_file = { version = "0.0.21", path = "crates/ruff_source_file" }
-ruff_mdtest = { path = "crates/ruff_mdtest" }
-ruff_ranged_value = { version = "0.0.21", path = "crates/ruff_ranged_value" }
-ruff_text_size = { version = "0.0.21", path = "crates/ruff_text_size" }
-ruff_unicode_names2 = { version = "0.0.21", path = "crates/ruff_unicode_names2" }
-ruff_unicode_names2_generator = { version = "0.0.21", path = "crates/ruff_unicode_names2_generator" }
-ruff_workspace = { version = "0.0.21", path = "crates/ruff_workspace" }
+ruff = { version = "0.17.5", path = "crates/ruff" }
+ruff_annotate_snippets = { version = "0.0.22", path = "crates/ruff_annotate_snippets" }
+ruff_cache = { version = "0.0.22", path = "crates/ruff_cache" }
+ruff_command_line = { version = "0.0.22", path = "crates/ruff_command_line" }
+ruff_db = { version = "0.0.22", path = "crates/ruff_db", default-features = false }
+ruff_diagnostics = { version = "0.0.22", path = "crates/ruff_diagnostics" }
+ruff_formatter = { version = "0.0.22", path = "crates/ruff_formatter" }
+ruff_graph = { version = "0.0.22", path = "crates/ruff_graph" }
+ruff_index = { version = "0.0.22", path = "crates/ruff_index" }
+ruff_linter = { version = "0.17.5", path = "crates/ruff_linter" }
+ruff_macros = { version = "0.0.22", path = "crates/ruff_macros" }
+ruff_markdown = { version = "0.0.22", path = "crates/ruff_markdown" }
+ruff_memory_usage = { version = "0.0.22", path = "crates/ruff_memory_usage" }
+ruff_notebook = { version = "0.0.22", path = "crates/ruff_notebook" }
+ruff_options_metadata = { version = "0.0.22", path = "crates/ruff_options_metadata" }
+ruff_python_ast = { version = "0.0.22", path = "crates/ruff_python_ast" }
+ruff_python_codegen = { version = "0.0.22", path = "crates/ruff_python_codegen" }
+ruff_python_edits = { version = "0.0.22", path = "crates/ruff_python_edits" }
+ruff_python_formatter = { version = "0.0.22", path = "crates/ruff_python_formatter" }
+ruff_python_importer = { version = "0.0.22", path = "crates/ruff_python_importer" }
+ruff_python_index = { version = "0.0.22", path = "crates/ruff_python_index" }
+ruff_python_literal = { version = "0.0.22", path = "crates/ruff_python_literal" }
+ruff_python_parser = { version = "0.0.22", path = "crates/ruff_python_parser" }
+ruff_python_semantic = { version = "0.0.22", path = "crates/ruff_python_semantic" }
+ruff_python_stdlib = { version = "0.0.22", path = "crates/ruff_python_stdlib" }
+ruff_python_trivia = { version = "0.0.22", path = "crates/ruff_python_trivia" }
+ruff_server = { version = "0.0.22", path = "crates/ruff_server" }
+ruff_source_file = { version = "0.0.22", path = "crates/ruff_source_file" }
+ruff_ranged_value = { version = "0.0.22", path = "crates/ruff_ranged_value" }
+ruff_text_size = { version = "0.0.22", path = "crates/ruff_text_size" }
+ruff_unicode_names2 = { version = "0.0.22", path = "crates/ruff_unicode_names2" }
+ruff_unicode_names2_generator = { version = "0.0.22", path = "crates/ruff_unicode_names2_generator" }
+ruff_workspace = { version = "0.0.22", path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
-ty_combine = { version = "0.0.21", path = "crates/ty_combine" }
-ty_completion_bench = { path = "crates/ty_completion_bench" }
-ty_completion_eval = { path = "crates/ty_completion_eval" }
+ty_combine = { version = "0.0.22", path = "crates/ty_combine" }
 ty_ide = { path = "crates/ty_ide" }
-ty_module_resolver = { version = "0.0.21", path = "crates/ty_module_resolver" }
+ty_module_resolver = { version = "0.0.22", path = "crates/ty_module_resolver" }
 ty_project = { path = "crates/ty_project", default-features = false }
-ty_python_semantic = { version = "0.0.21", path = "crates/ty_python_semantic" }
-ty_python_core = { version = "0.0.21", path = "crates/ty_python_core" }
+ty_python_semantic = { version = "0.0.22", path = "crates/ty_python_semantic" }
+ty_python_core = { version = "0.0.22", path = "crates/ty_python_core" }
 ty_server = { path = "crates/ty_server" }
-ty_site_packages = { version = "0.0.21", path = "crates/ty_site_packages" }
-ty_static = { version = "0.0.21", path = "crates/ty_static" }
+ty_site_packages = { version = "0.0.22", path = "crates/ty_site_packages" }
+ty_static = { version = "0.0.22", path = "crates/ty_static" }
 ty_test = { path = "crates/ty_test" }
-ty_vendored = { version = "0.0.21", path = "crates/ty_vendored" }
+ty_vendored = { version = "0.0.22", path = "crates/ty_vendored" }
 
 mdtest = { path = "crates/mdtest" }
 
@@ -93,7 +90,7 @@ clap = { version = "4.5.3", default-features = false, features = [
 ] }
 clap_complete_command = { version = "0.6.0", default-features = false, features = ["nushell"] }
 clearscreen = { version = "5.0.0", default-features = false }
-codspeed-criterion-compat = { version = "5.0.0", default-features = false }
+codspeed-criterion-compat = { version = "6.0.0", default-features = false }
 colored = { version = "3.0.0", default-features = false }
 compact_str = { version = "0.10.0", default-features = false, features = ["std"] }
 console = { version = "0.16.4", default-features = false, features = ["std"] }
@@ -106,7 +103,7 @@ csv = { version = "1.3.1", default-features = false }
 ctrlc = { version = "3.4.4", default-features = false }
 dashmap = { version = "6.0.1", default-features = false }
 datatest-stable = { version = "0.3.3", default-features = false }
-divan = { package = "codspeed-divan-compat", version = "5.0.0", default-features = false }
+divan = { package = "codspeed-divan-compat", version = "6.0.0", default-features = false }
 drop_bomb = { version = "0.1.5", default-features = false }
 dunce = { version = "1.0.5", default-features = false }
 etcetera = { version = "0.11.0", default-features = false }
@@ -176,7 +173,7 @@ pep440_rs = { version = "0.7.1", default-features = false }
 pretty_assertions = { version = "1.3.0", default-features = false, features = ["std"] }
 proc-macro2 = { version = "1.0.79", default-features = false, features = ["proc-macro"] }
 pyproject-toml = { version = "0.13.4", default-features = false }
-quick-junit = { version = "0.8.0", default-features = false }
+quick-xml = { version = "0.41.0", default-features = false }
 quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = { version = "1.0.0", default-features = false }
 quote = { version = "1.0.23", default-features = false, features = ["proc-macro"] }
@@ -219,6 +216,7 @@ snapbox = { version = "1.0.0", default-features = false, features = [
 ] }
 static_assertions = { version = "1.1.0", default-features = false }
 stacker = { version = "0.1.24", default-features = false }
+strip-ansi-escapes = { version = "0.2.1", default-features = false }
 strum = { version = "0.28.0", default-features = false, features = ["std", "strum_macros"] }
 strum_macros = { version = "0.28.0", default-features = false }
 supports-hyperlinks = { version = "3.1.0", default-features = false }
@@ -258,14 +256,7 @@ wasm-bindgen-test = { version = "0.3.42", default-features = false, features = [
 web-time = { version = "1.1.0", default-features = false }
 which = { version = "8.0.0", default-features = false, features = ["real-sys"] }
 wild = { version = "2", default-features = false }
-zip = { version = "9.0.5", default-features = false }
-
-[workspace.metadata.cargo-shear]
-ignored = [
-    "ruff_mdtest",
-    "ty_completion_bench",
-    "ty_completion_eval",
-]
+zip = { version = "9.5.1", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "warn"
@@ -326,6 +317,11 @@ unused_peekable = "warn"
 # in the `if` being an order of magnitude bigger than the
 # `else`, then some might consider that harder to read.
 if_not_else = "allow"
+
+[workspace.lints.cargo]
+# This is needed for maturin to generate the correct PyPI metadata, for at least
+# the ruff and ty crates.
+redundant_homepage = "allow"
 
 [profile.release]
 lto = "fat"

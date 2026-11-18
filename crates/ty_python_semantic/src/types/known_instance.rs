@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{Program, ProgramEnvironment};
 use ruff_python_ast::name::Name;
 
 use crate::{
@@ -457,10 +457,10 @@ impl<'db> KnownInstanceType<'db> {
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::NamedTupleSpec),
             Self::FunctoolsPartial(partial) => partial
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env.program(db), div, nested)
                 .map(Self::FunctoolsPartial),
             Self::FunctoolsPartialCall(partial) => partial
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env.program(db), div, nested)
                 .map(Self::FunctoolsPartialCall),
             Self::MethodWrapper(wrapper) => wrapper
                 .recursive_type_normalized_impl(db, env, div, nested)
@@ -835,15 +835,19 @@ impl<'db> FieldInstance<'db> {
     }
 }
 
+#[salsa::tracked]
 impl<'db> FunctoolsPartialInstance<'db> {
-    /// Normalizes both the wrapped callable and the exposed reduced callable recursively.
+    /// Normalizes the wrapped and reduced callables. Union alternatives can share inner
+    /// partials, so reuse their normalization when walking the chain.
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        program: Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let env = &ProgramEnvironment::from_program(program);
         // Repeated `f = partial(f)` assignments add a new layer to the wrapped callable.
         // Treat it as nested so that cycle recovery can collapse these layers while
         // preserving the reduced signature of the outer partial.

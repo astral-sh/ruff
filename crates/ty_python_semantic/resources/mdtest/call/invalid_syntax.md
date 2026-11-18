@@ -14,6 +14,14 @@ def f(x: int, x: str) -> int:
 reveal_type(f(1, x=2))  # revealed: int
 ```
 
+A repeated parameter can also conflict with the earlier parameter's type, even in a stub body.
+
+```py
+# error: [invalid-syntax]
+# error: [invalid-assignment]
+def stub(x: str, x=1): ...
+```
+
 ## Positional after non-positional
 
 When parameter kinds are given in an invalid order, we emit a diagnostic and implicitly reorder them

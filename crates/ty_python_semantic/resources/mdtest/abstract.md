@@ -387,6 +387,20 @@ class ConcreteDeleter(AbstractDeleter):
 ConcreteDeleter()  # ok
 ```
 
+## Implicit override of an abstract hash
+
+Defining `__eq__` implicitly sets `__hash__ = None`, which overrides the abstract method on
+`collections.abc.Hashable`.
+
+```py
+from collections.abc import Hashable
+
+class Concrete(Hashable):
+    __eq__ = object.__eq__
+
+Concrete()  # ok
+```
+
 ## Slots overriding abstract properties
 
 A slot creates a descriptor in the class namespace, which overrides an inherited abstract property.

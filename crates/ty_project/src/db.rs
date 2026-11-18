@@ -165,7 +165,6 @@ impl ProjectDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let uv_environments = UvEnvironments::new(project_metadata.use_uv());
         let mut db = Self {
             project: None,
             storage: salsa::Storage::new(if tracing::enabled!(tracing::Level::TRACE) {
@@ -182,7 +181,7 @@ impl ProjectDatabase {
                 None
             }),
             files: Files::default(),
-            uv_environments,
+            uv_environments: UvEnvironments::default(),
             system: Arc::new(system),
         };
 
@@ -226,8 +225,8 @@ impl ProjectDatabase {
 
     /// Checks the files in the project and its dependencies as per the project's check mode.
     ///
-    /// Uses current settings and environments without starting or waiting for uv. Callers that
-    /// require synchronized environments must request synchronization and apply its results first.
+    /// Uses current settings and environments without starting or waiting for uv. Returns no
+    /// diagnostics for a script while its initial environment synchronization is pending.
     ///
     /// Use [`set_check_mode`] to update the check mode.
     ///
@@ -250,6 +249,7 @@ impl ProjectDatabase {
     }
 
     /// Checks `file` using its current settings and available environment.
+    /// Reports no diagnostics for a script while its first uv sync is pending.
     ///
     /// Uses the same environment synchronization behavior as [`check`](Self::check).
     #[tracing::instrument(level = "debug", skip(self))]
@@ -776,7 +776,6 @@ pub(crate) mod testing {
     impl TestDb {
         pub fn new(project: ProjectMetadata) -> Self {
             let events = Events::default();
-            let uv_environments = UvEnvironments::new(project.use_uv());
             let mut db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
@@ -788,7 +787,7 @@ pub(crate) mod testing {
                 system: TestSystem::default(),
                 vendored: ty_vendored::file_system().clone(),
                 files: Files::default(),
-                uv_environments,
+                uv_environments: UvEnvironments::default(),
                 events,
                 project: None,
             };
@@ -969,7 +968,7 @@ mod tests {
 
     use crate::db::testing::TestDb;
     use crate::watch::ChangeEvent;
-    use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
+    use crate::{Db, ProjectDatabase, ProjectMetadata};
 
     #[test]
     fn checks_use_available_script_environment_without_running_uv() -> anyhow::Result<()> {
@@ -981,13 +980,17 @@ mod tests {
                 r"
                 # /// script
                 # dependencies = []
+                #
+                # [tool.ty]
+                # project-manager.script = 'uv'
                 # ///
+
                 import nonexistent_script_dependency
                 ",
             )
             .as_ref(),
         )?;
-        let metadata = ProjectMetadata::discover(&root, &system)?.with_use_uv(UseUv::Scripts);
+        let metadata = ProjectMetadata::discover(&root, &system)?;
         let db = ProjectDatabase::fallible(metadata, system)?;
         let file = system_path_to_file(&db, root.join("script.py"))?;
 

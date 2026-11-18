@@ -117,14 +117,14 @@ def direct_bool_tuple(pair: tuple[bool, bool]) -> int:
         case (_, False):
             return 2
 
-def non_exhaustive_bool_tuple(pair: tuple[bool, bool]) -> int:  # error: [invalid-return-type]
+def non_exhaustive_bool_tuple(pair: tuple[bool, bool]) -> int:  # error: [invalid-implicit-return]
     match pair:
         case (True, True):
             return 0
         case (False, _):
             return 1
 
-def guarded_bool_tuple(pair: tuple[bool, bool], flag: bool) -> int:  # error: [invalid-return-type]
+def guarded_bool_tuple(pair: tuple[bool, bool], flag: bool) -> int:  # error: [invalid-implicit-return]
     match pair:
         case (True, True) if flag:
             return 0
@@ -302,7 +302,7 @@ class MissingValueEnum(Enum):
     def _missing_(cls, value: object) -> "MissingValueEnum":
         return cls.ONLY
 
-def match_flag(value: Permission) -> int:  # error: [invalid-return-type]
+def match_flag(value: Permission) -> int:  # error: [invalid-implicit-return]
     match value:
         case Permission.READ:
             return 1
@@ -493,7 +493,7 @@ def match_non_exhaustive(x: A | B | C):
             # this diagnostic is correct: the inferred type of `x` is `B & ~A & ~C`
             assert_never(x)  # error: [type-assertion-failure]
 
-# Note: no invalid-return-type diagnostic; the `match` is exhaustive
+# The exhaustive `match` ensures that every path returns a value.
 def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
     match obj:
         case GenericClass(x=42):
@@ -719,7 +719,7 @@ class Status(StrEnum):
             case Status.SUCCEEDED | Status.FAILED:
                 return True
 
-    def incomplete(self) -> bool:  # error: [invalid-return-type]
+    def incomplete(self) -> bool:  # error: [invalid-implicit-return]
         match self:
             case Status.NEW | Status.QUEUED:
                 return False
@@ -745,7 +745,7 @@ class Unmatchable(Enum):
     def __eq__(self, other: object) -> Literal[False]:
         return False
 
-    def matches(self) -> bool:  # error: [invalid-return-type]
+    def matches(self) -> bool:  # error: [invalid-implicit-return]
         match self:
             case Unmatchable.A | Unmatchable.B:
                 return True
@@ -835,8 +835,8 @@ def eq_narrow_if_constrained[T: (Literal["foo"], Literal["bar"])](x: T) -> T:
     return x
 ```
 
-In these examples, no `invalid-return-type` diagnostics are emitted, despite the fact there are no
-`else` clauses. Note that these examples deliberately also do *not* have any `assert_never` or
+In these examples, no `invalid-implicit-return` diagnostics are emitted, despite the fact there are
+no `else` clauses. Note that these examples deliberately also do *not* have any `assert_never` or
 `assert_type` calls, since these call expressions can create their own `IsNonTerminalCall`
 predicates in our reachability infrastructure!
 
@@ -933,14 +933,14 @@ def g(x: ComplexN) -> bool:
 # from the fact that `assert_never` creates its own
 # reachability constraint:
 
-# no `invalid-return-type` diagnostic
+# no `invalid-implicit-return` diagnostic
 def h(x: FloatN) -> bool:
     if isinstance(x, int):
         return True
     elif isinstance(x, float):
         return False
 
-# no `invalid-return-type` diagnostic
+# no `invalid-implicit-return` diagnostic
 def i(x: ComplexN) -> bool:
     if isinstance(x, int):
         return True

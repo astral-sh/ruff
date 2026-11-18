@@ -1,6 +1,6 @@
 //! Generate Markdown documentation for applicable rules.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
@@ -11,12 +11,31 @@ use regex::{Captures, Regex};
 use ruff_linter::codes::RuleStatus;
 use strum::IntoEnumIterator;
 
-use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_linter::{FixAvailability, RULE_NAME_REDIRECTS};
 use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_workspace::options::Options;
 
 use crate::ROOT_DIR;
+
+pub(crate) fn rule_redirects() -> BTreeMap<String, String> {
+    let mut redirects = BTreeMap::new();
+    for rule in Rule::iter() {
+        if let Some(code) = rule.noqa_code() {
+            let code = code.to_string();
+            let target = format!("rules/{}.md", rule.name());
+            redirects.insert(format!("rules/{code}.md"), target.clone());
+            redirects.insert(format!("rules/{}.md", code.to_ascii_lowercase()), target);
+        }
+    }
+    for &(old_name, rule) in RULE_NAME_REDIRECTS {
+        redirects.insert(
+            format!("rules/{old_name}.md"),
+            format!("rules/{}.md", rule.name()),
+        );
+    }
+    redirects
+}
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -61,19 +80,20 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 .collect::<String>(),
             code = rule
                 .noqa_code()
-                .map(|code| format!("%20OR%20{code}"))
-                .unwrap_or_default(),
+                .map_or_default(|code| format!("%20OR%20{code}")),
         );
 
         let _ = writeln!(
             &mut output,
             r#"<small>
 {status_text} ·
+Category: [{category}](../rules.md?category={category}) ·
 <a href="https://github.com/astral-sh/ruff/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{issue_search}" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
 </small>
 
 "#,
+            category = rule.category(),
             file = url::form_urlencoded::byte_serialize(rule.file().replace('\\', "/").as_bytes())
                 .collect::<String>(),
             line = rule.line(),

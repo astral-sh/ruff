@@ -34,7 +34,7 @@ PublishDiagnosticsParams {
             ),
             code: Some(
                 String(
-                    "invalid-return-type",
+                    "invalid-explicit-return",
                 ),
             ),
             code_description: Some(
@@ -53,7 +53,7 @@ PublishDiagnosticsParams {
                         path: "/rules",
                         query: None,
                         fragment: Some(
-                            "invalid-return-type",
+                            "invalid-explicit-return",
                         ),
                     },
                 },

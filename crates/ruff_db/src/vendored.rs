@@ -369,14 +369,17 @@ impl VendoredZipArchive {
     }
 
     fn index_for_path(&self, path: &NormalizedVendoredPath) -> Option<usize> {
-        self.0.index_for_name(path.as_str())
+        // Vendored archives store entry names as UTF-8, so a byte lookup is enough.
+        // `index_for_name` scans decoded entry names on a miss to support CP437.
+        self.0.index_for_name_raw(path.as_bytes())
     }
 
     fn lookup_path(
         &mut self,
         path: &NormalizedVendoredPath,
     ) -> Result<ZipFile<'_, io::Cursor<ArchiveData>>> {
-        Ok(self.0.by_name(path.as_str())?)
+        let index = self.index_for_path(path).ok_or(ZipError::FileNotFound)?;
+        Ok(self.0.by_index(index)?)
     }
 
     fn metadata_for_path(&mut self, path: &NormalizedVendoredPath) -> Result<Metadata> {
@@ -405,8 +408,8 @@ impl NormalizedVendoredPath<'_> {
         Self(Cow::Owned(data))
     }
 
-    fn as_str(&self) -> &str {
-        &self.0
+    fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
     }
 }
 

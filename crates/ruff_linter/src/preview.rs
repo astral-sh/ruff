@@ -51,6 +51,11 @@ pub(crate) const fn is_legacy_type_comment_in_non_stub_enabled(settings: &Linter
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/15635
+pub(crate) const fn is_fix_runtime_string_union_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 /// <https://github.com/astral-sh/ruff/pull/19303>
 pub(crate) const fn is_fix_f_string_logging_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()

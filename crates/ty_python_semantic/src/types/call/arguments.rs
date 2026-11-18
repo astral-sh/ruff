@@ -490,7 +490,7 @@ impl<'db> CallArgumentTypes<'db> {
 
     /// Insert the type of this argument when inferred with the provided type context.
     fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
-        match tcx.into().declared_type() {
+        match tcx.into().expected_type() {
             None => self.fallback_type = Some(ty),
             Some(tcx) => {
                 self.types.insert(tcx, ty);
@@ -501,7 +501,7 @@ impl<'db> CallArgumentTypes<'db> {
     fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
         self.types
             .iter()
-            .map(|(tcx, ty)| (TypeContext::declared(Some(*tcx)), *ty))
+            .map(|(tcx, ty)| (TypeContext::preference(Some(*tcx)), *ty))
             .chain(self.fallback_type.map(|ty| (TypeContext::default(), ty)))
     }
 }
@@ -866,7 +866,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 f.debug_map()
                     .entries(self.types.iter().map(|(tcx, ty)| {
                         (
-                            tcx.declared_type()
+                            tcx.expected_type()
                                 .as_ref()
                                 .map(|ty| ty.display(db, self.env)),
                             ty.display(db, self.env),

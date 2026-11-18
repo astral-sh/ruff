@@ -196,13 +196,8 @@ fn is_arguments_huggable(arguments: &Arguments, context: &PyFormatContext) -> bo
     let options = context.options();
 
     // If the expression has a trailing comma, then we can't hug it.
-    if options.magic_trailing_comma().is_respect()
-        && commas::has_magic_trailing_comma(TextRange::new(arg.end(), arguments.end()), context)
-    {
-        return false;
-    }
-
-    true
+    !(options.magic_trailing_comma().is_respect()
+        && commas::has_magic_trailing_comma(TextRange::new(arg.end(), arguments.end()), context))
 }
 
 /// Returns `true` if `string` is a multiline string that is not implicitly concatenated and there's no

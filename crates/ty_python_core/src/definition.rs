@@ -592,7 +592,14 @@ pub(crate) enum ParameterDefinitionNodeRef<'ast> {
     Parameter(&'ast ast::ParameterWithDefault),
 }
 
-impl ParameterDefinitionNodeRef<'_> {
+impl<'ast> ParameterDefinitionNodeRef<'ast> {
+    pub(super) fn parameter(self) -> &'ast ast::Parameter {
+        match self {
+            Self::VariadicPositionalParameter(node) | Self::VariadicKeywordParameter(node) => node,
+            Self::Parameter(node) => &node.parameter,
+        }
+    }
+
     fn into_owned(self, parsed: &ParsedModuleRef) -> ParameterDefinitionNodeKind {
         match self {
             Self::VariadicPositionalParameter(parameter) => {
@@ -612,11 +619,7 @@ impl ParameterDefinitionNodeRef<'_> {
     }
 
     fn key(self) -> DefinitionNodeKey {
-        match self {
-            Self::VariadicPositionalParameter(node) => node.into(),
-            Self::VariadicKeywordParameter(node) => node.into(),
-            Self::Parameter(node) => (&node.parameter).into(),
-        }
+        self.parameter().into()
     }
 }
 

@@ -44,10 +44,7 @@ pub(crate) fn logging_config_insecure_listen(checker: &Checker, call: &ast::Expr
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["logging", "config", "listen"])
-        })
+        .matches_qualified_name(&call.func, &["logging", "config", "listen"])
     {
         if call.arguments.find_keyword("verify").is_some() {
             return;

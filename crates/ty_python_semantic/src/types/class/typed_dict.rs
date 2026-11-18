@@ -1013,8 +1013,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         synthesize_typed_dict_method(db, &env, typed_dict, name, || {
             TypedDictFields::Dynamic(self.items(db))
         })
-        .map(Member::definitely_declared)
-        .unwrap_or_default()
+        .map_or_default(Member::definitely_declared)
     }
 
     /// Look up a class-level member by name (including superclasses).

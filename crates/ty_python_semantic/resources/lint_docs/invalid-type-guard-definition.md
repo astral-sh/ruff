@@ -41,3 +41,8 @@ class C:
     def f(self) -> TypeIs[int]:  # error
         return True
 ```
+
+## Rule history
+
+- v0.0.106: The checks for incompatible `TypeIs` narrowings moved to `disjoint-type-is-narrowing`
+    and `suspicious-type-is-narrowing`.

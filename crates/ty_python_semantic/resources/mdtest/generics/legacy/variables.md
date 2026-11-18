@@ -654,12 +654,12 @@ reveal_type(S.__constraints__)  # revealed: tuple[float, str]
 ```py
 from typing import TypeVar
 
-# snapshot: invalid-legacy-type-variable
+# snapshot: invalid-type-variable-constraints
 T = TypeVar("T", int)
 ```
 
 ```snapshot
-error[invalid-legacy-type-variable]: A `TypeVar` cannot have exactly one constraint
+error[invalid-type-variable-constraints]: A `TypeVar` cannot have exactly one constraint
  --> src/mdtest_snippet.py:4:18
   |
 4 | T = TypeVar("T", int)

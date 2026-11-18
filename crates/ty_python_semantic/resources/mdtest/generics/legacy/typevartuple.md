@@ -771,10 +771,10 @@ class Array(Generic[*Ts]):
         return self
 
     def erase_shape_bottom(self) -> "Bottom[Array[*tuple[Any, ...]]]":
-        return self  # error: [invalid-return-type]
+        return self  # error: [invalid-explicit-return]
 
     def fixed_shape(self) -> "Top[Array[Any]]":
-        return self  # error: [invalid-return-type]
+        return self  # error: [invalid-explicit-return]
 ```
 
 ## Functions

@@ -42,6 +42,12 @@ mod tests {
                                 msg: "Use typing_extensions.TypedDict instead.".to_string(),
                             },
                         ),
+                        (
+                            ".dict.fromkeys".to_string(),
+                            ApiBan {
+                                msg: "Use a dict comprehension instead.".to_string(),
+                            },
+                        ),
                     ]),
                     ..Default::default()
                 },

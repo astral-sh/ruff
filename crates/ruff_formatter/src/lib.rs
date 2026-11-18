@@ -487,9 +487,8 @@ impl Printed {
             }
         }
 
-        let (source_start, formatted_start) = start_marker
-            .map(|marker| (marker.source, marker.dest))
-            .unwrap_or_default();
+        let (source_start, formatted_start) =
+            start_marker.map_or_default(|marker| (marker.source, marker.dest));
 
         let (source_end, formatted_end) = end_marker
             .map_or((source.text_len(), self.code.text_len()), |marker| {

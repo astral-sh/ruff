@@ -2242,12 +2242,13 @@ def _(answer: type[Answer]) -> None:
     reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
 ```
 
-## Reassigning enum members
+## Reassigning and deleting enum members
 
 ### Class attributes
 
-Enum members cannot be reassigned on the class, even to their original value or to the member
-itself. This also applies to aliases, including aliases declared with the same value.
+Enum members cannot be deleted or reassigned on the class, even if the assignment uses the original
+value or the member itself. This also applies to aliases, including aliases declared with the same
+value.
 
 ```py
 from enum import Enum
@@ -2263,6 +2264,7 @@ Answer.NO = 0  # error: [invalid-assignment]
 Answer.NO = Answer.NO  # error: [invalid-assignment]
 Answer.ALIAS = 0  # error: [invalid-assignment]
 Answer.SAME_VALUE = 0  # error: [invalid-assignment]
+del Answer.NO  # error: [invalid-assignment] "Cannot delete read-only attribute `NO`"
 ```
 
 The assigned expression is still checked when the target is read-only:
@@ -2442,7 +2444,7 @@ bound. Their `Self` type preserves the particular member at call sites.
 python-version = "3.11"
 
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -2475,13 +2477,29 @@ class Answer(Enum):
 reveal_type(Answer.YES.identity())  # revealed: Literal[Answer.YES]
 ```
 
+### Contextual element types when listing enum members
+
+The fresh list can use the annotated enum element type even when the classmethod receiver has a more
+specific `Self` type.
+
+```py
+from enum import Enum
+
+class Mode(Enum):
+    A = 1
+
+    @classmethod
+    def all(cls) -> list["Mode"]:
+        return reveal_type(list(cls))  # revealed: list[Mode]
+```
+
 ### Special attributes on bounded type variables
 
 An ordinary type variable bounded by an enum has the same special attributes as the enum itself.
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -2509,7 +2527,7 @@ from every possible enum.
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -3569,7 +3587,7 @@ def color_name(color: Color) -> str:
     else:
         assert_never(color)
 
-# No `invalid-return-type` error here because the implicit `else` branch is detected as unreachable:
+# The implicit `else` branch is unreachable, so ty accepts this function's return type.
 def color_name_without_assertion(color: Color) -> str:
     if color is Color.RED:
         return "Red"

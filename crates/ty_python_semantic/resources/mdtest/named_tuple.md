@@ -132,6 +132,94 @@ reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
 ```
 
+### Union of recursive named tuples
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, TypeAlias
+
+class Negation(NamedTuple):
+    child: Expression
+
+class Group(NamedTuple):
+    children: tuple[Expression, ...]
+
+Expression: TypeAlias = Negation | Group | str
+
+def _(group: Group):
+    reveal_type(group[0])  # revealed: tuple[Negation | Group | str, ...]
+```
+
+### Union containing a subclass of a recursive named tuple
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, TypeAlias
+
+class Negation(NamedTuple):
+    child: Expression
+
+class Group(NamedTuple):
+    children: tuple[Expression, ...]
+
+class Subgroup(Group): ...
+
+Expression: TypeAlias = Negation | Subgroup | str
+
+def _(group: Subgroup):
+    reveal_type(group[0])  # revealed: tuple[Negation | Subgroup | str, ...]
+```
+
+### Recursive fields with a wide union
+
+Two named tuples can share a field type that refers back to both of them. The repeated `int` members
+exercise normalization of a wide union. Both fields must retain `Leaf`.
+
+```py
+from typing import NamedTuple, Union
+from typing_extensions import assert_type
+
+class Leaf(NamedTuple):
+    value: "Metadata"
+
+class Closure(NamedTuple):
+    entries: Union[int, Leaf, int, int, int, int, int, int]
+
+class Partial(NamedTuple):
+    entries: Union[int, Leaf, int, int, int, int, int, int]
+
+Metadata = Closure | Partial
+
+def check(closure: Closure, partial: Partial) -> None:
+    assert_type(closure.entries, int | Leaf)
+    assert_type(partial.entries, int | Leaf)
+```
+
+### Explicit dataclass-transform metaclass
+
+`models.pyi`:
+
+```pyi
+from typing import dataclass_transform
+
+@dataclass_transform()
+class RecordMeta(type): ...
+```
+
+```py
+from dataclasses import fields
+from typing import NamedTuple
+from models import RecordMeta
+
+# TODO: Report the metaclass conflict that makes this class definition raise TypeError.
+class Point(NamedTuple, metaclass=RecordMeta):
+    x: int
+
+fields(Point)
+```
+
 ### Fields declared in stubs
 
 An annotation-only field in a stub remains a required constructor argument. An explicit ellipsis
@@ -1386,11 +1474,11 @@ class B(NamedTuple):
     x: int
 
 def choose(flag: bool) -> Callable[..., A]:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return A._replace if flag else B._replace
 
 def reversed_order(flag: bool) -> Callable[..., A]:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return B._replace if flag else A._replace
 
 def either_class(flag: bool) -> Callable[..., A | B]:
@@ -1404,7 +1492,7 @@ DynamicA = NamedTuple("DynamicA", [("x", int)])
 DynamicB = NamedTuple("DynamicB", [("x", int)])
 
 def choose_dynamic(flag: bool) -> Callable[..., DynamicA]:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return DynamicA._replace if flag else DynamicB._replace
 ```
 

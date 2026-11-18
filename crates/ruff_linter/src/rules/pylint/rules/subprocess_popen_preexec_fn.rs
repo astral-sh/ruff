@@ -59,8 +59,7 @@ pub(crate) fn subprocess_popen_preexec_fn(checker: &Checker, call: &ast::ExprCal
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "Popen"]))
+        .matches_qualified_name(&call.func, &["subprocess", "Popen"])
     {
         if let Some(keyword) = call
             .arguments

@@ -726,6 +726,73 @@ reveal_type(p)  # revealed: partial[(path: str, *, start: str | None = ".") -> s
 reveal_type(list(map(p, paths)))  # revealed: list[str]
 ```
 
+### Binding a union to an overloaded keyword
+
+Each union member can match different overloads. Both `str` and `None` allow one positional
+argument, and the return type depends on the stored value unless the caller overrides `option`. A
+second positional argument is only valid when the caller overrides `option` with `None`.
+
+```py
+from functools import partial
+from typing import Callable, overload
+
+@overload
+def f(value: int, /, *, option: str) -> str: ...
+@overload
+def f(value: int, extra: int, /, *, option: None) -> int: ...
+@overload
+def f(value: int, /, *, option: None) -> int: ...
+def f(value: int, extra: int = 0, /, *, option: str | None) -> str | int:
+    return option if option is not None else value + extra
+
+def check(option: str | None):
+    p = partial(f, option=option)
+    reveal_type(p(1))  # revealed: str | int
+    reveal_type(p(1, option="text"))  # revealed: str
+    reveal_type(p(1, option=None))  # revealed: int
+    p(1, 2)  # error: [no-matching-overload]
+    reveal_type(p(1, 2, option=None))  # revealed: int
+
+    # TODO: Report a shared error only once when both possible partials reject the call.
+    # error: [no-matching-overload]
+    # error: [no-matching-overload]
+    p()
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    p("text")
+
+    unary: Callable[[int], object] = p  # ok
+    binary: Callable[[int, int], object] = p  # error: [invalid-assignment]
+```
+
+Binding the keyword fails if any member of the union is incompatible with every overload.
+
+```py
+def invalid(option: str | bytes):
+    partial(f, option=option)  # error: [invalid-argument-type]
+```
+
+### Overlapping parameter types after binding a union
+
+Without a keyword override, a positional argument must be valid for every possible value of the
+bound `option`. A `str` satisfies both overloads here.
+
+```py
+from functools import partial
+from typing import overload
+
+@overload
+def f(value: int | str, /, *, option: str) -> None: ...
+@overload
+def f(value: str | bytes, /, *, option: None) -> None: ...
+def f(value: int | str | bytes, /, *, option: str | None) -> None: ...
+def check(option: str | None):
+    p = partial(f, option=option)
+    p("value")  # ok
+    p(1)  # error: [invalid-argument-type]
+    p(1, option="text")  # ok
+```
+
 ### ParamSpec callable bound with `partial`
 
 ```py
@@ -1051,6 +1118,25 @@ reveal_type(p)  # revealed: partial[(*, a: int = 1, b: str) -> bool]
 partial(f, **{"a": "wrong"})  # error: [invalid-argument-type]
 ```
 
+If an overload accepts the unpacked keywords through `**kwargs`, the caller can override an
+individual entry to select that overload.
+
+```py
+from typing import overload
+
+@overload
+def choose(x: int, /, **options: int | bytes) -> int: ...
+@overload
+def choose(x: str, /, **options: str | bytes) -> str: ...
+def choose(x: int | str, /, **options: int | str | bytes) -> int | str:
+    return x
+
+def check(flag: int | str):
+    p = partial(choose, **{"common": b"", "flag": flag})
+    reveal_type(p(1, flag=2))  # revealed: int
+    reveal_type(p("a", flag="b"))  # revealed: str
+```
+
 ### Kwargs splat with TypedDict
 
 An open `TypedDict` may contain hidden extra items, so it cannot be normalized to a precise partial
@@ -1258,6 +1344,29 @@ def chain(depth):
         cur = functools.partial(cur)
     reveal_type(cur())  # revealed: Unknown | Divergent
     return cur
+```
+
+### Repeated partial application to a union of callables
+
+The configured factories share earlier partials. When the loop wraps them again, cycle recovery
+preserves each factory's return type.
+
+```py
+from collections.abc import Callable
+from functools import partial
+
+Factory = Callable[..., bytes] | Callable[..., str] | Callable[..., bytearray] | Callable[..., int]
+
+def configure(factory: Factory, layers: list[int]):
+    build = partial(factory, width=32)
+    build = partial(build, height=32)
+    build = partial(build, channels=3)
+    build = partial(build, stride=2)
+    build = partial(build, padding=1)
+    build = partial(build, bias=False)
+    for units in layers:
+        build = partial(build, units=units)
+    reveal_type(build())  # revealed: bytes | str | bytearray | int | Divergent
 ```
 
 ### Repeated partial application at module scope

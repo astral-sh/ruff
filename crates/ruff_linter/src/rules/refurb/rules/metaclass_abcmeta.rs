@@ -86,8 +86,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
     // Determine whether it's assigned to `abc.ABCMeta`.
     if !checker
         .semantic()
-        .resolve_qualified_name(&keyword.value)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["abc", "ABCMeta"]))
+        .matches_qualified_name(&keyword.value, &["abc", "ABCMeta"])
     {
         return;
     }

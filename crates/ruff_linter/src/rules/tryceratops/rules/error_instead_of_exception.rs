@@ -95,13 +95,10 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
                                 Edit::range_replacement("exception".to_string(), attr.range()),
                                 // When run against `logging.error`, the fix is safe; otherwise,
                                 // the object _may_ not be a logger.
-                                if checker
-                                    .semantic()
-                                    .resolve_qualified_name(expr.func.as_ref())
-                                    .is_some_and(|qualified_name| {
-                                        matches!(qualified_name.segments(), ["logging", "error"])
-                                    })
-                                {
+                                if checker.semantic().matches_qualified_name(
+                                    expr.func.as_ref(),
+                                    &["logging", "error"],
+                                ) {
                                     Applicability::Safe
                                 } else {
                                     Applicability::Unsafe
@@ -122,16 +119,10 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
                                     [name_edit],
                                     // When run against `logging.error`, the fix is safe; otherwise,
                                     // the object _may_ not be a logger.
-                                    if checker
-                                        .semantic()
-                                        .resolve_qualified_name(expr.func.as_ref())
-                                        .is_some_and(|qualified_name| {
-                                            matches!(
-                                                qualified_name.segments(),
-                                                ["logging", "error"]
-                                            )
-                                        })
-                                    {
+                                    if checker.semantic().matches_qualified_name(
+                                        expr.func.as_ref(),
+                                        &["logging", "error"],
+                                    ) {
                                         Applicability::Safe
                                     } else {
                                         Applicability::Unsafe

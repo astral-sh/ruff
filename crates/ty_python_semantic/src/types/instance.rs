@@ -75,33 +75,23 @@ impl<'db> Type<'db> {
             }
             // Functional TypedDicts return a TypedDict instance type.
             ClassLiteral::DynamicTypedDict(_) => Type::typed_dict(class),
-            ClassLiteral::Static(class_literal) => {
-                let specialization = class.into_generic_alias().map(|g| g.specialization(db));
-                match class_literal.known(db) {
-                    Some(KnownClass::Tuple) => Type::tuple(TupleType::new(
-                        db,
-                        env,
-                        specialization
-                            .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
-                            .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
-                            .as_ref(),
-                    )),
-                    Some(KnownClass::Object) => Type::object(),
-                    _ => class_literal
-                        .is_typed_dict(db)
-                        .then(|| Type::typed_dict(class))
-                        .or_else(|| {
-                            class.into_protocol_class(db).map(|protocol_class| {
-                                Self::ProtocolInstance(ProtocolInstanceType::from_class(
-                                    protocol_class,
-                                ))
-                            })
-                        })
-                        .unwrap_or_else(|| {
-                            Type::NominalInstance(NominalInstanceType::from_class(db, class))
-                        }),
+            ClassLiteral::Static(class_literal) => match class_literal.known(db) {
+                Some(KnownClass::Tuple) => {
+                    Type::tuple(TupleType::new(db, env, &builtin_tuple_spec(db, class)))
                 }
-            }
+                Some(KnownClass::Object) => Type::object(),
+                _ => class_literal
+                    .is_typed_dict(db)
+                    .then(|| Type::typed_dict(class))
+                    .or_else(|| {
+                        class.into_protocol_class(db).map(|protocol_class| {
+                            Self::ProtocolInstance(ProtocolInstanceType::from_class(protocol_class))
+                        })
+                    })
+                    .unwrap_or_else(|| {
+                        Type::NominalInstance(NominalInstanceType::from_class(db, class))
+                    }),
+            },
         }
     }
 
@@ -259,6 +249,47 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Can neither instance be redundant with the other in a union, regardless of
+    /// their type arguments? Only ordinary instances are decided by class ancestry.
+    ///
+    /// For a pair of ordinary nominal instances, [`TypeRelationChecker::check_class_pair`]
+    /// requires the target class to appear in the source MRO before it compares type
+    /// arguments or tries alternate inheritance paths. This is not an assignability
+    /// check: an unknown base does not make an instance redundant in a union.
+    /// Object and exact tuples have dedicated rules and are excluded here.
+    pub(super) fn has_unrelated_class(self, db: &'db dyn Db, other: Self) -> bool {
+        let (NominalInstanceInner::NonTuple(left), NominalInstanceInner::NonTuple(right)) =
+            (self.0, other.0)
+        else {
+            return false;
+        };
+        let (Some(left), Some(right)) = (
+            left.class(db).class_literal(db).as_static(),
+            right.class(db).class_literal(db).as_static(),
+        ) else {
+            return false;
+        };
+        if left == right {
+            return false;
+        }
+
+        // Specialization changes the arguments of a base, never its class identity.
+        // C3 already compares origins when merging the MRO. If the unspecialized
+        // MRO is invalid or incomplete, leave the decision to the full relation.
+        let excludes = |source: super::StaticClassLiteral<'db>, target| {
+            source.try_mro_ancestors(db, None).is_ok_and(|bases| {
+                bases.iter().all(|base| match base {
+                    ClassBase::Class(class) => {
+                        class.class_literal(db) != ClassLiteral::Static(target)
+                    }
+                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => false,
+                    ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => true,
+                })
+            })
+        };
+        excludes(left, right) && excludes(right, left)
+    }
+
     /// Returns the class literal for this instance.
     pub(super) fn class_literal(
         &self,
@@ -277,6 +308,10 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::SysVersionInfo => Some(KnownClass::VersionInfo),
             NominalInstanceInner::Object => Some(KnownClass::Object),
         }
+    }
+
+    pub(super) const fn is_exact_tuple(self) -> bool {
+        matches!(self.0, NominalInstanceInner::ExactTuple(_))
     }
 
     pub(super) const fn is_sys_version_info(self) -> bool {
@@ -315,19 +350,8 @@ impl<'db> NominalInstanceType<'db> {
                 class
                     .iter_mro(db)
                     .filter_map(ClassBase::into_class)
-                    .find_map(|class| match class.known(db)? {
-                        KnownClass::Tuple => Some(
-                            class
-                                .into_generic_alias()
-                                .and_then(|alias| {
-                                    Some(Cow::Borrowed(alias.specialization(db).tuple(db)?))
-                                })
-                                .unwrap_or_else(|| {
-                                    Cow::Owned(TupleSpec::homogeneous(Type::unknown()))
-                                }),
-                        ),
-                        _ => None,
-                    })
+                    .find(|class| class.known(db) == Some(KnownClass::Tuple))
+                    .map(|class| builtin_tuple_spec(db, class))
             }
         }
     }
@@ -503,6 +527,24 @@ impl<'db> NominalInstanceType<'db> {
             }
         }
     }
+}
+
+/// Returns the tuple shape for a specialization of the built-in `tuple` class.
+fn builtin_tuple_spec<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Cow<'db, TupleSpec<'db>> {
+    let specialization = class
+        .into_generic_alias()
+        .map(|alias| alias.specialization(db));
+    if let Some(tuple) = specialization.and_then(|spec| spec.tuple(db)) {
+        return Cow::Borrowed(tuple);
+    }
+
+    // Generic call inference can specialize the class's element type without constructing
+    // an explicit tuple shape, for example when `tuple` is passed as a callback.
+    Cow::Owned(match specialization.map(|spec| spec.types(db)) {
+        Some([Type::Never]) => TupleSpec::heterogeneous([]),
+        Some([element]) => TupleSpec::homogeneous(*element),
+        _ => TupleSpec::homogeneous(Type::unknown()),
+    })
 }
 
 impl<'db> From<NominalInstanceType<'db>> for Type<'db> {

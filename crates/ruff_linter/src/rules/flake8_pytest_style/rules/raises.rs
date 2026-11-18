@@ -233,8 +233,7 @@ pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem],
     let raises_called = items.iter().any(|item| match &item.context_expr {
         Expr::Call(ast::ExprCall { func, .. }) => checker
             .semantic()
-            .resolve_qualified_name(func)
-            .is_some_and(|name| is_pytest_raises(&name)),
+            .matches_qualified_name(func, &["pytest", "raises"]),
         _ => false,
     });
 

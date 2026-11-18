@@ -9,6 +9,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
 
 use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass};
 use super::context::InferContext;
@@ -1824,6 +1825,9 @@ pub(crate) struct UnpackedTypedDict<'db> {
     pub(crate) openness: TypedDictOpenness<'db>,
 }
 
+/// Shapes of unpacked values, reused while checking one literal against multiple union arms.
+pub(super) type UnpackedTypedDictCache<'db> = FxHashMap<Type<'db>, Option<UnpackedTypedDict<'db>>>;
+
 /// Combines the openness policies of intersected `TypedDict`-shaped values.
 ///
 /// An intersection must satisfy every constituent, so `Closed` dominates, `ImplicitlyOpen` adds no
@@ -2664,7 +2668,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             let positional_inference_target_ty = Type::TypedDict(positional_inference_target);
             let arg_ty = expression_type_fn(
                 arg,
-                TypeContext::declared(Some(positional_inference_target_ty)),
+                TypeContext::preference(Some(positional_inference_target_ty)),
             );
 
             if let Some(provided_keys) = validate_from_typed_dict_argument(
@@ -2717,7 +2721,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         // Assignability already checks for required keys and type compatibility,
         // so we don't need separate validation.
         let arg = &arguments.args[0];
-        let arg_ty = expression_type_fn(arg, TypeContext::declared(Some(typed_dict_ty)));
+        let arg_ty = expression_type_fn(arg, TypeContext::preference(Some(typed_dict_ty)));
 
         if !arg_ty.is_assignable_to(db, env, typed_dict_ty) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
@@ -2768,6 +2772,7 @@ fn validate_from_dict_literal<'db, 'ast>(
         },
         &mut provided_keys,
         &mut shadowed_keys,
+        &mut UnpackedTypedDictCache::default(),
         expression_type_fn,
     );
 
@@ -2809,8 +2814,7 @@ fn validate_from_keywords<'db, 'ast>(
 
             let value_tcx = typed_dict
                 .item(db, arg_name.id.as_str())
-                .map(|field| TypeContext::declared(Some(field.declared_ty)))
-                .unwrap_or_default();
+                .map_or_default(|field| TypeContext::preference(Some(field.declared_ty)));
             let value_ty = expression_type_fn(&keyword.value, value_tcx);
             TypedDictKeyAssignment {
                 context,
@@ -2849,6 +2853,7 @@ fn validate_from_keywords<'db, 'ast>(
                 },
                 &mut unpacked_guaranteed_keys,
                 &mut shadowed_keys,
+                &mut UnpackedTypedDictCache::default(),
                 expression_type_fn,
             );
 
@@ -2871,6 +2876,7 @@ fn validate_from_keywords<'db, 'ast>(
     guaranteed_keys.into_keys().collect()
 }
 
+#[expect(clippy::too_many_arguments)]
 fn validate_merged_dict_literal<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
@@ -2878,6 +2884,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
     nodes: TypedDictAssignmentNodes<'ast>,
     guaranteed_keys: &mut BTreeMap<Name, Option<AnyNodeRef<'ast>>>,
     shadowed_keys: &mut OrderSet<Name>,
+    unpacked_cache: &mut UnpackedTypedDictCache<'db>,
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> bool {
     let db = context.db();
@@ -2894,7 +2901,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
                     {
                         let value_ty = expression_type_fn(
                             &item.value,
-                            TypeContext::declared(Some(expected_ty)),
+                            TypeContext::preference(Some(expected_ty)),
                         );
                         if !value_ty.is_assignable_to(db, env, expected_ty) {
                             valid = false;
@@ -2941,8 +2948,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
             if !is_shadowed {
                 let value_tcx = typed_dict
                     .item(db, key.as_str())
-                    .map(|field| TypeContext::declared(Some(field.declared_ty)))
-                    .unwrap_or_default();
+                    .map_or_default(|field| TypeContext::preference(Some(field.declared_ty)));
                 let value_ty = expression_type_fn(&item.value, value_tcx);
                 valid &= TypedDictKeyAssignment {
                     context,
@@ -2976,6 +2982,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
                 },
                 guaranteed_keys,
                 shadowed_keys,
+                unpacked_cache,
                 expression_type_fn,
             );
         }
@@ -2995,6 +3002,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
     nodes: TypedDictAssignmentNodes<'ast>,
     guaranteed_keys: &mut BTreeMap<Name, Option<AnyNodeRef<'ast>>>,
     shadowed_keys: &mut OrderSet<Name>,
+    unpacked_cache: &mut UnpackedTypedDictCache<'db>,
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> bool {
     let db = context.db();
@@ -3009,6 +3017,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             nodes,
             guaranteed_keys,
             shadowed_keys,
+            unpacked_cache,
             expression_type_fn,
         );
     }
@@ -3023,7 +3032,10 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         return true;
     }
 
-    if let Some(unpacked) = extract_unpacked_typed_dict_from_value_type(db, env, unpacked_type) {
+    let unpacked = unpacked_cache
+        .entry(unpacked_type)
+        .or_insert_with(|| extract_unpacked_typed_dict_from_value_type(db, env, unpacked_type));
+    if let Some(unpacked) = unpacked.as_ref() {
         let ignored_keys = shadowed_keys.clone();
         let (_, mut unpacked_valid) = validate_extracted_typed_dict_keys(
             context,
@@ -3042,8 +3054,8 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             &ignored_keys,
         );
 
-        for (key_name, unpacked_key) in unpacked.keys {
-            if unpacked_key.is_required && !ignored_keys.contains(&key_name) {
+        for (key_name, unpacked_key) in &unpacked.keys {
+            if unpacked_key.is_required && !ignored_keys.contains(key_name) {
                 guaranteed_keys
                     .entry(key_name.clone())
                     .and_modify(|node| {
@@ -3052,7 +3064,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
                         }
                     })
                     .or_insert(Some(nodes.key));
-                shadowed_keys.insert(key_name);
+                shadowed_keys.insert(key_name.clone());
             }
         }
 
@@ -3092,6 +3104,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     typed_dict: TypedDictType<'db>,
     dict_expr: &ast::ExprDict,
     typed_dict_node: AnyNodeRef,
+    unpacked_cache: &mut UnpackedTypedDictCache<'db>,
     mut expression_type_fn: impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> Result<OrderSet<Name>, OrderSet<Name>> {
     let mut provided_keys = BTreeMap::new();
@@ -3108,6 +3121,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
         },
         &mut provided_keys,
         &mut shadowed_keys,
+        unpacked_cache,
         &mut expression_type_fn,
     );
 

@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.17.5
+
+Released on 2026-11-12.
+
+### Preview features
+
+- Redirect renamed rules ([#30081](https://github.com/astral-sh/ruff/pull/30081))
+- \[`flake8-async`\] Implement `pytest-raises-exception-group` (`ASYNC401`) ([#28772](https://github.com/astral-sh/ruff/pull/28772))
+- \[`flake8-logging-format`\] Mark `G004` fix as unsafe ([#30087](https://github.com/astral-sh/ruff/pull/30087))
+- \[`pylint`\] Implement `no-method-argument` (`PLE0211`) ([#29748](https://github.com/astral-sh/ruff/pull/29748))
+- \[`refurb`\] Do not offer fix when `write` is nested in an expression (`FURB103`) ([#29789](https://github.com/astral-sh/ruff/pull/29789))
+- \[`ruff`\] Add `renamed-rule` (`RUF202`) ([#30079](https://github.com/astral-sh/ruff/pull/30079))
+- \[`ruff`\] Expand `redirected-noqa` to other suppression comments (`RUF101`) ([#30078](https://github.com/astral-sh/ruff/pull/30078))
+
+### Bug fixes
+
+- Avoid crashing when Ruff logs to a closed stderr pipe ([#30209](https://github.com/astral-sh/ruff/pull/30209))
+- Fix fixes that add or remove a keyword argument with a parenthesized value ([#30189](https://github.com/astral-sh/ruff/pull/30189))
+- \[`flake8-import-conventions`\] Avoid shadowing names when fixing import aliases (`ICN001`) ([#30035](https://github.com/astral-sh/ruff/pull/30035))
+- \[`flake8-bugbear`\] Fix `B010` autofix for parenthesized `setattr` calls ([#30168](https://github.com/astral-sh/ruff/pull/30168))
+- \[`flake8-pyi`\] Fix `PYI034` autofix for parenthesized `self` annotations ([#30173](https://github.com/astral-sh/ruff/pull/30173))
+- \[`pyupgrade`\] Fix `UP031` duplicating closing parentheses around the format string ([#30172](https://github.com/astral-sh/ruff/pull/30172))
+
+### Rule changes
+
+- \[`flake8-bugbear`\] Ignore frozen dataclass instantiations (`B008`) ([#29231](https://github.com/astral-sh/ruff/pull/29231))
+
+### Performance
+
+- Various performance improvements ([#30375](https://github.com/astral-sh/ruff/pull/30375), [#30211](https://github.com/astral-sh/ruff/pull/30211), [#30368](https://github.com/astral-sh/ruff/pull/30368), [#30259](https://github.com/astral-sh/ruff/pull/30259), [#30354](https://github.com/astral-sh/ruff/pull/30354), [#30115](https://github.com/astral-sh/ruff/pull/30115), [#30133](https://github.com/astral-sh/ruff/pull/30133), [#30132](https://github.com/astral-sh/ruff/pull/30132), [#30358](https://github.com/astral-sh/ruff/pull/30358), [#30135](https://github.com/astral-sh/ruff/pull/30135), [#30369](https://github.com/astral-sh/ruff/pull/30369), [#30351](https://github.com/astral-sh/ruff/pull/30351), [#30352](https://github.com/astral-sh/ruff/pull/30352), [#30347](https://github.com/astral-sh/ruff/pull/30347), [#30379](https://github.com/astral-sh/ruff/pull/30379), [#30328](https://github.com/astral-sh/ruff/pull/30328), [#30329](https://github.com/astral-sh/ruff/pull/30329), [#29446](https://github.com/astral-sh/ruff/pull/29446))
+
+### Other changes
+
+- Fix FreeBSD source builds with libc 0.2.190 ([#30176](https://github.com/astral-sh/ruff/pull/30176))
+
+### Contributors
+
+- [@rajveer3x](https://github.com/rajveer3x)
+- [@tjkuson](https://github.com/tjkuson)
+- [@hugehoo](https://github.com/hugehoo)
+- [@hector2394](https://github.com/hector2394)
+- [@ansh-rohilla](https://github.com/ansh-rohilla)
+- [@mati-caliz](https://github.com/mati-caliz)
+- [@yxshee](https://github.com/yxshee)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@GeorgiaPreda](https://github.com/GeorgiaPreda)
+- [@G26karthik](https://github.com/G26karthik)
+- [@ntBre](https://github.com/ntBre)
+- [@s-cork](https://github.com/s-cork)
+
 ## 0.17.4
 
 Released on 2026-11-05.

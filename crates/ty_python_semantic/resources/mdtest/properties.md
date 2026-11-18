@@ -448,9 +448,9 @@ class C:
 c = C()
 c.attr = 1
 
-# error: [call-non-callable] "property has no getter"
+# error: [not-callable] "property has no getter"
 C.attr.__get__(c, C)
-# error: [call-non-callable] "property has no getter"
+# error: [not-callable] "property has no getter"
 type(C.attr).__get__(C.attr, c, C)
 
 # error: [invalid-attribute-access] "Cannot read property `attr` on object of type `C` because it has no getter"

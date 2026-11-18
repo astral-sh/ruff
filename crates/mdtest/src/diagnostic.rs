@@ -29,8 +29,7 @@ impl<'a> SortedDiagnostics<'a> {
                 line_number: diagnostic
                     .primary_span()
                     .and_then(|span| span.range())
-                    .map(line_start)
-                    .unwrap_or_default(),
+                    .map_or_default(line_start),
                 diagnostic,
             })
             .collect();

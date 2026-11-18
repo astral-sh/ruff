@@ -275,8 +275,7 @@ impl<'a> AnyNodeWithOrElse<'a> {
             }) => elif_else_clauses
                 .last()
                 .filter(|clause| clause.test.is_none())
-                .map(|clause| &*clause.body)
-                .unwrap_or_default(),
+                .map_or_default(|clause| &*clause.body),
         }
     }
 }

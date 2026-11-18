@@ -951,6 +951,15 @@ factory: type[Box[str]] | None = Box
 reveal_type(factory())  # revealed: Box[str]
 ```
 
+The bare class is also the runtime class of a `Box[str]`. Comparing with it preserves the
+constructor's specialization.
+
+```py
+def construct(factory: type[Box[str]]):
+    if factory == Box:
+        reveal_type(factory())  # revealed: Box[str]
+```
+
 Without a concrete type context, the default still applies:
 
 ```py
@@ -1003,7 +1012,7 @@ T = TypeVar("T", bound=P[str])
 def create(cls: type[T]) -> int:
     if cls is not P:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
-        return cls()  # error: [invalid-return-type]
+        return cls()  # error: [invalid-explicit-return]
     return 0
 
 create(P[str])
@@ -1029,7 +1038,7 @@ T = TypeVar("T", bound=Impl)
 def create(cls: type[T]) -> int:
     if cls is not P:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
-        return cls()  # error: [invalid-return-type]
+        return cls()  # error: [invalid-explicit-return]
     return 0
 
 create(Impl)
@@ -1056,7 +1065,7 @@ class Impl:
 T = TypeVar("T", bound=Impl)
 
 def as_protocol_class(cls: type[T]) -> TypeOf[P[int]]:
-    return cls  # error: [invalid-return-type]
+    return cls  # error: [invalid-explicit-return]
 ```
 
 ## Narrowing class objects against a final TypedDict
@@ -1079,7 +1088,7 @@ T = TypeVar("T", bound=Other)
 def create(cls: type[T]) -> int:
     if cls is not Shape:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'Shape'>
-        return "wrong"  # error: [invalid-return-type]
+        return "wrong"  # error: [invalid-explicit-return]
     return 0
 
 create(Other)
@@ -1106,7 +1115,7 @@ class Other(TypedDict):
 T = TypeVar("T", bound=Other)
 
 def as_shape_class(cls: type[T]) -> TypeOf[Shape[int]]:
-    return cls  # error: [invalid-return-type]
+    return cls  # error: [invalid-explicit-return]
 ```
 
 ## A subclass of a fully specialized generic is not generic
@@ -1260,6 +1269,44 @@ def accept_consumer(consumer: Consumer[Box[T]]) -> None: ...
 def _(boxes: list[S], consumer: Consumer[S]) -> None:
     accept_list(boxes)  # error: [invalid-argument-type]
     accept_consumer(consumer)  # error: [invalid-argument-type]
+```
+
+## Constructor receivers preserve bounds and constraints
+
+An empty call supplies no concrete type for `S`, but its upper bound still constrains the items.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S", bound=int)
+
+class Bucket(Generic[T]):
+    items: tuple[T, ...]
+
+    def __init__(self: "Bucket[S]", *items: S) -> None:
+        self.items = items
+
+empty = Bucket()
+integers: tuple[int, ...] = empty.items
+strings: tuple[str, ...] = empty.items  # error: [invalid-assignment]
+reveal_type(Bucket(1, 2))  # revealed: Bucket[int]
+```
+
+The constructor narrows the class's three allowed types to `int` and `str`.
+
+```py
+Allowed = TypeVar("Allowed", int, str, bytes)
+Accepted = TypeVar("Accepted", int, str)
+
+class Choice(Generic[Allowed]):
+    value: Allowed
+
+    def __init__(self: "Choice[Accepted]") -> None: ...
+
+value = Choice().value
+valid: int | str = value
+invalid: bytes = value  # error: [invalid-assignment]
 ```
 
 ## Inferring generic class parameters from constructors
@@ -1502,7 +1549,7 @@ class Box(Generic[T, U]):
         return result
 
     def wrong_wrap(self, value: T) -> "Box[T, T]":
-        return Box[T, Self](value, self)  # error: [invalid-return-type]
+        return Box[T, Self](value, self)  # error: [invalid-explicit-return]
 ```
 
 ### Constructing through a classmethod receiver
@@ -1648,7 +1695,7 @@ class Pair(Generic[T, U]):
     def check(self, x: int, y: str) -> int:
         # revealed: Pair[str, int]
         reveal_type(Pair(x, y))
-        return Pair(x, y).first  # error: [invalid-return-type]
+        return Pair(x, y).first  # error: [invalid-explicit-return]
 
 def check(x: int, y: str) -> None:
     # revealed: Pair[str, int]
@@ -1772,6 +1819,12 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D(1))  # revealed: D[int]
 ```
 
+Through `super(D, D)`, the inherited `__new__` infers the specialization from its `cls` argument.
+
+```py
+reveal_type(super(D, D).__new__(D[str]))  # revealed: D[str]
+```
+
 ### Generic class inherits `__init__` from generic base class
 
 ```py
@@ -1794,6 +1847,24 @@ reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(C(1, "str"))  # revealed: C[int, str]
 reveal_type(D(1, "str"))  # revealed: D[int, str]
+```
+
+Passing the bare class to `super` leaves the initializer unbound, so each call can infer its type
+arguments.
+
+```py
+def initialize(child: D[int, str]) -> None:
+    super(D, D).__init__(child, 1, "value")  # ok
+```
+
+Inside a class method, `super()` uses the specialization of `cls`. The initializer's `t` parameter
+expects `T`, which could be a type other than `int`.
+
+```py
+class Child(D[T, str]):
+    @classmethod
+    def initialize(cls, child: "Child[T]") -> None:
+        super().__init__(child, 1, "value")  # error: [invalid-argument-type] "Expected `T@Child`"
 ```
 
 ### Generic class inherits `__init__` from `dict`
@@ -1888,6 +1959,57 @@ reveal_type(C(1, True))  # revealed: C[int]
 
 # error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
+```
+
+### Calling a generic initializer on an existing instance
+
+An inherited initializer can infer its own type parameters from the arguments. Its explicit `self`
+annotation must also match the specialization of the receiver.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+E = TypeVar("E")
+A = TypeVar("A")
+B = TypeVar("B")
+T = TypeVar("T", bound=str | int)
+
+class Either(Generic[E]):
+    value: E
+
+    def __init__(
+        self: "Either[A | B]",
+        first: type[A],
+        second: type[B],
+        default: A | B | Callable[[], A | B],
+    ) -> None: ...
+
+class TextOrNumber(Either[str | int], Generic[T]):
+    def initialize(self, default: T | Callable[[], T]) -> None:
+        super().__init__(str, int, default)  # ok
+        super().__init__(str, bytes, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+```
+
+An instance of `Either[T]` can accept values of type `T`. Even with the upper bound `str | int`, `T`
+could be `str` alone, so the initializer cannot assume it accepts both types.
+
+```py
+class Child(Either[T]):
+    def initialize(self, cls: type[T], default: T | Callable[[], T]) -> None:
+        super().__init__(cls, cls, default)  # ok
+        super().__init__(str, int, default)  # error: [invalid-argument-type] "Expected `Either[str | int]`"
+```
+
+For `Either[bytes]`, the receiver is incompatible whether it is bound implicitly or passed
+explicitly to the inherited method.
+
+```py
+class Bytes(Either[bytes], Generic[T]):
+    def initialize(self, default: T | Callable[[], T]) -> None:
+        super().__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+        self.__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+        Bytes.__init__(self, str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
 ```
 
 ### Class-scoped type variables in `__init__` receiver annotations
@@ -2093,6 +2215,10 @@ T = TypeVar("T")
 @dataclass
 class A(Generic[T]):
     x: T
+
+    def reset(self, x: T) -> None:
+        self.__init__(x)  # ok
+        self.__init__(42)  # error: [invalid-argument-type]
 
 # revealed: ty_extensions._internal.GenericContext[T@A]
 reveal_type(generic_context(A))
@@ -2785,6 +2911,26 @@ reveal_type(Box.count)  # revealed: int
 Box.shared = 2
 reveal_type(Box[int].shared)  # revealed: int
 reveal_type(Box[int].get)  # revealed: def get(self) -> int | None
+```
+
+## Inferred `ClassVar` types in generic classes
+
+`Cache[int]` and `Cache[str]` share the same list, so its element type cannot depend on the `T`
+bound by `Cache`. A function stored on the class can bind its own `T`.
+
+```py
+from typing import ClassVar, Generic, TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+class Cache(Generic[T]):
+    values: ClassVar = list[T]()  # error: [invalid-type-form]
+    pending: ClassVar
+    pending = list[T]()  # error: [invalid-type-form]
+    transform: ClassVar = identity  # ok
 ```
 
 ## Inherited generic instance attributes
@@ -3813,7 +3959,7 @@ def copy(value: Nested) -> Nested:
     return Box(value.value)
 
 def invalid() -> Nested:
-    return Box("wrong")  # error: [invalid-return-type]
+    return Box("wrong")  # error: [invalid-explicit-return]
 ```
 
 ## Writable `__class__` protocol specializations
@@ -4124,7 +4270,7 @@ def inferred_result(a: Box[str], b: Box[T], cond: bool):
 
 def wrong_return(a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str]:
     box = a if cond else b
-    return box.pair()  # error: [invalid-return-type]
+    return box.pair()  # error: [invalid-explicit-return]
 ```
 
 ## Calling a union of generic methods
@@ -4152,7 +4298,7 @@ def call(a: Box[str], b: Box[T], cond: bool, value: U):
 
 def wrong_return(a: Box[str], b: Box[T], cond: bool, value: U) -> tuple[Box[str], str, int]:
     pair = a.pair if cond else b.pair
-    return pair(value)  # error: [invalid-return-type]
+    return pair(value)  # error: [invalid-explicit-return]
 ```
 
 ## Dictionary methods on unions

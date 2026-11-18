@@ -707,6 +707,10 @@ impl<'db> EnumComplementType<'db> {
         positive: &FxOrderSet<Type<'db>>,
         negative: &NegativeIntersectionElements<'db>,
     ) -> Option<Self> {
+        if negative.is_empty() {
+            return None;
+        }
+
         let mut enum_class = None;
         let mut rest = SmallVec::<[Type<'db>; 1]>::default();
         for positive in positive {
@@ -956,16 +960,15 @@ pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -
     let ignore_place = place_from_bindings(db, &env, ignore_bindings).place;
 
     match ignore_place {
-        Place::Defined(DefinedPlace { ty, .. }) => ty
-            .as_string_literal()
-            .map(|ignored_names| {
+        Place::Defined(DefinedPlace { ty, .. }) => {
+            ty.as_string_literal().map_or_default(|ignored_names| {
                 ignored_names
                     .value(db)
                     .split_ascii_whitespace()
                     .map(Name::new)
                     .collect()
             })
-            .unwrap_or_default(),
+        }
 
         // TODO: support the list-variant of `_ignore_`.
         Place::Undefined => FxHashSet::default(),

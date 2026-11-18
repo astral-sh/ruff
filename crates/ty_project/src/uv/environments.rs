@@ -13,31 +13,39 @@
 //! check is necessary because the script's dependencies and Python version must be known to
 //! produce accurate diagnostics.
 //!
-//! The language server requests synchronization for indexed scripts when opening a project,
-//! including scripts that are not open in the editor. It also requests synchronization when
-//! scripts are discovered, opened or saved, or when a file-watcher event reports a change to a
-//! closed script. Project metadata is refreshed when configuration changes.
+//! The language server synchronizes scripts on open and save. With workspace diagnostics enabled,
+//! it also synchronizes closed scripts at startup and after relevant file or configuration changes.
 //!
 //! These operations run in the background because synchronizing scripts can create environments
 //! and install packages. Waiting for them would increase the latency of other editor requests;
 //! for example, semantic tokens should remain available while synchronization is running.
-//! Scripts are discovered independently of diagnostics because workspace symbols and references
-//! also need their environments.
 //! This avoids a rust-analyzer-like experience where editor operations wait for `cargo check` to
 //! complete before becoming available.
 //!
-//! While a script's initial environment is unavailable, the language server defers its semantic
-//! diagnostics to avoid incorrect missing-dependency errors. Document pull requests receive an
-//! empty diagnostic report, while workspace diagnostic requests are suspended. After applying the
-//! synchronization result, the server resumes suspended requests and refreshes diagnostics.
+//! When `diagnosticMode` is `off` or `openFilesOnly`, ty doesn't report diagnostics for closed
+//! scripts. We accept incomplete navigation in those scripts to avoid scanning the project and
+//! installing dependencies for files the user may never open. Until ty synchronizes a script's
+//! environment on open, unresolved imports can cause LSP requests to miss symbols from its
+//! dependencies or references to those symbols in the script.
 //!
-//! Refreshing an available environment does not defer diagnostics. Projects and scripts continue
+//! While a script's first uv sync is pending, the language server reports empty diagnostics for
+//! that script to avoid incorrect missing-dependency errors. Workspace diagnostics continue
+//! checking other files. After applying the synchronization result, the server resumes suspended
+//! requests and refreshes diagnostics.
+//!
+//! Refreshing a synchronized environment does not defer diagnostics. Projects and scripts continue
 //! using their most recently applied environments until the refresh results are applied.
 //!
 //! uv reads files from disk, not from the editor. If a user adds a script metadata block to an
 //! open file, ty does not request synchronization until the file is saved. It keeps checking the
 //! file using ty's settings, so existing diagnostics stay visible. Once the file is saved and uv
 //! finishes synchronization, ty checks it again using the environment returned by uv.
+//!
+//! If a project reload selects uv for an open script, the language server
+//! waits for the next save or reopen to request synchronization. This avoids rereading open
+//! scripts on a configuration change to check whether their inline metadata has been saved.
+//! Disabling the setting takes effect immediately because ty checks it when looking up the
+//! script's environment.
 //!
 //! CLI watch mode also schedules requests in the background after filesystem changes, but delays
 //! the next check until those requests have completed. Repeated changes to a project or script
@@ -80,12 +88,12 @@ use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use salsa::Setter;
 
-use crate::script::script_tag;
+use crate::script::{script_tag, use_uv_for_script};
 use crate::uv::{
     MetadataTarget, ScriptSyncRequest, ScriptSyncTask, Uv, UvMetadata, UvMetadataError,
     UvMetadataResult, UvMetadataService, UvSyncTask, uv_executable_error,
 };
-use crate::{Db, ProjectReloadResult, ProjectSyncProgressFactory, UseUv, UvSyncProgress};
+use crate::{Db, ProjectReloadResult, ProjectSyncProgressFactory, UvSyncProgress};
 
 type ProgressFactory<'factory> =
     dyn Fn(&dyn Db, File) -> Option<Box<dyn UvSyncProgress>> + 'factory;
@@ -113,15 +121,6 @@ pub struct UvEnvironments {
 }
 
 impl UvEnvironments {
-    pub(crate) fn new(use_uv: UseUv) -> Self {
-        Self {
-            inner: Arc::new(UvEnvironmentsInner {
-                use_uv,
-                ..UvEnvironmentsInner::default()
-            }),
-        }
-    }
-
     /// Requests fresh workspace metadata for project rediscovery.
     pub fn request_project_sync(
         &self,
@@ -169,59 +168,42 @@ impl UvEnvironments {
         self.inner.sync_wakeups.clone()
     }
 
-    /// Returns whether `file`'s environment is [`Pending`](ScriptEnvironmentAvailability::Pending).
+    /// Returns whether diagnostics for `file` should wait for its first uv synchronization.
     ///
     /// A `false` result does not guarantee that initialization has finished. It may not have been
     /// requested yet, and another database handle can request it after this call. Callers must submit
     /// any required initial synchronization before scheduling operations that rely on this check.
     ///
-    /// Refreshing an available environment does not make it pending. A pending environment stays
+    /// A synchronized environment stays available during a refresh. A pending environment stays
     /// pending until [`poll_sync`](Self::poll_sync) applies its result, even if uv has finished.
     ///
     /// Salsa does not track changes to the pending state.
-    pub fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
-        if !self.is_enabled() || script_tag(db, file).is_none() {
-            return false;
-        }
-
+    pub(crate) fn is_initialization_pending(&self, db: &dyn Db, file: File) -> bool {
         self.existing_entry(file).is_some_and(|entry| {
+            if script_tag(db, file).is_none() || !use_uv_for_script(db, file) {
+                return false;
+            }
             matches!(
                 *entry.lock(),
                 ScriptEnvironmentState::Synchronizing {
+                    environment,
                     availability: ScriptEnvironmentAvailability::Pending,
                     ..
-                }
+                } if environment.synchronized_cache_key(db).is_none()
             )
         })
     }
 
-    /// Returns whether any script's initial environment is unavailable.
+    /// Requests a background uv sync for `file` if its environment needs updating.
     ///
-    /// Like [`Self::is_initialization_pending`], this only covers requested synchronizations.
-    /// Refreshing an available environment does not make it unavailable again. Project
-    /// environments are initialized during discovery, before background requests are scheduled.
-    pub fn has_pending_initializations(&self) -> bool {
-        self.inner.scripts.iter().any(|entry| {
-            matches!(
-                *entry.lock(),
-                ScriptEnvironmentState::Synchronizing {
-                    availability: ScriptEnvironmentAvailability::Pending,
-                    ..
-                }
-            )
-        })
-    }
-
-    /// Requests background synchronization for `file`'s environment.
+    /// This is a no-op for files that aren't scripts. This method cancels
+    /// any in-flight requests for files that used to be scripts or files
+    /// that changed their uv sync settings .
     ///
-    /// If this call creates the script's first `ScriptEnvironment`, `availability` determines
-    /// whether it can be used while synchronization runs. An existing `ScriptEnvironment`
-    /// remains available, even if its virtual environment has not previously been synchronized.
-    ///
-    /// If another synchronization is pending, records the latest request to run afterward and
-    /// cancels the queued job if it has not started. Running uv processes are allowed to finish.
-    /// The follow-up reuses the existing progress reporter. Otherwise, creates a new progress
-    /// reporter and submits the synchronization.
+    /// On the first sync, `availability` controls when ty can report type errors. `Available`
+    /// allows checking with the current Python version and import paths while uv runs. `Pending`
+    /// defers those diagnostics until ty applies the uv result. During later syncs, ty keeps
+    /// checking against the previous environment.
     ///
     /// Submission does not wait for uv or queue space.
     pub fn request_sync(
@@ -231,35 +213,48 @@ impl UvEnvironments {
         availability: ScriptEnvironmentAvailability,
         make_progress: &ProgressFactory<'_>,
     ) {
-        if !self.is_enabled() {
-            return;
-        }
-
         let Some(task) = script_sync_task(db, file) else {
+            // This file doesn't need syncing (anymore)?...
+            if let Some(entry) = self.existing_entry(file)
+                && let ScriptEnvironmentState::Synchronizing { sync, .. } = &mut *entry.lock()
+            {
+                // ... but there's a pending in-flight sync. This can happen
+                // when a user removes the script block after requesting a sync
+                // or disables the uv sync with `project-manager.script = "none"`.
+                //
+                // Set `latest_request` to `None`, so that `poll_sync` knows that it should
+                // discard the result of the in-flight uv sync call without scheduling a new sync.
+                // This is necessary because cancellation only skips queued requests,
+                // but not requests that are already in flight.
+                sync.latest_request = None;
+                sync.cancellation.cancel();
+            }
             return;
         };
         let entry: Arc<ScriptEnvironmentEntry> = self.entry(file);
         let mut state = entry.lock();
 
-        let (environment, availability) = match &mut *state {
-            ScriptEnvironmentState::Vacant => {
-                (ScriptEnvironment::new(db, None, None, None), availability)
-            }
+        let environment = match &mut *state {
+            ScriptEnvironmentState::Vacant => ScriptEnvironment::new(db, None, None, None),
             ScriptEnvironmentState::Current { environment } => {
-                let synchronized_cache_key = environment.synchronized_cache_key(db);
-                let already_synchronized = synchronized_cache_key == Some(task.request.cache_key());
-
-                if already_synchronized {
+                if environment.synchronized_cache_key(db) == Some(task.request.cache_key()) {
                     tracing::trace!(
                         "Script environment for `{}` is already synchronized",
                         task.request.path()
                     );
                     return;
                 }
-
-                (*environment, ScriptEnvironmentAvailability::Available)
+                *environment
             }
-            ScriptEnvironmentState::Synchronizing { sync, .. } => {
+            ScriptEnvironmentState::Synchronizing {
+                availability: current_availability,
+                sync,
+                ..
+            } => {
+                // A script first synchronized on save can be reopened before uv finishes.
+                if matches!(availability, ScriptEnvironmentAvailability::Pending) {
+                    *current_availability = availability;
+                }
                 if !sync.update_next_request(task.request.clone()) {
                     tracing::trace!(
                         "Script environment synchronization for `{}` is already requested",
@@ -284,7 +279,7 @@ impl UvEnvironments {
             availability,
             sync: InFlightSync {
                 active_cache_key: task.request.cache_key(),
-                next_request: None,
+                latest_request: Some(task.request.clone()),
                 cancellation,
             },
         };
@@ -405,9 +400,19 @@ impl UvEnvironments {
                         request.path()
                     );
 
-                    let output = match (sync.next_request.take(), output) {
-                        (None, Some(output)) => output,
-                        (next, _) => {
+                    match (sync.latest_request.as_ref(), output) {
+                        // A saved edit or a configuration reload disabled uv sync for this script.
+                        (None, _) => {
+                            environment.set_synchronized_cache_key(db).to(None);
+                        }
+                        // The completed `uv sync` result is for the current script metadata
+                        (Some(latest), Some(output))
+                            if latest.cache_key() == request.cache_key() =>
+                        {
+                            apply_sync_result(db, *environment, &request, output);
+                        }
+                        // The script's metadata has changed...
+                        (Some(next), _) => {
                             // uv updates the same environment on disk for every version of this script. If the
                             // metadata changes A -> B -> A, the B synchronization may already have modified the
                             // environment. Run A again even though its cache key matches the last completed
@@ -415,7 +420,7 @@ impl UvEnvironments {
                             //
                             // A cancelled request can become current again after another edit. Retry it
                             // when there is no newer request; cancellation does not update the environment.
-                            let next = next.unwrap_or(request);
+                            let next = next.clone();
                             sync.active_cache_key = next.cache_key();
                             sync.cancellation = CancellationTokenSource::new();
                             let token = sync.cancellation.token();
@@ -438,11 +443,10 @@ impl UvEnvironments {
                             );
                             continue;
                         }
+                    }
+                    *state = ScriptEnvironmentState::Current {
+                        environment: *environment,
                     };
-
-                    let environment = *environment;
-                    apply_sync_result(db, environment, &request, output);
-                    *state = ScriptEnvironmentState::Current { environment };
                     changes.scripts.push(file);
                 }
             }
@@ -472,7 +476,7 @@ impl UvEnvironments {
     }
 
     fn environment(&self, db: &dyn Db, file: File) -> Option<ScriptEnvironment> {
-        if !self.is_enabled() || file.path(db).as_system_path().is_none() {
+        if file.path(db).as_system_path().is_none() || !use_uv_for_script(db, file) {
             return None;
         }
 
@@ -488,10 +492,6 @@ impl UvEnvironments {
             ScriptEnvironmentState::Current { environment }
             | ScriptEnvironmentState::Synchronizing { environment, .. } => Some(environment),
         }
-    }
-
-    fn is_enabled(&self) -> bool {
-        self.inner.use_uv.script_environments_enabled()
     }
 
     fn existing_entry(&self, file: File) -> Option<Arc<ScriptEnvironmentEntry>> {
@@ -557,7 +557,7 @@ impl UvWorkspace {
     }
 }
 
-/// Whether a script environment is suitable for operations that depend on its dependencies.
+/// Whether diagnostics can use the default environment during a script's first synchronization.
 ///
 /// When opening a script, the initial environment lacks its declared dependencies and can produce
 /// incorrect results. Operations affected by those dependencies, such as semantic diagnostics,
@@ -568,10 +568,10 @@ impl UvWorkspace {
 /// the script's settings, and synchronization is deferred until the file is saved.
 #[derive(Clone, Copy)]
 pub enum ScriptEnvironmentAvailability {
-    /// The host should skip semantic diagnostics until synchronization finishes.
+    /// Defer semantic diagnostics until the first uv result is applied.
     Pending,
 
-    /// The default or previously synchronized environment can be used.
+    /// Continue reporting semantic diagnostics using the default environment.
     Available,
 }
 
@@ -617,7 +617,6 @@ pub(crate) struct ScriptEnvironment {
 }
 
 struct UvEnvironmentsInner {
-    use_uv: UseUv,
     project: Mutex<Option<ProjectSync>>,
     scripts: FxDashMap<File, Arc<ScriptEnvironmentEntry>>,
     sync_service: UvMetadataService,
@@ -630,7 +629,6 @@ impl Default for UvEnvironmentsInner {
         let (results_sender, sync_results) = crossbeam::channel::unbounded();
         let (wake_sender, sync_wakeups) = crossbeam::channel::bounded(1);
         Self {
-            use_uv: UseUv::default(),
             project: Mutex::default(),
             scripts: FxDashMap::default(),
             sync_service: UvMetadataService::new(results_sender, wake_sender),
@@ -695,7 +693,8 @@ enum ScriptEnvironmentState {
 /// running, newer requests replace the pending request instead of accumulating in a queue.
 struct InFlightSync {
     active_cache_key: ScriptEnvironmentCacheKey,
-    next_request: Option<ScriptSyncRequest>,
+    /// The latest requested metadata, or `None` if synchronization was disabled.
+    latest_request: Option<ScriptSyncRequest>,
     /// Signals the worker to skip this request if it has not started.
     cancellation: CancellationTokenSource,
 }
@@ -703,25 +702,17 @@ struct InFlightSync {
 impl InFlightSync {
     /// Updates the synchronization to run after the active request.
     ///
-    /// If `request` matches the active synchronization, removes any previously requested follow-up.
-    /// Otherwise, replaces the follow-up with `request`. A changed request cancels the queued job;
-    /// an already running uv process is allowed to finish.
-    ///
-    /// Returns whether the requested synchronization changed.
+    /// A changed request cancels the queued job. An already running uv process can finish.
     fn update_next_request(&mut self, request: ScriptSyncRequest) -> bool {
-        let desired = self
-            .next_request
+        if self
+            .latest_request
             .as_ref()
-            .map_or(self.active_cache_key, ScriptSyncRequest::cache_key);
-        if desired == request.cache_key() {
+            .is_some_and(|latest| latest.cache_key() == request.cache_key())
+        {
             return false;
         }
 
-        self.next_request = if self.active_cache_key == request.cache_key() {
-            None
-        } else {
-            Some(request)
-        };
+        self.latest_request = Some(request);
         self.cancellation.cancel();
         true
     }
@@ -767,6 +758,12 @@ fn apply_sync_result(
 fn script_sync_task(db: &dyn Db, file: File) -> Option<ScriptSyncTask> {
     let path = file.path(db).as_system_path()?;
     let tag = script_tag(db, file)?;
+
+    // Bail if syncing is disabled at the project or script level.
+    if !use_uv_for_script(db, file) {
+        return None;
+    }
+
     let python = script_python(db);
 
     // Hash the metadata text directly to avoid parsing it solely to compute the cache key.
@@ -795,30 +792,156 @@ fn script_python(db: &dyn Db) -> Option<SystemPathBuf> {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use anyhow::Context;
     use ruff_db::Db as _;
     use ruff_db::files::{File, system_path_to_file};
-    use ruff_db::system::{DbWithWritableSystem, SystemPath};
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath};
     use salsa::Setter;
     use salsa::plumbing::AsId;
     use serde_json::{Value, json};
+    use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
     use ty_python_semantic::Db as _;
+    use ty_static::EnvVars;
 
-    use super::{UvMetadata, script_environment};
+    use super::{
+        UvMetadata, UvMetadataError, apply_sync_result, script_environment, script_sync_task,
+    };
     use crate::db::testing::TestDb;
-    use crate::{Db as _, ProjectMetadata, UseUv};
+    use crate::metadata::Options;
+    use crate::metadata::options::EnvironmentOptions;
+    use crate::metadata::value::RelativePathBuf;
+    use crate::{Db as _, ProjectMetadata};
+
+    #[test]
+    fn disabling_script_uv_discards_pending_synchronization() -> anyhow::Result<()> {
+        let root = SystemPath::new("/project");
+        let path = root.join("script.py");
+        let mut db = TestDb::new(ProjectMetadata::new("test", root.to_path_buf()));
+        let enabled = r"
+            # /// script
+            # [tool.ty]
+            # project-manager.script = 'uv'
+            # ///
+            ";
+        db.write_dedented(path.as_str(), enabled)?;
+        let file = system_path_to_file(&db, &path)?;
+        let environments = db.uv_environments().clone();
+        let availability = super::ScriptEnvironmentAvailability::Pending;
+
+        // The in-memory system returns a uv error. Leave it unpolled until the script opts out.
+        environments.request_sync(&mut db, file, availability, &|_, _| None);
+        assert!(environments.has_pending_synchronizations());
+        let environment = script_environment(&db, file).context("expected a script environment")?;
+
+        db.write_dedented(path.as_str(), &enabled.replace("'uv'", "'none'"))?;
+        environments.request_sync(&mut db, file, availability, &|_, _| None);
+        environments.poll_sync(&mut db);
+
+        assert!(!environments.has_pending_synchronizations());
+        assert!(environment.initialization_error(&db).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn uv_script_does_not_use_the_project_environment() -> anyhow::Result<()> {
+        let root = SystemPath::new(if cfg!(windows) {
+            "C:/project"
+        } else {
+            "/project"
+        });
+        let venv = root.join("project-venv");
+        let site_packages = venv.join(if cfg!(windows) {
+            "Lib/site-packages"
+        } else {
+            "lib/python3.13/site-packages"
+        });
+        let path = root.join("report.py");
+        let mut metadata = ProjectMetadata::new("test", root.to_path_buf());
+        metadata.set_fallback_options(Options {
+            environment: Some(EnvironmentOptions {
+                python: Some(RelativePathBuf::python_extension(&venv)),
+                ..EnvironmentOptions::default()
+            }),
+            ..Options::default()
+        });
+        let mut db = TestDb::new(metadata);
+        db.test_system()
+            .set_env_var(EnvVars::VIRTUAL_ENV, venv.as_str());
+        db.write_dedented(
+            venv.join("pyvenv.cfg").as_str(),
+            r"
+            home = /missing
+            version = 3.13.0
+            include-system-site-packages = false
+            ",
+        )?;
+        db.write_file(site_packages.join("project_dependency.py"), "")?;
+        db.write_dedented(
+            path.as_str(),
+            r"
+            # /// script
+            # [tool.ty]
+            # project-manager.script = 'none'
+            # ///
+
+            import project_dependency
+            ",
+        )?;
+        let script = system_path_to_file(&db, &path)?;
+        let dependency =
+            ModuleName::new_static("project_dependency").context("expected a valid module name")?;
+        let resolves_dependency = |db: &TestDb, script| {
+            resolve_module(
+                db,
+                ImportingFile::ResolverFile(db.program_file(script).resolver_file(db)),
+                &dependency,
+            )
+            .is_some()
+        };
+
+        assert!(resolves_dependency(&db, script));
+
+        db.write_dedented(
+            path.as_str(),
+            r"
+            # /// script
+            # [tool.ty]
+            # project-manager.script = 'uv'
+            # ///
+
+            import project_dependency
+            ",
+        )?;
+
+        let environment =
+            script_environment(&db, script).context("expected a script environment")?;
+        let task = script_sync_task(&db, script).context("expected a script sync task")?;
+        apply_sync_result(
+            &mut db,
+            environment,
+            &task.request,
+            Err(UvMetadataError::Invocation(io::Error::other("uv failed"))),
+        );
+        assert!(!resolves_dependency(&db, script));
+        Ok(())
+    }
 
     #[test]
     fn semantic_lookup_creates_a_stable_default_environment() -> anyhow::Result<()> {
         let root = SystemPath::new("/project").to_path_buf();
         let path = root.join("script.py");
-        let metadata = ProjectMetadata::new("test", root).with_use_uv(UseUv::Scripts);
+        let metadata = ProjectMetadata::new("test", root);
         let mut db = TestDb::new(metadata);
         db.write_dedented(
             path.as_str(),
             r#"
             # /// script
             # dependencies = []
+            #
+            # [tool.ty]
+            # project-manager.script = 'uv'
             # ///
             "#,
         )?;
@@ -854,13 +977,18 @@ mod tests {
         let indirect = r#"
             # /// script
             # dependencies = ['parent']
+            #
+            # [tool.ty]
+            # project-manager.script = 'uv'
+            #
             # [tool.ty.rules]
             # missing-direct-dependency = 'error'
             # ///
+
             import leaf
             "#;
         let declared = indirect.replace("['parent']", "['parent', 'leaf']");
-        let metadata = ProjectMetadata::new("test", root.to_path_buf()).with_use_uv(UseUv::Scripts);
+        let metadata = ProjectMetadata::new("test", root.to_path_buf());
         let mut db = TestDb::new(metadata);
         db.write_dedented(
             environment.join("pyvenv.cfg").as_str(),
@@ -964,7 +1092,7 @@ mod tests {
 
         use super::super::{ScriptEnvironmentAvailability, UvSyncChanges, script_environment};
         use crate::db::testing::TestDb;
-        use crate::{Db as _, ProjectMetadata, UseUv, uv_test_env_vars};
+        use crate::{Db as _, ProjectMetadata, uv_test_env_vars};
 
         #[test]
         fn newer_project_refresh_discards_old_metadata() -> anyhow::Result<()> {
@@ -1040,7 +1168,11 @@ mod tests {
                 # /// script
                 # requires-python = ">=3.12"
                 # dependencies = ["attrs==25.4.0"]
+                #
+                # [tool.ty]
+                # project-manager.script = 'uv'
                 # ///
+
                 from attrs import define
                 "#,
             )?;
@@ -1062,14 +1194,58 @@ mod tests {
         }
 
         #[test]
-        fn existing_environment_remains_available_during_background_synchronization()
-        -> anyhow::Result<()> {
+        fn reopening_during_initial_save_waits_for_synchronization() -> anyhow::Result<()> {
             let mut case = UvTestCase::script(
                 r#"
                 # /// script
                 # requires-python = ">=3.12"
                 # dependencies = ["attrs==25.4.0"]
+                #
+                # [tool.ty]
+                # project-manager.script = 'uv'
                 # ///
+
+                from attrs import define
+                "#,
+            )?;
+            let environments = case.db.uv_environments().clone();
+
+            // Saving new script metadata keeps diagnostics visible. Reopening the saved
+            // script before uv finishes defers diagnostics until its dependencies are ready.
+            environments.request_sync(
+                &mut case.db,
+                case.file,
+                ScriptEnvironmentAvailability::Available,
+                &|_, _| None,
+            );
+            assert!(!environments.is_initialization_pending(&case.db, case.file));
+            environments.request_sync(
+                &mut case.db,
+                case.file,
+                ScriptEnvironmentAvailability::Pending,
+                &|_, _| None,
+            );
+            assert!(environments.is_initialization_pending(&case.db, case.file));
+
+            assert_eq!(case.wait_for_synchronizations()?.scripts, vec![case.file]);
+            assert!(!environments.is_initialization_pending(&case.db, case.file));
+            case.assert_can_import("attrs")?;
+
+            Ok(())
+        }
+
+        #[test]
+        fn default_environment_is_pending_during_initial_synchronization() -> anyhow::Result<()> {
+            let mut case = UvTestCase::script(
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = ["attrs==25.4.0"]
+                #
+                # [tool.ty]
+                # project-manager.script = 'uv'
+                # ///
+
                 from attrs import define
                 "#,
             )?;
@@ -1078,7 +1254,7 @@ mod tests {
             // Semantic analysis can reach a script before the host requests synchronization.
             // The missing-import diagnostic must clear when the environment becomes available.
             let _ = case.db.program_file(case.file);
-            let diagnostics = crate::check_file(&case.db, case.file);
+            let diagnostics = case.db.check_file(case.file);
             assert_eq!(diagnostics.len(), 1);
             assert_eq!(diagnostics[0].id().as_str(), "import-not-found");
 
@@ -1092,12 +1268,12 @@ mod tests {
                 &|_, _| None,
             );
             assert_eq!(script_environment(&case.db, case.file), Some(environment));
-            assert!(!environments.is_initialization_pending(&case.db, case.file));
+            assert!(environments.is_initialization_pending(&case.db, case.file));
 
             assert_eq!(case.wait_for_synchronizations()?.scripts, vec![case.file]);
             assert_eq!(script_environment(&case.db, case.file), Some(environment));
             case.assert_can_import("attrs")?;
-            assert!(crate::check_file(&case.db, case.file).is_empty());
+            assert!(case.db.check_file(case.file).is_empty());
 
             Ok(())
         }
@@ -1108,7 +1284,11 @@ mod tests {
             # /// script
             # requires-python = ">=3.12"
             # dependencies = ["attrs==25.4.0"]
+            #
+            # [tool.ty]
+            # project-manager.script = 'uv'
             # ///
+
             from attrs import define
             "#;
             let mut case = UvTestCase::script(initial)?;
@@ -1128,7 +1308,11 @@ mod tests {
                 # /// script
                 # requires-python = ">=3.12"
                 # dependencies = ["anyio"]
+                #
+                # [tool.ty]
+                # project-manager.script = 'uv'
                 # ///
+
                 from attrs import define
                 "#,
             )?;
@@ -1154,6 +1338,7 @@ mod tests {
                 ScriptEnvironmentAvailability::Pending,
                 &|_, _| None,
             );
+            assert!(!environments.is_initialization_pending(&case.db, case.file));
 
             let mut changed = environments.poll_sync(&mut case.db).scripts;
             changed.extend(case.wait_for_synchronizations()?.scripts);
@@ -1170,6 +1355,9 @@ mod tests {
                 # /// script
                 # requires-python = ">=3.12"
                 # dependencies = []
+                #
+                # [tool.ty]
+                # project-manager.script = 'uv'
                 # ///
                 "#,
             )?;
@@ -1224,11 +1412,11 @@ mod tests {
 
         impl UvTestCase {
             fn script(source: &str) -> anyhow::Result<Self> {
-                Self::new("script.py", source, UseUv::Scripts)
+                Self::new("script.py", source, false)
             }
 
             fn project(source: &str) -> anyhow::Result<Self> {
-                let case = Self::new("pyproject.toml", source, UseUv::On)?;
+                let case = Self::new("pyproject.toml", source, true)?;
                 case.sync_workspace()?;
                 Ok(case)
             }
@@ -1297,13 +1485,18 @@ mod tests {
                 Ok(())
             }
 
-            fn new(file_name: &str, source: &str, use_uv: UseUv) -> anyhow::Result<Self> {
+            fn new(
+                file_name: &str,
+                source: &str,
+                uv_workspace_discovery: bool,
+            ) -> anyhow::Result<Self> {
                 let temp_dir = tempfile::tempdir()?;
                 let root = SystemPath::from_std_path(temp_dir.path())
                     .context("temporary directory is not a valid UTF-8 path")?;
                 // uv resolves symlinks, including macOS's symlinked temporary directory.
                 let root = OsSystem::default().canonicalize_path(root)?;
-                let metadata = ProjectMetadata::new("test", root.clone()).with_use_uv(use_uv);
+                let metadata = ProjectMetadata::new("test", root.clone())
+                    .with_uv_workspace_discovery(uv_workspace_discovery);
                 let mut db = TestDb::new(metadata);
                 db.use_system(OsSystem::new(&root));
                 db.test_system().clear_env_vars();

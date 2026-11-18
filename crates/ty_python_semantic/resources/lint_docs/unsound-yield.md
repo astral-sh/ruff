@@ -117,8 +117,8 @@ generator boundaries.
 
 ## See also
 
-- `unsound-return-statement` is a similar rule that triggers on unsound `return` statements rather
-    than unsound `yield` expressions
+- `unsound-return` is a similar rule that triggers on unsound `return` statements rather than
+    unsound `yield` expressions
 - `unsound-assignment` is a similar rule that triggers on unsound assignments
 
 [ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/

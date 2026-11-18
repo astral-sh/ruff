@@ -110,6 +110,51 @@ pub fn resolve_module_confident<'db>(
     resolve_module_query(db, interned_name)
 }
 
+/// Finds the local directories supplying a package through configured search paths.
+pub(crate) fn package_directories<'db>(
+    db: &'db dyn Db,
+    module: Module<'db>,
+    mode: ModuleResolveMode,
+) -> Option<Vec<SystemPathBuf>> {
+    if !module.kind(db).is_package() {
+        return None;
+    }
+
+    let resolver_environment = module.resolver_environment(db);
+    let name = module.name(db);
+    let candidates = resolve_name(db, resolver_environment, name, mode)?;
+    let resolution = candidates.first()?;
+    let context = ResolverContext::new(db, resolver_environment, mode);
+
+    let directories = if candidates.len() > 1 && resolution.is_any_namespace_package(&context) {
+        candidates
+            .iter()
+            .map(|candidate| candidate.directory.path().to_system_path())
+            .collect()
+    } else {
+        // A regular package uses the first candidate's directory. Lower-priority candidates can
+        // still supply missing submodules (e.g., for a partial stub package), but their directories
+        // are not additional locations of the package itself.
+        resolution
+            .directory
+            .path()
+            .to_system_path()
+            .map(|directory| vec![directory])
+    };
+
+    // Reject a lookup that selects a different module with the same name.
+    let selected_module =
+        candidates
+            .into_iter()
+            .next()?
+            .into_module(db, resolver_environment, name);
+    if selected_module != module {
+        return None;
+    }
+
+    directories
+}
+
 /// Resolves a module name to a module (stubs not allowed).
 pub fn resolve_real_module<'db>(
     db: &'db dyn Db,
@@ -1883,10 +1928,112 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::module::ModuleKind;
     use crate::module_name::ModuleName;
+    use crate::resolve::ModuleResolveMode::{Runtime, Typing};
     use crate::strategy::FallibleStrategy;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
+
+    #[test]
+    fn namespace_package_locations_include_all_directories() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("shared/left.py", "")])
+            .with_site_packages_files(&[("shared/right.py", "")])
+            .build();
+
+        db.assert_package_directories(
+            "shared",
+            Runtime,
+            Some(&["/src/shared", "/site-packages/shared"]),
+        );
+    }
+
+    #[test]
+    fn regular_package_locations_exclude_shadowed_namespaces() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("regular/left.py", "")])
+            .with_site_packages_files(&[("regular/__init__.py", "")])
+            .build();
+
+        db.assert_package_directories("regular", Runtime, Some(&["/site-packages/regular"]));
+    }
+
+    #[test]
+    fn legacy_namespace_locations_include_all_directories() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[(
+                "legacy/__init__.py",
+                "__path__ = __import__(\"pkgutil\").extend_path(__path__, __name__)",
+            )])
+            .with_site_packages_files(&[("legacy/right.py", "")])
+            .build();
+
+        db.assert_module_file("legacy", Runtime, "/src/legacy/__init__.py");
+        db.assert_package_directories(
+            "legacy",
+            Runtime,
+            Some(&["/src/legacy", "/site-packages/legacy"]),
+        );
+    }
+
+    #[test]
+    fn file_module_locations_exclude_shadowed_namespaces() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("shadowed/child.py", "")])
+            .with_site_packages_files(&[("shadowed.py", ""), ("shadowed-stubs/__init__.pyi", "")])
+            .build();
+
+        db.assert_package_directories("shadowed", Runtime, None);
+        db.assert_module_file("shadowed", Runtime, "/site-packages/shadowed.py");
+    }
+
+    #[test]
+    fn module_locations_respect_resolution_mode() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("package/__init__.py", "")])
+            .with_site_packages_files(&[("package-stubs/__init__.pyi", "")])
+            .build();
+
+        db.assert_module_file("package", Runtime, "/src/package/__init__.py");
+        db.assert_package_directories("package", Runtime, Some(&["/src/package"]));
+        db.assert_module_file(
+            "package",
+            Typing,
+            "/site-packages/package-stubs/__init__.pyi",
+        );
+        db.assert_package_directories("package", Typing, Some(&["/site-packages/package-stubs"]));
+
+        let module = module_for_mode(&db, "package", Runtime);
+        assert!(module.package_directories(&db, Typing).is_none());
+    }
+
+    #[test]
+    fn stub_only_module_locations_require_typing_mode() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(&[("package-stubs/__init__.pyi", "")])
+            .build();
+
+        let module = module_for_mode(&db, "package", Typing);
+        assert!(module.package_directories(&db, Runtime).is_none());
+        db.assert_module_file(
+            "package",
+            Typing,
+            "/site-packages/package-stubs/__init__.pyi",
+        );
+    }
+
+    #[test]
+    fn vendored_packages_resolve_without_system_directories() {
+        let TestCase { db, .. } = TestCaseBuilder::new().with_vendored_typeshed().build();
+
+        let module = module_for_mode(&db, "_typeshed", Typing);
+
+        assert_matches!(
+            module.file(&db).map(|file| file.path(&db)),
+            Some(FilePath::Vendored(_))
+        );
+        db.assert_package_directories("_typeshed", Typing, None);
+    }
 
     fn resolve_module_confident<'db>(
         db: &'db TestDb,
@@ -3411,5 +3558,44 @@ not_a_directory
         )
         .unwrap();
         assert_eq!(module.search_path(&db).unwrap(), &site_packages);
+    }
+
+    #[track_caller]
+    fn module_for_mode<'db>(db: &'db TestDb, name: &str, mode: ModuleResolveMode) -> Module<'db> {
+        let name = ModuleName::new(name).unwrap();
+        let key = ModuleNameIngredient::new(db, name, mode, db.resolver_environment());
+        resolve_module_query(db, key).unwrap()
+    }
+
+    impl TestDb {
+        /// Asserts that the named module has the expected package directories in search order.
+        #[track_caller]
+        fn assert_package_directories(
+            &self,
+            name: &str,
+            mode: ModuleResolveMode,
+            expected: Option<&[&str]>,
+        ) {
+            let actual = module_for_mode(self, name, mode).package_directories(self, mode);
+            let expected = expected.map(|directories| {
+                directories
+                    .iter()
+                    .map(|directory| SystemPathBuf::from(*directory))
+                    .collect::<Vec<_>>()
+            });
+
+            assert_eq!(actual, expected, "package directories for {name}");
+        }
+
+        /// Asserts that the named module's defining file matches the expected filesystem path.
+        #[track_caller]
+        fn assert_module_file(&self, name: &str, mode: ModuleResolveMode, expected: &str) {
+            let actual = module_for_mode(self, name, mode)
+                .file(self)
+                .map(|file| file.path(self));
+            let expected = FilePath::from(SystemPathBuf::from(expected));
+
+            assert_eq!(actual, Some(&expected), "defining file for {name}");
+        }
     }
 }

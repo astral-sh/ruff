@@ -1034,6 +1034,40 @@ def foo() -> str:
     Ok(())
 }
 
+#[test]
+fn workspace_pull_finishes_when_all_diagnostics_were_streamed() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .with_file("src/a.py", "missing_a\n")?
+        .with_file("src/b.py", "missing_b\n")?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let token = lsp_types::ProgressToken::String("diagnostics".into());
+    let request = server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
+        identifier: None,
+        previous_result_ids: Vec::new(),
+        work_done_progress_params: WorkDoneProgressParams::default(),
+        partial_result_params: PartialResultParams {
+            partial_result_token: Some(token.clone()),
+        },
+    });
+
+    let progress = server.await_notification::<ProgressNotification>();
+    assert_eq!(progress.token, token);
+    let batch: WorkspaceDiagnosticReportPartialResult = serde_json::from_value(progress.value)?;
+    assert_eq!(batch.items.len(), 2);
+
+    let response = server
+        .try_await_response::<WorkspaceDiagnosticRequest>(&request, Some(Duration::from_secs(2)))
+        .expect("a pull that streamed changed diagnostics must finish");
+    assert!(response.items.is_empty());
+    Ok(())
+}
+
 /// Tests that the server's diagnostic streaming (partial results) work correctly
 /// with result ids.
 #[test]
@@ -1629,7 +1663,7 @@ mod uv_metadata {
         Code, Position, Range, TextDocumentContentChangeEvent,
         TextDocumentContentChangeWholeDocument,
     };
-    use ty_project::UseUv;
+    use ruff_python_trivia::textwrap::dedent;
 
     use super::{
         ClientOptions, DiagnosticMode, DocumentDiagnosticReport, Result, SystemPath,
@@ -1647,7 +1681,7 @@ mod uv_metadata {
                 Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
             )?
             .with_file(SystemPath::new("src/initial.py"), source)?
-            .with_use_uv(UseUv::Scripts)
+            .with_uv_script_manager()
             .build()
             .wait_until_workspaces_are_initialized();
 
@@ -1671,13 +1705,23 @@ mod uv_metadata {
     fn synchronization_failure_highlights_script_metadata() -> Result<()> {
         let workspace_root = SystemPath::new("src");
         let script = SystemPath::new("src/script.py");
-        let source =
-            "#!/usr/bin/env python3\n\n# /// script\n# dependencies = []\n# ///\nvalue = 1\n";
+        let source = dedent(
+            r"
+            #!/usr/bin/env python3
+
+            # /// script
+            # [tool.ty]
+            # project-manager.script = 'uv'
+            # ///
+
+            value = 1
+            ",
+        );
+        let source = source.trim_start();
 
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, source)?
-            .with_use_uv(UseUv::Scripts)
             .with_env_var("UV", "missing-ty-script-uv-executable")
             .enable_workspace_diagnostic_refresh(true)
             .build()
@@ -1701,7 +1745,7 @@ mod uv_metadata {
 
         assert_eq!(
             diagnostic.range,
-            Range::new(Position::new(2, 0), Position::new(4, 5))
+            Range::new(Position::new(2, 0), Position::new(5, 5))
         );
 
         Ok(())
@@ -1712,16 +1756,33 @@ mod uv_metadata {
         let workspace_root = SystemPath::new("src");
         let script = SystemPath::new("src/script.py");
         let initial = "PythonFinalizationError\nmissing\n";
-        let updated = "# /// script\n# requires-python = '>=3.13'\n# dependencies = []\n# ///\nPythonFinalizationError\nmissing\n";
+        let updated = dedent(
+            r"
+            # /// script
+            # requires-python = '>=3.13'
+            # dependencies = []
+            #
+            # [tool.ty]
+            # project-manager.script = 'uv'
+            # ///
+
+            PythonFinalizationError
+            missing
+            ",
+        );
 
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, initial)?
             .with_file(
                 SystemPath::new("src/ty.toml"),
-                "[environment]\npython-version = '3.12'\n",
+                dedent(
+                    r"
+                    [environment]
+                    python-version = '3.12'
+                    ",
+                ),
             )?
-            .with_use_uv(UseUv::Scripts)
             .with_env_var("UV", "missing-ty-script-uv-executable")
             .enable_workspace_diagnostic_refresh(true)
             .build()
@@ -1758,7 +1819,7 @@ mod uv_metadata {
             diagnostic.code,
             Some(Code::String("unresolved-reference".to_string()))
         );
-        assert_eq!(diagnostic.range.start.line, 5);
+        assert_eq!(diagnostic.range.start.line, 10);
 
         server.write_file(script, updated)?;
         server.save_text_document(script);

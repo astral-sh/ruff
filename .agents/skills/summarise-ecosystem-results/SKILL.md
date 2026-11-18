@@ -19,7 +19,9 @@ Prefix every direct or indirect `gh` invocation with `GH_TELEMETRY=false`, inclu
 
 ## Deliverable
 
-Create `PR_<number>_ECOSYSTEM_SUMMARY.md` at the repository root by adapting [assets/report-template.md](assets/report-template.md). The finished artifact must be GitHub-flavored Markdown suitable for a GitHub comment, with each prose paragraph and list item on one source line.
+Write `PR_<number>_ECOSYSTEM_SUMMARY.md` directly to the current chat's `outputs` directory outside the worktree. After verification, link to the file in the final chat response using its absolute path.
+
+Adapt [assets/report-template.md](assets/report-template.md) to produce GitHub-flavored Markdown suitable for a GitHub comment, with each prose paragraph and list item on one source line.
 
 Use the template's structure and omissions as the report contract. Remove all placeholders and HTML comments. Link external source locations with permalinks such as `[project file.py:123](permalink)`; never emit raw URLs.
 

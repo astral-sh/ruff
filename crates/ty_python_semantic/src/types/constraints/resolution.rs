@@ -110,7 +110,6 @@ impl<'db> Resolver<'_, 'db> {
                     &TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
                         generic_context: context,
                         types: &types,
-                        skip: None,
                     }),
                     TypeContext::default(),
                 );

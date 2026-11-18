@@ -976,7 +976,7 @@ class C:
 
 # TODO: The explicit annotation should make this a `str`.
 reveal_type(C().f)  # revealed: bound method C.f() -> int
-# TODO: This should emit `call-non-callable`.
+# TODO: This should emit `not-callable`.
 C().f()
 ```
 

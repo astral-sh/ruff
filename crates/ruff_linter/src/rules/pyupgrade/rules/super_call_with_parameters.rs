@@ -231,8 +231,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 
         if checker
             .semantic()
-            .resolve_qualified_name(func)
-            .is_some_and(|name| name.segments() == ["dataclasses", "dataclass"])
+            .matches_qualified_name(func, &["dataclasses", "dataclass"])
         {
             arguments.find_keyword("slots").is_some_and(|keyword| {
                 matches!(
@@ -317,9 +316,7 @@ fn has_local_dunder_class_var_ref(
 
 /// Returns `true` if the call is to the built-in `builtins.super` function.
 fn is_builtins_super(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
-    semantic
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["builtins", "super"]))
+    semantic.matches_qualified_name(&call.func, &["builtins", "super"])
 }
 
 /// A [`Visitor`] that searches for implicit reference to `__class__` cell,
