@@ -2253,13 +2253,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         // If we're in a type definition, we need to treat the arguments to any
                         // other callables as non-type definitions (i.e., we don't want to treat
                         // any strings as deferred type definitions).
-                        for arg in arguments.args() {
-                            self.visit_non_type_definition(arg);
-                        }
-                        for keyword in arguments.keywords() {
-                            let Keyword { value, .. } = keyword;
-                            self.visit_non_type_definition(value);
-                        }
+                        arguments.for_each_in_evaluation_order(|argument| {
+                            self.visit_non_type_definition(argument.value());
+                        });
                     }
                 }
             }
