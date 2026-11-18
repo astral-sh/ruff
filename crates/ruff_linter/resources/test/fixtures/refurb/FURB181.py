@@ -42,6 +42,19 @@ h = sha256()
 h.digest().hex()
 
 
+# Parenthesized `.digest()` call: keep the parentheses balanced
+(sha256().digest()).hex()
+
+digest = (
+    sha256(b"data")
+    .digest()
+).hex()
+
+(sha256().digest)().hex()
+
+((sha256().digest()).hex)()
+
+
 # these will not
 
 sha256().digest()

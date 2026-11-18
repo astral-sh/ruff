@@ -1,5 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
@@ -62,7 +63,12 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+    let Expr::Attribute(ExprAttribute {
+        attr,
+        value: digest_call,
+        ..
+    }) = call.func.as_ref()
+    else {
         return;
     };
 
@@ -72,16 +78,21 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
 
     let Expr::Call(ExprCall {
         func, arguments, ..
-    }) = value.as_ref()
+    }) = digest_call.as_ref()
     else {
         return;
     };
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
+    let Expr::Attribute(ExprAttribute {
+        attr: digest_attr,
+        value,
+        ..
+    }) = func.as_ref()
+    else {
         return;
     };
 
-    if attr.as_str() != "digest" {
+    if digest_attr.as_str() != "digest" {
         return;
     }
 
@@ -117,16 +128,34 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
     {
         let mut diagnostic = checker.report_diagnostic(HashlibDigestHex, call.range());
         if arguments.is_empty() {
-            let replacement_range = TextRange::new(value.end(), call.func.end());
+            // Rename `.digest` to `.hexdigest`, then delete the `.hex` attribute and the empty
+            // `()` of the outer call as two separate edits. Either the `.digest()` call or the
+            // `.hex` attribute may be parenthesized, as in `(sha256().digest()).hex()` or
+            // `((sha256().digest()).hex)()`, so leave any parentheses between them untouched.
+            let digest_call_end = parenthesized_range(
+                digest_call.into(),
+                call.func.as_ref().into(),
+                checker.tokens(),
+            )
+            .unwrap_or(digest_call.range())
+            .end();
+            let attribute_range = TextRange::new(digest_call_end, call.func.end());
+            let arguments_range = call.arguments.range();
 
-            let applicability = if checker.comment_ranges().intersects(replacement_range) {
+            let applicability = if checker.comment_ranges().intersects(attribute_range)
+                || checker.comment_ranges().intersects(arguments_range)
+            {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
             };
 
-            diagnostic.set_fix(Fix::applicable_edit(
-                Edit::range_replacement(".hexdigest".to_string(), replacement_range),
+            diagnostic.set_fix(Fix::applicable_edits(
+                Edit::range_replacement("hexdigest".to_string(), digest_attr.range()),
+                [
+                    Edit::range_deletion(attribute_range),
+                    Edit::range_deletion(arguments_range),
+                ],
                 applicability,
             ));
         }
