@@ -117,7 +117,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: d1df990f871e616da38bb602a2671d5e840b9989 # frozen: 0.13.7
+    rev: 00eaed0068329eb6ca6bcb8de7b46c372d8d1c19 # frozen: 0.13.9
     hooks:
       - id: uv-lock
         priority: 0
