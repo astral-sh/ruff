@@ -416,6 +416,26 @@ fn definition_expression_type<'db>(
     definition_expression_type_in_scope(db, definition, expression, scope)
 }
 
+/// Infer the literal name argument in a `TypeAliasType`, `TypeVar`, `ParamSpec`, or
+/// `TypeVarTuple` assignment. These factories use `name` for the keyword argument.
+///
+/// Inferring the argument can re-enter the object's `__name__` lookup. Start cycle recovery
+/// with no literal so the lookup can use `str`.
+#[salsa::tracked(
+    cycle_initial=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn factory_name_literal<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<StringLiteralType<'db>> {
+    let assignment = definition.kind(db).as_unannotated_assignment()?;
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let call = assignment.value(&module).as_call_expr()?;
+    let name_arg = call.arguments.find_argument_value("name", 0)?;
+    definition_expression_type(db, definition, name_arg).as_string_literal()
+}
+
 /// Infer a definition's expression using an explicitly supplied evaluation scope.
 ///
 /// [`definition_expression_type`] can look up the scope of a string literal used as an annotation,

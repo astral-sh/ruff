@@ -5954,7 +5954,7 @@ BadTypedDict3 = TypedDict("WrongName", {"name": str})
 reveal_type(BadTypedDict3)  # revealed: <class 'WrongName'>
 
 def f(x: str) -> None:
-    # error: [mismatched-typeddict-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "Y", got variable of type `str`"
+    # error: [mismatched-typeddict-name] "The name passed to `TypedDict` must match the variable it is assigned to: Cannot verify that a value of type `str` matches "Y""
     Y = TypedDict(x, {})
 
 def g(x: str) -> None:

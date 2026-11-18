@@ -944,7 +944,10 @@ Invalid = TypeAliasType("Invalid", int, qualname=1)  # error: [invalid-argument-
 
 ### Error cases
 
-#### Name is not a string literal
+#### Name supplied at runtime
+
+The name comparison needs the value of the first argument. The type alias still resolves to its
+value type when the name argument has type `str`.
 
 ```py
 from typing_extensions import TypeAliasType
@@ -952,8 +955,11 @@ from typing_extensions import TypeAliasType
 def get_name() -> str:
     return "IntOrStr"
 
-# error: [invalid-type-alias-type] "The `name` argument to `TypeAliasType` must be a string literal"
-IntOrStr = TypeAliasType(get_name(), int | str)
+IntOrStr = TypeAliasType(get_name(), int | str)  # error: [mismatched-type-alias-name]
+reveal_type(IntOrStr.__name__)  # revealed: str
+
+def f(value: IntOrStr) -> None:
+    reveal_type(value)  # revealed: int | str
 ```
 
 #### Name does not match variable

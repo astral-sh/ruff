@@ -977,13 +977,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let name_param = name_param_ty.as_string_literal().map(|name| name.value(db));
+        if name_param.is_none()
+            && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        {
             return error(
                 &self.context,
-                "The first argument to `TypeVarTuple` must be a string literal",
+                "The first argument to `TypeVarTuple` must be a string",
                 call_expr,
             );
-        };
+        }
         let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
@@ -997,7 +1000,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        if name_param != target_name {
+        if name_param != Some(target_name.as_str()) {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_TYPEVARTUPLE_NAME,
@@ -1006,7 +1009,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .unwrap_or_else(|| call_expr.range()),
                 "TypeVarTuple",
                 target_name,
-                Some(name_param),
+                name_param,
                 name_param_ty,
             );
         }
@@ -1231,13 +1234,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let name_param = name_param_ty.as_string_literal().map(|name| name.value(db));
+        if name_param.is_none()
+            && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        {
             return error(
                 &self.context,
-                "The first argument to `ParamSpec` must be a string literal",
+                "The first argument to `ParamSpec` must be a string",
                 call_expr,
             );
-        };
+        }
         let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
@@ -1251,7 +1257,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        if name_param != target_name {
+        if name_param != Some(target_name.as_str()) {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_PARAMSPEC_NAME,
@@ -1260,7 +1266,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .unwrap_or_else(|| call_expr.range()),
                 "ParamSpec",
                 target_name,
-                Some(name_param),
+                name_param,
                 name_param_ty,
             );
         }
@@ -1475,13 +1481,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let name_param = name_param_ty.as_string_literal().map(|name| name.value(db));
+        if name_param.is_none()
+            && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        {
             return error(
                 &self.context,
-                "The first argument to `TypeVar` must be a string literal.",
+                "The first argument to `TypeVar` must be a string",
                 call_expr,
             );
-        };
+        }
         let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
@@ -1495,7 +1504,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        if name_param != target_name {
+        if name_param != Some(target_name.as_str()) {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_TYPEVAR_NAME,
@@ -1504,7 +1513,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .unwrap_or_else(|| call_expr.range()),
                 "TypeVar",
                 target_name,
-                Some(name_param),
+                name_param,
                 name_param_ty,
             );
         }

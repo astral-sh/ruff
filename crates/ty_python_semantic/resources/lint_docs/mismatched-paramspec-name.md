@@ -1,6 +1,7 @@
 ## What it does
 
-Checks whether the name passed to `ParamSpec` differs from the assigned variable.
+Checks whether the name passed to `ParamSpec` differs from the assigned variable, or if ty cannot
+determine the value of a string passed to the `name` argument.
 
 ## Why is this bad?
 
@@ -12,5 +13,15 @@ make it harder to connect that signature to the definition.
 ```python
 from typing import ParamSpec
 
-P = ParamSpec("Q")  # error: [mismatched-paramspec-name] "Expected "P", got "Q""
+# error: "Expected "P", got "Q""
+P = ParamSpec("Q")
+
+
+def f(x: str):
+    # error: "Cannot verify that a value of type `str` matches "Q""
+    Q = ParamSpec(x)
 ```
+
+## Rule history
+
+- v0.0.107: Split out from `mismatched-type-name`.

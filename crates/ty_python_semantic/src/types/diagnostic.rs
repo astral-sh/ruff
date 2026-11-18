@@ -757,7 +757,7 @@ declare_lint! {
     pub(crate) static MISMATCHED_TYPE_NAME = {
         summary: "detects functional typing definitions whose declared name does not match the assigned variable",
         status: LintStatus::deprecated(
-            "0.0.102",
+            "0.0.107",
             "Name mismatches now have a separate rule for each kind of type.",
             &[
                 LintId::of(&MISMATCHED_ENUM_NAME),
@@ -778,7 +778,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/mismatched-enum-name.md")]
     pub(crate) static MISMATCHED_ENUM_NAME = {
         summary: "detects mismatched names in enum classes",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.107"),
         default_level: Level::Ignore,
     }
 }
@@ -787,7 +787,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/mismatched-namedtuple-name.md")]
     pub(crate) static MISMATCHED_NAMEDTUPLE_NAME = {
         summary: "detects mismatched names in named tuples",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.107"),
         default_level: Level::Ignore,
     }
 }
@@ -796,7 +796,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/mismatched-newtype-name.md")]
     pub(crate) static MISMATCHED_NEWTYPE_NAME = {
         summary: "detects mismatched names in `NewType` definitions",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.107"),
         default_level: Level::Warn,
     }
 }
@@ -805,7 +805,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/mismatched-paramspec-name.md")]
     pub(crate) static MISMATCHED_PARAMSPEC_NAME = {
         summary: "detects mismatched names in `ParamSpec` definitions",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.107"),
         default_level: Level::Warn,
     }
 }
@@ -814,7 +814,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/mismatched-type-alias-name.md")]
     pub(crate) static MISMATCHED_TYPE_ALIAS_NAME = {
         summary: "detects mismatched names in `TypeAliasType` definitions",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.107"),
         default_level: Level::Warn,
     }
 }
@@ -823,7 +823,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/mismatched-typeddict-name.md")]
     pub(crate) static MISMATCHED_TYPEDDICT_NAME = {
         summary: "detects mismatched names in typed dictionaries",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.107"),
         default_level: Level::Warn,
     }
 }
@@ -832,7 +832,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/mismatched-typevar-name.md")]
     pub(crate) static MISMATCHED_TYPEVAR_NAME = {
         summary: "detects mismatched names in `TypeVar` definitions",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.107"),
         default_level: Level::Warn,
     }
 }
@@ -841,7 +841,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/mismatched-typevartuple-name.md")]
     pub(crate) static MISMATCHED_TYPEVARTUPLE_NAME = {
         summary: "detects mismatched names in `TypeVarTuple` definitions",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.107"),
         default_level: Level::Warn,
     }
 }
@@ -1790,7 +1790,7 @@ pub(crate) fn report_mismatched_type_name<'db>(
         } else {
             let env = context.program_environment();
             diagnostic.set_primary_annotation_message(format_args!(
-                "Expected \"{expected_name}\", got variable of type `{}`",
+                "Cannot verify that a value of type `{}` matches \"{expected_name}\"",
                 actual_name_ty.display(db, env)
             ));
         }

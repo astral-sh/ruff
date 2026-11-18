@@ -12,8 +12,7 @@ A mismatched name can be a typo and can make a enum's runtime representation con
 ## Default level
 
 This rule is disabled by default because enum names are not required to match their assigned
-variables, and sometimes the preferred `__repr__` for an enum may include non-identifier
-characters.
+variables, and sometimes the preferred `__repr__` for an enum may include non-identifier characters.
 
 Enable this rule to enforce consistent enum naming.
 
@@ -22,5 +21,10 @@ Enable this rule to enforce consistent enum naming.
 ```python
 from enum import Enum
 
-Color = Enum("Colour", "RED BLUE")  # error: [mismatched-enum-name] "Expected "Color", got "Colour""
+# error: [mismatched-enum-name] "Expected "Color", got "Colour""
+Color = Enum("Colour", "RED BLUE")
 ```
+
+## Rule history
+
+- v0.0.107: Split out from `mismatched-type-name`.

@@ -23,6 +23,12 @@ Enable this rule to enforce consistent namedtuple naming.
 from collections import namedtuple
 from typing import NamedTuple
 
-Point = NamedTuple("Vector", [("x", int)])  # error: [mismatched-namedtuple-name] "Expected "Point", got "Vector""
-Pair = namedtuple("Coordinates", "x y")  # error: [mismatched-namedtuple-name] "Expected "Pair", got "Coordinates""
+# error: [mismatched-namedtuple-name] "Expected "Point", got "Vector""
+Point = NamedTuple("Vector", [("x", int)])
+# error: [mismatched-namedtuple-name] "Expected "Pair", got "Coordinates""
+Pair = namedtuple("Coordinates", "x y")
 ```
+
+## Rule history
+
+- v0.0.107: Split out from `mismatched-type-name`.

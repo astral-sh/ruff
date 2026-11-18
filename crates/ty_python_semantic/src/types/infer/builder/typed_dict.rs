@@ -269,8 +269,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .as_string_literal()
             .map(|literal| literal.value(db));
 
-        if name.is_none()
-            && !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        let valid_name_type = name.is_some()
+            || name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env));
+
+        if !valid_name_type
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -280,7 +282,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Expected `str`, found `{}`",
                 name_type.display(db, env)
             ));
-        } else if let Some(definition) = definition
+        }
+
+        if valid_name_type
+            && let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
             && Some(assigned_name.as_str()) != name
         {

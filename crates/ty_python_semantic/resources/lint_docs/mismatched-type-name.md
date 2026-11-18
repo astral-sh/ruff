@@ -15,3 +15,7 @@ kind of type:
 Existing configuration entries and ignore comments using `mismatched-type-name` still apply to all
 eight rules. However, users are encouraged to migrate to using the new rules in configuration files
 and suppression comments wherever possible.
+
+## Rule history
+
+- v0.0.107: Split into the eight rules listed under Migration.

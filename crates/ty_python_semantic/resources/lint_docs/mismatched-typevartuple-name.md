@@ -1,6 +1,7 @@
 ## What it does
 
-Checks whether the name passed to `TypeVarTuple` differs from the assigned variable.
+Checks whether the name passed to `TypeVarTuple` differs from the assigned variable, or if ty cannot
+determine the value of a string passed to the `name` argument.
 
 ## Why is this bad?
 
@@ -11,5 +12,15 @@ A mismatched name can be a typo and can make a `TypeVarTuple`'s runtime represen
 ```python
 from typing_extensions import TypeVarTuple
 
-Ts = TypeVarTuple("Us")  # error: [mismatched-typevartuple-name] "Expected "Ts", got "Us""
+# error: "Expected "Ts", got "Us""
+Ts = TypeVarTuple("Us")
+
+
+def f(x: str):
+    # error: "Cannot verify that a value of type `str` matches "Us""
+    Us = TypeVarTuple(x)
 ```
+
+## Rule history
+
+- v0.0.107: Split out from `mismatched-type-name`.

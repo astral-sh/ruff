@@ -175,16 +175,21 @@ def g(x: RegularCallableTypeOf[j]):
     reveal_type(x)  # revealed: (a: str) -> bytes
 ```
 
-## The name must be a string literal
+## Names passed through a variable
+
+When the name argument has type `str`, `mismatched-newtype-name` reports that ty cannot verify that
+it matches the assignment target. The assigned variable still defines a new type.
 
 ```py
 from typing_extensions import NewType
 
 def _(name: str) -> None:
-    _ = NewType(name, int)  # error: [invalid-newtype] "The first argument to `NewType` must be a string literal"
+    UserId = NewType(name, int)  # error: [mismatched-newtype-name]
+    reveal_type(UserId(1))  # revealed: UserId
 ```
 
-However, the literal doesn't necessarily need to be inline, as long as we infer it:
+If ty infers a string literal type for the name argument, it can compare the value with the assigned
+variable:
 
 ```py
 name = "Foo"

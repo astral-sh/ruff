@@ -87,7 +87,7 @@ use crate::types::{
     LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, RecursiveType,
     StringLiteralType, TypeAliasType, TypeContext, TypeIdentity, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, is_property_method, list_members,
+    WrapperDescriptorKind, enums, factory_name_literal, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -1766,6 +1766,7 @@ impl<'db> Bindings<'db> {
                             ] if instance.is_none(db) => {
                                 overload.set_return_type(*property);
                             }
+
                             [
                                 Some(Type::PropertyInstance(property)),
                                 Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
@@ -1778,19 +1779,40 @@ impl<'db> Bindings<'db> {
                                     .is_some_and(|f| f.name(db) == "__name__")
                             }) =>
                             {
-                                overload
-                                    .set_return_type(Type::string_literal(db, type_alias.name(db)));
+                                let name_type = match type_alias {
+                                    TypeAliasType::PEP695(alias) => {
+                                        Type::string_literal(db, alias.name(db))
+                                    }
+                                    TypeAliasType::ManualPEP695(alias) => {
+                                        factory_name_literal(db, alias.definition(db))
+                                            .map(|name| Type::string_literal(db, name.value(db)))
+                                            .unwrap_or_else(|| KnownClass::Str.to_instance(db, env))
+                                    }
+                                };
+                                overload.set_return_type(name_type);
                             }
+
                             [
                                 Some(Type::PropertyInstance(property)),
                                 Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))),
                                 ..,
                             ] => match property.getter(db).and_then(Type::as_function_literal) {
                                 Some(getter) if getter.name(db) == "__name__" => {
-                                    overload.set_return_type(Type::string_literal(
-                                        db,
-                                        typevar.name(db),
-                                    ));
+                                    let name_type = match (typevar.kind(db), typevar.definition(db))
+                                    {
+                                        (
+                                            TypeVarKind::LegacyTypeVar
+                                            | TypeVarKind::LegacyParamSpec
+                                            | TypeVarKind::LegacyTypeVarTuple,
+                                            Some(definition),
+                                        ) => factory_name_literal(db, definition)
+                                            .map(|name| Type::string_literal(db, name.value(db)))
+                                            .unwrap_or_else(|| {
+                                                KnownClass::Str.to_instance(db, env)
+                                            }),
+                                        _ => Type::string_literal(db, typevar.name(db)),
+                                    };
+                                    overload.set_return_type(name_type);
                                 }
                                 Some(getter) if getter.name(db) == "__bound__" => {
                                     overload.set_return_type(
@@ -1815,6 +1837,7 @@ impl<'db> Bindings<'db> {
                                 }
                                 _ => {}
                             },
+
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
                                     overload.check_property_getter(db, env, getter, *instance, 1);
@@ -1825,6 +1848,7 @@ impl<'db> Bindings<'db> {
                                     overload.set_return_type(Type::Never);
                                 }
                             }
+
                             [
                                 Some(property @ Type::NominalInstance(_)),
                                 Some(instance),
@@ -1832,6 +1856,7 @@ impl<'db> Bindings<'db> {
                             ] if instance.is_none(db) => {
                                 overload.set_return_type(*property);
                             }
+
                             _ => {}
                         }
                     }
