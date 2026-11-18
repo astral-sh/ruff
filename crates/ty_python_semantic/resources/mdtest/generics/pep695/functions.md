@@ -3948,6 +3948,25 @@ def choose[T](value: T, reverse: bool) -> None:
     result: T | None = reveal_type(pick(wrap(value)))  # revealed: None
 ```
 
+## Failed calls in arguments unrelated to specialization
+
+A failed call in a non-generic parameter does not prevent narrowing an otherwise valid
+specialization. A failure in an argument that constrains the type variable still prevents narrowing.
+
+```py
+def head[T](items: list[T], note: object) -> T:
+    return items[0]
+
+def unrelated(value: object) -> int:
+    result: int | None = head([1], len(value))  # ty: ignore[invalid-argument-type]
+    reveal_type(result)  # revealed: int
+    return result + 1
+
+def related(value: object) -> int | None:
+    result: int | None = head([len(value)], None)  # ty: ignore[invalid-argument-type]
+    return reveal_type(result)  # revealed: int | None
+```
+
 ## Suppressed argument errors do not justify union narrowing
 
 Disabling an argument diagnostic does not make a failed speculative specialization valid.

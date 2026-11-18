@@ -288,6 +288,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.has_failed_call.get()
     }
 
+    pub(super) fn clear_failed_call(&self) {
+        self.has_failed_call.set(false);
+    }
+
     /// Records an invalid type form even when its diagnostic is suppressed or inferred separately.
     pub(super) fn mark_invalid_type_form(&self) {
         self.has_invalid_type_form.set(true);
