@@ -6303,8 +6303,11 @@ def compose[A, B, C](f: Transform[A, B], g: Transform[B, C]) -> Transform[A, C]:
 def compose_reversed[C, B, A](f: Transform[A, B], g: Transform[B, C]) -> Transform[A, C]:
     return lambda items: g(f(items))
 
-compose(identity, identity)  # ok
-compose_reversed(identity, identity)  # ok
+# TODO: The shared element type should be bound by the returned callable.
+# revealed: (tuple[B@compose, ...], /) -> tuple[B@compose, ...]
+reveal_type(compose(identity, identity))
+# revealed: (tuple[A@compose_reversed, ...], /) -> tuple[A@compose_reversed, ...]
+reveal_type(compose_reversed(identity, identity))
 ```
 
 ## Dictionary value context containing a bounded type variable
