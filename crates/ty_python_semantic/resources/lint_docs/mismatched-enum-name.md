@@ -1,8 +1,8 @@
 ## What it does
 
-Checks that the name passed to a functional enum constructor, such as `Enum`, `IntEnum`, or `Flag`,
-matches the variable it is assigned to. This rule also warns if ty cannot determine the value of the
-name argument.
+Checks whether the class name passed to a functional enum constructor, such as `Enum`, `IntEnum`, or
+`Flag`, differs from the assigned variable's name. The rule applies when ty infers a string literal
+type for the class name argument.
 
 ## Why is this bad?
 

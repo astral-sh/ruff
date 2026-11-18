@@ -2815,7 +2815,8 @@ reveal_type(enum_members(Color))
 
 ### Name mismatch diagnostics
 
-The name passed to `Enum` must match the variable it is assigned to:
+When enabled, `mismatched-enum-name` checks whether a class name with a string literal type matches
+the assigned variable:
 
 ```py
 from enum import Enum
@@ -2841,20 +2842,11 @@ info[mismatched-enum-name]: The name passed to `Enum` must match the variable it
   |                 ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
 ```
 
-If the name is not a string literal, we also emit a diagnostic:
+A name passed through a variable is still checked if its inferred type is a string literal:
 
 ```py
-def f(name: str) -> None:
-    # snapshot: mismatched-enum-name
-    DynamicMismatch = Enum(name, "A B")
-```
-
-```snapshot
-info[mismatched-enum-name]: The name passed to `Enum` must match the variable it is assigned to
-  --> src/mdtest_snippet.py:11:28
-   |
-11 |     DynamicMismatch = Enum(name, "A B")
-   |                            ^^^^ Expected "DynamicMismatch", got variable of type `str`
+# error: [mismatched-enum-name]
+Other = Enum(name, "A B")
 ```
 
 ### List/tuple of tuples
@@ -3119,14 +3111,14 @@ Enum("Color", bad_kwarg=True)
 
 ### Non-literal name
 
-Non-literal names should still be recognized as creating an enum class.
+ty skips the name comparison when the class name has type `str`. It still infers the result as an
+enum class and checks the types of the other arguments.
 
 ```py
 from enum import Enum
 
 def make_enum(name: str) -> type[Enum]:
-    # error: [mismatched-enum-name]
-    result = Enum(name.title(), "RED BLUE", module=__name__)
+    result = Enum(name.title(), "RED BLUE", module=__name__)  # ok
     reveal_type(result)  # revealed: type[Enum]
     return result
 

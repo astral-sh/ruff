@@ -419,23 +419,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let name_ty = self.expression_type(name_arg);
-        let name = name_ty
-            .as_string_literal()
-            .map(|name_literal| name_literal.value(db));
-
-        if (name.is_some()
-            || name_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env)))
+        if let Some(actual_name) = name_ty.as_string_literal().map(|literal| literal.value(db))
             && let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
-            && Some(assigned_name.as_str()) != name
+            && assigned_name.as_str() != actual_name
         {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_ENUM_NAME,
                 name_arg,
-                base_class.name(self.program_environment().python_version(db)),
+                base_class.name(env.python_version(db)),
                 &assigned_name,
-                name,
+                Some(actual_name),
                 name_ty,
             );
         }

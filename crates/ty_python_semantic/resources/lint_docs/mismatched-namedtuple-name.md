@@ -1,7 +1,8 @@
 ## What it does
 
 Checks whether the `typename` passed to `typing.NamedTuple` or `collections.namedtuple` differs from
-the assigned variable.
+the assigned variable's name. The rule applies when ty infers a string literal type for the
+`typename` argument.
 
 ## Why is this bad?
 

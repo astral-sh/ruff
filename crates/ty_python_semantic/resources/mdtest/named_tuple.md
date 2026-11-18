@@ -402,13 +402,18 @@ reveal_type(p.id)  # revealed: int
 reveal_type(p.name)  # revealed: str
 ```
 
-Non-literal `str` names should not be treated as proven mismatches:
+### Class names of type `str`
+
+ty skips the name comparison for both `NamedTuple` and `namedtuple` when the `typename` argument has
+type `str`.
 
 ```py
+from collections import namedtuple
 from typing import NamedTuple
 
 def f(name: str) -> None:
-    Match = NamedTuple(name, [("value", int)])
+    Record = NamedTuple(name, [("value", int)])  # ok
+    Row = namedtuple(name, ["value"])  # ok
 ```
 
 ### Functional syntax with tuple variable fields

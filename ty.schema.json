@@ -1316,7 +1316,7 @@
         },
         "mismatched-enum-name": {
           "title": "detects mismatched names in enum classes",
-          "description": "## What it does\n\nChecks that the name passed to a functional enum constructor, such as `Enum`, `IntEnum`, or `Flag`,\nmatches the variable it is assigned to. This rule also warns if ty cannot determine the value of the\nname argument.\n\n## Why is this bad?\n\nThe name argument becomes the enum class's `__name__`. A member's representation can therefore refer\nto a different class name than the one used in the source.\n\n## Default level\n\nThis rule is disabled by default because a functional enum can intentionally have a runtime name\nthat differs from its variable name.\n\n## Examples\n\n```python\nfrom enum import Enum\n\nColor = Enum(\"Colour\", \"RED BLUE\")  # error: [mismatched-enum-name]\n```",
+          "description": "## What it does\n\nChecks whether the class name passed to a functional enum constructor, such as `Enum`, `IntEnum`,\nor `Flag`, differs from the assigned variable's name. The rule applies when ty infers a string\nliteral type for the class name argument.\n\n## Why is this bad?\n\nThe name argument becomes the enum class's `__name__`. A member's representation can therefore refer\nto a different class name than the one used in the source.\n\n## Default level\n\nThis rule is disabled by default because a functional enum can intentionally have a runtime name\nthat differs from its variable name.\n\n## Examples\n\n```python\nfrom enum import Enum\n\nColor = Enum(\"Colour\", \"RED BLUE\")  # error: [mismatched-enum-name]\n```",
           "default": "ignore",
           "oneOf": [
             {
@@ -1326,7 +1326,7 @@
         },
         "mismatched-namedtuple-name": {
           "title": "detects mismatched names in named tuples",
-          "description": "## What it does\n\nChecks whether the `typename` passed to `typing.NamedTuple` or `collections.namedtuple` differs from\nthe assigned variable.\n\n## Why is this bad?\n\nThe `typename` determines the class name shown when printing a named tuple. A different name in the\nsource makes it harder to identify the class that produced a value.\n\n## Default level\n\nThis rule is disabled by default because named tuple factories can intentionally give their classes\na different runtime name.\n\n## Examples\n\n```python\nfrom collections import namedtuple\nfrom typing import NamedTuple\n\nPoint = NamedTuple(\"Vector\", [(\"x\", int)])  # error: [mismatched-namedtuple-name]\nPair = namedtuple(\"Coordinates\", \"x y\")  # error: [mismatched-namedtuple-name]\n```",
+          "description": "## What it does\n\nChecks whether the `typename` passed to `typing.NamedTuple` or `collections.namedtuple` differs from\nthe assigned variable's name. The rule applies when ty infers a string literal type for the\n`typename` argument.\n\n## Why is this bad?\n\nThe `typename` determines the class name shown when printing a named tuple. A different name in the\nsource makes it harder to identify the class that produced a value.\n\n## Default level\n\nThis rule is disabled by default because named tuple factories can intentionally give their classes\na different runtime name.\n\n## Examples\n\n```python\nfrom collections import namedtuple\nfrom typing import NamedTuple\n\nPoint = NamedTuple(\"Vector\", [(\"x\", int)])  # error: [mismatched-namedtuple-name]\nPair = namedtuple(\"Coordinates\", \"x y\")  # error: [mismatched-namedtuple-name]\n```",
           "default": "ignore",
           "oneOf": [
             {
