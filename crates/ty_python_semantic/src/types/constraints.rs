@@ -861,8 +861,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     }
 
     /// Projects out callable-local typevars that the outer solve cannot recover from a captured
-    /// ParamSpec. A failed prefix check or a relation between two ParamSpecs can produce
-    /// constraints without a captured signature.
+    /// `ParamSpec`. A failed prefix check or a relation between two `ParamSpec` variables can
+    /// produce constraints without a captured signature.
     pub(super) fn reduce_uncaptured_typevars(
         self,
         db: &'db dyn Db,
