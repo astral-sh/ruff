@@ -72,7 +72,7 @@ pub struct ProjectMetadata {
     /// Whether ty should query uv for workspace metadata during project discovery and reload.
     /// The CLI or language server supplies this flag.
     ///
-    /// TODO: Remove this field when the `use-uv-for-projects` setting is introduced.
+    /// TODO: Remove this field when the `project-manager.project` setting is introduced.
     #[cfg_attr(test, serde(skip))]
     use_uv_for_workspace: bool,
 }
