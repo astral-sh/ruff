@@ -5,7 +5,7 @@ use colored::Colorize;
 use ruff_command_line::TerminalColor;
 use std::fmt;
 use std::fs::File;
-use std::io::{BufWriter, IsTerminal};
+use std::io::{self, BufWriter, IsTerminal, Write};
 use tracing::{Event, Subscriber};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::LevelFilter;
@@ -288,5 +288,31 @@ where
         ctx.field_format().format_fields(writer.by_ref(), event)?;
 
         writeln!(writer)
+    }
+}
+
+/// A local version of [`tracing-indicatif`'s `IndicatifWriter`] that writes tracing events above
+/// active progress bars without enabling extra `indicatif` and `tracing-subscriber` features.
+///
+/// [`tracing-indicatif`'s `IndicatifWriter`]: https://docs.rs/tracing-indicatif/latest/tracing_indicatif/writer/struct.IndicatifWriter.html
+pub(crate) struct IndicatifWriter(indicatif::MultiProgress);
+
+impl IndicatifWriter {
+    pub(crate) fn stderr(progress: indicatif::MultiProgress) -> Self {
+        Self(progress)
+    }
+}
+
+impl Write for IndicatifWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.suspend(|| io::stderr().write(buf))
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.0.suspend(|| io::stderr().write_all(buf))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.suspend(|| io::stderr().flush())
     }
 }

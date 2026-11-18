@@ -28,7 +28,6 @@ use ruff_diagnostics::Applicability;
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::RangedValue;
 use salsa::Database;
-use tracing_indicatif::writer::{IndicatifWriter, Stderr};
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::metadata::settings::TerminalSettings;
@@ -42,7 +41,7 @@ use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_static::EnvVars;
 
 use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat};
-use crate::logging::{VerbosityLevel, setup_tracing};
+use crate::logging::{IndicatifWriter, VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
 
@@ -115,11 +114,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     let printer = Printer::new(verbosity, args.no_progress);
     let progress = indicatif::MultiProgress::with_draw_target(printer.progress_target());
-    let _guard = setup_tracing(
-        verbosity,
-        color,
-        IndicatifWriter::<Stderr>::new(progress.clone()),
-    )?;
+    let tracing_progress = progress.clone();
+    let _guard = setup_tracing(verbosity, color, move || {
+        IndicatifWriter::stderr(tracing_progress.clone())
+    })?;
 
     tracing::debug!("Version: {}", version::version());
 
@@ -803,14 +801,14 @@ struct IndicatifReporter {
 
     /// Show a spinner during indexing and a file count once the number of files to check is known.
     bar: indicatif::ProgressBar,
-    bars: indicatif::MultiProgress,
+    multi_progress: indicatif::MultiProgress,
 }
 
 impl IndicatifReporter {
-    fn new(bars: indicatif::MultiProgress) -> Self {
+    fn new(multi_progress: indicatif::MultiProgress) -> Self {
         Self {
-            bar: bars.add(indicatif::ProgressBar::hidden()),
-            bars,
+            bar: multi_progress.add(indicatif::ProgressBar::hidden()),
+            multi_progress,
             collector: CollectReporter::default(),
         }
     }
@@ -860,7 +858,7 @@ impl ty_project::ProgressReporter for IndicatifReporter {
 impl Drop for IndicatifReporter {
     fn drop(&mut self) {
         self.bar.finish_and_clear();
-        self.bars.remove(&self.bar);
+        self.multi_progress.remove(&self.bar);
     }
 }
 
