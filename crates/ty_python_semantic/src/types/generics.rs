@@ -1,7 +1,6 @@
 use crate::{Program, ProgramEnvironment};
 use std::borrow::Cow;
 use std::cell::{Cell, LazyCell, RefCell};
-use std::collections::VecDeque;
 use std::collections::hash_map::Entry;
 
 use itertools::Itertools;
@@ -1020,7 +1019,7 @@ impl<'db> GenericContext<'db> {
         // A bare T = T preserves an unresolved variable. Elsewhere in its own binding, T
         // contributes the bottom of its domain. Do this before substituting peers, since
         // applying a ParamSpec can rebuild the callable that contains it.
-        let mut pending = VecDeque::new();
+        let mut pending = Vec::new();
         for (i, (var, ty)) in self.variables(db).zip(&mut types).enumerate() {
             if *ty == Type::TypeVar(var) {
                 continue;
@@ -1028,7 +1027,7 @@ impl<'db> GenericContext<'db> {
             let context = Self::from_typevar_instances(db, &env, [var]);
             let bottom = context.specialize(db, &[var.domain(db).bottom(db)]);
             *ty = ty.apply_specialization(db, bottom);
-            pending.push_back((i, var, context));
+            pending.push((i, var, context));
         }
 
         // Independent bindings, including types from the caller, are already stable under
@@ -1043,38 +1042,84 @@ impl<'db> GenericContext<'db> {
 
         // Eliminate one variable from the other bindings at a time. Repeatedly substituting
         // all of them at once can keep reintroducing the same union members in a different order.
-        let mut deferred = 0;
-        while let Some((i, var, context)) = pending.pop_front() {
-            let binding = types[i];
-            if binding == Type::TypeVar(var) {
+        let mut alias_cycles = Vec::new();
+        while let Some(&(_, first, _)) = pending.first() {
+            // With B = B & C and C = B, eliminating C leaves B free. Picking the
+            // fixed point Never for B first would discard that solution. Try bindings
+            // without self-references before choosing a fixed point for a cycle.
+            let mut fixed_point = None;
+            let independent = pending
+                .iter()
+                .enumerate()
+                .find_map(|(slot, &(i, var, context))| {
+                    let binding = types[i];
+                    if binding == Type::TypeVar(var) {
+                        return Some((slot, binding));
+                    }
+                    let substitute =
+                        |value| binding.apply_specialization(db, context.specialize(db, &[value]));
+                    let candidate = substitute(var.domain(db).bottom(db));
+                    if candidate == binding {
+                        return Some((slot, binding));
+                    }
+                    if fixed_point.is_none()
+                        && candidate.is_equivalent_to(db, &env, substitute(candidate))
+                    {
+                        fixed_point = Some((slot, candidate));
+                    }
+                    None
+                });
+            let (slot, solution) = independent
+                .or(fixed_point)
+                .unwrap_or_else(|| (0, first.unknown_value(db, &env)));
+            let (i, var, context) = pending.remove(slot);
+            types[i] = solution;
+            if solution == Type::TypeVar(var) {
+                alias_cycles.push((var, context));
                 continue;
             }
-            // For T = T | int, substituting Never yields the fixed point int. For
-            // T = list[T], list[Never] fails the same check. A peer can still resolve
-            // the cycle, so only recover with Unknown after an entire pass stalls.
-            let substitute =
-                |value| binding.apply_specialization(db, context.specialize(db, &[value]));
-            let candidate = substitute(var.domain(db).bottom(db));
-            types[i] = if candidate == binding
-                || candidate.is_equivalent_to(db, &env, substitute(candidate))
-            {
-                candidate
-            } else if deferred < pending.len() {
-                pending.push_back((i, var, context));
-                deferred += 1;
-                continue;
-            } else {
-                var.unknown_value(db, &env)
-            };
-            deferred = 0;
-            let substitution = context.specialize(db, &[types[i]]);
+            let substitution = context.specialize(db, &[solution]);
             for (j, ty) in types.iter_mut().enumerate() {
                 if j != i {
                     *ty = ty.apply_specialization(db, substitution);
                 }
             }
         }
+        // An indirect alias can acquire this binding on the last substitution. Choose
+        // a representative after all such aliases, and their declared bounds, are known.
+        for (var, context) in alias_cycles {
+            let representative = self.alias_cycle_representative(db, &env, var, &types);
+            if representative != var {
+                let substitution = context.specialize(db, &[Type::TypeVar(representative)]);
+                for ty in &mut types {
+                    *ty = ty.apply_specialization(db, substitution);
+                }
+            }
+        }
         Specialization::new(db, self, types, None, None)
+    }
+
+    /// Substitution can leave several variables bound to one another: for `T = S, S = T`,
+    /// both slots end up containing whichever variable was eliminated last. If `S: int`
+    /// and `T` is unbounded, only `S` preserves what we know about both slots.
+    fn alias_cycle_representative(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        last: BoundTypeVarInstance<'db>,
+        types: &[Type<'db>],
+    ) -> BoundTypeVarInstance<'db> {
+        let aliases = || {
+            self.variables(db)
+                .zip(types)
+                .filter_map(|(var, ty)| (*ty == Type::TypeVar(last)).then_some(var))
+        };
+        std::iter::once(last)
+            .chain(aliases())
+            .find(|&candidate| {
+                aliases().all(|alias| candidate.can_specialize_typevar(db, env, alias))
+            })
+            .unwrap_or(last)
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
@@ -5135,6 +5180,26 @@ mod tests {
             let context = GenericContext::from_typevar_instances(db, &env, vars);
             let result = context.specialize_recursive(db, order.iter().map(|(_, ty)| Some(*ty)));
             assert_eq!(result.types(db), [Type::object(); 3]);
+        }
+    }
+
+    #[test]
+    fn recursive_specialization_preserves_bounds_on_indirect_aliases() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let [a, b, c, d] = create_typevars(db, ["A", "B", "C", "D"]);
+        let int = KnownClass::Int.to_instance(db, &env);
+        let d =
+            d.map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(int)));
+        // A and B form a cycle. The only bound comes from D, through C.
+        let bindings = [(a, b), (b, a), (c, b), (d, c)];
+        for order in bindings.into_iter().permutations(4) {
+            let vars = order.iter().map(|(var, _)| *var);
+            let context = GenericContext::from_typevar_instances(db, &env, vars);
+            let result = context
+                .specialize_recursive(db, order.iter().map(|(_, ty)| Some(Type::TypeVar(*ty))));
+            assert_eq!(result.types(db), [Type::TypeVar(d); 4]);
         }
     }
 

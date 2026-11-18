@@ -1226,33 +1226,33 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             let Type::TypeVar(typevar) = ty else {
                 return false;
             };
-            typevar.is_inferable(db, self.inferable)
-                || typevar
-                    .typevar(db)
-                    .constraints(db, env)
-                    .is_some_and(|actual_constraints| {
-                        actual_constraints.iter().all(|actual| {
-                            constrained_typevar
-                                .declared_constraints
-                                .iter()
-                                .any(|declared| {
-                                    actual.is_equivalent_to(db, env, declared.constrained_ty)
-                                })
-                        })
-                    })
+            typevar.can_specialize_typevar(db, env, bound_typevar)
+                || (typevar.is_inferable(db, self.inferable)
+                    && bound_typevar.can_specialize_typevar(db, env, typevar))
         };
         let contains_preservable_typevar =
             |ty| any_over_type(db, env, ty, false, is_preservable_typevar);
-        let has_bare_preservable_typevar_evidence =
-            evidence.evidence_lower.is_some_and(is_preservable_typevar)
-                || evidence
-                    .as_single_upper_bound(db, env)
-                    .is_some_and(is_preservable_typevar);
-        let has_non_concrete_evidence = has_no_evidence
-            || evidence.has_only_non_concrete_evidence == Some(true)
-            || has_bare_preservable_typevar_evidence;
+        let mut try_family_solution =
+            has_no_evidence || evidence.has_only_non_concrete_evidence == Some(true);
+        for ty in evidence
+            .evidence_lower
+            .into_iter()
+            .chain(evidence.as_single_upper_bound(db, env))
+        {
+            let Type::TypeVar(peer) = ty else {
+                continue;
+            };
+            if is_preservable_typevar(ty) {
+                try_family_solution = true;
+            } else if peer.is_inferable(db, self.inferable) {
+                // Neither variable can stand for this family. Checking individual alternatives
+                // retains directional assignments such as `bool <= int`.
+                try_family_solution = false;
+                break;
+            }
+        }
 
-        if has_non_concrete_evidence {
+        if try_family_solution {
             let has_preservable_typevar_evidence = evidence
                 .evidence_lower
                 .is_some_and(contains_preservable_typevar)

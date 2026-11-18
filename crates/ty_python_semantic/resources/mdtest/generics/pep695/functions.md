@@ -6240,6 +6240,73 @@ def example(output: list[Literal["a", "b"]]):
     run: Callable[[Wrap], None] = make_runner("a", output, lambda item: output.append(item))
 ```
 
+## Related type parameters in higher-order functions
+
+Both declaration orders preserve the output bound when the input tuple is empty.
+
+```py
+from collections.abc import Callable
+
+type Transform[A, B] = Callable[[tuple[A, ...]], tuple[B, ...]]
+
+def result_first[B: int, A](f: Transform[A, B]) -> Transform[A, B]:
+    return f
+
+def argument_first[A, B: int](f: Transform[A, B]) -> Transform[A, B]:
+    return f
+
+def identity[T](items: tuple[T, ...]) -> tuple[T, ...]:
+    return items
+
+ints1: tuple[int, ...] = result_first(identity)(())
+ints2: tuple[int, ...] = argument_first(identity)(())
+```
+
+The input bound `list[Any]` permits `list[int]`, so the output still accepts only integer elements.
+
+```py
+from typing import Any
+
+def bounded_lists[B: list[int], A: list[Any]](f: Transform[A, B]) -> Transform[A, B]:
+    return f
+
+for item in bounded_lists(identity)(()):
+    item.append(1)
+    item.append("bad")  # error: [invalid-argument-type]
+```
+
+The identity function uses the same element type for its input and output. When both type parameters
+are constrained, the only choice they share is `int`.
+
+```py
+from typing import assert_type
+
+def first[B: (int, str), A: (int, bytes)](f: Transform[A, B]) -> Transform[A, B]:
+    return f
+
+def swapped[A: (int, bytes), B: (int, str)](f: Transform[A, B]) -> Transform[A, B]:
+    return f
+
+out = first(identity)(())
+swapped_out = swapped(identity)(())
+assert_type(out, tuple[int, ...])
+assert_type(swapped_out, tuple[int, ...])
+```
+
+Composing two identity functions relates three type parameters without fixing a concrete element
+type.
+
+```py
+def compose[A, B, C](f: Transform[A, B], g: Transform[B, C]) -> Transform[A, C]:
+    return lambda items: g(f(items))
+
+def compose_reversed[C, B, A](f: Transform[A, B], g: Transform[B, C]) -> Transform[A, C]:
+    return lambda items: g(f(items))
+
+compose(identity, identity)  # ok
+compose_reversed(identity, identity)  # ok
+```
+
 ## Dictionary value context containing a bounded type variable
 
 The return annotation lets `dict.fromkeys` initialize a dictionary of `T | str` with a string. An
