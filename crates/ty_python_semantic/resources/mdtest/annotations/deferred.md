@@ -373,9 +373,21 @@ f = lambda x=NeverDefined(): x
 
 ## Relative `__future__` import on Python 3.12 vs. 3.13
 
-With a sibling `__future__.py` exporting `annotations`, `from .__future__ import annotations` enables deferred annotations on Python 3.12, but is treated as an ordinary relative import on Python 3.13.
+With a sibling `__future__.py` exporting `annotations`, `from .__future__ import annotations`
+enables deferred annotations on Python 3.12, but is treated as an ordinary relative import on Python
+3.13.
 
 ### Python 3.12
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`pkg_312/__init__.py`:
+
+```py
+```
 
 `pkg_312/__future__.py`:
 
@@ -384,11 +396,6 @@ annotations = object()
 ```
 
 `pkg_312/test.py`:
-
-```toml
-[environment]
-python-version = "3.12"
-```
 
 ```py
 from .__future__ import annotations
@@ -403,6 +410,16 @@ reveal_type(get_foo())  # revealed: Foo
 
 ### Python 3.13
 
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`pkg_313/__init__.py`:
+
+```py
+```
+
 `pkg_313/__future__.py`:
 
 ```py
@@ -410,11 +427,6 @@ annotations = object()
 ```
 
 `pkg_313/test.py`:
-
-```toml
-[environment]
-python-version = "3.13"
-```
 
 ```py
 from .__future__ import annotations
@@ -426,4 +438,3 @@ class Foo: ...
 
 reveal_type(get_foo())  # revealed: Unknown
 ```
-

@@ -43,7 +43,11 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
         return;
     }
 
-    if target.names.iter().all(|alias| &*alias.name != "annotations") {
+    if target
+        .names
+        .iter()
+        .all(|alias| &*alias.name != "annotations")
+    {
         return;
     }
 

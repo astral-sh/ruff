@@ -130,13 +130,11 @@ fn add_required_import(
         TextRange::default(),
     );
     diagnostic.set_fix(Fix::safe_edit(
-        Importer::new(
-            parsed,
-            locator.contents(),
-            stylist,
-            target_version,
-        )
-        .add_import(required_import, TextSize::default(), false),
+        Importer::new(parsed, locator.contents(), stylist, target_version).add_import(
+            required_import,
+            TextSize::default(),
+            false,
+        ),
     ));
 }
 
