@@ -87,6 +87,9 @@ impl<'a> SequenceIndexVisitor<'a> {
     }
 
     pub(crate) fn into_accesses(self) -> Vec<TextRange> {
+        if self.modified {
+            return Vec::new();
+        }
         self.accesses
     }
 }
@@ -112,6 +115,9 @@ impl SequenceIndexVisitor<'_> {
                     }
                 }
                 false
+            }
+            Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+                elts.iter().any(|elt| self.is_assignment(elt))
             }
             _ => false,
         }
