@@ -1966,34 +1966,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         self.never()
     }
 
-    /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
-    ///
-    /// This does not include all types that are subtypes of `builtins.type`! The semantic
-    /// distinction that matters here is not whether `target` is a subtype of `type`, but whether
-    /// it constrains the class or the metaclass of its inhabitants.
-    ///
-    /// The type `type[C]` and the type `ABCMeta` are both subtypes of `builtins.type`, but they
-    /// constrain their inhabitants in different domains. `type[C]` constrains in the regular-class
-    /// domain (it describes a regular class object and all its subclasses). A metaclass instance
-    /// like `ABCMeta` constrains in the metaclass domain: its inhabitants can be class objects
-    /// that are unrelated to each other in the regular-class domain (they do not inherit each
-    /// other or any other common base), but they are all constrained to have a metaclass that
-    /// inherits from `ABCMeta`.
-    fn is_metaclass_instance(&self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        target.as_nominal_instance().is_some_and(|instance| {
-            let env = self.env;
-            KnownClass::Type
-                .try_to_class_literal(db, env)
-                .is_some_and(|type_class| {
-                    instance.class(db, env).is_subclass_of(
-                        db,
-                        env,
-                        ClassType::NonGeneric(ClassLiteral::Static(type_class)),
-                    )
-                })
-        })
-    }
-
     /// Check the relation between a `type[T]` and a target type `A` when `A` can either be
     /// projected into the ordinary instance/object domain via `.to_instance()`, or is a plain
     /// metaclass object type.
@@ -2003,7 +1975,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// targets like `type[S]`: they constrain class objects via the instances they create, not via
     /// their metaclasses.
     ///
-    /// For a metaclass instance type (see `is_metaclass_instance` for definition),
+    /// For a metaclass instance type (see [`Type::is_metaclass_instance`] for definition),
     /// `A.to_instance()` is too lossy: it collapses to `object`, because we have no precise
     /// instance-space representation for "all class objects whose metaclass inhabits `A`". For
     /// these types which constrain in the metaclass space, we instead need to resolve `type[T]` to
@@ -2030,7 +2002,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> Option<ConstraintSet<'db, 'c>> {
         let source_i = source_subclass.into_type_var()?;
         let env = self.env;
-        if self.is_metaclass_instance(db, target) {
+        if target.is_metaclass_instance(db, env) {
             return Some(self.check_type_pair(
                 db,
                 source_subclass.to_metaclass_instance(db, env),

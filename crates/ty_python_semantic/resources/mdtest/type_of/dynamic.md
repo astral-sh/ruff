@@ -32,10 +32,12 @@ behavior of mypy or pyright. For now we interpret it as simply "an instance of `
 which is equivalent to `type[object]`. This is similar to the current behavior of mypy, and pyright
 in strict mode.
 
+Methods inherited by the represented class remain unbound, as they do on other class objects:
+
 ```py
 def f(x: type):
     reveal_type(x)  # revealed: type
-    reveal_type(x.__repr__)  # revealed: bound method type.__repr__() -> str
+    reveal_type(x.__repr__)  # revealed: def __repr__(self) -> str
 
 class A: ...
 
@@ -50,7 +52,7 @@ x: type = A()  # error: [invalid-assignment]
 ```py
 def f(x: type[object]):
     reveal_type(x)  # revealed: type
-    reveal_type(x.__repr__)  # revealed: bound method type.__repr__() -> str
+    reveal_type(x.__repr__)  # revealed: def __repr__(self) -> str
 
 class A: ...
 
