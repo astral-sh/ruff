@@ -1860,12 +1860,12 @@ impl PendingReachability {
         }
     }
 
-    fn materialize_reachability<'a>(
+    fn materialize_reachability(
         &self,
-        pending: &'a mut PendingPlaceState,
+        pending: &mut PendingPlaceState,
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) -> &'a mut PlaceState {
+    ) {
         if pending.reachability != target {
             let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
             let mut current = target;
@@ -1885,8 +1885,6 @@ impl PendingReachability {
             }
             pending.reachability = target;
         }
-
-        Rc::make_mut(&mut pending.state)
     }
 
     /// Returns the materialized place state for immutable access.
