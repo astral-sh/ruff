@@ -49,3 +49,24 @@ def check_custom_setattr(dogs: FrozenWithCustomSetattr[Dog]):
     dogs.value = Dog()  # ok
     animals: FrozenWithCustomSetattr[Animal] = dogs  # error: [invalid-assignment]
 ```
+
+## Thawed subclasses
+
+A subclass that disables freezing can write inherited fields. In this case, the subclass
+should be treated as invariant:
+
+```py
+from pydantic import BaseModel
+
+class Frozen[T](BaseModel, frozen=True):
+    value: T
+
+class Thawed[T](Frozen[T], frozen=False): ...
+
+def overwrite(box: Thawed[object]):
+    box.value = 0
+
+def check(box: Thawed[str]):
+    # TODO: Reject this call because the inherited writable field should make Thawed invariant.
+    overwrite(box)
+```
