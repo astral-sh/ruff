@@ -7,7 +7,7 @@ use ruff_db::files::File;
 use ruff_db::system::{CommandExecutor, System, SystemPathBuf};
 
 use super::command::unsupported_command_execution;
-use super::{MetadataTarget, ScriptEnvironmentCacheKey, Uv, UvMetadataError, uv_executable_error};
+use super::{MetadataTarget, ScriptEnvironmentCacheKey, Uv, UvMetadataError};
 use crate::UvSyncProgress;
 
 /// Runs workspace and standalone-script metadata requests with uv.
@@ -33,7 +33,7 @@ use crate::UvSyncProgress;
 /// [`UvEnvironments`](crate::UvEnvironments) is the higher level abstraction that
 /// application code should use.
 pub(crate) struct UvMetadataService {
-    workers: OnceLock<std::io::Result<UvWorkerPool>>,
+    workers: OnceLock<Result<UvWorkerPool, UvMetadataError>>,
 
     /// Channel, where to send the background results to.
     results_sender: Sender<UvMetadataResult>,
@@ -71,7 +71,7 @@ impl UvMetadataService {
             Err(error) => {
                 self.publish_result(UvMetadataResult {
                     task,
-                    output: Some(Err(UvMetadataError::Invocation(error))),
+                    output: Some(Err(error)),
                     progress,
                 });
                 return;
@@ -97,7 +97,7 @@ impl UvMetadataService {
             let job = error.into_inner();
             self.publish_result(UvMetadataResult {
                 task: job.task,
-                output: Some(Err(UvMetadataError::Invocation(worker_disconnected()))),
+                output: Some(Err(worker_disconnected().into())),
                 progress: job.progress,
             });
         }
@@ -116,17 +116,17 @@ impl UvMetadataService {
         }
     }
 
-    fn worker_pool(&self, system: &dyn System) -> std::io::Result<&UvWorkerPool> {
-        match self.workers.get_or_init(|| {
-            let command_executor = system
-                .command_executor()
-                .ok_or_else(unsupported_command_execution)?;
-            let uv = Uv::new(system).map_err(uv_executable_error)?;
-            UvWorkerPool::new(command_executor, &uv)
-        }) {
-            Ok(workers) => Ok(workers),
-            Err(error) => Err(std::io::Error::new(error.kind(), error.to_string())),
-        }
+    fn worker_pool(&self, system: &dyn System) -> Result<&UvWorkerPool, UvMetadataError> {
+        self.workers
+            .get_or_init(|| {
+                let command_executor = system
+                    .command_executor()
+                    .ok_or_else(unsupported_command_execution)?;
+                let uv = Uv::new(system)?;
+                UvWorkerPool::new(command_executor, &uv).map_err(UvMetadataError::from)
+            })
+            .as_ref()
+            .map_err(Clone::clone)
     }
 }
 

@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use char_str::CharStr;
 use pep440_rs::Version;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::system::{System, SystemPath, SystemPathBuf, WhichError};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -50,7 +51,8 @@ impl UvMetadata {
     ) -> Result<Self, UvMetadataError> {
         let metadata: WorkspaceMetadata = {
             let _interner = string_interner::InternerGuard::new();
-            serde_json::from_slice(metadata).map_err(UvMetadataError::InvalidMetadata)?
+            serde_json::from_slice(metadata)
+                .map_err(|error| UvMetadataError::InvalidMetadata(Arc::new(error)))?
         };
 
         let workspace_root = existing_directory(metadata.workspace_root, "workspace root", system)?;
@@ -96,16 +98,19 @@ pub(crate) struct WorkspaceMember {
     id: CharStr,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub(crate) enum UvMetadataError {
-    #[error("uv {version} is too old; upgrade `{executable}` to uv {minimum_version} or newer", minimum_version = Version::new(MINIMUM_UV_VERSION))]
+    #[error("Found uv {version}, but uv {minimum_version} or newer is required", minimum_version = Version::new(MINIMUM_UV_VERSION))]
     UnsupportedVersion {
         executable: String,
         version: Version,
     },
 
+    #[error("{}", uv_lookup_message(*.0))]
+    Lookup(#[from] WhichError),
+
     #[error("Failed to run `uv workspace metadata`: {0}")]
-    Invocation(#[source] std::io::Error),
+    Invocation(#[source] Arc<std::io::Error>),
 
     #[error("`uv workspace metadata` failed with `{status}`: {stderr}")]
     CommandFailed {
@@ -114,7 +119,7 @@ pub(crate) enum UvMetadataError {
     },
 
     #[error("invalid `uv workspace metadata` JSON: {0}")]
-    InvalidMetadata(serde_json::Error),
+    InvalidMetadata(Arc<serde_json::Error>),
 
     #[error("non-Unicode {description} returned by `uv workspace metadata`: `{path}`", path = path.display())]
     NonUnicodePath {
@@ -133,7 +138,17 @@ impl UvMetadataError {
     pub(super) fn to_diagnostic(&self, severity: Severity, headline: &str) -> Diagnostic {
         let mut diagnostic = Diagnostic::new(DiagnosticId::ProjectManager, severity, headline);
         match self {
-            Self::UnsupportedVersion { .. } => diagnostic.set_headline_message(self),
+            Self::Lookup(_) => {
+                diagnostic.set_headline_message(format_args!("{headline}: {self}"));
+                diagnostic.info("To install uv, see https://docs.astral.sh/uv/");
+            }
+            Self::UnsupportedVersion { executable, .. } => {
+                let minimum = Version::new(MINIMUM_UV_VERSION);
+                diagnostic.set_headline_message(format_args!("{headline}: {self}"));
+                diagnostic.help(format_args!(
+                    "Upgrade `{executable}` to uv {minimum} or newer"
+                ));
+            }
             Self::CommandFailed { status, stderr } => {
                 let failure = match status.code() {
                     Some(code) => format!("`uv workspace metadata` exited with status {code}"),
@@ -157,6 +172,19 @@ impl UvMetadataError {
             }
         }
         diagnostic
+    }
+}
+
+impl From<std::io::Error> for UvMetadataError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Invocation(Arc::new(error))
+    }
+}
+
+fn uv_lookup_message(error: WhichError) -> String {
+    match error {
+        WhichError::CannotFindBinaryPath => "could not find `uv` on `PATH`".to_owned(),
+        error => error.to_string(),
     }
 }
 

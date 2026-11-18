@@ -1520,31 +1520,48 @@ fn invalid_script_search_paths_do_not_blame_python_environment() -> anyhow::Resu
 fn unavailable_uv_reports_metadata_error() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "script.py",
-        "#!/usr/bin/env python3\n\n# /// script\n# dependencies = []\n# ///\nprint(missing)\n",
+        r#"
+        # /// script
+        # dependencies = []
+        # [tool.ty]
+        # project-manager.script = "uv"
+        # ///
+        print(missing)
+        "#,
     )?
     .with_filter(
         "program not found",
         "No such file or directory (os error 2)",
     );
 
-    assert_cmd_snapshot!(
-        case.command()
-            .arg("script.py")
-            .env(EnvVars::TY_UV, "1")
-            .env(EnvVars::UV, "missing-uv-executable"),
-        @"
+    let mut command = case.command();
+    command.arg("script.py").env("PATH", "");
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[project-manager]: Setting up the Python environment with uv failed: could not find `uv` on `PATH`
+    --> script.py:2:1
+    info: To install uv, see https://docs.astral.sh/uv/
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    command.env(EnvVars::UV, "missing-uv-executable");
+    assert_cmd_snapshot!(command, @"
     success: false
     exit_code: 1
     ----- stdout -----
     error[project-manager]: Setting up the Python environment with uv failed
-    --> script.py:3:1
+    --> script.py:2:1
     error: Failed to run `uv workspace metadata`: No such file or directory (os error 2)
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "
-    );
+    ");
 
     Ok(())
 }

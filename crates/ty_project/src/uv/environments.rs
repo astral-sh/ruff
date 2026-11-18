@@ -91,7 +91,7 @@ use salsa::Setter;
 use crate::script::{script_tag, use_uv_for_script};
 use crate::uv::{
     MetadataTarget, ScriptSyncRequest, ScriptSyncTask, Uv, UvMetadata, UvMetadataError,
-    UvMetadataResult, UvMetadataService, UvSyncTask, uv_executable_error,
+    UvMetadataResult, UvMetadataService, UvSyncTask,
 };
 use crate::{Db, ProjectReloadResult, ProjectSyncProgressFactory, UvSyncProgress};
 
@@ -536,8 +536,7 @@ impl UvWorkspace {
     /// Failures are retained as diagnostics for the project to report.
     pub fn discover(path: &SystemPath, system: &dyn System) -> Self {
         let metadata = Uv::new(system)
-            .map_err(uv_executable_error)
-            .map_err(UvMetadataError::Invocation)
+            .map_err(UvMetadataError::Lookup)
             .and_then(|uv| uv.metadata(system, &MetadataTarget::Workspace(path)));
 
         Self::from_metadata_result(metadata)
@@ -805,6 +804,7 @@ mod tests {
     use std::io;
 
     use anyhow::Context;
+    use pep440_rs::Version;
     use ruff_db::Db as _;
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath};
@@ -816,13 +816,27 @@ mod tests {
     use ty_static::EnvVars;
 
     use super::{
-        UvMetadata, UvMetadataError, apply_sync_result, script_environment, script_sync_task,
+        UvMetadata, UvMetadataError, UvWorkspace, apply_sync_result, script_environment,
+        script_sync_task,
     };
     use crate::db::testing::TestDb;
     use crate::metadata::Options;
     use crate::metadata::options::EnvironmentOptions;
     use crate::metadata::value::RelativePathBuf;
     use crate::{Db as _, ProjectMetadata};
+
+    #[test]
+    fn outdated_uv_reports_project_metadata_failure() -> anyhow::Result<()> {
+        let error = UvMetadataError::UnsupportedVersion {
+            executable: "uv".to_owned(),
+            version: Version::new([0, 12, 2]),
+        };
+        let diagnostic = UvWorkspace::from_metadata_result(Err(error))
+            .error
+            .context("expected a project metadata warning")?;
+        insta::assert_snapshot!(diagnostic.headline_message(), @"Failed to load project metadata from uv: Found uv 0.12.2, but uv 0.12.3 or newer is required");
+        Ok(())
+    }
 
     #[test]
     fn disabling_script_uv_discards_pending_synchronization() -> anyhow::Result<()> {
@@ -932,7 +946,7 @@ mod tests {
             &mut db,
             environment,
             &task.request,
-            Err(UvMetadataError::Invocation(io::Error::other("uv failed"))),
+            Err(io::Error::other("uv failed").into()),
         );
         assert!(!resolves_dependency(&db, script));
         Ok(())
