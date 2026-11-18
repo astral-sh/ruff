@@ -1238,6 +1238,16 @@ impl<'db> UnionBuilder<'db> {
                 }
             };
 
+            // Comparing `TypedDict`s for redundancy requires iterating over their fields, which is
+            // problematic if some of those fields point to recursive `Union`s. Compare their
+            // identities before trying any pairwise union simplifications.
+            if let (Type::TypedDict(left), Type::TypedDict(right)) = (ty, element_type) {
+                if left == right {
+                    return;
+                }
+                continue;
+            }
+
             if ty == element_type {
                 return;
             }
@@ -1301,14 +1311,6 @@ impl<'db> UnionBuilder<'db> {
             {
                 self.add_in_place_impl(KnownClass::Bool.to_instance(db, &self.env), seen_aliases);
                 return;
-            }
-
-            // Comparing `TypedDict`s for redundancy requires iterating over their fields, which is
-            // problematic if some of those fields point to recursive `Union`s. To avoid cycles,
-            // compare `TypedDict`s by name/identity instead of using the `has_relation_to`
-            // machinery.
-            if element_type.is_typed_dict() && ty.is_typed_dict() {
-                continue;
             }
 
             if should_simplify_full && !element_type.is_alias_like() {
