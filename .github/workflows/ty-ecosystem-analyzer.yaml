@@ -149,8 +149,6 @@ jobs:
     timeout-minutes: 10
     env:
       EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
-      # Enable experimental support for installing PEP 723 script dependencies.
-      TY_UV: scripts
     steps:
       - uses: $/.github/actions/setup-ruff-workspace
         with:
@@ -180,6 +178,7 @@ jobs:
             --locked \
             --only-group=ty-ecosystem \
             ecosystem-analyzer \
+            --sync-script-dependencies \
             --flaky-runs 10 \
             diff \
             --projects-flaky projects_flaky.txt \
