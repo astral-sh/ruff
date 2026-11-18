@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, helpers::is_dunder, name::QualifiedName};
-use ruff_python_semantic::{AnyImport, FromImport, Import, Imported, ResolvedReference, Scope};
+use ruff_python_semantic::{AnyImport, Imported, ResolvedReference, Scope};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
@@ -41,6 +41,7 @@ use crate::rules::pylint::helpers::is_underscore_prefixed_public_member;
 /// ## Example
 /// ```python
 /// from foo import _bar
+/// import _foo.bar
 /// ```
 ///
 /// ## Options
@@ -80,11 +81,10 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
             continue;
         };
 
-        let import_info = match import {
-            AnyImport::Import(import) => ImportInfo::from(import),
-            AnyImport::FromImport(import) => ImportInfo::from(import),
-            AnyImport::SubmoduleImport(_) => continue,
-        };
+        // `import foo.bar` without an alias is a submodule import. Its qualified
+        // name still includes every segment, so `import _foo.bar` is private in
+        // the same way as `from _foo import bar` and `import _foo.bar as bar`.
+        let import_info = ImportInfo::from_any(&import);
 
         let Some(root_module) = import_info.module_name.first() else {
             continue;
@@ -163,6 +163,18 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
                         .map_or(binding.range(), |alias| alias.name.range())
                 }
             }
+            // `import a.b._c` binds the whole dotted path. Point at the private
+            // segment. An aliased import binds the alias instead, so the
+            // highlight stays on the alias unless that name is the private one.
+            Some(ast::Stmt::Import(_)) => {
+                SimpleTokenizer::new(checker.locator().contents(), binding.range())
+                    .skip_trivia()
+                    .find(|token| {
+                        token.kind == SimpleTokenKind::Name
+                            && checker.locator().slice(token.range()) == *private_name
+                    })
+                    .map_or(binding.range(), |token| token.range())
+            }
             _ => binding.range(),
         };
 
@@ -182,28 +194,12 @@ struct ImportInfo<'a> {
     qualified_name: &'a QualifiedName<'a>,
 }
 
-impl<'a> From<&'a FromImport<'_>> for ImportInfo<'a> {
-    fn from(import: &'a FromImport) -> Self {
-        let module_name = import.module_name();
-        let member_name = import.member_name();
-        let qualified_name = import.qualified_name();
+impl<'a> ImportInfo<'a> {
+    fn from_any(import: &'a AnyImport<'_, 'a>) -> Self {
         Self {
-            module_name,
-            member_name,
-            qualified_name,
-        }
-    }
-}
-
-impl<'a> From<&'a Import<'_>> for ImportInfo<'a> {
-    fn from(import: &'a Import) -> Self {
-        let module_name = import.module_name();
-        let member_name = import.member_name();
-        let qualified_name = import.qualified_name();
-        Self {
-            module_name,
-            member_name,
-            qualified_name,
+            module_name: import.module_name(),
+            member_name: import.member_name(),
+            qualified_name: import.qualified_name(),
         }
     }
 }

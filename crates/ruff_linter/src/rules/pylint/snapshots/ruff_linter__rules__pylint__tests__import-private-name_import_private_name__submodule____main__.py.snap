@@ -115,3 +115,82 @@ PLC2701 Private name import `_other_private_member` from external module `os`
 58 | from os import _private_member
 59 | from os import _exit as os_exit, _other_private_member
    |                                  ^^^^^^^^^^^^^^^^^^^^^
+60 |
+61 | # Dotted `import` statements follow the same rules as `from` imports.
+   |
+
+PLC2701 Private name import `_pytest`
+  --> __main__.py:63:8
+   |
+61 | # Dotted `import` statements follow the same rules as `from` imports.
+62 | # See https://github.com/astral-sh/ruff/issues/30533.
+63 | import _pytest.outcomes
+   |        ^^^^^^^
+64 | import _pytest.outcomes as out
+65 | from _pytest import outcomes
+   |
+
+PLC2701 Private name import `_pytest`
+  --> __main__.py:64:28
+   |
+62 | # See https://github.com/astral-sh/ruff/issues/30533.
+63 | import _pytest.outcomes
+64 | import _pytest.outcomes as out
+   |                            ^^^
+65 | from _pytest import outcomes
+66 | import pytest._outcomes
+   |
+
+PLC2701 Private name import `_pytest`
+  --> __main__.py:65:6
+   |
+63 | import _pytest.outcomes
+64 | import _pytest.outcomes as out
+65 | from _pytest import outcomes
+   |      ^^^^^^^
+66 | import pytest._outcomes
+67 | from pytest import _outcomes
+   |
+
+PLC2701 Private name import `_outcomes` from external module `pytest`
+  --> __main__.py:66:15
+   |
+64 | import _pytest.outcomes as out
+65 | from _pytest import outcomes
+66 | import pytest._outcomes
+   |               ^^^^^^^^^
+67 | from pytest import _outcomes
+68 | import c._d.e
+   |
+
+PLC2701 Private name import `_outcomes` from external module `pytest`
+  --> __main__.py:67:20
+   |
+65 | from _pytest import outcomes
+66 | import pytest._outcomes
+67 | from pytest import _outcomes
+   |                    ^^^^^^^^^
+68 | import c._d.e
+69 | import bbb.ccc._ddd
+   |
+
+PLC2701 Private name import `_d` from external module `c`
+  --> __main__.py:68:10
+   |
+66 | import pytest._outcomes
+67 | from pytest import _outcomes
+68 | import c._d.e
+   |          ^^
+69 | import bbb.ccc._ddd
+   |
+
+PLC2701 Private name import `_ddd` from external module `bbb.ccc`
+  --> __main__.py:69:16
+   |
+67 | from pytest import _outcomes
+68 | import c._d.e
+69 | import bbb.ccc._ddd
+   |                ^^^^
+70 |
+71 | # Exceptions still apply to dotted imports.
+   |

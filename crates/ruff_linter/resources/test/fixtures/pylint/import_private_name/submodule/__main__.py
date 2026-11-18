@@ -57,3 +57,25 @@ from os import _exit as process_exit
 from another_module import _exit as another_exit
 from os import _private_member
 from os import _exit as os_exit, _other_private_member
+
+# Dotted `import` statements follow the same rules as `from` imports.
+# See https://github.com/astral-sh/ruff/issues/30533.
+import _pytest.outcomes
+import _pytest.outcomes as out
+from _pytest import outcomes
+import pytest._outcomes
+from pytest import _outcomes
+import c._d.e
+import bbb.ccc._ddd
+
+# Exceptions still apply to dotted imports.
+import public.module
+import os._exit
+import os._exit as os_process_exit
+import ll.__version__
+import import_private_name._top_level_secret  # Can import from self.
+import _typing_mod.member
+
+
+def typing_only(arg: _typing_mod.member) -> None:
+    pass
