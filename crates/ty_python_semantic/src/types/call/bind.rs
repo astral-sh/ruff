@@ -675,12 +675,27 @@ pub(crate) enum CheckTypesMode {
     /// Generic call inference may perform fixpoint iteration in order to unify
     /// type context across call arguments, and so all callable bindings should
     /// remain candidates until the final round is finalized.
-    Provisional,
+    Provisional {
+        /// The editor collects expected argument types from every candidate, including
+        /// later overloads specialized by a sibling argument.
+        collect_expected_types: bool,
+    },
 }
 
 impl CheckTypesMode {
     fn is_provisional(self) -> bool {
-        matches!(self, Self::Provisional)
+        matches!(self, Self::Provisional { .. })
+    }
+
+    /// The editor can use parameter types from later overloads even after the call has a winner.
+    fn needs_all_overload_specializations(self) -> bool {
+        match self {
+            Self::Finalize => false,
+            Self::SignatureDetails => true,
+            Self::Provisional {
+                collect_expected_types,
+            } => collect_expected_types,
+        }
     }
 }
 
@@ -3981,19 +3996,38 @@ impl<'db> CallableBinding<'db> {
             }
         };
 
-        // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
-        // whether it is compatible with the supplied argument list.
+        // Step 2: check the candidates in declaration order. Step 5 can discard every
+        // later overload as soon as the first match covers all argument materializations.
+        let can_prune_after_first_match = !mode.needs_all_overload_specializations()
+            && !should_retry_after_provisional_arity
+            && !call_arguments.iter().any(CallArgument::is_variadic)
+            && self
+                .matching_overloads()
+                .all(|(_, overload)| overload.supports_first_match_pruning());
+        let defer_literal_mismatches =
+            mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity;
         let check_types = |overload: &mut Binding<'db>| {
             overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
         };
-        // Signature details and provisional inference need the types of losing candidates too.
-        // An expandable `*args` can also change which parameters the arguments match.
-        if mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity {
-            self.check_overloads_deferring_literal_mismatches(
+        if can_prune_after_first_match || defer_literal_mismatches {
+            let first_match_covers_rest = |overload: &Binding<'db>| {
+                can_prune_after_first_match
+                    && overload.accepts_all_argument_materializations(
+                        db,
+                        env,
+                        constraints,
+                        call_arguments.as_ref(),
+                    )
+            };
+            if self.check_overloads_in_order(
                 db,
                 call_arguments.as_ref(),
+                defer_literal_mismatches,
                 check_types,
-            );
+                first_match_covers_rest,
+            ) {
+                return;
+            }
         } else {
             for (_, overload) in self.matching_overloads_mut() {
                 check_types(overload);
@@ -4233,23 +4267,40 @@ impl<'db> CallableBinding<'db> {
         snapshotter.restore(self, post_evaluation_snapshot);
     }
 
-    /// Defer type checking for overloads ruled out by a literal argument. If another candidate
-    /// matches, we can skip inference for those overloads entirely.
-    fn check_overloads_deferring_literal_mismatches(
+    /// Checks candidates in declaration order. Returns true when the first match covers every
+    /// materialization and wins outright. A literal mismatch can be deferred until we know
+    /// whether the call failed and needs that candidate's diagnostics.
+    fn check_overloads_in_order(
         &mut self,
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
+        defer_literal_mismatches: bool,
         check_types: impl Fn(&mut Binding<'db>),
-    ) {
+        first_match_covers_rest: impl Fn(&Binding<'db>) -> bool,
+    ) -> bool {
         let mut literal_mismatches = SmallVec::<[_; 4]>::new();
         let mut found_match = false;
-        for (_, overload) in self.matching_overloads_mut() {
-            if overload.has_disjoint_literal_argument(db, arguments) {
+        let mut overloads = self.matching_overloads_mut().peekable();
+        while let Some((_, overload)) = overloads.next() {
+            if defer_literal_mismatches && overload.has_disjoint_literal_argument(db, arguments) {
                 literal_mismatches.push(overload);
-            } else {
-                check_types(overload);
-                found_match = found_match || !overload.has_errors_affecting_overload_resolution();
+                continue;
             }
+
+            check_types(overload);
+            if overload.has_errors_affecting_overload_resolution() {
+                continue;
+            }
+            if !found_match && overloads.peek().is_some() && first_match_covers_rest(overload) {
+                for unmatched in literal_mismatches
+                    .into_iter()
+                    .chain(overloads.map(|(_, later)| later))
+                {
+                    unmatched.mark_as_unmatched_overload();
+                }
+                return true;
+            }
+            found_match = true;
         }
 
         if found_match {
@@ -4262,6 +4313,7 @@ impl<'db> CallableBinding<'db> {
                 check_types(overload);
             }
         }
+        false
     }
 
     /// Returns the set of overload candidates that may contribute to the call evaluation.
@@ -4378,42 +4430,11 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
-        struct OverloadFilterSlot<'db> {
-            parameter: Type<'db>,
-            argument: Type<'db>,
-            variadic_argument: Option<Type<'db>>,
-        }
-
         let matching_overload_slots = matching_overload_indexes
             .iter()
             .map(|&index| {
-                let overload = &self.overloads[index];
-                let slots = overload
-                    .argument_matches
-                    .iter()
-                    .zip(arguments.iter())
-                    .flat_map(move |(matched_argument, argument)| {
-                        matched_argument.iter().map(move |matched_parameter| {
-                            // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                            // `typing.Self` / `type[typing.Self]`
-                            let raw_parameter_type = overload.signature.parameters()
-                                [matched_parameter.index]
-                                .annotated_type();
-                            let parameter_type = raw_parameter_type.apply_optional_specialization(
-                                db,
-                                overload.merged_specialization(db),
-                            );
-                            OverloadFilterSlot {
-                                parameter: parameter_type,
-                                // Argument types are cached by the raw parameter type, even when
-                                // they were inferred using a return-context specialization.
-                                argument: argument
-                                    .source_types()
-                                    .get_for_declared_type(raw_parameter_type),
-                                variadic_argument: matched_parameter.argument_type,
-                            }
-                        })
-                    })
+                let slots = self.overloads[index]
+                    .overload_filter_slots(db, arguments)
                     .collect::<Vec<_>>();
                 (index, slots)
             })
@@ -8363,6 +8384,85 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 }
 
+/// The types compared at one position in step 5 of overload resolution. An unpacked
+/// argument can supply several positions, each with its own element type.
+struct OverloadFilterSlot<'db> {
+    parameter: Type<'db>,
+    argument: Type<'db>,
+    variadic_argument: Option<Type<'db>>,
+}
+
+/// The first-match shortcut may inspect positions that the full overload filter would discard.
+/// Avoid forcing a lazy base or function signature, expanding an alias, or rebuilding a
+/// wide union. Materializing a short `tuple[int, str]` takes bounded work. For nested
+/// tuples, each `t = (t, t)` doubles the number of leaf elements to materialize.
+fn may_be_expensive_to_materialize<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    argument: Type<'db>,
+) -> bool {
+    const MAX_FIXED_TUPLE_ELEMENTS: usize = 8;
+
+    let expensive = |part: Type<'db>| match part {
+        Type::TypeAlias(_)
+        | Type::Recursive(_)
+        | Type::RecursiveVar(_)
+        | Type::FunctionLiteral(_)
+        | Type::BoundMethod(_)
+        | Type::NewTypeInstance(_) => true,
+        Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some_and(|tuple| {
+            tuple.len().minimum() > MAX_FIXED_TUPLE_ELEMENTS
+                || tuple.iter_element_types(db).any(|element| match element {
+                    Type::LiteralValue(_) | Type::Dynamic(_) => false,
+                    Type::NominalInstance(instance) => instance.is_definition_generic(db),
+                    _ => true,
+                })
+        }),
+        Type::Union(union) => union.is_wide(db),
+        _ => false,
+    };
+    // Materializing a type variable also materializes its bound, constraints, and default.
+    // Stop at a second bounded variable because bounds can refer back to one another.
+    let expensive_attribute = |attribute| {
+        any_over_type(db, env, attribute, false, |part| {
+            expensive(part)
+                || part
+                    .as_typevar()
+                    .is_some_and(|var| !var.typevar(db).is_simple(db))
+        })
+    };
+    any_over_type(db, env, argument, false, |part| {
+        let Type::TypeVar(var) = part else {
+            return expensive(part);
+        };
+        let var = var.typevar(db);
+        if var.is_simple(db) {
+            return false;
+        }
+        let expensive_bound = match var.bound_or_constraints(db, env) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => expensive_attribute(bound),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                .elements(db)
+                .iter()
+                .copied()
+                .any(expensive_attribute),
+            None => false,
+        };
+        expensive_bound || var.default_type(db, env).is_some_and(expensive_attribute)
+    })
+}
+
+/// Step 5 drops empty unions from its argument and parameter tuples. An alias can resolve to
+/// `Never`, so the shortcut needs a visible member to prove that the slot survives.
+fn definitely_contributes_to_overload_filter_tuple<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    let is_concrete =
+        |ty: &Type<'db>| !matches!(ty, Type::Never | Type::TypeAlias(_) | Type::Union(_));
+    match ty {
+        Type::Union(union) => union.elements(db).iter().any(is_concrete),
+        _ => is_concrete(&ty),
+    }
+}
+
 /// Information about which parameter(s) an argument was matched against. This is tracked
 /// separately for each overload.
 #[derive(Clone, Debug, Default, get_size2::GetSize, salsa::SalsaValue)]
@@ -9569,6 +9669,103 @@ impl<'db> Binding<'db> {
         );
         checker.check_argument_types(constraints);
         (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
+    }
+
+    /// Partial application retains later signatures for arguments supplied in a future call.
+    /// For a complete call, the shortcut requires each source argument to match one parameter
+    /// directly. Unpacked elements have their own types in the full step-5 comparison.
+    fn supports_first_match_pruning(&self) -> bool {
+        !self.is_partial_application
+            && !self.variadic_argument_matched_to_variadic_parameter
+            && self.argument_matches.iter().all(|matched| {
+                matches!(matched.parameters.as_slice(), [parameter] if parameter.argument_type.is_none())
+            })
+    }
+
+    /// Pairs each argument with its specialized parameter type for overload filtering.
+    /// An argument can be inferred under several type contexts, so look it up by the
+    /// parameter's original annotation before applying this overload's specialization.
+    fn overload_filter_slots<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        arguments: &'a CallArguments<'_, 'db>,
+    ) -> impl Iterator<Item = OverloadFilterSlot<'db>> + 'a {
+        let specialization = self.merged_specialization(db);
+        self.argument_matches
+            .iter()
+            .zip(arguments.iter())
+            .flat_map(move |(matched, argument)| {
+                matched.iter().map(move |parameter| {
+                    // TODO: For an unannotated `self` / `cls` parameter, the type should be
+                    // `typing.Self` / `type[typing.Self]`.
+                    let annotation = self.signature.parameters()[parameter.index].annotated_type();
+                    OverloadFilterSlot {
+                        argument: argument.source_types().get_for_declared_type(annotation),
+                        parameter: annotation.apply_optional_specialization(db, specialization),
+                        variadic_argument: parameter.argument_type,
+                    }
+                })
+            })
+    }
+
+    /// Proves that step 5 can select the first matching overload for an ordinary call.
+    ///
+    /// ```python
+    /// from typing import Any, overload, reveal_type
+    ///
+    /// @overload
+    /// def pick(x: int) -> int: ...
+    /// @overload
+    /// def pick(x: object) -> object: ...
+    /// def pick(x: object) -> object:
+    ///     return x
+    ///
+    /// def f(n: int, a: Any):
+    ///     reveal_type(pick(n))  # int: the first overload covers every int.
+    ///     reveal_type(pick(a))  # Unknown: a could be a str, so both overloads matter.
+    /// ```
+    ///
+    /// The caller checks [`Self::supports_first_match_pruning`] before taking this shortcut.
+    /// If every slot is covered, dropping slots whose parameters agree across overloads
+    /// preserves the result. We use the full comparison when a slot might disappear or
+    /// materializing an argument would require inspecting a complex type.
+    fn accepts_all_argument_materializations(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> bool {
+        self.overload_filter_slots(db, arguments).all(|slot| {
+            // Every materialization of an instance is an object and still occupies a tuple
+            // slot, regardless of its type arguments or the base of a `NewType`.
+            if slot.parameter.is_object()
+                && matches!(
+                    slot.argument,
+                    Type::NominalInstance(_) | Type::NewTypeInstance(_)
+                )
+            {
+                return true;
+            }
+
+            if !definitely_contributes_to_overload_filter_tuple(db, slot.parameter)
+                || may_be_expensive_to_materialize(db, env, slot.argument)
+            {
+                return false;
+            }
+
+            let argument = slot.argument.top_materialization(db, env);
+            definitely_contributes_to_overload_filter_tuple(db, argument)
+                && argument
+                    .when_assignable_to(
+                        db,
+                        env,
+                        slot.parameter,
+                        constraints,
+                        self.inferable_typevars,
+                    )
+                    .is_always_satisfied(db, env, self.inferable_typevars)
+        })
     }
 
     fn check_keyword_unpack_key_types(
