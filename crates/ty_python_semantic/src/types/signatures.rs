@@ -3018,13 +3018,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // Preserve return-type inference for an incompatible object-variadic callback.
                 // A compatible prefix contributes its own inference bounds in the comparison above.
                 let parameters = source.parameters.expand_starred_variadic_annotations(db);
-                if parameters
-                    .variadic()
-                    .is_some_and(|(_, p)| p.annotated_type().is_object())
-                    && parameters
-                        .keyword_variadic()
-                        .is_some_and(|(_, p)| p.annotated_type().is_object())
-                {
+                if parameters.has_unrestricted_variadics(db) {
                     return checker.check_signature_return_pair(db, source, target);
                 }
             }
@@ -3392,6 +3386,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut keyword_collision_checks = true;
         let source_is_gradual = source_parameters.is_gradual();
         let target_is_gradual = target_parameters.is_gradual();
+        // A bottom-materialized gradual tail accepts arbitrary positional and keyword arguments.
+        // Its fixed parameters can bind the same calls as in the original signature.
+        let match_variadic_prefix = source_is_gradual
+            || target_is_gradual
+            || source_parameters.has_unrestricted_variadics(db);
         let specialize_target_tail = target_is_gradual && self.relation.is_assignability();
         // Keep every fixed parameter for both keyword collisions and ordinary matching. A
         // gradual target can specialize its tail to the source's remaining parameters. Strict
@@ -3406,13 +3405,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         });
         if (target_parameters.is_standard()
-            && (source_has_unpacked_suffix || target_has_unpacked_suffix || source_is_gradual))
+            && (source_has_unpacked_suffix || target_has_unpacked_suffix || match_variadic_prefix))
             || gradual_target.is_some()
         {
             let target_parameters = gradual_target.as_ref().unwrap_or(&target_parameters);
-            let has_variadic = target_parameters.variadic().is_some();
+            let target_variadic = target_parameters.variadic();
             let keyword_variadic = target_parameters.keyword_variadic();
             let positional_count = target_parameters.positional().count();
+            let positional_limit = LazyCell::new(|| {
+                let is_never = |parameter: &Parameter<'db>| {
+                    parameter.annotated_type().resolve_type_alias(db).is_never()
+                };
+                if let Some(index) = target_parameters.positional().position(is_never) {
+                    return Some(index);
+                }
+                // A `*args: Never` segment is empty, but its required suffix still binds.
+                if target_variadic.is_some_and(|(_, variadic)| is_never(variadic)) {
+                    return Some(
+                        target_parameters
+                            .iter()
+                            .filter(|p| p.is_positional())
+                            .count(),
+                    );
+                }
+                None
+            });
             // A target call can fill a source parameter positionally and also pass its name as a
             // keyword. A matching target prefix protects that name only when the same call must
             // already have filled the target parameter, including every prefix before a suffix.
@@ -3421,7 +3438,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     continue;
                 };
 
-                if !has_variadic && source_index >= positional_count {
+                if target_variadic.is_none() && source_index >= positional_count {
                     continue;
                 }
 
@@ -3437,10 +3454,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     continue;
                 };
 
-                // The keyword must be uninhabited to avoid the collision. Keep this as a
-                // constraint so gradual types can materialize to `Never` and inferable type
-                // variables can be constrained to it.
-                let no_collision = self.check_type_pair(db, keyword.annotated_type(), Type::Never);
+                // Beyond an uninhabited positional parameter, the keyword can only bind by name.
+                // Otherwise the keyword must be uninhabited to avoid binding the source twice.
+                let keyword_type = if positional_limit.is_some_and(|limit| source_index >= limit) {
+                    source_parameter.annotated_type()
+                } else {
+                    Type::Never
+                };
+                let no_collision = self.check_type_pair(db, keyword.annotated_type(), keyword_type);
                 if result
                     .intersect(db, self.constraints, no_collision)
                     .is_never_satisfied(db, env, self.inferable)
@@ -4313,9 +4334,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             if let Some(target_name) = target_param.keyword_name()
                                 && source_param.keyword_name() != Some(target_name)
                             {
-                                if !source_param.has_default()
-                                    || !(source_is_gradual || target_is_gradual)
-                                {
+                                if !source_param.has_default() || !match_variadic_prefix {
                                     if let Some(context) = self.report_context() {
                                         context.push(match source_param.keyword_name() {
                                             Some(name) => ErrorContext::ParameterNameMismatch {
@@ -4495,7 +4514,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .count();
                             let mut source_param = source_param;
                             let mut prefix_len = 0;
-                            while (source_is_gradual || target_is_gradual)
+                            while match_variadic_prefix
                                 && !source_has_unpacked_suffix
                                 && source_param.is_positional()
                                 && (prefix_len < target_suffix_len || source_param.has_default())
@@ -5231,6 +5250,16 @@ impl<'db> Parameters<'db> {
                 param
             }
         }))
+    }
+
+    fn has_unrestricted_variadics(&self, db: &'db dyn Db) -> bool {
+        let is_object = |(_, parameter): (usize, &Parameter<'db>)| {
+            parameter
+                .annotated_type()
+                .resolve_type_alias(db)
+                .is_object()
+        };
+        self.variadic().is_some_and(is_object) && self.keyword_variadic().is_some_and(is_object)
     }
 
     pub(crate) fn is_top(&self) -> bool {
