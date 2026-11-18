@@ -4179,6 +4179,61 @@ def metaclass_bound[M: Meta](cls: M) -> None:
     cls.__init__ = None  # error: [invalid-assignment]
 ```
 
+An `Any` bound does not erase the known class metadata after narrowing:
+
+```py
+from typing import Any
+
+def dynamic_bound[T: Any](cls: T) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: Any & str
+        return cls.__name__
+    return str(cls)
+
+class Known: ...
+
+def union_bound_name[T: Any | type[Known]](cls: T) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: str
+        return cls.__name__
+    return str(cls)
+
+def constrained_name[T: (Any, type[Known])](cls: T) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: str
+        return cls.__name__
+    return str(cls)
+```
+
+Dynamic type arguments inside a known generic class remain dynamic:
+
+```py
+class Box[T]:
+    @classmethod
+    def value(cls) -> T:
+        raise NotImplementedError
+
+def generic_argument(cls: type[Box[Any]]) -> None:
+    if isinstance(cls, Meta):
+        reveal_type(cls.value())  # revealed: Any
+```
+
+## Attribute access after excluding a union-bound alternative
+
+An excluded member of a type variable's bound does not supply a class namespace merely because its
+narrowed receiver is `Never`. A successful `hasattr` check establishes an `object` attribute.
+
+```py
+class Command: ...
+
+def check[T: int | Command](value: T) -> None:
+    if isinstance(value, Command):
+        pass
+    elif hasattr(value, "checks"):
+        reveal_type(value.checks)  # revealed: object
+        value.checks.append(None)  # error: [missing-attribute]
+```
+
 ## Attribute access on TypeVars bounded by `type[...]`
 
 Regression test for <https://github.com/astral-sh/ty/issues/3782>.

@@ -4768,6 +4768,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Retain the known class constraints used to select a class namespace. A dynamic
+    /// intersection alternative, including one from a type variable bound, supplies no known
+    /// namespace. Do not materialize dynamic arguments inside a generic class constraint.
+    fn class_namespace_constraints(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+        match self.flatten_typevars(db, env) {
+            Type::Union(union) => union.map(db, env, |ty| ty.class_namespace_constraints(db, env)),
+            Type::Intersection(intersection) => intersection.map_positive(db, env, |ty| {
+                if ty.is_dynamic() { Type::object() } else { *ty }
+            }),
+            ty => ty,
+        }
+    }
+
     /// Read a member from the represented class's MRO without binding an instance argument.
     /// Apply descriptors before combining intersection alternatives: distinct classmethod
     /// objects can expose compatible bound methods even though the descriptors are disjoint.
@@ -6229,15 +6242,21 @@ impl<'db> Type<'db> {
                 // An intersection can establish that an otherwise instance-like alternative
                 // describes a class object. Keep that alternative's metaclass members, but let
                 // the represented class's namespace shadow its non-data descriptors.
+                // An excluded union-bound alternative has a `Never` receiver; its vacuous
+                // subtype relation does not establish a class namespace.
                 let instance_fallback = this.instance_member(db, env, name_str);
                 let (fallback, shadowing) = if (this.is_metaclass_instance(db, env)
                     || receiver != this)
+                    && !receiver.is_never()
                     && receiver.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env))
                     && !Type::instance_lookup_class_member_with_policy(db, env, key, receiver)
                         .qualifiers
                         .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR)
                 {
+                    // Select the namespace from known class constraints, while retaining the
+                    // complete receiver for descriptor and `Self` binding.
                     let class_mro = receiver
+                        .class_namespace_constraints(db, env)
                         .to_instance_approximation(db, env)
                         .unwrap_or_else(Type::object)
                         .to_meta_type(db, env);

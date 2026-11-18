@@ -1831,6 +1831,27 @@ def reset_known(cls: type[Known]) -> None:
         cls.__init__ = Meta.__init__  # error: [invalid-assignment]
 ```
 
+## Metadata on narrowed dynamic class objects
+
+Narrowing a dynamic value to a class preserves the known metadata type. The dynamic part of the
+intersection does not supply a class namespace that shadows the metaclass's declarations.
+
+```py
+from typing import Any
+
+def class_name(cls: Any) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: Any & str
+        return cls.__name__
+    return str(cls)
+
+def unknown_class_name(cls) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: Unknown & str
+        return cls.__name__
+    return str(cls)
+```
+
 ## Shadowing static methods on instances
 
 ### Nominal instances
