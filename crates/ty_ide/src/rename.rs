@@ -1,10 +1,16 @@
 use crate::goto::find_goto_target;
-use crate::references::{ReferencesMode, references};
+use crate::references::{ReferencesMode, private_runtime_spellings, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
+use ruff_python_ast::find_node::{CoveringNode, covering_node};
+use ruff_python_ast::{AnyNodeRef, token::TokenKind};
+use ruff_python_trivia::NameMatcher;
 use ruff_text_size::{Ranged, TextSize};
+use rustc_hash::FxHashMap;
 use ty_python_core::ProgramFile;
-use ty_python_semantic::SemanticModel;
+use ty_python_core::definition::DefinitionKind;
+use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef};
+use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
 /// Returns the range of the symbol if it can be renamed, None if not.
 pub fn can_rename(
@@ -35,6 +41,10 @@ pub fn can_rename(
         .goto_declaration(&model, &goto_target)?
         .into_navigation_targets(model.db());
 
+    if class_runtime_alias_prevents_rename(db, file, &model, &goto_target) {
+        return None;
+    }
+
     for target in &declaration_targets {
         let target_file = target.file();
 
@@ -47,6 +57,17 @@ pub fn can_rename(
         if !current_file_in_project && target_file != source_file {
             return None;
         }
+    }
+
+    let mode = if current_file_in_project {
+        ReferencesMode::RenameMultiFile
+    } else {
+        ReferencesMode::Rename
+    };
+    if let Some(found) = references(db, file, &goto_target, mode)
+        && !uniform_reference_spelling(db, &found)
+    {
+        return None;
     }
 
     Some(goto_target.range())
@@ -72,6 +93,10 @@ pub fn rename(
         return None;
     }
 
+    if class_runtime_alias_prevents_rename(db, file, &model, &goto_target) {
+        return None;
+    }
+
     // Determine if we should do a multi-file rename or single-file rename
     // based on whether the current file is part of the project
     let current_file_in_project = is_file_in_project(db, file.file(db));
@@ -86,7 +111,212 @@ pub fn rename(
     };
 
     // Find all references that need to be renamed
-    references(db, file, &goto_target, rename_mode)
+    let found = references(db, file, &goto_target, rename_mode)?;
+    uniform_reference_spelling(db, &found).then_some(found)
+}
+
+/// The server currently applies one replacement text to every reference. Decline a rename when
+/// private and explicit runtime spellings are mixed, since they require different replacements.
+fn uniform_reference_spelling(db: &dyn Db, references: &[ReferenceTarget]) -> bool {
+    let Some(first) = references.first() else {
+        return true;
+    };
+    let first_source = ruff_db::source::source_text(db, first.file());
+    let spelling = &first_source[first.range()];
+    references.iter().skip(1).all(|reference| {
+        let source = ruff_db::source::source_text(db, reference.file());
+        &source[reference.range()] == spelling
+    })
+}
+
+/// A class rename changes every identifier compiled under its lexical private owner. Decline
+/// when private import sources would change, or when an explicit runtime spelling resolves to
+/// the same definition as an owner-scoped private identifier; those cases need distinct edits.
+fn class_runtime_alias_prevents_rename(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    model: &SemanticModel<'_>,
+    target: &crate::goto::GotoTarget<'_>,
+) -> bool {
+    let Some(definitions) =
+        target.definitions(model, ReferencesMode::Rename.to_import_alias_resolution())
+    else {
+        return false;
+    };
+    definitions
+        .iter()
+        .filter_map(|resolved| resolved.definition())
+        .any(|definition| {
+            let DefinitionKind::Class(class) = definition.kind(db) else {
+                return false;
+            };
+            let module = ruff_db::parsed::parsed_module(db, definition.python_file(db)).load(db);
+            let class = class.node(&module);
+            let index = ty_python_core::semantic_index(db, definition.program_file(db));
+            let body_scope = index.node_scope(NodeWithScopeRef::Class(class));
+            let type_parameter_scope =
+                index.try_node_scope(NodeWithScopeRef::ClassTypeParameters(class));
+            let source = ruff_db::source::source_text(db, definition.file(db));
+            let class_model = SemanticModel::new(db, definition.program_file(db));
+            if class_model.class_rename_has_owner_sensitive_slots(class) {
+                return true;
+            }
+            let mut private_definitions: FxHashMap<
+                String,
+                Vec<ty_python_semantic::ResolvedDefinition<'_>>,
+            > = FxHashMap::default();
+
+            for token in module.tokens().iter().filter(|token| {
+                token.kind() == TokenKind::Identifier && class.range().contains_range(token.range())
+            }) {
+                let spelling = &source[token.range()];
+                if !spelling.starts_with("__") || spelling.ends_with("__") {
+                    continue;
+                }
+                let covering = covering_node(module.syntax().into(), token.range());
+                let Some((owner, token_scope)) =
+                    lexical_owner_for_token(&class_model, &covering, spelling)
+                else {
+                    continue;
+                };
+                if owner != body_scope && Some(owner) != type_parameter_scope {
+                    continue;
+                }
+                if private_import_source(&covering, token.range()) {
+                    return true;
+                }
+                let Some(target) = find_goto_target(&class_model, &module, token.start()) else {
+                    continue;
+                };
+                let Some(normalized) = target.to_string() else {
+                    continue;
+                };
+                let key = index
+                    .place_table(token_scope)
+                    .canonical_attribute_name(&normalized);
+                if key == normalized {
+                    continue;
+                }
+                if let Some(found) =
+                    target.definitions(&class_model, ImportAliasResolution::ResolveAliases)
+                {
+                    private_definitions
+                        .entry(key.into_owned())
+                        .or_default()
+                        .extend(found.iter().cloned());
+                }
+            }
+            if private_definitions.is_empty() {
+                return false;
+            }
+            let mut spellings: FxHashMap<&str, Vec<&str>> = FxHashMap::default();
+            for key in private_definitions.keys() {
+                for spelling in private_runtime_spellings(key) {
+                    spellings.entry(spelling).or_default().push(key);
+                }
+            }
+            let matchers: Vec<_> = spellings
+                .keys()
+                .map(|spelling| NameMatcher::new(spelling))
+                .collect();
+            std::iter::once(file.file(db))
+                .chain(db.project().files(db).iter())
+                .any(|candidate| {
+                    let source = ruff_db::source::source_text(db, candidate);
+                    if !matchers.iter().any(|matcher| matcher.may_match(&source)) {
+                        return false;
+                    }
+                    let candidate_file = ProgramFile::new(db, candidate, file.program(db));
+                    let parsed =
+                        ruff_db::parsed::parsed_module(db, candidate_file.python_file(db)).load(db);
+                    let candidate_model = SemanticModel::new(db, candidate_file);
+                    parsed
+                        .tokens()
+                        .iter()
+                        .filter(|token| token.kind() == TokenKind::Identifier)
+                        .any(|token| {
+                            let Some(target) =
+                                find_goto_target(&candidate_model, &parsed, token.start())
+                            else {
+                                return false;
+                            };
+                            let Some(spelling) = target.to_string() else {
+                                return false;
+                            };
+                            let Some(keys) = spellings.get(spelling.as_ref()) else {
+                                return false;
+                            };
+                            let covering = covering_node(parsed.syntax().into(), token.range());
+                            let same_owner = candidate_file == definition.program_file(db)
+                                && lexical_owner_for_token(&candidate_model, &covering, &spelling)
+                                    .is_some_and(|(owner, _)| {
+                                        owner == body_scope || Some(owner) == type_parameter_scope
+                                    });
+                            target
+                                .definitions(
+                                    &candidate_model,
+                                    ImportAliasResolution::ResolveAliases,
+                                )
+                                .is_some_and(|found| {
+                                    keys.iter().any(|key| {
+                                        (!same_owner || spelling.as_ref() == *key)
+                                            && found.iter().any(|resolved| {
+                                                private_definitions[*key].contains(resolved)
+                                            })
+                                    })
+                                })
+                        })
+                })
+        })
+}
+
+/// Resolve a token's effective private owner from its semantic scope. Plain class headers use
+/// their enclosing owner; generic headers use the new owner only for private type parameters.
+fn lexical_owner_for_token(
+    model: &SemanticModel<'_>,
+    covering: &CoveringNode<'_>,
+    spelling: &str,
+) -> Option<(FileScopeId, FileScopeId)> {
+    let scope = covering.ancestors().find_map(|node| match node {
+        AnyNodeRef::Identifier(_)
+        | AnyNodeRef::StmtClassDef(_)
+        | AnyNodeRef::StmtFunctionDef(_)
+        | AnyNodeRef::TypeParamTypeVar(_) => model.scope(node),
+        node if node.as_expr_ref().is_some() => model.scope(node),
+        _ => None,
+    })?;
+    let index = ty_python_core::semantic_index(model.db(), model.program_file());
+    let table = index.place_table(scope);
+    if table.canonical_attribute_name(spelling) == spelling {
+        return None;
+    }
+    let selective = table.identifier_uses_selective_owner(spelling);
+    index
+        .ancestor_scopes(scope)
+        .find_map(|(owner, ancestor)| match (selective, ancestor.node()) {
+            (true, NodeWithScopeKind::ClassTypeParameters(_))
+            | (false, NodeWithScopeKind::Class(_)) => Some((owner, scope)),
+            _ => None,
+        })
+}
+
+/// Import source identifiers are evaluated under the private owner. Changing that owner changes
+/// the module or member imported even if every local use is renamed consistently.
+fn private_import_source(covering: &CoveringNode<'_>, range: ruff_text_size::TextRange) -> bool {
+    covering.ancestors().any(|node| match node {
+        AnyNodeRef::StmtImport(import) => import
+            .names
+            .iter()
+            .any(|alias| alias.name.range() == range && !alias.name.as_str().contains('.')),
+        AnyNodeRef::StmtImportFrom(import) => {
+            import
+                .module
+                .as_ref()
+                .is_some_and(|module| module.range() == range && !module.as_str().contains('.'))
+                || import.names.iter().any(|alias| alias.name.range() == range)
+        }
+        _ => false,
+    })
 }
 
 /// Helper function to check if a file is included in the project.

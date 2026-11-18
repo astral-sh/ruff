@@ -1025,7 +1025,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter_non_variadic_params()
             .skip(parameters.posonlyargs.len() + pep_484_positional_only_count)
             .map(|parameter| &parameter.parameter)
-            .filter(|parameter| unpacked_keys.contains_key(&parameter.name.id))
+            .filter(|parameter| {
+                unpacked_keys.contains_key(&parameter.name.id)
+                    // Preserve the declaration-spelling overlap diagnostic for private keys,
+                    // while the TypedDict schema itself retains the canonical runtime key.
+                    || (parameter.name.id.starts_with("__")
+                        && unpacked_keys.values().any(|key| {
+                            key.definition.is_some_and(|definition| {
+                                let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
+                                    return false;
+                                };
+                                let module = ruff_db::parsed::parsed_module(db, definition.python_file(db)).load(db);
+                                assignment.target(&module).as_name_expr().is_some_and(|name| name.id == parameter.name.id)
+                            })
+                        }))
+            })
             .collect::<Vec<_>>();
 
         if overlapping.is_empty() {

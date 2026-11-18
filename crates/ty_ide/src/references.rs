@@ -28,6 +28,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
+use ty_python_core::place::PlaceExprRef;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::{
     Db as SemanticDb, FixtureExposure, FixtureNameSource, ImportAliasResolution,
@@ -123,8 +124,35 @@ pub(crate) fn references(
             .is_some_and(|definition| definition.kind(db).is_parameter_def())
     });
 
+    let mut alias_texts = Vec::new();
+    for definition in target_definitions
+        .iter()
+        .filter_map(ResolvedDefinition::definition)
+    {
+        let table = ty_python_core::semantic_index(db, definition.program_file(db))
+            .place_table(definition.file_scope(db));
+        let runtime_name = match table.place(definition.place(db)) {
+            PlaceExprRef::Symbol(symbol) => Some(symbol.name().as_str()),
+            PlaceExprRef::Member(member) => member.as_instance_attribute(),
+        };
+        if let Some(runtime_name) = runtime_name
+            && runtime_name.starts_with('_')
+            && !runtime_name.starts_with("__")
+            && !runtime_name.ends_with("__")
+        {
+            // A complete key can arise from more than one owner/spelling pair:
+            // `_A__B__x` is both `A.__B__x` and `A__B.__x`.
+            for spelling in private_runtime_spellings(runtime_name) {
+                if spelling != target_text && !alias_texts.iter().any(|alias| alias == spelling) {
+                    alias_texts.push(spelling.to_string());
+                }
+            }
+        }
+    }
+
     let search = LocalReferenceSearch {
         target_text,
+        alias_texts,
         target_definitions,
         import_alias_resolution,
         fixture_resolution,
@@ -137,6 +165,17 @@ pub(crate) fn references(
         is_externally_visible_symbol,
         is_parameter,
     )
+}
+
+/// Enumerate source spellings that could produce a complete private runtime key under some
+/// lexical class owner, including the explicit runtime spelling itself.
+pub(super) fn private_runtime_spellings(runtime_name: &str) -> impl Iterator<Item = &str> {
+    std::iter::once(runtime_name).chain(runtime_name.char_indices().skip(2).filter_map(
+        |(offset, _)| {
+            let suffix = &runtime_name[offset..];
+            suffix.starts_with("__").then_some(suffix)
+        },
+    ))
 }
 
 fn references_for_search(
@@ -177,13 +216,16 @@ fn references_for_search(
                 .collect()
         };
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
-        let matcher = NameMatcher::new(search.target_text.as_str());
+        let matchers: Vec<_> = std::iter::once(search.target_text.as_str())
+            .chain(search.alias_texts.iter().map(String::as_str))
+            .map(NameMatcher::new)
+            .collect();
         let other_references = files
             .into_par_iter()
             .with_min_len(minimum_job_len)
             .map_with_db(db, |db, other_file| {
                 let source = ruff_db::source::source_text(db, other_file);
-                if !matcher.may_match(&source) {
+                if !matchers.iter().any(|matcher| matcher.may_match(&source)) {
                     return Vec::new();
                 }
 
@@ -403,6 +445,7 @@ impl<'db> FixtureReferenceTarget<'db> {
     ) -> Option<Vec<ReferenceTarget>> {
         let search = LocalReferenceSearch {
             target_text: self.name.to_string(),
+            alias_texts: Vec::new(),
             target_definitions: Definitions::new(Vec::new()),
             import_alias_resolution: ImportAliasResolution::PreserveAliases,
             fixture_resolution: Some(self.resolution),
@@ -449,9 +492,17 @@ impl<'db> FixtureReferenceTarget<'db> {
 
 struct LocalReferenceSearch<'db> {
     target_text: String,
+    alias_texts: Vec<String>,
     target_definitions: Definitions<'db>,
     import_alias_resolution: ImportAliasResolution,
     fixture_resolution: Option<FixtureReferenceResolution<'db>>,
+}
+
+impl LocalReferenceSearch<'_> {
+    /// Private source identifiers and their explicit runtime keys denote the same use-def place.
+    fn matches_text(&self, text: &str) -> bool {
+        text == self.target_text || self.alias_texts.iter().any(|alias| alias == text)
+    }
 }
 
 /// The name sources used to match fixture references and the files visited to find them.
@@ -598,7 +649,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
         match node {
             AnyNodeRef::ExprName(name_expr) => {
                 // If the name doesn't match our target text, this isn't a match
-                if name_expr.id.as_str() != self.search.target_text {
+                if !self.search.matches_text(name_expr.id.as_str()) {
                     return TraversalSignal::Traverse;
                 }
 
@@ -691,7 +742,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 }
                 // Only check the original name if it matches our target text
                 // This is for cases where we're renaming the imported symbol name itself
-                if alias.name.id == self.search.target_text {
+                if self.search.matches_text(alias.name.as_str()) {
                     self.check_declaration_identifier(&alias.name);
                 }
             }
@@ -747,7 +798,7 @@ impl<'a> LocalReferencesFinder<'a> {
 
     fn check_identifier(&mut self, identifier: &ast::Identifier, kind: OccurrenceKind) {
         // Quick text-based check first
-        if identifier.id != self.search.target_text {
+        if !self.search.matches_text(identifier.as_str()) {
             return;
         }
 
@@ -875,7 +926,7 @@ impl<'a> LocalReferencesFinder<'a> {
         let [part] = string_expr.value.as_slice() else {
             return;
         };
-        if part.value.as_ref() != self.search.target_text {
+        if !self.search.matches_text(part.value.as_ref()) {
             return;
         }
 

@@ -53,6 +53,7 @@ pub mod node_key;
 pub mod place;
 pub mod platform;
 pub mod predicate;
+pub mod private_name;
 pub mod rank;
 mod re_exports;
 pub mod reachability_constraints;
@@ -819,7 +820,7 @@ impl<'db> SemanticIndex<'db> {
                 return EnclosingSnapshotResult::NoLongerInEagerContext;
             }
         }
-        let Some(place_id) = self.place_tables[enclosing_scope].place_id(expr) else {
+        let Some(place_id) = self.place_tables[enclosing_scope].runtime_place_id(expr) else {
             return EnclosingSnapshotResult::NotFound;
         };
         let key = EnclosingSnapshotKey {

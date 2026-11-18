@@ -480,6 +480,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         symbol_name: &str,
         method_scope_id: FileScopeId,
     ) -> bool {
+        let symbol_name = self.place_tables[self.current_scope()]
+            .private_policy()
+            .canonical_identifier(symbol_name);
         for scope_info in self.scope_stack.iter().rev() {
             let scope_id = scope_info.file_scope_id;
 
@@ -487,7 +490,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 break;
             }
 
-            if let Some(symbol_id) = self.place_tables[scope_id].symbol_id(symbol_name) {
+            if let Some(symbol_id) = self.place_tables[scope_id].symbol_id(&symbol_name) {
                 let symbol = self.place_tables[scope_id].symbol(symbol_id);
                 if symbol.is_bound() {
                     return true;
@@ -530,7 +533,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.exception_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
-        self.place_tables.push(PlaceTableBuilder::default());
+        let parent_policy = parent.map_or_else(Default::default, |parent| {
+            self.place_tables[parent].private_policy().clone()
+        });
+        let private_policy = match node {
+            NodeWithScopeRef::Class(class) => {
+                crate::private_name::PrivateNamePolicy::for_class(class.name.id.clone())
+            }
+            NodeWithScopeRef::ClassTypeParameters(class) => {
+                crate::private_name::PrivateNamePolicy::for_class_type_parameters(class)
+            }
+            _ => parent_policy,
+        };
+        self.place_tables
+            .push(PlaceTableBuilder::with_private_policy(private_policy));
         self.use_def_maps
             .push(Box::new(UseDefMapBuilder::new(scope_kind)));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
@@ -585,7 +601,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // it may refer to the enclosing scope bindings
                 // so we also need to snapshot the bindings of the enclosing scope.
 
-                let Some(enclosing_place_id) = enclosing_place_table.place_id(nested_place) else {
+                let Some(enclosing_place_id) = enclosing_place_table.runtime_place_id(nested_place)
+                else {
                     continue;
                 };
                 let enclosing_place = enclosing_place_table.place(enclosing_place_id);
@@ -1187,12 +1204,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Don't register if the target itself is one of the narrowed places (e.g. `x = x is None`),
         // since the alias would be invalidated immediately by this same assignment.
         let target_is_narrowed = place_table
-            .symbol_id(target_name)
+            .source_symbol_id(target_name)
             .is_some_and(|symbol| narrowed_places.contains(&symbol.into()));
 
         if !narrowed_places.is_empty() && !target_is_narrowed {
+            let target_name = place_table
+                .source_symbol_id(target_name)
+                .map(|symbol| place_table.symbol(symbol).name().clone())
+                .unwrap_or_else(|| target_name.clone());
             self.narrowing_aliases.insert(
-                target_name.clone(),
+                target_name,
                 NarrowingAlias {
                     expression: value,
                     expression_scope: self.current_scope(),
@@ -1296,7 +1317,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let Some(name) = leaf.as_name_expr() else {
                 return;
             };
-            let Some(alias) = self.narrowing_aliases.get(&name.id) else {
+            let Some(symbol) = self.current_place_table().source_symbol_id(&name.id) else {
+                return;
+            };
+            let runtime_name = self.current_place_table().symbol(symbol).name();
+            let Some(alias) = self.narrowing_aliases.get(runtime_name) else {
                 return;
             };
             if self.current_ast_ids().try_use_id(leaf).is_none() {
@@ -1383,6 +1408,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
     fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
         let (symbol_id, added) = self.current_place_table_mut().add_symbol(Symbol::new(name));
+        if added {
+            self.current_use_def_map_mut().add_place(symbol_id.into());
+        }
+        symbol_id
+    }
+
+    /// Forward a nested binding under the runtime key computed at its original use site.
+    fn add_runtime_symbol(&mut self, name: Name) -> ScopedSymbolId {
+        let (symbol_id, added) = self
+            .current_place_table_mut()
+            .add_runtime_symbol(Symbol::new(name));
         if added {
             self.current_use_def_map_mut().add_place(symbol_id.into());
         }
@@ -1943,7 +1979,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             }
 
-            let place: ScopedPlaceId = self.add_symbol(name.clone()).into();
+            let place: ScopedPlaceId = self.add_runtime_symbol(name.clone()).into();
             let definition = Definition::new(
                 self.db,
                 self.current_scope_id(),
@@ -2020,7 +2056,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             let binding_status = self.comprehension_binding_status(&name, &declarations);
 
-            let symbol = self.add_symbol(name.clone());
+            let symbol = self.add_runtime_symbol(name.clone());
             debug_assert!(
                 declarations
                     .iter()
@@ -2521,7 +2557,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .has_active_exception_handler(self)
             && self
                 .current_place_table()
-                .symbol_id(name.id.as_str())
+                .source_symbol_id(name.id.as_str())
                 .is_none_or(|symbol| {
                     self.current_use_def_map_mut()
                         .symbol_live_binding_status(symbol)
@@ -4011,10 +4047,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Stmt::Import(node) => {
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     self.record_exception_checkpoint();
+                    self.scopes_by_expression
+                        .record_expression(&alias.name, self.current_scope());
 
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
-                    if let Some(module_name) = ModuleName::new(&alias.name) {
+                    let runtime_module = self.place_tables[self.current_scope()]
+                        .private_policy()
+                        .canonical_identifier(alias.name.as_str());
+                    if let Some(module_name) = ModuleName::new(&runtime_module) {
                         self.imported_modules.extend(module_name.ancestors());
                     }
 
@@ -4039,6 +4080,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Stmt::ImportFrom(node) => {
                 self.record_exception_checkpoint();
+                if let Some(module) = &node.module {
+                    self.scopes_by_expression
+                        .record_expression(module, self.current_scope());
+                }
 
                 // If we see:
                 //
@@ -4118,6 +4163,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Loading each imported name can fail after the module import and any earlier
                     // names or package-submodule side effects have completed.
                     self.record_exception_checkpoint();
+                    self.scopes_by_expression
+                        .record_expression(&alias.name, self.current_scope());
 
                     if &alias.name == "*" {
                         // The following line maintains the invariant that every AST node that
@@ -4174,7 +4221,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         //
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
                         for export in exported_names(self.db, referenced_program_file) {
-                            let symbol_id = self.add_symbol(export.clone());
+                            let symbol_id = self.add_runtime_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
@@ -5376,9 +5423,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.current_place_table_mut()
                         .symbol_mut(symbol_id)
                         .mark_global();
+                    let runtime_name = self.current_place_table().symbol(symbol_id).name().clone();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
-                        .insert(name.id.clone(), *range);
+                        .insert(runtime_name, *range);
                 }
                 walk_stmt(self, stmt);
             }
@@ -5429,9 +5477,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.current_place_table_mut()
                         .symbol_mut(symbol_id)
                         .mark_nonlocal();
+                    let runtime_name = self.current_place_table().symbol(symbol_id).name().clone();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
-                        .insert(name.id.clone(), *range);
+                        .insert(runtime_name, *range);
                 }
                 walk_stmt(self, stmt);
             }

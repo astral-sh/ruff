@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::{OnceCell, RefCell};
 use std::collections::hash_map;
 use std::convert::Infallible;
@@ -872,6 +873,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn scope(&self) -> ScopeId<'db> {
         self.scope
+    }
+
+    fn runtime_attribute_name<'a>(&self, name: &'a str) -> Cow<'a, str> {
+        self.index
+            .place_table(self.scope().file_scope_id(self.db()))
+            .canonical_attribute_name(name)
     }
 
     /// Returns call bindings annotated with the call site's enclosing binding contexts.
@@ -2089,8 +2096,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return;
         };
-        if protocol.interface(db).includes_member(db, target.attr.id())
-            || protocol.has_member_declaration(db, target.attr.id())
+        let runtime_name = self.runtime_attribute_name(target.attr.id());
+        if protocol.interface(db).includes_member(db, &runtime_name)
+            || protocol.has_member_declaration(db, &runtime_name)
         {
             return;
         }
@@ -5423,7 +5431,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = global;
         let global_place_table = self.index.place_table(FileScopeId::global());
         for name in names {
-            if let Some(symbol_id) = global_place_table.symbol_id(name) {
+            let runtime_name = self.runtime_attribute_name(name);
+            if let Some(symbol_id) = global_place_table.symbol_id(&runtime_name) {
                 let symbol = global_place_table.symbol(symbol_id);
                 if symbol.is_bound() || symbol.is_declared() {
                     // This name is explicitly defined in the global scope (not just in function
@@ -10107,7 +10116,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
             let use_def = self.index.use_def_map(*enclosing_scope_file_id);
             let place_table = self.index.place_table(*enclosing_scope_file_id);
-            let place = place_table.place_id(expr).unwrap();
+            let place = place_table.runtime_place_id(expr).unwrap();
 
             match use_def.applicable_constraints(
                 *constraint_key,
@@ -10798,6 +10807,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = target.into();
 
         if let Some(place_expr) = PlaceExpr::try_from_expr(target) {
+            let place_expr = self
+                .index
+                .place_table(self.scope().file_scope_id(self.db()))
+                .canonical_place_expression(place_expr);
             self.narrow_place_with_applicable_constraints(
                 PlaceExprRef::from(&place_expr),
                 target_ty,
@@ -10826,10 +10839,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         object_ty: Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
+        let runtime_name = self.runtime_attribute_name(&attribute.attr.id);
         if !object_ty.has_generic_instance_attribute(
             self.db(),
             self.program_environment(),
-            &attribute.attr.id,
+            &runtime_name,
         ) {
             return true;
         }
@@ -10870,6 +10884,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let env = self.program_environment();
         let ast::ExprAttribute { value, attr, .. } = attribute;
+        let runtime_name = self.runtime_attribute_name(&attr.id);
 
         let db = self.db();
         let mut constraint_keys = vec![];
@@ -10906,7 +10921,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         let member_lookup = value_type
-            .try_member_lookup(db, env, &attr.id)
+            .try_member_lookup(db, env, &runtime_name)
             .unwrap_or_else(|error| {
                 error.report_diagnostic(
                     &self.context,
@@ -10940,13 +10955,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
 
                     let bound_on_instance = match value_type {
-                        Type::ClassLiteral(class) => {
-                            !class.instance_member(db, env, None, attr).is_undefined()
-                        }
+                        Type::ClassLiteral(class) => !class
+                            .instance_member(db, env, None, &runtime_name)
+                            .is_undefined(),
                         Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                             match subclass_of.subclass_of() {
                                 SubclassOfInner::Class(class) => {
-                                    !class.instance_member(db, env, attr).is_undefined()
+                                    !class.instance_member(db, env, &runtime_name).is_undefined()
                                 }
                                 SubclassOfInner::Dynamic(_) => unreachable!(
                                     "Attribute lookup on a dynamic `SubclassOf` type \
@@ -11005,7 +11020,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.scope(),
                                 self.typevar_binding_context,
                                 self.inference_flags(),
-                            ) && !defined_type.member(db, env, attr_name).place.is_undefined()
+                            ) && !defined_type
+                                .member(db, env, &runtime_name)
+                                .place
+                                .is_undefined()
                             {
                                 diag.help(format_args!(
                                     "Objects with type `{ty}` have a{maybe_n} `{attr_name}` \
@@ -11072,7 +11090,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if value_type.is_callable_type()
                         && KnownClass::FunctionType
                             .to_instance(db, env)
-                            .member(db, env, attr_name)
+                            .member(db, env, &runtime_name)
                             .place
                             .is_definitely_bound()
                     {
@@ -11144,7 +11162,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 db,
                                 env,
                                 *element,
-                                attr_name,
+                                &runtime_name,
                                 &mut elements_missing_the_attribute,
                             );
                         }
@@ -11233,10 +11251,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ExprContext::Del => {
                 let _ = self.infer_attribute_load(attribute);
+                let runtime_name = self.runtime_attribute_name(attr.as_str());
                 self.validate_attribute_deletion(
                     attribute,
                     self.expression_type(value),
-                    attr.as_str(),
+                    &runtime_name,
                     true,
                 );
                 Type::Never

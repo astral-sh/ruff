@@ -946,7 +946,6 @@ impl<'db> EnumComplementType<'db> {
 pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
-
     let Some(ignore) = table.symbol_id("_ignore_") else {
         return FxHashSet::default();
     };
@@ -1079,6 +1078,9 @@ pub(crate) fn enum_metadata<'db>(
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
+    // Enum's private-member filter uses the original, untrimmed class name, unlike Python's
+    // lexical identifier mangling. In particular, `_E__x` is a member of an enum named `_E`.
+    let enum_private_prefix = format!("_{}__", class.name(db));
 
     let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
@@ -1127,7 +1129,12 @@ pub(crate) fn enum_metadata<'db>(
         .filter_map(|(symbol_id, bindings)| {
             let name = table.symbol(symbol_id).name();
 
-            if name.starts_with("__") {
+            if name.starts_with("__")
+                || (name
+                    .strip_prefix(&enum_private_prefix)
+                    .is_some_and(|suffix| !suffix.is_empty())
+                    && !name.ends_with("__"))
+            {
                 // Skip private attributes (`__private`) and dunders (`__module__`, etc.).
                 // CPython's enum metaclass never treats these as members.
                 return None;

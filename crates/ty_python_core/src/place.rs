@@ -4,12 +4,14 @@ use crate::member::{
     ScopedMemberId,
 };
 use crate::predicate::PatternPredicate;
+use crate::private_name::PrivateNamePolicy;
 use crate::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use smallvec::SmallVec;
+use std::borrow::Cow;
 use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
 
@@ -187,10 +189,12 @@ pub enum ScopedPlaceId {
 pub struct PlaceTable {
     symbols: SymbolTable,
     members: MemberTable,
+    private_policy: PrivateNamePolicy,
 }
 
 impl Hash for PlaceTable {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        self.private_policy.hash(state);
         // The reverse-lookup indexes are also ignored by equality.
         self.symbols.iter().len().hash(state);
         for symbol in self.symbols.iter() {
@@ -221,6 +225,10 @@ impl PlaceTable {
         match place_expr.into() {
             PlaceExprRef::Symbol(_) => ParentPlaceIter::for_symbol(),
             PlaceExprRef::Member(member) => {
+                let member = match self.place_id(member) {
+                    Some(ScopedPlaceId::Member(id)) => self.member(id),
+                    _ => member,
+                };
                 ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.members)
             }
         }
@@ -266,12 +274,64 @@ impl PlaceTable {
         self.symbols.symbol_id(name)
     }
 
+    /// Looks up an identifier spelled in this lexical scope.
+    pub fn source_symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
+        self.symbols.symbol_id(&self.canonical_attribute_name(name))
+    }
+
+    /// Returns the runtime key of an attribute spelled in this lexical scope.
+    pub fn canonical_attribute_name<'a>(&self, name: &'a str) -> Cow<'a, str> {
+        self.private_policy.canonical_identifier(name)
+    }
+
+    /// Whether this identifier belongs to the selective private owner of a generic class header.
+    pub fn identifier_uses_selective_owner(&self, identifier: &str) -> bool {
+        self.private_policy.uses_selective_owner(identifier)
+    }
+
+    pub fn private_owner(&self) -> Option<&str> {
+        self.private_policy.owner()
+    }
+
+    /// Return the private source spelling available under this scope's lexical owner. A runtime
+    /// key belonging to an unrelated inherited class has no private spelling in this scope.
+    pub fn lexical_private_spelling<'a>(&self, runtime_key: &'a str) -> Option<&'a str> {
+        self.private_policy.lexical_private_spelling(runtime_key)
+    }
+
+    /// Convert lexical identifiers before inserting a place into use-def tracking, so a private
+    /// spelling and its explicit runtime alias share assignment order and control-flow state.
+    pub fn canonical_place_expression(&self, mut expression: PlaceExpr) -> PlaceExpr {
+        match &mut expression {
+            PlaceExpr::Symbol(symbol) => symbol.canonicalize(&self.private_policy),
+            PlaceExpr::Member(member) => member.canonicalize_attributes(&self.private_policy),
+        }
+        expression
+    }
+
     /// Returns the [`ScopedPlaceId`] of the place expression.
     pub fn place_id<'e>(&self, place_expr: impl Into<PlaceExprRef<'e>>) -> Option<ScopedPlaceId> {
         let place_expr = place_expr.into();
 
         match place_expr {
-            PlaceExprRef::Symbol(symbol) => self.symbols.symbol_id(symbol.name()).map(Into::into),
+            PlaceExprRef::Symbol(symbol) => self.source_symbol_id(symbol.name()).map(Into::into),
+            PlaceExprRef::Member(member) => {
+                let expression = member
+                    .expression()
+                    .canonical_attributes(&self.private_policy);
+                self.members.member_id(&*expression).map(Into::into)
+            }
+        }
+    }
+
+    /// Look up a key already canonicalized in its use-site scope. Ancestor scopes must not
+    /// reinterpret that key under their own private-name owner.
+    pub fn runtime_place_id<'e>(
+        &self,
+        place_expr: impl Into<PlaceExprRef<'e>>,
+    ) -> Option<ScopedPlaceId> {
+        match place_expr.into() {
+            PlaceExprRef::Symbol(symbol) => self.symbol_id(symbol.name()).map(Into::into),
             PlaceExprRef::Member(member) => {
                 self.members.member_id(member.expression()).map(Into::into)
             }
@@ -299,16 +359,42 @@ impl PlaceTable {
 pub struct PlaceTableBuilder {
     symbols: SymbolTableBuilder,
     member: MemberTableBuilder,
+    private_policy: PrivateNamePolicy,
 
     associated_symbol_members: IndexVec<ScopedSymbolId, SmallVec<[ScopedMemberId; 4]>>,
     associated_sub_members: IndexVec<ScopedMemberId, SmallVec<[ScopedMemberId; 4]>>,
 }
 
 impl PlaceTableBuilder {
+    /// Build a table with the lexical mangling owner inherited by nested functions and replaced
+    /// on entry to a nested class. Module scopes have no private owner.
+    pub(crate) fn with_private_policy(private_policy: PrivateNamePolicy) -> Self {
+        Self {
+            private_policy,
+            ..Self::default()
+        }
+    }
+
+    pub(crate) fn private_policy(&self) -> &PrivateNamePolicy {
+        &self.private_policy
+    }
+
     /// Looks up a place ID by its expression.
     pub(crate) fn place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
         match expression {
-            PlaceExprRef::Symbol(symbol) => self.symbols.symbol_id(symbol.name()).map(Into::into),
+            PlaceExprRef::Symbol(symbol) => self.source_symbol_id(symbol.name()).map(Into::into),
+            PlaceExprRef::Member(member) => {
+                let expression = member
+                    .expression()
+                    .canonical_attributes(&self.private_policy);
+                self.member.member_id(&*expression).map(Into::into)
+            }
+        }
+    }
+
+    pub(crate) fn runtime_place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
+        match expression {
+            PlaceExprRef::Symbol(symbol) => self.symbol_id(symbol.name()).map(Into::into),
             PlaceExprRef::Member(member) => {
                 self.member.member_id(member.expression()).map(Into::into)
             }
@@ -326,6 +412,11 @@ impl PlaceTableBuilder {
 
     pub(super) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
         self.symbols.symbol_id(name)
+    }
+
+    pub(super) fn source_symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
+        let name = self.private_policy.canonical_identifier(name);
+        self.symbols.symbol_id(&name)
     }
 
     #[track_caller]
@@ -364,7 +455,12 @@ impl PlaceTableBuilder {
         self.symbols.iter()
     }
 
-    pub(crate) fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
+    pub(crate) fn add_symbol(&mut self, mut symbol: Symbol) -> (ScopedSymbolId, bool) {
+        symbol.canonicalize(&self.private_policy);
+        self.add_runtime_symbol(symbol)
+    }
+
+    pub(crate) fn add_runtime_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
         let (id, is_new) = self.symbols.add(symbol);
 
         if is_new {
@@ -375,7 +471,8 @@ impl PlaceTableBuilder {
         (id, is_new)
     }
 
-    fn add_member(&mut self, member: Member) -> (ScopedMemberId, bool) {
+    fn add_member(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
+        member.canonicalize_attributes(&self.private_policy);
         let (id, is_new) = self.member.add(member);
 
         if is_new {
@@ -443,6 +540,7 @@ impl PlaceTableBuilder {
         PlaceTable {
             symbols: self.symbols.build(),
             members: self.member.build(),
+            private_policy: self.private_policy,
         }
     }
 }

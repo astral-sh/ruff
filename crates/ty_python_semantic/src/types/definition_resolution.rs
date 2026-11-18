@@ -13,9 +13,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{
-    ImportingFile, ModuleName, resolve_module, resolve_module_for_import_from,
-};
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_python_core::definition::{
     Definition, DefinitionCategory, DefinitionKind, NestedBindingExecution,
 };
@@ -127,7 +125,7 @@ fn implementation_docstring<'db>(db: &'db dyn Db, definition: Definition<'db>) -
 
     let name = definition.name(db)?;
     let scope = definition.scope(db);
-    let symbol_id = place_table(db, scope).symbol_id(&name)?;
+    let symbol_id = place_table(db, scope).source_symbol_id(&name)?;
     let use_def = use_def_map(db, scope);
 
     let current_overload = binding_type(db, definition)
@@ -190,6 +188,11 @@ pub(crate) fn scoped_definitions_for_name<'db>(
     let file = scope.program_file(db);
     let index = semantic_index(db, file);
     let file_scope = scope.file_scope_id(db);
+    // Mangling is determined by the use site's lexical class, even when the binding is in an
+    // ancestor or forwarded to module scope by `global`.
+    let runtime_name = index
+        .place_table(file_scope)
+        .canonical_attribute_name(name_str);
 
     let mut all_definitions = FxIndexSet::default();
 
@@ -198,7 +201,7 @@ pub(crate) fn scoped_definitions_for_name<'db>(
     for (scope_id, _scope) in index.visible_ancestor_scopes(file_scope) {
         let place_table = index.place_table(scope_id);
 
-        let Some(symbol_id) = place_table.symbol_id(name_str) else {
+        let Some(symbol_id) = place_table.symbol_id(&runtime_name) else {
             continue; // Name not found in this scope, try parent scope
         };
 
@@ -238,7 +241,7 @@ pub(crate) fn scoped_definitions_for_name<'db>(
             let global_scope_id = global_scope(db, file);
             let global_place_table = ty_python_core::place_table(db, global_scope_id);
 
-            if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
+            if let Some(global_symbol_id) = global_place_table.symbol_id(&runtime_name) {
                 let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
                 all_definitions.extend(user_visible_definitions(
                     db,
@@ -644,7 +647,9 @@ fn resolve_definition_recursive<'db>(
             }
 
             // Get the full module name being imported
-            let Some(module_name) = ModuleName::new(&alias.name) else {
+            let table = place_table(db, definition.scope(db));
+            let runtime_module = table.canonical_attribute_name(alias.name.as_str());
+            let Some(module_name) = ModuleName::new(&runtime_module) else {
                 return Vec::new(); // Invalid module name, return empty list
             };
 
@@ -677,12 +682,19 @@ fn resolve_definition_recursive<'db>(
 
             // For `ImportFrom`, we need to resolve the original imported symbol name
             // (alias.name), not the local alias (symbol_name)
+            let table = place_table(db, definition.scope(db));
+            let runtime_module = import_node
+                .module
+                .as_deref()
+                .map(|name| table.canonical_attribute_name(name));
+            let runtime_symbol = table.canonical_attribute_name(alias.name.as_str());
             resolve_from_import_definitions(
                 db,
                 env,
                 ImportingFile::File(file.file(db), env.resolver_environment(db)),
                 import_node,
-                &alias.name,
+                runtime_module.as_deref(),
+                &runtime_symbol,
                 visited,
                 alias_resolution,
             )
@@ -701,6 +713,7 @@ fn resolve_definition_recursive<'db>(
                     env,
                     ImportingFile::File(file.file(db), env.resolver_environment(db)),
                     import_node,
+                    import_node.module.as_deref(),
                     symbol_name,
                     visited,
                     alias_resolution,
@@ -722,6 +735,7 @@ pub(crate) fn resolve_from_import_definitions<'db>(
     env: &ProgramEnvironment<'db>,
     importing_file: ImportingFile<'db>,
     import_node: &ast::StmtImportFrom,
+    runtime_module: Option<&str>,
     symbol_name: &str,
     visited: &mut FxHashSet<Definition<'db>>,
     alias_resolution: ImportAliasResolution,
@@ -739,8 +753,12 @@ pub(crate) fn resolve_from_import_definitions<'db>(
         }
     }
 
-    let Some(resolved_module) = resolve_module_for_import_from(db, importing_file, import_node)
+    let Ok(module_name) =
+        ModuleName::from_identifier_parts(db, importing_file, runtime_module, import_node.level)
     else {
+        return Vec::new();
+    };
+    let Some(resolved_module) = resolve_module(db, importing_file, &module_name) else {
         return Vec::new();
     };
 

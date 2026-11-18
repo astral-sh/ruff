@@ -266,7 +266,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = alias;
 
         // The name of the module being imported
-        let Some(full_module_name) = ModuleName::new(name) else {
+        let runtime_module_name = self.runtime_attribute_name(name);
+        let Some(full_module_name) = ModuleName::new(&runtime_module_name) else {
             tracing::debug!("Failed to resolve import due to invalid syntax");
             self.add_binding(alias.into(), definition)
                 .insert(self, Type::unknown());
@@ -377,8 +378,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 && let child = literal.module(db)
                                 && let child_name = child.name(db)
                                 && child_name.parent().as_ref() == Some(parent.name(db))
-                                && child_name.components().next_back() == Some(alias.name.as_str())
-                            {
+                                && child_name.components().next_back()
+                                    == Some(
+                                        self.runtime_attribute_name(alias.name.as_str()).as_ref(),
+                                    ) {
                                 child
                             } else {
                                 parent
@@ -430,7 +433,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.file(),
             self.program_environment().resolver_environment(db),
         );
-        let module_name = ModuleName::from_import_statement(db, importing_file, import_from);
+        let runtime_module = module.map(|name| self.runtime_attribute_name(name));
+        let module_name = ModuleName::from_identifier_parts(
+            db,
+            importing_file,
+            runtime_module.as_deref(),
+            *level,
+        );
 
         let module_name = match module_name {
             Ok(module_name) => module_name,
@@ -479,8 +488,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.file(),
             self.program_environment().resolver_environment(db),
         );
-        let Ok(module_name) = ModuleName::from_import_statement(db, importing_file, import_from)
-        else {
+        let runtime_module = import_from
+            .module
+            .as_deref()
+            .map(|name| self.runtime_attribute_name(name));
+        let Ok(module_name) = ModuleName::from_identifier_parts(
+            db,
+            importing_file,
+            runtime_module.as_deref(),
+            import_from.level,
+        ) else {
             self.add_binding(alias.into(), definition)
                 .insert(self, Type::unknown());
             return;
@@ -511,13 +528,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let module_ty = Type::ModuleLiteral(module_literal);
 
         let name = if let Some(star_import) = definition.kind(db).as_star_import() {
-            self.index
-                .place_table(self.scope().file_scope_id(db))
-                .symbol(star_import.symbol_id())
-                .name()
+            std::borrow::Cow::Borrowed(
+                self.index
+                    .place_table(self.scope().file_scope_id(db))
+                    .symbol(star_import.symbol_id())
+                    .name()
+                    .as_str(),
+            )
         } else {
-            &alias.name.id
+            self.runtime_attribute_name(alias.name.as_str())
         };
+        let name = name.as_ref();
 
         // Avoid looking up attributes on a module if a module imports from itself
         // at the module-global scope, where the import definition itself is one of the

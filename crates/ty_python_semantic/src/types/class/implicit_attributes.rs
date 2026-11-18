@@ -259,7 +259,7 @@ impl<'db> StaticClassLiteral<'db> {
                 if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table
-                        .symbol_id(&method_def.node(&module).name)
+                        .source_symbol_id(&method_def.node(&module).name)
                         .unwrap();
                     class_map
                         .reachable_symbol_bindings(method_place)

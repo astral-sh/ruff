@@ -331,6 +331,10 @@ impl<'db> Iterator for PlaceLoadResolution<'db, '_> {
 
 impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
     fn new(context: PlaceLoadResolutionContext<'db, 'ast>, place_expr: PlaceExpr) -> Self {
+        let place_expr = context
+            .index
+            .place_table(context.scope.file_scope_id(context.db))
+            .canonical_place_expression(place_expr);
         let crosses_scope_declaration =
             context.symbol_has_scope_declaration(PlaceExprRef::from(&place_expr));
         Self {
@@ -413,7 +417,7 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
 
             let enclosing_place_table = self.context.index.place_table(enclosing_file_scope);
             let place_expr = PlaceExprRef::from(&self.place_expr);
-            let enclosing_place_id = enclosing_place_table.place_id(place_expr);
+            let enclosing_place_id = enclosing_place_table.runtime_place_id(place_expr);
             let enclosing_place = enclosing_place_id.map(|id| enclosing_place_table.place(id));
             // A `global` declaration forwards the place to the module instead of making this
             // enclosing scope its owner. A possibly-unbound snapshot must still fall through.
@@ -944,7 +948,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
             )),
             PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
                 let source = table
-                    .place_id(place_expr)
+                    .runtime_place_id(place_expr)
                     .map(|id| PlaceLoadSourceKind::Bindings(use_def.reachable_bindings(id)));
                 assert!(
                     source.is_some() || matches!(self.mode, PlaceLoadMode::StringAnnotation),

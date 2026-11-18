@@ -1482,7 +1482,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if ty.is_never() || !self.type_before_if_chain(name)?.is_union() {
                 return None;
             }
-            let place = places.symbol_id(&name.id)?;
+            let place = places.source_symbol_id(&name.id)?;
             let (constraint, _) = infer_narrowing_constraints(db, predicate, place.into());
             NarrowingConstraint::intersection(ty)
                 .merge_constraint_and(constraint?)

@@ -8,6 +8,7 @@ use hashbrown::hash_table::Entry;
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 
+use std::borrow::Cow;
 use std::hash::{Hash, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
@@ -33,6 +34,15 @@ impl Member {
 
     pub(crate) fn expression(&self) -> &MemberExpr {
         &self.expression
+    }
+
+    pub(super) fn canonicalize_attributes(
+        &mut self,
+        policy: &crate::private_name::PrivateNamePolicy,
+    ) {
+        if let Cow::Owned(expression) = self.expression.canonical_attributes(policy) {
+            self.expression = expression;
+        }
     }
 
     /// Is the place given a value in its containing scope?
@@ -163,6 +173,39 @@ pub(crate) struct MemberExpr {
 }
 
 impl MemberExpr {
+    /// Canonicalize identifiers while leaving literal subscript keys untouched.
+    pub(super) fn canonical_attributes(
+        &self,
+        policy: &crate::private_name::PrivateNamePolicy,
+    ) -> Cow<'_, Self> {
+        let symbol = policy.canonical_identifier(self.symbol_name());
+        if matches!(symbol, Cow::Borrowed(_))
+            && !self.segments().any(|segment| {
+                segment.kind == SegmentKind::Attribute
+                    && matches!(policy.canonical_identifier(segment.text), Cow::Owned(_))
+            })
+        {
+            return Cow::Borrowed(self);
+        }
+
+        let mut path = symbol.into_owned();
+        let mut segments = SmallVec::new_const();
+        for segment in self.segments() {
+            let start = path.as_str().text_len();
+            let text = if segment.kind == SegmentKind::Attribute {
+                policy.canonical_identifier(segment.text)
+            } else {
+                Cow::Borrowed(segment.text)
+            };
+            path.push_str(&text);
+            segments.push(SegmentInfo::new(segment.kind, start));
+        }
+        Cow::Owned(Self {
+            path: CharStr::from(path.as_str()),
+            segments: Segments::from_vec(segments),
+        })
+    }
+
     #[cfg(test)]
     fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
         MemberExprBuilder::visit_expr(expression).and_then(Self::try_from_builder)

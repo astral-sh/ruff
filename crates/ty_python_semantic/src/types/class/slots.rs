@@ -16,7 +16,10 @@ use crate::{Db, FxIndexSet, ProgramEnvironment};
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 enum SlotDefinition {
     /// Every declared slot name is statically known.
-    Names(Box<[Name]>),
+    Names {
+        names: Box<[Name]>,
+        owner_sensitive: bool,
+    },
     /// The declaration is definitely nonempty, but at least one name is unknown.
     NonEmpty,
     /// The class has no slot declaration, or its declaration cannot be resolved statically.
@@ -241,7 +244,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         match self.slot_definition(db) {
-            SlotDefinition::Names(names) => Some(names),
+            SlotDefinition::Names { names, .. } => Some(names),
             SlotDefinition::NonEmpty | SlotDefinition::DynamicOrNone => None,
         }
     }
@@ -250,9 +253,21 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn has_nonempty_slots(self, db: &'db dyn Db) -> bool {
         (self.has_explicit_slots(db) || self.has_generated_slots(db))
             && match self.slot_definition(db) {
-                SlotDefinition::Names(names) => !names.is_empty(),
+                SlotDefinition::Names { names, .. } => !names.is_empty(),
                 SlotDefinition::NonEmpty => true,
                 SlotDefinition::DynamicOrNone => false,
+            }
+    }
+
+    /// A class rename cannot preserve an explicit runtime slot spelling without rewriting the
+    /// layout. Unknown explicit layouts fail closed; source-private slots follow the renamed owner.
+    pub(crate) fn has_owner_sensitive_slots(self, db: &'db dyn Db) -> bool {
+        self.has_explicit_slots(db)
+            && match self.slot_definition(db) {
+                SlotDefinition::Names {
+                    owner_sensitive, ..
+                } => *owner_sensitive,
+                SlotDefinition::NonEmpty | SlotDefinition::DynamicOrNone => true,
             }
     }
 
@@ -293,7 +308,10 @@ impl<'db> StaticClassLiteral<'db> {
             .filter(|_| self.has_explicit_slots(db))
         else {
             if self.has_named_tuple_slots(db) {
-                return SlotDefinition::Names(Box::default());
+                return SlotDefinition::Names {
+                    names: Box::default(),
+                    owner_sensitive: false,
+                };
             }
 
             if !self.has_generated_slots(db) {
@@ -333,7 +351,10 @@ impl<'db> StaticClassLiteral<'db> {
             {
                 names.push(weakref_name);
             }
-            return SlotDefinition::Names(names.into_boxed_slice());
+            return SlotDefinition::Names {
+                names: names.into_boxed_slice(),
+                owner_sensitive: false,
+            };
         };
 
         // A conditional assignment does not establish one definite layout:
@@ -353,8 +374,21 @@ impl<'db> StaticClassLiteral<'db> {
         };
 
         // A single string is itself a slot name: `__slots__ = "value"`.
+        let owner_sensitive = std::cell::Cell::new(false);
+        let runtime_slot_name = |name: &str| {
+            let runtime = place_table(db, body_scope).canonical_attribute_name(name);
+            owner_sensitive.set(
+                owner_sensitive.get()
+                    || ty_python_core::private_name::is_private_runtime_key(self.name(db), name),
+            );
+            Name::new(runtime.as_ref())
+        };
         if let Some(name) = slots_ty.as_string_literal() {
-            return SlotDefinition::Names(Box::new([Name::new(name.value(db))]));
+            let names = Box::new([runtime_slot_name(name.value(db))]);
+            return SlotDefinition::Names {
+                names,
+                owner_sensitive: owner_sensitive.get(),
+            };
         }
 
         // Tuple inference preserves individual names, including names supplied indirectly:
@@ -372,10 +406,13 @@ impl<'db> StaticClassLiteral<'db> {
                         .map(|element| {
                             element
                                 .as_string_literal()
-                                .map(|literal| Name::new(literal.value(db)))
+                                .map(|literal| runtime_slot_name(literal.value(db)))
                         })
                         .collect::<Option<Box<[_]>>>()
-                        .map_or(SlotDefinition::NonEmpty, SlotDefinition::Names);
+                        .map_or(SlotDefinition::NonEmpty, |names| SlotDefinition::Names {
+                            names,
+                            owner_sensitive: owner_sensitive.get(),
+                        });
                 }
                 Tuple::Variable(_) if tuple.len().minimum() > 0 => {
                     return SlotDefinition::NonEmpty;
@@ -408,7 +445,7 @@ impl<'db> StaticClassLiteral<'db> {
         let literal_slot_name = |expression: &ast::Expr| {
             definition_expression_type(db, definition, expression)
                 .as_string_literal()
-                .map(|literal| Name::new(literal.value(db)))
+                .map(|literal| runtime_slot_name(literal.value(db)))
         };
 
         let names = match value {
@@ -422,7 +459,12 @@ impl<'db> StaticClassLiteral<'db> {
             _ => None,
         };
 
-        names.map_or(SlotDefinition::DynamicOrNone, SlotDefinition::Names)
+        names.map_or(SlotDefinition::DynamicOrNone, |names| {
+            SlotDefinition::Names {
+                names,
+                owner_sensitive: owner_sensitive.get(),
+            }
+        })
     }
 
     /// Collects slot storage and instance-dictionary availability across the complete MRO.

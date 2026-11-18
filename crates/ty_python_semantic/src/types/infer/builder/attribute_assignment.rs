@@ -41,8 +41,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.db();
+        let runtime_name = self.runtime_attribute_name(attribute);
         let requirement =
-            attribute_write_requirement(db, self.program_environment(), object_ty, attribute);
+            attribute_write_requirement(db, self.program_environment(), object_ty, &runtime_name);
         let mut deprecation = (emit_diagnostics && self.context.is_lint_enabled(&DEPRECATED))
             .then_some(AttributeDeprecation::Missing);
         let mut evaluator = AssignmentAttributeWriteEvaluator {
@@ -50,7 +51,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             target,
             value,
             object_ty,
-            attribute,
+            attribute: &runtime_name,
             infer_value_ty: MultiInferenceGuard::new(infer_value_ty),
         };
         let valid = evaluator.evaluate(&requirement, emit_diagnostics, deprecation.as_mut());
@@ -502,7 +503,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 self.target.range(),
                 target_ty,
                 value_ty,
-                self.attribute,
+                self.target.attr.as_str(),
             );
         }
         assignable

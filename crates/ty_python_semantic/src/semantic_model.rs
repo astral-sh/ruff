@@ -26,11 +26,13 @@ use crate::place_load::{
     ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionStep, PlaceLoadSourceKind,
     resolve_place_load,
 };
-use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
+use crate::types::ide_support::{
+    ImportAliasResolution, definition_for_name, extract_class_literal,
+};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
-    infer_complete_scope_types, infer_definition_types, inferred_declaration,
+    ClassLiteral, CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers,
+    binding_type, infer_complete_scope_types, infer_definition_types, inferred_declaration,
     is_discarded_dict_key_assignment,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -302,20 +304,52 @@ impl<'db> SemanticModel<'db> {
         completions
     }
 
+    /// Whether changing this class's name may change an explicit or unknown slot layout.
+    pub fn class_rename_has_owner_sensitive_slots(&self, class: &ast::StmtClassDef) -> bool {
+        match binding_type(self.db, class.definition(self)) {
+            Type::ClassLiteral(ClassLiteral::Static(class)) => {
+                class.has_owner_sensitive_slots(self.db)
+            }
+            _ => true,
+        }
+    }
+
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
     pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Completion<'db>> {
         let db = self.db;
         let Some(ty) = node.value.inferred_type(self) else {
             return Vec::new();
         };
+        let index = semantic_index(db, self.program_file());
+        let lexical_table = self
+            .scope(node.into())
+            .map(|scope| index.place_table(scope));
+        let env = self.program_environment();
+        let receiver_scope = if lexical_table.is_none_or(|table| table.private_owner().is_none()) {
+            match extract_class_literal(db, &env, ty) {
+                Some(ClassLiteral::Static(class)) => Some(class.body_scope(db)),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        let receiver_table = receiver_scope.map(|scope| place_table(db, scope));
 
-        all_members(db, &self.program_environment(), ty)
+        all_members(db, &env, ty)
             .into_iter()
-            .map(|member| Completion {
-                name: CompactString::new(member.name),
-                ty: Some(member.ty),
-                builtin: false,
-                is_type_check_only: member.is_type_check_only,
+            .map(|member| {
+                let runtime_name = member.name.as_str();
+                let lexical =
+                    lexical_table.and_then(|table| table.lexical_private_spelling(runtime_name));
+                let receiver = receiver_table
+                    .as_deref()
+                    .and_then(|table| table.lexical_private_spelling(runtime_name));
+                Completion {
+                    name: CompactString::new(lexical.or(receiver).unwrap_or(runtime_name)),
+                    ty: Some(member.ty),
+                    builtin: false,
+                    is_type_check_only: member.is_type_check_only,
+                }
             })
             .collect()
     }
@@ -332,12 +366,17 @@ impl<'db> SemanticModel<'db> {
         let Some(file_scope) = self.scope(node) else {
             return vec![];
         };
+        let lexical_table = index.place_table(file_scope);
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
                 all_reachable_members(db, file_scope.to_scope_id(self.db, program_file)).map(
                     |memberdef| Completion {
-                        name: CompactString::new(memberdef.member.name),
+                        name: CompactString::new(
+                            lexical_table
+                                .lexical_private_spelling(memberdef.member.name.as_str())
+                                .unwrap_or(memberdef.member.name.as_str()),
+                        ),
                         ty: Some(memberdef.member.ty),
                         builtin: false,
                         is_type_check_only: memberdef.member.is_type_check_only,

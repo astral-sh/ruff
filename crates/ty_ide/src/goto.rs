@@ -68,6 +68,7 @@ pub(crate) enum GotoTarget<'a> {
     /// ```
     ImportModuleComponent {
         module_name: String,
+        runtime_module_name: String,
         level: u32,
         component_index: usize,
         component_range: TextRange,
@@ -523,13 +524,13 @@ impl GotoTarget<'_> {
             GotoTarget::TypeParamTypeVarName(typevar) => typevar.inferred_type(model),
             GotoTarget::TypeParamParamSpecName(typevar) => typevar.inferred_type(model),
             GotoTarget::ImportModuleComponent {
-                module_name,
+                runtime_module_name,
                 component_index,
                 level,
                 ..
             } => {
                 // We don't currently support hovering the bare `.` so there is always a name
-                let module = import_name(module_name, *component_index);
+                let module = import_name(runtime_module_name, *component_index);
                 model.resolve_module_type(Some(module), *level)
             }
             GotoTarget::StringAnnotationSubexpr {
@@ -680,13 +681,13 @@ impl GotoTarget<'_> {
             }
 
             GotoTarget::ImportModuleComponent {
-                module_name,
+                runtime_module_name,
                 component_index,
                 level,
                 ..
             } => {
                 // We don't currently support hovering the bare `.` so there is always a name
-                let module = import_name(module_name, *component_index);
+                let module = import_name(runtime_module_name, *component_index);
                 definitions_for_module(model, Some(module), *level)
             }
 
@@ -1101,6 +1102,11 @@ impl GotoTarget<'_> {
                                 {
                                     return Some(GotoTarget::ImportModuleComponent {
                                         module_name: full_name.to_string(),
+                                        runtime_module_name: runtime_import_module_name(
+                                            model,
+                                            Some(alias),
+                                            full_name,
+                                        ),
                                         level: 0,
                                         component_index,
                                         component_range,
@@ -1138,6 +1144,11 @@ impl GotoTarget<'_> {
                             find_module_component(&full_module_name, module_expr.start(), offset)
                         {
                             return Some(GotoTarget::ImportModuleComponent {
+                                runtime_module_name: runtime_import_module_name(
+                                    model,
+                                    from.names.first(),
+                                    &full_module_name,
+                                ),
                                 module_name: full_module_name,
                                 level: from.level,
                                 component_index,
@@ -1508,6 +1519,25 @@ fn find_module_component(
 }
 
 /// Helper to get the module name up to the given component index
+/// An undotted import path is a lexical identifier, while Python leaves dotted module paths
+/// unchanged. Keep the source spelling on the target for display and use this key for resolution.
+fn runtime_import_module_name(
+    model: &SemanticModel<'_>,
+    alias: Option<&ast::Alias>,
+    source: &str,
+) -> String {
+    let index = ty_python_core::semantic_index(model.db(), model.program_file());
+    alias
+        .and_then(|alias| index.definitions(alias).first())
+        .map(|definition| {
+            index
+                .place_table(definition.file_scope(model.db()))
+                .canonical_attribute_name(source)
+                .into_owned()
+        })
+        .unwrap_or_else(|| source.to_string())
+}
+
 fn import_name(module_name: &str, component_index: usize) -> &str {
     // We want everything to the left of the nth `.`
     // If there's no nth `.` then we want the whole thing.

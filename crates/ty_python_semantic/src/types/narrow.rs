@@ -2204,7 +2204,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 if !result.matched_subject_ty.is_never()
                     && let Some(place) = name
                         .as_ref()
-                        .and_then(|name| self.places().symbol_id(name.as_str()))
+                        .and_then(|name| self.places().source_symbol_id(name.as_str()))
                 {
                     Self::merge_binding(
                         &mut result.bindings,
@@ -2218,7 +2218,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 let mut bindings = BTreeMap::new();
                 if let Some(place) = name
                     .as_ref()
-                    .and_then(|name| self.places().symbol_id(name.as_str()))
+                    .and_then(|name| self.places().source_symbol_id(name.as_str()))
                 {
                     bindings.insert(place.into(), PatternBindingTypes::subject(subject_ty));
                 }
@@ -2956,7 +2956,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 if let Some(place) = kind
                     .rest
                     .as_ref()
-                    .and_then(|name| analyzer.places().symbol_id(name.as_str()))
+                    .and_then(|name| analyzer.places().source_symbol_id(name.as_str()))
                 {
                     Self::merge_binding(
                         &mut bindings,

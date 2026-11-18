@@ -69,13 +69,17 @@ impl<'db> ImplicitAliasLegacyTypeVarCollector<'_, 'db> {
         match expression {
             ast::Expr::Name(name) if name.ctx.is_load() => {
                 let definitions: Vec<_> = if let Some(scope) = self.string_annotation_scope {
+                    let runtime_name = self
+                        .index
+                        .place_table(scope)
+                        .canonical_attribute_name(&name.id);
                     let (scope, symbol) =
                         self.index
                             .visible_ancestor_scopes(scope)
                             .find_map(|(scope, _)| {
                                 self.index
                                     .place_table(scope)
-                                    .symbol_id(&name.id)
+                                    .symbol_id(&runtime_name)
                                     .map(|symbol| (scope, symbol))
                             })?;
                     self.index

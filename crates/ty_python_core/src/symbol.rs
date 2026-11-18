@@ -61,6 +61,12 @@ impl Symbol {
         &self.name
     }
 
+    pub(super) fn canonicalize(&mut self, policy: &crate::private_name::PrivateNamePolicy) {
+        if let std::borrow::Cow::Owned(name) = policy.canonical_identifier(self.name.as_str()) {
+            self.name = Name::new(name);
+        }
+    }
+
     /// Is the symbol used in its containing scope?
     pub fn is_used(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_USED)

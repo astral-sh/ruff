@@ -132,8 +132,22 @@ pub fn definitions_for_attribute<'db>(
         model.db(),
         &model.program_environment(),
         lhs_ty,
-        attribute.attr.as_str(),
+        &runtime_attribute_name(model, attribute),
     )
+}
+
+/// Resolve an attribute's runtime key from the use site's lexical class, rather than the
+/// receiver's class; an inherited private access may use a different owner than its receiver.
+fn runtime_attribute_name<'a>(
+    model: &SemanticModel<'_>,
+    attribute: &'a ast::ExprAttribute,
+) -> Cow<'a, str> {
+    let Some(scope) = model.scope(attribute.into()) else {
+        return Cow::Borrowed(attribute.attr.as_str());
+    };
+    semantic_index(model.db(), model.program_file())
+        .place_table(scope)
+        .canonical_attribute_name(attribute.attr.as_str())
 }
 
 /// A prepared implementation search.
@@ -159,7 +173,7 @@ pub struct ImplementationsFinder<'a> {
 enum ImplementationsFinderKind<'a> {
     ClassFamily,
     MemberFamily {
-        name: &'a str,
+        name: Cow<'a, str>,
         accessor_role: Option<PropertyAccessorRole>,
     },
 }
@@ -189,7 +203,8 @@ impl<'a> ImplementationsFinder<'a> {
     fn for_member_roots(
         db: &'a dyn Db,
         roots: Vec<ClassLiteral<'a>>,
-        member_name: &'a str,
+        source_name: &'a str,
+        member_name: Cow<'a, str>,
         accessor_role: Option<PropertyAccessorRole>,
     ) -> Option<Self> {
         let mut initial_definitions = Vec::new();
@@ -198,7 +213,7 @@ impl<'a> ImplementationsFinder<'a> {
         for root in roots {
             // Avoid scanning every known subclass when the member doesn't resolve on this root.
             let Some(root_definitions) =
-                mro_member_definitions(db, root, member_name, accessor_role)
+                mro_member_definitions(db, root, &member_name, accessor_role)
             else {
                 continue;
             };
@@ -216,10 +231,26 @@ impl<'a> ImplementationsFinder<'a> {
             return None;
         }
 
+        let private_key = family_roots.iter().any(|root| {
+            root.iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
+                .any(|class| {
+                    ty_python_core::private_name::is_private_runtime_key(
+                        class.name(db),
+                        &member_name,
+                    )
+                })
+        });
         Some(Self {
             initial_definitions,
             roots: family_roots,
-            name_matcher: Cow::Owned(NameMatcher::new(member_name)),
+            // The same runtime key may appear as either `__x` or `_C__x` in source.
+            name_matcher: if private_key {
+                Cow::Borrowed(&CLASS_MATCHER)
+            } else {
+                Cow::Owned(NameMatcher::new(source_name))
+            },
             kind: ImplementationsFinderKind::MemberFamily {
                 name: member_name,
                 accessor_role,
@@ -288,7 +319,13 @@ impl<'a> ImplementationsFinder<'a> {
             ast::ExprContext::Invalid => None,
         };
 
-        ImplementationsFinder::for_member_roots(db, roots, attribute.attr.as_str(), accessor_role)
+        ImplementationsFinder::for_member_roots(
+            db,
+            roots,
+            attribute.attr.as_str(),
+            runtime_attribute_name(model, attribute),
+            accessor_role,
+        )
     }
 
     /// Creates an `ImplementationsFinder` for a method declaration.
@@ -331,6 +368,8 @@ impl<'a> ImplementationsFinder<'a> {
             db,
             vec![root],
             function.name.as_str(),
+            ty_python_core::place_table(db, containing_scope)
+                .canonical_attribute_name(function.name.as_str()),
             accessor_role,
         )
     }
@@ -464,7 +503,11 @@ pub fn static_member_type_for_attribute<'db>(
     let db = model.db();
     let lhs_ty = attribute.value.inferred_type(model)?;
     lhs_ty
-        .static_member(db, &model.program_environment(), attribute.attr.as_str())
+        .static_member(
+            db,
+            &model.program_environment(),
+            &runtime_attribute_name(model, attribute),
+        )
         .ignore_possibly_undefined()
 }
 
@@ -890,12 +933,28 @@ pub fn definitions_for_imported_symbol<'db>(
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut visited = FxHashSet::default();
     let env = model.program_environment();
+    let index = semantic_index(model.db(), model.program_file());
+    let table = import_node
+        .names
+        .iter()
+        .find(|alias| alias.name.as_str() == symbol_name)
+        .and_then(|alias| index.definitions(alias).first())
+        .map(|definition| index.place_table(definition.file_scope(model.db())));
+    let runtime_module = import_node.module.as_deref().map(|name| {
+        table.map_or(Cow::Borrowed(name), |table| {
+            table.canonical_attribute_name(name)
+        })
+    });
+    let runtime_symbol = table.map_or(Cow::Borrowed(symbol_name), |table| {
+        table.canonical_attribute_name(symbol_name)
+    });
     definition_resolution::resolve_from_import_definitions(
         model.db(),
         &env,
         ImportingFile::File(model.file(), env.resolver_environment(model.db())),
         import_node,
-        symbol_name,
+        runtime_module.as_deref(),
+        &runtime_symbol,
         &mut visited,
         alias_resolution,
     )
@@ -2023,7 +2082,7 @@ fn reachable_class_literals_in_file<'db>(
 }
 
 /// Extract a `ClassLiteral` from a `Type`, handling various type forms.
-fn extract_class_literal<'db>(
+pub(crate) fn extract_class_literal<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
