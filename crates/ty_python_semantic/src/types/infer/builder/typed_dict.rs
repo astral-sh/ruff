@@ -460,6 +460,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .match_parameters(db, env, &call_arguments);
 
         if can_infer && !bindings.satisfies(|_| true) {
+            self.context.mark_failed_call(call_expression);
             self.prepare_typed_dict_constructor(typed_dict, form, arguments, error_node);
             return fallback_ty;
         }
@@ -480,6 +481,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let return_ty = result.map(|inferred| inferred.into_bindings().return_type(db, env));
         return_ty.unwrap_or_else(|CallError(_, bindings)| {
+            self.context.mark_failed_call(call_expression);
             if can_infer
                 && arguments.keywords.iter().any(|keyword| {
                     keyword

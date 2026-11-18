@@ -3911,6 +3911,24 @@ def first_int[T: int](values: list[T]) -> T | None:
     return reveal_type(next(iter(values), None))  # revealed: T@first_int | None
 ```
 
+## Nested `TypedDict` constructors with optional return context
+
+A failed specialization of a generic `TypedDict` constructor cannot justify narrowing the outer
+call's return type to `None`.
+
+```py
+from typing import TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+def get[T](box: Box[T]) -> T | None:
+    return box["value"]
+
+def read[T](value: T) -> T | None:
+    return reveal_type(get(Box(value=value)))  # revealed: T@read | None
+```
+
 ## Suppressed argument errors do not justify union narrowing
 
 Disabling an argument diagnostic does not make a failed speculative specialization valid.
