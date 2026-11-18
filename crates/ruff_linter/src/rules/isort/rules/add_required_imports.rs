@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::{self as ast, ModModule, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, ModModule, PySourceType, PythonVersion, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Parsed;
 use ruff_python_semantic::{FutureImport, NameImport};
@@ -101,6 +101,7 @@ fn add_required_import(
     parsed: &Parsed<ModModule>,
     locator: &Locator,
     stylist: &Stylist,
+    target_version: PythonVersion,
     source_type: PySourceType,
     context: &LintContext,
 ) {
@@ -129,11 +130,13 @@ fn add_required_import(
         TextRange::default(),
     );
     diagnostic.set_fix(Fix::safe_edit(
-        Importer::new(parsed, locator.contents(), stylist).add_import(
-            required_import,
-            TextSize::default(),
-            false,
-        ),
+        Importer::new(
+            parsed,
+            locator.contents(),
+            stylist,
+            target_version,
+        )
+        .add_import(required_import, TextSize::default(), false),
     ));
 }
 
@@ -143,6 +146,7 @@ pub(crate) fn add_required_imports(
     locator: &Locator,
     stylist: &Stylist,
     settings: &LinterSettings,
+    target_version: PythonVersion,
     source_type: PySourceType,
     context: &LintContext,
 ) {
@@ -152,6 +156,7 @@ pub(crate) fn add_required_imports(
             parsed,
             locator,
             stylist,
+            target_version,
             source_type,
             context,
         );

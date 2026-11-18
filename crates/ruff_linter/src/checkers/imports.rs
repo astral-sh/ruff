@@ -66,6 +66,7 @@ pub(crate) fn check_imports(
             locator,
             stylist,
             settings,
+            target_version,
             source_type,
             context,
         );

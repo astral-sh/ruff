@@ -134,7 +134,7 @@ impl SemanticSyntaxChecker {
                         //     lazy from sys import *
                         Self::add_error(ctx, SemanticSyntaxErrorKind::LazyImportStar, *range);
                         handled_lazy_error = true;
-                    } else if *level == 0 && matches!(module.as_deref(), Some("__future__")) {
+                    } else if import_from.is_future_import(ctx.python_version()) {
                         Self::add_error(ctx, SemanticSyntaxErrorKind::LazyFutureImport, *range);
                         handled_lazy_error = true;
                     }
