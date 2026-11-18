@@ -718,3 +718,14 @@ class Counter:
     def read(self) -> int | None:
         return reveal_type(next(self))  # revealed: int
 ```
+
+## Unreachable nested calls in a union context
+
+A failed call in an unreachable branch does not prevent narrowing the return context of `list`.
+
+```py
+def takes_no_parameters() -> None: ...
+
+# revealed: list[int | str] | list[int | None]
+result: list[int | str] | list[int | None] = reveal_type(list((1, 2, 3) if True else takes_no_parameters(1)))
+```

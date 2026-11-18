@@ -276,10 +276,12 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         !self.diagnostics.borrow().is_empty()
     }
 
-    /// Records a failed call even when its diagnostic is suppressed. A recovery type does not
-    /// establish that speculative inference succeeded.
-    pub(super) fn mark_failed_call(&self) {
-        self.has_failed_call.set(true);
+    /// Records a reachable failed call even when its diagnostic is suppressed. A recovery type
+    /// does not establish that speculative inference succeeded.
+    pub(super) fn mark_failed_call(&self, call: impl Ranged) {
+        if self.is_range_reachable(call.range()) {
+            self.has_failed_call.set(true);
+        }
     }
 
     pub(super) fn has_failed_call(&self) -> bool {

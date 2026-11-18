@@ -10221,7 +10221,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inferred = match bindings_result {
             Ok(inferred) => inferred,
             Err(CallError(_, bindings)) => {
-                self.context.mark_failed_call();
+                self.context.mark_failed_call(call_expression);
                 bindings.report_diagnostics(&self.context, call_expression.into());
                 return bindings.return_type(db, env);
             }
