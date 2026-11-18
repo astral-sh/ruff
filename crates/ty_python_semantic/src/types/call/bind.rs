@@ -5099,7 +5099,7 @@ struct ArgumentMatcher<'a, 'db> {
     is_partial_application: bool,
 
     argument_matches: Vec<MatchedArgument<'db>>,
-    parameter_info: Vec<ParameterInfo>,
+    parameter_info: SmallVec<[ParameterInfo; 8]>,
     next_positional: usize,
     first_excess_positional: Option<usize>,
     num_synthetic_args: usize,
@@ -5148,7 +5148,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             errors,
             is_partial_application,
             argument_matches: vec![MatchedArgument::default(); arguments.len()],
-            parameter_info: vec![ParameterInfo::default(); parameters.len()],
+            parameter_info: smallvec![ParameterInfo::default(); parameters.len()],
             next_positional: 0,
             first_excess_positional: None,
             num_synthetic_args: 0,
