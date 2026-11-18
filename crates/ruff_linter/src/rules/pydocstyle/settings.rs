@@ -50,7 +50,7 @@ impl Convention {
                 Rule::MissingBlankLineAfterLastDocstringSection,
                 Rule::MissingTerminalPunctuation,
                 Rule::MissingSectionNameColon,
-                Rule::UndocumentedParameters,
+                Rule::UndocumentedParameter,
             ],
             Convention::Pep257 => &[
                 Rule::IncorrectBlankLineBeforeClassDocstring,
@@ -69,7 +69,7 @@ impl Convention {
                 Rule::MissingBlankLineAfterLastDocstringSection,
                 Rule::MissingTerminalPunctuation,
                 Rule::MissingSectionNameColon,
-                Rule::UndocumentedParameters,
+                Rule::UndocumentedParameter,
                 Rule::IncorrectSectionOrder,
             ],
         }

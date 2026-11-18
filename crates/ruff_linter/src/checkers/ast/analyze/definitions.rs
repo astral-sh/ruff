@@ -71,7 +71,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::IncorrectDocstringQuotes,
         Rule::UnderIndentedDocstringLine,
         Rule::UndocumentedMagicMethod,
-        Rule::UndocumentedParameters,
+        Rule::UndocumentedParameter,
         Rule::IncorrectSectionOrder,
         Rule::PropertyDocstringStartsWithVerb,
         Rule::UndocumentedPublicClass,
@@ -298,7 +298,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 Rule::BlankLineBeforeDocstringSectionUnderline,
                 Rule::MismatchedSectionUnderlineLength,
                 Rule::OverIndentedDocstringSectionUnderline,
-                Rule::UndocumentedParameters,
+                Rule::UndocumentedParameter,
                 Rule::IncorrectSectionOrder,
             ]);
             if enforce_sections || enforce_pydoclint {

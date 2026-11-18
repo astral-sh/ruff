@@ -26,12 +26,9 @@ mod tests {
     #[test_case(Rule::MissingBlankLineBeforeDocstringSection, Path::new("sections.py"))]
     #[test_case(Rule::NonCapitalizedSectionName, Path::new("sections.py"))]
     #[test_case(Rule::MissingDashedUnderlineAfterSection, Path::new("sections.py"))]
-    #[test_case(
-        Rule::UndocumentedParameters,
-        Path::new("canonical_google_examples.py")
-    )]
-    #[test_case(Rule::UndocumentedParameters, Path::new("canonical_numpy_examples.py"))]
-    #[test_case(Rule::UndocumentedParameters, Path::new("sections.py"))]
+    #[test_case(Rule::UndocumentedParameter, Path::new("canonical_google_examples.py"))]
+    #[test_case(Rule::UndocumentedParameter, Path::new("canonical_numpy_examples.py"))]
+    #[test_case(Rule::UndocumentedParameter, Path::new("sections.py"))]
     #[test_case(Rule::MissingTrailingPeriod, Path::new("D.py"))]
     #[test_case(Rule::MissingTrailingPeriod, Path::new("D400.py"))]
     #[test_case(Rule::MissingTrailingPeriod, Path::new("D400_415.py"))]
@@ -148,7 +145,7 @@ mod tests {
                 // When inferring the convention, we'll see a few false negatives.
                 // See: https://github.com/PyCQA/pydocstyle/issues/459.
                 pydocstyle: Settings::default(),
-                ..settings::LinterSettings::for_rule(Rule::UndocumentedParameters)
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParameter)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -161,7 +158,7 @@ mod tests {
             Path::new("pydocstyle/D417.py"),
             &settings::LinterSettings {
                 pydocstyle: Settings::default(),
-                ..settings::LinterSettings::for_rule(Rule::UndocumentedParameters)
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParameter)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -178,7 +175,7 @@ mod tests {
                     convention: Some(Convention::Google),
                     ..Settings::default()
                 },
-                ..settings::LinterSettings::for_rule(Rule::UndocumentedParameters)
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParameter)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -195,7 +192,7 @@ mod tests {
                     ignore_var_parameters: true,
                     ..Settings::default()
                 },
-                ..settings::LinterSettings::for_rule(Rule::UndocumentedParameters)
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParameter)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -212,7 +209,7 @@ mod tests {
                     convention: Some(Convention::Numpy),
                     ..Settings::default()
                 },
-                ..settings::LinterSettings::for_rule(Rule::UndocumentedParameters)
+                ..settings::LinterSettings::for_rule(Rule::UndocumentedParameter)
             },
         )?;
         assert_diagnostics!(diagnostics);

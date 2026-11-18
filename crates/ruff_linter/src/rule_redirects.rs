@@ -83,7 +83,7 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         "missing-blank-line-after-last-section",
         Rule::MissingBlankLineAfterLastDocstringSection,
     ),
-    ("undocumented-param", Rule::UndocumentedParameters),
+    ("undocumented-param", Rule::UndocumentedParameter),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

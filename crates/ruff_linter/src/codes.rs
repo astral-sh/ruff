@@ -782,7 +782,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pydocstyle, "414") => rules::pydocstyle::rules::EmptyDocstringSection,
         (Pydocstyle, "415") => rules::pydocstyle::rules::MissingTerminalPunctuation,
         (Pydocstyle, "416") => rules::pydocstyle::rules::MissingSectionNameColon,
-        (Pydocstyle, "417") => rules::pydocstyle::rules::UndocumentedParameters,
+        (Pydocstyle, "417") => rules::pydocstyle::rules::UndocumentedParameter,
         (Pydocstyle, "418") => rules::pydocstyle::rules::OverloadWithDocstring,
         (Pydocstyle, "419") => rules::pydocstyle::rules::EmptyDocstring,
         (Pydocstyle, "420") => rules::pydocstyle::rules::IncorrectSectionOrder,

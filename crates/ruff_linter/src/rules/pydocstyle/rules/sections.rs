@@ -1246,17 +1246,17 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// - [Python - Unpack for keyword arguments](https://typing.python.org/en/latest/spec/callables.html#unpack-kwargs)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.73", category = Category::Pedantic)]
-pub(crate) struct UndocumentedParameters {
+pub(crate) struct UndocumentedParameter {
     /// The name of the function being documented.
     definition: String,
     /// The names of the undocumented parameters.
     names: Vec<String>,
 }
 
-impl Violation for UndocumentedParameters {
+impl Violation for UndocumentedParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndocumentedParameters { definition, names } = self;
+        let UndocumentedParameter { definition, names } = self;
         if names.len() == 1 {
             let name = &names[0];
             format!("Missing argument description in the docstring for `{definition}`: `{name}`")
@@ -1947,7 +1947,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
         if let Some(definition) = docstring.definition.name() {
             let names = missing_arg_names.into_iter().sorted().collect();
             checker.report_diagnostic(
-                UndocumentedParameters {
+                UndocumentedParameter {
                     definition: definition.to_string(),
                     names,
                 },
@@ -2100,7 +2100,7 @@ fn numpy_section(
         }
     }
 
-    if checker.is_rule_enabled(Rule::UndocumentedParameters) {
+    if checker.is_rule_enabled(Rule::UndocumentedParameter) {
         if matches!(context.kind(), SectionKind::Parameters) {
             parameters_section(checker, docstring, context);
         }
@@ -2155,7 +2155,7 @@ fn parse_google_sections(
         google_section(checker, docstring, &context, iterator.peek());
     }
 
-    if checker.is_rule_enabled(Rule::UndocumentedParameters) {
+    if checker.is_rule_enabled(Rule::UndocumentedParameter) {
         let mut has_args = false;
         let mut documented_args: FxHashSet<String> = FxHashSet::default();
         for section_context in section_contexts {
