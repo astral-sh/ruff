@@ -52,8 +52,8 @@ def check_custom_setattr(dogs: FrozenWithCustomSetattr[Dog]):
 
 ## Thawed subclasses
 
-A subclass that disables freezing can write inherited fields. In this case, the subclass
-should be treated as invariant:
+A subclass that disables freezing can write inherited fields. In this case, the subclass should be
+treated as invariant:
 
 ```py
 from pydantic import BaseModel
