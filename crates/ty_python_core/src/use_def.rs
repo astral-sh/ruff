@@ -1878,12 +1878,40 @@ impl PendingReachability {
         }
     }
 
+    /// Advance the place to `target` if it can reuse the scope's reachability there.
+    /// The place's cursor must be an ancestor of `target`.
+    fn try_apply_scope_reachability(
+        &self,
+        pending: &mut PendingPlaceState,
+        target: PendingReachabilityId,
+    ) {
+        let previous = pending.reachability;
+        if previous == target {
+            return;
+        }
+
+        // Within this uninterrupted path, a matching initial reachability yields the
+        // same AND operations as forward replay, even at the constraint arena limit.
+        let event = &self.constraints[target];
+        let initial = self.constraints[previous].scope_reachability;
+        if previous.index() >= event.path_start.index()
+            && pending.state.singleton_reachability() == Some(initial)
+        {
+            if initial != event.scope_reachability {
+                Rc::make_mut(&mut pending.state)
+                    .set_singleton_reachability(event.scope_reachability);
+            }
+            pending.reachability = target;
+        }
+    }
+
     fn materialize_reachability<'a>(
         &self,
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a mut PlaceState {
+        self.try_apply_scope_reachability(pending, target);
         let state = Rc::make_mut(&mut pending.state);
         if pending.reachability == target {
             return state;
@@ -1891,19 +1919,6 @@ impl PendingReachability {
 
         let previous = pending.reachability;
         pending.reachability = target;
-        let target_event = &self.constraints[target];
-        // The place cursor is an ancestor of `target`. Within this uninterrupted path, a
-        // matching initial reachability yields the exact same AND operations, in the same
-        // order, as the scope prefix, including when the constraint arena reaches its limit.
-        if previous.index() >= target_event.path_start.index()
-            && state.try_replace_reachability(
-                self.constraints[previous].scope_reachability,
-                target_event.scope_reachability,
-            )
-        {
-            return state;
-        }
-
         let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
         let mut current = target;
         while current != previous {
@@ -2121,6 +2136,10 @@ impl PendingReachability {
                         .record_narrowing_constraint(narrowing_constraints, merged_narrowing);
                 }
 
+                // If the place can reuse the scope's reachability at the fork, merge only the
+                // conditions after the fork. Rebuilding the common prefix as part of each
+                // branch can exhaust the constraint arena even for a trailing `if flag: pass`.
+                self.try_apply_scope_reachability(current, branch_ancestor);
                 let merged_constraint = match last_merged_reachability {
                     Some((ancestor, constraint)) if ancestor == current.reachability => constraint,
                     _ => {

@@ -696,22 +696,19 @@ impl PlaceState {
             .merge(b.declarations, reachability_constraints);
     }
 
-    /// Replaces the shared reachability of a sole binding and declaration if both match `previous`.
-    pub(super) fn try_replace_reachability(
+    /// The shared reachability of a sole binding and declaration.
+    pub(super) fn singleton_reachability(&self) -> Option<ScopedReachabilityConstraintId> {
+        self.singleton()
+            .map(|(binding, _)| binding.reachability_constraint)
+    }
+
+    /// Set the reachability of both definitions after checking [`Self::singleton_reachability`].
+    pub(super) fn set_singleton_reachability(
         &mut self,
-        previous: ScopedReachabilityConstraintId,
-        next: ScopedReachabilityConstraintId,
-    ) -> bool {
-        if self
-            .singleton()
-            .is_some_and(|(binding, _)| binding.reachability_constraint == previous)
-        {
-            self.bindings.live_bindings[0].reachability_constraint = next;
-            self.declarations.live_declarations[0].reachability_constraint = next;
-            true
-        } else {
-            false
-        }
+        reachability: ScopedReachabilityConstraintId,
+    ) {
+        self.bindings.live_bindings[0].reachability_constraint = reachability;
+        self.declarations.live_declarations[0].reachability_constraint = reachability;
     }
 
     /// Return the sole binding and declaration if they share a reachability constraint and the
