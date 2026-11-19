@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::preview::is_fix_f_string_logging_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_logging_format::violations::{
-    LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
+    LoggingErrorWithExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
 use crate::{Edit, Fix};
@@ -300,7 +300,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // G201, G202
-    if checker.any_rule_enabled(&[Rule::LoggingExcInfo, Rule::LoggingRedundantExcInfo]) {
+    if checker.any_rule_enabled(&[Rule::LoggingErrorWithExcInfo, Rule::LoggingRedundantExcInfo]) {
         if !checker.semantic().in_exception_handler() {
             return;
         }
@@ -310,7 +310,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
             match logging_level {
                 LoggingLevel::Error => {
-                    checker.report_diagnostic_if_enabled(LoggingExcInfo, range);
+                    checker.report_diagnostic_if_enabled(LoggingErrorWithExcInfo, range);
                 }
                 LoggingLevel::Exception => {
                     checker.report_diagnostic_if_enabled(LoggingRedundantExcInfo, exc_info.range());

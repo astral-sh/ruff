@@ -46,9 +46,9 @@ use crate::codes::Category;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
-pub(crate) struct RaiseVanillaArgs;
+pub(crate) struct RaiseExceptionWithMessage;
 
-impl Violation for RaiseVanillaArgs {
+impl Violation for RaiseExceptionWithMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Avoid specifying long messages outside the exception class".to_string()
@@ -80,7 +80,7 @@ pub(crate) fn raise_vanilla_args(checker: &Checker, expr: &Expr) {
     }
 
     if contains_message(arg) {
-        checker.report_diagnostic(RaiseVanillaArgs, expr.range());
+        checker.report_diagnostic(RaiseExceptionWithMessage, expr.range());
     }
 }
 

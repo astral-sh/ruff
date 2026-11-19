@@ -17,9 +17,9 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_errmsg/EM.py"),
             &settings::LinterSettings::for_rules(vec![
-                Rule::RawStringInException,
+                Rule::StringLiteralInException,
                 Rule::FStringInException,
-                Rule::DotFormatInException,
+                Rule::StrFormatInException,
             ]),
         )?;
         assert_diagnostics!("defaults", diagnostics);
@@ -35,9 +35,9 @@ mod tests {
                     max_string_length: 20,
                 },
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::RawStringInException,
+                    Rule::StringLiteralInException,
                     Rule::FStringInException,
-                    Rule::DotFormatInException,
+                    Rule::StrFormatInException,
                 ])
             },
         )?;
@@ -50,7 +50,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_errmsg/EM101_byte_string.py"),
             &settings::LinterSettings {
-                ..settings::LinterSettings::for_rule(Rule::RawStringInException)
+                ..settings::LinterSettings::for_rule(Rule::StringLiteralInException)
             },
         )?;
         assert_diagnostics!(diagnostics);

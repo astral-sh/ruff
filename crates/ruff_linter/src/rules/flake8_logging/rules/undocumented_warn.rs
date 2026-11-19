@@ -35,9 +35,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.2.0", category = Category::Suspicious)]
-pub(crate) struct UndocumentedWarn;
+pub(crate) struct LoggingWarnConstant;
 
-impl Violation for UndocumentedWarn {
+impl Violation for LoggingWarnConstant {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -60,7 +60,7 @@ pub(crate) fn undocumented_warn(checker: &Checker, expr: &Expr) {
         .semantic()
         .matches_qualified_name(expr, &["logging", "WARN"])
     {
-        let mut diagnostic = checker.report_diagnostic(UndocumentedWarn, expr.range());
+        let mut diagnostic = checker.report_diagnostic(LoggingWarnConstant, expr.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("logging", "WARNING"),

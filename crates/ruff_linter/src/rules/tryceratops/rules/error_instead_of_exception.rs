@@ -58,9 +58,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
-pub(crate) struct ErrorInsteadOfException;
+pub(crate) struct LoggingErrorInsteadOfException;
 
-impl Violation for ErrorInsteadOfException {
+impl Violation for LoggingErrorInsteadOfException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -87,7 +87,7 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
             if matches!(logging_level, LoggingLevel::Error) {
                 if exc_info(&expr.arguments, checker.semantic()).is_none() {
                     let mut diagnostic =
-                        checker.report_diagnostic(ErrorInsteadOfException, expr.range());
+                        checker.report_diagnostic(LoggingErrorInsteadOfException, expr.range());
 
                     match expr.func.as_ref() {
                         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
