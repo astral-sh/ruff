@@ -1672,7 +1672,7 @@ mod tests {
         .try_into_module()
         .unwrap();
         let indentation = Indentation::default();
-        let mut generator = Generator::new(&indentation, LineEnding::default());
+        let mut generator = Generator::new(&indentation, LineEnding::Lf);
         generator.unparse_suite(parsed.suite());
         assert_eq!(generator.generate(), "def f(a, **kw, b, /):\n    pass");
     }
