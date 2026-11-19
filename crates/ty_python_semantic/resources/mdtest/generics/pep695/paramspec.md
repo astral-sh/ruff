@@ -1410,6 +1410,20 @@ def consume(value: int, items: list[object]) -> None: ...
 Runner().run(*(consume, None, 1), [1])  # ok
 ```
 
+After the wrapper takes its tag, each possible pair of forwarded arguments matches an overload.
+
+```py
+from typing import overload
+
+@overload
+def pair(x: int, y: int) -> None: ...
+@overload
+def pair(x: str, y: str) -> None: ...
+def pair(x, y) -> None: ...
+def check_pairs(args: tuple[None, int, int] | tuple[None, str, str]):
+    Runner().run(pair, *args)  # ok
+```
+
 A dictionary can supply both a wrapper parameter and arguments to forward. The wrapper checks its
 own parameter and forwards only the remaining keys.
 

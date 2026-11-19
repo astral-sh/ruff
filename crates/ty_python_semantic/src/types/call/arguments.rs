@@ -18,7 +18,7 @@ use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
     TypedDictOpenness, UnpackedTypedDictKey, extract_unpacked_typed_dict_from_value_type,
 };
-use crate::types::{Parameter, Parameters, Type, TypeContext, UnionType, expand_type};
+use crate::types::{Parameter, Type, TypeContext, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArgumentExpansions::iter`].
@@ -230,6 +230,31 @@ impl<'db> VariadicArgument<'db> {
                 .is_some_and(|spec| spec.as_fixed_length().is_some()),
             Self::Sequence { sequence, .. } => sequence.as_fixed_length().is_some(),
         }
+    }
+
+    fn without_prefix(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        consumed: usize,
+    ) -> Option<Self> {
+        let suffix = |sequence: &TupleSpec<'db>| {
+            let elements = sequence.as_fixed_length()?.all_elements().get(consumed..)?;
+            Some(Type::heterogeneous_tuple(db, env, elements.iter().copied()))
+        };
+        let ty = match self {
+            Self::Sequence { sequence, .. } => suffix(sequence)?,
+            Self::Type(types) => {
+                // Slice each alternative separately so overload resolution can still distinguish
+                // e.g. two ints from two strings after the prefix is removed.
+                let project = |ty: &Type<'db>| suffix(&ty.iterate(db, env));
+                match types.get_default()?.expand_top_level_aliases(db, env) {
+                    Type::Union(union) => union.try_map(db, env, project)?,
+                    ty => project(&ty)?,
+                }
+            }
+        };
+        Some(Self::Type(CallArgumentTypes::new(Some(ty))))
     }
 
     fn expand(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Vec<Self>> {
@@ -794,32 +819,22 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        indices: impl ExactSizeIterator<Item = usize>,
         matches: &[MatchedArgument<'db>],
-        parameters: &Parameters<'db>,
-        prefix_len: usize,
+        prefix: &[Parameter<'db>],
     ) -> (Self, usize) {
-        let mut items = Vec::with_capacity(indices.len());
+        let mut items = Vec::new();
         let mut projected = 0;
-        for index in indices {
-            let mut argument = self.items[index].clone();
-            let prefix_matches = matches[index]
-                .parameters
-                .iter()
-                .filter(|matched| matched.index < prefix_len)
-                .count();
+        for (argument, matched) in self.iter().zip(matches) {
+            let Some(prefix_matches) = matched.paramspec_prefix_matches(prefix.len()) else {
+                continue;
+            };
+            let mut argument = argument.clone();
             match &mut argument {
                 _ if prefix_matches == 0 => projected += 1,
                 CallArgument::Variadic(variadic)
-                    if let Some(sequence) = variadic.sequence(db, env)
-                        && let Some(fixed) = sequence.as_fixed_length() =>
+                    if let Some(suffix) = variadic.without_prefix(db, env, prefix_matches) =>
                 {
-                    *variadic = VariadicArgument::Sequence {
-                        types: variadic.source_types().clone(),
-                        sequence: TupleSpec::heterogeneous(
-                            fixed.iter_all_elements().skip(prefix_matches),
-                        ),
-                    };
+                    *variadic = suffix;
                     projected += 1;
                 }
                 CallArgument::Keywords(argument) => {
@@ -829,9 +844,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                             .keys
                             .iter()
                             .filter(|(name, _)| {
-                                parameters
-                                    .keyword_by_name(name.as_str())
-                                    .is_none_or(|(index, _)| index >= prefix_len)
+                                !prefix.iter().any(|p| p.keyword_name() == Some(name))
                             })
                             .cloned()
                             .collect();
