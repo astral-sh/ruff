@@ -1662,16 +1662,20 @@ union_list_result: list[int | str] = to_thread_like(
     reveal_type([1]),  # revealed: list[int]
 )
 
+# TODO: Infer a common specialization for the forwarded arguments so these calls are accepted.
 to_thread_like(
     generic_pair,
-    reveal_type([1]),  # revealed: list[str | int]
-    reveal_type([""]),  # revealed: list[int | str]
+    # error: [invalid-argument-type]
+    reveal_type([1]),  # revealed: list[int]
+    # error: [invalid-argument-type]
+    reveal_type([""]),  # revealed: list[str]
 )
 
 to_thread_like(
     generic_pair_with_container,
     1,
-    reveal_type([""]),  # revealed: list[int | str]
+    # error: [invalid-argument-type]
+    reveal_type([""]),  # revealed: list[str]
 )
 ```
 

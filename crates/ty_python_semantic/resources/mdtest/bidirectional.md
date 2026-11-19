@@ -1340,11 +1340,11 @@ x2: TD | None = first([{"x": 0}, {"x": 1}])
 reveal_type(x2)  # revealed: TD
 
 # TODO: We could provide `TypedDict` key diagnostics here.
-# error: [invalid-assignment] "Object of type `TD | dict[str, int]` is not assignable to `TD`"
+# error: [invalid-assignment] "Object of type `dict[str, int] | TD` is not assignable to `TD`"
 x3: TD = first([{"y": 0}, {"x": 1}])
 
 # TODO: We could provide `TypedDict` key diagnostics here.
-# error: [invalid-assignment] "Object of type `TD | None | dict[str, int]` is not assignable to `TD | None`"
+# error: [invalid-assignment] "Object of type `dict[str, int] | TD` is not assignable to `TD | None`"
 x4: TD | None = first([{"y": 0}, {"x": 1}])
 
 # `ObjectCallback` is redundant in this union, so expanding the aliases collapses the narrowing
@@ -2236,6 +2236,15 @@ def _(a: int, b: str, c: int | str):
     reveal_type(x9)  # revealed: int | str | None
 ```
 
+An incompatible narrowing target does not widen a collection literal argument:
+
+```py
+from heapq import heappop
+
+def _(value: int):
+    item: int | str = reveal_type(heappop([value]))  # revealed: int
+```
+
 Generic calls are never narrowed to a dynamic type, which can lead to overly narrow or gradual types
 in the presence of unconstrained or dynamic arguments. Instead, the full declared union is preferred
 over a dynamic member:
@@ -2831,9 +2840,9 @@ def generic_type_context(values: list[int | str] | None) -> None:
     reveal_type(preserve_generic(values or []))  # revealed: list[int | str]
     reveal_type(preserve_partially_specialized(values or []))  # revealed: list[Unknown | int]
 
-def widened_non_empty_fallback(values: list[int] | None) -> None:
+def incompatible_non_empty_fallback(values: list[int] | None) -> None:
     result = values or ["x"]
-    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | str]
+    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[str]
 
 def incompatible_collection_kind(values: set[str] | None) -> None:
     reveal_type(values or [1])  # revealed: (set[str] & ~AlwaysFalsy) | list[int]
@@ -3132,6 +3141,8 @@ def list_pair[T](x: list[T], y: list[T]) -> T:
 
 def pair[T](x: T, y: T) -> T:
     return x
+
+pair_with_list("x", reveal_type([1]))  # revealed: list[str | int]
 
 def _(a: A, b: list[A]):
     x1: A = pair_with_list(a, [{"a": 1, "b": 2}])
