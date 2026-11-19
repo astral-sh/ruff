@@ -73,27 +73,6 @@ impl PyprojectDiscoveryStrategy {
     }
 }
 
-/// The strategy for resolving file paths in a `pyproject.toml`.
-#[derive(Copy, Clone)]
-pub enum Relativity {
-    /// Resolve file paths relative to the current working directory.
-    Cwd,
-    /// Resolve file paths relative to the directory containing the
-    /// `pyproject.toml`.
-    Parent,
-}
-
-impl Relativity {
-    fn resolve(self, path: &Path) -> &Path {
-        match self {
-            Relativity::Parent => path
-                .parent()
-                .expect("Expected pyproject.toml file to be in parent directory"),
-            Relativity::Cwd => &path_dedot::CWD,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Resolver<'a> {
     pyproject_config: &'a PyprojectConfig,
@@ -353,7 +332,6 @@ fn resolve_configuration_with_cache(
     origin: ConfigurationOrigin,
     configuration_cache: Option<&ConfigurationCache>,
 ) -> Result<Configuration> {
-    let relativity = Relativity::from(origin);
     let mut configurations = indexmap::IndexMap::new();
     let mut next = Some(fs::normalize_path(initial_config_path));
     while let Some(path) = next {
@@ -368,7 +346,7 @@ fn resolve_configuration_with_cache(
             ));
         }
 
-        let project_root = relativity.resolve(&path);
+        let project_root = origin.project_root(&path);
         let load = || {
             let options = pyproject::load_options(&path).with_context(|| {
                 if configurations.is_empty() {
@@ -430,11 +408,9 @@ fn resolve_scoped_settings(
     origin: ConfigurationOrigin,
     configuration_cache: Option<&ConfigurationCache>,
 ) -> Result<(PathBuf, Settings)> {
-    let relativity = Relativity::from(origin);
-
     let configuration =
         resolve_configuration_with_cache(pyproject, transformer, origin, configuration_cache)?;
-    let project_root = relativity.resolve(pyproject);
+    let project_root = origin.project_root(pyproject);
     let settings = configuration.into_settings(project_root)?;
     Ok((project_root.to_path_buf(), settings))
 }
@@ -463,13 +439,13 @@ pub enum ConfigurationOrigin {
     Ancestor,
 }
 
-impl From<ConfigurationOrigin> for Relativity {
-    fn from(value: ConfigurationOrigin) -> Self {
-        match value {
-            ConfigurationOrigin::Unknown => Self::Parent,
-            ConfigurationOrigin::UserSpecified => Self::Cwd,
-            ConfigurationOrigin::UserSettings => Self::Cwd,
-            ConfigurationOrigin::Ancestor => Self::Parent,
+impl ConfigurationOrigin {
+    fn project_root(self, path: &Path) -> &Path {
+        match self {
+            Self::Unknown | Self::Ancestor => path
+                .parent()
+                .expect("Expected pyproject.toml file to be in parent directory"),
+            Self::UserSpecified | Self::UserSettings => &path_dedot::CWD,
         }
     }
 }
