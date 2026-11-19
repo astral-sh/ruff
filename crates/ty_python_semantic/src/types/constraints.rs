@@ -2636,8 +2636,16 @@ impl NodeId {
             Node::AlwaysFalse => ControlFlow::Continue(false),
             Node::Interior(_) => {
                 let source_orders = storage.calculate_source_orders(source_order);
-                SolutionWalker::new(db, storage, source_orders, inferable, limits, self)
-                    .is_never_satisfied(db, env, storage, Polarity::Negative)
+                let (mut walker, mut path) = SolutionWalker::for_node(
+                    db,
+                    env,
+                    storage,
+                    source_orders,
+                    inferable,
+                    limits,
+                    self,
+                );
+                walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative)
             }
         }
     }
@@ -2731,8 +2739,16 @@ impl NodeId {
                     false
                 } else {
                     let source_orders = storage.calculate_source_orders(source_order);
-                    SolutionWalker::new(db, storage, source_orders, inferable, limits, self)
-                        .is_never_satisfied(db, env, storage, Polarity::Positive)?
+                    let (mut walker, mut path) = SolutionWalker::for_node(
+                        db,
+                        env,
+                        storage,
+                        source_orders,
+                        inferable,
+                        limits,
+                        self,
+                    );
+                    walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Positive)?
                 };
                 storage.never_satisfied_cache.insert(key, result);
                 ControlFlow::Continue(result)
@@ -2991,41 +3007,6 @@ impl NodeId {
         constraints
     }
 
-    fn ordered_atomic_constraints(
-        self,
-        storage: &ConstraintSetStorage<'_>,
-        source_orders: &FxIndexSet<AtomicConstraintId>,
-    ) -> SmallVec<[Option<AtomicConstraintId>; 8]> {
-        // Distinct nodes can test the same constraint, and some source-order entries may
-        // have been simplified out of the diagram. Record each reachable atomic constraint
-        // once at its source position for non-commutative sequent pairs.
-        let mut constraints = SmallVec::from_elem(None, source_orders.len());
-        self.for_each_unique_constraint(storage, &mut |id| {
-            if let Some(constraint) = id.as_atomic(storage) {
-                let index = source_orders
-                    .get_index_of(&constraint)
-                    .expect("every BDD constraint should have a source-order entry");
-                constraints[index] = Some(constraint);
-            }
-        });
-        constraints
-    }
-
-    fn scoped_path<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        source_orders: &FxIndexSet<AtomicConstraintId>,
-        inferable: TypeVarSet<'db>,
-    ) -> (TypeVarSet<'db>, PathAssignments) {
-        let atoms = self.ordered_atomic_constraints(storage, source_orders);
-        let atoms = atoms.iter().flatten().copied();
-        let inferable = inferable.with_captured_paramspecs(db, storage, || atoms.clone());
-        let path = PathAssignments::new(db, env, storage, atoms);
-        (inferable, path)
-    }
-
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
     ///
     /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
@@ -3098,14 +3079,12 @@ impl NodeId {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        source_order: Option<SourceOrderId>,
+        source_orders: &FxIndexSet<AtomicConstraintId>,
     ) -> PathAssignments {
-        if self.is_terminal() {
-            return PathAssignments::default();
+        match self.node() {
+            Node::AlwaysFalse | Node::AlwaysTrue => PathAssignments::default(),
+            Node::Interior(interior) => interior.path_assignments(db, env, storage, source_orders),
         }
-        let source_orders = storage.calculate_source_orders(source_order);
-        let constraints = self.ordered_atomic_constraints(storage, &source_orders);
-        PathAssignments::new(db, env, storage, constraints.iter().flatten().copied())
     }
 
     fn display<'db, 'a>(
@@ -4053,8 +4032,9 @@ impl<'db> CandidateSolutions<'db> {
 
         let source_orders =
             source_orders.unwrap_or_else(|| storage.calculate_source_orders(source_order));
-        let (inferable, mut path) = node.scoped_path(db, env, storage, &source_orders, inferable);
-        let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, limits, node)
+        let (walker, mut path) =
+            SolutionWalker::for_node(db, env, storage, source_orders, inferable, limits, node);
+        let mut walker = walker
             .with_unspecialized_type_var_policy(unspecialized_type_var_policy)
             .with_search(search);
         let node_support = storage.node_support(node).cloned();
@@ -4945,7 +4925,8 @@ impl InteriorNode {
             }
         }
 
-        let mut path = self.node().path_assignments(db, env, storage, source_order);
+        let source_orders = storage.calculate_source_orders(source_order);
+        let mut path = self.path_assignments(db, env, storage, &source_orders);
         let mut visitor = AbstractVisitor {
             should_remove,
             limits,
@@ -4955,6 +4936,57 @@ impl InteriorNode {
         let derived_source_order =
             path.projection_source_order(storage, source_order, derived_source_order);
         ControlFlow::Continue((node, derived_source_order))
+    }
+
+    fn path_assignments<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_orders: &FxIndexSet<AtomicConstraintId>,
+    ) -> PathAssignments {
+        // Distinct nodes can test the same constraint, and the source order can include
+        // constraints that were simplified out of the diagram. Record each reachable
+        // constraint once at its source position. `PathAssignments` needs this order
+        // when constructing non-commutative sequent pairs.
+        let mut constraints: SmallVec<[_; 8]> = SmallVec::from_elem(None, source_orders.len());
+        self.node()
+            .for_each_unique_constraint(storage, &mut |constraint| {
+                if let Some(constraint) = constraint.as_atomic(storage) {
+                    let index = source_orders
+                        .get_index_of(&constraint)
+                        .expect("every BDD constraint should have a source-order entry");
+                    constraints[index] = Some(constraint);
+                }
+            });
+
+        let bound_is_concrete = |bound: Type<'db>| {
+            !bound.has_typevar(db, env)
+                && !bound.has_unspecialized_type_var(db, env)
+                && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
+        };
+
+        let mut independent_typevars = FxHashSet::default();
+        let mut dependent_typevars = FxHashSet::default();
+        for &constraint_id in constraints.iter().flatten() {
+            let constraint = storage.atomic_constraint_data(constraint_id);
+            if let Some((typevar, bound)) = constraint.as_concrete()
+                && bound_is_concrete(bound)
+            {
+                let typevar = storage.typevar_id(db, typevar);
+                independent_typevars.insert(typevar);
+            } else {
+                dependent_typevars.extend(
+                    storage
+                        .constraint_support(constraint_id.into_inner())
+                        .iter(),
+                );
+            }
+        }
+
+        independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
+
+        PathAssignments::new(constraints.into_iter().flatten(), independent_typevars)
     }
 }
 
