@@ -2607,8 +2607,10 @@ reveal_type(f((None, None, None)))  # revealed: Literal[b""]
 
 ### An unannotated parameter with a context-dependent argument
 
-The first overload leaves `value` unannotated, so `first()` uses its type variable's default of
-`int`. The second overload supplies `Never` as the expected type for its own check.
+Both overloads initially match when `index` is `1`. The first leaves `value` unannotated, so
+`first()` uses its type variable's default of `int`. Filtering with that argument type selects the
+first overload. When `index` is a string, only the second overload matches and it supplies `Never`
+as the expected type for `first()`.
 
 ```py
 from typing import overload

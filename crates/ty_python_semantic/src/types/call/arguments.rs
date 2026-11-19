@@ -17,7 +17,7 @@ use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
     TypedDictOpenness, UnpackedTypedDictKey, extract_unpacked_typed_dict_from_value_type,
 };
-use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
+use crate::types::{Parameter, Parameters, Type, TypeContext, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArgumentExpansions::iter`].
@@ -142,7 +142,7 @@ impl<'a, 'db> CallArgument<'a, 'db> {
     }
 
     /// The type supplied by the argument, using the default source type for ordinary arguments.
-    pub(crate) fn default_matched_type(&self, matched: Option<Type<'db>>) -> Option<Type<'db>> {
+    pub(super) fn default_matched_type(&self, matched: Option<Type<'db>>) -> Option<Type<'db>> {
         matched.or_else(|| self.ordinary_types()?.get_default())
     }
 
@@ -491,12 +491,10 @@ impl<'db> CallArgumentTypes<'db> {
         .or_else(|| self.get_default())
     }
 
-    /// Returns the type of this argument when inferred against the provided declared type.
-    ///
-    /// If the type was not inferred against the declared type directly, this method will fall back to
-    /// [`Self::get_default`], or to `Unknown` if no fallback type exists.
-    pub(crate) fn get_for_declared_type(&self, declared: Option<Type<'db>>) -> Type<'db> {
-        self.try_get_for_declared_type(declared)
+    /// Returns the argument type inferred for this parameter, falling back to
+    /// [`Self::get_default`] or `Unknown` if that inference is unavailable.
+    pub(super) fn get_for_parameter(&self, parameter: &Parameter<'db>) -> Type<'db> {
+        self.try_get_for_declared_type(parameter.argument_context_type())
             .unwrap_or(Type::unknown())
     }
 
