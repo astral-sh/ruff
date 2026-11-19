@@ -40,7 +40,7 @@ jobs:
 
       - name: "Get Ruff token"
         id: token
-        uses: astral-sh/github-actions/simple-token-service@d6318dc5aafbdef5cbbec500af532944d4d4ad3d
+        uses: astral-sh/github-actions/simple-token-service@4877f85420cccab15834c3d0ea3433b0d91507d3
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -84,7 +84,7 @@ jobs:
           git switch -c "release/$version"
           git commit -am "Bump version to $version"
 
-      - uses: astral-sh/github-actions/rewrite-changelog@d6318dc5aafbdef5cbbec500af532944d4d4ad3d
+      - uses: astral-sh/github-actions/rewrite-changelog@4877f85420cccab15834c3d0ea3433b0d91507d3
         with:
           prompt-file: .agents/prompts/editorialize-changelog.md
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
