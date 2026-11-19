@@ -335,6 +335,12 @@ python-version = "3.10"
 This configuration will apply to all tests in the same section, and all nested sections within that
 section. Nested sections can override configurations from their parent sections.
 
+By default, ty checks a section's files one at a time. Set `parallel = true` at the top level of the
+TOML block to check the files concurrently against the same Salsa database. This can exercise query
+cycles that depend on the order in which different files request types. Parallel sections do not
+support `expect-panic`. A panic in one file can cancel a query in another, so the harness could
+see the cancellation message and miss the expected panic.
+
 To enable logging in an mdtest, set `log = true` at the top level of the TOML block.
 See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/src/config.rs)
 for the full list of supported configuration options.

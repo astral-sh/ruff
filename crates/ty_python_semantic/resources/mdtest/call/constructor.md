@@ -1891,6 +1891,15 @@ class Box(Generic[T1]):
 reveal_type(Box(1))  # revealed: Box[type[tuple[object, Literal[1]]]]
 ```
 
+The inferred class specialization must also agree with the method typevar for a homogeneous tuple.
+
+```py
+class NestedBox(Generic[T1]):
+    def __init__(self: "NestedBox[type[tuple[V1, ...]]]", x: V1) -> None: ...
+
+reveal_type(NestedBox(1))  # revealed: NestedBox[type[tuple[Literal[1], ...]]]
+```
+
 ## Constructor calls through `type[T]` with a bound TypeVar
 
 ```py

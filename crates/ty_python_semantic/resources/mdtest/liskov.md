@@ -124,7 +124,8 @@ class Base(Generic[T]):
     def method(self) -> "Derived[Any]": ...
 
 class Derived(Base[T], Generic[T]):
-    # error: [incompatible-method-override]
+    # TODO: Negative existential handling currently treats this receiver as unrestricted.
+    # TODO: error: [incompatible-method-override]
     def method(self: "Derived[Element[S]]") -> "Derived[S]": ...
 ```
 

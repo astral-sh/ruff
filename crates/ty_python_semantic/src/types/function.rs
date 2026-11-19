@@ -1303,7 +1303,7 @@ impl<'db> FunctionType<'db> {
         Some(signature)
     }
 
-    fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+    pub(super) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         self.updated_signatures(db)
             .as_deref()
             .and_then(|updated| updated.class_specialization)

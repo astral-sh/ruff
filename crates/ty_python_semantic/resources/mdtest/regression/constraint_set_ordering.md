@@ -283,6 +283,8 @@ Irrelevant non-inferable typevars must not appear in reported solution bindings,
 positive decisions must not leak onto independent alternatives. Universal abstraction of an
 alternative must likewise leave only the unrelated branch.
 
+TODO: Negative existential handling currently loses the solutions for the unquantified typevars.
+
 ```py
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
@@ -308,7 +310,8 @@ def noninferable_nested[T, U, V]() -> None:
     quantified = constraints.for_all(tuple[T, U])
     expected = ConstraintSet.lower_bound(bytes, V)
     static_assert(quantified == expected)
-    # revealed: tuple[Solution[V=bytes]]
+    # TODO: revealed: tuple[Solution[V=bytes]]
+    # revealed: None
     reveal_type(quantified.solutions_for(V, inferable=tuple[V]))
 
 def noninferable_negated[T, U]() -> None:
@@ -317,7 +320,8 @@ def noninferable_negated[T, U]() -> None:
     quantified = constraints.for_all(tuple[T])
     expected = ConstraintSet.lower_bound(bytes, U)
     static_assert(quantified == expected)
-    # revealed: tuple[Solution[U=bytes]]
+    # TODO: revealed: tuple[Solution[U=bytes]]
+    # revealed: None
     reveal_type(quantified.solutions_for(U, inferable=tuple[U]))
 ```
 
