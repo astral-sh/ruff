@@ -40,6 +40,7 @@ use crate::types::relation::{
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::{TypeVarInstance, TypeVarSet, freshening_delta};
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassLiteral, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor,
@@ -3524,6 +3525,42 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // the other signature before the return-type and gradual/top fast paths can return
             // early. We also need to compare the return types here so a return-type mismatch still
             // preserves the inferred ParamSpec binding.
+            let callback_locals =
+                |signature: &Signature<'db>, paramspec: BoundTypeVarInstance<'db>| {
+                    if inferable != TypeVarSet::All
+                        && paramspec.is_inferable(db, inferable)
+                        && let Some(context) =
+                            signature.local_generic_context(self.typevar_evaluation)
+                    {
+                        context.inferable_typevars(db)
+                    } else {
+                        TypeVarSet::None
+                    }
+                };
+            // A generic callback can use the same type variable in its fixed prefix and its
+            // return type. Once the prefix has been checked, preserve its constraints on the
+            // result and keep only the binders used by the captured parameters in scope.
+            let uncaptured = |signature, residual: &Parameters<'db>, paramspec| {
+                TypeVarSet::from_typevars(
+                    db,
+                    callback_locals(signature, paramspec)
+                        .iter(db)
+                        .filter(|local| {
+                            !residual.iter().any(|parameter| {
+                                any_over_type_expanding_aliases(
+                                    db,
+                                    self.env,
+                                    parameter.annotated_type(),
+                                    |ty| {
+                                        ty.as_typevar().is_some_and(|nested| {
+                                            nested.identity(db).binder() == local.identity(db)
+                                        })
+                                    },
+                                )
+                            })
+                        }),
+                )
+            };
             match (source_paramspec, target_paramspec) {
                 // self: `P`
                 // other: `P`
@@ -3736,6 +3773,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             target_bound_typevar,
                         );
                         result.intersect(db, self.constraints, param_spec_matches);
+                        // With matching prefixes, the residual is a forwarded ParamSpec.
+                        // There is no concrete parameter list to carry the callback's binders.
+                        let from_source = callback_locals(source, target_bound_typevar);
+                        let from_target = callback_locals(target, source_bound_typevar);
+                        return result.reduce_inferable(
+                            db,
+                            self.env,
+                            self.constraints,
+                            from_source.merge(db, from_target),
+                            inferable,
+                        );
                     }
                     return result;
                 }
@@ -3883,6 +3931,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let (source_params, _) = parameters.into_remaining();
                     let source_params =
                         source_parameters.with_transformed_parameters(source_params.cloned());
+                    let to_remove = uncaptured(source, &source_params, target_bound_typevar);
                     let lower = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::single(
@@ -3898,7 +3947,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_type_pair(db, lower, Type::TypeVar(target_bound_typevar));
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
 
-                    return result;
+                    return result.reduce_inferable(
+                        db,
+                        self.env,
+                        self.constraints,
+                        to_remove,
+                        inferable,
+                    );
                 }
 
                 // self: `P`
@@ -4014,6 +4069,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let (_, target_params) = parameters.into_remaining();
                     let target_params =
                         target_parameters.with_transformed_parameters(target_params.cloned());
+                    let to_remove = uncaptured(target, &target_params, source_bound_typevar);
                     let upper = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::single(
@@ -4029,7 +4085,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_type_pair(db, Type::TypeVar(source_bound_typevar), upper);
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
 
-                    return result;
+                    return result.reduce_inferable(
+                        db,
+                        self.env,
+                        self.constraints,
+                        to_remove,
+                        inferable,
+                    );
                 }
 
                 // Both self and other are callables without ParamSpecs
