@@ -26,8 +26,7 @@ use crate::types::protocol_class::{
     walk_protocol_interface,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
-    TypeRelationChecker, TypeVarEvaluation,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -1123,7 +1122,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         protocol: ProtocolInstanceType<'db>,
         nominally_satisfied: ConstraintSet<'db, 'c>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        if self.typevar_evaluation == TypeVarEvaluation::Eager
+        if !self.typevar_evaluation.is_lazy()
             || self.is_context_collection_enabled()
             || nominally_satisfied.is_trivially_never_satisfied()
         {

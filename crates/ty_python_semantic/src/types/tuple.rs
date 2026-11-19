@@ -605,7 +605,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     match (source.variable(), target.variable()) {
                         (source_segment, VariableSegment::TypeVarTuple(target_pack))
                             if !target_pack.is_inferable(db, self.inferable)
-                                && !self.collects(db, target_pack)
                                 && let Some(source_element) =
                                     source_segment.gradual_element_type(db, env) =>
                         {
@@ -627,7 +626,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                         (VariableSegment::TypeVarTuple(source_pack), target_segment)
                             if !source_pack.is_inferable(db, self.inferable)
-                                && !self.collects(db, source_pack)
                                 && let Some(target_element) =
                                     target_segment.gradual_element_type(db, env) =>
                         {
