@@ -441,7 +441,7 @@ fn factory_name_literal<'db>(
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let call = assignment.value(&module).as_call_expr()?;
     let name_arg = factory_name_argument(&call.arguments)?;
-    definition_expression_type(db, definition, name_arg).as_string_literal()
+    definition_expression_type(db, definition, name_arg).resolve_string_literal(db)
 }
 
 /// Infer a definition's expression using an explicitly supplied evaluation scope.
@@ -3345,6 +3345,11 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) => literal.as_string(),
             _ => None,
         }
+    }
+
+    /// Return the string literal after resolving outermost type aliases.
+    fn resolve_string_literal(self, db: &'db dyn Db) -> Option<StringLiteralType<'db>> {
+        self.resolve_type_alias(db).as_string_literal()
     }
 
     fn is_int_literal(&self) -> bool {

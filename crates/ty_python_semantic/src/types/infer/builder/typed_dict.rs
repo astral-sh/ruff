@@ -266,7 +266,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let name = name_type
-            .as_string_literal()
+            .resolve_string_literal(db)
             .map(|literal| literal.value(db));
 
         let valid_name_type = name.is_some()

@@ -3848,7 +3848,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
 
-        let name = name_param_ty.as_string_literal().map(|name| name.value(db));
+        let name = name_param_ty
+            .resolve_string_literal(db)
+            .map(|name| name.value(db));
 
         if name.is_none()
             && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
@@ -4274,7 +4276,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let name_param_ty = self.infer_expression(name_arg, TypeContext::default());
 
-        let name = name_param_ty.as_string_literal().map(|name| name.value(db));
+        let name = name_param_ty
+            .resolve_string_literal(db)
+            .map(|name| name.value(db));
 
         if name.is_none()
             && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))

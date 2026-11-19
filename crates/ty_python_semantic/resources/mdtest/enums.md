@@ -2849,12 +2849,13 @@ A name passed through a variable is still checked if its inferred type is a stri
 Other = Enum(name, "A B")
 ```
 
-### Name comparison through type aliases
+### Names specified by type aliases
 
-The name comparison follows a type alias to a single string literal. The rule is meant to spot
-simple, obvious typos. It allows names of type `str` so callers can still construct enums
-dynamically when that's desirable. If the name argument has a union of string literals as its type,
-the caller is likely doing the same thing, so these cases also do not trigger the rule:
+When the name argument's type resolves to a single string literal, ty uses that literal as the enum
+class's name and checks it against the assigned variable. The rule is meant to spot simple, obvious
+typos. It allows names of type `str` so callers can still construct enums dynamically when that's
+desirable. If the name argument has a union of string literals as its type, the caller is likely
+doing the same thing, so these cases also do not trigger the rule:
 
 ```toml
 [environment]
@@ -2871,6 +2872,7 @@ type ColorNames = Literal["Palette", "Swatch"]
 def fixed_name(name: PaletteName) -> None:
     # error: [mismatched-enum-name] "Expected "Color", got "Palette""
     Color = Enum(name, "RED BLUE")
+    reveal_type(Color.RED)  # revealed: Literal[Palette.RED]
 
 def choose_name(name: Literal["Palette", "Swatch"], aliased_name: ColorNames) -> None:
     Color = Enum(name, "RED BLUE")  # ok

@@ -977,7 +977,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let name_param = name_param_ty.as_string_literal().map(|name| name.value(db));
+        let name_param = name_param_ty
+            .resolve_string_literal(db)
+            .map(|name| name.value(db));
         if name_param.is_none()
             && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
         {
@@ -1234,7 +1236,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let name_param = name_param_ty.as_string_literal().map(|name| name.value(db));
+        let name_param = name_param_ty
+            .resolve_string_literal(db)
+            .map(|name| name.value(db));
         if name_param.is_none()
             && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
         {
@@ -1481,7 +1485,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let name_param = name_param_ty.as_string_literal().map(|name| name.value(db));
+        let name_param = name_param_ty
+            .resolve_string_literal(db)
+            .map(|name| name.value(db));
         if name_param.is_none()
             && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
         {
