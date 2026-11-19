@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for argument names that do not follow the `snake_case` convention.
+/// Checks for parameter names that are not lowercase.
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends that function names should be lower case and separated

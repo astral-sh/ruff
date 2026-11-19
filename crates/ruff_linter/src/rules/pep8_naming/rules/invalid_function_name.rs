@@ -10,8 +10,7 @@ use crate::codes::Category;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
-/// Checks for functions names that do not follow the `snake_case` naming
-/// convention.
+/// Checks for function names that are not lowercase.
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends that function names follow `snake_case`:

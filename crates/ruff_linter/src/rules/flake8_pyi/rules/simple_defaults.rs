@@ -203,7 +203,7 @@ impl Violation for UnassignedSpecialVariableInStub {
 }
 
 /// ## What it does
-/// Checks for type alias definitions that are not annotated with
+/// Checks for type alias definitions in stub files that are not annotated with
 /// `typing.TypeAlias`.
 ///
 /// ## Why is this bad?
