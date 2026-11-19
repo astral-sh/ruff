@@ -494,7 +494,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::DirectLoggerInstantiation), // LOG001
     RuleSelector::rule(Rule::FilePathAsLoggerName), // LOG002
     RuleSelector::rule(Rule::LoggingWarnConstant), // LOG009
-    RuleSelector::rule(Rule::ExcInfoOutsideExceptHandler), // LOG014
+    RuleSelector::rule(Rule::LoggingExcInfoOutsideExceptHandler), // LOG014
     RuleSelector::rule(Rule::RootLoggerCall), // LOG015
     RuleSelector::rule(Rule::InvalidModuleName), // N999
     RuleSelector::rule(Rule::UnnecessaryListCast), // PERF101
@@ -704,11 +704,11 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::EmptyTypeCheckingBlock), // TC005
     RuleSelector::rule(Rule::UnquotedTypeAlias), // TC007
     RuleSelector::rule(Rule::RuntimeStringUnion), // TC010
-    RuleSelector::rule(Rule::RaiseOverlyBroadException), // TRY002
+    RuleSelector::rule(Rule::RaiseExceptionOrBaseException), // TRY002
     RuleSelector::rule(Rule::TypeCheckWithoutTypeError), // TRY004
     RuleSelector::rule(Rule::VerboseRaise), // TRY201
     RuleSelector::rule(Rule::UselessTryExcept), // TRY203
-    RuleSelector::rule(Rule::LoggingRedundantException), // TRY401
+    RuleSelector::rule(Rule::RedundantExceptionInLoggingMessage), // TRY401
     RuleSelector::rule(Rule::UselessMetaclassType), // UP001
     RuleSelector::rule(Rule::TypeOfPrimitive), // UP003
     RuleSelector::rule(Rule::UselessObjectInheritance), // UP004

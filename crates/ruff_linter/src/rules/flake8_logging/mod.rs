@@ -16,12 +16,12 @@ mod tests {
 
     #[test_case(Rule::DirectLoggerInstantiation, Path::new("LOG001.py"))]
     #[test_case(Rule::FilePathAsLoggerName, Path::new("LOG002.py"))]
-    #[test_case(Rule::LoggingExceptionWithoutExcInfo, Path::new("LOG007.py"))]
+    #[test_case(Rule::LoggingExceptionWithFalsyExcInfo, Path::new("LOG007.py"))]
     #[test_case(Rule::LoggingWarnConstant, Path::new("LOG009.py"))]
     #[test_case(Rule::LoggingExceptionOutsideExceptHandler, Path::new("LOG004_0.py"))]
     #[test_case(Rule::LoggingExceptionOutsideExceptHandler, Path::new("LOG004_1.py"))]
-    #[test_case(Rule::ExcInfoOutsideExceptHandler, Path::new("LOG014_0.py"))]
-    #[test_case(Rule::ExcInfoOutsideExceptHandler, Path::new("LOG014_1.py"))]
+    #[test_case(Rule::LoggingExcInfoOutsideExceptHandler, Path::new("LOG014_0.py"))]
+    #[test_case(Rule::LoggingExcInfoOutsideExceptHandler, Path::new("LOG014_1.py"))]
     #[test_case(Rule::RootLoggerCall, Path::new("LOG015.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());

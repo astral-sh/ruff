@@ -5156,7 +5156,7 @@ fn default_rules() -> Result<()> {
     	direct-logger-instantiation (LOG001),
     	file-path-as-logger-name (LOG002),
     	logging-warn-constant (LOG009),
-    	exc-info-outside-except-handler (LOG014),
+    	logging-exc-info-outside-except-handler (LOG014),
     	root-logger-call (LOG015),
     	logging-warn (G010),
     	logging-extra-attr-clash (G101),
@@ -5471,11 +5471,11 @@ fn default_rules() -> Result<()> {
     	unused-noqa (RUF100),
     	redirected-noqa (RUF101),
     	invalid-pyproject-toml (RUF200),
-    	raise-overly-broad-exception (TRY002),
+    	raise-exception-or-base-exception (TRY002),
     	type-check-without-type-error (TRY004),
     	verbose-raise (TRY201),
     	useless-try-except (TRY203),
-    	logging-redundant-exception (TRY401),
+    	redundant-exception-in-logging-message (TRY401),
     ]
     ",
     );

@@ -1034,7 +1034,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::FilePathAsLoggerName) {
                 flake8_logging::rules::invalid_get_logger_argument(checker, call);
             }
-            if checker.is_rule_enabled(Rule::LoggingExceptionWithoutExcInfo) {
+            if checker.is_rule_enabled(Rule::LoggingExceptionWithFalsyExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
             if checker.is_rule_enabled(Rule::RootLoggerCall) {
@@ -1130,7 +1130,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::LoggingExceptionOutsideExceptHandler) {
                 flake8_logging::rules::log_exception_outside_except_handler(checker, call);
             }
-            if checker.is_rule_enabled(Rule::ExcInfoOutsideExceptHandler) {
+            if checker.is_rule_enabled(Rule::LoggingExcInfoOutsideExceptHandler) {
                 flake8_logging::rules::exc_info_outside_except_handler(checker, call);
             }
             if checker.is_rule_enabled(Rule::FromisoformatReplaceZ) {

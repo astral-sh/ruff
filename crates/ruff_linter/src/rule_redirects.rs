@@ -105,16 +105,23 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "exception-without-exc-info",
-        Rule::LoggingExceptionWithoutExcInfo,
+        Rule::LoggingExceptionWithFalsyExcInfo,
+    ),
+    (
+        "exc-info-outside-except-handler",
+        Rule::LoggingExcInfoOutsideExceptHandler,
     ),
     ("undocumented-warn", Rule::LoggingWarnConstant),
-    ("raise-vanilla-class", Rule::RaiseOverlyBroadException),
+    ("raise-vanilla-class", Rule::RaiseExceptionOrBaseException),
     ("raise-vanilla-args", Rule::RaiseExceptionWithMessage),
     (
         "error-instead-of-exception",
         Rule::LoggingErrorInsteadOfException,
     ),
-    ("verbose-log-message", Rule::LoggingRedundantException),
+    (
+        "verbose-log-message",
+        Rule::RedundantExceptionInLoggingMessage,
+    ),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

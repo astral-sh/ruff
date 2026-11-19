@@ -971,7 +971,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
-            if checker.is_rule_enabled(Rule::RaiseOverlyBroadException) {
+            if checker.is_rule_enabled(Rule::RaiseExceptionOrBaseException) {
                 if let Some(expr) = exc {
                     tryceratops::rules::raise_vanilla_class(checker, expr);
                 }
@@ -1404,7 +1404,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::VerboseRaise) {
                 tryceratops::rules::verbose_raise(checker, handlers);
             }
-            if checker.is_rule_enabled(Rule::LoggingRedundantException) {
+            if checker.is_rule_enabled(Rule::RedundantExceptionInLoggingMessage) {
                 tryceratops::rules::verbose_log_message(checker, handlers);
             }
             if checker.is_rule_enabled(Rule::RaiseWithinTry) {
