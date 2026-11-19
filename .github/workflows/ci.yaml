@@ -577,9 +577,6 @@ jobs:
           enable-cache: "true"
           cache-python: true
       - name: "Run tests"
-        env:
-          # Unoptimized recursive-alias mdtests exceed the default 2 MiB worker stack on macOS.
-          RUST_MIN_STACK: ${{ runner.os == 'macOS' && '4194304' || '' }}
         run: |
           uv run --locked --only-dev cargo nextest run --all-features --profile ci
           cargo test --all-features --doc

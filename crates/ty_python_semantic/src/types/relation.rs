@@ -1606,30 +1606,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             })
     }
 
-    fn check_fixed_source_typevar(
-        &self,
-        db: &'db dyn Db,
-        typevar: BoundTypeVarInstance<'db>,
-        bound_or_constraints: TypeVarBoundOrConstraints<'db>,
-        target: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        // Upcast the type variable directly rather than promoting it to its upper bound,
-        // such that `Self` in the callable signature refers back to the original type variable.
-        let source = Type::TypeVar(typevar);
-        if let Type::Callable(target_callable) = target
-            && let Some(callables) = source.try_upcast_to_callable_with_policy(
-                db,
-                self.env,
-                UpcastPolicy::from(self.relation),
-            )
-        {
-            return self.with_recursion_guard(db, source, target, || {
-                self.check_callables_vs_callable(db, &callables, target_callable)
-            });
-        }
-        self.check_source_typevar_bounds(db, bound_or_constraints, target)
-    }
-
     fn check_source_typevar_bounds(
         &self,
         db: &'db dyn Db,
@@ -2286,58 +2262,68 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Some(self.check_type_pair(db, Type::TypeVar(source), target))
     }
 
-    /// Collect a bound on the endpoint in scope. A caller-fixed variable on the other side
-    /// becomes part of that bound.
-    fn collect_typevar_bound(
+    /// Try the domain-specific relations that can hold for every specialization of a fixed
+    /// variable before falling back to the ordinary union and intersection rules.
+    ///
+    /// Keeping these checks separate reduces the stack needed by each recursive
+    /// `check_type_pair` call when comparing recursive aliases in unoptimized builds.
+    fn check_fixed_typevar_pair(
         &self,
         db: &'db dyn Db,
         source: Type<'db>,
         target: Type<'db>,
-        inferable: TypeVarSet<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
         let env = self.env;
-        // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
-        // tautology! We're moving the caller's subtyping/assignability requirement into a
-        // constraint set. If the typevar has an upper bound or constraints, then the relation
-        // only has to hold when the typevar has a valid specialization (i.e., one that
-        // satisfies the upper bound/constraints).
-        if let Type::TypeVar(bound_typevar) = source
-            && bound_typevar.is_inferable(db, inferable)
-        {
-            let upper = if self.relation.is_subtyping() {
-                target.bottom_materialization(db, env)
-            } else {
-                target
-            };
-            return Some(ConstraintSet::constrain_typevar_upper_bound(
-                db,
-                env,
-                self.constraints,
-                self.provenance,
-                inferable,
-                bound_typevar,
-                upper,
-            ));
+        let fixed = |ty: Type<'db>| {
+            ty.as_typevar()
+                .filter(|var| !var.is_inferable(db, self.inferable.explicit_typevars()))
+        };
+        let unpack = |var| Type::tuple(TupleType::unpacked_typevartuple(db, env, var));
+        // In a specialized generic alias, a gradual ParamSpec value (`...`) is assignable
+        // to and from any fixed ParamSpec. Its bottom materialization is below every
+        // ParamSpec, and its top is above every ParamSpec.
+        let gradual = |callable| {
+            self.relation.is_assignability() && Self::is_gradual_paramspec_value(db, callable)
+        };
+        if let Some(var) = fixed(source) {
+            // A TypeVarTuple specialization is represented by one tuple value. Keep inferable
+            // TypeVarTuples bare for constraint solving, but compare fixed symbolic values using
+            // the same tuple relation as concrete specializations.
+            if var.is_typevartuple(db) && target.exact_tuple_instance_spec(db).is_some() {
+                return Some(self.check_type_pair(db, unpack(var), target));
+            }
+            if var.domain(db) == TypeVarDomain::ParameterSignature
+                && let Type::Callable(other) = target
+                && (gradual(other) || other.is_top_paramspec_value(db))
+            {
+                return Some(self.always());
+            }
         }
-        if let Type::TypeVar(bound_typevar) = target
-            && bound_typevar.is_inferable(db, inferable)
+
+        let var = fixed(target)?;
+        // A fixed tuple cannot satisfy every specialization of a fixed TypeVarTuple.
+        // Expanding the target would repeat the tuple comparison and cause the recursion
+        // guard to accept it. Only expand for a variadic source.
+        if var.is_typevartuple(db)
+            && source
+                .exact_tuple_instance_spec(db)
+                .is_some_and(|spec| spec.is_variadic())
         {
-            let lower = if self.relation.is_subtyping() {
-                source.top_materialization(db, env)
-            } else {
-                source
-            };
-            return Some(ConstraintSet::constrain_typevar_lower_bound(
-                db,
-                env,
-                self.constraints,
-                self.provenance,
-                inferable,
-                bound_typevar,
-                lower,
-            ));
+            return Some(self.check_type_pair(db, source, unpack(var)));
         }
-        None
+        if var.domain(db) == TypeVarDomain::ParameterSignature
+            && let Type::Callable(other) = source
+            && (gradual(other) || other.is_bottom_paramspec_value(db))
+        {
+            return Some(self.always());
+        }
+
+        // Declared constraints can overlap. A source type might satisfy all of them.
+        let choices = var.typevar(db).constraints(db, env)?;
+        let when = choices.iter().when_all(db, self.constraints, |&choice| {
+            self.check_type_pair(db, source, choice)
+        });
+        (!when.is_never_satisfied(db, env, self.inferable)).then_some(when)
     }
 
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
@@ -2369,12 +2355,53 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         let env = self.env;
 
-        if self.typevar_evaluation.is_lazy()
-            && let Some(bound) = self.collect_typevar_bound(db, source, target, self.inferable)
-        {
-            return bound;
+        // With lazy evaluation, collect a bound on an inferable variable. A caller-fixed
+        // variable on the other side becomes part of that bound.
+        if self.typevar_evaluation.is_lazy() {
+            // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
+            // tautology! We're moving the caller's subtyping/assignability requirement into a
+            // constraint set. If the typevar has an upper bound or constraints, then the relation
+            // only has to hold when the typevar has a valid specialization (i.e., one that
+            // satisfies the upper bound/constraints).
+            if let Type::TypeVar(bound_typevar) = source
+                && bound_typevar.is_inferable(db, self.inferable)
+            {
+                let upper = if self.relation.is_subtyping() {
+                    target.bottom_materialization(db, env)
+                } else {
+                    target
+                };
+                return ConstraintSet::constrain_typevar_upper_bound(
+                    db,
+                    env,
+                    self.constraints,
+                    self.provenance,
+                    self.inferable,
+                    bound_typevar,
+                    upper,
+                );
+            }
+            if let Type::TypeVar(bound_typevar) = target
+                && bound_typevar.is_inferable(db, self.inferable)
+            {
+                let lower = if self.relation.is_subtyping() {
+                    source.top_materialization(db, env)
+                } else {
+                    source
+                };
+                return ConstraintSet::constrain_typevar_lower_bound(
+                    db,
+                    env,
+                    self.constraints,
+                    self.provenance,
+                    self.inferable,
+                    bound_typevar,
+                    lower,
+                );
+            }
         }
 
+        let inferable = self.inferable.explicit_typevars();
         match (source, target) {
             (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
                 unreachable!("semantic operation on an unbound recursive variable")
@@ -2819,90 +2846,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, instance, Type::TypeVar(type_var))
             }
 
-            // A TypeVarTuple specialization is represented by one tuple value. Keep inferable
-            // TypeVarTuples bare for constraint solving, but compare fixed symbolic values using
-            // the same tuple relation as concrete specializations.
-            (Type::TypeVar(bound_typevar), target)
-                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
-                    && bound_typevar.is_typevartuple(db)
-                    && target.exact_tuple_instance_spec(db).is_some() =>
+            (Type::TypeVar(_), _) | (_, Type::TypeVar(_))
+                if let Some(when) = self.check_fixed_typevar_pair(db, source, target) =>
             {
-                self.check_type_pair(
-                    db,
-                    Type::tuple(TupleType::unpacked_typevartuple(db, env, bound_typevar)),
-                    target,
-                )
-            }
-            // A fixed tuple cannot satisfy every specialization of a non-inferable TypeVarTuple.
-            // Let it reach the ordinary rejection below; expanding the target would repeat the
-            // same tuple comparison and cause the recursion guard to accept it.
-            (source, Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
-                    && bound_typevar.is_typevartuple(db)
-                    && source
-                        .exact_tuple_instance_spec(db)
-                        .is_some_and(|spec| spec.is_variadic()) =>
-            {
-                self.check_type_pair(
-                    db,
-                    source,
-                    Type::tuple(TupleType::unpacked_typevartuple(db, env, bound_typevar)),
-                )
+                when
             }
 
-            // A gradual `ParamSpec` value (`...`) is assignability-consistent with any concrete
-            // `ParamSpec` value. This only applies to fixed `ParamSpec` values in already-
-            // specialized generic aliases; inferable `ParamSpec`s are handled by the inference
-            // paths below.
-            (Type::TypeVar(bound_typevar), Type::Callable(other))
-            | (Type::Callable(other), Type::TypeVar(bound_typevar))
-                if self.relation.is_assignability()
-                    && !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
-                    && bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
-                    && Self::is_gradual_paramspec_value(db, other) =>
-            {
-                self.always()
-            }
-
-            // Compare fixed `ParamSpec`s with the endpoints of the materialization range of `...`:
-            // its bottom is below every `ParamSpec`, and its top is above every `ParamSpec`.
-            (Type::TypeVar(bound_typevar), Type::Callable(other))
-                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
-                    && bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
-                    && other.is_top_paramspec_value(db) =>
-            {
-                self.always()
-            }
-
-            (Type::Callable(other), Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
-                    && bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
-                    && other.is_bottom_paramspec_value(db) =>
-            {
-                self.always()
-            }
-
-            // If the typevar is constrained, there must be multiple constraints, and the typevar
-            // might be specialized to any one of them. However, the constraints do not have to be
-            // disjoint, which means an lhs type might be a subtype of all of the constraints.
-            (_, Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
-                    && let constraints = bound_typevar
-                        .typevar(db)
-                        .constraints(db, env)
-                        .when_some_and(db, self.constraints, |constraints| {
-                            constraints.iter().when_all(db, self.constraints, |c| {
-                                self.check_type_pair(db, source, *c)
-                            })
-                        })
-                    && !constraints.is_never_satisfied(db, env, self.inferable) =>
-            {
-                constraints
-            }
-
-            (Type::TypeVar(bound_typevar), _)
-                if bound_typevar.is_inferable(db, self.inferable.explicit_typevars()) =>
-            {
+            (Type::TypeVar(bound_typevar), _) if bound_typevar.is_inferable(db, inferable) => {
                 // The implicit lower bound of a typevar is `Never`, which means
                 // that it is always assignable to any other type.
 
@@ -2929,8 +2879,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Fast path: `object` is not a subtype of any non-inferable type variable, since the
             // type variable could be specialized to a type smaller than `object`.
             (Type::NominalInstance(source), Type::TypeVar(typevar))
-                if source.is_object()
-                    && !typevar.is_inferable(db, self.inferable.explicit_typevars()) =>
+                if source.is_object() && !typevar.is_inferable(db, inferable) =>
             {
                 self.never()
             }
@@ -2952,8 +2901,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Check an inferable target's bound before splitting a source intersection.
             // For `T: A & B`, neither `A` nor `B` alone need satisfy the bound, but `A & B` does.
             (_, Type::TypeVar(typevar))
-                if self.is_eager_assignability()
-                    && typevar.is_inferable(db, self.inferable.explicit_typevars()) =>
+                if self.is_eager_assignability() && typevar.is_inferable(db, inferable) =>
             {
                 // TODO: record the unification constraints
                 typevar.typevar(db).upper_bound(db, env).when_none_or(
@@ -2971,11 +2919,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(bound_typevar), _)
-                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars())
+                if !bound_typevar.is_inferable(db, inferable)
                     && let Some(bound_or_constraints) =
                         bound_typevar.typevar(db).bound_or_constraints(db, env) =>
             {
-                self.check_fixed_source_typevar(db, bound_typevar, bound_or_constraints, target)
+                // Upcast the type variable directly rather than promoting it to its upper bound,
+                // such that `Self` in the callable signature refers back to the original type variable.
+                if let Type::Callable(target_callable) = target
+                    && let Some(callables) = source.try_upcast_to_callable_with_policy(
+                        db,
+                        env,
+                        UpcastPolicy::from(self.relation),
+                    )
+                {
+                    self.with_recursion_guard(db, source, target, || {
+                        self.check_callables_vs_callable(db, &callables, target_callable)
+                    })
+                } else {
+                    self.check_source_typevar_bounds(db, bound_or_constraints, target)
+                }
             }
 
             // `Never` is the bottom type, the empty set.
@@ -2986,21 +2948,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // (If the typevar is bounded, it might be specialized to a smaller type than the
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
-            (_, Type::TypeVar(bound_typevar))
-                if !bound_typevar.is_inferable(db, self.inferable.explicit_typevars()) =>
-            {
+            (_, Type::TypeVar(bound_typevar)) if !bound_typevar.is_inferable(db, inferable) => {
                 self.never()
             }
 
             // TODO: Infer specializations here
-            (_, Type::TypeVar(typevar))
-                if typevar.is_inferable(db, self.inferable.explicit_typevars()) =>
-            {
-                self.never()
-            }
+            (_, Type::TypeVar(typevar)) if typevar.is_inferable(db, inferable) => self.never(),
             (Type::TypeVar(bound_typevar), _) => {
                 // All inferable cases should have been handled above
-                assert!(!bound_typevar.is_inferable(db, self.inferable.explicit_typevars()));
+                assert!(!bound_typevar.is_inferable(db, inferable));
                 self.never()
             }
 
