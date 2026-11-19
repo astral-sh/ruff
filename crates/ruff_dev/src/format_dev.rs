@@ -53,7 +53,7 @@ fn root_settings_for_formatting(
 ) -> anyhow::Result<RootSettings> {
     let mut root_settings = resolve(config_arguments, cli.stdin_filename.as_deref())?;
     // We don't want to format pyproject.toml
-    root_settings.settings.file_resolver.include = FilePatternSet::try_from_iter([
+    root_settings.resolved.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
         FilePattern::Builtin("*.pyi"),
     ])

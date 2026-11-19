@@ -232,7 +232,7 @@ mod test {
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{LinterSettings, flags};
     use ruff_workspace::Settings;
-    use ruff_workspace::resolver::{PyprojectDiscoveryStrategy, RootSettings};
+    use ruff_workspace::resolver::{PyprojectDiscoveryStrategy, ResolvedSettings, RootSettings};
 
     use crate::args::ConfigArguments;
 
@@ -266,7 +266,13 @@ mod test {
             linter: LinterSettings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
             ..Settings::default()
         };
-        let root_settings = RootSettings::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
+        let root_settings = RootSettings {
+            strategy: PyprojectDiscoveryStrategy::Fixed,
+            resolved: ResolvedSettings {
+                settings,
+                config_path: None,
+            },
+        };
 
         // Run
         let diagnostics = check(

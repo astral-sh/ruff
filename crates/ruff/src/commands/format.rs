@@ -77,7 +77,7 @@ pub(crate) fn format(
     let files = resolve_default_files(cli.files, false);
     let (paths, resolver) = project_files_in_path(&files, root_settings, config_arguments)?;
 
-    let output_format = root_settings.settings.output_format;
+    let output_format = root_settings.resolved.settings.output_format;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
