@@ -1771,6 +1771,10 @@ struct PendingReachabilityConstraint {
     parent: PendingReachabilityId,
     reachability_constraint: ScopedReachabilityConstraintId,
     narrowing_constraint: ScopedNarrowingConstraint,
+    scope_reachability: ScopedReachabilityConstraintId,
+    /// Oldest ancestor from which applying the intervening pending constraints to its stored
+    /// scope reachability produces this node's scope reachability. Node IDs increase along paths.
+    path_start: PendingReachabilityId,
 }
 
 /// An append-only tree of scope-wide reachability constraints and narrowing gates.
@@ -1791,6 +1795,8 @@ impl Default for PendingReachability {
             parent: root,
             reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+            scope_reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            path_start: root,
         });
         Self {
             constraints,
@@ -1804,11 +1810,23 @@ impl PendingReachability {
         &mut self,
         reachability_constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
+        previous_scope_reachability: ScopedReachabilityConstraintId,
+        scope_reachability: ScopedReachabilityConstraintId,
     ) {
+        let parent = &self.constraints[self.current];
+        // A merge may change scope reachability without moving the pending cursor. Its saved
+        // prefix then no longer describes the scope, so the next node begins a new path.
+        let path_start = if parent.scope_reachability == previous_scope_reachability {
+            parent.path_start
+        } else {
+            self.constraints.next_index()
+        };
         self.current = self.constraints.push(PendingReachabilityConstraint {
             parent: self.current,
             reachability_constraint,
             narrowing_constraint,
+            scope_reachability,
+            path_start,
         });
     }
 
@@ -1866,27 +1884,41 @@ impl PendingReachability {
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a mut PlaceState {
-        if pending.reachability != target {
-            let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
-            let mut current = target;
-            while current != pending.reachability {
-                let event = &self.constraints[current];
-                unapplied.push(event.reachability_constraint);
-                assert_ne!(
-                    current, event.parent,
-                    "pending reachability must be an ancestor"
-                );
-                current = event.parent;
-            }
-
-            let state = Rc::make_mut(&mut pending.state);
-            for constraint in unapplied.into_iter().rev() {
-                state.record_reachability_constraint(reachability_constraints, constraint);
-            }
-            pending.reachability = target;
+        let state = Rc::make_mut(&mut pending.state);
+        if pending.reachability == target {
+            return state;
         }
 
-        Rc::make_mut(&mut pending.state)
+        let previous = pending.reachability;
+        pending.reachability = target;
+        let target_event = &self.constraints[target];
+        // The place cursor is an ancestor of `target`. Within this uninterrupted path, a
+        // matching initial reachability yields the exact same AND operations, in the same
+        // order, as the scope prefix, including when the constraint arena reaches its limit.
+        if previous.index() >= target_event.path_start.index()
+            && state.try_replace_reachability(
+                self.constraints[previous].scope_reachability,
+                target_event.scope_reachability,
+            )
+        {
+            return state;
+        }
+
+        let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
+        let mut current = target;
+        while current != previous {
+            let event = &self.constraints[current];
+            unapplied.push(event.reachability_constraint);
+            assert_ne!(
+                current, event.parent,
+                "pending reachability must be an ancestor"
+            );
+            current = event.parent;
+        }
+        for constraint in unapplied.into_iter().rev() {
+            state.record_reachability_constraint(reachability_constraints, constraint);
+        }
+        state
     }
 
     /// Returns the materialized place state for immutable access.
@@ -2775,11 +2807,16 @@ impl<'db> UseDefMapBuilder<'db> {
         reachability_constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
     ) {
+        let previous_scope_reachability = self.reachability;
         self.reachability = self
             .reachability_constraints
-            .add_and_constraint(self.reachability, reachability_constraint);
-        self.pending_reachability
-            .push(reachability_constraint, narrowing_constraint);
+            .add_and_constraint(previous_scope_reachability, reachability_constraint);
+        self.pending_reachability.push(
+            reachability_constraint,
+            narrowing_constraint,
+            previous_scope_reachability,
+            self.reachability,
+        );
     }
 
     pub(super) fn record_declaration(
