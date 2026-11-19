@@ -27,14 +27,10 @@ pub fn resolve(
     // First priority: if we're running in isolated mode, use the default settings.
     if config_arguments.isolated {
         debug!("Isolated mode, not reading any pyproject.toml");
+        let configuration = config_arguments.transform(Configuration::default());
         return Ok(RootSettings {
             strategy: PyprojectDiscoveryStrategy::Fixed,
-            resolved: ResolvedSettings {
-                settings: config_arguments
-                    .transform(Configuration::default())
-                    .into_settings(&cwd)?,
-                config_path: None,
-            },
+            resolved: ResolvedSettings::new(configuration.into_settings(&cwd)?),
         });
     }
 
@@ -119,9 +115,6 @@ pub fn resolve(
     }
     Ok(RootSettings {
         strategy: PyprojectDiscoveryStrategy::Hierarchical,
-        resolved: ResolvedSettings {
-            settings: configuration.into_settings(&cwd)?,
-            config_path: None,
-        },
+        resolved: ResolvedSettings::new(configuration.into_settings(&cwd)?),
     })
 }

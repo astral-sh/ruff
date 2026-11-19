@@ -226,7 +226,30 @@ pub struct ResolvedSettings {
     /// The resolved settings.
     pub settings: Settings,
     /// Absolute path to the selected configuration file, if one was loaded.
-    pub config_path: Option<PathBuf>,
+    config_path: Option<PathBuf>,
+}
+
+impl ResolvedSettings {
+    pub fn new(settings: Settings) -> Self {
+        Self {
+            settings,
+            config_path: None,
+        }
+    }
+
+    /// Construct settings with an absolute, normalized configuration path.
+    fn new_with_path(settings: Settings, path: PathBuf) -> Self {
+        debug_assert!(path.is_absolute());
+        debug_assert_eq!(path.as_os_str(), fs::normalize_path(&path).as_os_str());
+        Self {
+            settings,
+            config_path: Some(path),
+        }
+    }
+
+    pub fn config_path(&self) -> Option<&Path> {
+        self.config_path.as_deref()
+    }
 }
 
 /// A wrapper around `detect_package_root` to cache filesystem lookups.
@@ -303,16 +326,14 @@ impl ConfigurationCache {
 /// specified [`Path`].
 pub fn resolve_configuration(
     initial_config_path: &Path,
-    transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin<'_>,
 ) -> Result<Configuration> {
-    resolve_configuration_with_cache(initial_config_path, transformer, origin, None)
+    resolve_configuration_with_cache(initial_config_path, origin, None)
         .map(|(_, configuration)| configuration)
 }
 
 fn resolve_configuration_with_cache(
     initial_config_path: &Path,
-    transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin<'_>,
     configuration_cache: Option<&ConfigurationCache>,
 ) -> Result<(PathBuf, Configuration)> {
@@ -379,8 +400,10 @@ fn resolve_configuration_with_cache(
         configuration = configuration.combine(extend);
     }
 
-    let configuration = configuration.apply_fallbacks(origin, initial_config_path);
-    Ok((config_path, transformer.transform(configuration)))
+    Ok((
+        config_path,
+        configuration.apply_fallbacks(origin, initial_config_path),
+    ))
 }
 
 /// Resolve settings from a configuration file, reusing configuration files shared by the traversal.
@@ -391,11 +414,11 @@ fn resolve_scoped_settings(
     configuration_cache: Option<&ConfigurationCache>,
 ) -> Result<ResolvedSettings> {
     let (config_path, configuration) =
-        resolve_configuration_with_cache(pyproject, transformer, origin, configuration_cache)?;
-    Ok(ResolvedSettings {
-        settings: configuration.into_settings(origin.project_root(pyproject))?,
-        config_path: Some(config_path),
-    })
+        resolve_configuration_with_cache(pyproject, origin, configuration_cache)?;
+    let settings = transformer
+        .transform(configuration)
+        .into_settings(origin.project_root(pyproject))?;
+    Ok(ResolvedSettings::new_with_path(settings, config_path))
 }
 
 /// Extract the [`Settings`] from a given `pyproject.toml` and process the
@@ -984,6 +1007,20 @@ mod tests {
     }
 
     #[test]
+    fn resolve_root_settings_normalizes_configuration_path() -> Result<()> {
+        let root = TempDir::new()?;
+        let config_path = root.path().join("ruff.toml");
+        File::create(&config_path)?;
+        let resolved = resolve_root_settings(
+            &root.path().join("sub/../ruff.toml"),
+            &NoOpTransformer,
+            ConfigurationOrigin::Ancestor,
+        )?;
+        assert_eq!(resolved.config_path(), Some(config_path.as_path()));
+        Ok(())
+    }
+
+    #[test]
     fn rooted_exclusion() -> Result<()> {
         let package_root = test_resource_path("package");
         let root_settings = RootSettings {
@@ -1034,10 +1071,7 @@ mod tests {
             &[root.to_path_buf()],
             &RootSettings {
                 strategy: PyprojectDiscoveryStrategy::Fixed,
-                resolved: ResolvedSettings {
-                    settings: Configuration::default().into_settings(root)?,
-                    config_path: None,
-                },
+                resolved: ResolvedSettings::new(Configuration::default().into_settings(root)?),
             },
             &NoOpTransformer,
         )?;

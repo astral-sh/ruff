@@ -27,7 +27,7 @@ pub(crate) struct RuffSettings(ResolvedSettings);
 
 impl RuffSettings {
     pub(crate) fn path(&self) -> Option<&Path> {
-        self.0.config_path.as_deref()
+        self.0.config_path()
     }
 }
 
@@ -116,10 +116,7 @@ impl RuffSettings {
                 })
             });
 
-        RuffSettings(ResolvedSettings {
-            settings,
-            config_path: None,
-        })
+        RuffSettings(ResolvedSettings::new(settings))
     }
 }
 
@@ -468,19 +465,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
 }
 
 fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
-    ruff_workspace::resolver::resolve_configuration(
-        config_path,
-        &IdentityTransformer,
-        ConfigurationOrigin::UserSpecified,
-    )
-}
-
-struct IdentityTransformer;
-
-impl ConfigurationTransformer for IdentityTransformer {
-    fn transform(&self, config: Configuration) -> Configuration {
-        config
-    }
+    ruff_workspace::resolver::resolve_configuration(config_path, ConfigurationOrigin::UserSpecified)
 }
 
 #[cfg(test)]

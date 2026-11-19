@@ -268,10 +268,7 @@ mod test {
         };
         let root_settings = RootSettings {
             strategy: PyprojectDiscoveryStrategy::Fixed,
-            resolved: ResolvedSettings {
-                settings,
-                config_path: None,
-            },
+            resolved: ResolvedSettings::new(settings),
         };
 
         // Run

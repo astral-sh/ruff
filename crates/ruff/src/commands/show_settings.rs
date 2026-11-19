@@ -32,7 +32,7 @@ pub(crate) fn show_settings(
     let resolved = resolver.resolve_with_path(&path);
 
     writeln!(writer, "Resolved settings for: \"{}\"", path.display())?;
-    if let Some(settings_path) = &resolved.config_path {
+    if let Some(settings_path) = resolved.config_path() {
         writeln!(writer, "Settings path: \"{}\"", settings_path.display())?;
     }
     write!(writer, "{}", resolved.settings)?;

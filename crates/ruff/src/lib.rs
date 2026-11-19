@@ -379,7 +379,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         for file in &files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
-        if let Some(file) = root_settings.resolved.config_path.as_ref() {
+        if let Some(file) = root_settings.resolved.config_path() {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
 
