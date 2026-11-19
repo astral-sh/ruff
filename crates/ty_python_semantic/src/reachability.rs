@@ -592,7 +592,6 @@ fn accumulate_constraint<'db>(
 }
 
 const NON_TERMINAL_CALL_CHUNK_SIZE: usize = 16;
-const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
@@ -635,7 +634,7 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root: InteriorNode,
-) -> bool {
+) {
     let root_predicate = root.atom();
     if !matches!(
         predicates[root_predicate].node,
@@ -646,7 +645,7 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
     {
         // No branch of this constraint can visit a statement-call predicate. If inferring
         // the condition itself needs earlier calls, their own reachability walks warm them.
-        return false;
+        return;
     }
     let scope = predicate_scope(db, &predicates[root_predicate]);
     let has_many_calls = predicates
@@ -656,7 +655,7 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
         .is_some();
 
     if !has_many_calls {
-        return false;
+        return;
     }
 
     let call_predicates = non_terminal_call_predicates(db, scope);
@@ -672,8 +671,6 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
         start += length;
         remaining -= length;
     }
-
-    true
 }
 
 /// Returns the statement-call predicates for `scope` in source order.
@@ -760,8 +757,7 @@ fn evaluate_reachability_constraint<'db>(
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
     let root = constraints.get_interior_node(id);
-    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
-    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
+    analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
 
     evaluate_reachability_path(
         db,
@@ -771,9 +767,7 @@ fn evaluate_reachability_constraint<'db>(
             entries: predicates,
             cache: predicate_cache,
         },
-        call_predicates,
         id,
-        true,
     )
 }
 
@@ -810,20 +804,8 @@ fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthines
     }
 }
 
-/// Selects sparse, stable checkpoints without adding a second scope-wide predicate index.
-///
-/// Statement calls retain their existing checkpoint spacing. Other control-flow predicates become
-/// checkpoints only after a sufficiently long path has demonstrated that reuse is worthwhile.
-fn is_reachability_checkpoint(
-    call_predicates: Option<&[ScopedPredicateId]>,
-    predicate: ScopedPredicateId,
-    visited: usize,
-) -> bool {
-    if let Some(call_index) = call_predicates.and_then(|calls| calls.binary_search(&predicate).ok())
-    {
-        return (call_index + 1).is_multiple_of(REACHABILITY_EVALUATION_CHUNK_SIZE);
-    }
-
+/// Selects sparse, stable checkpoints once a path is long enough to benefit from reuse.
+fn is_reachability_checkpoint(predicate: ScopedPredicateId, visited: usize) -> bool {
     // Folding the adjacent bucket prevents regularly interleaved predicate kinds from always
     // missing the same checkpoint positions.
     let index = predicate.index();
@@ -869,10 +851,7 @@ impl<'a, 'db> PredicateEvaluator<'a, 'db> {
 /// reachability. A stack holds pending branches, and a set avoids evaluating shared suffixes twice.
 /// Stop as soon as any required branch is unreachable.
 ///
-/// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the first
-/// node is evaluated directly to prevent the query from immediately calling itself again.
-///
-/// General checkpoints are created only after traversing a genuinely long path. Their positions
+/// Checkpoints are created only after traversing a genuinely long path. Their positions
 /// depend on stable predicate IDs, so adjacent roots reuse the same suffix without requiring an
 /// additional retained scope-wide index or allocating tracked queries for short, ordinary paths.
 fn evaluate_reachability_path<'db>(
@@ -880,9 +859,7 @@ fn evaluate_reachability_path<'db>(
     scope: ScopeId<'db>,
     constraints: &ReachabilityConstraints,
     predicates: PredicateEvaluator<'_, 'db>,
-    call_predicates: Option<&[ScopedPredicateId]>,
     mut id: ScopedReachabilityConstraintId,
-    mut use_checkpoint: bool,
 ) -> Truthiness {
     let env = ProgramEnvironment::from_scope(scope);
     let mut visited = 0;
@@ -898,7 +875,7 @@ fn evaluate_reachability_path<'db>(
             reachability
         } else {
             let node = constraints.get_interior_node(id);
-            if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
+            if is_reachability_checkpoint(node.atom(), visited) {
                 evaluate_reachability_checkpoint(db, scope, id)
             } else {
                 id = match predicates.evaluate(db, &env, node.atom()) {
@@ -913,7 +890,6 @@ fn evaluate_reachability_path<'db>(
                         node.if_true()
                     }
                 };
-                use_checkpoint = true;
                 visited += 1;
                 continue;
             }
@@ -927,17 +903,14 @@ fn evaluate_reachability_path<'db>(
             return result;
         };
         id = next;
-        use_checkpoint = true;
         visited = 0;
     }
 }
 
 /// Evaluates a canonical suffix of a reachability decision diagram.
 ///
-/// Statement calls retain their existing sparse checkpoints; other predicates become checkpoints
-/// only after a long path demonstrates that reuse is worthwhile. This lets later statements reuse
-/// constraints accumulated by earlier statements without retaining an additional scope-wide index
-/// or a Salsa query key and memo for every constraint.
+/// Caching sparse checkpoints lets later statements reuse constraints accumulated by earlier
+/// statements without retaining a Salsa query key and memo for every constraint.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
@@ -950,20 +923,12 @@ fn evaluate_reachability_checkpoint<'db>(
 ) -> Truthiness {
     let use_def = use_def_map(db, scope);
     let predicates = use_def.predicates();
-    let has_many_calls = predicates
-        .iter()
-        .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
-        .nth(NON_TERMINAL_CALL_CHUNK_SIZE)
-        .is_some();
-    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
     evaluate_reachability_path(
         db,
         scope,
         use_def.reachability_constraints(),
         PredicateEvaluator::uncached(predicates),
-        call_predicates,
         id,
-        false,
     )
 }
 
@@ -996,9 +961,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             predicate_scope(db, &predicates[root.atom()]),
             self,
             PredicateEvaluator::uncached(predicates),
-            None,
             id,
-            true,
         )
     }
 }
