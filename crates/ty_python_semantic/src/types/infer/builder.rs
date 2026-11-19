@@ -65,7 +65,7 @@ use crate::types::class::{
 };
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintProvenance, ConstraintSetBuilder,
-    IteratorConstraintsExtension, ReportDiagnostics, Solutions,
+    IteratorConstraintsExtension, PathBoundSolution, ReportDiagnostics, Solutions,
 };
 use crate::types::context::{InferContext, InferContextResult};
 use crate::types::dedicated::pydantic;
@@ -8293,14 +8293,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         let choose = |bounds: &CandidateTypeVarSolution<'db>, contextual: bool| {
-            CandidateSolutions::solve_with_preference(
-                db,
-                env,
-                &constraints,
-                bounds,
-                tcx.should_prefer_expected_type(),
-            )
-            .map(|ty| {
+            let solution = if !contextual && let Some(lower) = bounds.inference_lower() {
+                // Later writes contribute element types but do not narrow the initial elements.
+                PathBoundSolution::Solved(lower)
+            } else {
+                CandidateSolutions::solve_with_preference(
+                    db,
+                    env,
+                    &constraints,
+                    bounds,
+                    tcx.should_prefer_expected_type(),
+                )
+            };
+            solution.map(|ty| {
                 let allow_tuple_size_promotion = generic_context
                     .variable_index(db, bounds.bound_typevar.identity(db))
                     .is_some_and(|index| {

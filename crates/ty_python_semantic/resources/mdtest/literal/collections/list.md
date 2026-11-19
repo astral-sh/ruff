@@ -38,6 +38,17 @@ reveal_type(x[0].__name__)  # revealed: str
 reveal_type([1, (1, 2), (1, 2, 3)])
 ```
 
+## Inferring a list from later writes
+
+Appending a concrete value does not narrow the type of an earlier element:
+
+```py
+def _(value):
+    items = [value]
+    items.append(1)
+    reveal_type(items)  # revealed: list[int | Unknown]
+```
+
 ## None promotion
 
 `None` is promoted to `None | Unknown` in list literals when it is the only element type, so that
