@@ -9,6 +9,9 @@ For a complete enumeration of the available configuration options, see [_Setting
 
 For the complete list of enabled rules, see [_Default Rules_](default-rules.md).
 
+If you're new to Ruff, start with the default rules. For guidance on choosing
+additional rules, see [Rule selection](linter.md#rule-selection).
+
 If left unspecified, Ruff's default configuration is equivalent to:
 
 === "pyproject.toml"
@@ -24,7 +27,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
         ".git-rewrite",
         ".hg",
         ".ipynb_checkpoints",
-        ".mypy_cache",
+        ".mypy_cache",gi
         ".nox",
         ".pants.d",
         ".pyenv",
