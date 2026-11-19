@@ -315,6 +315,8 @@ The rules for this behavior are as follows:
 
 Note that in these last two cases, the behavior of Ruff may differ depending on the working directory from which it is invoked.
 
+If the minimum version allowed by `requires-python` is outside the range of versions that Ruff supports, Ruff warns and uses the nearest supported version instead. For example, `requires-python = ">=3.4"` is treated as `target-version = "py37"`. A minimum version that isn't a valid Python version, such as `>=4`, is ignored with a warning, and Ruff continues as if `requires-python` were not set.
+
 ## Python file discovery
 
 When passed a path on the command-line, Ruff will automatically discover all Python files in that

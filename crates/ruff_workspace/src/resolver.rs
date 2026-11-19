@@ -370,25 +370,29 @@ fn resolve_configuration_with_cache(
 
         let project_root = relativity.resolve(&path);
         let load = || {
-            let options = pyproject::load_options(&path).with_context(|| {
-                if configurations.is_empty() {
-                    format!(
-                        "Failed to load configuration `{path}`",
-                        path = path.display()
-                    )
-                } else {
-                    let chain = configurations
-                        .keys()
-                        .chain([&path])
-                        .map(|p| format!("`{}`", p.display()))
-                        .join(" extends ");
-                    format!(
-                        "Failed to load extended configuration `{path}` ({chain})",
-                        path = path.display()
-                    )
-                }
-            })?;
-            Configuration::from_options(options, Some(&path), project_root)
+            let (options, requires_python_version) =
+                pyproject::load_options(&path).with_context(|| {
+                    if configurations.is_empty() {
+                        format!(
+                            "Failed to load configuration `{path}`",
+                            path = path.display()
+                        )
+                    } else {
+                        let chain = configurations
+                            .keys()
+                            .chain([&path])
+                            .map(|p| format!("`{}`", p.display()))
+                            .join(" extends ");
+                        format!(
+                            "Failed to load extended configuration `{path}` ({chain})",
+                            path = path.display()
+                        )
+                    }
+                })?;
+            let mut configuration =
+                Configuration::from_options(options, Some(&path), project_root)?;
+            configuration.target_version = configuration.target_version.or(requires_python_version);
+            Ok(configuration)
         };
         let configuration = if let Some(cache) = configuration_cache {
             cache.get_or_try_insert_with(&path, project_root, load)?
