@@ -8308,19 +8308,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
             };
             solution.map(|ty| {
-                let allow_tuple_size_promotion = generic_context
-                    .variable_index(db, bounds.bound_typevar.identity(db))
-                    .is_some_and(|index| {
-                        tuple_size_promotion.get(index) == Some(&true)
-                            && (!contextual
-                                || element_hints[index].is_none_or(|hint| hint.is_dynamic()))
-                    });
-                let promoted = ty.promote_collection_element_type(
-                    db,
-                    env,
-                    allow_tuple_size_promotion,
-                    !contextual,
-                );
+                let index = generic_context.variable_index(db, bounds.bound_typevar.identity(db));
+                let hint = index.and_then(|i| element_hints.get(i).copied().flatten());
+                let allow_tuple_size_promotion = index.and_then(|i| tuple_size_promotion.get(i))
+                    == Some(&true)
+                    && (!contextual || hint.is_none_or(|hint| hint.is_dynamic()));
+                let promoted = if contextual
+                    && !allow_tuple_size_promotion
+                    && let (Type::Union(union), Some(hint)) = (ty, hint)
+                {
+                    // A literal required by the context need not prevent promotion of other members.
+                    union.map_leave_aliases(db, env, |&member| {
+                        let promoted = member.promote(db, env);
+                        if promoted != member
+                            && promoted.is_assignable_to(db, env, hint)
+                            && member.is_assignable_to(db, env, promoted)
+                        {
+                            promoted
+                        } else {
+                            member
+                        }
+                    })
+                } else {
+                    ty.promote_collection_element_type(
+                        db,
+                        env,
+                        allow_tuple_size_promotion,
+                        !contextual,
+                    )
+                };
                 if contextual
                     && promoted != ty
                     && !bounds.accepts_candidate(db, env, &constraints, promoted)

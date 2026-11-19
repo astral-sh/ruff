@@ -745,6 +745,15 @@ x24: Callable[[Literal[1]], bool] | None = maybe_make_callable(1)
 reveal_type(x24)  # revealed: ((Literal[1], /) -> bool) | None
 ```
 
+Preserving a literal in one element does not prevent promotion of another:
+
+```py
+def _(flag: bool):
+    tag = "yes" if flag else "no"
+    xs: Sequence[Literal["yes", "no"] | int] = [tag, 1]
+    reveal_type(xs)  # revealed: list[Literal["yes", "no"] | int]
+```
+
 ## Literal annotations see through subtyping
 
 Literal annotations are respected even if the inferred type is a subtype of the declared type:
