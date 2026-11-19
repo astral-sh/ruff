@@ -510,7 +510,7 @@ from ty_extensions._internal import reveal_mro
 
 def make_record(name: str):
     fields = ((name, int),)
-    Record = NamedTuple("Record", fields)  # error: [invalid-named-tuple]
+    Record = NamedTuple("Record", fields)  # error: [non-literal-named-tuple-fields]
     # revealed: (<class 'Record'>, <class 'tuple[int]'>, <class 'Sequence[int]'>, <class 'Reversible[int]'>, <class 'Collection[int]'>, <class 'Iterable[int]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
     reveal_mro(Record)
     record = Record(1)
@@ -519,14 +519,14 @@ def make_record(name: str):
     record[1]  # error: [index-out-of-bounds]
 ```
 
-A string in an indirect field definition could be a forward reference. ty reports an error and uses
-`Unknown` for the field type without interpreting the string as an annotation. Since `x` is the only
-field, ty can diagnose access to `y`.
+A string in an indirect field definition could be a forward reference. ty warns and uses `Unknown`
+for the field type without interpreting the string as an annotation. Since `x` is the only field, ty
+can diagnose access to `y`.
 
 ```py
 NAME = "int"
 fields = (("x", NAME),)
-# error: [invalid-named-tuple] "Cannot determine the type of field `x` from `Literal["int"]`"
+# error: [non-literal-named-tuple-fields] "Cannot determine the type of field `x` from `Literal["int"]`"
 Indirect = NamedTuple("Indirect", fields)
 # revealed: (<class 'Indirect'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Indirect)
@@ -549,18 +549,18 @@ Point = NamedTuple("Point", [pair])
 reveal_type(Point(1).x)  # revealed: int
 ```
 
-If the field name has type `str` with no known literal value, ty reports an error. When ty can
-determine the field count, it keeps one position per field in the tuple base, even if a pair is
-invalid. Each position has the declared field type if ty can determine it, or `Unknown` otherwise.
+If the field name has type `str` with no known literal value, ty warns. When ty can determine the
+field count, it keeps one position per field in the tuple base, even if a pair is invalid. Each
+position has the declared field type if ty can determine it, or `Unknown` otherwise.
 
 ```py
 def make_record(field: tuple[str, type], name: str):
-    Record = NamedTuple("Record", [field])  # error: [invalid-named-tuple]
+    Record = NamedTuple("Record", [field])  # error: [non-literal-named-tuple-fields]
     # revealed: (<class 'Record'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
     reveal_mro(Record)
     reveal_type(Record(1).x)  # revealed: Unknown
 
-    Named = NamedTuple("Named", [(name, int)])  # error: [invalid-named-tuple]
+    Named = NamedTuple("Named", [(name, int)])  # error: [non-literal-named-tuple-fields]
     # revealed: (<class 'Named'>, <class 'tuple[int]'>, <class 'Sequence[int]'>, <class 'Reversible[int]'>, <class 'Collection[int]'>, <class 'Iterable[int]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
     reveal_mro(Named)
     reveal_type(Named(1).x)  # revealed: Unknown
@@ -573,12 +573,12 @@ positionally or by keyword.
 
 ```py
 def unpack_fields(fields: list[tuple[str, type]], field: tuple[str, type]):
-    Many = NamedTuple("Many", [*fields])  # error: [invalid-named-tuple]
+    Many = NamedTuple("Many", [*fields])  # error: [non-literal-named-tuple-fields]
     # revealed: (<class 'Many'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
     reveal_mro(Many)
     reveal_type(Many(1).x)  # revealed: Unknown
 
-    WithLast = NamedTuple("WithLast", [*fields, ("last", bytes)])  # error: [invalid-named-tuple]
+    WithLast = NamedTuple("WithLast", [*fields, ("last", bytes)])  # error: [non-literal-named-tuple-fields]
     # revealed: (<class 'WithLast'>, <class 'tuple[*tuple[Unknown, ...], bytes]'>, <class 'Sequence[Unknown | bytes]'>, <class 'Reversible[Unknown | bytes]'>, <class 'Collection[Unknown | bytes]'>, <class 'Iterable[Unknown | bytes]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
     reveal_mro(WithLast)
 
@@ -595,12 +595,12 @@ def unpack_fields(fields: list[tuple[str, type]], field: tuple[str, type]):
     reveal_type(record[-1])  # revealed: bytes
 
     # The caller can pass the first explicit field positionally and the second by keyword.
-    Packet = NamedTuple("Packet", [*fields, ("count", int), ("last", bytes)])  # error: [invalid-named-tuple]
+    Packet = NamedTuple("Packet", [*fields, ("count", int), ("last", bytes)])  # error: [non-literal-named-tuple-fields]
     Packet("header", 2, last=b"")  # ok
     Packet("header", "wrong", last=b"")  # error: [invalid-argument-type] "Expected `int`"
 
     # Unpacking within a single pair still gives one field.
-    One = NamedTuple("One", [(*field,)])  # error: [invalid-named-tuple]
+    One = NamedTuple("One", [(*field,)])  # error: [non-literal-named-tuple-fields]
     # revealed: (<class 'One'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
     reveal_mro(One)
     reveal_type(One(1).x)  # revealed: Unknown
@@ -620,7 +620,7 @@ annotation gives `middle` the type `Unknown`. Since `other` could name the first
 ```py
 def fixed_unpack(name: str):
     fields = ((name, int), ("middle", "str"))
-    Record = NamedTuple("Record", [*fields, ("last", bytes)])  # error: [invalid-named-tuple]
+    Record = NamedTuple("Record", [*fields, ("last", bytes)])  # error: [non-literal-named-tuple-fields]
     # revealed: (<class 'Record'>, <class 'tuple[int, Unknown, bytes]'>, <class 'Sequence[int | Unknown | bytes]'>, <class 'Reversible[int | Unknown | bytes]'>, <class 'Collection[int | Unknown | bytes]'>, <class 'Iterable[int | Unknown | bytes]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
     reveal_mro(Record)
 
@@ -660,6 +660,46 @@ def invalid(field: tuple[str, type, type], name: int):
     reveal_type(Numbered(1).x)  # revealed: Unknown
 ```
 
+An invalid pair still triggers an error when an earlier field name is unknown, or when only one
+member of a union has the wrong length.
+
+```py
+def mixed(name: str, field: tuple[str, type] | tuple[str]):
+    Invalid = NamedTuple("Invalid", [(name, int), ("missing_type",)])  # error: [invalid-named-tuple]
+    # revealed: (<class 'Invalid'>, <class 'tuple[int, Unknown]'>, <class 'Sequence[int | Unknown]'>, <class 'Reversible[int | Unknown]'>, <class 'Collection[int | Unknown]'>, <class 'Iterable[int | Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+    reveal_mro(Invalid)
+    reveal_type(Invalid(1, 2).missing_type)  # revealed: Unknown
+
+    MaybeShort = NamedTuple("MaybeShort", [field])  # error: [invalid-named-tuple]
+    # revealed: (<class 'MaybeShort'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+    reveal_mro(MaybeShort)
+    reveal_type(MaybeShort(1).x)  # revealed: Unknown
+```
+
+A `list[str | type]` could contain `["host", str]`. A `list[int]` cannot supply a field name or an
+annotation, regardless of its length.
+
+```py
+def list_pair(field: list[str | type], numbers: list[int]):
+    Record = NamedTuple("Record", [field])  # error: [non-literal-named-tuple-fields]
+    # revealed: (<class 'Record'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+    reveal_mro(Record)
+    reveal_type(Record("localhost").host)  # revealed: Unknown
+
+    Invalid = NamedTuple("Invalid", [numbers])  # error: [invalid-named-tuple]
+    # revealed: (<class 'Invalid'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+    reveal_mro(Invalid)
+    reveal_type(Invalid(1).host)  # revealed: Unknown
+```
+
+Python can unpack `"id"` into the field name `"i"` and the string annotation `"d"`. Here `d` names
+`int`, so the string can serve as a forward reference. ty warns because it expects an explicit pair.
+
+```py
+d = int
+Record = NamedTuple("Record", ["id"])  # error: [non-literal-named-tuple-fields]
+```
+
 ### Functional syntax with Final variable field names
 
 When field names are `Final` variables, they resolve to their literal string values:
@@ -697,8 +737,16 @@ def more_fields() -> tuple[tuple[str, type], ...]:
     return (("y", str),)
 
 fields = (("x", int), *more_fields())
-# error: [invalid-named-tuple] "Cannot determine the number of fields"
+# snapshot
 NT = NamedTuple("NT", fields)
+```
+
+```snapshot
+warning[non-literal-named-tuple-fields]: Cannot determine the fields of `NamedTuple()` statically
+ --> src/mdtest_snippet.py:9:23
+  |
+9 | NT = NamedTuple("NT", fields)
+  |                       ^^^^^^ Cannot determine the number of fields
 ```
 
 ty infers `int` for the first field and for `record.x`. The return type of `more_fields` leaves the
@@ -834,7 +882,7 @@ from typing_extensions import Self
 
 fields = [("host", str), ("port", int)]
 
-# error: [invalid-named-tuple]
+# error: [non-literal-named-tuple-fields]
 class Url(NamedTuple("Url", fields)):
     def with_port(self, port: int) -> Self:
         reveal_type(self.host)  # revealed: Unknown
