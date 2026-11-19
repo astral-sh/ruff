@@ -54,4 +54,4 @@ def call[**P](
 
 ## Rule history
 
-- v0.0.102: Split from `invalid-paramspec` and `invalid-type-form`.
+- v0.0.108: Split from `invalid-paramspec` and `invalid-type-form`.

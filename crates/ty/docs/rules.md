@@ -3661,14 +3661,13 @@ P2 = ParamSpec()  # error
 **Rule history**
 
 
-- v0.0.102: Checks on the use of `P.args` and `P.kwargs` moved to [`invalid-paramspec-components`](#invalid-paramspec-components).
-    Use the new name in rule settings and suppression comments for these checks.
+- v0.0.108: Checks on the use of `P.args` and `P.kwargs` moved to [`invalid-paramspec-components`](#invalid-paramspec-components).
 
 ## `invalid-paramspec-components`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.102">0.0.102</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.108">0.0.108</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-paramspec-components%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L730" target="_blank">View source</a>
 </small>
@@ -3735,7 +3734,7 @@ def call[**P](
 **Rule history**
 
 
-- v0.0.102: Split from [`invalid-paramspec`](#invalid-paramspec) and [`invalid-type-form`](#invalid-type-form).
+- v0.0.108: Split from [`invalid-paramspec`](#invalid-paramspec) and [`invalid-type-form`](#invalid-type-form).
 
 ## `invalid-protocol`
 
@@ -4200,9 +4199,8 @@ b: Annotated[int]  # error
 **Rule history**
 
 
-- v0.0.102: Using `P.kwargs` on `*args` or `P.args` on `**kwargs` now triggers
-    [`invalid-paramspec-components`](#invalid-paramspec-components). Use the new name in rule settings and suppression comments for
-    these annotations.
+- v0.0.108: Using `P.kwargs` on `*args` or `P.args` on `**kwargs` now triggers
+    [`invalid-paramspec-components`](#invalid-paramspec-components).
 
 [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 

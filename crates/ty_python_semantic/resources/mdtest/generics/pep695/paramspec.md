@@ -233,18 +233,6 @@ class Foo4[**P]:
         self.kwargs: P.kwargs = kwargs
 ```
 
-## Suppressing a mismatched component
-
-When `**kwargs` is annotated with `P.kwargs`, ty reports a mismatched `*args` annotation on `*args`.
-An ignore comment on that annotation suppresses the error for the pair.
-
-```py
-def mismatched[**P](
-    *args: int,  # ty: ignore[invalid-paramspec-components]
-    **kwargs: P.kwargs,
-) -> None: ...
-```
-
 ## Class `ParamSpec` bindings remain visible in nested classes
 
 A PEP 695 `ParamSpec` remains bound to the class that declares it when referenced in a nested

@@ -20,8 +20,7 @@ b: Annotated[int]  # error
 
 ## Rule history
 
-- v0.0.102: Using `P.kwargs` on `*args` or `P.args` on `**kwargs` now triggers
-    `invalid-paramspec-components`. Use the new name in rule settings and suppression comments for
-    these annotations.
+- v0.0.108: Using `P.kwargs` on `*args` or `P.args` on `**kwargs` now triggers
+    `invalid-paramspec-components`.
 
 [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

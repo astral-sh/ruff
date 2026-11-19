@@ -731,7 +731,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-paramspec-components.md")]
     pub(crate) static INVALID_PARAMSPEC_COMPONENTS = {
         summary: "detects invalid uses of ParamSpec components",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.108"),
         default_level: Level::Error,
     }
 }
