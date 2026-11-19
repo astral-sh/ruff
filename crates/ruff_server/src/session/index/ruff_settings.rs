@@ -70,7 +70,7 @@ impl RuffSettings {
                 );
                 ruff_workspace::resolver::resolve_root_settings(
                     &user_settings,
-                    &EditorConfigurationTransformer(editor_settings, root),
+                    &EditorConfigurationTransformer::new(editor_settings, root),
                     ConfigurationOrigin::UserSettings { fallback_directory: root },
                 )
                 .ok()
@@ -105,7 +105,7 @@ impl RuffSettings {
         root: &Path,
         configuration: Configuration,
     ) -> RuffSettings {
-        let settings = EditorConfigurationTransformer(editor_settings, root)
+        let settings = EditorConfigurationTransformer::new(editor_settings, root)
             .transform(configuration.clone())
             .into_settings(root)
             .unwrap_or_else(|error| {
@@ -168,7 +168,7 @@ impl RuffSettingsIndex {
                 Ok(Some(pyproject)) => {
                     match ruff_workspace::resolver::resolve_root_settings(
                         &pyproject,
-                        &EditorConfigurationTransformer(editor_settings, root),
+                        &EditorConfigurationTransformer::new(editor_settings, root),
                         ConfigurationOrigin::Ancestor,
                     ) {
                         Ok(resolved) => {
@@ -295,7 +295,7 @@ impl RuffSettingsIndex {
                     Ok(Some(pyproject)) => {
                         match ruff_workspace::resolver::resolve_root_settings(
                             &pyproject,
-                            &EditorConfigurationTransformer(editor_settings, root),
+                            &EditorConfigurationTransformer::new(editor_settings, root),
                             ConfigurationOrigin::Ancestor,
                         ) {
                             Ok(settings) => {
@@ -368,10 +368,15 @@ impl RuffSettingsIndex {
     }
 }
 
-struct EditorConfigurationTransformer<'a>(&'a EditorSettings, &'a Path);
+/// Editor configuration prepared for merging with filesystem configurations.
+struct EditorConfigurationTransformer {
+    configuration: Configuration,
+    preference: ConfigurationPreference,
+    server_preview: Option<bool>,
+}
 
-impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
-    fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
+impl EditorConfigurationTransformer {
+    fn new(settings: &EditorSettings, project_root: &Path) -> Self {
         let EditorSettings {
             server_preview,
             configuration,
@@ -384,9 +389,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             exclude,
             line_length,
             configuration_preference,
-        } = self.0.clone();
-
-        let project_root = self.1;
+        } = settings.clone();
 
         let editor_configuration = Configuration {
             lint: LintConfiguration {
@@ -455,7 +458,18 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             editor_configuration
         };
 
-        let mut configuration = match configuration_preference {
+        Self {
+            configuration: editor_configuration,
+            preference: configuration_preference,
+            server_preview,
+        }
+    }
+}
+
+impl ConfigurationTransformer for EditorConfigurationTransformer {
+    fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
+        let editor_configuration = self.configuration.clone();
+        let mut configuration = match self.preference {
             ConfigurationPreference::EditorFirst => {
                 editor_configuration.combine(filesystem_configuration)
             }
@@ -464,7 +478,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             }
             ConfigurationPreference::EditorOnly => editor_configuration,
         };
-        apply_server_preview(&mut configuration, server_preview);
+        apply_server_preview(&mut configuration, self.server_preview);
         configuration
     }
 }
@@ -503,8 +517,8 @@ mod tests {
             ..EditorSettings::default()
         };
         let configuration =
-            EditorConfigurationTransformer(&editor_settings, Path::new("/src/project")).transform(
-                Configuration {
+            EditorConfigurationTransformer::new(&editor_settings, Path::new("/src/project"))
+                .transform(Configuration {
                     preview: Some(PreviewMode::Disabled),
                     lint: LintConfiguration {
                         preview: Some(PreviewMode::Disabled),
@@ -515,8 +529,7 @@ mod tests {
                         ..FormatConfiguration::default()
                     },
                     ..Configuration::default()
-                },
-            );
+                });
 
         assert_eq!(configuration.preview, Some(PreviewMode::Enabled));
         assert_eq!(configuration.lint.preview, Some(PreviewMode::Enabled));
@@ -531,8 +544,8 @@ mod tests {
             ..EditorSettings::default()
         };
         let configuration =
-            EditorConfigurationTransformer(&editor_settings, Path::new("/src/project")).transform(
-                Configuration {
+            EditorConfigurationTransformer::new(&editor_settings, Path::new("/src/project"))
+                .transform(Configuration {
                     preview: Some(PreviewMode::Enabled),
                     lint: LintConfiguration {
                         preview: Some(PreviewMode::Enabled),
@@ -543,8 +556,7 @@ mod tests {
                         ..FormatConfiguration::default()
                     },
                     ..Configuration::default()
-                },
-            );
+                });
 
         assert_eq!(configuration.preview, Some(PreviewMode::Disabled));
         assert_eq!(configuration.lint.preview, Some(PreviewMode::Disabled));
@@ -562,8 +574,9 @@ mod tests {
             ..Default::default()
         };
 
-        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
-            .transform(Configuration::default());
+        let config =
+            EditorConfigurationTransformer::new(&editor_settings, Path::new("/src/project"))
+                .transform(Configuration::default());
 
         assert_eq!(config.line_length.unwrap().value(), 120);
     }
@@ -581,8 +594,9 @@ mod tests {
             ..Default::default()
         };
 
-        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
-            .transform(Configuration::default());
+        let config =
+            EditorConfigurationTransformer::new(&editor_settings, Path::new("/src/project"))
+                .transform(Configuration::default());
 
         assert_eq!(config.line_length.unwrap().value(), 100);
     }
