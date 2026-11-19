@@ -4,7 +4,8 @@ use crate::{
         ClassLiteral, IntersectionType, KnownClass, KnownInstanceType, SpecialFormType, Type,
         TypeContext, UnionType,
         class::{
-            DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
+            DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FunctionalNamedTupleField,
+            NamedTupleField, NamedTupleSpec,
         },
         diagnostic::{
             INVALID_ARGUMENT_TYPE, INVALID_NAMED_TUPLE, MISSING_ARGUMENT,
@@ -472,7 +473,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let Some(mut field_names) = maybe_field_names else {
             // Couldn't determine fields statically; attribute lookups will return Any.
-            return NamedTupleSpec::unknown(db);
+            return NamedTupleSpec::unknown(db, Type::any());
         };
 
         // When `rename` is false (or not specified), emit diagnostics for invalid
@@ -529,16 +530,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 } else {
                     None
                 };
-                NamedTupleField {
+                FunctionalNamedTupleField::Named(NamedTupleField {
                     name: field_name.clone(),
                     ty: Type::any(),
                     default,
                     definition: None,
-                }
+                })
             })
             .collect();
 
-        NamedTupleSpec::known(db, fields)
+        NamedTupleSpec::from_fields(db, fields)
     }
 
     pub(super) fn infer_typing_namedtuple_fields(
@@ -546,7 +547,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         fields_arg: &ast::Expr,
     ) -> NamedTupleSpec<'db> {
         let spec = self.infer_typing_namedtuple_spec(fields_arg);
-        let names = spec.fields(self.db()).iter().map(|field| &field.name);
+        let names = spec.named_fields(self.db()).map(|field| &field.name);
         self.check_invalid_namedtuple_field_names(names, fields_arg, NamedTupleKind::Typing);
         spec
     }
@@ -567,19 +568,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Tuple(tuple) => (&tuple.elts, SequenceKind::Tuple),
             _ => {
                 let ty = self.infer_expression(fields_arg, TypeContext::default());
-                return NamedTupleSpec::from_fields_type(db, self.scope(), ty).unwrap_or_else(
-                    |reason| {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
-                        {
-                            let mut diagnostic = builder.into_diagnostic(
-                                "Invalid argument to parameter `fields` of `NamedTuple()`",
-                            );
-                            diagnostic.set_primary_annotation_message(reason);
-                        }
-                        NamedTupleSpec::unknown(db)
-                    },
-                );
+                return NamedTupleSpec::from_fields_type(db, self.scope(), ty, |reason| {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(
+                            "Invalid argument to parameter `fields` of `NamedTuple()`",
+                        );
+                        diagnostic.set_primary_annotation_message(reason);
+                    }
+                });
             }
         };
 
@@ -617,7 +615,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "`fields` must be a sequence of literal lists or tuples",
                         );
                     }
-                    return NamedTupleSpec::unknown(db);
+                    return NamedTupleSpec::unknown(db, Type::unknown());
                 }
             };
 
@@ -646,7 +644,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         "Each element in `fields` must be a length-2 tuple or list",
                     );
                 }
-                return NamedTupleSpec::unknown(db);
+                return NamedTupleSpec::unknown(db, Type::unknown());
             };
 
             let name_type = self.infer_expression(name_expr, TypeContext::default());
@@ -694,20 +692,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         name_type.display(db, env)
                     ));
                 }
-                return NamedTupleSpec::unknown(db);
+                return NamedTupleSpec::unknown(db, Type::unknown());
             };
 
-            let field = NamedTupleField {
-                name: Name::new(name.value(db)),
-                ty: declared_type,
-                default: None,
-                definition: None,
-            };
-
-            fields.push(field);
+            fields.push(FunctionalNamedTupleField::required(
+                Some(name.value(db)),
+                declared_type,
+            ));
         }
 
-        let spec = NamedTupleSpec::known(db, fields.into_boxed_slice());
+        let spec = NamedTupleSpec::from_fields(db, fields.into_boxed_slice());
         self.store_expression_type(
             fields_arg,
             Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)),

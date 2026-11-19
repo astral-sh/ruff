@@ -362,7 +362,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::NamedTupleSpec(spec) => {
             for field in spec.fields(db) {
-                visitor.visit_type(db, field.ty);
+                visitor.visit_type(db, field.ty());
             }
         }
         KnownInstanceType::FunctoolsPartial(partial)
