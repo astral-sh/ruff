@@ -722,8 +722,61 @@ def g(path: bytes | str, start: bytes | str | None = None) -> bytes | str:
 
 p = partial(g, start=".")
 paths: list[str] = ["x"]
-reveal_type(p)  # revealed: partial[(path: str, *, start: str | None = ".") -> str]
+# revealed: partial[Overload[(path: bytes, *, start: bytes | None) -> bytes, (path: str, *, start: str | None = ".") -> str]]
+reveal_type(p)
 reveal_type(list(map(p, paths)))  # revealed: list[str]
+```
+
+### Overriding a stored keyword can select another overload
+
+A stored keyword controls overload selection when omitted. Supplying that keyword at call time
+replaces the stored value and can select a different overload.
+
+```py
+from functools import partial
+from typing import Literal, assert_type, overload
+
+@overload
+def fetch(*, stream: Literal[True]) -> str: ...
+@overload
+def fetch(*, stream: Literal[False]) -> int: ...
+def fetch(*, stream: bool) -> str | int:
+    return "stream" if stream else 0
+
+fetch_stream = partial(fetch, stream=True)
+assert_type(fetch_stream(), str)
+assert_type(fetch_stream(stream=True), str)
+assert_type(fetch_stream(stream=False), int)
+
+# error: [no-matching-overload]
+fetch_stream(stream="invalid")
+```
+
+The same override works when ty has to expand a different stored keyword to select an overload.
+Either value of `mode` uses the stored `stream=True` by default, and both accept `stream=False`.
+Only mode `"a"` accepts `stream=None`, so that call also requires an explicit mode override.
+
+```py
+@overload
+def choose(*, mode: Literal["a"], stream: Literal[True]) -> str: ...
+@overload
+def choose(*, mode: Literal["b"], stream: Literal[True]) -> str: ...
+@overload
+def choose(*, mode: Literal["a", "b"], stream: Literal[False]) -> int: ...
+@overload
+def choose(*, mode: Literal["a"], stream: None) -> bytes: ...
+def choose(*, mode: str, stream: bool | None) -> str | int | bytes:
+    if stream is None:
+        return b""
+    return mode if stream else 1
+
+def check(mode: Literal["a", "b"]):
+    p = partial(choose, mode=mode, stream=True)
+    assert_type(p(), str)
+    assert_type(p(mode="b"), str)
+    assert_type(p(stream=False), int)
+    assert_type(p(mode="a", stream=None), bytes)
+    p(stream=None)  # error: [no-matching-overload]
 ```
 
 ### Binding a union to an overloaded keyword

@@ -3778,17 +3778,13 @@ impl<'db> CallableBinding<'db> {
             return None;
         }
 
-        let mut selected_overload_indexes: SmallVec<[usize; 1]> = self
-            .overloads
-            .iter()
-            .positions(|overload| {
-                !overload
-                    .errors
-                    .iter()
-                    .any(BindingError::is_relevant_for_partial_application)
-            })
-            .collect();
-        if selected_overload_indexes.is_empty() {
+        let compatible = |overload: &Binding<'db>| {
+            !overload
+                .errors
+                .iter()
+                .any(BindingError::is_relevant_for_partial_application)
+        };
+        if !self.overloads.iter().any(compatible) {
             let source_overload_index = self
                 .best_failing_overload_index(FailingOverloadSelection::ReportableForPartial)
                 .unwrap_or(0);
@@ -3807,35 +3803,41 @@ impl<'db> CallableBinding<'db> {
             if self.overloads().len() > 1 {
                 return None;
             }
-
-            selected_overload_indexes.push(source_overload_index);
         }
 
+        let cases = self.partial_keyword_cases();
         let signature_arguments = bound_call_arguments.with_self(self.bound_type);
-        let signatures: SmallVec<[(usize, Signature<'db>); 1]> = selected_overload_indexes
-            .into_iter()
-            .map(|index| {
-                let overload = &self.overloads()[index];
-                // TODO: Preserve intersected parameter lists when synthesizing partial signatures.
-                if let Some((_, paramspec)) =
-                    overload.signature.parameters().as_paramspec_with_prefix()
-                    && let Some(value) = overload
-                        .merged_specialization(db)
-                        .and_then(|specialization| specialization.get(db, paramspec))
-                    && matches!(
-                        value.as_paramspec_value(db),
-                        Some(ParamSpecValue::Intersection(_))
-                    )
-                {
-                    return None;
-                }
-                Some((
-                    index,
-                    overload.partially_applied_signature(db, env, signature_arguments.as_ref()),
-                ))
-            })
-            .collect::<Option<_>>()?;
-        if let Some(cases) = self.partial_keyword_cases() {
+        let mut signatures = SmallVec::<[(usize, Signature<'db>); 1]>::new();
+        for (index, overload) in self.overloads.iter().enumerate() {
+            // TODO: Preserve intersected parameter lists when synthesizing partial signatures.
+            if let Some((_, paramspec)) = overload.signature.parameters().as_paramspec_with_prefix()
+                && let Some(value) = overload
+                    .merged_specialization(db)
+                    .and_then(|specialization| specialization.get(db, paramspec))
+                && matches!(
+                    value.as_paramspec_value(db),
+                    Some(ParamSpecValue::Intersection(_))
+                )
+            {
+                return None;
+            }
+            let mut signature =
+                overload.partially_applied_signature(db, env, signature_arguments.as_ref());
+            // Expanded calls check overrides against each case's own binding errors below.
+            if cases.is_none() && self.overloads.len() > 1 && !compatible(overload) {
+                let Some(required) = require_keyword_overrides(
+                    db,
+                    bound_call_arguments,
+                    signature,
+                    &overload.errors,
+                ) else {
+                    continue;
+                };
+                signature = required;
+            }
+            signatures.push((index, signature));
+        }
+        if let Some(cases) = cases {
             return cases
                 .iter()
                 .map(|case| case.partial_callable(db, &signatures, bound_call_arguments))
@@ -5058,18 +5060,28 @@ impl<'db> ExpandedCallEvaluation<'db> {
                     .binary_search_by_key(index, |(index, _)| *index)
                     .ok()?;
                 let (_, snapshot) = &snapshots[position];
-                snapshot
-                    .errors
-                    .iter()
-                    .filter(|error| error.is_relevant_for_partial_application())
-                    .try_fold(signature.clone(), |reduced, error| {
-                        let (name, expected) =
-                            error.partial_keyword_override(db, arguments, signature)?;
-                        reduced.requiring_keyword(name, expected)
-                    })
+                require_keyword_overrides(db, arguments, signature.clone(), &snapshot.errors)
             }),
         )
     }
+}
+
+/// Keep an otherwise incompatible overload only if explicit keyword overrides
+/// at call time can repair every invalid bound argument.
+fn require_keyword_overrides<'db>(
+    db: &'db dyn Db,
+    arguments: &CallArguments<'_, 'db>,
+    mut signature: Signature<'db>,
+    errors: &[BindingError<'db>],
+) -> Option<Signature<'db>> {
+    for error in errors
+        .iter()
+        .filter(|error| error.is_relevant_for_partial_application())
+    {
+        let (name, expected) = error.partial_keyword_override(db, arguments, &signature)?;
+        signature = signature.requiring_keyword(name, expected)?;
+    }
+    Some(signature)
 }
 
 #[derive(Debug)]
