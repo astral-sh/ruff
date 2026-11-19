@@ -130,6 +130,22 @@ def _(value: T):
     items: Sequence[int] = [value]  # error: [invalid-assignment]
 ```
 
+A list of constructors uses the declared callable type if every constructor is compatible:
+
+```py
+from collections.abc import Callable
+
+class Item: ...
+
+class RequiresArgument(Item):
+    def __init__(self, value: int) -> None: ...
+
+factories: list[Callable[..., Item]] = reveal_type([Item])  # revealed: list[(...) -> Item]
+
+def _(factory: type[Item]):
+    invalid: list[Callable[[], Item]] = [factory, RequiresArgument]  # error: [invalid-assignment]
+```
+
 ## Mutually assignable annotated assignments use the declared type
 
 When an annotated assignment has a value whose inferred type is assignable to the declared type, the

@@ -4073,6 +4073,20 @@ impl<'db> CandidateSolutions<'db> {
         })
     }
 
+    /// Whether there is a single valid path that fixes every constrained type variable exactly.
+    pub(super) fn is_exact(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        if let Self::Constrained(paths) = self
+            && let [path] = paths.as_ref()
+            && matches!(path.validity, SolutionValidity::Valid)
+        {
+            path.typevars
+                .iter()
+                .all(|ty| ty.as_exact(db, env).is_some())
+        } else {
+            false
+        }
+    }
+
     pub(crate) fn solve_for_argument_context(
         &self,
         db: &'db dyn Db,

@@ -138,7 +138,9 @@ use crate::types::unpacker::{
     UnpackResult, fixed_sequence_elements, sequence_from_literal_elements,
     tuple_literal_needs_promotion,
 };
-use crate::types::visitor::any_over_type_expanding_aliases;
+use crate::types::visitor::{
+    any_over_type_expanding_aliases, any_over_type_including_alias_arguments,
+};
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     ClassType, DeclaredType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet,
@@ -8155,13 +8157,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         let mut element_hints = [None; N];
+        let mut exact_context = false;
         if let Some(expected) = tcx.expected_type() {
-            let hints = identity_instance
-                .assignable_solutions_for_argument_context(db, env, expected, inferable)
-                .solve_for_argument_context(db, env, &constraints);
+            let bounds = identity_instance
+                .assignable_solutions_for_argument_context(db, env, expected, inferable);
+            let hints = bounds.solve_for_argument_context(db, env, &constraints);
             for (hint, typevar) in element_hints.iter_mut().zip(generic_context.variables(db)) {
                 *hint = hints.get(&typevar.identity(db)).copied();
             }
+            exact_context = tcx.should_prefer_expected_type()
+                && generic_context.len(db) == N
+                && bounds.is_exact(db, env)
+                && element_hints.iter().all(|hint| {
+                    hint.is_some_and(|ty| {
+                        !any_over_type_including_alias_arguments(
+                            db,
+                            env,
+                            ty,
+                            Type::is_provisional_marker,
+                        )
+                    })
+                });
         }
 
         if tcx.expected_type().is_none()
@@ -8283,6 +8299,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        let validate = |specialization: Specialization<'db>| {
+            let ty = identity_instance.apply_specialization(db, specialization);
+            (ty.is_assignable_to(db, env, tcx.expected_type()?)
+                && elements
+                    .iter()
+                    .zip(specialization.types(db))
+                    .all(|(elements, &target)| {
+                        elements
+                            .iter()
+                            .all(|elt| elt.is_assignable_to(db, env, target))
+                    }))
+            .then_some(ty)
+        };
+
+        // If the context fixes every type argument, the elements only need to be checked
+        // against that specialization; there is no need to combine their types.
+        if exact_context
+            && let Some(ty) = validate(generic_context.specialize_partial(db, element_hints))
+        {
+            return Some(ty);
+        }
+
         // Each element contributes a lower bound, regardless of the variance of the
         // expected collection. Combine the elements first to avoid a constraint per item.
         let inferred = generic_context
@@ -8350,7 +8388,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Solve the element and context constraints together. If there is no compatible
         // specialization, recover from the element types without re-inferring the expressions.
-        if let Some(expected) = tcx.expected_type() {
+        if !exact_context && let Some(expected) = tcx.expected_type() {
             let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
             let provenance = if tcx.kind() == TypeContextKind::Validity {
                 ConstraintProvenance::VALIDITY
@@ -8370,23 +8408,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .build_inference_with(ReportDiagnostics::No, |_, bounds| {
                     Some(choose(bounds?, true))
                 })
+                && let Some(ty) = validate(inference.merged_specialization(db))
             {
-                let specialization = inference.merged_specialization(db);
-                let ty = identity_instance.apply_specialization(db, specialization);
-
-                // As in a generic call, check the inputs against the chosen specialization.
-                if ty.is_assignable_to(db, env, expected)
-                    && elements
-                        .iter()
-                        .zip(specialization.types(db))
-                        .all(|(elements, &target)| {
-                            elements
-                                .iter()
-                                .all(|elt| elt.is_assignable_to(db, env, target))
-                        })
-                {
-                    return Some(ty);
-                }
+                return Some(ty);
             }
         }
 
