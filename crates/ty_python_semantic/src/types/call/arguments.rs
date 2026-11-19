@@ -17,7 +17,7 @@ use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
     TypedDictOpenness, UnpackedTypedDictKey, extract_unpacked_typed_dict_from_value_type,
 };
-use crate::types::{Parameter, Parameters, Type, TypeContext, UnionType, expand_type};
+use crate::types::{Parameter, Type, TypeContext, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArgumentExpansions::iter`].
@@ -219,6 +219,43 @@ impl<'db> VariadicArgument<'db> {
             Self::Type(_) => self.source_type()?.iterate(db, env),
             Self::Sequence { sequence, .. } => Cow::Borrowed(sequence),
         })
+    }
+
+    /// Return the suffix of this positional unpack that a wrapper function forwards to its callback.
+    ///
+    /// `consumed` counts the leading elements of this unpack that bind to the wrapper's
+    /// prefix parameters. In `invoke(*(callback, x), y)`, `invoke` takes `callback`
+    /// (`consumed` is 1), leaving `*(x,)` for the forwarded call.
+    ///
+    /// Slice union members independently so overload resolution can distinguish their suffixes.
+    /// Returns `None` if any member has fewer than `consumed` fixed leading elements.
+    pub(super) fn without_prefix(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        consumed: usize,
+    ) -> Option<Self> {
+        let start = i32::try_from(consumed).ok()?;
+        let suffix = |sequence: &TupleSpec<'db>| match sequence.len() {
+            // Slicing into a variable segment can lose the types and positions of trailing elements.
+            TupleLength::Fixed(prefix) | TupleLength::Variable(prefix, _) if consumed <= prefix => {
+                sequence
+                    .py_slice_type(db, env, Some(start), None, None)
+                    .ok()
+            }
+            _ => None,
+        };
+        let ty = match self {
+            Self::Sequence { sequence, .. } => suffix(sequence)?,
+            Self::Type(types) => {
+                let project = |ty: &Type<'db>| suffix(&ty.iterate(db, env));
+                match types.get_default()?.expand_top_level_aliases(db, env) {
+                    Type::Union(union) => union.try_map(db, env, project)?,
+                    ty => project(&ty)?,
+                }
+            }
+        };
+        Some(Self::Type(CallArgumentTypes::new(Some(ty))))
     }
 
     fn is_fixed_sequence(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
@@ -701,8 +738,16 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .collect()
     }
 
+    pub(super) fn push(&mut self, argument: CallArgument<'a, 'db>) {
+        self.items.push(argument);
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.items.len()
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.items.is_empty()
     }
 
     pub(crate) fn is_variadic(&self, index: usize) -> bool {
@@ -773,47 +818,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     fn start_from(&self, index: usize) -> Self {
         Self {
             items: self.items[index..].to_vec(),
-        }
-    }
-
-    /// Select the arguments forwarded to a `ParamSpec` sub-call.
-    ///
-    /// The resulting argument list preserves the order of `indices`. Unlike [`Self::start_from`],
-    /// this can project a non-contiguous subset of the original call arguments. Known keyword
-    /// arguments retain only keys that were not consumed by the wrapper's prefix:
-    ///
-    /// ```py
-    /// def wrapper[**P, R](func: Callable[P, R], **kwargs: P.kwargs) -> R: ...
-    /// wrapper(TagSet=[...], func=f)  # select `TagSet=[...]`, but not the later `func=f`
-    /// ```
-    pub(crate) fn select_for_paramspec(
-        &self,
-        indices: &[usize],
-        parameters: &Parameters<'db>,
-        prefix_len: usize,
-    ) -> Self {
-        Self {
-            items: indices
-                .iter()
-                .map(|index| {
-                    let mut argument = self.items[*index].clone();
-                    if let CallArgument::Keywords(KeywordArgument::Known { keywords, .. }) =
-                        &mut argument
-                    {
-                        keywords.keys = keywords
-                            .keys
-                            .iter()
-                            .filter(|(name, _)| {
-                                parameters
-                                    .keyword_by_name(name.as_str())
-                                    .is_none_or(|(index, _)| index >= prefix_len)
-                            })
-                            .cloned()
-                            .collect();
-                    }
-                    argument
-                })
-                .collect(),
         }
     }
 

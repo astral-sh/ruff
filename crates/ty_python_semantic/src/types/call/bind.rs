@@ -6285,29 +6285,6 @@ impl<'a, 'db> CallInference<'a, 'db> {
 }
 
 impl<'db> ArgumentTypeChecker<'_, 'db> {
-    /// Returns argument-index mappings for arguments matched to the `ParamSpec` component.
-    ///
-    /// `prefix_len` is the number of parameters before the `ParamSpec` components in a callable like
-    /// `Concatenate[Prefix, P]`. Any argument matched to a later parameter belongs to `P`. The
-    /// first item is the matched-argument index; the second is the source argument index, or `None`
-    /// for synthetic arguments such as bound `self` or `cls`.
-    ///
-    /// ```py
-    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R: ...
-    /// wrapper(f, 1, y="x")  # returns the indices for `1` and `y="x"`
-    /// ```
-    fn paramspec_argument_indices(&self, prefix_len: usize) -> Vec<(usize, Option<usize>)> {
-        enumerate_argument_types(self.arguments)
-            .filter_map(|(argument_index, adjusted_argument_index, _, _)| {
-                self.argument_matches[argument_index]
-                    .parameters
-                    .iter()
-                    .any(|parameter| parameter.index >= prefix_len)
-                    .then_some((argument_index, adjusted_argument_index))
-            })
-            .collect()
-    }
-
     /// Returns the source callable whose parameters supplied a `ParamSpec` specialization.
     ///
     /// Forwarded arguments are checked against the wrapped callable, not the wrapper's
@@ -6351,8 +6328,11 @@ impl<'db> ArgumentTypeChecker<'_, 'db> {
                     .find_map(|matched_parameter| {
                         let parameter = &self.signature.parameters()[matched_parameter.index];
                         let declared_type = parameter.annotated_type();
-                        let argument_type =
-                            argument_types.source_types().get_for_parameter(parameter);
+                        let argument_type = if matches!(argument, Argument::Variadic) {
+                            matched_parameter.argument_type?
+                        } else {
+                            argument_types.source_types().get_for_parameter(parameter)
+                        };
                         let paramspec_prefix_len = |candidate: Type<'db>| {
                             candidate
                                 .try_upcast_to_callable(db, env)?
@@ -7992,41 +7972,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let paramspec = self.signature.parameters().as_paramspec_with_prefix();
         let paramspec_component_start = paramspec.and_then(|(prefix, paramspec)| {
-            let prefix_len = prefix.len();
-            let paramspec_argument_indices = self.paramspec_argument_indices(prefix_len);
-            if paramspec_argument_indices.is_empty() {
-                self.evaluate_paramspec_sub_call(constraints, None, prefix_len, paramspec);
-                return None;
-            }
-
-            let has_paramspec_component_argument =
-                paramspec_argument_indices
-                    .iter()
-                    .any(|(argument_index, _)| {
-                        let matches = &self.argument_matches[*argument_index].parameters;
-                        // Complete keyword sets are projected onto the ParamSpec in the sub-call.
-                        // Other arguments must belong entirely to the ParamSpec.
-                        matches!(
-                            self.arguments.get(*argument_index),
-                            Some(CallArgument::Keywords(keywords)) if keywords.is_complete()
-                        ) || matches
-                            .iter()
-                            .all(|parameter| parameter.index >= prefix_len)
-                    });
-
-            if has_paramspec_component_argument
-                && self.evaluate_paramspec_sub_call(
-                    constraints,
-                    Some(&paramspec_argument_indices),
-                    prefix_len,
-                    paramspec,
-                )
-            {
-                Some(prefix_len)
-            } else {
-                self.evaluate_paramspec_sub_call(constraints, None, prefix_len, paramspec);
-                None
-            }
+            self.evaluate_paramspec_sub_call(constraints, prefix, paramspec)
+                .then_some(prefix.len())
         });
 
         let is_paramspec_component_parameter = |parameter_index: usize| {
@@ -8089,8 +8036,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
     ///
-    /// The forwarded arguments are those matched to the `ParamSpec` components if provided,
-    /// otherwise no arguments are passed. No forwarded arguments can still require a sub-call:
+    /// Even when no arguments are forwarded, the sub-call can produce diagnostics.
     ///
     /// ```py
     /// from typing import Callable
@@ -8101,13 +8047,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// foo(f)  # P specializes to `(x: int)`, so `f` is checked with no arguments.
     /// ```
     ///
-    /// This method returns `false` if the specialization does not contain a mapping for the given
-    /// `paramspec` or contains a value other than captured parameter lists.
+    /// Returns whether the sub-call checked forwarded arguments against the captured parameters.
     fn evaluate_paramspec_sub_call(
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
-        paramspec_arguments: Option<&[(usize, Option<usize>)]>,
-        prefix_len: usize,
+        prefix: &[Parameter<'db>],
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
         let db = self.db;
@@ -8120,23 +8064,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         };
 
-        let (sub_arguments, error_argument_indices) =
-            if let Some(paramspec_arguments) = paramspec_arguments {
-                let (paramspec_argument_indices, error_argument_indices): (Vec<_>, Vec<_>) =
-                    paramspec_arguments.iter().copied().unzip();
-
-                (
-                    self.arguments.select_for_paramspec(
-                        &paramspec_argument_indices,
-                        self.signature.parameters(),
-                        prefix_len,
-                    ),
-                    Some(error_argument_indices),
-                )
-            } else {
-                (CallArguments::none(), None)
-            };
-        let error_argument_indices = error_argument_indices.as_deref();
+        let (sub_arguments, sources) =
+            select_paramspec_arguments(db, self.env, self.arguments, self.argument_matches, prefix);
 
         let bindings = match callable
             .bindings(db, self.env)
@@ -8161,7 +8090,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .and_then(|_| {
                     self.paramspec_parameter_source(paramspec, binding.source_overload_index())
                 });
-            let argument_matches = self.argument_matches;
 
             self.errors
                 .extend(binding.errors.iter().cloned().map(|mut error| {
@@ -8179,21 +8107,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                                 .is_some()
                         {
                             *error_parameter_source = Some(parameter_source);
-                        } else if let Some(parameter_index) = argument_index
-                            .and_then(|index| paramspec_arguments?.get(index))
-                            .and_then(|(index, _)| {
-                                argument_matches[*index]
-                                    .parameters
-                                    .iter()
-                                    .find(|parameter| parameter.index >= prefix_len)
-                            })
-                            .map(|parameter| parameter.index)
+                        } else if let Some(source) =
+                            argument_index.and_then(|index| sources.get(index))
                         {
-                            parameter.signature_parameter_index = parameter_index;
+                            parameter.signature_parameter_index = source.parameter_index;
                         }
                     }
 
-                    error.maybe_remap_argument_indices(error_argument_indices)
+                    error.map_argument_indices(|index| Some(sources.get(index?)?.argument_index));
+                    error
                 }));
         };
 
@@ -8242,7 +8164,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        true
+        !sub_arguments.is_empty()
     }
 
     fn check_variadic_argument_type(
@@ -8556,6 +8478,78 @@ impl<'db> ArgumentTypeContext<'db> {
     }
 }
 
+/// The original call argument and wrapper parameter for a forwarded argument.
+struct ParamSpecArgumentSource {
+    argument_index: usize,
+    parameter_index: usize,
+}
+
+/// Select the arguments forwarded to a `ParamSpec` sub-call. Each selected argument
+/// supplies one sub-call argument, even when the wrapper consumes part of an unpack.
+///
+/// ```py
+/// def wrapper[**P, R](func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R: ...
+/// wrapper(*(f, value))  # forward only `value`
+/// wrapper(TagSet=[...], func=f)  # forward only `TagSet`
+/// ```
+fn select_paramspec_arguments<'a, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    arguments: &'a CallArguments<'a, 'db>,
+    matches: &[MatchedArgument<'db>],
+    prefix: &[Parameter<'db>],
+) -> (CallArguments<'a, 'db>, Vec<ParamSpecArgumentSource>) {
+    let mut sub_arguments = CallArguments::none();
+    let mut sources = Vec::new();
+    let mut has_forwarded_argument = false;
+    for ((_, source_index, _, argument), matched) in
+        enumerate_argument_types(arguments).zip(matches)
+    {
+        let Some(parameter) = matched.iter().find(|p| p.index >= prefix.len()) else {
+            continue;
+        };
+        let consumed = matched.iter().filter(|p| p.index < prefix.len()).count();
+        let mut argument = argument.clone();
+        match &mut argument {
+            _ if consumed == 0 => has_forwarded_argument = true,
+            CallArgument::Variadic(variadic)
+                if let Some(suffix) = variadic.without_prefix(db, env, consumed) =>
+            {
+                *variadic = suffix;
+                has_forwarded_argument = true;
+            }
+            CallArgument::Keywords(argument) => {
+                has_forwarded_argument |= argument.is_complete();
+                if let KeywordArgument::Known { keywords, .. } = argument {
+                    keywords.keys = keywords
+                        .keys
+                        .iter()
+                        .filter(|(name, _)| !prefix.iter().any(|p| p.keyword_name() == Some(name)))
+                        .cloned()
+                        .collect();
+                }
+            }
+            _ => {}
+        }
+        sub_arguments.push(argument);
+        // Sub-call diagnostics already exclude synthetic arguments from their indices.
+        if let Some(argument_index) = source_index {
+            sources.push(ParamSpecArgumentSource {
+                argument_index,
+                parameter_index: parameter.index,
+            });
+        }
+    }
+
+    if has_forwarded_argument {
+        (sub_arguments, sources)
+    } else {
+        // If every unpack overlaps the prefix ambiguously, check the empty sub-call
+        // for missing arguments and let the wrapper check the unpacks.
+        (CallArguments::none(), Vec::new())
+    }
+}
+
 /// Indicates that a parameter of the given name was not found.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct UnknownParameterNameError;
@@ -8791,40 +8785,6 @@ impl<'db> Binding<'db> {
             .get(argument_index + usize::from(binding.bound_type.is_some()))
     }
 
-    /// Returns source argument indices matched to the `ParamSpec` component.
-    ///
-    /// The returned indices are relative to the original call site, excluding any synthetic bound
-    /// receiver. For example, this can select all arguments forwarded through `P.args` and
-    /// `P.kwargs` after the wrapper's prefix parameters.
-    ///
-    /// ```py
-    /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R: ...
-    /// wrapper(f, 1, y="x")  # can select `1` and `y="x"` without including `func`
-    /// ```
-    fn paramspec_call_argument_indices(
-        &self,
-        binding: &CallableBinding<'db>,
-        prefix_len: usize,
-    ) -> Vec<usize> {
-        let bound_argument_offset = usize::from(binding.bound_type.is_some());
-
-        self.argument_matches
-            .iter()
-            .enumerate()
-            .filter_map(|(matched_argument_index, argument_matches)| {
-                if matched_argument_index < bound_argument_offset {
-                    return None;
-                }
-
-                argument_matches
-                    .parameters
-                    .iter()
-                    .any(|parameter| parameter.index >= prefix_len)
-                    .then_some(matched_argument_index - bound_argument_offset)
-            })
-            .collect()
-    }
-
     /// Returns the specialized wrapped-call parameter type for a forwarded argument.
     ///
     /// The forwarded outer arguments are first projected into a sub-call against the callable stored
@@ -8853,17 +8813,17 @@ impl<'db> Binding<'db> {
         let callable = paramspec_value.to_callable_type(db, env)?;
 
         let (prefix, _) = self.signature.parameters().as_paramspec_with_prefix()?;
-        let paramspec_argument_indices =
-            self.paramspec_call_argument_indices(binding, prefix.len());
-        let sub_argument_index = paramspec_argument_indices
-            .iter()
-            .position(|paramspec_argument_index| *paramspec_argument_index == argument_index)?;
-
-        let mut sub_arguments = arguments_types.select_for_paramspec(
-            &paramspec_argument_indices,
-            self.signature.parameters(),
-            prefix.len(),
+        let bound_argument_offset = usize::from(binding.bound_type.is_some());
+        let (mut sub_arguments, sources) = select_paramspec_arguments(
+            db,
+            env,
+            arguments_types,
+            &self.argument_matches[bound_argument_offset..],
+            prefix,
         );
+        let sub_argument_index = sources
+            .iter()
+            .position(|source| source.argument_index == argument_index)?;
         // Clear the previously inferred type for this argument, if it was inferred in the previous
         // fixpoint iteration.
         sub_arguments.clear_types(sub_argument_index);
@@ -10499,23 +10459,8 @@ impl BindingError<'_> {
         self
     }
 
-    /// Remaps any argument index in this error when a remapping table is available.
-    ///
-    /// This is used when propagating errors from a synthetic sub-call back to the original call.
-    /// Each sub-call argument index is looked up in `argument_indices`; `None` means the error
-    /// should be reported on the whole call expression.
-    fn maybe_remap_argument_indices(mut self, argument_indices: Option<&[Option<usize>]>) -> Self {
-        if let Some(argument_indices) = argument_indices {
-            self.map_argument_indices(|argument_index| {
-                argument_index
-                    .and_then(|index| argument_indices.get(index).copied())
-                    .flatten()
-            });
-        }
-        self
-    }
-
     /// Rewrites every stored argument index with the provided mapping function.
+    /// An index mapped to `None` reports the error on the whole call expression.
     ///
     /// This supports both simple offsets and sparse sub-call remapping. For a forwarded `ParamSpec`
     /// call, the sub-call only contains the arguments supplied to `P`. An error at sub-call
