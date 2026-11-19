@@ -531,7 +531,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Returns whether this constraint set never holds, without checking the type variables'
     /// declared bounds or constraints. Use [`Self::has_no_valid_solutions`] to include those.
     ///
-    /// Checks for conflicting bounds on the inferable variables.
+    /// Checks for conflicting inferred bounds on the variables in `inferable`.
     pub(crate) fn is_never_satisfied(
         self,
         db: &'db dyn Db,
@@ -644,13 +644,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
     ) -> bool {
-        self.node.is_always_satisfied(
-            db,
-            env,
-            &mut self.builder.storage.borrow_mut(),
-            inferable,
-            self.source_order,
-        )
+        let mut storage = self.builder.storage.borrow_mut();
+        self.node
+            .is_always_satisfied(db, env, &mut storage, inferable, self.source_order)
     }
 
     /// Like [`Self::is_always_satisfied`], but returns `None` if the default solution budget is
@@ -1250,10 +1246,8 @@ impl<'db> ConstraintSetBuilder<'db> {
         other: &OwnedConstraintSet<'db>,
         provenance: ConstraintProvenance,
     ) -> ConstraintSet<'db, 'c> {
-        let (node, source_order) =
-            self.storage
-                .borrow_mut()
-                .load_with_provenance(db, env, other, Some(provenance));
+        let mut storage = self.storage.borrow_mut();
+        let (node, source_order) = storage.load_with_provenance(db, env, other, Some(provenance));
         ConstraintSet::from_node(self, node, source_order)
     }
 }

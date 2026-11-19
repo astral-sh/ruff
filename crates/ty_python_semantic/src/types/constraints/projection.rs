@@ -6,7 +6,8 @@ use super::{
     CandidateSearch, CandidateSolutions, CandidateTypeVarSolution, ConstraintSet,
     PathBoundSolution, ReportDiagnostics, Solutions, TypeVarSolution,
 };
-use crate::types::{Type, TypeVarSet, TypeVarVariance};
+use crate::types::typevar::TypeVarSet;
+use crate::types::{Type, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
 
 /// Limits for one projection, including preprocessing, path collection, and its result.

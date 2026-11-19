@@ -2673,7 +2673,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
             let check_capture =
                 |inferable, source: &[Signature<'db>], target: &[Signature<'db>]| {
-                    self.with_inferable(inferable)
+                    self.with_inferable_typevars(inferable)
                         .check_callable_overloads(db, source, target)
                         .reduce_uncaptured_typevars(db, self.env, self.inferable, inferable)
                 };
@@ -2943,7 +2943,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let inferable = self.inferable.merge(db, signature_inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
-        let mut checker = self.with_inferable(inferable);
+        let mut checker = self.with_inferable_typevars(inferable);
         // Preserve receiver typevar constraints until the complete signature relation is solved.
         if [source, target].iter().any(|signature| {
             signature

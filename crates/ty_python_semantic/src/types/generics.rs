@@ -3150,10 +3150,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // constraints; combined with `_KT@dict = Hashable`, PathAssignments/SequentMap traversal
         // derives cross-typevar facts such as `TypedDictSchema <= _VT@dict <= Hashable`.
         //
-        // A naive fast path that skipped `remove_noninferable` when no constraint would be removed
-        // was not enough: `solutions_with` still performed the expensive path traversal, and the
-        // skipped projection changed precision in LiteralString tests. See the
-        // `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
+        // See the `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
         let mut inference = match project(self, choose) {
             Ok(SolutionProjection::Unsatisfiable) => return Err(()),
             Ok(SolutionProjection::Unconstrained) => {
