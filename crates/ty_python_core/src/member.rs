@@ -496,7 +496,12 @@ pub struct ScopedMemberId;
 ///
 /// Uses a hash table to avoid storing the path twice.
 #[derive(Debug, Default, get_size2::GetSize)]
-struct MemberReverseTable(hashbrown::HashTable<ScopedMemberId>);
+struct MemberReverseTable {
+    by_path: hashbrown::HashTable<ScopedMemberId>,
+    /// A flagged direct instance attribute, when one exists. All instance attributes in one
+    /// scope use the same receiver: the method's first parameter.
+    receiver_attribute: Option<ScopedMemberId>,
+}
 
 impl MemberReverseTable {
     fn member_id(
@@ -504,7 +509,7 @@ impl MemberReverseTable {
         members: &IndexVec<ScopedMemberId, Member>,
         member: &MemberExprRef<'_>,
     ) -> Option<ScopedMemberId> {
-        self.0
+        self.by_path
             .find(hash_single(member), |id| members[*id].expression == *member)
             .copied()
     }
@@ -515,7 +520,7 @@ impl MemberReverseTable {
         member: &Member,
     ) -> Entry<'a, ScopedMemberId> {
         let member = member.expression.as_ref();
-        self.0.entry(
+        self.by_path.entry(
             hash_single(&member),
             |id| members[*id].expression.as_ref() == member,
             |id| hash_single(&members[*id].expression.as_ref()),
@@ -523,7 +528,7 @@ impl MemberReverseTable {
     }
 
     fn shrink_to_fit(&mut self, members: &IndexVec<ScopedMemberId, Member>) {
-        self.0
+        self.by_path
             .shrink_to_fit(|id| hash_single(&members[*id].expression.as_ref()));
     }
 }
@@ -577,6 +582,21 @@ impl MemberTable {
     }
 
     pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
+        if let Some(reverse) = self.reverse.as_deref() {
+            let receiver_attribute = self.members[reverse.receiver_attribute?]
+                .expression
+                .as_ref();
+            let path = CharStr::concat(&[receiver_attribute.symbol_name(), name]);
+            // Every direct attribute of the same receiver has one attribute segment, whose
+            // offset is the receiver name's byte length. Its metadata can be reused here.
+            let candidate = MemberExprRef {
+                path: path.as_str(),
+                ..receiver_attribute
+            };
+            let id = reverse.member_id(&self.members, &candidate)?;
+            return self.members[id].is_instance_attribute().then_some(id);
+        }
+
         for (id, member) in self.members.iter_enumerated() {
             if member.is_instance_attribute_named(name) {
                 return Some(id);
@@ -650,6 +670,17 @@ impl MemberTableBuilder {
 
         if table.members.len() > LINEAR_SEARCH_THRESHOLD {
             reverse.shrink_to_fit(&table.members);
+            reverse.receiver_attribute = table
+                .members
+                .iter_enumerated()
+                .find_map(|(id, member)| member.is_instance_attribute().then_some(id));
+            debug_assert!(table.members.iter().all(|member| {
+                !member.is_instance_attribute()
+                    || reverse.receiver_attribute.is_some_and(|id| {
+                        table.members[id].expression.symbol_name()
+                            == member.expression.symbol_name()
+                    })
+            }));
             table.reverse = Some(Box::new(reverse));
         }
 
