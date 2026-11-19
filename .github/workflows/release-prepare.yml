@@ -24,6 +24,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # for the credential broker
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,17 +39,6 @@ jobs:
         with:
           save-if: false
 
-      - name: "Get Ruff token"
-        id: token
-        uses: astral-sh/github-actions/simple-token-service@4877f85420cccab15834c3d0ea3433b0d91507d3
-        with:
-          exchange-url: ${{ secrets.STS_API_URL }}/exchange
-          audience: ${{ secrets.STS_API_URL }}
-          repository: astral-sh/ruff
-          permissions: |
-            contents: write
-            pull_requests: write
-
       - name: "Configure Git"
         run: |
           git config user.name "astral-automations-bot[bot]"
@@ -62,8 +52,9 @@ jobs:
             ./scripts/release.sh
           fi
         env:
-          GITHUB_TOKEN: ${{ steps.token.outputs.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           INPUT_VERSION: ${{ inputs.version }}
+          ROOSTER_NO_CACHE: "1"
 
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
@@ -88,6 +79,17 @@ jobs:
         with:
           prompt-file: .agents/prompts/editorialize-changelog.md
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: "Get Ruff token"
+        id: token
+        uses: astral-sh/github-actions/simple-token-service@4877f85420cccab15834c3d0ea3433b0d91507d3
+        with:
+          exchange-url: ${{ secrets.STS_API_URL }}/exchange
+          audience: ${{ secrets.STS_API_URL }}
+          repository: astral-sh/ruff
+          permissions: |
+            contents: write
+            pull_requests: write
 
       - name: "Create or update pull request"
         run: |
