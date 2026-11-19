@@ -262,7 +262,7 @@ pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
     }
 
     let source = source_text(db, file);
-    ScriptTag::parse(source.as_bytes()).map(Box::new)
+    ScriptTag::parse(&source).map(Box::new)
 }
 
 /// Parses a script's inline metadata. Edits that move an option must invalidate its diagnostic

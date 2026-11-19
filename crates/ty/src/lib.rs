@@ -183,7 +183,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         && system.is_file(path)
         && system
             .read_to_string(path)
-            .is_ok_and(|source| ScriptTag::parse(source.as_bytes()).is_some())
+            .is_ok_and(|source| ScriptTag::parse(&source).is_some())
     {
         // A single PEP 723 script uses its own uv environment, even with an explicit ty
         // configuration file. The other explicit paths still discover workspace metadata.
