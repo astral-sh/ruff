@@ -1529,6 +1529,32 @@ class Factory[P: Protocol]:
 Factory.for_protocol(Protocol)  # ok
 ```
 
+### Inferring the result of a callback that forwards arguments
+
+`run` passes a function returning `int` to its callback. The callback's own return type determines
+the result of `run`, even when the function's parameter list is gradual.
+
+```py
+from typing import Callable
+
+def run[R](callback: Callable[[Callable[..., int]], R]) -> R:
+    return callback(lambda: 1)
+
+def stringify[**P](fn: Callable[P, int], /, *args: P.args, **kwargs: P.kwargs) -> str:
+    return str(fn(*args, **kwargs))
+
+reveal_type(run(stringify))  # revealed: str
+```
+
+When the callback returns the function's result directly, `T` specializes to `int`.
+
+```py
+def invoke[**P, T](fn: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
+    return fn(*args, **kwargs)
+
+reveal_type(run(invoke))  # revealed: int
+```
+
 ### A factory and its callbacks share a parameter list
 
 `register` requires the factory and its callbacks to accept the same arguments. Since `empty` takes
@@ -1672,6 +1698,20 @@ def replace[**P, R, T](fn: Callable[P, list[R]]) -> Callable[[T, Callable[P, T]]
 def accept[F](transform: Callable[[F], F]) -> None: ...
 
 accept(replace)  # ok
+```
+
+`apply` calls `run` with just `fn`, so `P` specializes to an empty parameter list. Checking the `F`
+arm of `F | R` compares the returned callback, which binds its own `T`, with `fn`.
+
+```py
+def run[**P, T](fn: Callable[P, int], /, *args: P.args, **kwargs: P.kwargs) -> Callable[P, int | T]:
+    fn(*args, **kwargs)
+    return fn
+
+def apply[F, R](transform: Callable[[F], F | R], fn: F) -> F | R:
+    return transform(fn)
+
+apply(run, lambda *args, **kwargs: 1)  # ok
 ```
 
 ### A fixed type variable in the callback's parameter and return types
