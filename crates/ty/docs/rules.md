@@ -4728,7 +4728,7 @@ modifier `/` in `Wrong2.scale`.
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.107">0.0.107</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.108">0.0.108</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-enum-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L777" target="_blank">View source</a>
 </small>
@@ -4768,13 +4768,13 @@ Color = Enum("Colour", "RED BLUE")
 **Rule history**
 
 
-- v0.0.107: Split out from [`mismatched-type-name`](#mismatched-type-name).
+- v0.0.108: Split out from [`mismatched-type-name`](#mismatched-type-name).
 
 ## `mismatched-namedtuple-name`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.107">0.0.107</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.108">0.0.108</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-namedtuple-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L786" target="_blank">View source</a>
 </small>
@@ -4823,13 +4823,13 @@ at runtime, due to a `typename` that is either an invalid identifier or a keywor
 **Rule history**
 
 
-- v0.0.107: Split out from [`mismatched-type-name`](#mismatched-type-name).
+- v0.0.108: Split out from [`mismatched-type-name`](#mismatched-type-name).
 
 ## `mismatched-newtype-name`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.107">0.0.107</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.108">0.0.108</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-newtype-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L795" target="_blank">View source</a>
 </small>
@@ -4865,13 +4865,13 @@ def f(x: str):
 **Rule history**
 
 
-- v0.0.107: Split out from [`mismatched-type-name`](#mismatched-type-name).
+- v0.0.108: Split out from [`mismatched-type-name`](#mismatched-type-name).
 
 ## `mismatched-paramspec-name`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.107">0.0.107</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.108">0.0.108</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-paramspec-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L804" target="_blank">View source</a>
 </small>
@@ -4907,7 +4907,7 @@ def f(x: str):
 **Rule history**
 
 
-- v0.0.107: Split out from [`mismatched-type-name`](#mismatched-type-name).
+- v0.0.108: Split out from [`mismatched-type-name`](#mismatched-type-name).
 
 ## `mismatched-sentinel-name`
 
@@ -4965,7 +4965,7 @@ class Container:
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.107">0.0.107</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.108">0.0.108</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-type-alias-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L813" target="_blank">View source</a>
 </small>
@@ -5000,13 +5000,13 @@ def f(x: str):
 **Rule history**
 
 
-- v0.0.107: Split out from [`mismatched-type-name`](#mismatched-type-name).
+- v0.0.108: Split out from [`mismatched-type-name`](#mismatched-type-name).
 
 ## `mismatched-type-name`
 
 <small>
 Default level: varies by replacement rule ·
-Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.107">0.0.107</a>) ·
+Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.108">0.0.108</a>) ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-type-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L755" target="_blank">View source</a>
 </small>
@@ -5034,13 +5034,13 @@ and suppression comments wherever possible.
 **Rule history**
 
 
-- v0.0.107: Split into the eight rules listed under Migration.
+- v0.0.108: Split into the eight rules listed under Migration.
 
 ## `mismatched-typeddict-name`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.107">0.0.107</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.108">0.0.108</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-typeddict-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L822" target="_blank">View source</a>
 </small>
@@ -5075,13 +5075,13 @@ def f(x: str):
 **Rule history**
 
 
-- v0.0.107: Split out from [`mismatched-type-name`](#mismatched-type-name).
+- v0.0.108: Split out from [`mismatched-type-name`](#mismatched-type-name).
 
 ## `mismatched-typevar-name`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.107">0.0.107</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.108">0.0.108</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-typevar-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L831" target="_blank">View source</a>
 </small>
@@ -5116,13 +5116,13 @@ def f(x: str):
 **Rule history**
 
 
-- v0.0.107: Split out from [`mismatched-type-name`](#mismatched-type-name).
+- v0.0.108: Split out from [`mismatched-type-name`](#mismatched-type-name).
 
 ## `mismatched-typevartuple-name`
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.107">0.0.107</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.108">0.0.108</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-typevartuple-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L840" target="_blank">View source</a>
 </small>
@@ -5157,7 +5157,7 @@ def f(x: str):
 **Rule history**
 
 
-- v0.0.107: Split out from [`mismatched-type-name`](#mismatched-type-name).
+- v0.0.108: Split out from [`mismatched-type-name`](#mismatched-type-name).
 
 ## `misplaced-overload-decorator`
 

@@ -27,4 +27,4 @@ Color = Enum("Colour", "RED BLUE")
 
 ## Rule history
 
-- v0.0.107: Split out from `mismatched-type-name`.
+- v0.0.108: Split out from `mismatched-type-name`.

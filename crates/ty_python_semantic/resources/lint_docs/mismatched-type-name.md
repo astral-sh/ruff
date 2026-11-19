@@ -18,4 +18,4 @@ and suppression comments wherever possible.
 
 ## Rule history
 
-- v0.0.107: Split into the eight rules listed under Migration.
+- v0.0.108: Split into the eight rules listed under Migration.

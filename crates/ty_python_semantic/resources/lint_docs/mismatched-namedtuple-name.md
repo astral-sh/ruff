@@ -35,4 +35,4 @@ at runtime, due to a `typename` that is either an invalid identifier or a keywor
 
 ## Rule history
 
-- v0.0.107: Split out from `mismatched-type-name`.
+- v0.0.108: Split out from `mismatched-type-name`.
