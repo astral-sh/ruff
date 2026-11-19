@@ -1642,8 +1642,8 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike => KnownModule::TyExtensions,
-            Self::ConstraintSet
+            Self::NamedTupleLike
+            | Self::ConstraintSet
             | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization

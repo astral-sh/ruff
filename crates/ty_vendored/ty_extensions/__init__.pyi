@@ -1,4 +1,3 @@
-# ruff: file-ignore[docstring-in-stub]
 """ty-extensions is a module that provides experimental typing features supported by ty.
 
 ty bundles the typing stubs for this module, which means that you can use them without
@@ -11,11 +10,9 @@ uv add ty-extensions
 ```
 """
 
-import collections.abc
-import sys
-from typing import Any, ClassVar, Protocol, _SpecialForm
+from typing import _SpecialForm
 
-from typing_extensions import LiteralString, Self  # ruff: ignore[deprecated-import]
+from typing_extensions import LiteralString
 
 from ._internal import TypeOf as _TypeOf
 
@@ -210,33 +207,3 @@ At runtime, `JustComplex` is an alias for the built-in `complex` class.
 
 [type-system special case]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 """
-
-class NamedTupleLike(Protocol):
-    """
-    A protocol describing an interface that should be satisfied by all named tuples
-    created using `typing.NamedTuple` or `collections.namedtuple`.
-    """
-
-    # _fields is defined as `tuple[Any, ...]` rather than `tuple[str, ...]` so
-    # that instances of actual `NamedTuple` classes with more precise `_fields`
-    # types are considered assignable to this protocol (protocol attribute members
-    # are invariant, and `tuple[str, str]` is not invariantly assignable to
-    # `tuple[str, ...]`).
-    _fields: ClassVar[tuple[Any, ...]]
-    _field_defaults: ClassVar[dict[str, Any]]
-    @classmethod
-    def _make(cls: type[Self], iterable: collections.abc.Iterable[Any]) -> Self: ...
-    def _asdict(self, /) -> dict[str, Any]: ...
-
-    # Positional arguments aren't actually accepted by these methods at runtime,
-    # but adding the `*args` parameters means that all `NamedTuple` classes
-    # are understood as assignable to this protocol due to the special case
-    # outlined in https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable:
-    #
-    # > If the input signature in a function definition includes both a
-    # > `*args` and `**kwargs` parameter and both are typed as `Any`
-    # > (explicitly or implicitly because it has no annotation), a type
-    # > checker should treat this as the equivalent of `...`.
-    def _replace(self, *args, **kwargs) -> Self: ...
-    if sys.version_info >= (3, 13):
-        def __replace__(self, *args, **kwargs) -> Self: ...
