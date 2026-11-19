@@ -7744,6 +7744,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer expressions once, in evaluation order and with their type context, before
         // recovering literal positions. For `(*[(item := 1), item],)`, both list elements
         // must be inferred before the traversal reads their types.
+        self.tuple_type_from_literal_elements(elts)
+    }
+
+    /// Recover the positional types of already-inferred list or tuple elements, expanding
+    /// starred expressions.
+    fn tuple_type_from_literal_elements(&self, elts: &[ast::Expr]) -> Type<'db> {
+        let db = self.db();
+        let env = self.program_environment();
         let inferred_type = |expression: &ast::Expr, promote| {
             let ty = self.expression_type(expression);
             if promote { ty.promote(db, env) } else { ty }
