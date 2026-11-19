@@ -18,6 +18,8 @@ use crate::{
 
 pub(crate) struct GlobalClientSettings {
     pub(super) options: ClientOptions,
+    /// Preview mode supplied when starting the server.
+    pub(super) server_preview: Option<bool>,
 
     /// Lazily initialized client settings to avoid showing error warnings
     /// when a field of the global settings has any errors but the field is overridden
@@ -36,7 +38,7 @@ impl GlobalClientSettings {
 
     fn settings_impl(&self) -> &Arc<ClientSettings> {
         self.settings.get_or_init(|| {
-            let settings = self.options.clone().into_settings();
+            let settings = self.options.clone().into_settings(self.server_preview);
             let settings = match settings {
                 Ok(settings) => settings,
                 Err(settings) => {
@@ -79,11 +81,14 @@ pub(crate) struct ClientSettings {
 }
 
 /// Contains the resolved values of 'editor settings' - Ruff configuration for the linter/formatter that was passed in via
-/// LSP client settings. These fields are optional because we don't want to override file-based linter/formatting settings
+/// LSP client settings or server arguments. These fields are optional because we don't want to override file-based linter/formatting settings
 /// if these were un-set.
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(Default, PartialEq, Eq))]
 pub(crate) struct EditorSettings {
+    /// Preview mode supplied when starting the server. This overrides configuration files and
+    /// editor settings.
+    pub(super) server_preview: Option<bool>,
     pub(super) configuration: Option<ResolvedConfiguration>,
     pub(super) lint_preview: Option<bool>,
     pub(super) format_preview: Option<bool>,
