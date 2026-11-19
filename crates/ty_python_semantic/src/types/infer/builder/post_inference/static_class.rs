@@ -29,14 +29,14 @@ use crate::{
             INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS, INVALID_DATACLASS_FIELD_ORDER,
             INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
             INVALID_PROTOCOL, INVALID_TYPE_FORM, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
-            SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
-            report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
-            report_duplicate_bases, report_inconsistent_generic_bases,
-            report_instance_layout_conflict, report_invalid_attribute_assignment,
-            report_invalid_named_tuple_field_qualifier, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference, report_missing_type_arguments,
-            report_named_tuple_field_with_leading_underscore,
+            SHADOWED_TYPE_VARIABLE, SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS,
+            UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
+            report_conflicting_metaclass_from_bases, report_duplicate_bases,
+            report_inconsistent_generic_bases, report_instance_layout_conflict,
+            report_invalid_attribute_assignment, report_invalid_named_tuple_field_qualifier,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
+            report_missing_type_arguments, report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
             report_subclass_of_class_with_non_callable_init_subclass, report_unsupported_base,
@@ -970,46 +970,47 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
         }
+    }
 
-        let scope = class.body_scope(db).scope(db);
-        if let Some(parent) = scope.parent() {
-            // Check that the class's own type parameters don't shadow
-            // type variables from enclosing scopes (by name).
-            if let Some(generic_context) = class.generic_context(db) {
-                for self_typevar in generic_context.variables(db) {
-                    let name = self_typevar.typevar(db).name(db);
-                    for enclosing in enclosing_generic_contexts(db, index, parent) {
-                        if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
-                            report_shadowed_type_variable(
-                                context,
-                                name,
-                                "class",
-                                &class_node.name.id,
-                                class.header_range(db),
-                                self_typevar.kind(db),
-                                other_typevar,
-                            );
-                        }
-                    }
-                }
-            }
-
-            // Check that the class's base classes don't reference type
-            // variables from enclosing scopes (by identity).
-            for base_typevar in class.typevars_referenced_in_bases(db) {
-                let typevar = base_typevar.typevar(db);
+    if context.is_lint_enabled(&SHADOWED_TYPE_VARIABLE)
+        && let Some(parent) = class.body_scope(db).scope(db).parent()
+    {
+        // Check that the class's own type parameters don't shadow
+        // type variables from enclosing scopes (by name).
+        if let Some(generic_context) = class.generic_context(db) {
+            for self_typevar in generic_context.variables(db) {
+                let name = self_typevar.typevar(db).name(db);
                 for enclosing in enclosing_generic_contexts(db, index, parent) {
-                    if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
+                    if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
                         report_shadowed_type_variable(
                             context,
-                            typevar.name(db),
+                            name,
                             "class",
                             &class_node.name.id,
                             class.header_range(db),
-                            base_typevar.kind(db),
+                            self_typevar.kind(db),
                             other_typevar,
                         );
                     }
+                }
+            }
+        }
+
+        // Check that the class's base classes don't reference type
+        // variables from enclosing scopes (by identity).
+        for base_typevar in class.typevars_referenced_in_bases(db) {
+            let typevar = base_typevar.typevar(db);
+            for enclosing in enclosing_generic_contexts(db, index, parent) {
+                if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
+                    report_shadowed_type_variable(
+                        context,
+                        typevar.name(db),
+                        "class",
+                        &class_node.name.id,
+                        class.header_range(db),
+                        base_typevar.kind(db),
+                        other_typevar,
+                    );
                 }
             }
         }
