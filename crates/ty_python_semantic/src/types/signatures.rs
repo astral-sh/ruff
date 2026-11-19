@@ -2715,34 +2715,47 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
     ) -> ConstraintSet<'db, 'c> {
-        if self.typevar_evaluation.is_lazy() && self.inferable != TypeVarSet::All {
-            let capture = |overloads: &[Signature<'db>], other: &[Signature<'db>]| {
-                let [target] = other else {
-                    return None;
-                };
-                let (_, paramspec) = target.parameters.as_paramspec_with_prefix()?;
-                if !paramspec.is_inferable(db, self.inferable) {
-                    return None;
+        // For a single pair, ordinary signature comparison specializes a callback's own
+        // ParamSpec. A ParamSpec in the caller's scope can capture the opposite signature.
+        // Across overloads, a bare ParamSpec matches the entire set of parameter lists.
+        let match_paramspecs = self.typevar_evaluation.is_lazy()
+            && match (source_overloads, target_overloads) {
+                ([source], [target]) => [source, target].iter().any(|signature| {
+                    signature
+                        .parameters
+                        .as_paramspec_with_prefix()
+                        .is_some_and(|(_, paramspec)| paramspec.is_inferable(db, self.inferable))
+                }),
+                ([signature], _) | (_, [signature]) => {
+                    signature.parameters.as_paramspec().is_some()
                 }
-                let mut inferable = self.inferable;
-                let signatures =
-                    self.freshen_for_paramspec_match(db, overloads, other, &mut inferable)?;
-                Some((inferable, signatures))
+                _ => false,
             };
-            let check_capture =
-                |inferable, source: &[Signature<'db>], target: &[Signature<'db>]| {
-                    self.with_inferable_typevars(inferable)
-                        .check_callable_overloads(db, source, target)
-                        .reduce_uncaptured_typevars(db, self.env, self.inferable, inferable)
-                };
-            if let Some((inferable, source)) = capture(source_overloads, target_overloads) {
-                return check_capture(inferable, &source, target_overloads);
-            }
-            if let Some((inferable, target)) = capture(target_overloads, source_overloads) {
-                return check_capture(inferable, source_overloads, &target);
-            }
+        if match_paramspecs && self.inferable != TypeVarSet::All {
+            let mut inferable = self.inferable;
+            let source = self.freshen_for_paramspec_match(
+                db,
+                source_overloads,
+                target_overloads,
+                &mut inferable,
+            );
+            let target = self.freshen_for_paramspec_match(
+                db,
+                target_overloads,
+                source_overloads,
+                &mut inferable,
+            );
+            return self
+                .with_inferable_typevars(inferable)
+                .check_callable_overloads(
+                    db,
+                    source.as_deref().unwrap_or(source_overloads),
+                    target.as_deref().unwrap_or(target_overloads),
+                    match_paramspecs,
+                )
+                .reduce_uncaptured_typevars(db, self.env, self.inferable, inferable);
         }
-        self.check_callable_overloads(db, source_overloads, target_overloads)
+        self.check_callable_overloads(db, source_overloads, target_overloads, match_paramspecs)
     }
 
     fn check_callable_overloads(
@@ -2750,8 +2763,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
+        match_paramspecs: bool,
     ) -> ConstraintSet<'db, 'c> {
-        if self.typevar_evaluation.is_lazy() {
+        if match_paramspecs {
+            if let ([source], [target]) = (source_overloads, target_overloads) {
+                return self.check_signature_pair_inner(db, source, target);
+            }
+
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let source_is_single_paramspec =
                 CallableSignature::signatures_is_single_paramspec(source_overloads);
@@ -2770,10 +2788,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // TODO: Adding proper support for overloads with ParamSpec will likely require some
             // changes here.
 
-            // Only handle ParamSpec here when we still need the whole overload set. Once we're
-            // down to a single signature on both sides, let
-            // `TypeRelationChecker::check_signature_pair_inner` handle the ParamSpec binding
-            // instead.
+            // Here a ParamSpec binds the whole overload set.
             match (source_is_single_paramspec, target_is_single_paramspec) {
                 (Some((source_tvar, source_signature)), None) if target_overloads.len() > 1 => {
                     let upper = Type::Callable(CallableType::paramspec_value_from_signatures(
@@ -2857,20 +2872,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         match (source_overloads, target_overloads) {
             ([source_signature], [target_signature]) => {
                 // Base case: both callable types contain a single signature.
-                if self.typevar_evaluation.is_lazy()
-                    && (source_signature
-                        .parameters
-                        .as_paramspec_with_prefix()
-                        .is_some()
-                        || target_signature
-                            .parameters
-                            .as_paramspec_with_prefix()
-                            .is_some())
-                {
-                    self.check_signature_pair_inner(db, source_signature, target_signature)
-                } else {
-                    self.check_signature_pair(db, source_signature, target_signature)
-                }
+                self.check_signature_pair(db, source_signature, target_signature)
             }
 
             // source is possibly overloaded while target is definitely not overloaded.

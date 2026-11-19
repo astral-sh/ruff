@@ -2292,6 +2292,37 @@ def register_prefixed(callback: Callable[Concatenate[int, P], object]) -> None: 
 register_prefixed(wrap(lambda x, y, z: reveal_type((x, y, z))))
 ```
 
+### Inferring the result of a callback that forwards arguments
+
+`run` passes a function returning `int` to its callback. The callback's own return type determines
+the result of `run`, even when the function's parameter list is gradual.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def run(callback: Callable[[Callable[..., int]], R]) -> R:
+    return callback(lambda: 1)
+
+def stringify(fn: Callable[P, int], /, *args: P.args, **kwargs: P.kwargs) -> str:
+    return str(fn(*args, **kwargs))
+
+reveal_type(run(stringify))  # revealed: str
+```
+
+When the callback returns the function's result directly, `T` specializes to `int`.
+
+```py
+T = TypeVar("T")
+
+def invoke(fn: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
+    return fn(*args, **kwargs)
+
+reveal_type(run(invoke))  # revealed: int
+```
+
 ### A factory and its callbacks share a parameter list
 
 `register` requires the factory and its callbacks to accept the same arguments. Since `empty` takes
@@ -2459,6 +2490,20 @@ def replace(fn: Callable[P, list[R]]) -> Callable[[T, Callable[P, T]], list[T]]:
 def accept(transform: Callable[[F], F]) -> None: ...
 
 accept(replace)  # ok
+```
+
+`apply` calls `run` with just `fn`, so `P` specializes to an empty parameter list. Checking the `F`
+arm of `F | R` compares the returned callback, which binds its own `T`, with `fn`.
+
+```py
+def run(fn: Callable[P, int], /, *args: P.args, **kwargs: P.kwargs) -> Callable[P, int | T]:
+    fn(*args, **kwargs)
+    return fn
+
+def apply(transform: Callable[[F], F | R], fn: F) -> F | R:
+    return transform(fn)
+
+apply(run, lambda *args, **kwargs: 1)  # ok
 ```
 
 ### A fixed type variable in the callback's parameter and return types
