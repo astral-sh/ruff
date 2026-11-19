@@ -1,9 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    ExprName, PySourceType, PythonVersion, Stmt, StmtImport, StmtImportFrom, helpers,
+    Expr, ExprName, PySourceType, PythonVersion, Stmt, StmtImport, StmtImportFrom, helpers,
+    name::UnqualifiedName,
     token::{TokenKind, Tokens},
 };
-use ruff_python_semantic::{GeneratorKind, ScopeKind, SemanticModel};
+use ruff_python_semantic::{Binding, BindingKind, GeneratorKind, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -97,14 +98,9 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
         return;
     }
 
-    let Some(binding_id) = semantic.resolve_name(name) else {
+    let Some(binding) = resolved_lazy_import(semantic, name) else {
         return;
     };
-
-    let binding = semantic.binding(binding_id);
-    if !binding.is_lazy() {
-        return;
-    }
     let Some(import) = binding.statement(semantic) else {
         return;
     };
@@ -147,6 +143,64 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
     if let Some(fix_range) = fix_range {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(fix_range)));
     }
+}
+
+/// Find a lazy import resolved by loading this name and its attributes.
+fn resolved_lazy_import<'a, 'b>(
+    semantic: &'b SemanticModel<'a>,
+    name: &ExprName,
+) -> Option<&'b Binding<'a>> {
+    let binding_id = semantic.resolve_name(name)?;
+    let binding = semantic.binding(binding_id);
+    let root_import = |binding: &'b Binding<'a>| match &binding.kind {
+        BindingKind::SubmoduleImport(import) => Some(import.qualified_name.segments()),
+        BindingKind::Import(import) if import.qualified_name.segments() == [name.id.as_str()] => {
+            Some(import.qualified_name.segments())
+        }
+        _ => None,
+    };
+    if root_import(binding).is_none() {
+        return binding.is_lazy().then_some(binding);
+    }
+
+    // `import pkg.a` and `import pkg.b` share the binding `pkg`, but either submodule can
+    // remain lazy after the other has been imported eagerly. Retain earlier imports until
+    // a different kind of binding replaces the parent name.
+    let imports = || {
+        semantic.scopes[binding.scope]
+            .shadowed_bindings(binding_id)
+            .map(|id| semantic.binding(id))
+            .map_while(|binding| root_import(binding).map(|module| (binding, module)))
+    };
+
+    let expression = semantic
+        .current_expressions()
+        .skip(1)
+        .take_while(|expr| matches!(expr, Expr::Attribute(attribute) if attribute.ctx.is_load()))
+        .last()
+        .or_else(|| semantic.current_expression())?;
+    let accessed = UnqualifiedName::from_expr(expression)?;
+    let shared_prefix = |module: &[&str]| {
+        accessed
+            .segments()
+            .iter()
+            .zip(module)
+            .take_while(|(accessed, imported)| accessed == imported)
+            .count()
+    };
+
+    // An eager import also loads all its parent packages. Only an accessed prefix beyond
+    // those packages can resolve a lazy import, e.g. `pkg.a` after `import pkg.b`.
+    let eager_prefix = imports()
+        .filter(|(binding, _)| !binding.is_lazy())
+        .map(|(_, module)| shared_prefix(module))
+        .max()
+        .unwrap_or(0);
+
+    imports()
+        .filter(|(binding, module)| binding.is_lazy() && shared_prefix(module) > eager_prefix)
+        .max_by_key(|(_, module)| shared_prefix(module))
+        .map(|(binding, _)| binding)
 }
 
 /// Return `true` if changing `lazy` affects only one imported name.
