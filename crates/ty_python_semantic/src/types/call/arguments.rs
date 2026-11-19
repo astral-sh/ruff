@@ -148,6 +148,9 @@ impl<'a, 'db> CallArgument<'a, 'db> {
         matched.or_else(|| self.ordinary_types()?.get_default())
     }
 
+    /// Returns the inferred types of a positional argument, a named keyword argument, or a
+    /// synthetic receiver. Returns `None` for `*args` and `**kwargs` because their stored types
+    /// describe the whole iterable or mapping. Matching supplies the type of each unpacked value.
     fn ordinary_types(&self) -> Option<&CallArgumentTypes<'db>> {
         match self {
             Self::Synthetic(types) | Self::Positional(types) | Self::Keyword { types, .. } => {
