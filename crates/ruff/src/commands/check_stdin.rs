@@ -2,8 +2,6 @@ use std::path::Path;
 
 use anyhow::Result;
 use ruff_linter::message::RenderContext;
-use ruff_linter::package::PackageRoot;
-use ruff_linter::packaging;
 use ruff_linter::settings::flags;
 use ruff_workspace::resolver::{Resolver, RootSettings, match_exclusion, project_file_at_path};
 
@@ -41,17 +39,14 @@ pub(crate) fn check_stdin(
         }
     }
     let stdin = read_from_stdin()?;
-    let package_root = filename.and_then(Path::parent).and_then(|path| {
-        packaging::detect_package_root(path, &resolver.root_settings().linter.namespace_packages)
-            .map(PackageRoot::root)
-    });
+    let settings = resolver.root_settings();
     let mut diagnostics = lint_stdin(
         filename,
-        package_root,
         stdin,
-        resolver.root_settings(),
+        &settings.linter,
         noqa,
         fix_mode,
+        settings.unsafe_fixes,
     )?;
     let context = RenderContext::new(&diagnostics.notebook_indexes);
     diagnostics.inner.sort_unstable_by(|a, b| {
