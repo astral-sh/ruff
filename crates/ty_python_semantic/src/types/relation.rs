@@ -694,6 +694,11 @@ impl<'db> Type<'db> {
         match (self, target) {
             (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
             (_, Type::NominalInstance(target)) if target.is_object() => true,
+            (Type::LiteralValue(literal), Type::NominalInstance(target)) => match literal.kind() {
+                LiteralValueTypeKind::String(_) => target.has_known_class(db, KnownClass::Str),
+                LiteralValueTypeKind::Bytes(_) => target.has_known_class(db, KnownClass::Bytes),
+                _ => false,
+            },
             (_, Type::Union(union)) => {
                 self.materialized_divergent_fallback().is_none() && union.contains_member(db, self)
             }
