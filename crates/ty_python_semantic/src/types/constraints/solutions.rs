@@ -74,9 +74,8 @@ impl<B> Break<B> {
 
 pub(super) struct SolutionWalker<'db, L> {
     source_orders: FxIndexSet<AtomicConstraintId>,
-    /// The relation before non-inferable variables are projected away. Used to recover the
-    /// original upper bounds for diagnostics, since projected paths can contain derived bounds
-    /// that obscure the original evidence.
+    /// The root of the relation. Used to recover the original upper bounds for diagnostics,
+    /// since derived bounds can obscure the original evidence.
     original_node: NodeId,
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
@@ -118,14 +117,21 @@ struct PendingCandidateSolution<'db> {
 }
 
 impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
-    pub(super) fn new(
+    pub(super) fn for_node(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_orders: FxIndexSet<AtomicConstraintId>,
         inferable: TypeVarSet<'db>,
         limits: L,
         original_node: NodeId,
-    ) -> Self {
+    ) -> (Self, PathAssignments) {
+        // Sequent discovery must also happen in source order. Sorting the collected paths is
+        // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
+        // discard gradual evidence before solution extraction.
+        let path = original_node.path_assignments(db, env, storage, &source_orders);
+        let inferable =
+            inferable.with_captured_paramspecs(db, storage, || path.discovered_constraints());
         let inferable_support = if inferable == TypeVarSet::All {
             storage
                 .node_support(original_node)
@@ -134,7 +140,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         } else {
             Support::from_typevar_set(db, storage, inferable)
         };
-        Self {
+        let walker = Self {
             source_orders,
             original_node,
             inferable,
@@ -148,7 +154,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             pending: Vec::default(),
             unspecialized_type_var_policy: UnspecializedTypeVarPolicy::Ignore,
             _phantom: PhantomData,
-        }
+        };
+        (walker, path)
     }
 
     pub(super) fn with_search(mut self, search: CandidateSearch) -> Self {
@@ -202,28 +209,23 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        path: &mut PathAssignments,
         polarity: Polarity,
     ) -> ControlFlow<L::Break, bool> {
         let node = self.original_node;
-        let (inferable, mut path) =
-            node.scoped_path(db, env, storage, &self.source_orders, self.inferable);
-        if self.inferable != inferable {
-            self.inferable = inferable;
-            self.inferable_support = Support::from_typevar_set(db, storage, inferable);
-        }
         // Bounded callers account for each visit in the exact traversal.
         if polarity == Polarity::Negative
             && self.limits.traversal_budget().is_none()
             && let Some(atoms) = node.all_negative_path_to_false(storage)
         {
             let snapshot = path.snapshot();
-            if self.has_all_negative_counterexample(db, env, storage, &mut path, &atoms) {
+            if self.has_all_negative_counterexample(db, env, storage, path, &atoms) {
                 return ControlFlow::Continue(false);
             }
             // Keep discovered rules for the fallback, as when backtracking to a sibling.
             path.truncate(&snapshot);
         }
-        self.node_is_satisfiable_on_path(db, env, storage, &mut path, polarity, node, None)
+        self.node_is_satisfiable_on_path(db, env, storage, path, polarity, node, None)
             .map_continue(|satisfiable| !satisfiable)
     }
 
@@ -927,15 +929,15 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         if node == ALWAYS_FALSE {
             return ControlFlow::Continue(false);
         }
-        self.source_orders
-            .extend(storage.calculate_source_orders(source_order));
+        let source_orders = storage.calculate_source_orders(source_order);
+        self.source_orders.extend(&source_orders);
         // Test the negation from an empty path: the evidence path may itself constrain a fixed
         // typevar, but the declared bound has to hold for every allowed specialization of it.
         let validations = storage
             .node_support(node)
             .cloned()
             .map(|support| Validations::from_support(db, env, storage, self.inferable, &support));
-        let mut relation_path = node.path_assignments(db, env, storage, source_order);
+        let mut relation_path = node.path_assignments(db, env, storage, &source_orders);
         let has_counterexample = self
             .node_is_satisfiable_on_path(
                 db,

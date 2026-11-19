@@ -11,7 +11,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_index::{IndexVec, newtype_index};
 
-use crate::types::Type;
 use crate::types::constraints::sequents::{
     GroupedSequents, InternedSequentConstraint, Sequent, SequentGroup, SequentMap,
 };
@@ -282,43 +281,23 @@ impl PathAssignments {
     }
 
     /// Seeds the path with each reachable atomic constraint in source order.
-    pub(super) fn new<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        constraints: impl Iterator<Item = AtomicConstraintId> + Clone,
+    pub(super) fn new(
+        constraints: impl IntoIterator<Item = AtomicConstraintId>,
+        independent_typevars: FxHashSet<TypeVarId>,
     ) -> Self {
-        let bound_is_concrete = |bound: Type<'db>| {
-            !bound.has_typevar(db, env)
-                && !bound.has_unspecialized_type_var(db, env)
-                && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
-        };
-
-        let mut independent_typevars = FxHashSet::default();
-        let mut dependent_typevars = FxHashSet::default();
-        for constraint_id in constraints.clone() {
-            let constraint = storage.atomic_constraint_data(constraint_id);
-            if let Some((typevar, bound)) = constraint.as_concrete()
-                && bound_is_concrete(bound)
-            {
-                let typevar = storage.typevar_id(db, typevar);
-                independent_typevars.insert(typevar);
-            } else {
-                dependent_typevars.extend(
-                    storage
-                        .constraint_support(constraint_id.into_inner())
-                        .iter(),
-                );
-            }
-        }
-
-        independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
-
+        let discovered = constraints
+            .into_iter()
+            .map(|constraint| (constraint, false))
+            .collect();
         Self {
-            discovered: constraints.map(|id| (id, false)).collect(),
+            discovered,
             independent_typevars,
             ..Self::default()
         }
+    }
+
+    pub(super) fn discovered_constraints(&self) -> impl Iterator<Item = AtomicConstraintId> {
+        self.discovered.keys().copied()
     }
 
     pub(super) fn visit<'db, V>(
@@ -1383,9 +1362,10 @@ mod tests {
         // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
         let set = u_str.and(db, &builder, || t_int);
         let mut storage = builder.storage.borrow_mut();
+        let source_orders = storage.calculate_source_orders(set.source_order);
         let path = set
             .node
-            .path_assignments(db, &env, &mut storage, set.source_order);
+            .path_assignments(db, &env, &mut storage, &source_orders);
         let expected = [u_str.node, t_int.node].map(|node| {
             storage
                 .interior_node_data(node)
@@ -1429,15 +1409,13 @@ mod tests {
             (1, usize::MAX, ProjectionError::PathBudgetExceeded),
         ] {
             let mut storage = builder.storage.borrow_mut();
-            let mut path = set
-                .node
-                .path_assignments(db, &env, &mut storage, set.source_order);
             let limits = BoundedSolutionLimits {
                 remaining_paths,
                 remaining_visits,
             };
-            let mut walker = SolutionWalker::new(
+            let (mut walker, mut path) = SolutionWalker::for_node(
                 db,
+                &env,
                 &mut storage,
                 source_orders.clone(),
                 inferable,
@@ -1459,8 +1437,9 @@ mod tests {
             drop(walker);
 
             let limits = UnboundedSolutionLimits;
-            let mut walker = SolutionWalker::new(
+            let (mut walker, _) = SolutionWalker::for_node(
                 db,
+                &env,
                 &mut storage,
                 source_orders.clone(),
                 inferable,
