@@ -41,7 +41,7 @@ use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_static::EnvVars;
 
 use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat};
-use crate::logging::{VerbosityLevel, setup_tracing};
+use crate::logging::{IndicatifWriter, VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
 
@@ -112,9 +112,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     }
 
     let verbosity = args.verbosity.level();
-    let _guard = setup_tracing(verbosity, color)?;
-
     let printer = Printer::new(verbosity, args.no_progress);
+    let progress = indicatif::MultiProgress::with_draw_target(printer.progress_target());
+    let tracing_progress = progress.clone();
+    let _guard = setup_tracing(verbosity, color, move || {
+        IndicatifWriter::stderr(tracing_progress.clone())
+    })?;
 
     tracing::debug!("Version: {}", version::version());
 
@@ -225,7 +228,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.freeze();
     }
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer, progress);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -313,6 +316,9 @@ struct MainLoop {
     /// Progress for the current synchronization batch, cleared before checking starts.
     sync_progress: Option<SyncProgress>,
 
+    /// Shared with tracing so warnings can be printed above active progress bars.
+    progress: indicatif::MultiProgress,
+
     /// Interface for displaying information to the user.
     printer: Printer,
 
@@ -323,7 +329,11 @@ struct MainLoop {
 }
 
 impl MainLoop {
-    fn new(mode: MainLoopMode, printer: Printer) -> (Self, MainLoopCancellationToken) {
+    fn new(
+        mode: MainLoopMode,
+        printer: Printer,
+        progress: indicatif::MultiProgress,
+    ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         let cancellation_token_source = CancellationTokenSource::new();
@@ -336,6 +346,7 @@ impl MainLoop {
                 receiver,
                 watcher: None,
                 sync_progress: None,
+                progress,
                 printer,
                 cancellation_token,
             },
@@ -393,13 +404,13 @@ impl MainLoop {
                     self.sync_progress = None;
                     let db = db.clone();
                     let sender = self.sender.clone();
-                    let printer = self.printer;
+                    let progress = self.progress.clone();
 
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
                         match salsa::Cancelled::catch(|| {
-                            let mut reporter = IndicatifReporter::new(printer.progress_target());
+                            let mut reporter = IndicatifReporter::new(progress);
                             db.check_with_reporter(&mut reporter);
                             reporter.into_sorted_diagnostics(&db)
                         }) {
@@ -600,9 +611,9 @@ impl MainLoop {
     fn spawn_indexing_task(&self, db: &ProjectDatabase) {
         let db = db.clone();
         let sender = self.sender.clone();
-        let printer = self.printer;
+        let progress = self.progress.clone();
         rayon::spawn(move || {
-            let reporter = IndicatifReporter::new(printer.progress_target());
+            let reporter = IndicatifReporter::new(progress);
             reporter.start_indexing();
             let indexed = salsa::Cancelled::catch(|| db.project().files(&db));
             // Indicatif skips terminal cleanup while unwinding.
@@ -621,13 +632,8 @@ impl MainLoop {
         db: &mut ProjectDatabase,
         changes: &ChangeResult,
     ) -> Result<()> {
-        // Another filesystem event can arrive while a script is still synchronizing.
-        // Keep its progress visible after clearing the previous check's output.
-        if let Some(progress) = &self.sync_progress {
-            progress.bars.suspend(Printer::clear_screen)?;
-        } else {
-            Printer::clear_screen()?;
-        }
+        // Keep active progress visible after clearing the previous check's output.
+        self.progress.suspend(Printer::clear_screen)?;
 
         let project_path = changes.project_sync_path();
         let scripts = changes.scripts_to_synchronize(db);
@@ -637,7 +643,7 @@ impl MainLoop {
 
         let progress = self
             .sync_progress
-            .get_or_insert_with(|| SyncProgress::new(self.printer.progress_target()));
+            .get_or_insert_with(|| SyncProgress::new(self.progress.clone()));
 
         if let Some(project_path) = project_path {
             db.uv_environments()
@@ -658,7 +664,7 @@ impl MainLoop {
 
         let progress = self
             .sync_progress
-            .get_or_insert_with(|| SyncProgress::new(self.printer.progress_target()));
+            .get_or_insert_with(|| SyncProgress::new(self.progress.clone()));
 
         for &file in scripts {
             environments.request_sync(
@@ -795,12 +801,14 @@ struct IndicatifReporter {
 
     /// Show a spinner during indexing and a file count once the number of files to check is known.
     bar: indicatif::ProgressBar,
+    multi_progress: indicatif::MultiProgress,
 }
 
 impl IndicatifReporter {
-    fn new(target: indicatif::ProgressDrawTarget) -> Self {
+    fn new(multi_progress: indicatif::MultiProgress) -> Self {
         Self {
-            bar: indicatif::ProgressBar::with_draw_target(None, target),
+            bar: multi_progress.add(indicatif::ProgressBar::hidden()),
+            multi_progress,
             collector: CollectReporter::default(),
         }
     }
@@ -850,6 +858,7 @@ impl ty_project::ProgressReporter for IndicatifReporter {
 impl Drop for IndicatifReporter {
     fn drop(&mut self) {
         self.bar.finish_and_clear();
+        self.multi_progress.remove(&self.bar);
     }
 }
 
@@ -862,8 +871,7 @@ struct SyncProgress {
 }
 
 impl SyncProgress {
-    fn new(target: indicatif::ProgressDrawTarget) -> Self {
-        let bars = indicatif::MultiProgress::with_draw_target(target);
+    fn new(bars: indicatif::MultiProgress) -> Self {
         let script_bar = indicatif::ProgressBar::hidden();
         script_bar.set_length(0);
         script_bar.set_message("Syncing");
@@ -911,7 +919,7 @@ impl SyncProgress {
 impl Drop for SyncProgress {
     fn drop(&mut self) {
         self.script_bar.finish_and_clear();
-        let _ = self.bars.clear();
+        self.bars.remove(&self.script_bar);
     }
 }
 
