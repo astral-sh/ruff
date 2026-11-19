@@ -130,8 +130,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
         let path = original_node.path_assignments(db, env, storage, &source_orders);
-        let inferable =
-            inferable.with_captured_paramspecs(db, storage, || path.discovered_constraints());
+        let captures = inferable.captured_typevars(db, storage, || path.discovered_constraints());
+        let inferable = inferable.merge(db, captures);
         let inferable_support = if inferable == TypeVarSet::All {
             storage
                 .node_support(original_node)

@@ -90,7 +90,7 @@
 //! [duboc]: https://gldubc.github.io/#thesis
 
 use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, LazyCell, RefCell};
 use std::cmp::Ordering;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display};
@@ -137,31 +137,43 @@ pub(crate) use variables::ConstraintProvenance;
 use variables::{AtomicConstraint, Constraint, UnspecializedTypeVarPolicy};
 
 impl<'db> TypeVarSet<'db> {
-    /// A captured generic callable brings its own binders into scope when comparing its
-    /// parameters with other bounds, such as the arguments forwarded by `fn(*args, **kwargs)`.
-    fn with_captured_paramspecs<I: IntoIterator<Item = AtomicConstraintId>>(
+    /// Returns the binders brought into scope by each `ParamSpec` in this set. A captured
+    /// generic callable brings its own binders into scope when comparing its parameters
+    /// with other bounds, such as the arguments forwarded by `fn(*args, **kwargs)`.
+    fn captured_typevars<I: IntoIterator<Item = AtomicConstraintId>>(
         self,
         db: &'db dyn Db,
         storage: &ConstraintSetStorage<'db>,
-        constraints: impl FnOnce() -> I,
+        constraints: impl Fn() -> I,
     ) -> Self {
-        if self == Self::All || !self.iter(db).any(|typevar| typevar.is_paramspec(db)) {
-            return self;
-        }
-
-        let mut expanded = self;
-        for id in constraints() {
-            if let Some((parameter, Type::Callable(captured))) =
-                storage.atomic_constraint_data(id).as_concrete()
-                && parameter.is_paramspec(db)
-                && parameter.is_inferable(db, self)
-            {
-                for signature in captured.signatures(db) {
-                    expanded = expanded.merge(db, signature.inferable_typevars(db));
+        let mut binders = Self::None;
+        let mut owners = self.explicit_typevars();
+        while owners.iter(db).any(|typevar| typevar.is_paramspec(db)) {
+            let mut locals = Self::None;
+            for id in constraints() {
+                if let Some((parameter, Type::Callable(captured))) =
+                    storage.atomic_constraint_data(id).as_concrete()
+                    && parameter.is_paramspec(db)
+                    && parameter.is_inferable(db, owners)
+                {
+                    for signature in captured.signatures(db) {
+                        locals = locals.merge(db, signature.inferable_typevars(db));
+                    }
                 }
             }
+            // A captured signature can bind a ParamSpec that captures another generic signature.
+            owners = locals.difference(db, binders);
+            binders = binders.merge(db, owners);
         }
-        expanded
+        binders
+    }
+
+    /// Returns the variables in this finite set that are absent from `other`.
+    fn difference(self, db: &'db dyn Db, other: Self) -> Self {
+        if other == Self::None {
+            return self;
+        }
+        Self::from_typevars(db, self.iter(db).filter(|var| !var.is_inferable(db, other)))
     }
 }
 
@@ -857,30 +869,46 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node == other.node || (is_subset(self, other) && is_subset(other, self))
     }
 
+    fn captured_typevars(self, db: &'db dyn Db, inferable: TypeVarSet<'db>) -> TypeVarSet<'db> {
+        let storage = self.builder.storage.borrow();
+        let constraints = LazyCell::new(|| self.node.atomic_constraints(&storage));
+        inferable.captured_typevars(db, &storage, || constraints.iter().copied())
+    }
+
     /// Projects out callable-local typevars that the outer solve cannot recover from a captured
     /// `ParamSpec`. A failed prefix check or a relation between two `ParamSpec` variables can
     /// produce constraints without a captured signature.
     pub(super) fn reduce_uncaptured_typevars(
-        self,
+        mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         outer: TypeVarSet<'db>,
-        inferable: TypeVarSet<'db>,
+        mut candidates: TypeVarSet<'db>,
     ) -> Self {
-        if self.node.is_terminal() || inferable == outer {
-            return self;
+        // A local can occur free in another captured parameter list. Projecting it out
+        // removes that capture too, so check which binders the caller can still reach.
+        while !self.node.is_terminal() && candidates != outer {
+            let retained = outer.merge(db, self.captured_typevars(db, outer));
+            let unreachable = candidates.difference(db, retained);
+            if unreachable == TypeVarSet::None {
+                break;
+            }
+
+            // Project a ParamSpec before its binders so its signature can transfer to a
+            // surviving ParamSpec. If every unreachable variable is itself captured,
+            // there is a cycle and we project the whole unreachable set together.
+            let captured = self.captured_typevars(db, candidates);
+            let roots = unreachable.difference(db, captured);
+            let to_remove = if roots == TypeVarSet::None {
+                unreachable
+            } else {
+                roots
+            };
+            let body_scope = candidates.merge(db, captured);
+            (self, candidates) = self.project_typevars(db, env, to_remove, body_scope);
+            candidates = candidates.difference(db, to_remove);
         }
-        let captured_scope = {
-            let storage = self.builder.storage.borrow();
-            outer.with_captured_paramspecs(db, &storage, || self.node.atomic_constraints(&storage))
-        };
-        let to_remove = TypeVarSet::from_typevars(
-            db,
-            inferable
-                .iter(db)
-                .filter(|typevar| !typevar.is_inferable(db, captured_scope)),
-        );
-        self.reduce_inferable(db, env, self.builder, to_remove, inferable)
+        self
     }
 
     /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
@@ -900,9 +928,24 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         if to_remove == TypeVarSet::None {
             return self;
         }
+        let scope = inferable.merge(db, self.captured_typevars(db, inferable));
+        let (projected, candidates) = self.project_typevars(db, env, to_remove, scope);
+        // Once we know which captures survive projection, eliminate any binders
+        // that are no longer in scope through a surviving ParamSpec.
+        projected.reduce_uncaptured_typevars(db, env, inferable, candidates)
+    }
+
+    /// Returns the projection and the variables in scope during it, including any
+    /// binders introduced while deriving constraints.
+    fn project_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        to_remove: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> (Self, TypeVarSet<'db>) {
+        let builder = self.builder;
         let mut storage = builder.storage.borrow_mut();
-        let inferable = inferable
-            .with_captured_paramspecs(db, &storage, || self.node.atomic_constraints(&storage));
         // A quantified body is false if no assignment to its locals or free variables can
         // satisfy it.
         if storage
@@ -922,10 +965,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 self.source_order,
                 limits,
             ) {
-                return Self::never(builder);
+                return (Self::never(builder), inferable);
             }
         }
-        let (node, derived_source_order) = self.node.exists(
+        let projection = self.node.exists(
             db,
             env,
             &mut storage,
@@ -946,8 +989,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 let constraint_source_order = storage.atomic_constraint_source_order(constraint);
                 storage.ordered_source_order(source_order, Some(constraint_source_order))
             });
-        let source_order = storage.ordered_source_order(source_order, derived_source_order);
-        Self::from_node(builder, node, source_order)
+        let source_order =
+            storage.ordered_source_order(source_order, projection.derived_source_order);
+        (
+            Self::from_node(builder, projection.node, source_order),
+            projection.scope,
+        )
     }
 
     /// Universally abstracts constraints involving the given type variables from this TDD.
@@ -1050,6 +1097,14 @@ type ExistsCacheKey<'db> = (
     Option<SourceOrderId>,
 );
 
+#[derive(Clone, Copy, Debug)]
+struct Projection<'db> {
+    node: NodeId,
+    derived_source_order: Option<SourceOrderId>,
+    /// Includes binders from intermediate captures that may still occur in `node`.
+    scope: TypeVarSet<'db>,
+}
+
 #[derive(Debug, Default)]
 struct ConstraintSetStorage<'db> {
     /// Compacted owned storage overlaid onto this builder. This is used by
@@ -1123,7 +1178,7 @@ struct ConstraintSetStorage<'db> {
     and_cache: FxHashMap<(NodeId, NodeId), NodeId>,
     /// Existential abstraction derives new constraints in source order and returns their
     /// source-order sidecar, so distinct orderings of the same BDD must not share a cache entry.
-    exists_cache: FxHashMap<ExistsCacheKey<'db>, (NodeId, Option<SourceOrderId>)>,
+    exists_cache: FxHashMap<ExistsCacheKey<'db>, Projection<'db>>,
 }
 
 impl<'db> ConstraintSetStorage<'db> {
@@ -2967,13 +3022,18 @@ impl NodeId {
         inferable: TypeVarSet<'db>,
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
-    ) -> (Self, Option<SourceOrderId>) {
+    ) -> Projection<'db> {
+        let unchanged = Projection {
+            node: self,
+            derived_source_order: None,
+            scope: inferable,
+        };
         if bound_typevars == TypeVarSet::None {
-            return (self, None);
+            return unchanged;
         }
 
         let Node::Interior(interior) = self.node() else {
-            return (self, None);
+            return unchanged;
         };
 
         let key = (self, inferable, bound_typevars, source_order);
@@ -4731,7 +4791,7 @@ impl InteriorNode {
         inferable: TypeVarSet<'db>,
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
-    ) -> (NodeId, Option<SourceOrderId>) {
+    ) -> Projection<'db> {
         let ControlFlow::Continue(result) = self.abstract_inner(
             db,
             env,
@@ -4760,7 +4820,7 @@ impl InteriorNode {
         source_order: Option<SourceOrderId>,
         limits: &mut L,
         should_remove: F,
-    ) -> ControlFlow<L::Break, (NodeId, Option<SourceOrderId>)>
+    ) -> ControlFlow<L::Break, Projection<'db>>
     where
         F: FnMut(&ConstraintSetStorage<'_>, ConstraintId) -> bool,
         L: SolutionLimits,
@@ -4929,7 +4989,20 @@ impl InteriorNode {
             path.visit(db, env, storage, inferable, self.node(), &mut visitor)?;
         let derived_source_order =
             path.projection_source_order(storage, source_order, derived_source_order);
-        ControlFlow::Continue((node, derived_source_order))
+        // Comparing lower and upper callable bounds can capture a generic signature in
+        // a ParamSpec being projected out. Other derived facts can still refer to its
+        // binders, so include these intermediate captures when checking what left scope.
+        let scope = if derived_source_order.is_some() {
+            let captured = inferable.captured_typevars(db, storage, || path.implied_constraints());
+            inferable.merge(db, captured)
+        } else {
+            inferable
+        };
+        ControlFlow::Continue(Projection {
+            node,
+            derived_source_order,
+            scope,
+        })
     }
 
     fn path_assignments<'db>(
