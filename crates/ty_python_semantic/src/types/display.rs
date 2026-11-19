@@ -1848,7 +1848,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
     fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> impl Display {
         std::fmt::from_fn(move |f| {
             f.write_str(self.identity.name(db))?;
-            let binding_context = self.binding_context;
+            let binding_context = self.binding_context(db);
             if let Some(binding_context_name) = binding_context.name(db)
                 && let Some(definition) = binding_context.definition()
                 && !settings.active_scopes.contains(&definition)
