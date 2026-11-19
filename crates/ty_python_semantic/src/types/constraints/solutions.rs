@@ -655,7 +655,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     ) -> ControlFlow<B> {
         let interior = storage.interior_node_data(node);
         let constraint_id = interior.constraint;
-        match storage.constraint_data(constraint_id) {
+        let constraint = storage.constraint_data(constraint_id);
+        match constraint {
             Constraint::Atomic(_) => self.visit_atomic_constraint(
                 db,
                 env,

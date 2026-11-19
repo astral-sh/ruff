@@ -1,6 +1,7 @@
 //! Display implementations for types.
 
 use crate::ProgramEnvironment;
+use crate::types::typevar::TypeVarSet;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
@@ -29,7 +30,7 @@ use crate::types::recursive::RecursiveType;
 use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature};
 use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::type_alias::QualifiedTypeAliasName;
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
+use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,

@@ -9741,7 +9741,6 @@ impl<'db> Binding<'db> {
         // create multiple instances of a single typevar identity with different
         // bounds/constraints. We should reconcile the invariants expected by the constraint solver
         // with those actually enforced by our typevar representation.
-        let call = CallInference::new(db, env, self, arguments, call_expression_tcx);
         let constraints = &ConstraintSetBuilder::new();
         let parameters = self.signature.parameters();
 
@@ -9761,7 +9760,8 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let inferred = call.infer(constraints);
+        let inferred =
+            CallInference::new(db, env, self, arguments, call_expression_tcx).infer(constraints);
 
         let mut checker = ArgumentTypeChecker::new(
             db,
