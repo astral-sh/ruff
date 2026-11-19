@@ -3040,16 +3040,44 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .visit(&key, || self.always(), work)
     }
 
+    /// A generic callback can use the same type variable in its fixed prefix and its
+    /// return type. Once the prefix has been checked, preserve its constraints on the
+    /// result and keep only the binders used by the captured parameters in scope.
+    fn uncaptured_typevars(
+        &self,
+        db: &'db dyn Db,
+        signature: &Signature<'db>,
+        paramspec: BoundTypeVarInstance<'db>,
+        captured: &[Parameter<'db>],
+    ) -> TypeVarSet<'db> {
+        if self.inferable == TypeVarSet::All || !paramspec.is_inferable(db, self.inferable) {
+            return TypeVarSet::None;
+        }
+        let Some(context) = signature.local_generic_context(self.typevar_evaluation) else {
+            return TypeVarSet::None;
+        };
+
+        let uncaptured =
+            context.variables(db).filter(|local| {
+                let identity = local.identity(db);
+                captured.iter().all(|parameter| {
+                !any_over_type_expanding_aliases(db, self.env, parameter.annotated_type(), |ty| {
+                    matches!(ty, Type::TypeVar(var) if var.identity(db).binder() == identity)
+                })
+            })
+            });
+        TypeVarSet::from_typevars(db, uncaptured)
+    }
+
     fn check_paramspec_equivalence(
         &self,
         db: &'db dyn Db,
-        inferable: TypeVarSet<'db>,
         source: BoundTypeVarInstance<'db>,
         target: BoundTypeVarInstance<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let (subject, bound) = if source.is_inferable(db, inferable) {
+        let (subject, bound) = if source.is_inferable(db, self.inferable) {
             (source, target)
-        } else if target.is_inferable(db, inferable) {
+        } else if target.is_inferable(db, self.inferable) {
             (target, source)
         } else {
             return ConstraintSet::from_bool(
@@ -3062,7 +3090,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.env,
             self.constraints,
             self.provenance,
-            inferable,
+            self.inferable,
             subject,
             Type::TypeVar(bound),
         )
@@ -3515,7 +3543,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         if self.typevar_evaluation.is_lazy() {
-            let inferable = self.inferable;
+            let reduce = |result: ConstraintSet<'db, 'c>, to_remove| {
+                result.reduce_inferable(db, env, self.constraints, to_remove, self.inferable)
+            };
             let source_paramspec = source_parameters.as_paramspec_with_prefix();
             let target_paramspec = target_parameters.as_paramspec_with_prefix();
 
@@ -3523,49 +3553,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // the other signature before the return-type and gradual/top fast paths can return
             // early. We also need to compare the return types here so a return-type mismatch still
             // preserves the inferred ParamSpec binding.
-            let callback_locals =
-                |signature: &Signature<'db>, paramspec: BoundTypeVarInstance<'db>| {
-                    if inferable != TypeVarSet::All
-                        && paramspec.is_inferable(db, inferable)
-                        && let Some(context) =
-                            signature.local_generic_context(self.typevar_evaluation)
-                    {
-                        context.inferable_typevars(db)
-                    } else {
-                        TypeVarSet::None
-                    }
-                };
-            // A generic callback can use the same type variable in its fixed prefix and its
-            // return type. Once the prefix has been checked, preserve its constraints on the
-            // result and keep only the binders used by the captured parameters in scope.
-            let uncaptured = |signature, residual: &Parameters<'db>, paramspec| {
-                TypeVarSet::from_typevars(
-                    db,
-                    callback_locals(signature, paramspec)
-                        .iter(db)
-                        .filter(|local| {
-                            !residual.iter().any(|parameter| {
-                                any_over_type_expanding_aliases(
-                                    db,
-                                    self.env,
-                                    parameter.annotated_type(),
-                                    |ty| {
-                                        ty.as_typevar().is_some_and(|nested| {
-                                            nested.identity(db).binder() == local.identity(db)
-                                        })
-                                    },
-                                )
-                            })
-                        }),
-                )
-            };
             match (source_paramspec, target_paramspec) {
                 // self: `P`
                 // other: `P`
                 (Some(([], source_bound_typevar)), Some(([], target_bound_typevar))) => {
                     let param_spec_matches = self.check_paramspec_equivalence(
                         db,
-                        inferable,
                         source_bound_typevar,
                         target_bound_typevar,
                     );
@@ -3766,22 +3759,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // When the prefixes match exactly, we just relate the remaining tails.
                         let param_spec_matches = self.check_paramspec_equivalence(
                             db,
-                            inferable,
                             source_bound_typevar,
                             target_bound_typevar,
                         );
                         result.intersect(db, self.constraints, param_spec_matches);
                         // With matching prefixes, the residual is a forwarded ParamSpec.
                         // There is no concrete parameter list to carry the callback's binders.
-                        let from_source = callback_locals(source, target_bound_typevar);
-                        let from_target = callback_locals(target, source_bound_typevar);
-                        return result.reduce_inferable(
-                            db,
-                            self.env,
-                            self.constraints,
-                            from_source.merge(db, from_target),
-                            inferable,
-                        );
+                        let from_source =
+                            self.uncaptured_typevars(db, source, target_bound_typevar, &[]);
+                        let from_target =
+                            self.uncaptured_typevars(db, target, source_bound_typevar, &[]);
+                        return reduce(result, from_source.merge(db, from_target));
                     }
                     return result;
                 }
@@ -3929,7 +3917,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let (source_params, _) = parameters.into_remaining();
                     let source_params =
                         source_parameters.with_transformed_parameters(source_params.cloned());
-                    let to_remove = uncaptured(source, &source_params, target_bound_typevar);
+                    let to_remove = self.uncaptured_typevars(
+                        db,
+                        source,
+                        target_bound_typevar,
+                        source_params.as_slice(),
+                    );
                     let lower = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::single(
@@ -3945,13 +3938,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_type_pair(db, lower, Type::TypeVar(target_bound_typevar));
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
 
-                    return result.reduce_inferable(
-                        db,
-                        self.env,
-                        self.constraints,
-                        to_remove,
-                        inferable,
-                    );
+                    return reduce(result, to_remove);
                 }
 
                 // self: `P`
@@ -4067,7 +4054,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let (_, target_params) = parameters.into_remaining();
                     let target_params =
                         target_parameters.with_transformed_parameters(target_params.cloned());
-                    let to_remove = uncaptured(target, &target_params, source_bound_typevar);
+                    let to_remove = self.uncaptured_typevars(
+                        db,
+                        target,
+                        source_bound_typevar,
+                        target_params.as_slice(),
+                    );
                     let upper = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
                         CallableSignature::single(
@@ -4083,13 +4075,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_type_pair(db, Type::TypeVar(source_bound_typevar), upper);
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
 
-                    return result.reduce_inferable(
-                        db,
-                        self.env,
-                        self.constraints,
-                        to_remove,
-                        inferable,
-                    );
+                    return reduce(result, to_remove);
                 }
 
                 // Both self and other are callables without ParamSpecs
