@@ -2038,7 +2038,7 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
     if isinstance(value, Iterable) and not isinstance(value, Sized):
         # revealed: list[T@maybe_iterable_to_list | Unknown]
         reveal_type(list(value))
-        # revealed: list[T@maybe_iterable_to_list]
+        # revealed: list[T@maybe_iterable_to_list | Unknown]
         return reveal_type(list(value))
     raise NotImplementedError
 ```
