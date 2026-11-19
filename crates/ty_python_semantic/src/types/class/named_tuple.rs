@@ -661,7 +661,7 @@ impl<'db> NamedTupleSpec<'db> {
 
     /// Append fields from a sequence of `(name, annotation)` pairs. For a variable-length
     /// sequence, retain its fixed prefix and suffix for lookup by name and index.
-    fn extend_fields(
+    pub(in crate::types) fn extend_fields(
         db: &'db dyn Db,
         scope: ScopeId<'db>,
         pairs: &TupleSpec<'db>,
@@ -702,7 +702,7 @@ impl<'db> NamedTupleSpec<'db> {
 
     /// Recover the name and declared type of a computed field pair independently, recording
     /// the first inference problem in `problem`.
-    fn field_from_type(
+    pub(in crate::types) fn field_from_type(
         db: &'db dyn Db,
         scope: ScopeId<'db>,
         pair: Type<'db>,
