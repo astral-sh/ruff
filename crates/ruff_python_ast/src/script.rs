@@ -62,19 +62,18 @@ impl ScriptTag {
     /// ```
     ///
     /// See: <https://peps.python.org/pep-0723/>
-    pub fn parse(contents: &[u8]) -> Option<Self> {
+    pub fn parse(contents: &str) -> Option<Self> {
         FINDER
-            .find_iter(contents)
+            .find_iter(contents.as_bytes())
             .find_map(|index| Self::parse_at(contents, index))
     }
 
-    fn parse_at(contents: &[u8], index: usize) -> Option<Self> {
+    fn parse_at(contents: &str, index: usize) -> Option<Self> {
         // The opening pragma must be the first line, or immediately preceded by a newline.
-        if !(index == 0 || matches!(contents[index - 1], b'\r' | b'\n')) {
+        if !(index == 0 || matches!(contents.as_bytes()[index - 1], b'\r' | b'\n')) {
             return None;
         }
 
-        let contents = std::str::from_utf8(contents).ok()?;
         let contents = &contents[index..];
 
         let start = TextSize::try_from(index).ok()?;
@@ -207,7 +206,7 @@ mod tests {
 
     #[test]
     fn carriage_return_line_endings() -> Result<(), &'static str> {
-        let tag = ScriptTag::parse(b"# /// script\r# value = true\r# ///\r")
+        let tag = ScriptTag::parse("# /// script\r# value = true\r# ///\r")
             .ok_or("Expected script metadata with carriage-return line endings")?;
 
         assert_eq!(tag.metadata(), "value = true\n");
@@ -220,7 +219,7 @@ mod tests {
         let prefix = "#!/usr/bin/env python3\n\n";
         let metadata = "# /// script\n# dependencies = []\n# ///";
         let source = format!("{prefix}{metadata}\n\nprint('hello')\n");
-        let tag = ScriptTag::parse(source.as_bytes()).ok_or("Expected valid script metadata")?;
+        let tag = ScriptTag::parse(&source).ok_or("Expected valid script metadata")?;
 
         assert_eq!(
             tag.range(),
@@ -244,7 +243,7 @@ last
 # """"#
             .replace('\n', "\r\n");
         let source = format!("π\r\n# /// script\r\n# value = {source_value}\r\n# ///\r\n");
-        let tag = ScriptTag::parse(source.as_bytes()).ok_or("Expected valid script metadata")?;
+        let tag = ScriptTag::parse(&source).ok_or("Expected valid script metadata")?;
 
         assert_eq!(tag.metadata(), format!("value = {metadata_value}\n"));
 
@@ -268,7 +267,7 @@ last
 # ///
 # ignored = true
 ";
-        let tag = ScriptTag::parse(source.as_bytes()).ok_or("Expected valid script metadata")?;
+        let tag = ScriptTag::parse(source).ok_or("Expected valid script metadata")?;
 
         assert_eq!(
             tag.metadata(),

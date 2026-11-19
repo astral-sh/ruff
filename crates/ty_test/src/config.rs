@@ -102,7 +102,7 @@ pub(crate) struct ScriptMetadata {
 
 impl ScriptMetadata {
     pub(crate) fn from_source(source: &str) -> Option<Self> {
-        let tag = ScriptTag::parse(source.as_bytes())?;
+        let tag = ScriptTag::parse(source)?;
         toml::from_str(tag.metadata()).ok()
     }
 
