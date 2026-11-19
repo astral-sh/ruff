@@ -102,11 +102,12 @@ impl AlwaysFixableViolation for IfExprWithFalseTrue {
 }
 
 /// ## What it does
-/// Checks for `if` expressions that check against a negated condition.
+/// Checks for `if` expressions that negate a variable in the condition and
+/// return that same variable in the `else` branch.
 ///
 /// ## Why is this bad?
-/// `if` expressions that check against a negated condition are more difficult
-/// to read than `if` expressions that check against the condition directly.
+/// In these expressions, testing the variable directly and swapping the arms
+/// makes the expression easier to read.
 ///
 /// ## Example
 /// ```python
