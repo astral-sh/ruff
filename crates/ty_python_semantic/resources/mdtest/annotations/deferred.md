@@ -384,18 +384,13 @@ enables deferred annotations on Python 3.12, but is treated as an ordinary relat
 python-version = "3.12"
 ```
 
-`pkg_312/__init__.py`:
-
-```py
-```
-
-`pkg_312/__future__.py`:
+`pkg/__future__.py`:
 
 ```py
 annotations = object()
 ```
 
-`pkg_312/test.py`:
+`pkg/main.py`:
 
 ```py
 from .__future__ import annotations
@@ -415,24 +410,20 @@ reveal_type(get_foo())  # revealed: Foo
 python-version = "3.13"
 ```
 
-`pkg_313/__init__.py`:
-
-```py
-```
-
-`pkg_313/__future__.py`:
+`pkg/__future__.py`:
 
 ```py
 annotations = object()
 ```
 
-`pkg_313/test.py`:
+`pkg/main.py`:
 
 ```py
 from .__future__ import annotations
 
 # error: [unresolved-reference]
-def get_foo() -> Foo: ...
+def get_foo() -> Foo:
+    return Foo()
 
 class Foo: ...
 

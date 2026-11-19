@@ -97,6 +97,7 @@ impl SemanticSyntaxChecker {
                     //     lazy import os
                     // with contextlib.nullcontext():
                     //     lazy from sys import path
+                    // lazy from .__future__ import feature
 
                     // test_err lazy_import_invalid_context_py315
                     // # parse_options: {"target-version": "3.15"}
