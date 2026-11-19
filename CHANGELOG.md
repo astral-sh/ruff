@@ -14,6 +14,7 @@ Released on 2026-11-19.
 - \[`pyflakes`\] Fix false negative when a name is assigned more than once (`F823`) ([#30524](https://github.com/astral-sh/ruff/pull/30524))
 - \[`pylint`\] Avoid false positive when collection is modified in loop (`PLR1733`, `PLR1736`) ([#30466](https://github.com/astral-sh/ruff/pull/30466))
 - \[`ruff`\] Avoid syntax error in `useless-finally` fix for inline `try` bodies (`RUF072`) ([#30349](https://github.com/astral-sh/ruff/pull/30349))
+- Treat relative imports from `.__future__` as ordinary imports ([#30260](https://github.com/astral-sh/ruff/pull/30260))
 
 ### Rule changes
 
@@ -25,14 +26,10 @@ Released on 2026-11-19.
 - Decode in-memory notebooks directly from their source string ([#30385](https://github.com/astral-sh/ruff/pull/30385))
 - Short-circuit exact qualified-name checks ([#30058](https://github.com/astral-sh/ruff/pull/30058))
 - Stream JSON diagnostics to the output writer ([#30384](https://github.com/astral-sh/ruff/pull/30384))
-- [ty] Defer overloads with incompatible string literals ([#30249](https://github.com/astral-sh/ruff/pull/30249))
-
-### Formatter
-
-- Fix the multiline string example in Known Deviations from Black ([#30447](https://github.com/astral-sh/ruff/pull/30447))
 
 ### Documentation
 
+- Fix the multiline string example in Known Deviations from Black ([#30447](https://github.com/astral-sh/ruff/pull/30447))
 - Include the category in individual rule documentation pages ([#30503](https://github.com/astral-sh/ruff/pull/30503))
 
 ### Other changes
