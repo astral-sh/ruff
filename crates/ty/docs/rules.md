@@ -3712,7 +3712,7 @@ def call[**P](
     return f(*args, **kwargs)
 ```
 
-Make `debug` positional-only so the caller can pass `debug=` through to `f`:
+Instead, make `debug` positional-only so the caller can pass `debug=` through to `f`:
 
 ```python
 from collections.abc import Callable
@@ -3734,7 +3734,7 @@ def call[**P](
 **Rule history**
 
 
-- v0.0.108: Split from [`invalid-paramspec`](#invalid-paramspec) and [`invalid-type-form`](#invalid-type-form).
+- v0.0.108: Split from [`invalid-paramspec`](#invalid-paramspec) and [`invalid-type-form`](#invalid-type-form) into a standalone rule.
 
 ## `invalid-protocol`
 
