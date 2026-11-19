@@ -394,6 +394,47 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Resolve simple subtype checks between class-based `TypedDict`s before walking recursive
+    /// fields. Use only for standalone Boolean checks. Other checks may rely on the constraints
+    /// and recursion results accumulated while visiting the fields in their original order.
+    fn quick_typed_dict_subtype(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> Option<bool> {
+        let (Type::TypedDict(source), Type::TypedDict(target)) = (self, target) else {
+            return None;
+        };
+
+        // Preserve the nominal shortcut in `check_typeddict_pair`. For a non-generic target
+        // it only checks the source's bases and is independent of the recursion guard.
+        let target_class @ ClassType::NonGeneric(_) = target.defining_class()? else {
+            return None;
+        };
+        if source
+            .defining_class()?
+            .is_subclass_of(db, env, target_class)
+        {
+            return Some(true);
+        }
+
+        // Different string literals for a required key rule out structural subtyping.
+        // Bound the extra work for wide schemas that would fail on an early field.
+        let source_items = source.items(db);
+        for (name, field) in target.items(db).iter().take(16) {
+            if field.is_required()
+                && let Some(target_tag) = field.declared_ty.as_string_literal()
+                && let Some(source_field) = source_items.get(name.as_str())
+                && let Some(source_tag) = source_field.declared_ty.as_string_literal()
+                && source_tag != target_tag
+            {
+                return Some(false);
+            }
+        }
+        None
+    }
+
     /// Return true if this type is a subtype of type `target`.
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
@@ -403,6 +444,10 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
+        if let Some(result) = self.quick_typed_dict_subtype(db, env, target) {
+            return result;
+        }
+
         let constraints = ConstraintSetBuilder::new();
         self.when_subtype_of(db, env, target, &constraints, TypeVarSet::None)
             .is_always_satisfied(db, env, TypeVarSet::None)
@@ -592,6 +637,14 @@ impl<'db> Type<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
         fn is_constraint_set_subtype_of_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
             let env = ProgramEnvironment::from_program(types.program(db));
+            if let Some(result) =
+                types
+                    .first(db)
+                    .quick_typed_dict_subtype(db, &env, types.second(db))
+            {
+                return result;
+            }
+
             let constraints = ConstraintSetBuilder::new();
             types
                 .first(db)
