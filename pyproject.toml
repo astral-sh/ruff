@@ -367,6 +367,15 @@ ignore = [
     "repeated-append",
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"crates/ty_vendored/ty_extensions/*.pyi" = [
+    # Import newer typing features from typing_extensions so ty can resolve them
+    # when checking code that targets Python 3.8.
+    "deprecated-import",
+    # Allow stub docstrings so IDEs can show them on hover.
+    "docstring-in-stub",
+]
+
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
 combine-as-imports = true
