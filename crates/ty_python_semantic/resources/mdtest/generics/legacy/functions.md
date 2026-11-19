@@ -2836,9 +2836,7 @@ def last(items: list[T]) -> T | None:
 
 def choose(value: T, reverse: bool) -> None:
     pick = last if reverse else first
-    # TODO: Reveal `T@choose | None` once failed-call information is preserved across callable
-    # union inference contexts. https://github.com/astral-sh/ruff/pull/27942
-    result: T | None = reveal_type(pick(wrap(value)))  # revealed: None
+    result: T | None = reveal_type(pick(wrap(value)))  # revealed: T@choose | None
 ```
 
 ## Failed calls in arguments unrelated to specialization

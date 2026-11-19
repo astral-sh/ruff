@@ -2259,6 +2259,122 @@ def _(values: list[Any]):
 items: Any | list[int] = reveal_type(list())  # revealed: list[int]
 ```
 
+Adding an unrelated `list[bytes]` alternative does not erase the field types of a `TypedDict`.
+Treating the literal as an ordinary dictionary would only fit the `Any` member:
+
+```py
+class Row(TypedDict):
+    name: str
+    count: int
+
+# revealed: list[Row]
+rows: list[Row] | list[bytes] | Any = reveal_type(lst({"name": "first", "count": 1}))
+rows[0]["name"] = 42  # error: [invalid-assignment]
+```
+
+A full-union retry does not discard a `TypedDict` field type by matching only `Any`:
+
+```py
+def tag[T, U](row: T, value: U) -> tuple[T, U]:
+    return row, value
+
+def _(value: Any | None):
+    result: tuple[Row, None] | tuple[Row, int] | Any = tag({"name": "first", "count": 1}, value)
+    result[0]["name"] = 42  # error: [invalid-assignment]
+```
+
+Even when the declared union is fully static, a gradual argument can make one member look like the
+only possible result. Here the second argument rules out `int` as the sole return type, but the
+first argument can still be an `int`:
+
+```py
+def either[T, U](x: T, y: U) -> T | U:
+    return x
+
+def _(value: Any):
+    result: int | None = reveal_type(either(value, None))  # revealed: int | None
+```
+
+The same applies when `None` is part of the function's return type:
+
+```py
+def first_or_none[T](items: list[T]) -> T | None:
+    raise NotImplementedError
+
+def _(value: Any):
+    x: int | None = reveal_type(first_or_none([value]))  # revealed: int | None
+```
+
+The same context can be projected into a collection element or forwarded through a generic call. An
+independent parameter annotation, return annotation, or earlier declaration does not supply
+annotated-assignment context:
+
+```py
+def forward[T](value: T) -> T:
+    return value
+
+def consume(value: int | None) -> object:
+    return value
+
+def _(value: Any) -> int | None:
+    nested: list[int | None] = [reveal_type(first_or_none([value]))]  # revealed: int | None
+    forwarded: int | None = forward(reveal_type(first_or_none([value])))  # revealed: int | None
+
+    outer: object = consume(reveal_type(first_or_none([value])))  # revealed: None
+    reassigned: int | None
+    reassigned = reveal_type(first_or_none([value]))  # revealed: None
+    return reveal_type(first_or_none([value]))  # revealed: None
+```
+
+Elements that can use a narrowing target still contribute their contextual types, even when another
+element is incompatible with that target:
+
+```py
+def empty[T = int]() -> list[T]:
+    return []
+
+def _(items: list[int]):
+    result: list[int] | list[str] = reveal_type(head([items, empty()]))  # revealed: list[int] | list[str]
+```
+
+The `list[bool]` attempt below produces `list[bool] | list[int]`. Neither successful member attempt
+accounts for `list[bool]`, so we use the full-union result on its own:
+
+```py
+def list_of_either[T, U](x: T, y: U) -> list[T] | list[U]:
+    return [x]
+
+type Lists = list[bool] | list[int] | list[int | None]
+
+def _(b: bool, i: int):
+    result: Lists = reveal_type(list_of_either(b, i))  # revealed: list[int | None]
+```
+
+With the full union as context, the empty list below is inferred as `list[int | str]`, which fits
+neither `list[int]` nor `list[str]`. We keep the results of the individual attempts that fit the
+declaration. This includes the third attempt: `tuple[list[int], Any | None]` doesn't fit its own
+member because the value can be `None`, but it does fit the full union.
+
+```py
+def pair[T, U](items: list[T], value: U) -> tuple[list[T], U]:
+    return items, value
+
+type Pairs = tuple[list[int], None] | tuple[list[str], None] | tuple[list[int], int]
+
+def _(value: Any | None):
+    # revealed: tuple[list[int], Any | None] | tuple[list[str], None]
+    result: Pairs = reveal_type(pair([], value))
+```
+
+Adding `list[bytes]` does not change the result here: using it as the expected type produces
+`list[int]`, which is already accounted for.
+
+```py
+def _(i: int):
+    # revealed: list[int] | list[int | str]
+    result: list[int] | list[int | str] | list[bytes] = reveal_type(lst(i))
+```
+
 When a generic call is narrowed to a single element of the union, any diagnostics emitted use the
 types inferred using that element as type context.
 
@@ -2347,6 +2463,67 @@ x2: tuple[list[str] | list[int]] = wrap_tuple((
     # TODO: This should remain `list[str] | list[int]`.
     reveal_type(make_list()),  # revealed: list[int]
 ))
+```
+
+## Narrowing multiple return alternatives to one union member
+
+```py
+def f[T, U](x: list[T], y: list[U]) -> T | U:
+    raise NotImplementedError
+
+class Base: ...
+class A(Base): ...
+class B(Base): ...
+
+y: Base | None = reveal_type(f([A()], [B()]))  # revealed: Base
+```
+
+## Narrowing generic calls with `TypedDict` arguments
+
+When the same type variable occurs twice in the return type, each specialization fills both
+positions. Inferring against each member of the declared union keeps the two positions correlated.
+
+```py
+from typing import TypedDict
+
+class A(TypedDict):
+    x: list[int]
+
+class B(TypedDict):
+    x: list[str]
+
+def make_pair[T](x: T) -> tuple[T, T]:
+    return x, x
+
+# revealed: tuple[A, A] | tuple[B, B]
+pair: tuple[A, A | B] | tuple[B, A | B] = reveal_type(make_pair({"x": []}))
+```
+
+Trying only individual members or the full union can lose this correlation:
+
+```py
+def maybe_pair[T](x: T) -> tuple[T, T] | None:
+    raise NotImplementedError
+
+# TODO: Narrowing against subsets should preserve `tuple[A, A] | tuple[B, B] | None`.
+# revealed: tuple[A | B, A | B] | None
+# error: [invalid-assignment]
+result: tuple[A, A | B] | tuple[B, A | B] | None = reveal_type(maybe_pair({"x": []}))
+
+a: tuple[A, A | B] | None = reveal_type(maybe_pair({"x": []}))  # revealed: tuple[A, A] | None
+b: tuple[B, A | B] | None = reveal_type(maybe_pair({"x": []}))  # revealed: tuple[B, B] | None
+```
+
+An empty list lets the dictionary match either `A` or `B`. The call can return a list of the
+matching dictionary type or a list of strings; no single member describes both possibilities.
+
+```py
+def make_list_pair[T, U](x: T, y: U) -> list[T] | list[U]:
+    raise NotImplementedError
+
+def _(s: str):
+    # revealed: list[A] | list[str] | list[B]
+    items: list[A] | list[B] | list[str] = reveal_type(make_list_pair({"x": []}, s))
 ```
 
 ## Correlated overload specializations from an expected type
