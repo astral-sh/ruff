@@ -21,8 +21,8 @@ mod tests {
     use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
-    #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"))]
-    #[test_case(Rule::ConvertTypedDictFunctionalToClass, Path::new("UP013.py"))]
+    #[test_case(Rule::FunctionalNamedTuple, Path::new("UP014.py"))]
+    #[test_case(Rule::FunctionalTypedDict, Path::new("UP013.py"))]
     #[test_case(Rule::DeprecatedCElementTree, Path::new("UP023.py"))]
     #[test_case(Rule::DeprecatedImport, Path::new("UP035.py"))]
     #[test_case(Rule::DeprecatedMockImport, Path::new("UP026.py"))]
@@ -71,7 +71,7 @@ mod tests {
     #[test_case(Rule::ReplaceUniversalNewlines, Path::new("UP021.py"))]
     #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
     #[test_case(Rule::TimeoutErrorAlias, Path::new("UP041.py"))]
-    #[test_case(Rule::ReplaceStrEnum, Path::new("UP042.py"))]
+    #[test_case(Rule::ManualStrEnum, Path::new("UP042.py"))]
     #[test_case(Rule::TypeOfPrimitive, Path::new("UP003.py"))]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_0.py"))]

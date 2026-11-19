@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for argument names that do not follow the `snake_case` convention.
+/// Checks for parameter names that are not lowercase.
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends that function names should be lower case and separated
@@ -48,14 +48,14 @@ use crate::codes::Category;
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
-pub(crate) struct InvalidArgumentName {
+pub(crate) struct NonLowercaseParameterName {
     name: String,
 }
 
-impl Violation for InvalidArgumentName {
+impl Violation for NonLowercaseParameterName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidArgumentName { name } = self;
+        let NonLowercaseParameterName { name } = self;
         format!("Argument name `{name}` should be lowercase")
     }
 }
@@ -99,7 +99,7 @@ fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
         }
 
         checker.report_diagnostic(
-            InvalidArgumentName {
+            NonLowercaseParameterName {
                 name: name.to_string(),
             },
             parameter.range(),

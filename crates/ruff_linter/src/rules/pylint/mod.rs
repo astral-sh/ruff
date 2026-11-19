@@ -203,7 +203,7 @@ mod tests {
     )]
     #[test_case(Rule::UnspecifiedEncoding, Path::new("unspecified_encoding.py"))]
     #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
-    #[test_case(Rule::NoSelfUse, Path::new("no_self_use.py"))]
+    #[test_case(Rule::UnusedSelf, Path::new("no_self_use.py"))]
     #[test_case(Rule::MisplacedBareRaise, Path::new("misplaced_bare_raise.py"))]
     #[test_case(Rule::LiteralMembership, Path::new("literal_membership.py"))]
     #[test_case(Rule::GlobalAtModuleLevel, Path::new("global_at_module_level.py"))]
@@ -218,9 +218,9 @@ mod tests {
         Rule::UnnecessaryListIndexLookup,
         Path::new("unnecessary_list_index_lookup.py")
     )]
-    #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::NonDecoratorClassmethod, Path::new("no_method_decorator.py"))]
     #[test_case(Rule::UnnecessaryDunderCall, Path::new("unnecessary_dunder_call.py"))]
-    #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::NonDecoratorStaticmethod, Path::new("no_method_decorator.py"))]
     #[test_case(Rule::PotentialIndexError, Path::new("potential_index_error.py"))]
     #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
     #[test_case(Rule::SelfOrClsAssignment, Path::new("self_or_cls_assignment.py"))]

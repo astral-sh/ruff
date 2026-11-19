@@ -122,6 +122,76 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         "verbose-log-message",
         Rule::RedundantExceptionInLoggingMessage,
     ),
+    (
+        "boolean-type-hint-positional-argument",
+        Rule::BooleanAnnotatedPositionalParameter,
+    ),
+    (
+        "boolean-default-value-positional-argument",
+        Rule::BooleanDefaultValuePositionalParameter,
+    ),
+    ("invalid-class-name", Rule::NonCamelCaseClassName),
+    ("invalid-function-name", Rule::NonLowercaseFunctionName),
+    ("invalid-argument-name", Rule::NonLowercaseParameterName),
+    (
+        "invalid-first-argument-name-for-class-method",
+        Rule::ClassMethodReceiverNotNamedCls,
+    ),
+    (
+        "invalid-first-argument-name-for-method",
+        Rule::InstanceMethodReceiverNotNamedSelf,
+    ),
+    (
+        "camelcase-imported-as-lowercase",
+        Rule::CamelCaseImportedAsLowercase,
+    ),
+    (
+        "camelcase-imported-as-constant",
+        Rule::CamelCaseImportedAsConstant,
+    ),
+    (
+        "camelcase-imported-as-acronym",
+        Rule::CamelCaseImportedAsAcronym,
+    ),
+    (
+        "error-suffix-on-exception-name",
+        Rule::ExceptionClassWithoutErrorSuffix,
+    ),
+    ("no-classmethod-decorator", Rule::NonDecoratorClassmethod),
+    ("no-staticmethod-decorator", Rule::NonDecoratorStaticmethod),
+    ("no-self-use", Rule::UnusedSelf),
+    (
+        "typed-argument-default-in-stub",
+        Rule::ComplexDefaultForAnnotatedParameterInStub,
+    ),
+    (
+        "argument-default-in-stub",
+        Rule::ComplexDefaultForUnannotatedParameterInStub,
+    ),
+    (
+        "type-alias-without-annotation",
+        Rule::UnannotatedTypeAliasInStub,
+    ),
+    (
+        "no-return-argument-annotation-in-stub",
+        Rule::ParameterAnnotatedWithNoReturn,
+    ),
+    ("redundant-literal-union", Rule::LiteralUnionWithSupertype),
+    ("byte-string-usage", Rule::DeprecatedByteStringType),
+    (
+        "generator-return-from-iter-method",
+        Rule::IterMethodWithGeneratorReturnAnnotation,
+    ),
+    ("runtime-cast-value", Rule::CastWithUnquotedType),
+    (
+        "convert-typed-dict-functional-to-class",
+        Rule::FunctionalTypedDict,
+    ),
+    (
+        "convert-named-tuple-functional-to-class",
+        Rule::FunctionalNamedTuple,
+    ),
+    ("replace-str-enum", Rule::ManualStrEnum),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
