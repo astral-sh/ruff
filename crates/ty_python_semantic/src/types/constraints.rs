@@ -4813,24 +4813,21 @@ impl InteriorNode {
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
-        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
+        let source_orders = storage.calculate_source_orders(source_order);
+        // Distinct nodes can test the same constraint, and the source order can include
+        // constraints that were simplified out of the diagram. Record each reachable
+        // constraint once at its source position. `PathAssignments` needs this order
+        // when constructing non-commutative sequent pairs.
+        let mut constraints: SmallVec<[_; 8]> = SmallVec::from_elem(None, source_orders.len());
         self.node()
             .for_each_unique_constraint(storage, &mut |constraint| {
                 if let Some(constraint) = constraint.as_atomic(storage) {
-                    constraints.push(constraint);
+                    let index = source_orders
+                        .get_index_of(&constraint)
+                        .expect("every BDD constraint should have a source-order entry");
+                    constraints[index] = Some(constraint);
                 }
             });
-        let source_orders = storage.calculate_source_orders(source_order);
-        // `PathAssignments` seeds its insertion-ordered discovered-constraint map from this list,
-        // and uses that order when constructing non-commutative sequent pairs. Do not replace this
-        // with TDD traversal order: doing so can change inference and lose gradual constraints.
-        // Every constraint in the TDD must appear in the sidecar. If an operation introduces new
-        // constraints, it must preserve their source orders rather than invent an order here.
-        constraints.sort_by_key(|constraint| {
-            source_orders
-                .get_index_of(constraint)
-                .expect("every BDD constraint should have a source-order entry")
-        });
 
         let bound_is_concrete = |bound: Type<'db>| {
             !bound.has_typevar(db, env)
@@ -4840,8 +4837,8 @@ impl InteriorNode {
 
         let mut independent_typevars = FxHashSet::default();
         let mut dependent_typevars = FxHashSet::default();
-        for constraint_id in &constraints {
-            let constraint = storage.atomic_constraint_data(*constraint_id);
+        for &constraint_id in constraints.iter().flatten() {
+            let constraint = storage.atomic_constraint_data(constraint_id);
             if let Some((typevar, bound)) = constraint.as_concrete()
                 && bound_is_concrete(bound)
             {
@@ -4858,7 +4855,7 @@ impl InteriorNode {
 
         independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
 
-        PathAssignments::new(constraints, independent_typevars)
+        PathAssignments::new(constraints.into_iter().flatten(), independent_typevars)
     }
 }
 
