@@ -403,9 +403,46 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
+        if let Some(result) = self.compare_tagged_typed_dicts(db, env, target) {
+            return result;
+        }
         let constraints = ConstraintSetBuilder::new();
         self.when_subtype_of(db, env, target, &constraints, TypeVarSet::None)
             .is_always_satisfied(db, env, TypeVarSet::None)
+    }
+
+    /// Try to settle subtyping or assignability before comparing recursive payload fields.
+    /// Use only for standalone boolean checks. Other callers can observe the visitor entries
+    /// or the constraint source order produced while checking earlier fields.
+    fn compare_tagged_typed_dicts(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> Option<bool> {
+        let source = self.as_typed_dict()?;
+        let target = target.as_typed_dict()?;
+        let source_class = source.defining_class()?;
+        let target_class @ ClassType::NonGeneric(_) = target.defining_class()? else {
+            return None;
+        };
+
+        // As in `check_typeddict_pair`, nominal subtyping takes precedence over the fields.
+        if source_class.is_subclass_of(db, env, target_class) {
+            return Some(true);
+        }
+
+        let source_items = source.items(db);
+        for (name, field) in target.items(db) {
+            if let Some(target_tag) = field.declared_ty.as_string_literal()
+                && let Some(source_field) = source_items.get(name)
+                && let Some(source_tag) = source_field.declared_ty.as_string_literal()
+                && source_tag != target_tag
+            {
+                return Some(false);
+            }
+        }
+        None
     }
 
     pub(super) fn when_subtype_of<'c>(
@@ -576,6 +613,9 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
+        if let Some(result) = self.compare_tagged_typed_dicts(db, env, target) {
+            return result;
+        }
         let constraints = ConstraintSetBuilder::new();
         self.when_constraint_set_assignable_to(db, env, target, &constraints)
             .is_always_satisfied(db, env, TypeVarSet::None)
@@ -592,19 +632,14 @@ impl<'db> Type<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
         fn is_constraint_set_subtype_of_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
             let env = ProgramEnvironment::from_program(types.program(db));
+            let source = types.first(db);
+            let target = types.second(db);
+            if let Some(result) = source.compare_tagged_typed_dicts(db, &env, target) {
+                return result;
+            }
             let constraints = ConstraintSetBuilder::new();
-            types
-                .first(db)
-                .has_relation_to_with_typevar_evaluation(
-                    db,
-                    &env,
-                    types.second(db),
-                    &constraints,
-                    TypeVarSet::None,
-                    TypeRelation::Subtyping,
-                    TypeVarEvaluation::Lazy,
-                    ConstraintProvenance::INFERRED,
-                )
+            source
+                .when_constraint_set_subtype_of(db, &env, target, &constraints)
                 .is_always_satisfied(db, &env, TypeVarSet::None)
         }
 
