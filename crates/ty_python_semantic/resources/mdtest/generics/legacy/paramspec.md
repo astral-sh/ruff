@@ -1113,6 +1113,93 @@ reveal_type(without_first(wrapped))  # revealed: (value: str) -> None
 reveal_type(without_first(Callback(original)))  # revealed: (value: str) -> None
 ```
 
+## Registering a wrapper that forwards to its callback
+
+The first argument of `invoke` is a callback. Its remaining parameters and its return type match
+that callback. A decorator requiring this relationship accepts `invoke`.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def register(wrapper: Callable[Concatenate[Callable[P, R], P], R]) -> Callable[P, R]:
+    raise NotImplementedError
+
+def invoke(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+register(invoke)  # ok
+```
+
+Passing `parse` to `wrap` fixes `P` to the parameter `s: str` and `R` to `int`. With that
+specialization, `invoke` accepts a callback of type `(s: str) -> int` followed by the argument `s`
+to forward.
+
+```py
+def wrap(fn: Callable[P, R], wrapper: Callable[Concatenate[Callable[P, R], P], R]) -> Callable[P, R]:
+    raise NotImplementedError
+
+def parse(s: str) -> int:
+    return int(s)
+
+# TODO: No error. Specialize `invoke`'s `P` and `R` when checking its first parameter.
+# We currently compare the signature of `parse` against the still-generic `Callable[P, R]`.
+wrap(parse, invoke)  # error: [invalid-argument-type]
+```
+
+## Choosing an overload from a callback's leading parameters
+
+The two overloads of `command` accept callbacks with one or two parameters before `P`. When the
+callback is a union of those two signatures, ty resolves the call separately for each signature.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar, overload
+
+O = TypeVar("O")
+C = TypeVar("C")
+P = ParamSpec("P")
+R = TypeVar("R")
+
+@overload
+def command(f: Callable[Concatenate[O, C, P], R]) -> tuple[O, R]: ...
+@overload
+def command(f: Callable[Concatenate[C, P], R]) -> tuple[None, R]: ...
+def command(f):
+    raise NotImplementedError
+
+def check(
+    callback: Callable[Concatenate[O, C, P], R] | Callable[Concatenate[C, P], R],
+    standalone: Callable[Concatenate[C, P], R],
+):
+    reveal_type(command(callback))  # revealed: tuple[O@check, R@check] | tuple[None, R@check]
+    reveal_type(command(standalone))  # revealed: tuple[None, R@check]
+    owned: tuple[O, R] = command(standalone)  # error: [invalid-assignment]
+```
+
+## Forwarding a positional argument to a generic callable
+
+`pipe` passes its first argument to the callback. That argument can determine the callback's return
+type even when there are no remaining arguments in `P`.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def pipe(value: A, f: Callable[Concatenate[A, P], R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return f(value, *args, **kwargs)
+
+def identity(value: T, /) -> T:
+    return value
+
+reveal_type(pipe(1, identity))  # revealed: Literal[1]
+```
+
 ## Inferring through unions of structural `ParamSpec` protocols
 
 Different protocols with the same parameter list can satisfy a target protocol structurally, even
