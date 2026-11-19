@@ -332,8 +332,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .as_string_literal()
             .map(|literal| literal.value(db));
 
-        if name.is_none()
-            && !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        if let Some(actual_name) = name {
+            let problem = if is_keyword(actual_name) {
+                Some("cannot be a Python keyword")
+            } else if !is_identifier(actual_name) {
+                Some("is not a valid Python identifier")
+            } else {
+                None
+            };
+
+            if let Some(problem) = problem {
+                if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, name_arg) {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Type name {actual_name:?} in `{kind}()` {problem}"
+                    ));
+                    diagnostic.set_primary_annotation_message("Will raise `ValueError` at runtime");
+                }
+            } else if let Some(definition) = definition
+                && let Some(assigned_name) = definition.name(db)
+                && assigned_name.as_str() != actual_name
+            {
+                report_mismatched_type_name(
+                    &self.context,
+                    &MISMATCHED_NAMEDTUPLE_NAME,
+                    name_arg,
+                    kind,
+                    &assigned_name,
+                    Some(actual_name),
+                    name_type,
+                );
+            }
+        } else if !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -343,20 +372,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Expected `str`, found `{}`",
                 name_type.display(db, env)
             ));
-        } else if let Some(actual_name) = name
-            && let Some(definition) = definition
-            && let Some(assigned_name) = definition.name(db)
-            && assigned_name.as_str() != actual_name
-        {
-            report_mismatched_type_name(
-                &self.context,
-                &MISMATCHED_NAMEDTUPLE_NAME,
-                name_arg,
-                kind,
-                &assigned_name,
-                Some(actual_name),
-                name_type,
-            );
         }
 
         let name = name.unwrap_or("<unknown>");

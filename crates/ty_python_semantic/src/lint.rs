@@ -507,6 +507,11 @@ impl LintRegistry {
         }
     }
 
+    /// Returns the replacement rules for a deprecated lint name.
+    pub fn replacement_lints(&self, name: &str) -> Option<&'static [LintId]> {
+        self.by_name.get(name)?.id().status.replacements()
+    }
+
     /// Returns an iterator over all known aliases and to their target lints.
     ///
     /// This iterator includes aliases that point to removed lints.

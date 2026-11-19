@@ -263,6 +263,25 @@ reveal_type(Mismatch)  # revealed: <class 'WrongName'>
 reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Literal[True]]
 ```
 
+### Invalid literal names
+
+Both factories reject names that are keywords or invalid identifiers. A bad name is reported by
+`invalid-named-tuple` even when the name mismatch rule is enabled.
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+# error: [invalid-named-tuple] "Type name "not valid" in `NamedTuple()` is not a valid Python identifier"
+Spaced = NamedTuple("not valid", [("x", int)])
+
+# error: [invalid-named-tuple] "Type name "class" in `namedtuple()` cannot be a Python keyword"
+Keyword = namedtuple(typename="class", field_names="x", rename=True)
+
+# Soft keywords are valid type names.
+match = namedtuple("match", "x")  # ok
+```
+
 ### Functional syntax with string annotations
 
 String annotations (forward references) are properly evaluated to types:

@@ -12,8 +12,7 @@ A mismatched name can be a typo and can make a namedtuple's runtime representati
 ## Default level
 
 This rule is disabled by default because namedtuple names are not required to match their assigned
-variables, and sometimes the preferred `__repr__` for a namedtuple may include non-identifier
-characters.
+variables.
 
 Enable this rule to enforce consistent namedtuple naming.
 
@@ -28,6 +27,11 @@ Point = NamedTuple("Vector", [("x", int)])
 # error: [mismatched-namedtuple-name] "Expected "Pair", got "Coordinates""
 Pair = namedtuple("Coordinates", "x y")
 ```
+
+## See also
+
+`invalid-named-tuple` is emitted on namedtuples that will actually lead to exceptions being raised
+at runtime, due to a `typename` that is either an invalid identifier or a keyword.
 
 ## Rule history
 

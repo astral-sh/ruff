@@ -76,6 +76,7 @@ from typing import Generic, TypeVar
 
 # error: [mismatched-typevar-name]
 T = TypeVar("Q")
+reveal_type(T.__name__)  # revealed: Literal["Q"]
 
 class Box(Generic[T]): ...
 

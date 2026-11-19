@@ -214,6 +214,62 @@ fn baseline_accepts_previous_rule_name() {
 }
 
 #[test]
+fn baseline_accepts_split_rule_name() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "test.py",
+            "from typing import TypeVar\nT = TypeVar(\"U\")\n",
+        ),
+        (
+            "baseline.json",
+            r#"{
+                "version": 0,
+                "files": {"test.py": [
+                    {"rule": "mismatched-type-name", "startColumn": 12, "endColumn": 15, "lineCount": 1}
+                ]}
+            }"#,
+        ),
+    ])?;
+    let args = [
+        "--baseline",
+        "baseline.json",
+        "--error-on-warning",
+        "--output-format=concise",
+    ];
+
+    assert_cmd_snapshot!(case.command().args(args), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    // Both replacements can match the old rule name and underline the same columns. One baseline
+    // entry suppresses only one diagnostic.
+    case.write_file(
+        "test.py",
+        r#"
+        from typing import NewType, TypeVar
+        N = NewType("M", int)
+        T = TypeVar("U")
+        "#,
+    )?;
+    assert_cmd_snapshot!(case.command().args(args), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:4:13: warning[mismatched-typevar-name] The name passed to `TypeVar` must match the variable it is assigned to: Expected "T", got "U"
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn update_baseline_is_idempotent() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "test.py",

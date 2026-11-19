@@ -3458,13 +3458,13 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.19">0
 **What it does**
 
 
-Checks for invalidly defined `NamedTuple` classes.
+Checks for invalid definitions of `typing.NamedTuple` and `collections.namedtuple` classes.
 
 **Why is this bad?**
 
 
 An invalidly defined `NamedTuple` class may lead to the type checker drawing incorrect conclusions.
-It may also lead to `TypeError`s or `AttributeError`s at runtime.
+It may also lead to errors at runtime, such as `ValueError`, `TypeError`, or `AttributeError`.
 
 **Examples**
 
@@ -3486,6 +3486,32 @@ Further, `NamedTuple` field names cannot start with an underscore:
 >>> class Foo(NamedTuple):
 ...     _bar: int
 ValueError: Field names cannot start with an underscore: '_bar'
+```
+
+Nor can they be keywords:
+
+```pycon
+>>> from collections import namedtuple
+>>> X = namedtuple("X", ["class"])
+ValueError: Type names and field names cannot be a keyword: 'class'
+```
+
+or invalid identifiers:
+
+```pycon
+>>> from collections import namedtuple
+>>> X = namedtuple("X", ["-"])
+ValueError: Type names and field names must be valid identifiers: '-
+```
+
+Similar restrictions apply to the `typename` argument:
+
+```pycon
+>>> from typing import NamedTuple
+>>> X = NamedTuple("class", [])
+ValueError: Type names and field names cannot be a keyword: 'class'
+>>> X = NamedTuple("x-", [])
+ValueError: Type names and field names must be valid identifiers: 'x-'
 ```
 
 `NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`, `_replace`,
@@ -4771,8 +4797,7 @@ A mismatched name can be a typo and can make a namedtuple's runtime representati
 
 
 This rule is disabled by default because namedtuple names are not required to match their assigned
-variables, and sometimes the preferred `__repr__` for a namedtuple may include non-identifier
-characters.
+variables.
 
 Enable this rule to enforce consistent namedtuple naming.
 
@@ -4788,6 +4813,12 @@ Point = NamedTuple("Vector", [("x", int)])
 # error: [mismatched-namedtuple-name] "Expected "Pair", got "Coordinates""
 Pair = namedtuple("Coordinates", "x y")
 ```
+
+**See also**
+
+
+[`invalid-named-tuple`](#invalid-named-tuple) is emitted on namedtuples that will actually lead to exceptions being raised
+at runtime, due to a `typename` that is either an invalid identifier or a keyword.
 
 **Rule history**
 
