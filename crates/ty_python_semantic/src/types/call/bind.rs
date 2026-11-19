@@ -6874,8 +6874,8 @@ impl<'db> CallInference<'_, 'db> {
             if variance == TypeVarVariance::Invariant {
                 return true;
             }
-            // Captured parameter lists carry only input types. Their variance in the returned
-            // type is accounted for above, including any correlation with its output types.
+            // ParamSpec bindings use callable types to represent parameter lists. The pairwise
+            // check would treat those callables as potentially stateful.
             if variable.is_paramspec(db) {
                 return false;
             }
