@@ -17,8 +17,14 @@ mod tests {
 
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.py"))]
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.pyi"))]
-    #[test_case(Rule::UntypedArgumentDefaultInStub, Path::new("PYI014.py"))]
-    #[test_case(Rule::UntypedArgumentDefaultInStub, Path::new("PYI014.pyi"))]
+    #[test_case(
+        Rule::ComplexDefaultForUnannotatedParameterInStub,
+        Path::new("PYI014.py")
+    )]
+    #[test_case(
+        Rule::ComplexDefaultForUnannotatedParameterInStub,
+        Path::new("PYI014.pyi")
+    )]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.py"))]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.pyi"))]
     #[test_case(Rule::BadExitAnnotation, Path::new("PYI036.py"))]
@@ -27,8 +33,8 @@ mod tests {
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.pyi"))]
     #[test_case(Rule::BadVersionInfoOrder, Path::new("PYI066.py"))]
     #[test_case(Rule::BadVersionInfoOrder, Path::new("PYI066.pyi"))]
-    #[test_case(Rule::ByteStringType, Path::new("PYI057.py"))]
-    #[test_case(Rule::ByteStringType, Path::new("PYI057.pyi"))]
+    #[test_case(Rule::DeprecatedByteStringType, Path::new("PYI057.py"))]
+    #[test_case(Rule::DeprecatedByteStringType, Path::new("PYI057.pyi"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.py"))]
     #[test_case(Rule::CollectionsNamedTuple, Path::new("PYI024.pyi"))]
     #[test_case(Rule::ComplexAssignmentInStub, Path::new("PYI017.py"))]
@@ -45,14 +51,14 @@ mod tests {
     #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.pyi"))]
     #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.py"))]
     #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.pyi"))]
-    #[test_case(Rule::IterMethodGeneratorReturnType, Path::new("PYI058.py"))]
-    #[test_case(Rule::IterMethodGeneratorReturnType, Path::new("PYI058.pyi"))]
+    #[test_case(Rule::IterMethodWithGeneratorReturnAnnotation, Path::new("PYI058.py"))]
+    #[test_case(Rule::IterMethodWithGeneratorReturnAnnotation, Path::new("PYI058.pyi"))]
     #[test_case(Rule::GenericNotLastBaseClass, Path::new("PYI059.py"))]
     #[test_case(Rule::GenericNotLastBaseClass, Path::new("PYI059.pyi"))]
     #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.py"))]
     #[test_case(Rule::IterMethodReturnIterable, Path::new("PYI045.pyi"))]
-    #[test_case(Rule::NoReturnParameterAnnotation, Path::new("PYI050.py"))]
-    #[test_case(Rule::NoReturnParameterAnnotation, Path::new("PYI050.pyi"))]
+    #[test_case(Rule::ParameterAnnotatedWithNoReturn, Path::new("PYI050.py"))]
+    #[test_case(Rule::ParameterAnnotatedWithNoReturn, Path::new("PYI050.pyi"))]
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.py"))]
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.pyi"))]
     #[test_case(Rule::NonSelfReturnType, Path::new("PYI034.py"))]
@@ -86,12 +92,18 @@ mod tests {
     #[test_case(Rule::StringOrBytesTooLong, Path::new("PYI053.pyi"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.py"))]
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.pyi"))]
-    #[test_case(Rule::UnannotatedTypeAlias, Path::new("PYI026.py"))]
-    #[test_case(Rule::UnannotatedTypeAlias, Path::new("PYI026.pyi"))]
+    #[test_case(Rule::UnannotatedTypeAliasInStub, Path::new("PYI026.py"))]
+    #[test_case(Rule::UnannotatedTypeAliasInStub, Path::new("PYI026.pyi"))]
     #[test_case(Rule::LegacyTypeComment, Path::new("PYI033.py"))]
     #[test_case(Rule::LegacyTypeComment, Path::new("PYI033.pyi"))]
-    #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.py"))]
-    #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.pyi"))]
+    #[test_case(
+        Rule::ComplexDefaultForAnnotatedParameterInStub,
+        Path::new("PYI011.py")
+    )]
+    #[test_case(
+        Rule::ComplexDefaultForAnnotatedParameterInStub,
+        Path::new("PYI011.pyi")
+    )]
     #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_1.py"))]
     #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_1.pyi"))]
     #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_2.py"))]
@@ -174,8 +186,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::UnannotatedTypeAlias, Path::new("PYI026.py"))]
-    #[test_case(Rule::UnannotatedTypeAlias, Path::new("PYI026.pyi"))]
+    #[test_case(Rule::UnannotatedTypeAliasInStub, Path::new("PYI026.py"))]
+    #[test_case(Rule::UnannotatedTypeAliasInStub, Path::new("PYI026.pyi"))]
     #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.py"))]
     #[test_case(Rule::RedundantNoneLiteral, Path::new("PYI061.pyi"))]
     fn py38(rule_code: Rule, path: &Path) -> Result<()> {

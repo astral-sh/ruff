@@ -610,7 +610,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::CustomTypeVarForSelf), // PYI019
     RuleSelector::rule(Rule::QuotedAnnotationInStub), // PYI020
     RuleSelector::rule(Rule::UnaliasedCollectionsAbcSetImport), // PYI025
-    RuleSelector::rule(Rule::UnannotatedTypeAlias), // PYI026
+    RuleSelector::rule(Rule::UnannotatedTypeAliasInStub), // PYI026
     RuleSelector::rule(Rule::StrOrReprDefinedInStub), // PYI029
     RuleSelector::rule(Rule::UnnecessaryLiteralUnion), // PYI030
     RuleSelector::rule(Rule::AnyEqNeAnnotation), // PYI032
@@ -627,11 +627,11 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnusedPrivateTypeAlias), // PYI047
     RuleSelector::rule(Rule::StubBodyMultipleStatements), // PYI048
     RuleSelector::rule(Rule::UnusedPrivateTypedDict), // PYI049
-    RuleSelector::rule(Rule::NoReturnParameterAnnotation), // PYI050
+    RuleSelector::rule(Rule::ParameterAnnotatedWithNoReturn), // PYI050
     RuleSelector::rule(Rule::UnannotatedAssignmentInStub), // PYI052
     RuleSelector::rule(Rule::UnnecessaryTypeUnion), // PYI055
-    RuleSelector::rule(Rule::ByteStringType), // PYI057
-    RuleSelector::rule(Rule::IterMethodGeneratorReturnType), // PYI058
+    RuleSelector::rule(Rule::DeprecatedByteStringType), // PYI057
+    RuleSelector::rule(Rule::IterMethodWithGeneratorReturnAnnotation), // PYI058
     RuleSelector::rule(Rule::GenericNotLastBaseClass), // PYI059
     RuleSelector::rule(Rule::RedundantNoneLiteral), // PYI061
     RuleSelector::rule(Rule::DuplicateLiteralMember), // PYI062
@@ -720,7 +720,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryFutureImport), // UP010
     RuleSelector::rule(Rule::LRUCacheWithoutParameters), // UP011
     RuleSelector::rule(Rule::UnnecessaryEncodeUTF8), // UP012
-    RuleSelector::rule(Rule::NamedTupleFunctional), // UP014
+    RuleSelector::rule(Rule::FunctionalNamedTuple), // UP014
     RuleSelector::rule(Rule::DatetimeTimezoneUTC), // UP017
     RuleSelector::rule(Rule::NativeLiterals), // UP018
     RuleSelector::rule(Rule::TypingTextStrAlias), // UP019

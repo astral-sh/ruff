@@ -124,18 +124,22 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "boolean-type-hint-positional-argument",
-        Rule::BooleanPositionalParameter,
+        Rule::BooleanAnnotatedPositionalParameter,
+    ),
+    (
+        "boolean-default-value-positional-argument",
+        Rule::BooleanDefaultValuePositionalParameter,
     ),
     ("invalid-class-name", Rule::NonCamelCaseClassName),
     ("invalid-function-name", Rule::NonLowercaseFunctionName),
-    ("invalid-argument-name", Rule::NonLowercaseArgumentName),
+    ("invalid-argument-name", Rule::NonLowercaseParameterName),
     (
         "invalid-first-argument-name-for-class-method",
-        Rule::ClassMethodFirstArgumentNotCls,
+        Rule::ClassMethodReceiverNotNamedCls,
     ),
     (
         "invalid-first-argument-name-for-method",
-        Rule::InstanceMethodFirstArgumentNotSelf,
+        Rule::InstanceMethodReceiverNotNamedSelf,
     ),
     (
         "camelcase-imported-as-lowercase",
@@ -151,34 +155,41 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "error-suffix-on-exception-name",
-        Rule::MissingErrorSuffixOnExceptionName,
+        Rule::ExceptionClassWithoutErrorSuffix,
     ),
     ("no-classmethod-decorator", Rule::NonDecoratorClassmethod),
     ("no-staticmethod-decorator", Rule::NonDecoratorStaticmethod),
     ("no-self-use", Rule::UnusedSelf),
     (
-        "argument-default-in-stub",
-        Rule::UntypedArgumentDefaultInStub,
+        "typed-argument-default-in-stub",
+        Rule::ComplexDefaultForAnnotatedParameterInStub,
     ),
-    ("type-alias-without-annotation", Rule::UnannotatedTypeAlias),
+    (
+        "argument-default-in-stub",
+        Rule::ComplexDefaultForUnannotatedParameterInStub,
+    ),
+    (
+        "type-alias-without-annotation",
+        Rule::UnannotatedTypeAliasInStub,
+    ),
     (
         "no-return-argument-annotation-in-stub",
-        Rule::NoReturnParameterAnnotation,
+        Rule::ParameterAnnotatedWithNoReturn,
     ),
     ("redundant-literal-union", Rule::LiteralUnionWithSupertype),
-    ("byte-string-usage", Rule::ByteStringType),
+    ("byte-string-usage", Rule::DeprecatedByteStringType),
     (
         "generator-return-from-iter-method",
-        Rule::IterMethodGeneratorReturnType,
+        Rule::IterMethodWithGeneratorReturnAnnotation,
     ),
-    ("runtime-cast-value", Rule::TypingCastUnquotedType),
+    ("runtime-cast-value", Rule::CastWithUnquotedType),
     (
         "convert-typed-dict-functional-to-class",
-        Rule::TypedDictFunctional,
+        Rule::FunctionalTypedDict,
     ),
     (
         "convert-named-tuple-functional-to-class",
-        Rule::NamedTupleFunctional,
+        Rule::FunctionalNamedTuple,
     ),
     ("replace-str-enum", Rule::ManualStrEnum),
 ];

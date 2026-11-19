@@ -513,7 +513,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::PandasUseOfDotValues) {
                 pandas_vet::rules::attr(checker, attribute);
             }
-            if checker.is_rule_enabled(Rule::ByteStringType) {
+            if checker.is_rule_enabled(Rule::DeprecatedByteStringType) {
                 flake8_pyi::rules::bytestring_attribute(checker, expr);
             }
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
@@ -1701,7 +1701,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &lambda.into());
             }
-            if checker.is_rule_enabled(Rule::NonLowercaseArgumentName) {
+            if checker.is_rule_enabled(Rule::NonLowercaseParameterName) {
                 pep8_naming::rules::invalid_argument_name_lambda(checker, lambda);
             }
         }

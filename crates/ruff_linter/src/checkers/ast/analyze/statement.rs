@@ -132,7 +132,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     parameters,
                 );
             }
-            if checker.is_rule_enabled(Rule::IterMethodGeneratorReturnType) {
+            if checker.is_rule_enabled(Rule::IterMethodWithGeneratorReturnAnnotation) {
                 flake8_pyi::rules::bad_generator_return_type(function_def, checker);
             }
             if checker.is_rule_enabled(Rule::StopIterationReturn) {
@@ -144,7 +144,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.source_type.is_stub() || checker.target_version() >= PythonVersion::PY311 {
-                if checker.is_rule_enabled(Rule::NoReturnParameterAnnotation) {
+                if checker.is_rule_enabled(Rule::ParameterAnnotatedWithNoReturn) {
                     flake8_pyi::rules::no_return_argument_annotation(checker, parameters);
                 }
             }
@@ -293,7 +293,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             ]) {
                 flake8_pytest_style::rules::marks(checker, decorator_list);
             }
-            if checker.is_rule_enabled(Rule::BooleanPositionalParameter) {
+            if checker.is_rule_enabled(Rule::BooleanAnnotatedPositionalParameter) {
                 flake8_boolean_trap::rules::boolean_type_hint_positional_argument(
                     checker,
                     name,
@@ -301,7 +301,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     parameters,
                 );
             }
-            if checker.is_rule_enabled(Rule::BooleanDefaultValuePositionalArgument) {
+            if checker.is_rule_enabled(Rule::BooleanDefaultValuePositionalParameter) {
                 flake8_boolean_trap::rules::boolean_default_value_positional_argument(
                     checker,
                     name,
@@ -366,7 +366,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::NonPEP695GenericFunction) {
                 pyupgrade::rules::non_pep695_generic_function(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::NonLowercaseArgumentName) {
+            if checker.is_rule_enabled(Rule::NonLowercaseParameterName) {
                 pep8_naming::rules::invalid_argument_name_function(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::PropertyWithoutReturn) {
@@ -459,7 +459,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     &checker.settings().pep8_naming.ignore_names,
                 );
             }
-            if checker.is_rule_enabled(Rule::MissingErrorSuffixOnExceptionName) {
+            if checker.is_rule_enabled(Rule::ExceptionClassWithoutErrorSuffix) {
                 pep8_naming::rules::error_suffix_on_exception_name(
                     checker,
                     stmt,
@@ -935,7 +935,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     &checker.settings().flake8_import_conventions.banned_from,
                 );
             }
-            if checker.is_rule_enabled(Rule::ByteStringType) {
+            if checker.is_rule_enabled(Rule::DeprecatedByteStringType) {
                 flake8_pyi::rules::bytestring_import(checker, import_from);
             }
         }
@@ -1453,12 +1453,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UselessMetaclassType) {
                 pyupgrade::rules::useless_metaclass_type(checker, stmt, value, targets);
             }
-            if checker.is_rule_enabled(Rule::TypedDictFunctional) {
+            if checker.is_rule_enabled(Rule::FunctionalTypedDict) {
                 pyupgrade::rules::convert_typed_dict_functional_to_class(
                     checker, stmt, targets, value,
                 );
             }
-            if checker.is_rule_enabled(Rule::NamedTupleFunctional) {
+            if checker.is_rule_enabled(Rule::FunctionalNamedTuple) {
                 pyupgrade::rules::convert_named_tuple_functional_to_class(
                     checker, stmt, targets, value,
                 );
@@ -1496,7 +1496,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     Rule::AssignmentDefaultInStub,
                     Rule::UnannotatedAssignmentInStub,
                     Rule::ComplexAssignmentInStub,
-                    Rule::UnannotatedTypeAlias,
+                    Rule::UnannotatedTypeAliasInStub,
                 ]) {
                     // Ignore assignments in function bodies; those are covered by other rules.
                     if !checker
@@ -1518,7 +1518,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         if checker.is_rule_enabled(Rule::ComplexAssignmentInStub) {
                             flake8_pyi::rules::complex_assignment_in_stub(checker, assign);
                         }
-                        if checker.is_rule_enabled(Rule::UnannotatedTypeAlias) {
+                        if checker.is_rule_enabled(Rule::UnannotatedTypeAliasInStub) {
                             flake8_pyi::rules::type_alias_without_annotation(
                                 checker, value, targets,
                             );

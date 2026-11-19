@@ -1197,7 +1197,7 @@ mod tests {
 		&LinterSettings {
 			unresolved_target_version: PythonVersion { major: 3, minor: 9 }.into(),
 			typing_extensions: false,
-			..LinterSettings::for_rule(Rule::UnannotatedTypeAlias)
+			..LinterSettings::for_rule(Rule::UnannotatedTypeAliasInStub)
 		}
 	)]
     fn test_disabled_typing_extensions_pyi(name: &str, contents: &str, settings: &LinterSettings) {

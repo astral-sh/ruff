@@ -61,17 +61,17 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// more than two statements (including docstrings) in its body.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.2.0", category = Category::Style)]
-pub(crate) struct IterMethodGeneratorReturnType {
+pub(crate) struct IterMethodWithGeneratorReturnAnnotation {
     return_type: Iterator,
     method: Method,
 }
 
-impl Violation for IterMethodGeneratorReturnType {
+impl Violation for IterMethodWithGeneratorReturnAnnotation {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IterMethodGeneratorReturnType {
+        let IterMethodWithGeneratorReturnAnnotation {
             return_type,
             method,
         } = self;
@@ -79,7 +79,7 @@ impl Violation for IterMethodGeneratorReturnType {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let IterMethodGeneratorReturnType {
+        let IterMethodWithGeneratorReturnAnnotation {
             return_type,
             method,
         } = self;
@@ -213,7 +213,7 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
         }
     }
     let mut diagnostic = checker.report_diagnostic(
-        IterMethodGeneratorReturnType {
+        IterMethodWithGeneratorReturnAnnotation {
             return_type: member.to_iter(),
             method,
         },

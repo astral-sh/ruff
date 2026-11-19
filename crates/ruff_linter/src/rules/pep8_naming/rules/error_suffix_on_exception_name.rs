@@ -37,14 +37,14 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// [PEP 8]: https://peps.python.org/pep-0008/#exception-names
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.89", category = Category::Pedantic)]
-pub(crate) struct MissingErrorSuffixOnExceptionName {
+pub(crate) struct ExceptionClassWithoutErrorSuffix {
     name: String,
 }
 
-impl Violation for MissingErrorSuffixOnExceptionName {
+impl Violation for ExceptionClassWithoutErrorSuffix {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingErrorSuffixOnExceptionName { name } = self;
+        let ExceptionClassWithoutErrorSuffix { name } = self;
         format!("Exception name `{name}` should be named with an Error suffix")
     }
 }
@@ -79,7 +79,7 @@ pub(crate) fn error_suffix_on_exception_name(
     }
 
     checker.report_diagnostic(
-        MissingErrorSuffixOnExceptionName {
+        ExceptionClassWithoutErrorSuffix {
             name: name.to_string(),
         },
         class_def.identifier(),

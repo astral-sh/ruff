@@ -18,8 +18,8 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
-        Rule::ClassMethodFirstArgumentNotCls,
-        Rule::InstanceMethodFirstArgumentNotSelf,
+        Rule::ClassMethodReceiverNotNamedCls,
+        Rule::InstanceMethodReceiverNotNamedSelf,
         Rule::MethodReceiverDefault,
         Rule::MutableClassDefault,
         Rule::MutableDataclassDefault,
@@ -272,8 +272,8 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
 
             if checker.any_rule_enabled(&[
-                Rule::ClassMethodFirstArgumentNotCls,
-                Rule::InstanceMethodFirstArgumentNotSelf,
+                Rule::ClassMethodReceiverNotNamedCls,
+                Rule::InstanceMethodReceiverNotNamedSelf,
             ]) {
                 pep8_naming::rules::invalid_first_argument_name(checker, scope);
             }
