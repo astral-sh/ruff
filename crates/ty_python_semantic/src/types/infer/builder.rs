@@ -7914,7 +7914,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ) {
                     return ty;
                 }
-            } else if let Type::Union(union) = annotation {
+            } else if let Type::Union(union) = annotation
+                && union
+                    .elements(db)
+                    .iter()
+                    .any(|ty| ty.resolve_type_alias(db).is_typed_dict())
+            {
                 let union_elements = union.elements(self.db());
                 let mut typed_dicts = Vec::new();
                 let mut has_dict_compatible_fallback = false;
