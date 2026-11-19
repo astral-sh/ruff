@@ -2017,6 +2017,32 @@ class Factory(Generic[P]):
 Factory.for_protocol(Protocol)  # ok
 ```
 
+### Inferring lambda parameters through nested calls
+
+When the outer call leaves the callback's parameter list unspecified, the lambda parameter remains
+unknown.
+
+```py
+from typing import Callable, Concatenate, ParamSpec
+
+P = ParamSpec("P")
+
+def wrap(callback: Callable[P, str]) -> Callable[P, str]:
+    return callback
+
+def register(callback: Callable[P, str]) -> None: ...
+
+register(wrap(lambda x: chr(reveal_type(x))))  # revealed: Unknown
+```
+
+A fixed prefix still supplies types for the corresponding lambda parameters.
+
+```py
+def register_prefixed(callback: Callable[Concatenate[int, P], str]) -> None: ...
+
+register_prefixed(wrap(lambda x, y: str(reveal_type((x, y)))))  # revealed: tuple[int, Unknown]
+```
+
 ### A decorator's unsolved parameter list
 
 The parameter list of `identity` is local to that function. When there is no callback to specialize
