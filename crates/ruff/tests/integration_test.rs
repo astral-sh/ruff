@@ -1377,7 +1377,7 @@ fn preview_disabled_direct() {
     All checks passed!
 
     ----- stderr -----
-    warning: Selection `RUF911` has no effect because preview is not enabled.
+    warning: Selection `preview-test-rule` (`RUF911`) has no effect because preview is not enabled.
     ");
 }
 
@@ -1494,7 +1494,7 @@ fn removed_direct() {
 
     ----- stderr -----
     ruff failed
-      Cause: Rule `RUF931` was removed and cannot be selected.
+      Cause: Rule `another-removed-test-rule` (`RUF931`) was removed and cannot be selected.
     ");
 }
 
@@ -1513,8 +1513,8 @@ fn removed_direct_multiple() {
     ----- stderr -----
     ruff failed
       Cause: The following rules have been removed and cannot be selected:
-        - RUF930
-        - RUF931
+        - `removed-test-rule` (`RUF930`)
+        - `another-removed-test-rule` (`RUF931`)
     ");
 }
 
@@ -1544,7 +1544,7 @@ fn removed_ignore_direct() {
 
     ----- stderr -----
     warning: The following rules have been removed and ignoring them has no effect:
-        - UP027
+        - `unpacked-list-comprehension` (`UP027`)
     ");
 }
 
@@ -1561,8 +1561,8 @@ fn removed_ignore_multiple_direct() {
 
     ----- stderr -----
     warning: The following rules have been removed and ignoring them has no effect:
-        - PLR1706
-        - UP027
+        - `and-or-ternary` (`PLR1706`)
+        - `unpacked-list-comprehension` (`UP027`)
     ");
 }
 
@@ -1662,7 +1662,7 @@ fn deprecated_direct() {
     Found 1 error.
 
     ----- stderr -----
-    warning: Rule `RUF920` is deprecated and will be removed in a future release.
+    warning: Rule `deprecated-test-rule` (`RUF920`) is deprecated and will be removed in a future release.
     ");
 }
 
@@ -1686,8 +1686,8 @@ fn deprecated_multiple_direct() {
     Found 2 errors.
 
     ----- stderr -----
-    warning: Rule `RUF920` is deprecated and will be removed in a future release.
-    warning: Rule `RUF921` is deprecated and will be removed in a future release.
+    warning: Rule `deprecated-test-rule` (`RUF920`) is deprecated and will be removed in a future release.
+    warning: Rule `another-deprecated-test-rule` (`RUF921`) is deprecated and will be removed in a future release.
     ");
 }
 
@@ -1719,7 +1719,7 @@ fn deprecated_direct_preview_enabled() {
 
     ----- stderr -----
     ruff failed
-      Cause: Selection of deprecated rule `RUF920` is not allowed when preview is enabled.
+      Cause: Selection of deprecated rule `deprecated-test-rule` (`RUF920`) is not allowed when preview is enabled.
     ");
 }
 
@@ -1754,8 +1754,8 @@ fn deprecated_multiple_direct_preview_enabled() {
     ----- stderr -----
     ruff failed
       Cause: Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:
-    	- RUF920
-    	- RUF921
+        - `deprecated-test-rule` (`RUF920`)
+        - `another-deprecated-test-rule` (`RUF921`)
     ");
 }
 
