@@ -21,12 +21,16 @@ use crate::{FixAvailability, Violation};
 /// ## Example
 ///
 /// ```python
+/// import os
+///
 /// os.chmod("foo", 644)
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
+/// import os
+///
 /// os.chmod("foo", 0o644)
 /// ```
 ///
