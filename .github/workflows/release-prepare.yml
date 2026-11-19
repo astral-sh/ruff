@@ -84,6 +84,48 @@ jobs:
           git switch -c "release/$version"
           git commit -am "Bump version to $version"
 
+      - name: "Prepare Codex prompt"
+        run: |
+          {
+            printf 'Release preparation for Ruff %s: Rewrite changelog\n\n' "$(uv version --short)"
+            cat .agents/prompts/editorialize-changelog.md
+          } > "$RUNNER_TEMP/editorialize-changelog-prompt.md"
+
+      - name: "Rewrite changelog"
+        uses: openai/codex-action@c05cfd74ad95c626cdf05c6685e62becc3bf7813
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          codex-version: "0.169.0"
+          model: gpt-5.6-sol
+          effort: high
+          permission-profile: ":read-only"
+          safety-strategy: drop-sudo
+          prompt-file: "${{ runner.temp }}/editorialize-changelog-prompt.md"
+          output-file: "${{ runner.temp }}/changelog-section.md"
+
+      - name: "Upload Codex thread"
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codex-thread-release-prepare-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ~/.codex/sessions
+          if-no-files-found: warn
+
+      - name: "Apply changelog rewrite"
+        run: |
+          uv run --locked scripts/update-latest-changelog-section.py \
+            CHANGELOG.md \
+            "$RUNNER_TEMP/changelog-section.md"
+
+      - name: "Commit changelog rewrite"
+        run: |
+          git diff --check -- CHANGELOG.md
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "Codex left the generated changelog unchanged."
+          else
+            git -c core.hooksPath=/dev/null commit --only --message "Rewrite changelog" -- CHANGELOG.md
+          fi
+
       - name: "Create or update pull request"
         run: |
           branch="$(git branch --show-current)"
