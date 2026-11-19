@@ -118,6 +118,18 @@ bad_key: dict[str, object] = {1: 2}
 bad_mapping_key: Mapping[str, object] = {1: 2}
 ```
 
+The collection's element type cannot be chosen by specializing a type variable from an outer scope:
+
+```py
+from collections.abc import Sequence
+from typing import TypeVar
+
+T = TypeVar("T", bound=str)
+
+def _(value: T):
+    items: Sequence[int] = [value]  # error: [invalid-assignment]
+```
+
 ## Mutually assignable annotated assignments use the declared type
 
 When an annotated assignment has a value whose inferred type is assignable to the declared type, the

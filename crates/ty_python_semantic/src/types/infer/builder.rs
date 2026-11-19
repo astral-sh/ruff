@@ -8207,7 +8207,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let mut elements: [Option<UnionAccumulator<'db>>; N] = std::array::from_fn(|_| None);
+        let mut elements: [SmallVec<[Type<'db>; 2]>; N] = std::array::from_fn(|_| SmallVec::new());
         let mut tuple_size_promotion = [true; N];
         let mut record_element = |index: usize, ty: Type<'db>, expression: Option<&ast::Expr>| {
             let promoted = ty.promote(db, env);
@@ -8219,12 +8219,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty
             };
             // Ignore provisional evidence before combining it with known element types.
-            if !ty.has_unspecialized_type_var(db, env) {
-                match &mut elements[index] {
-                    Some(UnionAccumulator::One(existing)) if *existing == ty => {}
-                    Some(existing) => existing.add(db, env, ty),
-                    element @ None => *element = Some(UnionAccumulator::new(ty)),
-                }
+            if elements[index].last() != Some(&ty) && !ty.has_unspecialized_type_var(db, env) {
+                elements[index].push(ty);
             }
         };
         for elts in elts {
@@ -8286,9 +8282,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // expected collection. Combine the elements first to avoid a constraint per item.
         let inferred = generic_context
             .variables(db)
-            .zip(elements)
-            .filter_map(|(typevar, elt)| Some((typevar, elt?.into_type(db, env))))
-            .when_all(db, &constraints, |(typevar, ty)| {
+            .zip(&elements)
+            .filter(|(_, elements)| !elements.is_empty())
+            .when_all(db, &constraints, |(typevar, elements)| {
+                let ty = UnionType::from_elements(db, env, elements.iter().copied());
                 ty.when_constraint_set_assignable_to(db, env, Type::TypeVar(typevar), &constraints)
             });
 
@@ -8353,9 +8350,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Some(choose(bounds?, true))
                 })
             {
-                let ty =
-                    identity_instance.apply_specialization(db, inference.merged_specialization(db));
-                if ty.is_assignable_to(db, env, expected) {
+                let specialization = inference.merged_specialization(db);
+                let ty = identity_instance.apply_specialization(db, specialization);
+
+                // As in a generic call, check the inputs against the chosen specialization.
+                if ty.is_assignable_to(db, env, expected)
+                    && elements
+                        .iter()
+                        .zip(specialization.types(db))
+                        .all(|(elements, &target)| {
+                            elements
+                                .iter()
+                                .all(|elt| elt.is_assignable_to(db, env, target))
+                        })
+                {
                     return Some(ty);
                 }
             }
