@@ -6854,6 +6854,9 @@ impl<'db> CallInference<'_, 'db> {
         // In particular, `Callable[P, R]` can capture state linking its inputs and output.
         // The same applies to `Callable[[T], U]`. Output-only callables can still refine their
         // covariant return types.
+        //
+        // TODO: Account for state shared across calls in returns like
+        // `Callable[P, Callable[P, R]]`, where both occurrences of `P` are contravariant.
         let mut variance = TypeVarVariance::Bivariant;
         let invariant_visitor = PairVisitor::new(true);
         let mut remaining_comparisons = SolutionBudget::default().visits;
