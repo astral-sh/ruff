@@ -696,6 +696,24 @@ impl PlaceState {
             .merge(b.declarations, reachability_constraints);
     }
 
+    /// Replaces the shared reachability of a sole binding and declaration if both match `previous`.
+    pub(super) fn try_replace_reachability(
+        &mut self,
+        previous: ScopedReachabilityConstraintId,
+        next: ScopedReachabilityConstraintId,
+    ) -> bool {
+        if self
+            .singleton()
+            .is_some_and(|(binding, _)| binding.reachability_constraint == previous)
+        {
+            self.bindings.live_bindings[0].reachability_constraint = next;
+            self.declarations.live_declarations[0].reachability_constraint = next;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Return the sole binding and declaration if they share a reachability constraint and the
     /// place has no separate narrowing constraint for an unbound name.
     fn singleton(&self) -> Option<(&LiveBinding, &LiveDeclaration)> {
