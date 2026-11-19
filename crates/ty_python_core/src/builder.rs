@@ -150,33 +150,25 @@ type NestedGlobalOrNonlocalDeclarations = FxHashMap<Name, SmallVec<[NestedDeclar
 ///     value = 1
 /// ```
 ///
-/// Each pending capture remembers the bindings visible when the nested scope was created and, for
-/// lazy scopes, any bindings added afterward.
+/// Free uses of the same name can share a pending capture if they have the same
+/// visibility of enclosing class namespaces. They will resolve to the same binding
+/// scope, so we need only the bindings visible at any of the uses, plus subsequent
+/// bindings if any use is lazy.
 type PendingCaptures = FxHashMap<Name, SmallVec<[PendingCapture; 1]>>;
 
 #[derive(Debug)]
 struct PendingCapture {
-    nested_scope: FileScopeId,
+    class_visible: bool,
     laziness: ScopeLaziness,
     binding_definition_ids: SmallVec<[ScopedDefinitionId; 2]>,
 }
 
 #[derive(Debug)]
 struct UnresolvedCapture {
-    /// The scope containing the free symbol use. Retaining this lets final resolution apply class
-    /// scope visibility rules correctly as the capture is propagated outward.
-    nested_scope: FileScopeId,
     name: Name,
+    /// True if every scope crossed since the use is an annotation scope.
+    class_visible: bool,
     laziness: ScopeLaziness,
-}
-
-impl UnresolvedCapture {
-    fn through_scope(mut self, scope_laziness: ScopeLaziness) -> Self {
-        if scope_laziness.is_lazy() {
-            self.laziness = ScopeLaziness::Lazy;
-        }
-        self
-    }
 }
 
 #[derive(Copy, Clone, Debug, get_size2::GetSize)]
@@ -631,7 +623,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         if let Some(pending) = captures
             .iter_mut()
-            .find(|pending| pending.nested_scope == capture.nested_scope)
+            .find(|pending| pending.class_visible == capture.class_visible)
         {
             pending
                 .binding_definition_ids
@@ -641,7 +633,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         } else {
             captures.push(PendingCapture {
-                nested_scope: capture.nested_scope,
+                class_visible: capture.class_visible,
                 laziness: capture.laziness,
                 binding_definition_ids,
             });
@@ -677,41 +669,46 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn finish_pending_captures(
         &mut self,
         popped_scope_id: FileScopeId,
-        popped_scope_laziness: ScopeLaziness,
+        popped_scope_kind: ScopeKind,
         pending_captures: PendingCaptures,
     ) -> Vec<UnresolvedCapture> {
         let mut unresolved = Vec::new();
+        let table = &self.place_tables[popped_scope_id];
+        let laziness = popped_scope_kind.laziness();
 
         #[expect(
             clippy::iter_over_hash_type,
             reason = "capture resolution and usage marking are order-independent"
         )]
         for (name, captures) in pending_captures {
+            // Each intervening scope has already had its chance to resolve the name.
+            let is_local = table
+                .symbol_id(&name)
+                .is_some_and(|id| table.symbol(id).is_local());
             for capture in captures {
-                if self.resolve_nested_reference_scope(capture.nested_scope, &name)
-                    == Some(popped_scope_id)
-                {
+                if is_local && (!popped_scope_kind.is_class() || capture.class_visible) {
                     self.use_def_maps[popped_scope_id]
                         .mark_binding_definitions_used(capture.binding_definition_ids);
                 } else {
-                    unresolved.push(
-                        UnresolvedCapture {
-                            nested_scope: capture.nested_scope,
-                            name: name.clone(),
-                            laziness: capture.laziness,
-                        }
-                        .through_scope(popped_scope_laziness),
-                    );
+                    unresolved.push(UnresolvedCapture {
+                        name: name.clone(),
+                        class_visible: capture.class_visible && popped_scope_kind.is_annotation(),
+                        laziness: if laziness.is_lazy() {
+                            laziness
+                        } else {
+                            capture.laziness
+                        },
+                    });
                 }
             }
         }
 
-        for symbol in self.place_tables[popped_scope_id].symbols() {
+        for symbol in table.symbols() {
             if symbol.is_used() && !symbol.is_local() && !symbol.is_global() {
                 unresolved.push(UnresolvedCapture {
-                    nested_scope: popped_scope_id,
                     name: symbol.name().clone(),
-                    laziness: popped_scope_laziness,
+                    class_visible: popped_scope_kind.is_annotation(),
+                    laziness,
                 });
             }
         }
@@ -867,25 +864,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         FrozenMap::from_entries(snapshots)
     }
 
-    /// Finds the nearest visible ancestor scope that actually owns a local binding for `name`.
-    fn resolve_nested_reference_scope(
-        &self,
-        nested_scope: FileScopeId,
-        name: &str,
-    ) -> Option<FileScopeId> {
-        self.visible_ancestor_scopes(nested_scope)
-            .skip(1)
-            .find_map(|(scope_id, _)| {
-                let place_table = &self.place_tables[scope_id];
-                let symbol_id = place_table.symbol_id(name)?;
-                let symbol = place_table.symbol(symbol_id);
-
-                // Only a true local binding in an ancestor scope can be the resolution target.
-                // `global`/`nonlocal` here are forwarding declarations, not owning bindings.
-                symbol.is_local().then_some(scope_id)
-            })
-    }
-
     /// Returns the `NestedGlobalOrNonlocalDeclarations` that are still visible to the enclosing
     /// scope, including those contributed by `global` and `nonlocal` keywords in the popped scope,
     /// but excluding nested `nonlocal`s that resolved to the popped scope.
@@ -920,7 +898,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         let unresolved_captures =
-            self.finish_pending_captures(popped_scope_id, popped_scope_laziness, pending_captures);
+            self.finish_pending_captures(popped_scope_id, popped_scope_kind, pending_captures);
         if !self.scope_stack.is_empty() {
             for capture in unresolved_captures {
                 self.register_pending_capture(capture);

@@ -696,6 +696,30 @@ mod tests {
     }
 
     #[test]
+    fn class_captures_from_alias_and_method_resolve_separately() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                shared = int
+                shadowed = int
+
+                class C:
+                    shared = str
+                    shadowed = str
+                    type Alias = tuple[shared, shadowed]
+
+                    def method(self):
+                        return shared
+
+                return C
+            ",
+        );
+
+        assert_eq!(collect_unused_names(&source)?, vec!["shadowed"]);
+        Ok(())
+    }
+
+    #[test]
     fn closure_use_does_not_mark_shadowed_binding_used() -> anyhow::Result<()> {
         let source = dedent(
             "
