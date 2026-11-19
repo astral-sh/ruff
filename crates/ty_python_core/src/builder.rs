@@ -623,29 +623,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
             .collect();
 
-        let captures = self
-            .current_scope_info_mut()
+        // A scope contributes each free name once from its symbol table. Each enclosing
+        // scope forwards that capture at most once when it pops.
+        self.current_scope_info_mut()
             .pending_captures
             .entry(capture.name)
-            .or_default();
-
-        if let Some(pending) = captures
-            .iter_mut()
-            .find(|pending| pending.nested_scope == capture.nested_scope)
-        {
-            pending
-                .binding_definition_ids
-                .extend(binding_definition_ids);
-            if capture.laziness.is_lazy() {
-                pending.laziness = ScopeLaziness::Lazy;
-            }
-        } else {
-            captures.push(PendingCapture {
+            .or_default()
+            .push(PendingCapture {
                 nested_scope: capture.nested_scope,
                 laziness: capture.laziness,
                 binding_definition_ids,
             });
-        }
     }
 
     fn record_pending_capture_binding(
