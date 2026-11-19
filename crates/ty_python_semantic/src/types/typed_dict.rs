@@ -819,6 +819,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.always();
         }
 
+        // Mutable fields require the relation in both directions. For identical annotations,
+        // the reverse check would repeat the forward check with exactly the same arguments.
+        let check_mutable_field = |source, target| {
+            let forward = self.check_type_pair(db, source, target);
+            if forward.is_trivially_always_satisfied() && source == target {
+                return forward;
+            }
+            forward.and(db, self.constraints, || {
+                self.check_type_pair(db, target, source)
+            })
+        };
+
         let source_items = source.items(db);
         let target_items = target.items(db);
         let source_openness = source.openness(db);
@@ -877,18 +889,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // invariants of self. For fully-static types, this is "equivalence".
                     // For gradual types, it depends on the relation, but mutual
                     // assignability is "consistency".
-                    self.check_type_pair(
-                        db,
+                    check_mutable_field(
                         source_item_field.declared_ty,
                         target_item_field.declared_ty,
                     )
-                    .and(db, self.constraints, || {
-                        self.check_type_pair(
-                            db,
-                            target_item_field.declared_ty,
-                            source_item_field.declared_ty,
-                        )
-                    })
                 }
             } else {
                 // `NotRequired[]` target fields
@@ -943,18 +947,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                         // As above, for mutable fields in the target, the relation needs
                         // to apply both ways.
-                        self.check_type_pair(
-                            db,
+                        check_mutable_field(
                             source_item_field.declared_ty,
                             target_item_field.declared_ty,
                         )
-                        .and(db, self.constraints, || {
-                            self.check_type_pair(
-                                db,
-                                target_item_field.declared_ty,
-                                source_item_field.declared_ty,
-                            )
-                        })
                     } else {
                         let Some(source_extra_items) = source_openness.explicit_extra_items()
                         else {
@@ -963,18 +959,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         if source_extra_items.is_read_only() {
                             return self.never();
                         }
-                        self.check_type_pair(
-                            db,
+                        check_mutable_field(
                             source_extra_items.declared_ty,
                             target_item_field.declared_ty,
                         )
-                        .and(db, self.constraints, || {
-                            self.check_type_pair(
-                                db,
-                                target_item_field.declared_ty,
-                                source_extra_items.declared_ty,
-                            )
-                        })
                     }
                 }
             };
