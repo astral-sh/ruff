@@ -319,6 +319,7 @@ impl Configuration {
         let future_annotations = lint.future_annotations.unwrap_or_default();
 
         Ok(Settings {
+            preview: global_preview,
             cache_dir: self
                 .cache_dir
                 .clone()
@@ -1774,7 +1775,9 @@ mod tests {
     use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
 
-    use crate::configuration::{LintConfiguration, RuleSelection};
+    use crate::configuration::{
+        Configuration, FormatConfiguration, LintConfiguration, RuleSelection,
+    };
     use crate::options::PydocstyleOptions;
 
     const PREVIEW_RULES: &[Rule] = &[
@@ -2039,6 +2042,28 @@ mod tests {
             Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn global_preview_is_independent_of_component_preview() -> Result<()> {
+        let settings = Configuration {
+            preview: Some(PreviewMode::Enabled),
+            lint: LintConfiguration {
+                preview: Some(PreviewMode::Disabled),
+                ..LintConfiguration::default()
+            },
+            format: FormatConfiguration {
+                preview: Some(PreviewMode::Disabled),
+                ..FormatConfiguration::default()
+            },
+            ..Configuration::default()
+        }
+        .into_settings(&std::env::temp_dir())?;
+
+        assert!(settings.preview.is_enabled());
+        assert!(!settings.linter.preview.is_enabled());
+        assert!(!settings.formatter.preview.is_enabled());
         Ok(())
     }
 
