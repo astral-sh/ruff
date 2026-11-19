@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{BindingKind, Scope, ScopeId};
+use ruff_python_semantic::{BindingKind, NodeId, Scope, ScopeId, SemanticModel};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
@@ -71,11 +71,21 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
                 continue;
             }
 
-            // If the bindings are in different forks, abort.
-            if shadowed.source.is_none_or(|left| {
-                binding
-                    .source
-                    .is_none_or(|right| !checker.semantic().same_branch(left, right))
+            // Skip the pair only if the import and the loop are in different arms of one
+            // statement or in sibling blocks. If one is nested inside the other's branch, the
+            // loop still shadows the import, as in:
+            //
+            // ```python
+            // from os import path
+            //
+            // if condition:
+            //     for path in paths:
+            //         ...
+            // ```
+            if shadowed.source.is_none_or(|import| {
+                binding.source.is_none_or(|loop_var| {
+                    !branch_paths_nested(checker.semantic(), import, loop_var)
+                })
             }) {
                 continue;
             }
@@ -89,6 +99,12 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
             );
         }
     }
+}
+
+/// Returns `true` if one statement's branch path contains the other's. Statements in different
+/// arms of the same statement, or in sibling blocks such as two consecutive `if`s, return `false`.
+fn branch_paths_nested(semantic: &SemanticModel, left: NodeId, right: NodeId) -> bool {
+    semantic.dominates(left, right) || semantic.dominates(right, left)
 }
 
 /// ## What it does
