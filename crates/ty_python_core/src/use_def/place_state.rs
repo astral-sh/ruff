@@ -710,6 +710,11 @@ impl PlaceState {
             .then_some((binding, declaration))
     }
 
+    /// Return the constraints of a place with a single binding and declaration sharing reachability.
+    pub(super) fn singleton_constraints(&self) -> Option<SingletonConstraints> {
+        self.singleton().map(|(binding, _)| binding.into())
+    }
+
     /// Return each branch's constraints if both branches retain the same binding and declaration.
     /// Different places can reuse the merged constraints when these inputs and the pending paths
     /// match. In this example, `x` and `y` keep their own definitions but follow the same paths.
@@ -752,7 +757,7 @@ impl PlaceState {
         merged
     }
 
-    /// Apply a merged result to a matching singleton, preserving this place's definition IDs.
+    /// Apply precomputed constraints to a matching singleton, preserving this place's definition IDs.
     pub(super) fn set_singleton_constraints(&mut self, constraints: SingletonConstraints) {
         let binding = &mut self.bindings.live_bindings[0];
         binding.narrowing_constraint = constraints.narrowing;

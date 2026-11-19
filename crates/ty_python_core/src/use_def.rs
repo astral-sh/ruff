@@ -3325,22 +3325,50 @@ impl<'db> UseDefMapBuilder<'db> {
         ranges.into_boxed_slice()
     }
 
-    pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
-        let range_reachability = self.finish_ranges();
+    /// Finalize reachability for each place at scope exit. No later place change or merge
+    /// can require the path correlation represented by pending narrowing gates.
+    fn finish_reachability(&mut self) {
         let pending = self.pending_reachability.current;
+        let mut last_singleton = None;
         for state in self
             .symbol_states
             .iter_mut()
             .chain(self.member_states.iter_mut())
         {
-            // No later place change or merge can require the path correlation represented by
-            // pending narrowing gates, so only reachability needs to be finalized here.
-            self.pending_reachability.materialize_reachability(
+            if state.reachability == pending {
+                continue;
+            }
+
+            // Consecutive definitions followed by a series of calls can share both their
+            // initial constraints and their pending path. Replay that path once for them.
+            let inputs = state
+                .state
+                .singleton_constraints()
+                .map(|constraints| (state.reachability, constraints));
+            if let (Some(inputs), Some((previous, result))) = (inputs, last_singleton)
+                && inputs == previous
+            {
+                Rc::make_mut(&mut state.state).set_singleton_constraints(result);
+                state.reachability = pending;
+                continue;
+            }
+
+            let finalized = self.pending_reachability.materialize_reachability(
                 state,
                 pending,
                 &mut self.reachability_constraints,
             );
+            if let Some(inputs) = inputs {
+                last_singleton = finalized
+                    .singleton_constraints()
+                    .map(|result| (inputs, result));
+            }
         }
+    }
+
+    pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
+        let range_reachability = self.finish_ranges();
+        self.finish_reachability();
 
         let place_state_count = self.symbol_states.len()
             + self.member_states.len()
