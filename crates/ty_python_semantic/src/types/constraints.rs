@@ -107,9 +107,7 @@ use ty_static::EnvVars;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::generics::Specialization;
-use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeAliasExpansion, TypeVarConstraints, TypeVarDomain, TypeVarSet,
-};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarSet};
 use crate::types::visitor::{
     NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases, walk_non_atomic_type,
 };
@@ -1301,7 +1299,7 @@ impl<'db> ConstraintSetStorage<'db> {
         ty: Type<'db>,
         support: &mut Support,
     ) {
-        let (typevars, skipped_lazy) = ty.free_typevars(db, env, TypeAliasExpansion::Skip);
+        let (typevars, skipped_lazy) = ty.free_typevars(db, env);
         *support |= &Support::from_typevar_set(db, self, typevars);
         if skipped_lazy {
             support.mark_incomplete();

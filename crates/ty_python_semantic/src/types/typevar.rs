@@ -1989,34 +1989,21 @@ impl<'db> BoundTypeVarIdentity<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub(super) enum TypeAliasExpansion {
-    Skip,
-    Expand,
-}
-
 impl<'db> Type<'db> {
     /// Returns the free type variables in this type and whether any lazy attributes were skipped.
     pub(super) fn free_typevars(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        aliases: TypeAliasExpansion,
     ) -> (TypeVarSet<'db>, bool) {
-        #[salsa::tracked(
-            returns(copy),
-            cycle_initial=|_, _, _, _, aliases| (TypeVarSet::None, aliases == TypeAliasExpansion::Expand),
-            heap_size=ruff_memory_usage::heap_size,
-        )]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| (TypeVarSet::None, false), heap_size=ruff_memory_usage::heap_size)]
         fn non_atomic_free_typevars<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             ty: NonAtomicType<'db>,
-            aliases: TypeAliasExpansion,
         ) -> (TypeVarSet<'db>, bool) {
             struct CollectFreeTypeVars<'a, 'db> {
                 env: &'a ProgramEnvironment<'db>,
-                aliases: TypeAliasExpansion,
                 variables: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
                 skipped_lazy: Cell<bool>,
             }
@@ -2069,15 +2056,6 @@ impl<'db> Type<'db> {
                 }
 
                 fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-                    // A growing recursive alias can keep producing new query keys.
-                    if self.aliases == TypeAliasExpansion::Expand
-                        && !matches!(
-                            Type::TypeAlias(alias).to_type_identity(db),
-                            TypeIdentity::GrowingTypeAlias(_)
-                        )
-                    {
-                        return self.visit_type(db, alias.value_type(db));
-                    }
                     self.notify_skipped_lazy_type_attributes();
                     let Some(specialization) = alias.specialization(db) else {
                         return;
@@ -2094,7 +2072,7 @@ impl<'db> Type<'db> {
                 }
 
                 fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                    let (typevars, skipped_lazy) = ty.free_typevars(db, self.env, self.aliases);
+                    let (typevars, skipped_lazy) = ty.free_typevars(db, self.env);
                     self.variables.borrow_mut().extend(typevars.iter(db));
                     if skipped_lazy {
                         self.notify_skipped_lazy_type_attributes();
@@ -2104,7 +2082,6 @@ impl<'db> Type<'db> {
 
             let collector = CollectFreeTypeVars {
                 env: &ProgramEnvironment::from_program(program),
-                aliases,
                 variables: RefCell::default(),
                 skipped_lazy: Cell::new(false),
             };
@@ -2128,7 +2105,7 @@ impl<'db> Type<'db> {
                     false,
                 )
             }
-            TypeKind::NonAtomic(ty) => non_atomic_free_typevars(db, env.program(db), ty, aliases),
+            TypeKind::NonAtomic(ty) => non_atomic_free_typevars(db, env.program(db), ty),
         }
     }
 }

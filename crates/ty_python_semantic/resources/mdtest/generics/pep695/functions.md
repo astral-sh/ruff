@@ -148,19 +148,6 @@ reveal_type(result)
 result.nonexistent()
 ```
 
-When an alias expands to a type variable, we can infer the callback's return type even if it is
-still generic in the caller.
-
-```py
-type Id[T] = T
-
-def run[R](callback: Callable[[], Id[R]]) -> R:
-    return callback()
-
-def check[T](callback: Callable[[], T]):
-    reveal_type(run(callback))  # revealed: T@check
-```
-
 ## Conditional imports of `Type`
 
 Either binding of `Type` lets ty infer `T` from the class passed to `make`.

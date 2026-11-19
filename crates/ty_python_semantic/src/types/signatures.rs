@@ -39,7 +39,7 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{TypeAliasExpansion, TypeVarInstance, TypeVarSet, freshening_delta};
+use crate::types::typevar::{TypeVarInstance, TypeVarSet, freshening_delta};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassLiteral, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor,
@@ -966,45 +966,6 @@ impl<'db> Signature<'db> {
             .is_some_and(|extras| extras.is_paramspec_value)
     }
 
-    /// For a wrapper taking `callback: Callable[P, R], *args: P.args, **kwargs: P.kwargs`,
-    /// returns the callback's parameter index and `R` if the forwarded call alone can determine it.
-    pub(super) fn forwarded_callback_result(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<(usize, BoundTypeVarInstance<'db>)> {
-        let (prefix, paramspec) = self.parameters().as_paramspec_with_prefix()?;
-        let (index, result) = prefix.iter().enumerate().find_map(|(i, parameter)| {
-            let (captured, callback) = parameter
-                .annotated_type()
-                .resolve_type_alias(db)
-                .as_callable()?
-                .signatures(db)
-                .is_single_paramspec()?;
-            let result = callback.return_ty.resolve_type_alias(db).as_typevar()?;
-            (captured == paramspec).then_some((i, result))
-        })?;
-        if result.typevar(db).bound_or_constraints(db, env).is_some() {
-            return None;
-        }
-        // A skipped lazy attribute could hide another occurrence of P or R.
-        let free_typevars = |ty: Type<'db>| ty.free_typevars(db, env, TypeAliasExpansion::Expand);
-        let (returned, skipped) = free_typevars(self.return_ty);
-        if skipped || !result.is_inferable(db, returned) || paramspec.is_inferable(db, returned) {
-            return None;
-        }
-        for (i, parameter) in prefix.iter().enumerate() {
-            if i == index {
-                continue;
-            }
-            let (free, skipped) = free_typevars(parameter.annotated_type());
-            if skipped || result.is_inferable(db, free) || paramspec.is_inferable(db, free) {
-                return None;
-            }
-        }
-        Some((index, result))
-    }
-
     /// A dynamically callable value accepts arbitrary arguments and supplies no expected
     /// type for their expressions.
     pub(crate) fn dynamic(return_ty: Type<'db>) -> Self {
@@ -1110,6 +1071,47 @@ impl<'db> Signature<'db> {
         self.parameters
             .paramspec_component_bindings(db)
             .find(|bound| bound.typevar(db).identity(db) == typevar.identity(db))
+    }
+
+    /// For a wrapper taking `callback: Callable[P, R], *args: P.args, **kwargs: P.kwargs`,
+    /// returns the callback's parameter index and `R` if the forwarded call alone can determine it.
+    pub(super) fn forwarded_callback_result(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<(usize, BoundTypeVarInstance<'db>)> {
+        let (prefix, paramspec) = self.parameters().as_paramspec_with_prefix()?;
+        let (index, result) = prefix.iter().enumerate().find_map(|(i, parameter)| {
+            let (captured, callback) = parameter
+                .annotated_type()
+                .resolve_type_alias(db)
+                .as_callable()?
+                .signatures(db)
+                .is_single_paramspec()?;
+            let result = callback.return_ty.resolve_type_alias(db).as_typevar()?;
+            (captured == paramspec).then_some((i, result))
+        })?;
+        if result.typevar(db).bound_or_constraints(db, env).is_some() {
+            return None;
+        }
+        // Another parameter could constrain R or supply a different P. A returned
+        // Callable[P, R] needs to preserve the relationship between P and R for future
+        // calls. A skipped lazy attribute could hide either variable.
+        let free_typevars = |ty: Type<'db>| ty.resolve_type_alias(db).free_typevars(db, env);
+        let (returned, skipped) = free_typevars(self.return_ty);
+        if skipped || !result.is_inferable(db, returned) || paramspec.is_inferable(db, returned) {
+            return None;
+        }
+        for (i, parameter) in prefix.iter().enumerate() {
+            if i == index {
+                continue;
+            }
+            let (free, skipped) = free_typevars(parameter.annotated_type());
+            if skipped || result.is_inferable(db, free) || paramspec.is_inferable(db, free) {
+                return None;
+            }
+        }
+        Some((index, result))
     }
 
     /// Returns the signature which accepts any parameters and returns an `Unknown` type.
