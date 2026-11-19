@@ -1,12 +1,12 @@
 name: Prepare release
-run-name: Dry-run changelog rewrite for Ruff 0.17.6
+run-name: Dry-run changelog rewrite for Ruff 0.17.6 with GPT-5.6 Sol
 on: workflow_dispatch
 permissions:
   contents: read
 
 jobs:
   dry-run:
-    if: github.repository == 'astral-sh/ruff' && github.ref == 'refs/heads/ee/dry-run-changelog-rewrite-20261119'
+    if: github.repository == 'astral-sh/ruff' && github.ref == 'refs/heads/ee/dry-run-changelog-gpt-5-6-sol-20261119'
     runs-on: github-ubuntu-24.04-x86_64-4
     timeout-minutes: 20
     environment:
@@ -42,6 +42,7 @@ jobs:
       - uses: astral-sh/github-actions/rewrite-changelog@4877f85420cccab15834c3d0ea3433b0d91507d3
         with:
           prompt-file: .agents/prompts/editorialize-changelog.md
+          model: gpt-5.6-sol
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Verify and capture the rewrite
