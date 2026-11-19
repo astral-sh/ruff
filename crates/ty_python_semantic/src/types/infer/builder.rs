@@ -9264,13 +9264,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None
         };
 
-        // Extract the annotated parameter types.
-        //
-        // Note that `Callable` annotations are only valid for positional parameters.
-        let mut parameter_types = match callable_tcx {
-            None => [].iter(),
-            Some(signature) => signature.parameters().into_iter(),
+        // The synthetic `P.args` and `P.kwargs` describe an entire ParamSpec tail.
+        // Only the fixed prefix gives types for individual positional lambda parameters.
+        let mut parameter_types = match callable_tcx.map(Signature::parameters) {
+            Some(params) if let Some((prefix, _)) = params.as_paramspec_with_prefix() => prefix,
+            Some(params) => params.as_slice(),
+            None => &[],
         }
+        .iter()
         .map(|parameter| {
             let ty = parameter.annotated_type();
             (!ty.is_provisional_marker()).then_some(ty)

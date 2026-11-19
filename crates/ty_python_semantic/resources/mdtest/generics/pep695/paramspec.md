@@ -1186,6 +1186,31 @@ accept(wrap(keyword_only), value=1)
 accept(wrap(keyword_only), value="incorrect")  # error: [invalid-argument-type]
 ```
 
+### Inferring lambda parameters through nested calls
+
+When the outer call leaves the callback's parameter list unspecified, the lambda parameter remains
+unknown.
+
+```py
+from typing import Callable, Concatenate
+
+def wrap[**P](callback: Callable[P, object]) -> Callable[P, object]:
+    return callback
+
+def register[**P](callback: Callable[P, object]) -> None: ...
+
+register(wrap(lambda x: chr(reveal_type(x))))  # revealed: Unknown
+```
+
+A fixed prefix still supplies types for the corresponding lambda parameters.
+
+```py
+def register_prefixed[**P](callback: Callable[Concatenate[int, P], object]) -> None: ...
+
+# revealed: tuple[int, Unknown, Unknown]
+register_prefixed(wrap(lambda x, y, z: reveal_type((x, y, z))))
+```
+
 ### Immediate literal forwarding
 
 A literal unpack can supply several arguments to a forwarded `ParamSpec`. The wrapped callable
