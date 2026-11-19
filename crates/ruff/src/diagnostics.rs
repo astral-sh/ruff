@@ -13,6 +13,7 @@ use log::{debug, warn};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
+use ruff_linter::message::RenderContext;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{LinterSettings, flags};
@@ -51,6 +52,17 @@ impl Diagnostics {
             fixed: FixMap::default(),
             notebook_indexes,
         }
+    }
+
+    /// Include diagnostics for the command line and put all diagnostics in rendering order.
+    pub(crate) fn with_cli_diagnostics(mut self, cli_diagnostics: &[Diagnostic]) -> Self {
+        self.inner.extend_from_slice(cli_diagnostics);
+        let context = RenderContext::new(&self.notebook_indexes);
+        self.inner.sort_by(|a, b| {
+            a.rendering_sort_key(&context)
+                .cmp(&b.rendering_sort_key(&context))
+        });
+        self
     }
 
     /// Generate [`Diagnostics`] based on a [`SourceError`].

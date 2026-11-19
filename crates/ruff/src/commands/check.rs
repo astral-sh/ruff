@@ -9,7 +9,7 @@ use ignore::Error;
 use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff_linter::message::{RenderContext, create_panic_diagnostic};
+use ruff_linter::message::create_panic_diagnostic;
 use ruff_python_ast::{SourceType, TomlSourceType};
 use rustc_hash::FxHashMap;
 
@@ -57,9 +57,10 @@ pub(crate) fn check(
         }
     });
 
+    let cli_diagnostics = config_arguments.diagnostics(&pyproject_config.settings.linter);
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
-        return Ok(Diagnostics::default());
+        return Ok(Diagnostics::default().with_cli_diagnostics(cli_diagnostics));
     }
 
     // Discover the package root for each Python file.
@@ -164,7 +165,7 @@ pub(crate) fn check(
 
     // Aggregate the diagnostics of all checked files and count the checked files.
     // This can't be a regular for loop because we use `par_iter`.
-    let (mut all_diagnostics, checked_files) = diagnostics_per_file
+    let (file_diagnostics, checked_files) = diagnostics_per_file
         .fold(
             || (Diagnostics::default(), 0u64),
             |(all_diagnostics, checked_files), file_diagnostics| {
@@ -176,19 +177,13 @@ pub(crate) fn check(
             |a, b| (a.0 + b.0, a.1 + b.1),
         );
 
-    let context = RenderContext::new(&all_diagnostics.notebook_indexes);
-    all_diagnostics.inner.sort_by(|a, b| {
-        a.rendering_sort_key(&context)
-            .cmp(&b.rendering_sort_key(&context))
-    });
-
     // Store the caches.
     caches.persist()?;
 
     let duration = start.elapsed();
     debug!("Checked {checked_files:?} files in: {duration:?}");
 
-    Ok(all_diagnostics)
+    Ok(file_diagnostics.with_cli_diagnostics(cli_diagnostics))
 }
 
 /// Wraps [`lint_path`](crate::diagnostics::lint_path) in a [`catch_unwind`](std::panic::catch_unwind) and emits

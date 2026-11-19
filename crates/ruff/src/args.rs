@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::fmt::{Formatter, Write as _};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -10,20 +11,24 @@ use anyhow::bail;
 use clap::builder::Styles;
 use clap::builder::styling::{AnsiColor, Effects};
 use clap::builder::{TypedValueParser, ValueParserFactory};
-use clap::{Parser, Subcommand};
+use clap::{ArgMatches, FromArgMatches, Parser, Subcommand};
 use colored::Colorize;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use path_absolutize::path_dedot;
 use regex::Regex;
 use ruff_command_line::TerminalColor;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
+use ruff_linter::rules::ruff::renamed_rule_on_cli;
+use ruff_linter::settings::LinterSettings;
 use ruff_linter::settings::types::{
     ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
     PythonVersion, UnsafeFixes,
 };
+use ruff_linter::toml::renamed_rules_in_cli_config;
 use ruff_linter::{RuleParser, UnresolvedRuleSelector, UnresolvedRuleSelectorParser};
 use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_python_ast as ast;
@@ -34,6 +39,7 @@ use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
+use serde::Deserialize;
 use toml;
 
 /// All configuration options that can be passed "globally",
@@ -273,52 +279,8 @@ pub struct CheckCommand {
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
-    /// Comma-separated list of rule codes to enable (or ALL, to enable all rules).
-    #[arg(
-        long,
-        value_delimiter = ',',
-        value_name = "RULE_CODE",
-        value_parser = UnresolvedRuleSelectorParser,
-        help_heading = "Rule selection",
-        hide_possible_values = true
-    )]
-    select: Option<Vec<UnresolvedRuleSelector>>,
-    /// Comma-separated list of rule codes to disable.
-    #[arg(
-        long,
-        value_delimiter = ',',
-        value_name = "RULE_CODE",
-        value_parser = UnresolvedRuleSelectorParser,
-        help_heading = "Rule selection",
-        hide_possible_values = true
-    )]
-    ignore: Option<Vec<UnresolvedRuleSelector>>,
-    /// Like --select, but adds additional rule codes on top of those already specified.
-    #[arg(
-        long,
-        value_delimiter = ',',
-        value_name = "RULE_CODE",
-        value_parser = UnresolvedRuleSelectorParser,
-        help_heading = "Rule selection",
-        hide_possible_values = true
-    )]
-    extend_select: Option<Vec<UnresolvedRuleSelector>>,
-    /// Like --ignore. (Deprecated: You can just use --ignore instead.)
-    #[arg(
-        long,
-        value_delimiter = ',',
-        value_name = "RULE_CODE",
-        value_parser = UnresolvedRuleSelectorParser,
-        help_heading = "Rule selection",
-        hide = true
-    )]
-    extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
-    /// List of mappings from file pattern to code to exclude.
-    #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
-    per_file_ignores: Option<Vec<PatternPrefixPair>>,
-    /// Like `--per-file-ignores`, but adds additional ignores on top of those already specified.
-    #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
-    extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    #[command(flatten)]
+    rule_selection: RuleSelectionArgs,
     /// List of paths, used to omit files and/or directories from analysis.
     #[arg(
         long,
@@ -335,46 +297,6 @@ pub struct CheckCommand {
         help_heading = "File selection"
     )]
     extend_exclude: Option<Vec<FilePattern>>,
-    /// List of rule codes to treat as eligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
-    #[arg(
-        long,
-        value_delimiter = ',',
-        value_name = "RULE_CODE",
-        value_parser = UnresolvedRuleSelectorParser,
-        help_heading = "Rule selection",
-        hide_possible_values = true
-    )]
-    fixable: Option<Vec<UnresolvedRuleSelector>>,
-    /// List of rule codes to treat as ineligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
-    #[arg(
-        long,
-        value_delimiter = ',',
-        value_name = "RULE_CODE",
-        value_parser = UnresolvedRuleSelectorParser,
-        help_heading = "Rule selection",
-        hide_possible_values = true
-    )]
-    unfixable: Option<Vec<UnresolvedRuleSelector>>,
-    /// Like --fixable, but adds additional rule codes on top of those already specified.
-    #[arg(
-        long,
-        value_delimiter = ',',
-        value_name = "RULE_CODE",
-        value_parser = UnresolvedRuleSelectorParser,
-        help_heading = "Rule selection",
-        hide_possible_values = true
-    )]
-    extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
-    /// Like --unfixable. (Deprecated: You can just use --unfixable instead.)
-    #[arg(
-        long,
-        value_delimiter = ',',
-        value_name = "RULE_CODE",
-        value_parser = UnresolvedRuleSelectorParser,
-        help_heading = "Rule selection",
-        hide = true
-    )]
-    extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
     #[arg(
@@ -504,6 +426,151 @@ pub struct CheckCommand {
         conflicts_with = "watch",
     )]
     show_settings: bool,
+}
+
+#[derive(Clone, Debug, Default, clap::Args)]
+struct RuleSelectionFlags {
+    /// Comma-separated list of rule codes to enable (or ALL, to enable all rules).
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = UnresolvedRuleSelectorParser,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    select: Option<Vec<UnresolvedRuleSelector>>,
+    /// Comma-separated list of rule codes to disable.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = UnresolvedRuleSelectorParser,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    ignore: Option<Vec<UnresolvedRuleSelector>>,
+    /// Like --select, but adds additional rule codes on top of those already specified.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = UnresolvedRuleSelectorParser,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    extend_select: Option<Vec<UnresolvedRuleSelector>>,
+    /// Like --ignore. (Deprecated: You can just use --ignore instead.)
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = UnresolvedRuleSelectorParser,
+        help_heading = "Rule selection",
+        hide = true
+    )]
+    extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
+    /// List of mappings from file pattern to code to exclude.
+    #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
+    per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    /// Like `--per-file-ignores`, but adds additional ignores on top of those already specified.
+    #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
+    extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    /// List of rule codes to treat as eligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = UnresolvedRuleSelectorParser,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    fixable: Option<Vec<UnresolvedRuleSelector>>,
+    /// List of rule codes to treat as ineligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = UnresolvedRuleSelectorParser,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    unfixable: Option<Vec<UnresolvedRuleSelector>>,
+    /// Like --fixable, but adds additional rule codes on top of those already specified.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = UnresolvedRuleSelectorParser,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
+    /// Like --unfixable. (Deprecated: You can just use --unfixable instead.)
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = UnresolvedRuleSelectorParser,
+        help_heading = "Rule selection",
+        hide = true
+    )]
+    extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
+}
+
+/// Capture the flag name before settings resolution combines options such as `--ignore` and `--extend-ignore`.
+#[derive(Clone, Debug, Default)]
+struct RuleSelectionArgs {
+    flags: RuleSelectionFlags,
+    diagnostics: BTreeMap<clap::Id, Vec<Diagnostic>>,
+}
+
+impl FromArgMatches for RuleSelectionArgs {
+    fn from_arg_matches(matches: &ArgMatches) -> Result<Self, clap::Error> {
+        Self::from_arg_matches_mut(&mut matches.clone())
+    }
+
+    fn from_arg_matches_mut(matches: &mut ArgMatches) -> Result<Self, clap::Error> {
+        let mut args = Self::default();
+        args.update_from_arg_matches_mut(matches)?;
+        Ok(args)
+    }
+
+    fn update_from_arg_matches(&mut self, matches: &ArgMatches) -> Result<(), clap::Error> {
+        self.update_from_arg_matches_mut(&mut matches.clone())
+    }
+
+    fn update_from_arg_matches_mut(&mut self, matches: &mut ArgMatches) -> Result<(), clap::Error> {
+        for id in matches.ids() {
+            let selectors = if let Ok(Some(selectors)) =
+                matches.try_get_many::<UnresolvedRuleSelector>(id.as_str())
+            {
+                Either::Left(selectors)
+            } else if let Ok(Some(patterns)) =
+                matches.try_get_many::<PatternPrefixPair>(id.as_str())
+            {
+                Either::Right(patterns.map(|pattern| &pattern.prefix))
+            } else {
+                continue;
+            };
+            let flag = id.as_str().replace('_', "-");
+            let diagnostics = selectors
+                .filter_map(|selector| renamed_rule_on_cli(selector.as_str(), &flag))
+                .collect();
+            self.diagnostics.insert(id.clone(), diagnostics);
+        }
+        self.flags.update_from_arg_matches_mut(matches)
+    }
+}
+
+impl clap::Args for RuleSelectionArgs {
+    fn augment_args(cmd: clap::Command) -> clap::Command {
+        RuleSelectionFlags::augment_args(cmd)
+    }
+
+    fn augment_args_for_update(cmd: clap::Command) -> clap::Command {
+        RuleSelectionFlags::augment_args_for_update(cmd)
+    }
 }
 
 #[derive(Clone, Debug, clap::Parser)]
@@ -713,9 +780,18 @@ pub struct ConfigArguments {
     /// These overrides take precedence over all configuration files,
     /// and also over all overrides specified using any `--config "KEY=VALUE"` flags.
     per_flag_overrides: ExplicitConfigOverrides,
+    cli_diagnostics: Vec<Diagnostic>,
 }
 
 impl ConfigArguments {
+    pub(crate) fn diagnostics(&self, settings: &LinterSettings) -> &[Diagnostic] {
+        if settings.rules.enabled(Rule::RenamedRule) {
+            &self.cli_diagnostics
+        } else {
+            &[]
+        }
+    }
+
     pub(crate) fn config_file(&self) -> Option<&Path> {
         self.config_file.as_deref()
     }
@@ -727,10 +803,12 @@ impl ConfigArguments {
         let (log_level, config_options, isolated) = global_options.partition();
         let mut config_file: Option<PathBuf> = None;
         let mut overrides = Configuration::default();
+        let mut cli_diagnostics = Vec::new();
 
         for option in config_options {
             match option {
-                SingleConfigArgument::SettingsOverride(overridden_option) => {
+                SingleConfigArgument::SettingsOverride(overridden_option, diagnostics) => {
+                    cli_diagnostics.extend(diagnostics);
                     let overridden_option = Arc::try_unwrap(overridden_option)
                         .unwrap_or_else(|option| option.deref().clone());
                     overrides = overrides.combine(Configuration::from_options(
@@ -773,6 +851,7 @@ You cannot specify more than one configuration file on the command line.
             config_file,
             overrides,
             per_flag_overrides,
+            cli_diagnostics,
         })
     }
 }
@@ -809,23 +888,14 @@ impl CheckCommand {
         };
 
         let cli_overrides = ExplicitConfigOverrides {
+            rules: self.rule_selection.flags,
             dummy_variable_rgx: self.dummy_variable_rgx,
             exclude: self.exclude,
             extend_exclude: self.extend_exclude,
-            extend_fixable: self.extend_fixable,
-            extend_ignore: self.extend_ignore,
-            extend_per_file_ignores: self.extend_per_file_ignores,
-            extend_select: self.extend_select,
-            extend_unfixable: self.extend_unfixable,
-            fixable: self.fixable,
-            ignore: self.ignore,
             line_length: self.line_length,
-            per_file_ignores: self.per_file_ignores,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
-            select: self.select,
             target_version: self.target_version.map(ast::PythonVersion::from),
-            unfixable: self.unfixable,
             // TODO(charlie): Included in `pyproject.toml`, but not inherited.
             cache_dir: self.cache_dir,
             fix: resolve_bool_arg(self.fix, self.no_fix),
@@ -839,7 +909,13 @@ impl CheckCommand {
             ..ExplicitConfigOverrides::default()
         };
 
-        let config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
+        let mut config_args = ConfigArguments::from_cli_arguments(global_options, cli_overrides)?;
+        config_args.cli_diagnostics = config_args
+            .cli_diagnostics
+            .into_iter()
+            .chain(self.rule_selection.diagnostics.into_values().flatten())
+            .unique()
+            .collect();
         Ok((check_arguments, config_args))
     }
 }
@@ -969,7 +1045,7 @@ impl InvalidConfigFlagReason {
 #[derive(Clone, Debug)]
 pub enum SingleConfigArgument {
     FilePath(PathBuf),
-    SettingsOverride(Arc<Options>),
+    SettingsOverride(Arc<Options>, Vec<Diagnostic>),
 }
 
 #[derive(Clone)]
@@ -1013,18 +1089,26 @@ impl TypedValueParser for ConfigArgumentParser {
 
         let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
 
-        let config_parse_error = match toml::Table::from_str(value) {
-            Ok(table) => match Options::from_toml_table(table) {
-                Ok(option) => {
-                    if option.extend.is_none() {
-                        return Ok(SingleConfigArgument::SettingsOverride(Arc::new(option)));
+        let config_parse_error = match toml::de::DeTable::parse(value) {
+            Ok(table) => {
+                let diagnostics = renamed_rules_in_cli_config(table.get_ref());
+                match toml::Table::deserialize(toml::de::Deserializer::from(table))
+                    .and_then(Options::from_toml_table)
+                {
+                    Ok(option) => {
+                        if option.extend.is_none() {
+                            return Ok(SingleConfigArgument::SettingsOverride(
+                                Arc::new(option),
+                                diagnostics,
+                            ));
+                        }
+                        InvalidConfigFlagReason::ExtendPassedViaConfigFlag
                     }
-                    InvalidConfigFlagReason::ExtendPassedViaConfigFlag
+                    Err(underlying_error) => {
+                        InvalidConfigFlagReason::ValidTomlButInvalidRuffSchema(underlying_error)
+                    }
                 }
-                Err(underlying_error) => {
-                    InvalidConfigFlagReason::ValidTomlButInvalidRuffSchema(underlying_error)
-                }
-            },
+            }
             Err(underlying_error) => InvalidConfigFlagReason::InvalidToml(underlying_error),
         };
 
@@ -1377,23 +1461,14 @@ pub struct AnalyzeGraphArgs {
 /// `--line-length`, `--respect-gitignore`, etc.
 #[derive(Clone, Default)]
 struct ExplicitConfigOverrides {
+    rules: RuleSelectionFlags,
     dummy_variable_rgx: Option<Regex>,
     exclude: Option<Vec<FilePattern>>,
     extend_exclude: Option<Vec<FilePattern>>,
-    extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
-    extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
-    extend_select: Option<Vec<UnresolvedRuleSelector>>,
-    extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
-    fixable: Option<Vec<UnresolvedRuleSelector>>,
-    ignore: Option<Vec<UnresolvedRuleSelector>>,
     line_length: Option<LineLength>,
-    per_file_ignores: Option<Vec<PatternPrefixPair>>,
-    extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
-    select: Option<Vec<UnresolvedRuleSelector>>,
     target_version: Option<ast::PythonVersion>,
-    unfixable: Option<Vec<UnresolvedRuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     cache_dir: Option<PathBuf>,
     fix: Option<bool>,
@@ -1422,7 +1497,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         if let Some(extend_exclude) = &self.extend_exclude {
             config.extend_exclude.extend(extend_exclude.clone());
         }
-        if let Some(extend_per_file_ignores) = &self.extend_per_file_ignores {
+        if let Some(extend_per_file_ignores) = &self.rules.extend_per_file_ignores {
             config
                 .lint
                 .extend_per_file_ignores
@@ -1438,24 +1513,26 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
             config.unsafe_fixes = self.unsafe_fixes;
         }
         config.lint.rule_selections.push(RuleSelection {
-            select: self.select.clone(),
+            select: self.rules.select.clone(),
             ignore: self
+                .rules
                 .ignore
                 .iter()
                 .cloned()
-                .chain(self.extend_ignore.iter().cloned())
+                .chain(self.rules.extend_ignore.iter().cloned())
                 .flatten()
                 .collect(),
-            extend_select: self.extend_select.clone().unwrap_or_default(),
-            fixable: self.fixable.clone(),
+            extend_select: self.rules.extend_select.clone().unwrap_or_default(),
+            fixable: self.rules.fixable.clone(),
             unfixable: self
+                .rules
                 .unfixable
                 .iter()
                 .cloned()
-                .chain(self.extend_unfixable.iter().cloned())
+                .chain(self.rules.extend_unfixable.iter().cloned())
                 .flatten()
                 .collect(),
-            extend_fixable: self.extend_fixable.clone().unwrap_or_default(),
+            extend_fixable: self.rules.extend_fixable.clone().unwrap_or_default(),
         });
         if let Some(output_format) = &self.output_format {
             config.output_format = Some(*output_format);
@@ -1475,7 +1552,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
             config.lint.preview = Some(*preview);
             config.format.preview = Some(*preview);
         }
-        if let Some(per_file_ignores) = &self.per_file_ignores {
+        if let Some(per_file_ignores) = &self.rules.per_file_ignores {
             config.lint.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
         }
         if let Some(respect_gitignore) = &self.respect_gitignore {

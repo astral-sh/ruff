@@ -16,6 +16,7 @@ use crate::settings::LinterSettings;
 use crate::settings::types::UnsafeFixes;
 
 mod rule_selectors;
+pub use rule_selectors::renamed_rules_in_cli_config;
 
 pub struct TomlFixerResult<'a> {
     pub diagnostics: Vec<Diagnostic>,

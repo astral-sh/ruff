@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use anyhow::Result;
-use ruff_linter::message::RenderContext;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging;
 use ruff_linter::settings::flags;
@@ -19,33 +18,26 @@ pub(crate) fn check_stdin(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
+    let cli_diagnostics = overrides.diagnostics(&pyproject_config.settings.linter);
     let mut resolver = Resolver::new(pyproject_config);
-
-    if resolver.force_exclude() {
-        if let Some(filename) = filename {
-            if !project_file_at_path(filename, &mut resolver, overrides)? {
-                if fix_mode.is_apply() {
-                    parrot_stdin()?;
-                }
-                return Ok(Diagnostics::default());
-            }
-
-            if filename.file_name().is_some_and(|name| {
+    if resolver.force_exclude()
+        && let Some(filename) = filename
+        && (!project_file_at_path(filename, &mut resolver, overrides)?
+            || filename.file_name().is_some_and(|name| {
                 match_exclusion(filename, name, &resolver.base_settings().linter.exclude)
-            }) {
-                if fix_mode.is_apply() {
-                    parrot_stdin()?;
-                }
-                return Ok(Diagnostics::default());
-            }
+            }))
+    {
+        if fix_mode.is_apply() {
+            parrot_stdin()?;
         }
+        return Ok(Diagnostics::default().with_cli_diagnostics(cli_diagnostics));
     }
     let stdin = read_from_stdin()?;
     let package_root = filename.and_then(Path::parent).and_then(|path| {
         packaging::detect_package_root(path, &resolver.base_settings().linter.namespace_packages)
             .map(PackageRoot::root)
     });
-    let mut diagnostics = lint_stdin(
+    let diagnostics = lint_stdin(
         filename,
         package_root,
         stdin,
@@ -53,10 +45,5 @@ pub(crate) fn check_stdin(
         noqa,
         fix_mode,
     )?;
-    let context = RenderContext::new(&diagnostics.notebook_indexes);
-    diagnostics.inner.sort_unstable_by(|a, b| {
-        a.rendering_sort_key(&context)
-            .cmp(&b.rendering_sort_key(&context))
-    });
-    Ok(diagnostics)
+    Ok(diagnostics.with_cli_diagnostics(cli_diagnostics))
 }

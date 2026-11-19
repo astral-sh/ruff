@@ -1408,7 +1408,6 @@ fn renamed_rule_selector() -> Result<()> {
     1 unsafe fix available with `--fix --unsafe-fixes`.
 
     ----- stderr -----
-    warning: `missing-return-type-undocumented-public-function` has been remapped to `missing-return-type-public-function`.
     ");
     Ok(())
 }
@@ -5529,5 +5528,74 @@ fn fix_redirected_selectors_with_rule_names() -> Result<()> {
     "
     );
 
+    Ok(())
+}
+
+#[test]
+fn renamed_rule_on_command_line() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "ruff.toml",
+            "lint.preview = true\nlint.select = ['RUF202', 'F401']\n",
+        ),
+        ("a.py", "import os\n"),
+        ("b.py", ""),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args([
+        "--extend-select", "TCH,TCH",
+        "--per-file-ignores", "a.py:TCH002",
+        "--config", "lint.extend-unsafe-fixes = ['T001']",
+        "a.py", "b.py",
+    ]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    renamed-rule: Rule selector `T001` redirects to `FIX001` in `--config`
+    renamed-rule: Rule selector `TCH002` redirects to `TC002` in `--per-file-ignores`
+    renamed-rule: Rule selector `TCH` redirects to `TC` in `--extend-select`
+    a.py:1:8: unused-import: [*] `os` imported but unused
+    Found 4 errors.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    assert_cmd_snapshot!(test.check_command().args(["--ignore", "RUF202,TCH", "b.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn renamed_rule_on_command_line_stdin() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.command().args([
+        "check", "--no-cache",
+        "--preview", "--select", "RUF202", "--ignore", "TCH", "--output-format", "json", "-",
+    ]).pass_stdin("pass\n"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [
+      {
+        "cell": null,
+        "code": "RUF202",
+        "end_location": null,
+        "filename": null,
+        "fix": null,
+        "location": null,
+        "message": "Rule selector `TCH` redirects to `TC` in `--ignore`",
+        "name": "renamed-rule",
+        "noqa_row": null,
+        "severity": "error",
+        "url": "https://docs.astral.sh/ruff/rules/renamed-rule"
+      }
+    ]
+    ----- stderr -----
+    "#);
     Ok(())
 }
