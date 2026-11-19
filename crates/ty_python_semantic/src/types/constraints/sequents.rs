@@ -18,6 +18,7 @@ use crate::types::constraints::{
     OwnedConstraintSet,
 };
 use crate::types::generics::AliasPolicy;
+use crate::types::relation::TypeVarEvaluation;
 use crate::types::signatures::CallableSignature;
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
@@ -728,12 +729,16 @@ impl<'db> AtomicConstraint<'db> {
             return;
         }
 
-        let when = lower.bound().when_constraint_set_assignable_to_owned(
-            db,
-            env,
-            upper.bound(),
-            map.inferable,
-        );
+        let when = lower
+            .bound()
+            .when_constraint_set_assignable_to_owned_with_evaluation(
+                db,
+                env,
+                upper.bound(),
+                map.inferable,
+                TypeVarEvaluation::LazyPreservingExclusions,
+                ConstraintProvenance::INFERRED,
+            );
         let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
         Self::add_constraint_set_implication(
             map,

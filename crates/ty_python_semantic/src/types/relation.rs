@@ -196,7 +196,7 @@ impl TypeRelation {
     }
 }
 
-/// Determines when comparisons involving type variables are evaluated.
+/// Controls how comparisons involving type variables are evaluated.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum TypeVarEvaluation {
     /// Check immediately whether the relation holds for all or any valid specializations,
@@ -205,11 +205,14 @@ pub(crate) enum TypeVarEvaluation {
 
     /// Collect constraints on the variables in scope.
     Lazy,
+
+    /// Collect constraints for a solver implication while preserving exclusions on source typevars.
+    LazyPreservingExclusions,
 }
 
 impl TypeVarEvaluation {
     pub(super) const fn is_lazy(self) -> bool {
-        matches!(self, Self::Lazy)
+        matches!(self, Self::Lazy | Self::LazyPreservingExclusions)
     }
 }
 
@@ -783,21 +786,23 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
-        self.when_constraint_set_assignable_to_owned_with_provenance(
+        self.when_constraint_set_assignable_to_owned_with_evaluation(
             db,
             env,
             target,
             inferable,
+            TypeVarEvaluation::Lazy,
             ConstraintProvenance::INFERRED,
         )
     }
 
-    pub(super) fn when_constraint_set_assignable_to_owned_with_provenance(
+    pub(super) fn when_constraint_set_assignable_to_owned_with_evaluation(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
+        typevar_evaluation: TypeVarEvaluation,
         provenance: ConstraintProvenance,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         fn when_constraint_set_assignable_to_impl<'db>(
@@ -806,6 +811,7 @@ impl<'db> Type<'db> {
             source: Type<'db>,
             target: Type<'db>,
             inferable: TypeVarSet<'db>,
+            typevar_evaluation: TypeVarEvaluation,
             provenance: ConstraintProvenance,
         ) -> OwnedConstraintSet<'db> {
             ConstraintSetBuilder::new().into_owned(|constraints| {
@@ -816,7 +822,7 @@ impl<'db> Type<'db> {
                     constraints,
                     inferable,
                     TypeRelation::Assignability,
-                    TypeVarEvaluation::Lazy,
+                    typevar_evaluation,
                     provenance,
                 )
             })
@@ -837,19 +843,21 @@ impl<'db> Type<'db> {
                 types.first(db),
                 types.second(db),
                 TypeVarSet::None,
+                TypeVarEvaluation::Lazy,
                 ConstraintProvenance::INFERRED,
             )
         }
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _, _| OwnedConstraintSet::always(),
+            cycle_initial=|_, _, _, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
-        fn when_constraint_set_assignable_to_owned_with_provenance_impl<'db>(
+        fn when_constraint_set_assignable_to_owned_with_evaluation_impl<'db>(
             db: &'db dyn Db,
             types: TypePair<'db>,
             inferable: TypeVarSet<'db>,
+            typevar_evaluation: TypeVarEvaluation,
             provenance: ConstraintProvenance,
         ) -> OwnedConstraintSet<'db> {
             when_constraint_set_assignable_to_impl(
@@ -858,6 +866,7 @@ impl<'db> Type<'db> {
                 types.first(db),
                 types.second(db),
                 inferable,
+                typevar_evaluation,
                 provenance,
             )
         }
@@ -868,17 +877,27 @@ impl<'db> Type<'db> {
 
         if should_inline_assignability_check(self, target) {
             return Cow::Owned(when_constraint_set_assignable_to_impl(
-                db, env, self, target, inferable, provenance,
+                db,
+                env,
+                self,
+                target,
+                inferable,
+                typevar_evaluation,
+                provenance,
             ));
         }
 
         let types = TypePair::new(db, env.program(db), self, target);
-        Cow::Borrowed(match (inferable, provenance) {
-            (TypeVarSet::None, ConstraintProvenance::INFERRED) => {
+        Cow::Borrowed(match (inferable, typevar_evaluation, provenance) {
+            (TypeVarSet::None, TypeVarEvaluation::Lazy, ConstraintProvenance::INFERRED) => {
                 when_constraint_set_assignable_to_owned_impl(db, types)
             }
-            _ => when_constraint_set_assignable_to_owned_with_provenance_impl(
-                db, types, inferable, provenance,
+            _ => when_constraint_set_assignable_to_owned_with_evaluation_impl(
+                db,
+                types,
+                inferable,
+                typevar_evaluation,
+                provenance,
             ),
         })
     }
@@ -1149,7 +1168,7 @@ impl<'db> Type<'db> {
                         types.second(db),
                         constraints,
                         &materialization_visitor,
-                        TypeVarEvaluation::Lazy,
+                        TypeVarEvaluation::LazyPreservingExclusions,
                         inferable,
                     )
             })
@@ -1951,25 +1970,33 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> Option<ConstraintSet<'db, 'c>> {
         let positive = intersection.iter_positive(db).exactly_one().ok()?;
         let typevar = positive.as_typevar()?;
-        // When specializing a generic callable, prefer the target as evidence for its local
-        // type variable. For example, matching `(T) -> T & ~str` against `(U) -> int`
-        // can infer `int` for both T and U.
+        let collects = self.collects(db, typevar);
+        let preserve_exclusions =
+            self.typevar_evaluation == TypeVarEvaluation::LazyPreservingExclusions && collects;
+        // When specializing a generic callable, the target can provide more specific evidence
+        // for its local type variable. Matching `(T) -> T & ~str` against `(U) -> int` can infer
+        // `int` for both variables. Solver implications need the bound on the whole intersection.
         if typevar.domain(db) != TypeVarDomain::Type
-            || typevar.is_inferable(db, self.inferable.explicit_typevars())
+            || (!preserve_exclusions
+                && typevar.is_inferable(db, self.inferable.explicit_typevars()))
         {
             return None;
         }
 
         let env = self.env;
         let upper_elements = || std::iter::once(target).chain(intersection.iter_negative(db));
-        // Match type variables and structural types in place. A protocol member or
-        // TypedDict field can refer to another type variable that needs its own evidence.
+        // Match inferable variables and structural types in place when they can supply additional
+        // evidence. A solver implication can use caller-fixed variables as opaque types in the
+        // rewritten bound.
         if upper_elements().any(|ty| {
-            any_over_type_expanding_aliases(db, env, ty, |nested| {
-                matches!(
-                    nested,
-                    Type::TypeVar(_) | Type::ProtocolInstance(_) | Type::TypedDict(_)
-                )
+            any_over_type_expanding_aliases(db, env, ty, |nested| match nested {
+                Type::TypeVar(variable) => {
+                    !preserve_exclusions
+                        || variable.domain(db) != TypeVarDomain::Type
+                        || variable.is_inferable(db, self.inferable)
+                }
+                Type::ProtocolInstance(_) | Type::TypedDict(_) => true,
+                _ => false,
             }) || ty.top_materialization(db, env) != ty.bottom_materialization(db, env)
         }) {
             return None;
@@ -1978,7 +2005,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
         // For a fixed U, compare what remains of its declared domain. Keeping a gradual
         // bound intact lets it materialize during assignability.
-        if !self.collects(db, typevar) {
+        if !collects {
             return Some(self.check_type_pair(db, expanded, target));
         }
 

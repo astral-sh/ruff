@@ -67,6 +67,7 @@ use crate::types::infer::{TypeContextKind, original_class_type};
 use crate::types::known_instance::{
     FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
 };
+use crate::types::relation::TypeVarEvaluation;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication,
@@ -6993,11 +6994,12 @@ impl<'db> CallInference<'_, 'db> {
                 ConstraintProvenance::DECLARED
             };
             let return_constraints = return_ty
-                .when_constraint_set_assignable_to_owned_with_provenance(
+                .when_constraint_set_assignable_to_owned_with_evaluation(
                     db,
                     self.env,
                     tcx,
                     self.inferable_typevars,
+                    TypeVarEvaluation::Lazy,
                     provenance,
                 );
             builder.record_constraint_set(constraints.load(db, self.env, &return_constraints));

@@ -1983,6 +1983,36 @@ reveal_type(C(1, True))  # revealed: C[int]
 wrong_innards: C[int] = C("five", 1)
 ```
 
+### Inferring a union from the initializer's receiver
+
+The arguments fix `A` to `bool` and `B` to `int`. The initializer's `self` annotation then gives the
+new box the element type `int`, since `bool` is a subtype of `int`.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+B = TypeVar("B")
+
+class Box(Generic[T]):
+    value: T
+
+    def __init__(self: "Box[A | B]", left: "Box[A]", right: "Box[B]") -> None: ...
+
+def combine(left: Box[bool], right: Box[int]):
+    reveal_type(Box(left, right))  # revealed: Box[int]
+```
+
+If the left box carries a caller's type variable, the result keeps it in the union.
+
+```py
+U = TypeVar("U")
+
+def forward(left: Box[U], right: Box[int]):
+    reveal_type(Box(left, right))  # revealed: Box[U@forward | int]
+```
+
 ### Calling a generic initializer on an existing instance
 
 An inherited initializer can infer its own type parameters from the arguments. Its explicit `self`
