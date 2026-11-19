@@ -5,7 +5,7 @@ use ruff_db::files::FileRootKind;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_ranged_value::ValueSource;
+use ruff_ranged_value::{RangedValue, ValueSource};
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
@@ -15,7 +15,7 @@ use ty_python_semantic::PythonEnvironment;
 use crate::Db;
 use crate::metadata::options::{
     EnvironmentOptions, OptionDiagnostic, OptionsContext, ProgramSettingsDiagnostic,
-    ToProgramSettingsError, ToSettingsError,
+    ProjectManager, ToProgramSettingsError, ToSettingsError,
 };
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
@@ -68,13 +68,6 @@ pub struct ProjectMetadata {
 
     #[cfg_attr(test, serde(skip))]
     uv_workspace: UvWorkspace,
-
-    /// Whether ty should query uv for workspace metadata during project discovery and reload.
-    /// The CLI or language server supplies this flag.
-    ///
-    /// TODO: Remove this field when the `project-manager.project` setting is introduced.
-    #[cfg_attr(test, serde(skip))]
-    use_uv_for_workspace: bool,
 }
 
 impl ProjectMetadata {
@@ -90,7 +83,6 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             uv_workspace: UvWorkspace::default(),
-            use_uv_for_workspace: false,
         }
     }
 
@@ -121,7 +113,6 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             uv_workspace: UvWorkspace::default(),
-            use_uv_for_workspace: false,
         })
     }
 
@@ -176,7 +167,6 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             uv_workspace: UvWorkspace::default(),
-            use_uv_for_workspace: false,
         })
     }
 
@@ -226,7 +216,7 @@ impl ProjectMetadata {
         Ok(metadata)
     }
 
-    /// Applies a previously obtained uv workspace without invoking uv or checking [`Self::uv_workspace_discovery_enabled`].
+    /// Applies a previously obtained uv workspace without invoking uv or checking [`Self::project_uses_uv`].
     ///
     /// An explicit ty configuration keeps its root; otherwise uv's workspace root supplies
     /// the project configuration. Already applied option layers are preserved.
@@ -351,13 +341,6 @@ impl ProjectMetadata {
         Ok(Some(metadata))
     }
 
-    /// Sets whether ty queries uv for workspace metadata during project discovery and reload.
-    #[must_use]
-    pub fn with_uv_workspace_discovery(mut self, enabled: bool) -> Self {
-        self.use_uv_for_workspace = enabled;
-        self
-    }
-
     /// Rediscovers the project from `path`, while preserving applied options.
     pub(crate) fn rediscover(
         &self,
@@ -372,11 +355,18 @@ impl ProjectMetadata {
         };
 
         metadata.apply_uv_workspace(system, workspace)?;
-        Ok(metadata.with_applied_options_from(self))
+        let mut metadata = metadata.with_applied_options_from(self);
+        if let Err(error) = metadata.apply_configuration_files(system) {
+            let error = anyhow::Error::new(error);
+            tracing::error!(
+                "Failed to apply configuration files, \
+                 continuing without applying them: {error:#}"
+            );
+        }
+        Ok(metadata)
     }
 
     fn with_applied_options_from(mut self, previous: &Self) -> Self {
-        self.use_uv_for_workspace = previous.use_uv_for_workspace;
         self.override_options.clone_from(&previous.override_options);
         self.fallback_options.clone_from(&previous.fallback_options);
         self.user_configuration
@@ -393,8 +383,10 @@ impl ProjectMetadata {
     }
 
     /// Whether ty should query uv for workspace metadata.
-    pub const fn uv_workspace_discovery_enabled(&self) -> bool {
-        self.use_uv_for_workspace
+    pub fn project_uses_uv(&self) -> bool {
+        self.options_in_precedence_order(&self.options, None)
+            .find_map(Options::project_uses_uv)
+            .unwrap_or(false)
     }
 
     /// The `project-manager.script` override that takes precedence over inline and project settings.
@@ -441,6 +433,15 @@ impl ProjectMetadata {
     /// Sets the highest-precedence options for this project, replacing any previous overrides.
     pub fn set_override_options(&mut self, options: Options) {
         self.override_options = Some(Box::new(options));
+    }
+
+    /// Overrides the project manager without changing any other explicit overrides.
+    pub fn override_project_manager(&mut self, manager: RangedValue<ProjectManager>) {
+        self.override_options
+            .get_or_insert_default()
+            .project_manager
+            .get_or_insert_default()
+            .project = Some(manager);
     }
 
     pub(crate) fn uv_workspace(&self) -> &UvWorkspace {

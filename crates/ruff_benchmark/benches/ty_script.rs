@@ -21,6 +21,7 @@ fn setup_iteration(root: &SystemPath, uv: &SystemPath) -> ProjectDatabase {
     metadata.set_override_options(Options {
         project_manager: Some(ProjectManagerOptions {
             script: Some(RangedValue::cli(ScriptProjectManager::Uv)),
+            ..ProjectManagerOptions::default()
         }),
         ..Options::default()
     });

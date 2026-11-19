@@ -57,6 +57,38 @@ fn malformed_initialization_options_preserve_workspace_trust() -> Result<()> {
 }
 
 #[test]
+fn editor_project_manager_overrides_legacy_use_uv() -> Result<()> {
+    let server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file("src/pyproject.toml", "")?
+        .with_raw_initialization_options(json!({
+            "experimental": {"useUv": "on"},
+            "configuration": {"project-manager": {"project": "none"}}
+        }))
+        .with_env_var("UV", "missing-ty-project-uv")
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.assert_no_pending_messages();
+    Ok(())
+}
+
+#[test]
+fn untrusted_workspace_overrides_editor_project_manager() -> Result<()> {
+    let server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file("src/pyproject.toml", "")?
+        .with_raw_initialization_options(json!({
+            "untrustedWorkspace": true,
+            "configuration": {"project-manager": {"project": "uv"}}
+        }))
+        .with_env_var("UV", "missing-ty-project-uv")
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.assert_no_pending_messages();
+    Ok(())
+}
+
+#[test]
 fn empty_workspace_folders() -> Result<()> {
     let server = TestServerBuilder::new()?
         .build()

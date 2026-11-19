@@ -723,6 +723,56 @@ fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn ty_uv_off_overrides_project_cli_setting() -> anyhow::Result<()> {
+    let case = CliTest::with_file("main.py", "x = 1")?;
+    assert_cmd_snapshot!(
+        case.command()
+            .args(["--config", "project-manager.project='uv'"])
+            .env(EnvVars::TY_UV, "off")
+            .env(EnvVars::UV, "missing-ty-project-uv"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+    Ok(())
+}
+
+#[cfg(feature = "test-uv")]
+#[test]
+fn configured_uv_discovers_workspace_from_member() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file("shared.py", "value = 1")?;
+    case.write_file(
+        "packages/member/member.py",
+        r#"
+        import shared
+        value: int = 'selected-member'
+        "#,
+    )?;
+    let mut command = uv_sync_command(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .env_remove("TY_UV")
+        .args([".", "--config", "project-manager.project='uv'"]);
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    member.py:3:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// Script-only uv integration must not invoke uv to discover the enclosing workspace.
 #[test]
 fn scripts_only_mode_disables_uv_workspace_discovery() -> anyhow::Result<()> {
