@@ -624,7 +624,8 @@ def make_record(field: tuple[str, type], name: str):
 
 Unpacking a list of pairs leaves the field count unknown. An attribute such as `x` could name one of
 the unpacked fields. An explicit field after the unpacking has a known name, type, and position from
-the end of the tuple.
+the end of the tuple. ty checks its type in constructor calls whether the caller passes it
+positionally or by keyword.
 
 ```py
 def unpack_fields(fields: list[tuple[str, type]], field: tuple[str, type]):
@@ -637,10 +638,22 @@ def unpack_fields(fields: list[tuple[str, type]], field: tuple[str, type]):
     # revealed: (<class 'WithLast'>, <class 'tuple[*tuple[Unknown, ...], bytes]'>, <class 'Sequence[Unknown | bytes]'>, <class 'Reversible[Unknown | bytes]'>, <class 'Collection[Unknown | bytes]'>, <class 'Iterable[Unknown | bytes]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
     reveal_mro(WithLast)
 
+    # revealed: Overload[[Self](_cls: type[Self], *tuple[*tuple[Unknown, ...], bytes]) -> Self, [Self](_cls: type[Self], *args: Unknown, last: bytes, **kwargs: Unknown) -> Self]
+    reveal_type(WithLast.__new__)
+    WithLast(1, "wrong")  # error: [invalid-argument-type] "Expected `bytes`"
+    WithLast(1, last="wrong")  # error: [invalid-argument-type] "Expected `bytes`"
+    WithLast(last=b"")  # ok
+    WithLast(1, other=2, last=b"")  # ok
+
     record = WithLast(1, b"")
     reveal_type(record.x)  # revealed: Unknown
     reveal_type(record.last)  # revealed: bytes
     reveal_type(record[-1])  # revealed: bytes
+
+    # The caller can pass the first explicit field positionally and the second by keyword.
+    Packet = NamedTuple("Packet", [*fields, ("count", int), ("last", bytes)])  # error: [invalid-named-tuple]
+    Packet("header", 2, last=b"")  # ok
+    Packet("header", "wrong", last=b"")  # error: [invalid-argument-type] "Expected `int`"
 
     # Unpacking within a single pair still gives one field.
     One = NamedTuple("One", [(*field,)])  # error: [invalid-named-tuple]
@@ -666,6 +679,16 @@ def fixed_unpack(name: str):
     Record = NamedTuple("Record", [*fields, ("last", bytes)])  # error: [invalid-named-tuple]
     # revealed: (<class 'Record'>, <class 'tuple[int, Unknown, bytes]'>, <class 'Sequence[int | Unknown | bytes]'>, <class 'Reversible[int | Unknown | bytes]'>, <class 'Collection[int | Unknown | bytes]'>, <class 'Iterable[int | Unknown | bytes]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
     reveal_mro(Record)
+
+    # revealed: Overload[[Self](_cls: type[Self], int, /, middle: Unknown, last: bytes) -> Self, [Self](_cls: type[Self], *, middle: Unknown, last: bytes, **kwargs: int) -> Self]
+    reveal_type(Record.__new__)
+    Record(1, "text", "wrong")  # error: [invalid-argument-type] "Expected `bytes`"
+    Record(1, "text", last="wrong")  # error: [invalid-argument-type] "Expected `bytes`"
+    Record(1, last=b"", middle="text")  # ok
+
+    # `first` could name the first field, whose annotation is `int`.
+    Record(first=1, middle="text", last=b"")  # ok
+    Record(first="wrong", middle="text", last=b"")  # error: [invalid-argument-type] "Expected `int`"
 
     record = Record(1, "text", b"")
     reveal_type(record.last)  # revealed: bytes
@@ -857,8 +880,9 @@ reveal_type(url)  # revealed: Url
 
 ### Functional syntax with list variable fields
 
-The inferred type of the list below loses the individual field names, so field access returns
-`Unknown`.
+The inferred type of the list below tells ty that each field annotation is `str` or `int`, so the
+constructor checks each argument against `str | int`. The list's type loses the individual field
+names, so field access returns `Unknown`.
 
 ```py
 from typing import NamedTuple
@@ -873,6 +897,9 @@ class Url(NamedTuple("Url", fields)):
         reveal_type(self.port)  # revealed: Unknown
         reveal_type(self.unknown)  # revealed: Unknown
         return self._replace(port=port)
+
+Url(host="localhost", port=80)  # ok
+Url(host=b"localhost", port=80)  # error: [invalid-argument-type] "Expected `str | int`"
 ```
 
 When `collections.namedtuple` receives a dynamically computed string of field names, the constructor
