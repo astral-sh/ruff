@@ -127,6 +127,34 @@ fn rule_json_output() {
 }
 
 #[test]
+fn deprecated_rule_with_mixed_defaults() -> anyhow::Result<()> {
+    let output = ty_cmd()
+        .args(["explain", "rule", "mismatched-type-name"])
+        .output()?;
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        stdout.contains("Default level: varies by replacement rule | Deprecated"),
+        "{stdout}"
+    );
+
+    let output = ty_cmd()
+        .args([
+            "explain",
+            "rule",
+            "mismatched-type-name",
+            "--output-format",
+            "json",
+        ])
+        .output()?;
+    assert!(output.status.success());
+    let rule: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert!(rule.get("default_level").is_none(), "{rule}");
+
+    Ok(())
+}
+
+#[test]
 fn preview_rule_status() -> anyhow::Result<()> {
     let output = ty_cmd()
         .args(["explain", "rule", "missing-direct-dependency"])

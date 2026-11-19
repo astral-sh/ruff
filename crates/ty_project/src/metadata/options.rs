@@ -2531,10 +2531,9 @@ mod schema {
                     if lint.status.is_deprecated() {
                         object.insert("deprecated".to_string(), Value::Bool(true));
                     }
-                    object.insert(
-                        "default".to_string(),
-                        Value::String(lint.default_level.to_string()),
-                    );
+                    if let Some(level) = lint.default_level() {
+                        object.insert("default".to_string(), Value::String(level.to_string()));
+                    }
                     object.insert(
                         "oneOf".to_string(),
                         Value::Array(vec![level_schema.clone().into()]),

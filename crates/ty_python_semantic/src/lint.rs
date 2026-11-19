@@ -18,7 +18,7 @@ pub struct LintMetadata {
     /// An in depth explanation of the lint in markdown. Covers what the lint does, why it's bad and possible fixes.
     pub raw_documentation: &'static str,
 
-    /// The default level of the lint if the user doesn't specify one.
+    /// The default level for a lint that emits its own diagnostics.
     pub default_level: Level,
 
     pub status: LintStatus,
@@ -127,8 +127,17 @@ impl LintMetadata {
         lint_documentation_url(self.name())
     }
 
-    pub fn default_level(&self) -> Level {
-        self.default_level
+    /// Returns this lint's default level. For a lint with replacements, returns their shared
+    /// default level, or `None` if their defaults differ.
+    pub fn default_level(&self) -> Option<Level> {
+        let Some([first, rest @ ..]) = self.status.replacements() else {
+            return Some(self.default_level);
+        };
+
+        let level = first.default_level;
+        rest.iter()
+            .all(|lint| lint.default_level == level)
+            .then_some(level)
     }
 
     pub fn status(&self) -> &LintStatus {
@@ -542,6 +551,9 @@ impl LintRegistry {
             .iter()
             .map(|lint| {
                 let name = lint.name();
+                let default_severity = lint
+                    .default_level()
+                    .and_then(|level| Severity::try_from(level).ok());
                 (
                     name,
                     RuleMetadata {
@@ -550,8 +562,8 @@ impl LintRegistry {
                         description: lint.documentation().into(),
                         help_url: lint.documentation_url(),
                         linter: None,
-                        default_severity: Severity::try_from(lint.default_level()).ok(),
-                        enabled_by_default: !lint.default_level().is_ignore(),
+                        default_severity,
+                        enabled_by_default: default_severity.is_some(),
                     },
                 )
             })
@@ -669,7 +681,7 @@ impl RuleSelection {
             .iter()
             .filter(|lint| lint.status.replacements().is_none())
             .filter_map(|lint| {
-                Severity::try_from(lint.default_level())
+                Severity::try_from(lint.default_level)
                     .ok()
                     .or(default_severity)
                     .map(|severity| (*lint, (severity, LintSource::Default)))

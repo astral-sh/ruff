@@ -5005,7 +5005,7 @@ def f(x: str):
 ## `mismatched-type-name`
 
 <small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Default level: varies by replacement rule ·
 Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.107">0.0.107</a>) ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22mismatched-type-name%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L755" target="_blank">View source</a>

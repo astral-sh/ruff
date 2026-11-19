@@ -164,10 +164,18 @@ fn write_rule(output: &mut String, lint: LintId, aliases: &FxHashMap<LintId, Vec
         format!("({terms})")
     };
 
+    let default_level_text = if let Some(level) = lint.default_level() {
+        format!(
+            r#"<a href="../../rules#rule-levels" title="This lint has a default level of '{level}'."><code>{level}</code></a>"#
+        )
+    } else {
+        "varies by replacement rule".to_string()
+    };
+
     let _ = writeln!(
         output,
         r#"<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of '{level}'."><code>{level}</code></a> ·
+Default level: {default_level_text} ·
 {status_text} ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_terms}" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
@@ -176,7 +184,6 @@ Default level: <a href="../../rules#rule-levels" title="This lint has a default 
 
 {documentation}
 "#,
-        level = lint.default_level(),
         encoded_terms =
             url::form_urlencoded::byte_serialize(search_terms.as_bytes()).collect::<String>(),
         file = url::form_urlencoded::byte_serialize(lint.file().replace('\\', "/").as_bytes())

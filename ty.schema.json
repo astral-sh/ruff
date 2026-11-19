@@ -1377,7 +1377,6 @@
         "mismatched-type-name": {
           "title": "detects functional typing definitions whose declared name does not match the assigned variable",
           "description": "## Migration\n\nThis diagnostic code is deprecated. ty now reports name mismatches under a separate rule for each\nkind of type:\n\n- `mismatched-enum-name`\n- `mismatched-namedtuple-name`\n- `mismatched-newtype-name`\n- `mismatched-paramspec-name`\n- `mismatched-type-alias-name`\n- `mismatched-typeddict-name`\n- `mismatched-typevar-name`\n- `mismatched-typevartuple-name`\n\nExisting configuration entries and ignore comments using `mismatched-type-name` still apply to all\neight rules. However, users are encouraged to migrate to using the new rules in configuration files\nand suppression comments wherever possible.\n\n## Rule history\n\n- v0.0.107: Split into the eight rules listed under Migration.",
-          "default": "warn",
           "deprecated": true,
           "oneOf": [
             {
