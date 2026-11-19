@@ -273,9 +273,9 @@ impl Rule {
             }
             Rule::BlanketNOQA
             | Rule::NoqaComments
-            | Rule::RenamedRuleInSuppression
+            | Rule::RenamedRuleInSuppressionComment
             | Rule::RuleCodesInSuppressionComments
-            | Rule::UnusedSuppression => LintSource::Noqa,
+            | Rule::UnusedSuppressionComment => LintSource::Noqa,
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
@@ -288,18 +288,18 @@ impl Rule {
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::BlanketTypeIgnore
             | Rule::BlankLineAfterDecorator
-            | Rule::MissingBlankLineBetweenMethods
-            | Rule::MissingBlankLinesAfterFunctionOrClass
-            | Rule::MissingBlankLinesBeforeNestedDefinition
-            | Rule::MissingBlankLinesTopLevel
+            | Rule::MissingBlankLineBeforeMethod
+            | Rule::MissingBlankLinesAfterTopLevelDefinition
+            | Rule::MissingBlankLineBeforeNestedDefinition
+            | Rule::MissingBlankLinesBeforeTopLevelDefinition
             | Rule::CommentedOutCode
             | Rule::EmptyComment
             | Rule::ExtraneousParentheses
-            | Rule::BackspaceCharacter
-            | Rule::EscCharacter
-            | Rule::InvalidCharacterNul
-            | Rule::SubCharacter
-            | Rule::ZeroWidthSpaceCharacter
+            | Rule::UnescapedBackspaceCharacter
+            | Rule::UnescapedEscapeCharacter
+            | Rule::UnescapedNullCharacter
+            | Rule::UnescapedSubstituteCharacter
+            | Rule::UnescapedZeroWidthSpaceCharacter
             | Rule::InvalidTodoCapitalization
             | Rule::InvalidTodoTag
             | Rule::LineContainsFixme

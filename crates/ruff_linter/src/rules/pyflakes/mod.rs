@@ -67,7 +67,7 @@ mod tests {
     #[test_case(Rule::LateFutureImport, Path::new("F404_0.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404_1.py"))]
     #[test_case(Rule::PossiblyUndefinedNameWithStarImport, Path::new("F405.py"))]
-    #[test_case(Rule::NestedStarImport, Path::new("F406.py"))]
+    #[test_case(Rule::NonModuleLevelStarImport, Path::new("F406.py"))]
     #[test_case(Rule::FutureFeatureNotDefined, Path::new("F407.py"))]
     #[test_case(Rule::PercentFormatInvalidFormat, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatExpectedMapping, Path::new("F502.py"))]
@@ -3300,12 +3300,11 @@ lambda: fu
     fn relative_future_import_star() {
         let diagnostics = test_snippet(
             "from .__future__ import *",
-            &LinterSettings::for_rule(Rule::UndefinedLocalWithImportStar)
-                .with_target_version(PythonVersion::PY313),
+            &LinterSettings::for_rule(Rule::StarImport).with_target_version(PythonVersion::PY313),
         );
         assert_eq!(
             diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
-            [Rule::UndefinedLocalWithImportStar.name().as_str()]
+            [Rule::StarImport.name().as_str()]
         );
     }
 

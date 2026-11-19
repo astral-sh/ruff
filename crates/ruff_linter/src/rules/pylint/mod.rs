@@ -104,13 +104,16 @@ mod tests {
     )]
     #[test_case(Rule::InvalidStrReturnType, Path::new("invalid_return_type_str.py"))]
     #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"))]
-    #[test_case(Rule::BackspaceCharacter, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::EscCharacter, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::InvalidCharacterNul, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::SubCharacter, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::ZeroWidthSpaceCharacter, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedBackspaceCharacter, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedEscapeCharacter, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedNullCharacter, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedSubstituteCharacter, Path::new("invalid_characters.py"))]
     #[test_case(
-        Rule::BackspaceCharacter,
+        Rule::UnescapedZeroWidthSpaceCharacter,
+        Path::new("invalid_characters.py")
+    )]
+    #[test_case(
+        Rule::UnescapedBackspaceCharacter,
         Path::new("invalid_characters_syntax_error.py")
     )]
     #[test_case(Rule::ShallowCopyEnviron, Path::new("shallow_copy_environ.py"))]

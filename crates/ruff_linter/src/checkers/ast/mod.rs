@@ -75,7 +75,7 @@ use crate::preview::{
 use crate::registry::{LintSource, Rule};
 use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
-    LateFutureImport, MultipleStarredExpressions, NestedStarImport, ReturnOutsideFunction,
+    LateFutureImport, MultipleStarredExpressions, NonModuleLevelStarImport, ReturnOutsideFunction,
     YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{
@@ -818,8 +818,8 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::NonModuleImportStar(name) => {
-                if self.is_rule_enabled(Rule::NestedStarImport) {
-                    self.report_diagnostic(NestedStarImport { name }, error.range);
+                if self.is_rule_enabled(Rule::NonModuleLevelStarImport) {
+                    self.report_diagnostic(NonModuleLevelStarImport { name }, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {

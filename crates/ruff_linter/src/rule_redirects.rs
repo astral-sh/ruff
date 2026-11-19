@@ -195,16 +195,19 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("prohibited-trailing-comma", Rule::UnnecessaryTrailingComma),
     (
         "blank-line-between-methods",
-        Rule::MissingBlankLineBetweenMethods,
+        Rule::MissingBlankLineBeforeMethod,
     ),
-    ("blank-lines-top-level", Rule::MissingBlankLinesTopLevel),
+    (
+        "blank-lines-top-level",
+        Rule::MissingBlankLinesBeforeTopLevelDefinition,
+    ),
     (
         "blank-lines-after-function-or-class",
-        Rule::MissingBlankLinesAfterFunctionOrClass,
+        Rule::MissingBlankLinesAfterTopLevelDefinition,
     ),
     (
         "blank-lines-before-nested-definition",
-        Rule::MissingBlankLinesBeforeNestedDefinition,
+        Rule::MissingBlankLineBeforeNestedDefinition,
     ),
     ("shebang-not-executable", Rule::NonExecutableFileWithShebang),
     (
@@ -218,17 +221,21 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "undefined-local-with-nested-import-star-usage",
-        Rule::NestedStarImport,
+        Rule::NonModuleLevelStarImport,
     ),
-    ("invalid-character-backspace", Rule::BackspaceCharacter),
-    ("invalid-character-sub", Rule::SubCharacter),
-    ("invalid-character-esc", Rule::EscCharacter),
+    (
+        "invalid-character-backspace",
+        Rule::UnescapedBackspaceCharacter,
+    ),
+    ("invalid-character-sub", Rule::UnescapedSubstituteCharacter),
+    ("invalid-character-esc", Rule::UnescapedEscapeCharacter),
+    ("invalid-character-nul", Rule::UnescapedNullCharacter),
     (
         "invalid-character-zero-width-space",
-        Rule::ZeroWidthSpaceCharacter,
+        Rule::UnescapedZeroWidthSpaceCharacter,
     ),
-    ("unused-noqa", Rule::UnusedSuppression),
-    ("redirected-noqa", Rule::RenamedRuleInSuppression),
+    ("unused-noqa", Rule::UnusedSuppressionComment),
+    ("redirected-noqa", Rule::RenamedRuleInSuppressionComment),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

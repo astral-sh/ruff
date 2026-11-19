@@ -33,12 +33,12 @@ pub(crate) fn check_tokens(
     let comment_ranges = indexer.comment_ranges();
 
     if context.any_rule_enabled(&[
-        Rule::MissingBlankLineBetweenMethods,
-        Rule::MissingBlankLinesTopLevel,
+        Rule::MissingBlankLineBeforeMethod,
+        Rule::MissingBlankLinesBeforeTopLevelDefinition,
         Rule::TooManyBlankLines,
         Rule::BlankLineAfterDecorator,
-        Rule::MissingBlankLinesAfterFunctionOrClass,
-        Rule::MissingBlankLinesBeforeNestedDefinition,
+        Rule::MissingBlankLinesAfterTopLevelDefinition,
+        Rule::MissingBlankLineBeforeNestedDefinition,
     ]) {
         BlankLinesChecker::new(locator, stylist, source_type, cell_offsets, context)
             .check_lines(tokens);
@@ -71,11 +71,11 @@ pub(crate) fn check_tokens(
     }
 
     if context.any_rule_enabled(&[
-        Rule::BackspaceCharacter,
-        Rule::SubCharacter,
-        Rule::EscCharacter,
-        Rule::InvalidCharacterNul,
-        Rule::ZeroWidthSpaceCharacter,
+        Rule::UnescapedBackspaceCharacter,
+        Rule::UnescapedSubstituteCharacter,
+        Rule::UnescapedEscapeCharacter,
+        Rule::UnescapedNullCharacter,
+        Rule::UnescapedZeroWidthSpaceCharacter,
     ]) && pylint::rules::contains_invalid_string_character(locator.contents())
     {
         let mut interpolated_string_depths: Vec<u32> = Vec::new();

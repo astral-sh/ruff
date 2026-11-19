@@ -246,14 +246,14 @@ impl Violation for PossiblyUndefinedNameWithStarImport {
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.37", category = Category::Correctness)]
-pub(crate) struct NestedStarImport {
+pub(crate) struct NonModuleLevelStarImport {
     pub(crate) name: String,
 }
 
-impl Violation for NestedStarImport {
+impl Violation for NonModuleLevelStarImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NestedStarImport { name } = self;
+        let NonModuleLevelStarImport { name } = self;
         format!("`from {name} import *` only allowed at module level")
     }
 }

@@ -119,8 +119,8 @@ mod tests {
     #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
     #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
     #[test_case(Rule::IncorrectDecoratorOrder, Path::new("RUF074.py"))]
-    #[test_case(Rule::RenamedRuleInSuppression, Path::new("RUF101_0.py"))]
-    #[test_case(Rule::RenamedRuleInSuppression, Path::new("RUF101_1.py"))]
+    #[test_case(Rule::RenamedRuleInSuppressionComment, Path::new("RUF101_0.py"))]
+    #[test_case(Rule::RenamedRuleInSuppressionComment, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102_1.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
@@ -501,7 +501,7 @@ mod tests {
                 Rule::UnusedFunctionArgument,
                 Rule::UnusedMethodArgument,
                 Rule::AmbiguousVariableName,
-                Rule::UnusedSuppression,
+                Rule::UnusedSuppressionComment,
                 Rule::InvalidRuleCode,
                 Rule::InvalidSuppressionComment,
                 Rule::UnmatchedSuppressionComment,
@@ -520,7 +520,7 @@ mod tests {
             &settings::LinterSettings {
                 external: vec!["V101".to_string()],
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedSuppression,
+                    Rule::UnusedSuppressionComment,
                     Rule::LineTooLong,
                     Rule::UnusedImport,
                     Rule::UnusedVariable,
@@ -541,7 +541,7 @@ mod tests {
             &settings::LinterSettings {
                 external: vec!["V".to_string()],
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedSuppression,
+                    Rule::UnusedSuppressionComment,
                     Rule::LineTooLong,
                     Rule::UnusedImport,
                     Rule::UnusedVariable,
@@ -559,7 +559,10 @@ mod tests {
     fn ruf100_1() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_1.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedSuppression, Rule::UnusedImport]),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedSuppressionComment,
+                Rule::UnusedImport,
+            ]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -567,8 +570,10 @@ mod tests {
 
     #[test]
     fn ruf100_2() -> Result<()> {
-        let mut settings =
-            settings::LinterSettings::for_rules(vec![Rule::UnusedSuppression, Rule::UnusedImport]);
+        let mut settings = settings::LinterSettings::for_rules(vec![
+            Rule::UnusedSuppressionComment,
+            Rule::UnusedImport,
+        ]);
 
         settings.per_file_ignores = CompiledPerFileIgnoreList::resolve(
             vec![PerFileIgnore::new(
@@ -590,7 +595,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_3.py"),
             &settings::LinterSettings::for_rules(vec![
-                Rule::UnusedSuppression,
+                Rule::UnusedSuppressionComment,
                 Rule::LineTooLong,
                 Rule::UndefinedName,
             ]),
@@ -603,7 +608,10 @@ mod tests {
     fn ruf100_4() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_4.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedSuppression, Rule::UnusedImport]),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedSuppressionComment,
+                Rule::UnusedImport,
+            ]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -615,7 +623,7 @@ mod tests {
             Path::new("ruff/RUF100_5.py"),
             &settings::LinterSettings {
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedSuppression,
+                    Rule::UnusedSuppressionComment,
                     Rule::LineTooLong,
                     Rule::CommentedOutCode,
                 ])
@@ -629,7 +637,7 @@ mod tests {
     fn ruff_noqa_filedirective_unused() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_6.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedSuppression]),
+            &settings::LinterSettings::for_rules(vec![Rule::UnusedSuppressionComment]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -640,7 +648,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_7.py"),
             &settings::LinterSettings::for_rules(vec![
-                Rule::UnusedSuppression,
+                Rule::UnusedSuppressionComment,
                 Rule::FStringMissingPlaceholders,
                 Rule::LineTooLong,
                 Rule::UnusedVariable,
@@ -688,7 +696,7 @@ mod tests {
                 .unwrap(),
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::UnusedImport,
-                    Rule::UnusedSuppression,
+                    Rule::UnusedSuppressionComment,
                 ])
             },
         )?;
@@ -710,7 +718,7 @@ mod tests {
                     PreviewMode::Disabled,
                 )
                 .unwrap(),
-                ..settings::LinterSettings::for_rules(vec![Rule::UnusedSuppression])
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedSuppressionComment])
             },
         )?;
         assert_diagnostics!(diagnostics);

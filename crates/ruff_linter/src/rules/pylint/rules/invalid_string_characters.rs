@@ -29,9 +29,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct BackspaceCharacter;
+pub(crate) struct UnescapedBackspaceCharacter;
 
-impl Violation for BackspaceCharacter {
+impl Violation for UnescapedBackspaceCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -65,9 +65,9 @@ impl Violation for BackspaceCharacter {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct SubCharacter;
+pub(crate) struct UnescapedSubstituteCharacter;
 
-impl Violation for SubCharacter {
+impl Violation for UnescapedSubstituteCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -101,9 +101,9 @@ impl Violation for SubCharacter {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct EscCharacter;
+pub(crate) struct UnescapedEscapeCharacter;
 
-impl Violation for EscCharacter {
+impl Violation for UnescapedEscapeCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -137,9 +137,9 @@ impl Violation for EscCharacter {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterNul;
+pub(crate) struct UnescapedNullCharacter;
 
-impl Violation for InvalidCharacterNul {
+impl Violation for UnescapedNullCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -172,9 +172,9 @@ impl Violation for InvalidCharacterNul {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct ZeroWidthSpaceCharacter;
+pub(crate) struct UnescapedZeroWidthSpaceCharacter;
 
-impl Violation for ZeroWidthSpaceCharacter {
+impl Violation for UnescapedZeroWidthSpaceCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -234,23 +234,23 @@ pub(crate) fn invalid_string_characters(
         let (replacement, diagnostic) = match c {
             '\x08' => (
                 "\\b",
-                context.report_diagnostic_if_enabled(BackspaceCharacter, range),
+                context.report_diagnostic_if_enabled(UnescapedBackspaceCharacter, range),
             ),
             '\x1a' => (
                 "\\x1a",
-                context.report_diagnostic_if_enabled(SubCharacter, range),
+                context.report_diagnostic_if_enabled(UnescapedSubstituteCharacter, range),
             ),
             '\x1b' => (
                 "\\x1b",
-                context.report_diagnostic_if_enabled(EscCharacter, range),
+                context.report_diagnostic_if_enabled(UnescapedEscapeCharacter, range),
             ),
             '\0' => (
                 "\\0",
-                context.report_diagnostic_if_enabled(InvalidCharacterNul, range),
+                context.report_diagnostic_if_enabled(UnescapedNullCharacter, range),
             ),
             '\u{200b}' => (
                 "\\u200b",
-                context.report_diagnostic_if_enabled(ZeroWidthSpaceCharacter, range),
+                context.report_diagnostic_if_enabled(UnescapedZeroWidthSpaceCharacter, range),
             ),
             _ => {
                 continue;
