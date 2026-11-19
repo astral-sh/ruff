@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.17.6
+
+Released on 2026-11-19.
+
+### Preview features
+
+- \[`flake8-type-checking`\] Add a fix for `runtime-string-union` (`TC010`) ([#15635](https://github.com/astral-sh/ruff/pull/15635))
+
+### Bug fixes
+
+- Fix handling of parenthesized duplicate items (`B033`, `RUF068`) ([#30493](https://github.com/astral-sh/ruff/pull/30493))
+- \[`pyflakes`\] Fix false negative when a name is assigned more than once (`F823`) ([#30524](https://github.com/astral-sh/ruff/pull/30524))
+- \[`pylint`\] Avoid false positive when collection is modified in loop (`PLR1733`, `PLR1736`) ([#30466](https://github.com/astral-sh/ruff/pull/30466))
+- \[`ruff`\] Avoid syntax error in `useless-finally` fix for inline `try` bodies (`RUF072`) ([#30349](https://github.com/astral-sh/ruff/pull/30349))
+- Treat relative imports from `.__future__` as ordinary imports ([#30260](https://github.com/astral-sh/ruff/pull/30260))
+
+### Rule changes
+
+- \[`flake8-simplify`\] Avoid redundant `bool` wrappers in `SIM208` fixes ([#30457](https://github.com/astral-sh/ruff/pull/30457))
+- \[`pyflakes`\] Ignore `__traceback_hide__` in `unused-variable` (`F841`) ([#29600](https://github.com/astral-sh/ruff/pull/29600))
+
+### Performance
+
+- Decode in-memory notebooks directly from their source string ([#30385](https://github.com/astral-sh/ruff/pull/30385))
+- Short-circuit exact qualified-name checks ([#30058](https://github.com/astral-sh/ruff/pull/30058))
+- Stream JSON diagnostics to the output writer ([#30384](https://github.com/astral-sh/ruff/pull/30384))
+
+### Documentation
+
+- Fix the multiline string example in Known Deviations from Black ([#30447](https://github.com/astral-sh/ruff/pull/30447))
+- Include the category in individual rule documentation pages ([#30503](https://github.com/astral-sh/ruff/pull/30503))
+
+### Other changes
+
+- Update Rust toolchain to 1.100 and MSRV to 1.98 ([#30416](https://github.com/astral-sh/ruff/pull/30416))
+
+### Contributors
+
+- [@pseudo-usama](https://github.com/pseudo-usama)
+- [@G26karthik](https://github.com/G26karthik)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@apathydevil](https://github.com/apathydevil)
+- [@Shivansh-S17](https://github.com/Shivansh-S17)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@ntBre](https://github.com/ntBre)
+- [@anujdas](https://github.com/anujdas)
+- [@chammika](https://github.com/chammika)
+- [@imryanthedev](https://github.com/imryanthedev)
+- [@Daverball](https://github.com/Daverball)
+
 ## 0.17.5
 
 Released on 2026-11-12.
