@@ -3926,7 +3926,8 @@ def get[T](box: Box[T]) -> T | None:
     return box["value"]
 
 def read[T](value: T) -> T | None:
-    return reveal_type(get(Box(value=value)))  # revealed: T@read | None
+    # TODO: Infer `T@read | None` from the value passed to `Box`.
+    return reveal_type(get(Box(value=value)))  # revealed: Unknown | None
 ```
 
 ## Nested calls through a callable union

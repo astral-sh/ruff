@@ -4313,10 +4313,12 @@ impl<'db> CandidateSolutions<'db> {
         .filter(|candidate| !candidate.has_provisional_marker(db, env));
 
         // Prefer the declared candidate when it is mutually assignable with the inferred
-        // candidate. Otherwise, prefer the inferred candidate.
+        // candidate for a type variable in non-covariant position, i.e., when the declared
+        // type provides a lower bound. Otherwise, prefer the inferred candidate.
         let candidates = match (inferred, declared) {
             (Some(inferred), Some(declared))
                 if prefer_declared
+                    && path_bound.declared_lower.is_some()
                     && inferred.is_assignable_to(db, env, declared)
                     && declared.is_assignable_to(db, env, inferred) =>
             {
