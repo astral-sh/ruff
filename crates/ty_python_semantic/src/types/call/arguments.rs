@@ -141,7 +141,9 @@ impl<'a, 'db> CallArgument<'a, 'db> {
         })
     }
 
-    /// The type supplied by the argument, using the default source type for ordinary arguments.
+    /// A splatted argument supplies the type of its matched element. For an ordinary argument,
+    /// if inference with one or more expected types gave the same result each time, use that
+    /// result. Otherwise, use the type inferred without an expected type, if available.
     pub(super) fn default_matched_type(&self, matched: Option<Type<'db>>) -> Option<Type<'db>> {
         matched.or_else(|| self.ordinary_types()?.get_default())
     }
