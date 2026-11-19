@@ -82,7 +82,7 @@ pub(crate) fn add_uv_setting_info<T>(
     let source = setting.source();
     let reason = match source {
         ValueSource::ScriptMetadata(_) | ValueSource::File(_) => {
-            format_args!("`{option}` is set to `\"uv\"`")
+            format_args!("of your configuration")
         }
         ValueSource::Cli if UseUv::from_system(db.system()).is_some() => {
             format_args!("the `TY_UV` environment variable enables it")
@@ -96,7 +96,7 @@ pub(crate) fn add_uv_setting_info<T>(
     if let Some(file) = source.file(db) {
         info.annotate(
             Annotation::primary(Span::from(file).with_optional_range(setting.range()))
-                .message("configured here"),
+                .message("uv specified here"),
         );
     }
 }

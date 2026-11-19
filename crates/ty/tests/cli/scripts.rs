@@ -1542,11 +1542,11 @@ fn unavailable_uv_reports_metadata_error() -> anyhow::Result<()> {
     ----- stdout -----
     error[project-manager]: Setting up the Python environment with uv failed: could not find `uv` on `PATH`
     --> script.py:2:1
-    info: ty uses uv to install this script's dependencies because `project-manager.script` is set to `"uv"`
+    info: ty uses uv to install this script's dependencies because of your configuration
      --> script.py:5:28
       |
     5 | # project-manager.script = "uv"
-      |                            ^^^^ configured here
+      |                            ^^^^ uv specified here
     info: To install uv, see https://docs.astral.sh/uv/
 
     Found 1 diagnostic
