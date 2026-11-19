@@ -68,24 +68,6 @@ impl RuffSettings {
     /// If there is an error in the editor-only settings, it finally falls back to the default
     /// settings.
     pub(crate) fn fallback(editor_settings: &EditorSettings, root: &Path) -> RuffSettings {
-        struct FallbackTransformer<'a> {
-            inner: EditorConfigurationTransformer<'a>,
-        }
-
-        impl ConfigurationTransformer for FallbackTransformer<'_> {
-            fn transform(&self, mut configuration: Configuration) -> Configuration {
-                let fallback = find_fallback_target_version(self.inner.1);
-                if let Some(fallback) = fallback {
-                    tracing::debug!(
-                        "Derived `target-version` from found `requires-python`: {fallback:?}"
-                    );
-                    configuration.target_version = Some(fallback.into());
-                }
-
-                self.inner.transform(configuration)
-            }
-        }
-
         find_user_settings_toml()
             .and_then(|user_settings| {
                 tracing::debug!(
@@ -94,10 +76,10 @@ impl RuffSettings {
                 );
                 ruff_workspace::resolver::resolve_root_settings(
                     &user_settings,
-                    &FallbackTransformer {
-                        inner: EditorConfigurationTransformer(editor_settings, root),
+                    &EditorConfigurationTransformer(editor_settings, root),
+                    ruff_workspace::resolver::ConfigurationOrigin::UserSettings {
+                        fallback_directory: root,
                     },
-                    ruff_workspace::resolver::ConfigurationOrigin::UserSettings,
                 )
                 .ok()
                 .map(|settings| RuffSettings {

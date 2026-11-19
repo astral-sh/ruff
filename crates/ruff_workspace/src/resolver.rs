@@ -329,7 +329,7 @@ impl ConfigurationCache {
 pub fn resolve_configuration(
     initial_config_path: &Path,
     transformer: &dyn ConfigurationTransformer,
-    origin: ConfigurationOrigin,
+    origin: ConfigurationOrigin<'_>,
 ) -> Result<Configuration> {
     resolve_configuration_with_cache(initial_config_path, transformer, origin, None)
 }
@@ -337,7 +337,7 @@ pub fn resolve_configuration(
 fn resolve_configuration_with_cache(
     initial_config_path: &Path,
     transformer: &dyn ConfigurationTransformer,
-    origin: ConfigurationOrigin,
+    origin: ConfigurationOrigin<'_>,
     configuration_cache: Option<&ConfigurationCache>,
 ) -> Result<Configuration> {
     let mut configurations = indexmap::IndexMap::new();
@@ -413,7 +413,7 @@ fn resolve_configuration_with_cache(
 fn resolve_scoped_settings(
     pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
-    origin: ConfigurationOrigin,
+    origin: ConfigurationOrigin<'_>,
     configuration_cache: Option<&ConfigurationCache>,
 ) -> Result<(PathBuf, Settings)> {
     let configuration =
@@ -428,7 +428,7 @@ fn resolve_scoped_settings(
 pub fn resolve_root_settings(
     pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
-    origin: ConfigurationOrigin,
+    origin: ConfigurationOrigin<'_>,
 ) -> Result<Settings> {
     let (_project_root, settings) = resolve_scoped_settings(pyproject, transformer, origin, None)?;
     Ok(settings)
@@ -436,24 +436,27 @@ pub fn resolve_root_settings(
 
 #[derive(Debug, Clone, Copy)]
 /// How the configuration is provided.
-pub enum ConfigurationOrigin {
+pub enum ConfigurationOrigin<'a> {
     /// Origin is unknown to the caller
     Unknown,
     /// User specified path to specific configuration file
     UserSpecified,
     /// User-level configuration (e.g. in `~/.config/ruff/pyproject.toml`)
-    UserSettings,
+    ///
+    /// The fallback directory determines where to start looking for the project's Python requirement:
+    /// the current working directory for the CLI, or the editor's workspace root for the server.
+    UserSettings { fallback_directory: &'a Path },
     /// In parent or higher ancestor directory of path
     Ancestor,
 }
 
-impl ConfigurationOrigin {
+impl ConfigurationOrigin<'_> {
     fn project_root(self, path: &Path) -> &Path {
         match self {
             Self::Unknown | Self::Ancestor => path
                 .parent()
                 .expect("Expected pyproject.toml file to be in parent directory"),
-            Self::UserSpecified | Self::UserSettings => &path_dedot::CWD,
+            Self::UserSpecified | Self::UserSettings { .. } => &path_dedot::CWD,
         }
     }
 }
@@ -1165,6 +1168,34 @@ mod tests {
             file_basename,
             &make_exclusion(exclude),
         ));
+    }
+
+    #[test]
+    fn project_requires_python_overrides_user_target_version() -> Result<()> {
+        let user = TempDir::new()?;
+        let config = user.path().join("ruff.toml");
+        std::fs::write(&config, "target-version = 'py39'")?;
+        let project = TempDir::new()?;
+        std::fs::write(
+            project.path().join("pyproject.toml"),
+            r"
+            [project]
+            requires-python = '>=3.12'
+            ",
+        )?;
+
+        let settings = resolve_root_settings(
+            &config,
+            &NoOpTransformer,
+            ConfigurationOrigin::UserSettings {
+                fallback_directory: project.path(),
+            },
+        )?;
+        assert_eq!(
+            settings.linter.unresolved_target_version.0,
+            Some(PythonVersion::Py312.into())
+        );
+        Ok(())
     }
 
     #[test]
