@@ -148,6 +148,23 @@ reveal_type(result)
 result.nonexistent()
 ```
 
+## Inferring a type variable through an identity alias
+
+The expected callback return type `Id[R]` expands to `R`, so a callback returning the caller's type
+variable `T` lets us infer `T` for `R`.
+
+```py
+from collections.abc import Callable
+
+type Id[T] = T
+
+def run[R](callback: Callable[[], Id[R]]) -> R:
+    return callback()
+
+def check[T](callback: Callable[[], T]):
+    reveal_type(run(callback))  # revealed: T@check
+```
+
 ## Conditional imports of `Type`
 
 Either binding of `Type` lets ty infer `T` from the class passed to `make`.
