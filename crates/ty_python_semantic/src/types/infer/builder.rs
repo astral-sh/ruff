@@ -4611,7 +4611,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let declared_ty = annotated.inner_type();
             let value_ty = value.as_ref().map(|value| {
-                self.infer_maybe_standalone_expression(value, TypeContext::preference(declared_ty))
+                self.infer_maybe_standalone_expression(
+                    value,
+                    TypeContext::annotated_assignment(declared_ty),
+                )
             });
 
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
@@ -5031,7 +5034,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
-                TypeContext::preference(declared.inner_type()),
+                TypeContext::annotated_assignment(declared.inner_type()),
             );
             let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
                 // Alias type inference emits the diagnostic, but this runtime value is
@@ -6177,6 +6180,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             };
 
+        let mut try_infer = |tcx, narrowing| {
+            let mut speculative_bindings = bindings.clone();
+            let mut speculative_builder = self.speculate();
+            let mut speculative_argument_types = initial_argument_types.clone();
+            infer_and_check_argument_types(
+                &mut speculative_builder,
+                &mut speculative_argument_types,
+                &mut speculative_bindings,
+                tcx,
+                narrowing,
+            )
+            .ok()?;
+
+            // Nested calls can return recovery types after binding fails. Those types can make
+            // this call appear compatible with the target, but do not justify committing to it.
+            if narrowing && speculative_builder.context.has_failed_call() {
+                return None;
+            }
+
+            Some((
+                speculative_bindings,
+                speculative_argument_types,
+                speculative_builder,
+            ))
+        };
+
+        let expected_ty = call_expression_tcx.expected_type();
+        let retry_union = call_expression_tcx.is_from_annotated_assignment();
+        let return_matches = |target| {
+            bindings.satisfies(|overload| {
+                let inferable = overload
+                    .signature
+                    .generic_context
+                    .map(|generic_context| generic_context.inferable_typevars(db))
+                    .unwrap_or(TypeVarSet::None);
+
+                !overload
+                    .return_ty
+                    .when_assignable_to(db, env, target, &constraints, inferable)
+                    .is_never_satisfied(db, env, inferable)
+            })
+        };
+        let return_matches_context =
+            retry_union && !narrow_targets.is_empty() && expected_ty.is_some_and(return_matches);
+        let mut union_only_matches = Vec::new();
         let mut try_narrow = |target_ty: Type<'db>| {
             // Preserve results that were already inferred directly in a previous round of iteration,
             // even if they aren't strictly compatible with a single member of the union, to avoid
@@ -6187,73 +6235,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // context may allow a nested generic call to return a valid result that spans multiple
             // members of the full target union without explicitly providing that subset of the
             // union as type context, which we take advantage of here.
+            let expected_ty = expected_ty?;
             let compatible_ty = if call_expression_tcx.is_inferred() {
-                call_expression_tcx.expected_type()?
+                expected_ty
             } else {
                 target_ty
             };
 
-            // Short-circuit if there is no overload with a matching return type.
-            if !bindings.satisfies(|overload| {
-                let inferable = overload
-                    .signature
-                    .generic_context
-                    .map(|generic_context| generic_context.inferable_typevars(db))
-                    .unwrap_or(TypeVarSet::None);
-
-                !overload
-                    .return_ty
-                    .when_assignable_to(db, env, compatible_ty, &constraints, inferable)
-                    .is_never_satisfied(db, env, inferable)
-            }) {
+            // A context projected from an annotated assignment can require a result that spans
+            // multiple members. For other contexts, skip attempts that cannot fit their member.
+            let return_matches_target = if retry_union {
+                return_matches_context
+            } else {
+                return_matches(compatible_ty)
+            };
+            if !return_matches_target {
                 return None;
             }
 
-            let target_tcx = call_expression_tcx.with_expected_type(Some(target_ty));
-
-            let mut speculative_bindings = bindings.clone();
-            let mut speculative_builder = self.speculate();
-            let mut speculative_argument_types = initial_argument_types.clone();
-
-            // Attempt to infer the argument types using the target type context.
-            infer_and_check_argument_types(
-                &mut speculative_builder,
-                &mut speculative_argument_types,
-                &mut speculative_bindings,
-                target_tcx,
+            let attempt = try_infer(
+                call_expression_tcx.with_expected_type(Some(target_ty)),
                 true,
-            )
-            .ok()?;
-
-            // Nested calls can return recovery types after binding fails. Those types can make
-            // this call appear compatible with the target, but do not justify committing to it.
-            if speculative_builder.context.has_failed_call() {
-                return None;
+            )?;
+            let return_ty = attempt.0.return_type(db, env);
+            if return_ty.is_assignable_to(db, env, compatible_ty) {
+                return Some(attempt);
             }
 
-            if !speculative_bindings
-                .return_type(db, env)
-                .is_assignable_to(db, env, compatible_ty)
+            if retry_union
+                && compatible_ty != expected_ty
+                && return_ty.is_assignable_to(db, env, expected_ty)
             {
-                return None;
+                union_only_matches.push(attempt);
             }
-
-            // Successfully inferred a result compatible with the type context.
-            Some((
-                speculative_bindings,
-                speculative_argument_types,
-                speculative_builder,
-            ))
+            None
         };
 
-        let mut narrowed = narrow_targets
-            .iter()
-            // Skip dynamic members, unless they were already inferred directly in a previous round of
-            // fixpoint iteration.
-            .filter(|ty| call_expression_tcx.is_inferred() || !ty.is_dynamic())
+        // Skip dynamic members, unless they were already inferred directly in a previous round of
+        // fixpoint iteration.
+        let is_eligible = |ty: &Type<'db>| call_expression_tcx.is_inferred() || !ty.is_dynamic();
+        let eligible_targets = narrow_targets.iter().copied().filter(is_eligible);
+        let mut narrowed = eligible_targets
+            .clone()
             // Avoid expanding a very large union of literals.
             .filter(|ty| !should_group_literals || !is_concrete_literal(ty))
-            .filter_map(|ty| try_narrow(*ty))
+            .filter_map(&mut try_narrow)
             .collect::<Vec<_>>();
 
         // Note that we do not attempt to narrow to arbitrary subsets of the target union
@@ -6268,11 +6294,73 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             narrowed.push(result);
         }
 
+        let retry_target = expected_ty.and_then(|expected_ty| {
+            if union_only_matches.is_empty() {
+                return None;
+            }
+            if narrowed.is_empty() {
+                return Some(expected_ty);
+            }
+
+            // A result that missed its member can still fit the union. Retry only if it adds a
+            // possibility not already covered by the successful member attempts.
+            let member_returns = UnionType::from_elements(
+                db,
+                env,
+                narrowed
+                    .iter()
+                    .map(|(bindings, _, _)| bindings.return_type(db, env)),
+            );
+
+            // Neither the result that triggers a retry nor its replacement may rely on a member
+            // that was excluded from narrowing.
+            let target = if narrow_targets.iter().any(|ty| !is_eligible(ty)) {
+                UnionType::from_elements(db, env, eligible_targets)
+            } else {
+                expected_ty
+            };
+            union_only_matches
+                .iter()
+                .any(|(bindings, _, _)| {
+                    let ty = bindings.return_type(db, env);
+                    !ty.is_redundant_with(db, env, member_returns)
+                        && (target == expected_ty || ty.is_assignable_to(db, env, target))
+                })
+                .then_some(target)
+        });
+
+        // Prefer a successful full-union retry on its own. If it fails, both sets of member
+        // attempts remain available: their results all fit the retry target.
+        let mut use_default_argument_context = false;
+        if let Some(retry_target) = retry_target {
+            if let Some(attempt) =
+                try_infer(call_expression_tcx, false).filter(|(bindings, _, _)| {
+                    bindings
+                        .return_type(db, env)
+                        .is_assignable_to(db, env, retry_target)
+                })
+            {
+                narrowed = vec![attempt];
+            } else {
+                if Some(retry_target) != expected_ty {
+                    union_only_matches.retain(|(bindings, _, _)| {
+                        bindings
+                            .return_type(db, env)
+                            .is_assignable_to(db, env, retry_target)
+                    });
+                }
+                narrowed.extend(union_only_matches);
+                use_default_argument_context = true;
+            }
+        }
+
         let mut narrowed = narrowed.into_iter();
         let result = match narrowed.next() {
-            Some((narrowed_bindings, narrowed_arguments, builder)) if narrowed.len() > 0 => {
-                // If there are multiple applicable type contexts, infer the arguments without type
-                // context as the default inference.
+            Some((narrowed_bindings, narrowed_arguments, builder))
+                if narrowed.len() > 0 || use_default_argument_context =>
+            {
+                // If the contexts disagree, or we couldn't narrow to the member that supplied
+                // the context, don't report argument diagnostics specific to that member.
                 for (index, argument) in ast_arguments.enumerate() {
                     if !argument.is_variadic() {
                         let ty = infer_argument_ty(

@@ -13,6 +13,8 @@ pub(crate) enum TypeContextKind {
         /// Whether the type context should provide a solver preference in the case that the
         /// declared and inferred solutions are mutually assignable.
         prefer: bool,
+        /// Whether this context was derived from an annotated assignment's annotation.
+        from_annotated_assignment: bool,
     },
 
     /// A constraint originating from inference evidence.
@@ -31,7 +33,17 @@ pub(crate) enum TypeContextKind {
 
 impl TypeContextKind {
     pub(crate) fn preference() -> Self {
-        Self::Expected { prefer: true }
+        Self::Expected {
+            prefer: true,
+            from_annotated_assignment: false,
+        }
+    }
+
+    pub(crate) fn annotated_assignment() -> Self {
+        Self::Expected {
+            prefer: true,
+            from_annotated_assignment: true,
+        }
     }
 }
 
@@ -74,8 +86,18 @@ impl<'db> TypeContext<'db> {
         Self::new(expected_type, TypeContextKind::preference())
     }
 
+    pub(super) fn annotated_assignment(expected_type: Option<Type<'db>>) -> Self {
+        Self::new(expected_type, TypeContextKind::annotated_assignment())
+    }
+
     fn expected(expected_type: Option<Type<'db>>) -> Self {
-        Self::new(expected_type, TypeContextKind::Expected { prefer: false })
+        Self::new(
+            expected_type,
+            TypeContextKind::Expected {
+                prefer: false,
+                from_annotated_assignment: false,
+            },
+        )
     }
 
     pub(super) fn from_origin(ty: Type<'db>, origin: TypeOrigin) -> Self {
@@ -100,9 +122,19 @@ impl<'db> TypeContext<'db> {
         matches!(self.kind, TypeContextKind::Inferred)
     }
 
+    pub(super) fn is_from_annotated_assignment(self) -> bool {
+        matches!(
+            self.kind,
+            TypeContextKind::Expected {
+                from_annotated_assignment: true,
+                ..
+            }
+        )
+    }
+
     pub(crate) fn should_prefer_expected_type(self) -> bool {
         match self.kind {
-            TypeContextKind::Expected { prefer } => prefer,
+            TypeContextKind::Expected { prefer, .. } => prefer,
             // Preserve a solution inferred from other arguments in the previous fixpoint round.
             TypeContextKind::Inferred => true,
             TypeContextKind::Validity => false,

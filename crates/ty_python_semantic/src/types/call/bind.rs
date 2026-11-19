@@ -6163,8 +6163,17 @@ fn parameter_context_specialization<'db>(
         .variables(db)
         .map(|typevar| {
             let identity = typevar.identity(db);
-            if return_type_solutions.contains_key(&identity) {
-                Some(return_context_kind)
+            if let Some(&return_ty) = return_type_solutions.get(&identity) {
+                // A fixpoint solution can come from another argument rather than the annotation.
+                Some(
+                    if return_context_kind == TypeContextKind::annotated_assignment()
+                        && specialization.get(db, typevar) != Some(return_ty)
+                    {
+                        TypeContextKind::preference()
+                    } else {
+                        return_context_kind
+                    },
+                )
             } else {
                 inference
                     .is_some_and(|inference| inference.has_inferred_type(db, identity))
