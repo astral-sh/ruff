@@ -750,7 +750,9 @@ fn apply_sync_result(
                 ),
                 explain_uv_setting: matches!(
                     error,
-                    UvMetadataError::Lookup(_) | UvMetadataError::UnsupportedVersion { .. }
+                    UvMetadataError::Lookup(_)
+                        | UvMetadataError::Invocation { .. }
+                        | UvMetadataError::UnsupportedVersion { .. }
                 ),
             }),
         ),

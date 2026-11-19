@@ -1555,14 +1555,29 @@ fn unavailable_uv_reports_metadata_error() -> anyhow::Result<()> {
     "#);
 
     command.env(EnvVars::UV, "missing-uv-executable");
-    assert_cmd_snapshot!(command, @"
+    assert_cmd_snapshot!(command, @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[project-manager]: Setting up the Python environment with uv failed
+    error[project-manager]: Setting up the Python environment with uv failed: failed to run `missing-uv-executable`: No such file or directory (os error 2)
     --> script.py:2:1
-    error: Failed to run `uv workspace metadata`: No such file or directory (os error 2)
+    info: ty uses uv to install this script's dependencies because of your configuration
+     --> script.py:5:28
+      |
+    5 | # project-manager.script = "uv"
+      |                            ^^^^ uv specified here
+    info: The uv executable was specified by the `UV` environment variable
 
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    assert_cmd_snapshot!(command.arg("--output-format=concise"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:2:1: error[project-manager] Setting up the Python environment with uv failed: failed to run `missing-uv-executable`: No such file or directory (os error 2)
     Found 1 diagnostic
 
     ----- stderr -----

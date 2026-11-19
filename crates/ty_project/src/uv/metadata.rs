@@ -110,7 +110,15 @@ pub(crate) enum UvMetadataError {
     Lookup(#[from] WhichError),
 
     #[error("Failed to run `uv workspace metadata`: {0}")]
-    Invocation(#[source] Arc<std::io::Error>),
+    Initialization(#[source] Arc<std::io::Error>),
+
+    #[error("failed to run `{executable}`: {error}")]
+    Invocation {
+        executable: String,
+        from_env: bool,
+        #[source]
+        error: Arc<std::io::Error>,
+    },
 
     #[error("`uv workspace metadata` failed with `{status}`: {stderr}")]
     CommandFailed {
@@ -141,6 +149,13 @@ impl UvMetadataError {
             Self::Lookup(_) => {
                 diagnostic.set_headline_message(format_args!("{headline}: {self}"));
                 diagnostic.info("To install uv, see https://docs.astral.sh/uv/");
+            }
+            Self::Invocation { from_env, .. } => {
+                diagnostic.set_headline_message(format_args!("{headline}: {self}"));
+                if *from_env {
+                    diagnostic
+                        .info("The uv executable was specified by the `UV` environment variable");
+                }
             }
             Self::UnsupportedVersion { executable, .. } => {
                 let minimum = Version::new(MINIMUM_UV_VERSION);
@@ -177,7 +192,7 @@ impl UvMetadataError {
 
 impl From<std::io::Error> for UvMetadataError {
     fn from(error: std::io::Error) -> Self {
-        Self::Invocation(Arc::new(error))
+        Self::Initialization(Arc::new(error))
     }
 }
 
