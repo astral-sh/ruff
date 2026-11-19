@@ -110,6 +110,8 @@ impl RuffSettings {
             .into_settings(root)
             .unwrap_or_else(|error| {
                 tracing::error!("Failed to resolve editor settings: {error}");
+                let mut configuration = configuration;
+                apply_server_preview(&mut configuration, editor_settings.server_preview);
                 configuration.into_settings(root).unwrap_or_else(|error| {
                     tracing::error!("Failed to resolve default settings: {error}");
                     Settings::default()
@@ -371,6 +373,7 @@ struct EditorConfigurationTransformer<'a>(&'a EditorSettings, &'a Path);
 impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
     fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
         let EditorSettings {
+            server_preview,
             configuration,
             format_preview,
             lint_preview,
@@ -452,7 +455,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             editor_configuration
         };
 
-        match configuration_preference {
+        let mut configuration = match configuration_preference {
             ConfigurationPreference::EditorFirst => {
                 editor_configuration.combine(filesystem_configuration)
             }
@@ -460,7 +463,17 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                 filesystem_configuration.combine(editor_configuration)
             }
             ConfigurationPreference::EditorOnly => editor_configuration,
-        }
+        };
+        apply_server_preview(&mut configuration, server_preview);
+        configuration
+    }
+}
+
+fn apply_server_preview(configuration: &mut Configuration, server_preview: Option<bool>) {
+    if let Some(preview) = server_preview.map(PreviewMode::from) {
+        configuration.preview = Some(preview);
+        configuration.lint.preview = Some(preview);
+        configuration.format.preview = Some(preview);
     }
 }
 
@@ -479,6 +492,64 @@ mod tests {
     use ruff_workspace::options::Options;
 
     use super::*;
+
+    #[test]
+    fn server_preview_overrides_filesystem_first() {
+        let editor_settings = EditorSettings {
+            server_preview: Some(true),
+            lint_preview: Some(false),
+            format_preview: Some(false),
+            configuration_preference: ConfigurationPreference::FilesystemFirst,
+            ..EditorSettings::default()
+        };
+        let configuration =
+            EditorConfigurationTransformer(&editor_settings, Path::new("/src/project")).transform(
+                Configuration {
+                    preview: Some(PreviewMode::Disabled),
+                    lint: LintConfiguration {
+                        preview: Some(PreviewMode::Disabled),
+                        ..LintConfiguration::default()
+                    },
+                    format: FormatConfiguration {
+                        preview: Some(PreviewMode::Disabled),
+                        ..FormatConfiguration::default()
+                    },
+                    ..Configuration::default()
+                },
+            );
+
+        assert_eq!(configuration.preview, Some(PreviewMode::Enabled));
+        assert_eq!(configuration.lint.preview, Some(PreviewMode::Enabled));
+        assert_eq!(configuration.format.preview, Some(PreviewMode::Enabled));
+    }
+
+    #[test]
+    fn server_no_preview_overrides_filesystem_first() {
+        let editor_settings = EditorSettings {
+            server_preview: Some(false),
+            configuration_preference: ConfigurationPreference::FilesystemFirst,
+            ..EditorSettings::default()
+        };
+        let configuration =
+            EditorConfigurationTransformer(&editor_settings, Path::new("/src/project")).transform(
+                Configuration {
+                    preview: Some(PreviewMode::Enabled),
+                    lint: LintConfiguration {
+                        preview: Some(PreviewMode::Enabled),
+                        ..LintConfiguration::default()
+                    },
+                    format: FormatConfiguration {
+                        preview: Some(PreviewMode::Enabled),
+                        ..FormatConfiguration::default()
+                    },
+                    ..Configuration::default()
+                },
+            );
+
+        assert_eq!(configuration.preview, Some(PreviewMode::Disabled));
+        assert_eq!(configuration.lint.preview, Some(PreviewMode::Disabled));
+        assert_eq!(configuration.format.preview, Some(PreviewMode::Disabled));
+    }
 
     /// This test ensures that the inline configuration is correctly applied to the configuration.
     #[test]
@@ -548,6 +619,7 @@ mod tests {
     fn invalid_editor_only_settings_fall_back_to_defaults() {
         let root = Path::new("/src/project");
         let editor_settings = EditorSettings {
+            server_preview: Some(true),
             exclude: Some(vec!["foo[".to_string()]),
             configuration_preference: ConfigurationPreference::EditorOnly,
             ..Default::default()
@@ -557,6 +629,12 @@ mod tests {
 
         assert_eq!(settings.path(), None);
         assert_eq!(settings.linter.project_root, root);
+        assert_eq!(settings.preview, PreviewMode::Enabled);
+        assert_eq!(settings.linter.preview, PreviewMode::Enabled);
+        assert_eq!(
+            settings.formatter.preview,
+            ruff_python_formatter::PreviewMode::Enabled
+        );
     }
 
     #[test]

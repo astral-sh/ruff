@@ -109,7 +109,7 @@ impl Server {
 
         tracing::debug!("Negotiated position encoding: {position_encoding:?}");
 
-        let global = global_options.into_settings(client.clone());
+        let global = global_options.into_settings(client.clone(), preview);
 
         Ok(Self {
             connection,
