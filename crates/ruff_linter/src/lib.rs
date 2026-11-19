@@ -79,7 +79,7 @@ mod tests {
             """
 "#;
         let source_type = SourceType::Python(PySourceType::Python);
-        let rule = Rule::OverIndentation;
+        let rule = Rule::OverIndentedDocstringLine;
 
         let source_kind = SourceKind::from_source_code(code.to_string(), source_type)
             .expect("Source code should be valid")
