@@ -39,23 +39,7 @@ pub struct RootSettings {
     /// Whether to look for a closer configuration file for each input.
     pub strategy: PyprojectDiscoveryStrategy,
     /// The resolved settings for the invocation's root configuration.
-    pub settings: Settings,
-    /// Absolute path to the selected configuration file, if one was loaded.
-    pub config_path: Option<PathBuf>,
-}
-
-impl RootSettings {
-    pub fn new(
-        strategy: PyprojectDiscoveryStrategy,
-        settings: Settings,
-        config_path: Option<PathBuf>,
-    ) -> Self {
-        Self {
-            strategy,
-            settings,
-            config_path: config_path.map(fs::normalize_path),
-        }
-    }
+    pub resolved: ResolvedSettings,
 }
 
 /// How the resolver chooses a configuration for each input file.
@@ -97,7 +81,7 @@ impl<'a> Resolver<'a> {
     /// Return the [`Settings`] from the [`RootSettings`].
     #[inline]
     pub fn root_settings(&self) -> &Settings {
-        &self.root_settings.settings
+        &self.root_settings.resolved.settings
     }
 
     /// Return `true` if the [`Resolver`] is using a hierarchical discovery strategy.
@@ -109,21 +93,18 @@ impl<'a> Resolver<'a> {
     /// Return `true` if the [`Resolver`] should force-exclude files passed directly to the CLI.
     #[inline]
     pub fn force_exclude(&self) -> bool {
-        self.root_settings.settings.file_resolver.force_exclude
+        self.root_settings().file_resolver.force_exclude
     }
 
     /// Return `true` if the [`Resolver`] should respect `.gitignore` files.
     #[inline]
     fn respect_gitignore(&self) -> bool {
-        self.root_settings.settings.file_resolver.respect_gitignore
+        self.root_settings().file_resolver.respect_gitignore
     }
 
-    /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: &Path, settings: Settings, config_path: PathBuf) {
-        self.settings.push(ResolvedSettings {
-            settings,
-            config_path,
-        });
+    /// Add resolved [`Settings`] under the given directory.
+    fn add(&mut self, path: &Path, settings: ResolvedSettings) {
+        self.settings.push(settings);
 
         // Normalize the path to use `/` separators and escape the '{' and '}' characters,
         // which matchit uses for routing parameters.
@@ -148,27 +129,18 @@ impl<'a> Resolver<'a> {
 
     /// Return the appropriate [`Settings`] for a given [`Path`].
     pub fn resolve(&self, path: &Path) -> &Settings {
-        self.resolve_with_path(path).0
+        &self.resolve_with_path(path).settings
     }
 
     /// Return the appropriate [`Settings`] and config file path for a given [`Path`].
-    pub fn resolve_with_path(&self, path: &Path) -> (&Settings, Option<&Path>) {
+    pub fn resolve_with_path(&self, path: &Path) -> &ResolvedSettings {
         match self.root_settings.strategy {
-            PyprojectDiscoveryStrategy::Fixed => (
-                &self.root_settings.settings,
-                self.root_settings.config_path.as_deref(),
-            ),
+            PyprojectDiscoveryStrategy::Fixed => &self.root_settings.resolved,
             PyprojectDiscoveryStrategy::Hierarchical => self
                 .router
                 .at(path.to_slash_lossy().as_ref())
-                .map(|Match { value, .. }| {
-                    let entry = &self.settings[*value];
-                    (&entry.settings, Some(entry.config_path.as_path()))
-                })
-                .unwrap_or((
-                    &self.root_settings.settings,
-                    self.root_settings.config_path.as_deref(),
-                )),
+                .map(|Match { value, .. }| &self.settings[*value])
+                .unwrap_or(&self.root_settings.resolved),
         }
     }
 
@@ -243,15 +215,41 @@ impl<'a> Resolver<'a> {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        std::iter::once(&self.root_settings.settings)
+        std::iter::once(self.root_settings())
             .chain(self.settings.iter().map(|entry| &entry.settings))
     }
 }
 
+/// Resolved Ruff settings and the configuration file from which they were built.
 #[derive(Debug)]
-struct ResolvedSettings {
-    settings: Settings,
-    config_path: PathBuf,
+pub struct ResolvedSettings {
+    /// The resolved settings.
+    pub settings: Settings,
+    /// Absolute path to the selected configuration file, if one was loaded.
+    config_path: Option<PathBuf>,
+}
+
+impl ResolvedSettings {
+    pub fn new(settings: Settings) -> Self {
+        Self {
+            settings,
+            config_path: None,
+        }
+    }
+
+    /// Construct settings with an absolute, normalized configuration path.
+    fn new_with_path(settings: Settings, path: PathBuf) -> Self {
+        debug_assert!(path.is_absolute());
+        debug_assert_eq!(path.as_os_str(), fs::normalize_path(&path).as_os_str());
+        Self {
+            settings,
+            config_path: Some(path),
+        }
+    }
+
+    pub fn config_path(&self) -> Option<&Path> {
+        self.config_path.as_deref()
+    }
 }
 
 /// A wrapper around `detect_package_root` to cache filesystem lookups.
@@ -328,18 +326,17 @@ impl ConfigurationCache {
 /// specified [`Path`].
 pub fn resolve_configuration(
     initial_config_path: &Path,
-    transformer: &dyn ConfigurationTransformer,
-    origin: ConfigurationOrigin,
+    origin: ConfigurationOrigin<'_>,
 ) -> Result<Configuration> {
-    resolve_configuration_with_cache(initial_config_path, transformer, origin, None)
+    resolve_configuration_with_cache(initial_config_path, origin, None)
+        .map(|(_, configuration)| configuration)
 }
 
 fn resolve_configuration_with_cache(
     initial_config_path: &Path,
-    transformer: &dyn ConfigurationTransformer,
-    origin: ConfigurationOrigin,
+    origin: ConfigurationOrigin<'_>,
     configuration_cache: Option<&ConfigurationCache>,
-) -> Result<Configuration> {
+) -> Result<(PathBuf, Configuration)> {
     let mut configurations = indexmap::IndexMap::new();
     let mut next = Some(fs::normalize_path(initial_config_path));
     while let Some(path) = next {
@@ -397,30 +394,31 @@ fn resolve_configuration_with_cache(
     }
 
     // Merge the configurations, in order.
-    let mut configurations = configurations.into_values();
-    let mut configuration = configurations.next().unwrap();
-    for extend in configurations {
+    let mut configurations = configurations.into_iter();
+    let (config_path, mut configuration) = configurations.next().unwrap();
+    for (_, extend) in configurations {
         configuration = configuration.combine(extend);
     }
 
-    let configuration = configuration.apply_fallbacks(origin, initial_config_path);
-
-    Ok(transformer.transform(configuration))
+    Ok((
+        config_path,
+        configuration.apply_fallbacks(origin, initial_config_path),
+    ))
 }
 
-/// Extract the project root (scope) and [`Settings`] from a given
-/// `pyproject.toml`.
+/// Resolve settings from a configuration file, reusing configuration files shared by the traversal.
 fn resolve_scoped_settings(
     pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
-    origin: ConfigurationOrigin,
+    origin: ConfigurationOrigin<'_>,
     configuration_cache: Option<&ConfigurationCache>,
-) -> Result<(PathBuf, Settings)> {
-    let configuration =
-        resolve_configuration_with_cache(pyproject, transformer, origin, configuration_cache)?;
-    let project_root = origin.project_root(pyproject);
-    let settings = configuration.into_settings(project_root)?;
-    Ok((project_root.to_path_buf(), settings))
+) -> Result<ResolvedSettings> {
+    let (config_path, configuration) =
+        resolve_configuration_with_cache(pyproject, origin, configuration_cache)?;
+    let settings = transformer
+        .transform(configuration)
+        .into_settings(origin.project_root(pyproject))?;
+    Ok(ResolvedSettings::new_with_path(settings, config_path))
 }
 
 /// Extract the [`Settings`] from a given `pyproject.toml` and process the
@@ -428,32 +426,34 @@ fn resolve_scoped_settings(
 pub fn resolve_root_settings(
     pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
-    origin: ConfigurationOrigin,
-) -> Result<Settings> {
-    let (_project_root, settings) = resolve_scoped_settings(pyproject, transformer, origin, None)?;
-    Ok(settings)
+    origin: ConfigurationOrigin<'_>,
+) -> Result<ResolvedSettings> {
+    resolve_scoped_settings(pyproject, transformer, origin, None)
 }
 
 #[derive(Debug, Clone, Copy)]
 /// How the configuration is provided.
-pub enum ConfigurationOrigin {
+pub enum ConfigurationOrigin<'a> {
     /// Origin is unknown to the caller
     Unknown,
     /// User specified path to specific configuration file
     UserSpecified,
     /// User-level configuration (e.g. in `~/.config/ruff/pyproject.toml`)
-    UserSettings,
+    ///
+    /// The fallback directory determines where to start looking for the project's Python requirement:
+    /// the current working directory for the CLI, or the editor's workspace root for the server.
+    UserSettings { fallback_directory: &'a Path },
     /// In parent or higher ancestor directory of path
     Ancestor,
 }
 
-impl ConfigurationOrigin {
+impl ConfigurationOrigin<'_> {
     fn project_root(self, path: &Path) -> &Path {
         match self {
             Self::Unknown | Self::Ancestor => path
                 .parent()
                 .expect("Expected pyproject.toml file to be in parent directory"),
-            Self::UserSpecified | Self::UserSettings => &path_dedot::CWD,
+            Self::UserSpecified | Self::UserSettings { .. } => &path_dedot::CWD,
         }
     }
 }
@@ -472,8 +472,8 @@ pub fn project_files_in_path<'a>(
     let mut seen = FxHashSet::default();
     let configuration_cache = ConfigurationCache::default();
 
-    // Insert the path to the root configuration to avoid parsing the configuration a second time.
-    if let Some(config_path) = &root_settings.config_path {
+    // Insert the directory of the root configuration to avoid parsing the configuration a second time.
+    if let Some(config_path) = &root_settings.resolved.config_path {
         seen.insert(config_path.parent().unwrap());
     }
 
@@ -482,13 +482,13 @@ pub fn project_files_in_path<'a>(
             for ancestor in path.ancestors() {
                 if seen.insert(ancestor) {
                     if let Some(pyproject) = settings_toml(ancestor)? {
-                        let (root, settings) = resolve_scoped_settings(
+                        let settings = resolve_scoped_settings(
                             &pyproject,
                             transformer,
                             ConfigurationOrigin::Ancestor,
                             Some(&configuration_cache),
                         )?;
-                        resolver.add(&root, settings, pyproject);
+                        resolver.add(ancestor, settings);
                         // We found the closest configuration.
                         break;
                     }
@@ -678,12 +678,12 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                             ConfigurationOrigin::Ancestor,
                             Some(&self.global.configuration_cache),
                         ) {
-                            Ok((root, settings)) => {
+                            Ok(settings) => {
                                 self.global
                                     .resolver
                                     .write()
                                     .unwrap()
-                                    .add(&root, settings, pyproject);
+                                    .add(entry.path(), settings);
                             }
                             Err(err) => {
                                 self.local_error = Err(err);
@@ -801,13 +801,13 @@ pub fn project_file_at_path(
     if resolver.is_hierarchical() {
         for ancestor in path.ancestors() {
             if let Some(pyproject) = settings_toml(ancestor)? {
-                let (root, settings) = resolve_scoped_settings(
+                let settings = resolve_scoped_settings(
                     &pyproject,
                     transformer,
                     ConfigurationOrigin::Unknown,
                     None,
                 )?;
-                resolver.add(&root, settings, pyproject);
+                resolver.add(ancestor, settings);
                 break;
             }
         }
@@ -993,10 +993,9 @@ mod tests {
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
         ConfigurationOrigin, ConfigurationTransformer, PyprojectDiscoveryStrategy, ResolvedFile,
-        Resolver, RootSettings, is_file_excluded, match_exclusion, project_files_in_path,
-        resolve_root_settings,
+        ResolvedSettings, Resolver, RootSettings, is_file_excluded, match_exclusion,
+        project_files_in_path, resolve_root_settings,
     };
-    use crate::settings::Settings;
     use crate::tests::test_resource_path;
 
     struct NoOpTransformer;
@@ -1008,17 +1007,30 @@ mod tests {
     }
 
     #[test]
+    fn resolve_root_settings_normalizes_configuration_path() -> Result<()> {
+        let root = TempDir::new()?;
+        let config_path = root.path().join("ruff.toml");
+        File::create(&config_path)?;
+        let resolved = resolve_root_settings(
+            &root.path().join("sub/../ruff.toml"),
+            &NoOpTransformer,
+            ConfigurationOrigin::Ancestor,
+        )?;
+        assert_eq!(resolved.config_path(), Some(config_path.as_path()));
+        Ok(())
+    }
+
+    #[test]
     fn rooted_exclusion() -> Result<()> {
         let package_root = test_resource_path("package");
-        let root_settings = RootSettings::new(
-            PyprojectDiscoveryStrategy::Hierarchical,
-            resolve_root_settings(
+        let root_settings = RootSettings {
+            strategy: PyprojectDiscoveryStrategy::Hierarchical,
+            resolved: resolve_root_settings(
                 &find_settings_toml(&package_root)?.unwrap(),
                 &NoOpTransformer,
                 ConfigurationOrigin::Ancestor,
             )?,
-            None,
-        );
+        };
         let resolver = Resolver::new(&root_settings);
         // src/app.py should not be excluded even if it lives in a hierarchy that should
         // be excluded by virtue of the pyproject.toml having `resources/*` in
@@ -1057,7 +1069,10 @@ mod tests {
 
         let (paths, _) = project_files_in_path(
             &[root.to_path_buf()],
-            &RootSettings::new(PyprojectDiscoveryStrategy::Fixed, Settings::default(), None),
+            &RootSettings {
+                strategy: PyprojectDiscoveryStrategy::Fixed,
+                resolved: ResolvedSettings::new(Configuration::default().into_settings(root)?),
+            },
             &NoOpTransformer,
         )?;
         let paths = paths
@@ -1168,6 +1183,34 @@ mod tests {
     }
 
     #[test]
+    fn project_requires_python_overrides_user_target_version() -> Result<()> {
+        let user = TempDir::new()?;
+        let config = user.path().join("ruff.toml");
+        std::fs::write(&config, "target-version = 'py39'")?;
+        let project = TempDir::new()?;
+        std::fs::write(
+            project.path().join("pyproject.toml"),
+            r"
+            [project]
+            requires-python = '>=3.12'
+            ",
+        )?;
+
+        let resolved = resolve_root_settings(
+            &config,
+            &NoOpTransformer,
+            ConfigurationOrigin::UserSettings {
+                fallback_directory: project.path(),
+            },
+        )?;
+        assert_eq!(
+            resolved.settings.linter.unresolved_target_version.0,
+            Some(PythonVersion::Py312.into())
+        );
+        Ok(())
+    }
+
+    #[test]
     fn extend_respects_target_version() -> Result<()> {
         let tmp_dir = TempDir::new()?;
         let root = tmp_dir.path();
@@ -1197,13 +1240,13 @@ A: TypeAlias = str | int
 "#,
         )?;
 
-        let settings = resolve_root_settings(
+        let resolved = resolve_root_settings(
             &dot_ruff_toml,
             &NoOpTransformer,
             ConfigurationOrigin::Ancestor,
         )?;
         assert_eq!(
-            settings.linter.unresolved_target_version,
+            resolved.settings.linter.unresolved_target_version,
             TargetVersion(Some(PythonVersion::Py310.into()))
         );
 

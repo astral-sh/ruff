@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::io;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::str;
 
 use anyhow::Result;
@@ -3121,7 +3121,10 @@ requires-python = ">= 3.11"
 /// ```
 #[test]
 fn requires_python_no_tool_target_version_override() -> Result<()> {
-    let fixture = CliTest::new()?;
+    let fixture = CliTest::with_settings(|_, mut settings| {
+        settings.add_filter(r"\[\d{4}-\d{2}-\d{2}\]\[\d{2}:\d{2}:\d{2}\]", "[TIMESTAMP]");
+        settings
+    })?;
     fixture.write_file(
         "pyproject.toml",
         r#"[project]
@@ -3143,6 +3146,17 @@ requires-python = ">= 3.11"
             .arg("test.py")
             .arg("-")
     );
+
+    assert_cmd_snapshot!(fixture.check_command()
+        .args(["--verbose", "--no-respect-gitignore", "--show-settings", "--target-version=py310", "test.py"])
+        .stdout(Stdio::null()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    [TIMESTAMP][ruff::resolve][DEBUG] Using Ruff default settings
+    ");
 
     Ok(())
 }
