@@ -762,12 +762,10 @@ impl<'db> ReceiverConstraints<'db> {
         db: &'db dyn Db,
         checker: &TypeRelationChecker<'_, '_, 'db>,
     ) -> bool {
-        self.relations.iter().any(|&(receiver, annotation)| {
-            [receiver, annotation].into_iter().any(|ty| {
-                // Aliases can hide type variables; leave their evaluation to the checker.
-                any_over_type(db, checker.env, ty, false, |ty| {
-                    matches!(ty, Type::TypeVar(_) | Type::TypeAlias(_))
-                })
+        self.types().any(|ty| {
+            // Aliases can hide type variables; leave their evaluation to the checker.
+            any_over_type(db, checker.env, ty, false, |ty| {
+                matches!(ty, Type::TypeVar(_) | Type::TypeAlias(_))
             })
         })
     }
