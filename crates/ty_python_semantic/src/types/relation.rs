@@ -206,13 +206,14 @@ pub(crate) enum TypeVarEvaluation {
     /// Collect constraints on the variables in scope.
     Lazy,
 
-    /// Collect constraints for a solver implication while preserving exclusions on source typevars.
-    LazyPreservingExclusions,
+    /// Derive constraints from existing bounds, preserving exclusions on source typevars
+    /// and the identities of captured binders already in scope.
+    LazyForSolver,
 }
 
 impl TypeVarEvaluation {
     pub(super) const fn is_lazy(self) -> bool {
-        matches!(self, Self::Lazy | Self::LazyPreservingExclusions)
+        matches!(self, Self::Lazy | Self::LazyForSolver)
     }
 }
 
@@ -1168,7 +1169,7 @@ impl<'db> Type<'db> {
                         types.second(db),
                         constraints,
                         &materialization_visitor,
-                        TypeVarEvaluation::LazyPreservingExclusions,
+                        TypeVarEvaluation::LazyForSolver,
                         inferable,
                     )
             })
@@ -1948,7 +1949,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let typevar = positive.as_typevar()?;
         let collects = self.collects(db, typevar);
         let preserve_exclusions =
-            self.typevar_evaluation == TypeVarEvaluation::LazyPreservingExclusions && collects;
+            self.typevar_evaluation == TypeVarEvaluation::LazyForSolver && collects;
         // When specializing a generic callable, the target can provide more specific evidence
         // for its local type variable. Matching `(T) -> T & ~str` against `(U) -> int` can infer
         // `int` for both variables. Solver implications need the bound on the whole intersection.

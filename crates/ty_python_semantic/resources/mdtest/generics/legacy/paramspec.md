@@ -2292,6 +2292,43 @@ def register_prefixed(callback: Callable[Concatenate[int, P], object]) -> None: 
 register_prefixed(wrap(lambda x, y, z: reveal_type((x, y, z))))
 ```
 
+### A factory and its callbacks share a parameter list
+
+`register` requires the factory and its callbacks to accept the same arguments. Since `empty` takes
+no arguments, `P` is empty and `T` specializes to `Callable[[], int]`.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+Factory = Callable[P, list[Callable[P, int]]]
+
+def register(factory: Factory[P]) -> Factory[P]:
+    return factory
+
+@register
+def empty() -> list[T]:
+    return []
+
+reveal_type(empty())  # revealed: list[() -> int]
+```
+
+For a factory with a required generic parameter, the argument determines the parameter type of each
+returned callback.
+
+```py
+K = TypeVar("K")
+
+@register
+def empty_for(key: K) -> list[T]:
+    return []
+
+reveal_type(empty_for(1))  # revealed: list[(key: int) -> int]
+empty_for()  # error: [missing-argument]
+```
+
 ### A decorator's unsolved parameter list
 
 The parameter list of `identity` is local to that function. When there is no callback to specialize
@@ -2388,6 +2425,19 @@ def passthrough(fn: F) -> F:
     return fn
 
 reveal_type(keep(passthrough))  # revealed: [T](value: T, /) -> T
+```
+
+`passthrough` also preserves a type variable used only in the return type. When `P` captures the
+parameter list of `empty`, its `T` stays in scope as `R` specializes to `list[T]`.
+
+```py
+def empty() -> list[T]:
+    return []
+
+def decorate_with(fn: Callable[P, R], decorator: Callable[[Callable[P, R]], X]) -> X:
+    return decorator(fn)
+
+reveal_type(decorate_with(empty, passthrough))  # revealed: [T]() -> list[T]
 ```
 
 ### A transform that returns a generic callback

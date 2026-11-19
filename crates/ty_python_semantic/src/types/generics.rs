@@ -3337,18 +3337,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         ty: Type<'db>,
     ) -> bool {
         let db = self.db;
-        let target_context = target.binding_context(db);
-        let target_freshness = target.freshness(db);
+        let target = target.identity(db);
         ty.as_typevar().is_some_and(|typevar| {
             // Relationships across binding contexts can intentionally remap one generic context
             // onto another, as with constructor `self` annotations. Relationships across fresh
             // occurrences preserve an outer generic value through a recursive call. Synthetic
             // contexts do not identify a single source-level binding, so they are not safe to
             // project either.
-            !matches!(target_context, BindingContext::Synthetic(_))
+            !matches!(target.binding_context(db), BindingContext::Synthetic(_))
                 && typevar.is_inferable(db, self.inferable)
-                && typevar.binding_context(db) == target_context
-                && typevar.freshness(db) == target_freshness
+                && typevar.identity(db).shares_binding(target)
         })
     }
 

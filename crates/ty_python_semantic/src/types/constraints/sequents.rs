@@ -736,7 +736,7 @@ impl<'db> AtomicConstraint<'db> {
                 env,
                 upper.bound(),
                 map.inferable,
-                TypeVarEvaluation::LazyPreservingExclusions,
+                TypeVarEvaluation::LazyForSolver,
                 ConstraintProvenance::INFERRED,
             );
         let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());

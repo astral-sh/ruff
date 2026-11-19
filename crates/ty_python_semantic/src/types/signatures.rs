@@ -39,7 +39,7 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{TypeVarInstance, TypeVarSet, freshening_delta};
+use crate::types::typevar::{TypeVarFreshening, TypeVarInstance, TypeVarSet, freshening_delta};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -1243,15 +1243,24 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         delta: u32,
     ) -> Self {
-        let Some(generic_context) = self.generic_context else {
+        let Some(context) = self.generic_context else {
             return self.clone();
         };
+        self.freshen_context(db, env, context, TypeVarFreshening::Offset(delta))
+    }
 
+    fn freshen_context(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+        freshening: TypeVarFreshening<'db>,
+    ) -> Self {
         self.apply_type_mapping_impl(
             db,
             &TypeMapping::FreshenBoundTypeVars {
                 generic_context,
-                delta,
+                freshening,
             },
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
@@ -2619,6 +2628,85 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads)
     }
 
+    /// When the solver re-derives a bound on P, each local binder captured by P
+    /// needs the same identity as in the previous capture. This includes binders
+    /// that become visible only after substituting the callback's return type.
+    fn solver_capture(
+        &self,
+        db: &'db dyn Db,
+        signatures: &[Signature<'db>],
+        other: &[Signature<'db>],
+    ) -> Option<TypeVarFreshening<'db>> {
+        if self.typevar_evaluation != TypeVarEvaluation::LazyForSolver {
+            return None;
+        }
+        let [other] = other else { return None };
+        let (prefix, paramspec) = other.parameters.as_paramspec_with_prefix()?;
+        if !paramspec.is_inferable(db, self.inferable) {
+            return None;
+        }
+        if let [signature] = signatures
+            && let Some((own_prefix, _)) = signature.parameters.as_paramspec_with_prefix()
+            && own_prefix.len() <= prefix.len()
+        {
+            return None;
+        }
+        Some(TypeVarFreshening::Capture(paramspec.identity(db)))
+    }
+
+    /// A captured signature retains its binders for the forwarded call. Give them
+    /// fresh identities so a same-source variable in the caller remains fixed.
+    fn freshen_for_paramspec_match(
+        &self,
+        db: &'db dyn Db,
+        overloads: &[Signature<'db>],
+        other: &[Signature<'db>],
+        inferable: &mut TypeVarSet<'db>,
+    ) -> Option<SmallVec<[Signature<'db>; 1]>> {
+        let local_context =
+            |signature: &Signature<'db>| signature.local_generic_context(self.typevar_evaluation);
+        if !overloads.iter().any(|sig| local_context(sig).is_some()) {
+            return None;
+        }
+        let capture = self.solver_capture(db, overloads, other);
+        let freshen = |signature: &Signature<'db>| {
+            let Some(mut context) = local_context(signature) else {
+                return signature.clone();
+            };
+            if self.typevar_evaluation == TypeVarEvaluation::LazyForSolver {
+                // Substituting P in Callable[P, R] merges P's binders with the signature's
+                // own binders. The fresh binders already in scope belong to the surrounding
+                // inference and keep their identities through subsequent comparisons.
+                let locals = context.variables(db).filter(|binder| {
+                    !binder.is_fresh(db) || !binder.is_inferable(db, self.inferable)
+                });
+                let Some(locals) = GenericContext::try_from_typevar_instances(db, self.env, locals)
+                else {
+                    return signature.clone();
+                };
+                context = locals;
+            }
+            let freshening = capture.or_else(|| {
+                let types = signature
+                    .types_for_freshening(db)
+                    .chain(
+                        other
+                            .iter()
+                            .flat_map(|signature| signature.types_for_freshening(db)),
+                    )
+                    .chain(inferable.iter(db).map(Type::TypeVar));
+                freshening_delta(db, types, context).map(TypeVarFreshening::Offset)
+            });
+            let signature = freshening.map_or_else(
+                || signature.clone(),
+                |freshening| signature.freshen_context(db, self.env, context, freshening),
+            );
+            *inferable = inferable.merge(db, signature.inferable_typevars(db));
+            signature
+        };
+        Some(overloads.iter().map(freshen).collect())
+    }
+
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
     fn check_callable_signature_pair_inner(
@@ -2633,42 +2721,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return None;
                 };
                 let (_, paramspec) = target.parameters.as_paramspec_with_prefix()?;
-                if !paramspec.is_inferable(db, self.inferable)
-                    || !overloads.iter().any(|signature| {
-                        signature
-                            .local_generic_context(self.typevar_evaluation)
-                            .is_some()
-                    })
-                {
+                if !paramspec.is_inferable(db, self.inferable) {
                     return None;
                 }
-                // A captured signature retains its binders for the forwarded call. Give them
-                // fresh identities so a same-source variable in the caller remains fixed.
                 let mut inferable = self.inferable;
-                let signatures: SmallVec<[_; 1]> = overloads
-                    .iter()
-                    .map(|signature| {
-                        let Some(context) =
-                            signature.local_generic_context(self.typevar_evaluation)
-                        else {
-                            return signature.clone();
-                        };
-                        let delta = freshening_delta(
-                            db,
-                            signature
-                                .types_for_freshening(db)
-                                .chain(target.types_for_freshening(db))
-                                .chain(inferable.iter(db).map(Type::TypeVar)),
-                            context,
-                        );
-                        let signature = delta.map_or_else(
-                            || signature.clone(),
-                            |delta| signature.freshen_bound_typevars(db, self.env, delta),
-                        );
-                        inferable = inferable.merge(db, signature.inferable_typevars(db));
-                        signature
-                    })
-                    .collect();
+                let signatures =
+                    self.freshen_for_paramspec_match(db, overloads, other, &mut inferable)?;
                 Some((inferable, signatures))
             };
             let check_capture =
