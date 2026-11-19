@@ -27,7 +27,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
         ".git-rewrite",
         ".hg",
         ".ipynb_checkpoints",
-        ".mypy_cache",gi
+        ".mypy_cache",
         ".nox",
         ".pants.d",
         ".pyenv",
