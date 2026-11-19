@@ -935,7 +935,7 @@ where
         reuse_cached: impl FnOnce(&R) -> bool,
         compute: impl FnOnce() -> R,
     ) -> Result<R, T> {
-        let cached_result = self.cache.borrow().get(&item).cloned();
+        let cached_result = self.completed(&item);
         let was_cached = cached_result.is_some();
         if let Some(result) = cached_result
             && reuse_cached(&result)
@@ -958,9 +958,22 @@ where
         }
     }
 
+    /// Returns an already completed result without starting an active visit.
+    pub(super) fn completed(&self, item: &T) -> Option<R> {
+        self.cache.borrow().get(item).cloned()
+    }
+
+    /// Records a completed result unless a recursive computation already recorded it.
+    pub(super) fn insert_completed_if_absent(&self, item: T, result: R) {
+        let mut cache = self.cache.borrow_mut();
+        if cache.get(&item).is_none() {
+            cache.insert_new(item, result);
+        }
+    }
+
     fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
-        if let Some(result) = self.cache.borrow().get(&item) {
-            return CycleDetectorVisit::Ready(result.clone());
+        if let Some(result) = self.completed(&item) {
+            return CycleDetectorVisit::Ready(result);
         }
 
         self.begin_active_visit(db, item)

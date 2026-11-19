@@ -2430,6 +2430,25 @@ static_assert(is_assignable_to(Person1, Person2))
 static_assert(is_equivalent_to(Person1, Person2))
 ```
 
+Both alternatives below require a name on each child that is present. While comparing `Tree` with
+`NamedNode`, the recursive child comparison provisionally succeeds. Checking `Parent` must revisit
+that comparison once the missing `name` field has ruled out `NamedNode`.
+
+```py
+from typing_extensions import ReadOnly
+
+class Tree(TypedDict):
+    child: "Tree | None"
+
+class Parent(TypedDict):
+    child: ReadOnly["NamedNode | None"]
+
+class NamedNode(Parent):
+    name: str
+
+static_assert(not is_assignable_to(Tree, NamedNode | Parent))
+```
+
 ## Recursively-specialized generic `TypedDict`s
 
 ```toml

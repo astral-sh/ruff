@@ -1672,13 +1672,26 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
         };
 
-        let mut elements_context = vec![];
-        let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
+        // Recursive TypedDict schemas can compare the same source against the same union
+        // many times. Once every visited arm has a cached TypedDict comparison, repeating
+        // the traversal would combine the same constraints in the same order. An arm that
+        // returned a provisional result from the recursion stack has no such cache entry.
+        let context_tree = self.report_context();
+        let key = |ty| (source, ty, self.relation, self.typevar_evaluation);
+        let mut can_memoize = source.is_typed_dict() && context_tree.is_none();
+        if can_memoize && let Some(result) = self.relation_visitor.completed(&key(target)) {
+            return result;
+        }
 
+        let mut elements_context = vec![];
         let result = elements
             .iter()
             .when_any(db, self.constraints, |&element| {
                 let result = self.check_type_pair(db, source, element);
+                if can_memoize {
+                    can_memoize = element.is_typed_dict()
+                        && self.relation_visitor.completed(&key(element)).is_some();
+                }
                 if let Some(context_tree) = context_tree {
                     let context = context_tree.take();
                     if !context.is_empty() {
@@ -1724,6 +1737,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }
                 self.without_context_collection(|| self.check_type_pair(db, source, materialized))
             });
+
+        if can_memoize {
+            self.relation_visitor
+                .insert_completed_if_absent(key(target), result);
+        }
 
         if context_tree.is_some()
             && !elements_context.is_empty()
