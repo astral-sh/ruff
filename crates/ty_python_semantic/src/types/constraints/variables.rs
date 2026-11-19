@@ -542,48 +542,16 @@ impl<'db> AtomicConstraint<'db> {
         )
     }
 
-    pub(super) fn subjects_are_inferable(
-        self,
-        db: &'db dyn Db,
-        inferable: TypeVarSet<'db>,
-    ) -> bool {
-        match self {
-            Self::ConcreteLower(bound) => bound.typevar.is_inferable(db, inferable),
-            Self::ConcreteUpper(bound) => bound.typevar.is_inferable(db, inferable),
-            Self::ConcreteEquivalence(bound) => bound.typevar.is_inferable(db, inferable),
-            Self::TypeVarRange(bound) => {
-                bound.left.is_inferable(db, inferable) && bound.right.is_inferable(db, inferable)
-            }
-            Self::TypeVarEquivalence(bound) => {
-                bound.left.is_inferable(db, inferable) && bound.right.is_inferable(db, inferable)
-            }
-        }
-    }
-
-    pub(super) fn provides_bound_for(
-        self,
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
-        match self {
-            AtomicConstraint::ConcreteLower(bound) => {
-                bound.typevar.is_same_typevar_as(db, bound_typevar)
-            }
-            AtomicConstraint::ConcreteUpper(bound) => {
-                bound.typevar.is_same_typevar_as(db, bound_typevar)
-            }
-            AtomicConstraint::ConcreteEquivalence(bound) => {
-                bound.typevar.is_same_typevar_as(db, bound_typevar)
-            }
-            AtomicConstraint::TypeVarRange(bound) => {
-                bound.left.is_same_typevar_as(db, bound_typevar)
-                    || bound.right.is_same_typevar_as(db, bound_typevar)
-            }
-            AtomicConstraint::TypeVarEquivalence(bound) => {
-                bound.left.is_same_typevar_as(db, bound_typevar)
-                    || bound.right.is_same_typevar_as(db, bound_typevar)
-            }
-        }
+    /// The variables that receive bounds from this constraint.
+    pub(super) fn subjects(self) -> impl Iterator<Item = BoundTypeVarInstance<'db>> {
+        let (first, second) = match self {
+            Self::ConcreteLower(bound) => (bound.typevar, None),
+            Self::ConcreteUpper(bound) => (bound.typevar, None),
+            Self::ConcreteEquivalence(bound) => (bound.typevar, None),
+            Self::TypeVarRange(bound) => (bound.left, Some(bound.right)),
+            Self::TypeVarEquivalence(bound) => (bound.left, Some(bound.right)),
+        };
+        std::iter::once(first).chain(second)
     }
 
     pub(super) fn lower_bound_for(
