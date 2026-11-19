@@ -6618,7 +6618,10 @@ impl<'db> CallInference<'_, 'db> {
             SolutionType::Unresolved(_) => None,
         };
         let generic_context = inference.generic_context(db);
-        // TODO: Account for variadic-tuple bindings when refining returns.
+        // TODO: Account for variadic-tuple bindings when refining returns. For `ParamSpec`,
+        // support non-callable returns and account for shared state in nested returns such as
+        // `Callable[P, Callable[P, R]]`.
+        // In particular, `Callable[P, R]` can capture state linking its inputs and output.
         if generic_context
             .variables(db)
             .any(|variable| variable.is_typevartuple(db))
@@ -6849,14 +6852,9 @@ impl<'db> CallInference<'_, 'db> {
         // which would incorrectly imply that the function cannot return.
         // Apply this check only to valid specializations: a rejected sibling cannot prevent a
         // single remaining specialization from providing its own return type.
-        // Combine the return variances of all variables whose bindings differ, even when no
-        // variable is invariant on its own.
-        // In particular, `Callable[P, R]` can capture state linking its inputs and output.
-        // The same applies to `Callable[[T], U]`. Output-only callables can still refine their
-        // covariant return types.
-        //
-        // TODO: Account for state shared across calls in returns like
-        // `Callable[P, Callable[P, R]]`, where both occurrences of `P` are contravariant.
+        // Combine the return variances of all variables whose bindings differ: `Callable[[T], U]`
+        // can capture state linking its input and output even though neither variable is invariant
+        // on its own. Output-only callables can still refine their covariant return types.
         let mut variance = TypeVarVariance::Bivariant;
         let invariant_visitor = PairVisitor::new(true);
         let mut remaining_comparisons = SolutionBudget::default().visits;
