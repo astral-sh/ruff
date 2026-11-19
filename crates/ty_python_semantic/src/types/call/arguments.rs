@@ -17,7 +17,7 @@ use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
     TypedDictOpenness, UnpackedTypedDictKey, extract_unpacked_typed_dict_from_value_type,
 };
-use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
+use crate::types::{Parameter, Parameters, Type, TypeContext, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArgumentExpansions::iter`].
@@ -135,16 +135,29 @@ impl<'a, 'db> CallArgument<'a, 'db> {
         declared: impl Into<Option<Type<'db>>>,
         matched: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        let declared = declared.into();
-        matched.or_else(|| match self {
+        matched.or_else(|| {
+            self.ordinary_types()?
+                .try_get_for_declared_type(declared.into())
+        })
+    }
+
+    /// A splatted argument supplies the type of its matched element. For an ordinary argument,
+    /// if inference with one or more expected types gave the same result each time, use that
+    /// result. Otherwise, use the type inferred without an expected type, if available.
+    pub(super) fn default_matched_type(&self, matched: Option<Type<'db>>) -> Option<Type<'db>> {
+        matched.or_else(|| self.ordinary_types()?.get_default())
+    }
+
+    /// Returns the inferred types of a positional argument, a named keyword argument, or a
+    /// synthetic receiver. Returns `None` for `*args` and `**kwargs` because their stored types
+    /// describe the whole iterable or mapping. Matching supplies the type of each unpacked value.
+    fn ordinary_types(&self) -> Option<&CallArgumentTypes<'db>> {
+        match self {
             Self::Synthetic(types) | Self::Positional(types) | Self::Keyword { types, .. } => {
-                declared.map_or_else(
-                    || types.get_default(),
-                    |declared| types.try_get_for_declared_type(declared),
-                )
+                Some(types)
             }
             Self::Variadic(_) | Self::Keywords(_) => None,
-        })
+        }
     }
 
     fn expand(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ArgumentExpansion<'a, 'db> {
@@ -473,18 +486,20 @@ impl<'db> CallArgumentTypes<'db> {
 
     /// Returns the type of this argument when inferred against the provided declared type.
     ///
-    /// If the type was not inferred against the declared type directly, this method will fall back to
-    /// [`Self::get_default`].
-    fn try_get_for_declared_type(&self, tcx: Type<'db>) -> Option<Type<'db>> {
-        self.types.get(&tcx).copied().or_else(|| self.get_default())
+    /// An unannotated parameter supplies no expected type. Use the result inferred without
+    /// context for that overload, even if another overload provided an expected type.
+    fn try_get_for_declared_type(&self, declared: Option<Type<'db>>) -> Option<Type<'db>> {
+        match declared {
+            Some(ty) => self.types.get(&ty).copied(),
+            None => self.fallback_type,
+        }
+        .or_else(|| self.get_default())
     }
 
-    /// Returns the type of this argument when inferred against the provided declared type.
-    ///
-    /// If the type was not inferred against the declared type directly, this method will fall back to
-    /// [`Self::get_default`], or to `Unknown` if no fallback type exists.
-    pub(crate) fn get_for_declared_type(&self, tcx: Type<'db>) -> Type<'db> {
-        self.try_get_for_declared_type(tcx)
+    /// Returns the argument type inferred for this parameter, falling back to
+    /// [`Self::get_default`] or `Unknown` if that inference is unavailable.
+    pub(super) fn get_for_parameter(&self, parameter: &Parameter<'db>) -> Type<'db> {
+        self.try_get_for_declared_type(parameter.argument_context_type())
             .unwrap_or(Type::unknown())
     }
 

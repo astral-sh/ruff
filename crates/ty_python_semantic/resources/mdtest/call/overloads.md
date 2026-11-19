@@ -2605,6 +2605,35 @@ def _(s: str):
 reveal_type(f((None, None, None)))  # revealed: Literal[b""]
 ```
 
+### An unannotated parameter with a context-dependent argument
+
+Both overloads initially match when `index` is `1`. The first leaves `value` unannotated, so
+`first()` uses its type variable's default of `int`. Filtering with that argument type selects the
+first overload. When `index` is a string, only the second overload matches and it supplies `Never`
+as the expected type for `first()`.
+
+```py
+from typing import overload
+from typing_extensions import Never, TypeVar
+
+T = TypeVar("T", default=int)
+
+def first(*values: T) -> T:
+    return values[0]
+
+@overload
+def choose(value, index: int) -> int: ...
+@overload
+def choose(value: Never, index: object) -> object: ...
+def choose(value, index):
+    return index
+
+result = choose(reveal_type(first()), 1)  # revealed: int
+reveal_type(result)  # revealed: int
+
+choose(reveal_type(first()), "x")  # revealed: Never
+```
+
 ## Bidirectional Type Inference
 
 ```toml
