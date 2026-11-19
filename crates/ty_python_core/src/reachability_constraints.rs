@@ -512,20 +512,30 @@ impl ReachabilityConstraintsBuilder {
         a: ScopedReachabilityConstraintId,
         b: ScopedReachabilityConstraintId,
     ) -> ScopedReachabilityConstraintId {
+        if let Some(result) = self.known_and_constraint(a, b) {
+            return result;
+        }
+        let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+        self.and_uncached(a, b)
+    }
+
+    /// Look up a conjunction without allocating any new nodes.
+    #[inline]
+    pub(crate) fn known_and_constraint(
+        &self,
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
+    ) -> Option<ScopedReachabilityConstraintId> {
         match (a, b) {
-            (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return ALWAYS_FALSE,
-            (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return other,
-            _ if a == b => return a,
+            (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return Some(ALWAYS_FALSE),
+            (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return Some(other),
+            _ if a == b => return Some(a),
             _ => {}
         }
 
         // AND is commutative, which lets us halve the cache requirements
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-        if let Some(cached) = self.and_cache.get(&(a, b)) {
-            return *cached;
-        }
-
-        self.and_uncached(a, b)
+        self.and_cache.get(&(a, b)).copied()
     }
 
     /// Compute the conjunction on a cache miss with the operands in ascending ID order.

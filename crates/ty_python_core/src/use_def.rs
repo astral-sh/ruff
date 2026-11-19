@@ -1884,6 +1884,7 @@ impl PendingReachability {
         &self,
         pending: &mut PendingPlaceState,
         target: PendingReachabilityId,
+        constraints: &ReachabilityConstraintsBuilder,
     ) {
         let previous = pending.reachability;
         if previous == target {
@@ -1893,10 +1894,21 @@ impl PendingReachability {
         // Within this uninterrupted path, a matching initial reachability yields the
         // same AND operations as forward replay, even at the constraint arena limit.
         let event = &self.constraints[target];
-        let initial = self.constraints[previous].scope_reachability;
-        if previous.index() >= event.path_start.index()
-            && pending.state.singleton_reachability() == Some(initial)
-        {
+        let Some(initial) = pending.state.singleton_reachability() else {
+            return;
+        };
+        let matches = if previous.index() >= event.path_start.index() {
+            initial == self.constraints[previous].scope_reachability
+        } else {
+            // A join can change the scope's reachability while the place cursor stays
+            // at the parent of the new path. If applying the first condition brings
+            // the place to the same result as the scope, it can reuse the rest.
+            let first = &self.constraints[event.path_start];
+            first.parent == previous
+                && constraints.known_and_constraint(initial, first.reachability_constraint)
+                    == Some(first.scope_reachability)
+        };
+        if matches {
             if initial != event.scope_reachability {
                 Rc::make_mut(&mut pending.state)
                     .set_singleton_reachability(event.scope_reachability);
@@ -1911,7 +1923,7 @@ impl PendingReachability {
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a mut PlaceState {
-        self.try_apply_scope_reachability(pending, target);
+        self.try_apply_scope_reachability(pending, target, reachability_constraints);
         let state = Rc::make_mut(&mut pending.state);
         if pending.reachability == target {
             return state;
@@ -2139,7 +2151,11 @@ impl PendingReachability {
                 // If the place can reuse the scope's reachability at the fork, merge only the
                 // conditions after the fork. Rebuilding the common prefix as part of each
                 // branch can exhaust the constraint arena even for a trailing `if flag: pass`.
-                self.try_apply_scope_reachability(current, branch_ancestor);
+                self.try_apply_scope_reachability(
+                    current,
+                    branch_ancestor,
+                    reachability_constraints,
+                );
                 let merged_constraint = match last_merged_reachability {
                     Some((ancestor, constraint)) if ancestor == current.reachability => constraint,
                     _ => {
