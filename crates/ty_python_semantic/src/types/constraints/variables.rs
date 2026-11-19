@@ -542,41 +542,14 @@ impl<'db> AtomicConstraint<'db> {
         )
     }
 
-    pub(super) fn subjects_are_inferable(
-        self,
-        db: &'db dyn Db,
-        inferable: TypeVarSet<'db>,
-    ) -> bool {
-        match self {
-            Self::ConcreteLower(bound) => bound.typevar.is_inferable(db, inferable),
-            Self::ConcreteUpper(bound) => bound.typevar.is_inferable(db, inferable),
-            Self::ConcreteEquivalence(bound) => bound.typevar.is_inferable(db, inferable),
-            Self::TypeVarRange(bound) => {
-                bound.left.is_inferable(db, inferable) && bound.right.is_inferable(db, inferable)
-            }
-            Self::TypeVarEquivalence(bound) => {
-                bound.left.is_inferable(db, inferable) && bound.right.is_inferable(db, inferable)
-            }
-        }
-    }
-
-    pub(super) fn provides_bound_for(
-        self,
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
-        match self.operands() {
-            ConstraintOperands::Concrete(typevar, _) => {
-                typevar.is_same_typevar_as(db, bound_typevar)
-            }
-            ConstraintOperands::TypeVarRange(TypeVarRangeBound { left, right, .. })
-            | ConstraintOperands::TypeVarEquivalence(TypeVarEquivalenceBound {
-                left, right, ..
-            }) => {
-                left.is_same_typevar_as(db, bound_typevar)
-                    || right.is_same_typevar_as(db, bound_typevar)
-            }
-        }
+    /// The variables that receive bounds from this constraint.
+    pub(super) fn subjects(self) -> impl Iterator<Item = BoundTypeVarInstance<'db>> {
+        let (first, second) = match self.operands() {
+            ConstraintOperands::Concrete(typevar, _) => (typevar, None),
+            ConstraintOperands::TypeVarRange(bound) => (bound.left, Some(bound.right)),
+            ConstraintOperands::TypeVarEquivalence(bound) => (bound.left, Some(bound.right)),
+        };
+        std::iter::once(first).chain(second)
     }
 
     pub(super) fn lower_bound_for(

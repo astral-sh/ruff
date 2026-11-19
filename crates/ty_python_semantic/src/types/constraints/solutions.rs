@@ -684,7 +684,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         debug_assert!(
             storage
                 .atomic_constraint_data(constraint)
-                .subjects_are_inferable(db, self.inferable),
+                .subjects()
+                .all(|subject| subject.is_inferable(db, self.inferable)),
             "solver encountered a constraint on a fixed type variable",
         );
         // The repetitive nature of the visit_atomic_edge calls is intentional; in the negative
@@ -837,7 +838,9 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let mut evidence = CandidateTypeVarSolver::default();
         for constraint in constraints {
             let constraint = storage.atomic_constraint_data(constraint);
-            if constraint.provides_bound_for(db, bound_typevar)
+            if constraint
+                .subjects()
+                .any(|subject| subject.is_same_typevar_as(db, bound_typevar))
                 && constraint.provides_candidate_evidence(
                     db,
                     env,
@@ -1697,9 +1700,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 ConstraintOperands::TypeVarEquivalence(bound) => bound.in_builder(db, storage),
             };
 
-            // A direct relationship between an inferable and non-inferable typevar must
-            // contribute bounds for both endpoints. Contextual inference relies on the
-            // reverse, non-inferable binding to preserve relationships to outer typevars.
             if left.is_inferable(db, self.inferable) || right.is_inferable(db, self.inferable) {
                 add_bound(left, Type::TypeVar(right));
                 add_bound(right, Type::TypeVar(left));
