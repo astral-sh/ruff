@@ -40,7 +40,7 @@ jobs:
 
       - name: "Get Ruff token"
         id: token
-        uses: astral-sh/github-actions/simple-token-service@abc46928d96671a29cb1e0c254a01af7fdb6648d
+        uses: astral-sh/github-actions/simple-token-service@7942e930963a965d0a8d6dec2ae1bfd81c493f4f
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -84,9 +84,9 @@ jobs:
           git switch -c "release/$version"
           git commit -am "Bump version to $version"
 
-      - uses: astral-sh/github-actions/rewrite-changelog@abc46928d96671a29cb1e0c254a01af7fdb6648d
+      - uses: astral-sh/github-actions/rewrite-changelog@7942e930963a965d0a8d6dec2ae1bfd81c493f4f
         with:
-          project: ruff
+          prompt-file: .agents/prompts/editorialize-changelog.md
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
 
       - name: "Create or update pull request"
