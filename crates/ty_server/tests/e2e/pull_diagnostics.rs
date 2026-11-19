@@ -1663,6 +1663,7 @@ mod uv_metadata {
         Code, Position, Range, TextDocumentContentChangeEvent,
         TextDocumentContentChangeWholeDocument,
     };
+    use ruff_db::diagnostic::DiagnosticId;
     use ruff_python_trivia::textwrap::dedent;
 
     use super::{
@@ -1738,7 +1739,9 @@ mod uv_metadata {
             .full_document_diagnostic_report
             .items
             .iter()
-            .find(|diagnostic| diagnostic.code == Some(Code::String("uv-metadata".to_string())))
+            .find(|diagnostic| {
+                diagnostic.code == Some(Code::String(DiagnosticId::ProjectManager.as_str().into()))
+            })
             .ok_or_else(|| {
                 anyhow::anyhow!("expected the script synchronization error: {report:?}")
             })?;
@@ -1834,7 +1837,8 @@ mod uv_metadata {
                 .full_document_diagnostic_report
                 .items
                 .iter()
-                .any(|diagnostic| diagnostic.code == Some(Code::String("uv-metadata".to_string())))
+                .any(|diagnostic| diagnostic.code
+                    == Some(Code::String(DiagnosticId::ProjectManager.as_str().into())))
         );
 
         Ok(())

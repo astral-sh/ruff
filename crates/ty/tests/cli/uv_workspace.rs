@@ -361,7 +361,7 @@ fn overridden_python_environment_disables_dependency_checks() -> anyhow::Result<
             exit_code: 1
             ----- stdout -----
             packages/member/member.py:3:15: error[invalid-assignment] Object of type `int` is not assignable to `str`
-            pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: selected Python environment `<environment>` (from `--python` argument) differs from uv's environment `<temp_dir>/.venv`
+            pyproject.toml: warning[project-manager] Failed to load uv dependency metadata: selected Python environment `<environment>` (from `--python` argument) differs from uv's environment `<temp_dir>/.venv`
             Found 2 diagnostics
 
             ----- stderr -----
@@ -430,7 +430,7 @@ fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> 
     exit_code: 1
     ----- stdout -----
     member.py:1:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
-    pyproject.toml: warning[uv-metadata] Failed to load uv metadata: No solution found when resolving dependencies
+    pyproject.toml: warning[project-manager] Failed to load project metadata from uv: No solution found when resolving dependencies
     Found 2 diagnostics
 
     ----- stderr -----
@@ -788,7 +788,7 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    pyproject.toml: warning[uv-metadata] Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
+    pyproject.toml: warning[project-manager] Failed to load project metadata from uv: could not find `uv` on `PATH`
     Found 1 diagnostic
 
     ----- stderr -----
@@ -800,8 +800,9 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[uv-metadata]: Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
+    warning[project-manager]: Failed to load project metadata from uv: could not find `uv` on `PATH`
     --> pyproject.toml:1:1
+    info: To install uv, see https://docs.astral.sh/uv/
 
     Found 1 diagnostic
 

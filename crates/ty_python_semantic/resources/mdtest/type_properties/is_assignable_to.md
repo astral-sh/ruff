@@ -1295,7 +1295,14 @@ one_str: Callable[[str], None] = takes_str  # ok
 one_str = implicit  # ok
 
 starts_with_int: Callable[Concatenate[int, ...], None] = takes_str  # error: [invalid-assignment]
-starts_with_str: Callable[[str, int], None] = takes_str  # ok
+starts_with_int = implicit  # error: [invalid-assignment]
+starts_with_str: Callable[Concatenate[str, ...], None] = takes_str  # ok
+starts_with_str = implicit  # ok
+
+two_ints: Callable[[int, int], None] = takes_str  # error: [invalid-assignment]
+two_ints = implicit  # error: [invalid-assignment]
+str_then_int: Callable[[str, int], None] = takes_str  # ok
+str_then_int = implicit  # ok
 ```
 
 Calling with `other=""` sends `other` to `**kwargs`, so `value` needs a default.
@@ -1356,6 +1363,48 @@ def by_position_or_keyword(value: str) -> None: ...
 keyword: RegularCallableTypeOf[keyword_only] = extra  # ok
 keyword = wrong_type  # error: [invalid-assignment]
 either: RegularCallableTypeOf[by_position_or_keyword] = keyword_only  # error: [invalid-assignment]
+```
+
+### Keyword binding with unrestricted variadics
+
+The variadics accept arbitrary arguments because `Obj` is an alias for `object`. Calling
+`takes_value(other="two")` sends `other` to `**kwargs` and uses the default for `value`.
+
+```pyi
+from typing import Never
+from ty_extensions._internal import RegularCallableTypeOf
+
+type Obj = object
+
+def takes_value(value: str = ..., *args: Obj, **kwargs: Obj) -> None: ...
+def takes_other(other: str) -> None: ...
+
+renamed: RegularCallableTypeOf[takes_other] = takes_value  # ok
+```
+
+An optional positional parameter of type `Never` can only be omitted. The caller can still pass
+`value="two"` by keyword. A target that allows `value=2` is incompatible with `takes_value`.
+
+```pyi
+def str_keywords(unused: Never = ..., /, **kw: str) -> None: ...
+def int_keywords(unused: Never = ..., /, **kw: int) -> None: ...
+
+by_keyword: RegularCallableTypeOf[str_keywords] = takes_value  # ok
+by_keyword_int: RegularCallableTypeOf[int_keywords] = takes_value  # error: [invalid-assignment]
+```
+
+Likewise, `*args: Never` accepts no positional arguments. A required `str` after that empty segment
+allows `callback("one", value="two")`, which binds `value` twice in `takes_value`. Using the alias
+`Empty` keeps the variadic segment in the signature until ty compares the callables.
+
+```pyi
+type Empty = Never
+
+def no_positionals(*args: Never, **kw: str) -> None: ...
+def with_suffix(*args: *tuple[*tuple[Empty, ...], str], **kw: str) -> None: ...
+
+empty: RegularCallableTypeOf[no_positionals] = takes_value  # ok
+duplicate: RegularCallableTypeOf[with_suffix] = takes_value  # error: [invalid-assignment]
 ```
 
 ### Unpacked positional parameters with a required suffix

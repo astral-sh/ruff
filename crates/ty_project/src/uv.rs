@@ -1,10 +1,14 @@
 //! Runs uv commands and coordinates project and script environments.
 
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::system::System;
+use ruff_ranged_value::{RangedValue, ValueSource};
 use ty_combine::Combine;
 use ty_static::EnvVars;
 
-pub(crate) use command::{MetadataTarget, Uv, uv_executable_error};
+use crate::Db;
+
+pub(crate) use command::{MetadataTarget, Uv};
 pub use environments::{ScriptEnvironmentAvailability, UvEnvironments, UvSyncChanges, UvWorkspace};
 pub(crate) use environments::{ScriptEnvironmentCacheKey, script_environment};
 pub(crate) use metadata::{DependencyMetadataError, UvMetadata, UvMetadataError};
@@ -64,6 +68,36 @@ impl UseUv {
 impl Combine for UseUv {
     fn combine_with(&mut self, other: Self) {
         *self = other;
+    }
+}
+
+/// Explain why ty tried to run uv, using the setting's current source and range.
+pub(crate) fn add_uv_setting_info<T>(
+    db: &dyn Db,
+    diagnostic: &mut Diagnostic,
+    setting: &RangedValue<T>,
+    option: &str,
+    purpose: &str,
+) {
+    let source = setting.source();
+    let reason = match source {
+        ValueSource::ScriptMetadata(_) | ValueSource::File(_) => {
+            format_args!("of your configuration")
+        }
+        ValueSource::Cli if UseUv::from_system(db.system()).is_some() => {
+            format_args!("the `TY_UV` environment variable enables it")
+        }
+        ValueSource::Cli => format_args!("`{option}` was set to `\"uv\"` on the command line"),
+        ValueSource::Editor => format_args!("it was enabled in your editor settings"),
+        ValueSource::UvMetadata => return,
+    };
+
+    let info = diagnostic.prepend_info(format_args!("ty uses uv to {purpose} because {reason}"));
+    if let Some(file) = source.file(db) {
+        info.annotate(
+            Annotation::primary(Span::from(file).with_optional_range(setting.range()))
+                .message("uv specified here"),
+        );
     }
 }
 

@@ -101,7 +101,7 @@ pub(crate) fn implicit_namespace_package(
             .first().filter(|range| range.start() == TextSize::from(0))
             .is_none_or(|range| ShebangDirective::try_extract(locator.slice(*range)).is_none())
         // Ignore PEP 723 scripts.
-        && ScriptTag::parse(locator.contents().as_bytes()).is_none()
+        && ScriptTag::parse(locator.contents()).is_none()
     {
         context.report_diagnostic(
             ImplicitNamespacePackage {

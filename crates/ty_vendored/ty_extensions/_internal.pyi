@@ -1,4 +1,3 @@
-# ruff: file-ignore[docstring-in-stub]
 """
 Internal-only symbols for special forms and type-system tests.
 
@@ -6,11 +5,12 @@ Some symbols provide definitions and on-hover documentation for special forms. O
 helpers for ty's tests. None of these symbols are intended to be directly imported by end users.
 """
 
+import collections.abc
+import sys
 import types
 from enum import Enum
-from typing import Any, Protocol, _SpecialForm
+from typing import Any, ClassVar, Protocol, _SpecialForm
 
-# ruff: ignore[deprecated-import]
 from typing_extensions import LiteralString, Self, TypeForm
 
 # -------------
@@ -91,6 +91,36 @@ Like `Any` and `Unknown`, `Divergent` is a dynamic type, so ty allows any operat
 Unlike `Unknown`, it does not represent missing type information. It is an internal type
 used by ty and cannot be used in annotations.
 """
+
+class NamedTupleLike(Protocol):
+    """
+    A protocol describing an interface that should be satisfied by all named tuples
+    created using `typing.NamedTuple` or `collections.namedtuple`.
+    """
+
+    # _fields is defined as `tuple[Any, ...]` rather than `tuple[str, ...]` so
+    # that instances of actual `NamedTuple` classes with more precise `_fields`
+    # types are considered assignable to this protocol (protocol attribute members
+    # are invariant, and `tuple[str, str]` is not invariantly assignable to
+    # `tuple[str, ...]`).
+    _fields: ClassVar[tuple[Any, ...]]
+    _field_defaults: ClassVar[dict[str, Any]]
+    @classmethod
+    def _make(cls: type[Self], iterable: collections.abc.Iterable[Any]) -> Self: ...
+    def _asdict(self, /) -> dict[str, Any]: ...
+
+    # Positional arguments aren't actually accepted by these methods at runtime,
+    # but adding the `*args` parameters means that all `NamedTuple` classes
+    # are understood as assignable to this protocol due to the special case
+    # outlined in https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable:
+    #
+    # > If the input signature in a function definition includes both a
+    # > `*args` and `**kwargs` parameter and both are typed as `Any`
+    # > (explicitly or implicitly because it has no annotation), a type
+    # > checker should treat this as the equivalent of `...`.
+    def _replace(self, *args, **kwargs) -> Self: ...
+    if sys.version_info >= (3, 13):
+        def __replace__(self, *args, **kwargs) -> Self: ...
 
 # -----------
 # Constraints

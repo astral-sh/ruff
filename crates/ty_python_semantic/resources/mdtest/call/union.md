@@ -120,13 +120,17 @@ def call_both(f: Long | Short, g: Short | Long) -> None:
     g(1)  # error: [missing-argument]
 ```
 
-The shorter prefix also admits an implementation that accepts just one argument.
+A function that takes just one `int` is assignable to `Short`, so either union accepts it. The `...`
+in `Short` allows `f(1, "two")` to type-check even though `takes_one(1, "two")` would raise
+`TypeError`. Conversely, `takes_one(1)` succeeds, but `f(1)` is rejected because `f` could be
+`Long`, which requires two arguments.
 
 ```py
 def takes_one(value: int) -> int:
     return value
 
-call_both(takes_one, takes_one)  # ok
+long_or_short: Long | Short = takes_one  # ok
+short_or_long: Short | Long = takes_one  # ok
 ```
 
 When one member has no fixed parameters, a zero-argument implementation is valid in either union
@@ -146,7 +150,8 @@ def call(f: AnyParameters | WithString, g: WithString | AnyParameters) -> None:
 
 def no_arguments() -> None: ...
 
-call(no_arguments, no_arguments)  # ok
+any_or_string: AnyParameters | WithString = no_arguments  # ok
+string_or_any: WithString | AnyParameters = no_arguments  # ok
 ```
 
 ## Gradual callables with different keyword parameters
