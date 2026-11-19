@@ -135,16 +135,24 @@ impl<'a, 'db> CallArgument<'a, 'db> {
         declared: impl Into<Option<Type<'db>>>,
         matched: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        let declared = declared.into();
-        matched.or_else(|| match self {
+        matched.or_else(|| {
+            self.ordinary_types()?
+                .try_get_for_declared_type(declared.into())
+        })
+    }
+
+    /// The type supplied by the argument, using the default source type for ordinary arguments.
+    pub(crate) fn default_matched_type(&self, matched: Option<Type<'db>>) -> Option<Type<'db>> {
+        matched.or_else(|| self.ordinary_types()?.get_default())
+    }
+
+    fn ordinary_types(&self) -> Option<&CallArgumentTypes<'db>> {
+        match self {
             Self::Synthetic(types) | Self::Positional(types) | Self::Keyword { types, .. } => {
-                declared.map_or_else(
-                    || types.get_default(),
-                    |declared| types.try_get_for_declared_type(declared),
-                )
+                Some(types)
             }
             Self::Variadic(_) | Self::Keywords(_) => None,
-        })
+        }
     }
 
     fn expand(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ArgumentExpansion<'a, 'db> {
@@ -473,18 +481,22 @@ impl<'db> CallArgumentTypes<'db> {
 
     /// Returns the type of this argument when inferred against the provided declared type.
     ///
-    /// If the type was not inferred against the declared type directly, this method will fall back to
-    /// [`Self::get_default`].
-    fn try_get_for_declared_type(&self, tcx: Type<'db>) -> Option<Type<'db>> {
-        self.types.get(&tcx).copied().or_else(|| self.get_default())
+    /// An unannotated parameter supplies no expected type. Use the result inferred without
+    /// context for that overload, even if another overload provided an expected type.
+    fn try_get_for_declared_type(&self, declared: Option<Type<'db>>) -> Option<Type<'db>> {
+        match declared {
+            Some(ty) => self.types.get(&ty).copied(),
+            None => self.fallback_type,
+        }
+        .or_else(|| self.get_default())
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
     ///
     /// If the type was not inferred against the declared type directly, this method will fall back to
     /// [`Self::get_default`], or to `Unknown` if no fallback type exists.
-    pub(crate) fn get_for_declared_type(&self, tcx: Type<'db>) -> Type<'db> {
-        self.try_get_for_declared_type(tcx)
+    pub(crate) fn get_for_declared_type(&self, declared: Option<Type<'db>>) -> Type<'db> {
+        self.try_get_for_declared_type(declared)
             .unwrap_or(Type::unknown())
     }
 

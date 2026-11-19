@@ -1550,7 +1550,8 @@ impl<'db> Bindings<'db> {
             && let Ok((_, overload)) = binding.matching_overloads().exactly_one()
             && let [parameter] = *overload.argument_matches[argument_index].parameters
         {
-            let declared_type = overload.signature.parameters()[parameter.index].annotated_type();
+            let declared_type =
+                overload.signature.parameters()[parameter.index].argument_context_type();
             return argument_types.get_for_declared_type(declared_type);
         }
 
@@ -4072,18 +4073,18 @@ impl<'db> CallableBinding<'db> {
                         return true;
                     }
 
-                    let parameter_type = matched_parameter
+                    let declared_type = matched_parameter
                         .expected_type
-                        .unwrap_or_else(|| parameter.annotated_type());
+                        .or_else(|| parameter.argument_context_type());
                     let argument_type = call_argument
-                        .matched_type(parameter_type, matched_parameter.argument_type)
+                        .matched_type(declared_type, matched_parameter.argument_type)
                         .unwrap_or(Type::unknown());
 
                     argument_type
                         .when_assignable_to(
                             db,
                             env,
-                            parameter_type,
+                            declared_type.unwrap_or_else(|| parameter.annotated_type()),
                             constraints,
                             overload.inferable_typevars,
                         )
@@ -4396,20 +4397,20 @@ impl<'db> CallableBinding<'db> {
                         matched_argument.iter().map(move |matched_parameter| {
                             // TODO: For an unannotated `self` / `cls` parameter, the type should be
                             // `typing.Self` / `type[typing.Self]`
-                            let raw_parameter_type = overload.signature.parameters()
-                                [matched_parameter.index]
-                                .annotated_type();
-                            let parameter_type = raw_parameter_type.apply_optional_specialization(
-                                db,
-                                overload.merged_specialization(db),
-                            );
+                            let parameter =
+                                &overload.signature.parameters()[matched_parameter.index];
+                            let parameter_type =
+                                parameter.annotated_type().apply_optional_specialization(
+                                    db,
+                                    overload.merged_specialization(db),
+                                );
                             OverloadFilterSlot {
                                 parameter: parameter_type,
                                 // Argument types are cached by the raw parameter type, even when
                                 // they were inferred using a return-context specialization.
                                 argument: argument
                                     .source_types()
-                                    .get_for_declared_type(raw_parameter_type),
+                                    .get_for_declared_type(parameter.argument_context_type()),
                                 variadic_argument: matched_parameter.argument_type,
                             }
                         })
@@ -6269,7 +6270,7 @@ impl<'a, 'db> CallInference<'a, 'db> {
                         // Note that the inferred type of a positional argument is stored under
                         // the variadic parameter type, rather than the matched parameter.
                         let argument_type = argument_types.matched_type(
-                            parameter.annotated_type(),
+                            parameter.argument_context_type(),
                             matched_parameter.argument_type,
                         )?;
 
@@ -6351,11 +6352,11 @@ impl<'db> ArgumentTypeChecker<'_, 'db> {
                 self.argument_matches[argument_index]
                     .iter()
                     .find_map(|matched_parameter| {
-                        let declared_type =
-                            self.signature.parameters()[matched_parameter.index].annotated_type();
+                        let parameter = &self.signature.parameters()[matched_parameter.index];
+                        let declared_type = parameter.annotated_type();
                         let argument_type = argument_types
                             .source_types()
-                            .get_for_declared_type(declared_type);
+                            .get_for_declared_type(parameter.argument_context_type());
                         let paramspec_prefix_len = |candidate: Type<'db>| {
                             candidate
                                 .try_upcast_to_callable(db, env)?
@@ -7653,7 +7654,7 @@ impl<'db> CallInference<'_, 'db> {
             {
                 let declared_type = matched
                     .expected_type
-                    .unwrap_or_else(|| parameter.annotated_type());
+                    .or_else(|| parameter.argument_context_type());
                 actual.push(
                     argument_types
                         .matched_type(declared_type, matched.argument_type)
@@ -8073,7 +8074,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                         let parameter = &self.signature.parameters()[parameter_index];
                         let argument_type = argument_types
-                            .matched_type(parameter.annotated_type(), None)
+                            .matched_type(parameter.argument_context_type(), None)
                             .unwrap_or(Type::unknown());
                         let relation = ArgumentRelation::new(
                             argument_index,
@@ -9725,7 +9726,7 @@ impl<'db> Binding<'db> {
                             parameter_index,
                             (parameter.annotated_type() != Type::Never).then(|| {
                                 argument
-                                    .matched_type(None, matched_parameter.argument_type)
+                                    .default_matched_type(matched_parameter.argument_type)
                                     .unwrap_or_else(Type::unknown)
                             }),
                         );
@@ -9809,7 +9810,8 @@ impl<'db> Binding<'db> {
                     .any(|parameter| parameter.index == parameter_index)
             })
             .map(move |(argument, _)| {
-                let declared_type = self.signature.parameters()[parameter_index].annotated_type();
+                let declared_type =
+                    self.signature.parameters()[parameter_index].argument_context_type();
                 (
                     argument.kind(),
                     argument.source_types().get_for_declared_type(declared_type),
