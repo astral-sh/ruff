@@ -303,17 +303,14 @@ pub(crate) enum DependencyMetadataError {
 impl DependencyMetadataError {
     pub(crate) fn to_diagnostic(&self, kind: DependencyProjectKind) -> Diagnostic {
         let mut diagnostic = Diagnostic::new(
-            DiagnosticId::UvMetadata,
+            DiagnosticId::ProjectManager,
             Severity::Warning,
             "Failed to load uv dependency metadata",
         );
         diagnostic.set_concise_message(format_args!(
             "Failed to load uv dependency metadata: {self}"
         ));
-        diagnostic.sub(SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            self.to_string(),
-        ));
+        diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Error, self));
         match self {
             Self::MissingModuleOwnership
             | Self::MissingEnvironment

@@ -1520,30 +1520,68 @@ fn invalid_script_search_paths_do_not_blame_python_environment() -> anyhow::Resu
 fn unavailable_uv_reports_metadata_error() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "script.py",
-        "#!/usr/bin/env python3\n\n# /// script\n# dependencies = []\n# ///\nprint(missing)\n",
+        r#"
+        # /// script
+        # dependencies = []
+        # [tool.ty]
+        # project-manager.script = "uv"
+        # ///
+        print(missing)
+        "#,
     )?
     .with_filter(
         "program not found",
         "No such file or directory (os error 2)",
     );
 
-    assert_cmd_snapshot!(
-        case.command()
-            .arg("script.py")
-            .env(EnvVars::TY_UV, "1")
-            .env(EnvVars::UV, "missing-uv-executable"),
-        @"
+    let mut command = case.command();
+    command.arg("script.py").env("PATH", "");
+    assert_cmd_snapshot!(command, @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[uv-metadata]: Failed to invoke `uv workspace metadata`: No such file or directory (os error 2)
-    --> script.py:3:1
+    error[project-manager]: Setting up the Python environment with uv failed: could not find `uv` on `PATH`
+    --> script.py:2:1
+    info: ty uses uv to install this script's dependencies because of your configuration
+     --> script.py:5:28
+      |
+    5 | # project-manager.script = "uv"
+      |                            ^^^^ uv specified here
+    info: To install uv, see https://docs.astral.sh/uv/
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "
-    );
+    "#);
+
+    command.env(EnvVars::UV, "missing-uv-executable");
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[project-manager]: Setting up the Python environment with uv failed: failed to run `missing-uv-executable`: No such file or directory (os error 2)
+    --> script.py:2:1
+    info: ty uses uv to install this script's dependencies because of your configuration
+     --> script.py:5:28
+      |
+    5 | # project-manager.script = "uv"
+      |                            ^^^^ uv specified here
+    info: The uv executable was specified by the `UV` environment variable
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    assert_cmd_snapshot!(command.arg("--output-format=concise"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:2:1: error[project-manager] Setting up the Python environment with uv failed: failed to run `missing-uv-executable`: No such file or directory (os error 2)
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -2141,8 +2179,7 @@ mod uv_metadata {
             # ///
             print(missing)
             ",
-        )?
-        .with_filter(r"exit code: (\d+)", "exit status: $1");
+        )?;
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .arg("script.py")
@@ -2151,12 +2188,13 @@ mod uv_metadata {
         success: false
         exit_code: 1
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with `exit status: 1`
+        error[project-manager]: Setting up the Python environment with uv failed
         --> script.py:2:1
-        info: No solution found when resolving dependencies
+        error: No solution found when resolving dependencies
           cause: Because missing-script-dependency was not found in the cache and you require missing-script-dependency==99.0.0, we can conclude that your requirements are unsatisfiable.
 
         hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
+        error: `uv workspace metadata` exited with status 1
 
         Found 1 diagnostic
 

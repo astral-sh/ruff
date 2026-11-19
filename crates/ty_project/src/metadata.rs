@@ -675,7 +675,7 @@ mod tests {
     use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
     use ruff_db::Db as _;
-    use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+    use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, SubDiagnosticSeverity};
     use ruff_db::files::File;
     #[cfg(unix)]
     use ruff_db::system::{OsSystem, System, SystemPath, WritableSystem};
@@ -1172,8 +1172,12 @@ unclosed table, expected `]`
 
         let diagnostics = db.project().check_settings(&db);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::ProjectManager);
         assert_eq!(diagnostics[0].severity(), Severity::Warning);
+        assert_eq!(
+            diagnostics[0].sub_diagnostics()[0].severity(),
+            SubDiagnosticSeverity::Error
+        );
         assert_eq!(
             diagnostics[0].concise_message().to_string(),
             "Failed to load uv dependency metadata: uv did not provide a Python environment"
@@ -1496,7 +1500,7 @@ unclosed table, expected `]`
         system.memory_file_system().create_directory_all(&root)?;
         let mut workspace = uv_workspace(&root, &system)?;
         workspace.error = Some(Diagnostic::new(
-            DiagnosticId::UvMetadata,
+            DiagnosticId::ProjectManager,
             Severity::Warning,
             "uv metadata refresh failed",
         ));
@@ -1512,7 +1516,7 @@ unclosed table, expected `]`
         assert!(project.metadata(&db).uv_workspace_metadata().is_some());
         let diagnostics = project.check_settings(&db);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::ProjectManager);
         assert_eq!(diagnostics[0].severity(), Severity::Warning);
         assert_eq!(
             diagnostics[0].concise_message().to_string(),

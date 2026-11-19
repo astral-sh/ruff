@@ -967,6 +967,7 @@ mod uv_metadata {
     #[cfg(feature = "test-uv")]
     use lsp_types::Message;
     use lsp_types::{Code, PublishDiagnosticsNotification};
+    use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::system::SystemPath;
     use ruff_python_trivia::textwrap::dedent;
     use serde_json::json;
@@ -1016,19 +1017,17 @@ mod uv_metadata {
         let Message::String(message) = &diagnostic.message else {
             anyhow::bail!("expected a plain-text diagnostic: {diagnostic:?}");
         };
-        let mut settings = insta::Settings::clone_current();
-        settings.add_filter(r"exit code: (\d+)", "exit status: $1");
-        let _settings = settings.bind_to_scope();
         insta::assert_snapshot!(message, @"
-        `uv workspace metadata` failed with `exit status: 2`
+        Setting up the Python environment with uv failed
 
-        info: TOML parse error at line 1, column 17
+        error: TOML parse error at line 1, column 17
           |
         1 | dependencies = ['not a valid requirement ???']
           |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         Expected one of `@`, `(`, `<`, `=`, `>`, `~`, `!`, `;`, found `a`
         not a valid requirement ???
             ^
+        error: `uv workspace metadata` exited with status 2
         ");
         Ok(())
     }
@@ -1066,7 +1065,7 @@ package = "invalid"
         assert_eq!(diagnostics[&event.uri].len(), 1);
         assert_eq!(
             diagnostics[&event.uri][0].code,
-            Some(Code::String("uv-metadata".into()))
+            Some(Code::String(DiagnosticId::ProjectManager.as_str().into()))
         );
 
         server.write_file("src/pyproject.toml", manifest)?;
@@ -1120,7 +1119,7 @@ package = "invalid"
 
         server.open_text_document(script, source, 1);
 
-        // An attempted synchronization would replace this with a `uv-metadata` error.
+        // An attempted synchronization would replace this with a `project-manager` error.
         let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
         assert_eq!(diagnostics.uri, server.file_uri(script));
         assert_eq!(
@@ -1177,7 +1176,7 @@ package = "invalid"
 
         let synchronized = server.await_notification::<PublishDiagnosticsNotification>();
         assert!(synchronized.diagnostics.iter().any(|diagnostic| {
-            diagnostic.code == Some(Code::String("uv-metadata".to_string()))
+            diagnostic.code == Some(Code::String(DiagnosticId::ProjectManager.as_str().into()))
         }));
         assert!(!synchronized.diagnostics.iter().any(|diagnostic| {
             diagnostic.code == Some(Code::String("unresolved-reference".to_string()))

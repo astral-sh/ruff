@@ -176,12 +176,15 @@ impl Diagnostic {
     }
 
     /// Adds an "info" sub-diagnostic before any existing sub-diagnostics.
-    pub fn prepend_info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
+    pub fn prepend_info<'a>(
+        &mut self,
+        message: impl IntoDiagnosticMessage + 'a,
+    ) -> &mut SubDiagnostic {
         let subs = &mut Arc::make_mut(&mut self.inner).subs;
         if subs.is_empty() {
             subs.reserve_exact(1);
         }
-        subs.insert(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
+        subs.insert_mut(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message))
     }
 
     /// Adds a "help" sub-diagnostic with the given message.
@@ -970,8 +973,8 @@ pub enum DiagnosticId {
     /// A PEP 723 script contains invalid metadata or configuration.
     InvalidScriptMetadata,
 
-    /// Metadata could not be loaded from uv.
-    UvMetadata,
+    /// The project manager could not provide the Python environment or dependency metadata.
+    ProjectManager,
 
     /// An `include` glob without any patterns.
     ///
@@ -1106,7 +1109,7 @@ impl DiagnosticId {
             DiagnosticId::RenamedRule => "renamed-rule",
             DiagnosticId::InvalidGlob => "invalid-glob",
             DiagnosticId::InvalidScriptMetadata => "invalid-script-metadata",
-            DiagnosticId::UvMetadata => "uv-metadata",
+            DiagnosticId::ProjectManager => "project-manager",
             DiagnosticId::EmptyInclude => "empty-include",
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
