@@ -13,7 +13,7 @@ mod tests {
     use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::Print, Path::new("T201.py"))]
-    #[test_case(Rule::PPrint, Path::new("T203.py"))]
+    #[test_case(Rule::Pprint, Path::new("T203.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

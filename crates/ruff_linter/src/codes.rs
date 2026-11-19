@@ -514,8 +514,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bugbear, "006") => rules::flake8_bugbear::rules::MutableArgumentDefault,
         (Flake8Bugbear, "007") => rules::flake8_bugbear::rules::UnusedLoopControlVariable,
         (Flake8Bugbear, "008") => rules::flake8_bugbear::rules::FunctionCallInDefaultArgument,
-        (Flake8Bugbear, "009") => rules::flake8_bugbear::rules::GetAttrWithConstant,
-        (Flake8Bugbear, "010") => rules::flake8_bugbear::rules::SetAttrWithConstant,
+        (Flake8Bugbear, "009") => rules::flake8_bugbear::rules::GetattrWithConstant,
+        (Flake8Bugbear, "010") => rules::flake8_bugbear::rules::SetattrWithConstant,
         (Flake8Bugbear, "011") => rules::flake8_bugbear::rules::AssertFalse,
         (Flake8Bugbear, "012") => rules::flake8_bugbear::rules::JumpStatementInFinally,
         (Flake8Bugbear, "013") => rules::flake8_bugbear::rules::RedundantTupleInExceptionHandler,
@@ -542,7 +542,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bugbear, "034") => rules::flake8_bugbear::rules::ReSubPositionalArgs,
         (Flake8Bugbear, "035") => rules::flake8_bugbear::rules::StaticKeyDictComprehension,
         (Flake8Bugbear, "039") => rules::flake8_bugbear::rules::MutableContextvarDefault,
-        (Flake8Bugbear, "043") => rules::flake8_bugbear::rules::DelAttrWithConstant,
+        (Flake8Bugbear, "043") => rules::flake8_bugbear::rules::DelattrWithConstant,
         (Flake8Bugbear, "901") => rules::flake8_bugbear::rules::ReturnInGenerator,
         (Flake8Bugbear, "903") => rules::flake8_bugbear::rules::ClassAsDataStructure,
         (Flake8Bugbear, "904") => rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
@@ -599,9 +599,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Return, "508") => rules::flake8_return::rules::SuperfluousElseBreak,
 
         // flake8-gettext
-        (Flake8GetText, "001") => rules::flake8_gettext::rules::FStringInGetTextFuncCall,
-        (Flake8GetText, "002") => rules::flake8_gettext::rules::FormatInGetTextFuncCall,
-        (Flake8GetText, "003") => rules::flake8_gettext::rules::PrintfInGetTextFuncCall,
+        (Flake8GetText, "001") => rules::flake8_gettext::rules::FStringInGettextCall,
+        (Flake8GetText, "002") => rules::flake8_gettext::rules::FormatInGettextCall,
+        (Flake8GetText, "003") => rules::flake8_gettext::rules::PrintfInGettextCall,
 
         // flake8-implicit-str-concat
         (Flake8ImplicitStrConcat, "001") => rules::flake8_implicit_str_concat::rules::SingleLineImplicitStringConcatenation,
@@ -611,7 +611,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-print
         (Flake8Print, "1") => rules::flake8_print::rules::Print,
-        (Flake8Print, "3") => rules::flake8_print::rules::PPrint,
+        (Flake8Print, "3") => rules::flake8_print::rules::Pprint,
 
         // flake8-quotes
         (Flake8Quotes, "000") => rules::flake8_quotes::rules::BadQuotesInlineString,
@@ -815,7 +815,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-bandit
         (Flake8Bandit, "101") => rules::flake8_bandit::rules::Assert,
-        (Flake8Bandit, "102") => rules::flake8_bandit::rules::ExecBuiltin,
+        (Flake8Bandit, "102") => rules::flake8_bandit::rules::Exec,
         (Flake8Bandit, "103") => rules::flake8_bandit::rules::BadFilePermissions,
         (Flake8Bandit, "104") => rules::flake8_bandit::rules::HardcodedBindAllInterfaces,
         (Flake8Bandit, "105") => rules::flake8_bandit::rules::HardcodedPasswordString,
@@ -833,11 +833,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bandit, "304") => rules::flake8_bandit::rules::SuspiciousInsecureCipherUsage,
         (Flake8Bandit, "305") => rules::flake8_bandit::rules::SuspiciousInsecureCipherModeUsage,
         (Flake8Bandit, "306") => rules::flake8_bandit::rules::SuspiciousMktempUsage,
-        (Flake8Bandit, "307") => rules::flake8_bandit::rules::SuspiciousEvalUsage,
+        (Flake8Bandit, "307") => rules::flake8_bandit::rules::Eval,
         (Flake8Bandit, "308") => rules::flake8_bandit::rules::SuspiciousMarkSafeUsage,
         (Flake8Bandit, "310") => rules::flake8_bandit::rules::SuspiciousURLOpenUsage,
         (Flake8Bandit, "311") => rules::flake8_bandit::rules::SuspiciousNonCryptographicRandomUsage,
-        (Flake8Bandit, "312") => rules::flake8_bandit::rules::SuspiciousTelnetUsage,
+        (Flake8Bandit, "312") => rules::flake8_bandit::rules::SuspiciousTelnetlibUsage,
         (Flake8Bandit, "313") => rules::flake8_bandit::rules::SuspiciousXMLCElementTreeUsage,
         (Flake8Bandit, "314") => rules::flake8_bandit::rules::SuspiciousXMLElementTreeUsage,
         (Flake8Bandit, "315") => rules::flake8_bandit::rules::SuspiciousXMLExpatReaderUsage,
@@ -846,7 +846,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bandit, "318") => rules::flake8_bandit::rules::SuspiciousXMLMiniDOMUsage,
         (Flake8Bandit, "319") => rules::flake8_bandit::rules::SuspiciousXMLPullDOMUsage,
         (Flake8Bandit, "320") => rules::flake8_bandit::rules::SuspiciousXMLETreeUsage,
-        (Flake8Bandit, "321") => rules::flake8_bandit::rules::SuspiciousFTPLibUsage,
+        (Flake8Bandit, "321") => rules::flake8_bandit::rules::SuspiciousFtplibUsage,
         (Flake8Bandit, "323") => rules::flake8_bandit::rules::SuspiciousUnverifiedContextUsage,
         (Flake8Bandit, "324") => rules::flake8_bandit::rules::HashlibInsecureHashFunction,
         (Flake8Bandit, "401") => rules::flake8_bandit::rules::SuspiciousTelnetlibImport,
@@ -918,7 +918,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Datetimez, "901") => rules::flake8_datetimez::rules::DatetimeMinMax,
 
         // pygrep-hooks
-        (PygrepHooks, "001") => rules::pygrep_hooks::rules::Eval,
+        (PygrepHooks, "001") => rules::pygrep_hooks::rules::PygrepHooksEval,
         (PygrepHooks, "002") => rules::pygrep_hooks::rules::DeprecatedLogWarn,
         (PygrepHooks, "003") => rules::pygrep_hooks::rules::BlanketTypeIgnore,
         (PygrepHooks, "004") => rules::pygrep_hooks::rules::BlanketNOQA,

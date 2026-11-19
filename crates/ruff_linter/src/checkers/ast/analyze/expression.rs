@@ -286,11 +286,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         Rule::SuspiciousInsecureCipherUsage,
                         Rule::SuspiciousInsecureCipherModeUsage,
                         Rule::SuspiciousMktempUsage,
-                        Rule::SuspiciousEvalUsage,
+                        Rule::Eval,
                         Rule::SuspiciousMarkSafeUsage,
                         Rule::SuspiciousURLOpenUsage,
                         Rule::SuspiciousNonCryptographicRandomUsage,
-                        Rule::SuspiciousTelnetUsage,
+                        Rule::SuspiciousTelnetlibUsage,
                         Rule::SuspiciousXMLCElementTreeUsage,
                         Rule::SuspiciousXMLElementTreeUsage,
                         Rule::SuspiciousXMLExpatReaderUsage,
@@ -299,7 +299,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         Rule::SuspiciousXMLMiniDOMUsage,
                         Rule::SuspiciousXMLPullDOMUsage,
                         Rule::SuspiciousXMLETreeUsage,
-                        Rule::SuspiciousFTPLibUsage,
+                        Rule::SuspiciousFtplibUsage,
                         Rule::SuspiciousUnverifiedContextUsage,
                     ]) {
                         flake8_bandit::rules::suspicious_function_reference(checker, expr);
@@ -412,11 +412,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     Rule::SuspiciousInsecureCipherUsage,
                     Rule::SuspiciousInsecureCipherModeUsage,
                     Rule::SuspiciousMktempUsage,
-                    Rule::SuspiciousEvalUsage,
+                    Rule::Eval,
                     Rule::SuspiciousMarkSafeUsage,
                     Rule::SuspiciousURLOpenUsage,
                     Rule::SuspiciousNonCryptographicRandomUsage,
-                    Rule::SuspiciousTelnetUsage,
+                    Rule::SuspiciousTelnetlibUsage,
                     Rule::SuspiciousXMLCElementTreeUsage,
                     Rule::SuspiciousXMLElementTreeUsage,
                     Rule::SuspiciousXMLExpatReaderUsage,
@@ -425,7 +425,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     Rule::SuspiciousXMLMiniDOMUsage,
                     Rule::SuspiciousXMLPullDOMUsage,
                     Rule::SuspiciousXMLETreeUsage,
-                    Rule::SuspiciousFTPLibUsage,
+                    Rule::SuspiciousFtplibUsage,
                     Rule::SuspiciousUnverifiedContextUsage,
                 ]) {
                     flake8_bandit::rules::suspicious_function_reference(checker, expr);
@@ -731,7 +731,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::SuspiciousInsecureCipherUsage,
                 Rule::SuspiciousInsecureCipherModeUsage,
                 Rule::SuspiciousMktempUsage,
-                Rule::SuspiciousEvalUsage,
+                Rule::Eval,
                 Rule::SuspiciousMarkSafeUsage,
                 Rule::SuspiciousURLOpenUsage,
                 Rule::SuspiciousNonCryptographicRandomUsage,
@@ -744,8 +744,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::SuspiciousXMLPullDOMUsage,
                 Rule::SuspiciousXMLETreeUsage,
                 Rule::SuspiciousUnverifiedContextUsage,
-                Rule::SuspiciousTelnetUsage,
-                Rule::SuspiciousFTPLibUsage,
+                Rule::SuspiciousTelnetlibUsage,
+                Rule::SuspiciousFtplibUsage,
             ]) {
                 flake8_bandit::rules::suspicious_function_call(checker, call);
             }
@@ -758,13 +758,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_bugbear::rules::strip_with_multi_characters(checker, expr, func, args);
             }
             if keywords.is_empty() {
-                if checker.is_rule_enabled(Rule::GetAttrWithConstant) {
+                if checker.is_rule_enabled(Rule::GetattrWithConstant) {
                     flake8_bugbear::rules::getattr_with_constant(checker, expr, func, args);
                 }
-                if checker.is_rule_enabled(Rule::DelAttrWithConstant) {
+                if checker.is_rule_enabled(Rule::DelattrWithConstant) {
                     flake8_bugbear::rules::delattr_with_constant(checker, expr, func, args);
                 }
-                if checker.is_rule_enabled(Rule::SetAttrWithConstant) {
+                if checker.is_rule_enabled(Rule::SetattrWithConstant) {
                     flake8_bugbear::rules::setattr_with_constant(checker, expr, func, args);
                 }
             }
@@ -792,7 +792,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryRangeStart) {
                 flake8_pie::rules::unnecessary_range_start(checker, call);
             }
-            if checker.is_rule_enabled(Rule::ExecBuiltin) {
+            if checker.is_rule_enabled(Rule::Exec) {
                 flake8_bandit::rules::exec_used(checker, func);
             }
             if checker.is_rule_enabled(Rule::HardcodedPasswordFuncArg) {
@@ -964,21 +964,21 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
             }
             if checker.any_rule_enabled(&[
-                Rule::FStringInGetTextFuncCall,
-                Rule::FormatInGetTextFuncCall,
-                Rule::PrintfInGetTextFuncCall,
+                Rule::FStringInGettextCall,
+                Rule::FormatInGettextCall,
+                Rule::PrintfInGettextCall,
             ]) && flake8_gettext::is_gettext_func_call(
                 checker,
                 func,
                 &checker.settings().flake8_gettext.function_names,
             ) {
-                if checker.is_rule_enabled(Rule::FStringInGetTextFuncCall) {
+                if checker.is_rule_enabled(Rule::FStringInGettextCall) {
                     flake8_gettext::rules::f_string_in_gettext_func_call(checker, func, args);
                 }
-                if checker.is_rule_enabled(Rule::FormatInGetTextFuncCall) {
+                if checker.is_rule_enabled(Rule::FormatInGettextCall) {
                     flake8_gettext::rules::format_in_gettext_func_call(checker, func, args);
                 }
-                if checker.is_rule_enabled(Rule::PrintfInGetTextFuncCall) {
+                if checker.is_rule_enabled(Rule::PrintfInGettextCall) {
                     flake8_gettext::rules::printf_in_gettext_func_call(checker, func, args);
                 }
             }
@@ -1718,7 +1718,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::OSErrorAlias,
         Rule::TimeoutErrorAlias,
         Rule::Print,
-        Rule::PPrint,
+        Rule::Pprint,
         Rule::ReSubPositionalArgs,
         Rule::UselessContextlibSuppress,
         Rule::NoExplicitStacklevel,
@@ -1821,7 +1821,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
             pyupgrade::rules::timeout_error_alias_call(checker, &call.func, &qualified_name);
         }
     }
-    if checker.any_rule_enabled(&[Rule::Print, Rule::PPrint]) {
+    if checker.any_rule_enabled(&[Rule::Print, Rule::Pprint]) {
         flake8_print::rules::print_call(checker, call, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::ReSubPositionalArgs) {
