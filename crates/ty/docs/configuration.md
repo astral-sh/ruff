@@ -1121,6 +1121,41 @@ Defaults to `false`.
 
 ## `project-manager`
 
+### `project`
+
+The project manager to use for discovering the project's workspace and Python environment.
+
+- With `"none"` (the default), ty discovers the project and Python environment itself.
+- With `"uv"`, ty uses [uv](https://docs.astral.sh/uv/) to discover the workspace root,
+  Python environment, and dependency metadata. The environment must already be synchronized;
+  ty does not install project dependencies. uv may update the lockfile. This requires
+  uv 0.12.3 or newer.
+
+An explicit `TY_UV` takes precedence over this setting. If your editor marks the workspace
+as untrusted, ty discovers the project without running uv.
+
+**Default value**: `"none"`
+
+**Type**: `"uv" | "none"`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.project-manager]
+    project = "uv"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [project-manager]
+    project = "uv"
+    ```
+
+---
+
 ### `script`
 
 The project manager to use for scripts with PEP 723 inline metadata.

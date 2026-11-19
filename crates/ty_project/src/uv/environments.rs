@@ -155,6 +155,14 @@ impl UvEnvironments {
         );
     }
 
+    /// Cancels queued workspace metadata and discards any result already in flight.
+    pub(crate) fn cancel_project_sync(&self) {
+        if let Some(sync) = self.inner.project.lock().as_mut() {
+            sync.next_request = None;
+            sync.cancellation.cancel();
+        }
+    }
+
     /// Returns a receiver for background synchronization wakeups.
     ///
     /// A wakeup indicates that synchronization results may be ready to process with
@@ -325,6 +333,17 @@ impl UvEnvironments {
             match task {
                 UvSyncTask::Workspace(path) => {
                     let mut project_sync = self.inner.project.lock();
+                    // Cancellation without a replacement means project integration was disabled.
+                    if project_sync.as_ref().is_some_and(|sync| {
+                        sync.next_request.is_none() && sync.cancellation.token().is_cancelled()
+                    }) {
+                        *project_sync = None;
+                        drop(project_sync);
+                        if let Some(progress) = progress {
+                            progress.completed();
+                        }
+                        continue;
+                    }
                     let next = project_sync
                         .as_mut()
                         .and_then(|sync| sync.next_request.take());
@@ -1125,12 +1144,14 @@ mod tests {
             DbWithTestSystem, DbWithWritableSystem, OsSystem, System as _, SystemPath,
             SystemPathBuf,
         };
+        use ruff_ranged_value::ValueSource;
         use salsa::Database as _;
         use ty_python_semantic::Db as _;
         use ty_static::EnvVars;
 
         use super::super::{ScriptEnvironmentAvailability, UvSyncChanges, script_environment};
         use crate::db::testing::TestDb;
+        use crate::metadata::Options;
         use crate::{Db as _, ProjectMetadata, uv_test_env_vars};
 
         #[test]
@@ -1196,6 +1217,37 @@ mod tests {
                     .find(|member| member.name.as_ref() == "member")
                     .map(|member| member.path.as_path()),
                 Some(member_root.as_path())
+            );
+            Ok(())
+        }
+
+        #[test]
+        fn disabled_project_manager_discards_completed_refresh() -> anyhow::Result<()> {
+            let mut case = UvTestCase::project(
+                r#"
+                [project]
+                name = 'example'
+                version = '0.1.0'
+                requires-python = '>=3.8'
+                "#,
+            )?;
+            let root = case.db.project().root(&case.db).to_path_buf();
+            let environments = case.db.uv_environments().clone();
+            environments.request_project_sync(&case.db, &root, &|_, _| None);
+            environments
+                .sync_wakeups()
+                .recv_timeout(Duration::from_secs(30))?;
+
+            environments.cancel_project_sync();
+            let changes = environments.poll_sync(&mut case.db);
+            assert!(changes.project.is_none());
+            assert!(!environments.has_pending_synchronizations());
+            assert!(
+                case.db
+                    .project()
+                    .metadata(&case.db)
+                    .uv_workspace_metadata()
+                    .is_none()
             );
             Ok(())
         }
@@ -1524,18 +1576,19 @@ mod tests {
                 Ok(())
             }
 
-            fn new(
-                file_name: &str,
-                source: &str,
-                uv_workspace_discovery: bool,
-            ) -> anyhow::Result<Self> {
+            fn new(file_name: &str, source: &str, project_uses_uv: bool) -> anyhow::Result<Self> {
                 let temp_dir = tempfile::tempdir()?;
                 let root = SystemPath::from_std_path(temp_dir.path())
                     .context("temporary directory is not a valid UTF-8 path")?;
                 // uv resolves symlinks, including macOS's symlinked temporary directory.
                 let root = OsSystem::default().canonicalize_path(root)?;
-                let metadata = ProjectMetadata::new("test", root.clone())
-                    .with_uv_workspace_discovery(uv_workspace_discovery);
+                let mut metadata = ProjectMetadata::new("test", root.clone());
+                if project_uses_uv {
+                    metadata.set_override_options(Options::from_toml_str(
+                        "project-manager.project = 'uv'",
+                        ValueSource::Cli,
+                    )?);
+                }
                 let mut db = TestDb::new(metadata);
                 db.use_system(OsSystem::new(&root));
                 db.test_system().clear_env_vars();

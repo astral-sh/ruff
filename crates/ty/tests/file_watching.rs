@@ -557,7 +557,6 @@ where
     }
     project.apply_configuration_files(&system)?;
     if let Some(mode) = UseUv::from_system(&system) {
-        project = project.with_uv_workspace_discovery(mode.workspace_discovery_enabled());
         override_options = Some(
             Options::from_uv_mode(Some(RangedValue::cli(mode)))
                 .combine(override_options.unwrap_or_default()),
@@ -566,7 +565,7 @@ where
     if let Some(override_options) = override_options {
         project.set_override_options(override_options);
     }
-    if project.uv_workspace_discovery_enabled() {
+    if project.project_uses_uv() {
         let workspace = UvWorkspace::discover(&project_path, &system);
         project.apply_uv_workspace(&system, workspace)?;
     }
@@ -3336,6 +3335,28 @@ mod uv_metadata {
     version = "0.1.0"
     requires-python = ">=3.8"
     "#;
+
+    #[test]
+    fn project_manager_reloads_on_configuration_changes() -> anyhow::Result<()> {
+        let mut case = setup_with_system(
+            [
+                ("pyproject.toml", MANIFEST),
+                ("ty.toml", "project-manager.project = 'none'"),
+                ("main.py", "value = 1"),
+            ],
+            |system| system.set_env_var(EnvVars::UV, "missing-ty-project-uv"),
+        )?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        update_file_and_wait_for_uv_sync(&mut case, "ty.toml", "project-manager.project = 'uv'")?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "project-manager");
+
+        update_file_and_wait_for_uv_sync(&mut case, "ty.toml", "project-manager.project = 'none'")?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
 
     #[test]
     fn project_refresh_applies_settings_despite_uv_errors() -> anyhow::Result<()> {
