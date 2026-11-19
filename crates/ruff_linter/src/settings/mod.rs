@@ -555,7 +555,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::PropertyWithParameters), // PLR0206
     RuleSelector::rule(Rule::ManualFromImport), // PLR0402
     RuleSelector::rule(Rule::RedefinedArgumentFromLocal), // PLR1704
-    RuleSelector::rule(Rule::GeneratorRaiseStopIteration), // PLR1708
+    RuleSelector::rule(Rule::RaiseStopIterationInGenerator), // PLR1708
     RuleSelector::rule(Rule::UselessReturn), // PLR1711
     RuleSelector::rule(Rule::BooleanChainedComparison), // PLR1716
     RuleSelector::rule(Rule::SysExitAlias), // PLR1722
@@ -659,7 +659,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::AssertWithPrintMessage), // RUF030
     RuleSelector::rule(Rule::DecimalFromFloatLiteral), // RUF032
     RuleSelector::rule(Rule::PostInitDefault), // RUF033
-    RuleSelector::rule(Rule::UselessIfExpr), // RUF034
+    RuleSelector::rule(Rule::IfExprWithSameArms), // RUF034
     RuleSelector::rule(Rule::InvalidAssertMessageLiteralArgument), // RUF040
     RuleSelector::rule(Rule::UnnecessaryNestedLiteral), // RUF041
     RuleSelector::rule(Rule::UnnecessaryCastToInt), // RUF046
@@ -1022,7 +1022,7 @@ mod tests {
         	while-one (UP048),
         	deprecated-abc-decorator (UP051),
         	context-manager-iterator (UP052),
-        	if-expr-instead-of-or-operator (FURB110),
+        	if-expr-with-redundant-test (FURB110),
         	repeated-append (FURB113),
         	delete-full-slice (FURB131),
         	for-loop-set-mutations (FURB142),
@@ -1033,7 +1033,7 @@ mod tests {
         	single-item-membership-test (FURB171),
         	meta-class-abc-meta (FURB180),
         	subclass-builtin (FURB189),
-        	missing-f-string-prefix (RUF027),
+        	possibly-missing-f-string-prefix (RUF027),
         	none-not-at-end-of-union (RUF036),
         	unnecessary-empty-iterable-within-deque-call (RUF037),
         	redundant-bool-literal (RUF038),

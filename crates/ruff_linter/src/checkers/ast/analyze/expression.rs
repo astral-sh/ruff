@@ -1196,7 +1196,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_literal);
                 }
             }
-            if checker.is_rule_enabled(Rule::MissingFStringPrefix) {
+            if checker.is_rule_enabled(Rule::PossiblyMissingFStringPrefix) {
                 for string_literal in value.literals() {
                     ruff::rules::missing_fstring_syntax(checker, string_literal);
                 }
@@ -1486,7 +1486,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
                 }
             }
-            if checker.is_rule_enabled(Rule::MissingFStringPrefix) {
+            if checker.is_rule_enabled(Rule::PossiblyMissingFStringPrefix) {
                 for string_literal in value {
                     ruff::rules::missing_fstring_syntax(checker, string_literal);
                 }
@@ -1515,16 +1515,16 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::IfExprWithFalseTrue) {
                 flake8_simplify::rules::if_expr_with_false_true(checker, expr, test, body, orelse);
             }
-            if checker.is_rule_enabled(Rule::IfExprNegatedCondition) {
+            if checker.is_rule_enabled(Rule::UnnecessaryNegationInIfExpr) {
                 flake8_simplify::rules::twisted_arms_in_ifexpr(checker, expr, test, body, orelse);
             }
             if checker.is_rule_enabled(Rule::IfExprMinMax) {
                 refurb::rules::if_expr_min_max(checker, if_exp);
             }
-            if checker.is_rule_enabled(Rule::IfExprInsteadOfOrOperator) {
+            if checker.is_rule_enabled(Rule::IfExprWithRedundantTest) {
                 refurb::rules::if_exp_instead_of_or_operator(checker, if_exp);
             }
-            if checker.is_rule_enabled(Rule::UselessIfExpr) {
+            if checker.is_rule_enabled(Rule::IfExprWithSameArms) {
                 ruff::rules::useless_if_else(checker, if_exp);
             }
             if checker.is_rule_enabled(Rule::SliceToRemovePrefixOrSuffix) {
@@ -1693,7 +1693,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryKeyCheck) {
                 ruff::rules::unnecessary_key_check(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::AmbiguousChainedOperators) {
+            if checker.is_rule_enabled(Rule::AmbiguousBooleanChain) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
             }
         }

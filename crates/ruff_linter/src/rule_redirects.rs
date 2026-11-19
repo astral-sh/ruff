@@ -242,28 +242,40 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "if-exp-instead-of-or-operator",
-        Rule::IfExprInsteadOfOrOperator,
+        Rule::IfExprWithRedundantTest,
     ),
-    ("repeated-global", Rule::ConsecutiveScopeDeclarations),
-    ("stop-iteration-return", Rule::GeneratorRaiseStopIteration),
+    (
+        "repeated-global",
+        Rule::ConsecutiveGlobalOrNonlocalStatements,
+    ),
+    ("stop-iteration-return", Rule::RaiseStopIterationInGenerator),
     ("assert-on-string-literal", Rule::AssertStringLiteral),
     ("redefined-loop-name", Rule::RedefinedForOrWithTarget),
-    ("superfluous-else-return", Rule::UnnecessaryElseReturn),
-    ("superfluous-else-raise", Rule::UnnecessaryElseRaise),
-    ("superfluous-else-continue", Rule::UnnecessaryElseContinue),
-    ("superfluous-else-break", Rule::UnnecessaryElseBreak),
+    ("superfluous-else-return", Rule::UnnecessaryElseAfterReturn),
+    ("superfluous-else-raise", Rule::UnnecessaryElseAfterRaise),
+    (
+        "superfluous-else-continue",
+        Rule::UnnecessaryElseAfterContinue,
+    ),
+    ("superfluous-else-break", Rule::UnnecessaryElseAfterBreak),
     (
         "parenthesize-chained-operators",
-        Rule::AmbiguousChainedOperators,
+        Rule::AmbiguousBooleanChain,
     ),
-    ("missing-f-string-syntax", Rule::MissingFStringPrefix),
-    ("useless-if-else", Rule::UselessIfExpr),
+    (
+        "missing-f-string-syntax",
+        Rule::PossiblyMissingFStringPrefix,
+    ),
+    ("useless-if-else", Rule::IfExprWithSameArms),
     (
         "if-else-block-instead-of-if-exp",
-        Rule::IfElseBlockInsteadOfIfExpr,
+        Rule::IfElseAssignmentToSameVariable,
     ),
     ("enumerate-for-loop", Rule::ManualLoopCounter),
-    ("if-expr-with-twisted-arms", Rule::IfExprNegatedCondition),
+    (
+        "if-expr-with-twisted-arms",
+        Rule::UnnecessaryNegationInIfExpr,
+    ),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

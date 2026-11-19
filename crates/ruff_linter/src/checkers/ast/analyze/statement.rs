@@ -135,7 +135,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::IterMethodWithGeneratorReturnAnnotation) {
                 flake8_pyi::rules::bad_generator_return_type(function_def, checker);
             }
-            if checker.is_rule_enabled(Rule::GeneratorRaiseStopIteration) {
+            if checker.is_rule_enabled(Rule::RaiseStopIterationInGenerator) {
                 pylint::rules::stop_iteration_return(checker, function_def);
             }
             if checker.source_type.is_stub() {
@@ -201,10 +201,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::UnnecessaryReturnNone,
                 Rule::ImplicitReturnValue,
                 Rule::ImplicitReturn,
-                Rule::UnnecessaryElseReturn,
-                Rule::UnnecessaryElseRaise,
-                Rule::UnnecessaryElseContinue,
-                Rule::UnnecessaryElseBreak,
+                Rule::UnnecessaryElseAfterReturn,
+                Rule::UnnecessaryElseAfterRaise,
+                Rule::UnnecessaryElseAfterContinue,
+                Rule::UnnecessaryElseAfterBreak,
             ]) {
                 flake8_return::rules::function(checker, function_def);
             }
@@ -1035,7 +1035,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfDictLookup) {
                 flake8_simplify::rules::if_else_block_instead_of_dict_lookup(checker, if_);
             }
-            if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfIfExpr) {
+            if checker.is_rule_enabled(Rule::IfElseAssignmentToSameVariable) {
                 flake8_simplify::rules::if_else_block_instead_of_if_exp(checker, if_);
             }
             if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfDictGet) {
