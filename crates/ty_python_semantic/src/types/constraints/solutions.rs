@@ -1249,14 +1249,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             // constraints can possibly be satisfied.
             return ControlFlow::Continue(());
         };
-        let accepts_fixed_typevar = |var: BoundTypeVarInstance<'db>| {
-            let Some(TypeVarBoundOrConstraints::Constraints(actual)) =
-                var.typevar(db).bound_or_constraints(db, env)
-            else {
-                return false;
-            };
-            actual.is_subset_of(db, env, constrained_typevar.typevar_constraints)
-        };
         // A caller's constrained U can be the solution for T for every choice of U.
         // For example, U: (int, str) satisfies T: (int, str, bytes), even though neither
         // T = int nor T = str works for every U. Check T = U against the other bounds
@@ -1271,7 +1263,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             for ty in evidence.evidence_lower.into_iter().chain(bounds) {
                 if let Type::TypeVar(var) = ty
                     && !var.is_inferable(db, self.inferable)
-                    && accepts_fixed_typevar(var)
+                    && var.can_specialize_typevar(db, env, bound_typevar)
                     && !witnesses.contains(&ty)
                 {
                     witnesses.push(ty);
