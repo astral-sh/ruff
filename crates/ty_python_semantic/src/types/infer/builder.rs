@@ -6201,10 +6201,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(|generic_context| generic_context.inferable_typevars(db))
                     .unwrap_or(TypeVarSet::None);
 
-                !overload
+                overload
                     .return_ty
-                    .when_assignable_to(db, env, compatible_ty, &constraints, inferable)
-                    .is_never_satisfied(db, env, inferable)
+                    .when_assignable_to_owned(db, env, compatible_ty, inferable)
+                    .query(|_, when| !when.is_never_satisfied(db, env, inferable))
             }) {
                 return None;
             }

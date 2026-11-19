@@ -4514,8 +4514,8 @@ impl<'db> CallableBinding<'db> {
 
             let inferable = self.overloads[*current_index].inferable_typevars;
             if top_materialized_argument_type
-                .when_assignable_to(db, env, parameter_types, constraints, inferable)
-                .is_always_satisfied(db, env, inferable)
+                .when_assignable_to_owned(db, env, parameter_types, inferable)
+                .query(|_, when| when.is_always_satisfied(db, env, inferable))
             {
                 for &index in remaining {
                     self.overloads[index].mark_as_unmatched_overload();
@@ -6922,14 +6922,11 @@ impl<'db> CallInference<'_, 'db> {
             } else {
                 ConstraintProvenance::DECLARED
             };
-            let return_constraints = return_ty.when_constraint_set_assignable_to_with_provenance(
-                db,
-                self.env,
-                tcx,
-                constraints,
-                provenance,
-            );
-            builder.record_constraint_set(return_constraints);
+            let return_constraints = return_ty
+                .when_constraint_set_assignable_to_owned_with_provenance(
+                    db, self.env, tcx, provenance,
+                );
+            builder.record_constraint_set(constraints.load(db, self.env, &return_constraints));
             (return_ty, tcx)
         });
 
@@ -7751,12 +7748,7 @@ impl<'db> CallInference<'_, 'db> {
 }
 
 impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
-    fn check_argument_type(
-        &mut self,
-        constraints: &ConstraintSetBuilder<'db>,
-        argument: Argument<'a>,
-        relation: ArgumentRelation<'db>,
-    ) {
+    fn check_argument_type(&mut self, argument: Argument<'a>, relation: ArgumentRelation<'db>) {
         let ArgumentRelation {
             argument_index,
             adjusted_argument_index,
@@ -7861,14 +7853,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && (!has_starred_annotation || matched_parameter.expected_type.is_some())
             && !is_valid_isinstance_target()
             && argument_type
-                .when_assignable_to(
-                    db,
-                    self.env,
-                    expected_ty,
-                    constraints,
-                    self.inferable_typevars,
-                )
-                .is_never_satisfied(db, self.env, self.inferable_typevars)
+                .when_assignable_to_owned(db, self.env, expected_ty, self.inferable_typevars)
+                .query(|_, when| when.is_never_satisfied(db, self.env, self.inferable_typevars))
             && !self.should_defer_typevartuple_callable_check(
                 parameter.annotated_type(),
                 expected_ty,
@@ -8047,7 +8033,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             match argument_types {
                 CallArgument::Variadic(_) => self.check_variadic_argument_type(
-                    constraints,
                     argument_index,
                     adjusted_argument_index,
                     argument,
@@ -8080,7 +8065,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             argument_type,
                         );
 
-                        self.check_argument_type(constraints, argument, relation);
+                        self.check_argument_type(argument, relation);
                     }
                 }
             }
@@ -8247,7 +8232,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn check_variadic_argument_type(
         &mut self,
-        constraints: &ConstraintSetBuilder<'db>,
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
@@ -8269,7 +8253,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .unwrap_or_else(Type::unknown),
             );
 
-            self.check_argument_type(constraints, argument, relation);
+            self.check_argument_type(argument, relation);
         }
     }
 
@@ -8284,7 +8268,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let db = self.db;
         if keywords.unpack(db, self.env).is_some() {
             self.check_variadic_argument_type(
-                constraints,
                 argument_index,
                 adjusted_argument_index,
                 Argument::Keywords,
@@ -8341,7 +8324,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 value_type,
             );
 
-            self.check_argument_type(constraints, Argument::Keywords, relation);
+            self.check_argument_type(Argument::Keywords, relation);
         }
     }
 
