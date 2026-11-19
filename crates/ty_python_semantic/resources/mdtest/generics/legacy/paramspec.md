@@ -2027,10 +2027,10 @@ from typing import Callable, Concatenate, ParamSpec
 
 P = ParamSpec("P")
 
-def wrap(callback: Callable[P, str]) -> Callable[P, str]:
+def wrap(callback: Callable[P, object]) -> Callable[P, object]:
     return callback
 
-def register(callback: Callable[P, str]) -> None: ...
+def register(callback: Callable[P, object]) -> None: ...
 
 register(wrap(lambda x: chr(reveal_type(x))))  # revealed: Unknown
 ```
@@ -2038,9 +2038,10 @@ register(wrap(lambda x: chr(reveal_type(x))))  # revealed: Unknown
 A fixed prefix still supplies types for the corresponding lambda parameters.
 
 ```py
-def register_prefixed(callback: Callable[Concatenate[int, P], str]) -> None: ...
+def register_prefixed(callback: Callable[Concatenate[int, P], object]) -> None: ...
 
-register_prefixed(wrap(lambda x, y: str(reveal_type((x, y)))))  # revealed: tuple[int, Unknown]
+# revealed: tuple[int, Unknown, Unknown]
+register_prefixed(wrap(lambda x, y, z: reveal_type((x, y, z))))
 ```
 
 ### A decorator's unsolved parameter list

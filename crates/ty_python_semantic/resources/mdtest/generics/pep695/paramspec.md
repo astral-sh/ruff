@@ -1194,10 +1194,10 @@ unknown.
 ```py
 from typing import Callable, Concatenate
 
-def wrap[**P](callback: Callable[P, str]) -> Callable[P, str]:
+def wrap[**P](callback: Callable[P, object]) -> Callable[P, object]:
     return callback
 
-def register[**P](callback: Callable[P, str]) -> None: ...
+def register[**P](callback: Callable[P, object]) -> None: ...
 
 register(wrap(lambda x: chr(reveal_type(x))))  # revealed: Unknown
 ```
@@ -1205,9 +1205,10 @@ register(wrap(lambda x: chr(reveal_type(x))))  # revealed: Unknown
 A fixed prefix still supplies types for the corresponding lambda parameters.
 
 ```py
-def register_prefixed[**P](callback: Callable[Concatenate[int, P], str]) -> None: ...
+def register_prefixed[**P](callback: Callable[Concatenate[int, P], object]) -> None: ...
 
-register_prefixed(wrap(lambda x, y: str(reveal_type((x, y)))))  # revealed: tuple[int, Unknown]
+# revealed: tuple[int, Unknown, Unknown]
+register_prefixed(wrap(lambda x, y, z: reveal_type((x, y, z))))
 ```
 
 ### Immediate literal forwarding
