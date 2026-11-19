@@ -1073,7 +1073,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8TypeChecking, "010") => rules::flake8_type_checking::rules::RuntimeStringUnion,
 
         // tryceratops
-        (Tryceratops, "002") => rules::tryceratops::rules::RaiseOverlyBroadException,
+        (Tryceratops, "002") => rules::tryceratops::rules::RaiseExceptionOrBaseException,
         (Tryceratops, "003") => rules::tryceratops::rules::RaiseExceptionWithMessage,
         (Tryceratops, "004") => rules::tryceratops::rules::TypeCheckWithoutTypeError,
         (Tryceratops, "200") => rules::tryceratops::rules::ReraiseNoCause,
@@ -1082,7 +1082,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Tryceratops, "300") => rules::tryceratops::rules::TryConsiderElse,
         (Tryceratops, "301") => rules::tryceratops::rules::RaiseWithinTry,
         (Tryceratops, "400") => rules::tryceratops::rules::LoggingErrorInsteadOfException,
-        (Tryceratops, "401") => rules::tryceratops::rules::LoggingRedundantException,
+        (Tryceratops, "401") => rules::tryceratops::rules::RedundantExceptionInLoggingMessage,
 
         // flake8-use-pathlib
         (Flake8UsePathlib, "100") => rules::flake8_use_pathlib::rules::OsPathAbspath,
@@ -1367,9 +1367,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Logging, "001") => rules::flake8_logging::rules::DirectLoggerInstantiation,
         (Flake8Logging, "002") => rules::flake8_logging::rules::FilePathAsLoggerName,
         (Flake8Logging, "004") => rules::flake8_logging::rules::LoggingExceptionOutsideExceptHandler,
-        (Flake8Logging, "007") => rules::flake8_logging::rules::LoggingExceptionWithoutExcInfo,
+        (Flake8Logging, "007") => rules::flake8_logging::rules::LoggingExceptionWithFalsyExcInfo,
         (Flake8Logging, "009") => rules::flake8_logging::rules::LoggingWarnConstant,
-        (Flake8Logging, "014") => rules::flake8_logging::rules::ExcInfoOutsideExceptHandler,
+        (Flake8Logging, "014") => rules::flake8_logging::rules::LoggingExcInfoOutsideExceptHandler,
         (Flake8Logging, "015") => rules::flake8_logging::rules::RootLoggerCall,
 
         // Rules that belong only to categories, without linter groups or codes.
