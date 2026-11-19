@@ -5455,36 +5455,6 @@ mod tests {
     }
 
     #[test]
-    fn sequent_derivation_respects_the_inference_scope() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let t = create_typevar(db, "T");
-        let u = create_typevar(db, "U");
-        let list = |ty| KnownClass::List.to_specialized_instance(db, &env, &[ty]);
-        let list_u = list(Type::TypeVar(u));
-        let list_int = list(KnownClass::Int.to_instance(db, &env));
-
-        // list[U] ≤ T ≤ list[int] is possible only if the relation can choose U = int.
-        let builder = ConstraintSetBuilder::new();
-        let set = ConstraintSet::constrain_typevar(
-            db,
-            &env,
-            &builder,
-            ConstraintProvenance::INFERRED,
-            TypeVarSet::All,
-            t,
-            list_u,
-            list_int,
-        );
-        let fixed = TypeVarSet::from_typevars(db, [t]);
-        let inferable = TypeVarSet::from_typevars(db, [t, u]);
-        assert!(set.is_never_satisfied(db, &env, fixed));
-        assert!(!set.is_never_satisfied(db, &env, inferable));
-        assert!(set.is_never_satisfied(db, &env, fixed));
-    }
-
-    #[test]
     fn constraint_support_ignores_typevar_declaration_defaults() {
         let db = setup_db();
         let db = &db;
@@ -6330,13 +6300,14 @@ class E: ...
             assert!(!set.is_never_satisfied(db, &env, TypeVarSet::All));
         });
 
-        // tuple[U] <= T <= tuple[int] is satisfiable only when U is also inferable.
+        // list[U] ≤ T ≤ list[int] is satisfiable only when U is also inferable.
         let u = create_typevar(db, "U");
         let infer_t = TypeVarSet::from_typevars(db, [t]);
         let infer_tu = TypeVarSet::from_typevars(db, [t, u]);
         let int = known_instance(db, KnownClass::Int);
-        let lower = Type::heterogeneous_tuple(db, &env, [Type::TypeVar(u)]);
-        let upper = Type::heterogeneous_tuple(db, &env, [int]);
+        let list = |ty| KnownClass::List.to_specialized_instance(db, &env, &[ty]);
+        let lower = list(Type::TypeVar(u));
+        let upper = list(int);
         let owned = ConstraintSetBuilder::new().into_owned(|builder| {
             ConstraintSet::constrain_typevar(
                 db,
