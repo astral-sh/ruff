@@ -2849,6 +2849,34 @@ A name passed through a variable is still checked if its inferred type is a stri
 Other = Enum(name, "A B")
 ```
 
+### Name comparison through type aliases
+
+The name comparison follows a type alias to a single string literal. The rule is meant to spot
+simple, obvious typos. It allows names of type `str` so callers can still construct enums
+dynamically when that's desirable. If the name argument has a union of string literals as its type,
+the caller is likely doing the same thing, so these cases also do not trigger the rule:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing import Literal
+
+type PaletteName = Literal["Palette"]
+type ColorNames = Literal["Palette", "Swatch"]
+
+def fixed_name(name: PaletteName) -> None:
+    # error: [mismatched-enum-name] "Expected "Color", got "Palette""
+    Color = Enum(name, "RED BLUE")
+
+def choose_name(name: Literal["Palette", "Swatch"], aliased_name: ColorNames) -> None:
+    Color = Enum(name, "RED BLUE")  # ok
+    Color = Enum(aliased_name, "RED BLUE")  # ok
+```
+
 ### List/tuple of tuples
 
 ```py

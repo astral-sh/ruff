@@ -263,6 +263,39 @@ reveal_type(Mismatch)  # revealed: <class 'WrongName'>
 reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Literal[True]]
 ```
 
+### Name comparison through type aliases
+
+The name comparison follows a type alias to a single string literal. The rule is meant to spot
+simple, obvious typos. It allows names of type `str` so callers can still construct named tuples
+dynamically when that's desirable. If the name argument has a union of string literals as its type,
+the caller is likely doing the same thing. The rule allows it even when none of the possible names
+match the assigned variable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections import namedtuple
+from typing import Literal, NamedTuple
+
+type VectorName = Literal["Vector"]
+type PointNames = Literal["Vector", "Coordinate"]
+
+def fixed_name(name: VectorName) -> None:
+    # error: [mismatched-namedtuple-name] "Expected "Point", got "Vector""
+    Point = NamedTuple(name, [("x", int)])
+    # error: [mismatched-namedtuple-name] "Expected "Point", got "Vector""
+    Point = namedtuple(typename=name, field_names="x")
+
+def choose_name(name: Literal["Vector", "Coordinate"], aliased_name: PointNames) -> None:
+    Point = NamedTuple(name, [("x", int)])  # ok
+    Point = NamedTuple(aliased_name, [("x", int)])  # ok
+    Point = namedtuple(typename=name, field_names="x")  # ok
+    Point = namedtuple(typename=aliased_name, field_names="x")  # ok
+```
+
 ### Invalid literal names
 
 Both factories reject names that are keywords or invalid identifiers. A bad name is reported by

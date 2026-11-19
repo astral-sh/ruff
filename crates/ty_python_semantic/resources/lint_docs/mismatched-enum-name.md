@@ -7,7 +7,7 @@ This rule is only applied if ty infers a string literal type for the class name 
 
 ## Why is this bad?
 
-A mismatched name can be a typo and can make a enum's runtime representation confusing.
+A mismatched name can be a typo and can make an enum's runtime representation confusing.
 
 ## Default level
 

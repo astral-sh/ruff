@@ -419,7 +419,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let name_ty = self.expression_type(name_arg);
-        if let Some(actual_name) = name_ty.as_string_literal().map(|literal| literal.value(db))
+        if let Some(actual_name) = name_ty
+            .resolve_type_alias(db)
+            .as_string_literal()
+            .map(|literal| literal.value(db))
             && let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
             && assigned_name.as_str() != actual_name

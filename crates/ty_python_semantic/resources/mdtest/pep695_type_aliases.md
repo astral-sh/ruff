@@ -1013,6 +1013,7 @@ Extra = TypeAliasType("Extra", int, ())
 
 Invalid = TypeAliasType("Invalid", int, bogus=True)  # error: [unknown-argument]
 Duplicate = TypeAliasType("Duplicate", int, name="Other")  # error: [parameter-already-assigned]
+reveal_type(Duplicate.__name__)  # revealed: Literal["Duplicate"]
 DuplicateValue = TypeAliasType("DuplicateValue", int, value=str)  # error: [parameter-already-assigned]
 Unpacked = TypeAliasType("Unpacked", int, **{"bogus": True})  # error: [unknown-argument]
 NonStringKey = TypeAliasType("NonStringKey", int, **{1: 42})  # error: [invalid-argument-type]

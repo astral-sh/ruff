@@ -416,6 +416,14 @@ fn definition_expression_type<'db>(
     definition_expression_type_in_scope(db, definition, expression, scope)
 }
 
+/// Find a factory's `name` argument. If it is supplied twice, use the positional
+/// argument for error recovery.
+fn factory_name_argument(arguments: &ast::Arguments) -> Option<&ast::Expr> {
+    arguments
+        .find_positional(0)
+        .or_else(|| arguments.find_keyword("name").map(|keyword| &keyword.value))
+}
+
 /// Infer the literal name argument in a `TypeAliasType`, `TypeVar`, `ParamSpec`, or
 /// `TypeVarTuple` assignment. These factories use `name` for the keyword argument.
 ///
@@ -432,7 +440,7 @@ fn factory_name_literal<'db>(
     let assignment = definition.kind(db).as_unannotated_assignment()?;
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let call = assignment.value(&module).as_call_expr()?;
-    let name_arg = call.arguments.find_argument_value("name", 0)?;
+    let name_arg = factory_name_argument(&call.arguments)?;
     definition_expression_type(db, definition, name_arg).as_string_literal()
 }
 

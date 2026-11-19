@@ -327,10 +327,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        // Extract name.
         let name = name_type
+            .resolve_type_alias(db)
             .as_string_literal()
-            .map(|literal| literal.value(db));
+            .map(|name_type| name_type.value(db));
 
         if let Some(actual_name) = name {
             let problem = if is_keyword(actual_name) {
