@@ -1477,6 +1477,16 @@ def upper[U: Any]() -> None:
     static_assert(is_constraint_set_subtype_of(Intersection[U, Not[str], Not[bytes]], int) == expected)
 ```
 
+The same reasoning applies through an intermediate bound. If `U & ~str ≤ T` and `T ≤ int`, the
+solver derives `U ≤ int | str`.
+
+```py
+def implied_upper[T, U]() -> None:
+    bounds = ConstraintSet.lower_bound(Intersection[U, Not[str]], T) & ConstraintSet.upper_bound(T, int)
+    # revealed: tuple[Solution[U=int | str]]
+    reveal_type(bounds.solutions_for(U, inferable=tuple[T, U]))
+```
+
 For a static specialization of `U`, `(U & ~str) ≤ str` holds exactly when `U ≤ str`. With a bound of
 `Any`, assignability can materialize the bound to `str`, making the intersection `Never`. Subtyping
 also considers a bound of `object`, which permits `U = int`.
@@ -1499,9 +1509,6 @@ For `U & ~str` to equal `int`, `U` must contain `int` and may also contain strin
 def equivalent[T, U]() -> None:
     equal = ConstraintSet.equality(T, Intersection[U, Not[str]]) & ConstraintSet.equality(T, int)
     candidate = equal & ConstraintSet.equality(U, int | str)
-    # TODO: Derive U ≤ int | str from (U & ~str) ≤ int. The current equivalence check
-    # derives U ≤ int and rejects this valid specialization.
-    # error: [static-assert-error]
     static_assert(candidate.solutions(inferable=tuple[T, U]) is not None)
 ```
 

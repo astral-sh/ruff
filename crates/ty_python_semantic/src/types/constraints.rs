@@ -109,6 +109,7 @@ use ty_static::EnvVars;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::generics::Specialization;
+use crate::types::relation::TypeVarEvaluation;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarSet};
 use crate::types::visitor::{
     NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
@@ -2105,10 +2106,20 @@ impl<'db> UpperBound<'db> {
             return true;
         }
 
+        // A lower bound such as `T & ~str` can fit `int` even when `T` itself includes
+        // strings. Keep the exclusion when checking whether all the bounds can hold together.
+        let when_assignable = |clause| {
+            lower.when_constraint_set_assignable_to_owned_with_evaluation(
+                db,
+                env,
+                clause,
+                inferable,
+                TypeVarEvaluation::LazyPreservingExclusions,
+                ConstraintProvenance::INFERRED,
+            )
+        };
         if self.iter_clauses(source).all(|clause| {
-            lower
-                .when_constraint_set_assignable_to_owned(db, env, clause, inferable)
-                .query(|_, when| when.is_always_satisfied(db, env, inferable))
+            when_assignable(clause).query(|_, when| when.is_always_satisfied(db, env, inferable))
         }) {
             return true;
         }
@@ -2116,8 +2127,7 @@ impl<'db> UpperBound<'db> {
         let mut node = ALWAYS_TRUE;
         let mut source_order = None;
         for clause in self.iter_clauses(source) {
-            let when_clause =
-                lower.when_constraint_set_assignable_to_owned(db, env, clause, inferable);
+            let when_clause = when_assignable(clause);
             let (clause_node, clause_source_order) = storage.load(db, env, &when_clause);
             node = node.and(storage, clause_node);
             source_order = storage.ordered_source_order(source_order, clause_source_order);
