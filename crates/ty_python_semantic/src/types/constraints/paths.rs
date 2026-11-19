@@ -300,6 +300,20 @@ impl PathAssignments {
         self.discovered.keys().copied()
     }
 
+    /// Returns the conclusions of the rules discovered during this walk, including those
+    /// that exceeded the fuel budget. A callable comparison can imply both a `ParamSpec`
+    /// capture and a bound on one of its binders. The path may have fuel for only the bound.
+    pub(super) fn implied_constraints(&self) -> impl Iterator<Item = AtomicConstraintId> {
+        self.sequents.iter().filter_map(|sequent| match *sequent {
+            Sequent::SingleImplication { post, .. } | Sequent::PairImplication { post, .. } => {
+                Some(post)
+            }
+            // A negative conclusion `a ∧ b → ¬c` is encoded as `a ∧ b ∧ c → false`.
+            Sequent::TripleImpossibility { ante3, .. } => Some(ante3),
+            Sequent::SingleTautology { .. } | Sequent::PairImpossibility { .. } => None,
+        })
+    }
+
     pub(super) fn visit<'db, V>(
         &mut self,
         db: &'db dyn Db,

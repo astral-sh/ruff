@@ -2325,6 +2325,92 @@ def word(f: Callable[P, str]) -> Word[P]:
 reveal_type(return_type_of(word))  # revealed: str
 ```
 
+### Nested parameter captures in a decorator
+
+`run` calls the decorated identity with an `int`. Matching its required callable signature
+specializes the identity's `T` to `int` and gives `X` the same type.
+
+```py
+from typing import Callable, ParamSpec, Protocol, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+X = TypeVar("X")
+
+class Identity(Protocol):
+    def __call__(self, value: T, /) -> T: ...
+
+identity: Identity = lambda value: value
+
+def decorate(fn: Callable[P, R]) -> Callable[P, R]:
+    return fn
+
+def run(decorator: Callable[[Identity], Callable[[int], X]]) -> X:
+    return decorator(identity)(1)
+
+# TODO: Accept the signature-preserving decorator as an argument to run.
+result = run(decorate)  # error: [invalid-argument-type]
+reveal_type(result)  # revealed: int
+```
+
+In `invoke`, `Q` captures the signature of `decorate`, including `P`, which in turn captures `T`
+from `Identity.__call__`. The returned `Identity` specializes `T` when called.
+
+```py
+Q = ParamSpec("Q")
+
+def invoke(decorator: Callable[Q, Identity], *args: Q.args, **kwargs: Q.kwargs) -> Identity:
+    return decorator(*args, **kwargs)
+
+reveal_type(invoke(decorate, identity)(1))  # revealed: Literal[1]
+```
+
+`keep` carries the decorated function's parameter list into its return type through `Q`. The
+returned callable stays generic in the identity's `T`.
+
+```py
+def keep(decorator: Callable[[Identity], Callable[Q, X]]) -> Callable[Q, X]:
+    return decorator(identity)
+
+# TODO: Accept the signature-preserving decorator as an argument to keep.
+wrapped = keep(decorate)  # error: [invalid-argument-type]
+reveal_type(wrapped)  # revealed: [T](value: T, /) -> T
+```
+
+A decorator generic over the entire function also preserves the relationship between the parameter
+and return types of `Identity.__call__`.
+
+```py
+F = TypeVar("F")
+
+def passthrough(fn: F) -> F:
+    return fn
+
+reveal_type(keep(passthrough))  # revealed: [T](value: T, /) -> T
+```
+
+### A transform that returns a generic callback
+
+`accept` requires the result of `replace` to be usable as its input. Comparing the two signatures
+relates `list[T]` to `list[R]`, where `T` belongs to the returned callback and `R` to `replace`.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+F = TypeVar("F")
+
+def replace(fn: Callable[P, list[R]]) -> Callable[[T, Callable[P, T]], list[T]]:
+    return lambda value, _: [value]
+
+def accept(transform: Callable[[F], F]) -> None: ...
+
+accept(replace)  # ok
+```
+
 ### A fixed type variable in the callback's parameter and return types
 
 The callback can return `None`, but it only accepts `T` as an argument. Capturing its parameter list
