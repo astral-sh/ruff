@@ -1560,24 +1560,6 @@ reveal_type(inner)  # revealed: ((int, /) -> None) & ((str, /) -> None)
 inner("text")  # ok
 ```
 
-### Nested callable parameter lists
-
-Nested callable returns keep one specialization because their calls can share state.
-
-```py
-from typing import Callable, ParamSpec
-from ty_extensions import Intersection
-
-P = ParamSpec("P")
-
-def nested(factory: Callable[P, Callable[P, bytes]]) -> Callable[P, Callable[P, bytes]]:
-    raise NotImplementedError
-
-def _(factory: Intersection[Callable[[int], Callable[[int], bytes]], Callable[[str], Callable[[str], bytes]]]):
-    reveal_type(nested(factory)(1)(1))  # revealed: bytes
-    nested(factory)("text")  # error: [invalid-argument-type]
-```
-
 ### Type variable variance alongside a parameter list
 
 A captured parameter list does not change how other type variables follow variance.

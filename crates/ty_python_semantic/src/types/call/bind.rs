@@ -6625,20 +6625,10 @@ impl<'db> CallInference<'_, 'db> {
         {
             return (specialize_return_ty(merged_specialization), false);
         }
-        // Limit parameter-list refinement to the inputs of a returned callable. Nested parameter
-        // lists can link successive calls through captured state and need further validation.
-        if generic_context_has_paramspec(db, generic_context) {
-            let Type::Callable(callable) = self.return_ty.resolve_type_alias(db) else {
-                return (specialize_return_ty(merged_specialization), false);
-            };
-            if callable.signatures(db).iter().any(|signature| {
-                any_over_type_expanding_aliases(db, env, signature.return_ty, |ty| {
-                    typevar_identity_for_inference(db, ty)
-                        .is_some_and(|identity| identity.is_paramspec(db))
-                })
-            }) {
-                return (specialize_return_ty(merged_specialization), false);
-            }
+        if generic_context_has_paramspec(db, generic_context)
+            && !matches!(self.return_ty.resolve_type_alias(db), Type::Callable(_))
+        {
+            return (specialize_return_ty(merged_specialization), false);
         }
         // An unresolved dependency does not make an alternative invalid. Keep the merged fallback
         // for the whole call rather than silently dropping that sibling.
