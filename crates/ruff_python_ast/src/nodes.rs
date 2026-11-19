@@ -4,6 +4,7 @@ use crate::AtomicNodeIndex;
 use crate::generated::{
     ExprBytesLiteral, ExprCall, ExprCompare, ExprDict, ExprFString, ExprList, ExprName, ExprSet,
     ExprStringLiteral, ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
+    StmtImportFrom,
 };
 use std::borrow::Cow;
 use std::fmt;
@@ -23,7 +24,7 @@ use crate::str_prefix::{
 };
 use crate::{
     Expr, ExprRef, InterpolatedStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern,
-    Stmt, TypeParam, int,
+    PythonVersion, Stmt, TypeParam, int,
     name::Name,
     str::{Quote, TripleQuotes},
 };
@@ -43,6 +44,18 @@ impl StmtClassDef {
             Some(arguments) => &arguments.keywords,
             None => &[],
         }
+    }
+}
+
+impl StmtImportFrom {
+    /// Returns `true` if this import statement is a `__future__` import for the given Python version.
+    ///
+    /// In Python < 3.13, relative imports from `.__future__` are treated as future imports.
+    /// In Python >= 3.13, only absolute imports (`level == 0`) from `__future__` are treated as
+    /// future imports.
+    pub fn is_future_import(&self, target_version: PythonVersion) -> bool {
+        self.module.as_deref() == Some("__future__")
+            && (self.level == 0 || target_version < PythonVersion::PY313)
     }
 }
 

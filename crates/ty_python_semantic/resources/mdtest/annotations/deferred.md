@@ -370,3 +370,62 @@ class Foo: ...
 # error: [unresolved-reference]
 f = lambda x=NeverDefined(): x
 ```
+
+## Relative `__future__` import on Python 3.12 vs. 3.13
+
+With a sibling `__future__.py` exporting `annotations`, `from .__future__ import annotations`
+enables deferred annotations on Python 3.12, but is treated as an ordinary relative import on Python
+3.13.
+
+### Python 3.12
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`pkg/__future__.py`:
+
+```py
+annotations = object()
+```
+
+`pkg/main.py`:
+
+```py
+from .__future__ import annotations
+
+def get_foo() -> Foo:
+    return Foo()
+
+class Foo: ...
+
+reveal_type(get_foo())  # revealed: Foo
+```
+
+### Python 3.13
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`pkg/__future__.py`:
+
+```py
+annotations = object()
+```
+
+`pkg/main.py`:
+
+```py
+from .__future__ import annotations
+
+# error: [unresolved-reference]
+def get_foo() -> Foo:
+    return Foo()
+
+class Foo: ...
+
+reveal_type(get_foo())  # revealed: Unknown
+```

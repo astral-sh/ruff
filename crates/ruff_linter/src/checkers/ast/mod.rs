@@ -294,7 +294,12 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
-            importer: Importer::new(parsed, locator.contents(), stylist),
+            importer: Importer::new(
+                parsed,
+                locator.contents(),
+                stylist,
+                target_version.parser_version(),
+            ),
             semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
@@ -638,6 +643,13 @@ impl<'a> Checker<'a> {
     /// supported Python version.
     pub(crate) fn target_version(&self) -> PythonVersion {
         self.target_version.linter_version()
+    }
+
+    /// Return the [`PythonVersion`] to use for syntax checking and future-import classification.
+    ///
+    /// This defaults to [`PythonVersion::latest`] when `target_version` is unset.
+    pub(crate) fn parser_version(&self) -> PythonVersion {
+        self.target_version.parser_version()
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
@@ -1073,18 +1085,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
             {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                is_lazy,
-                ..
-            }) => {
+            Stmt::ImportFrom(import_from) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
                 // Allow eager `__future__` imports until we see any other import. Lazy imports,
                 // including `lazy from __future__ import ...`, don't enable future annotations.
-                if !*is_lazy && matches!(module.as_deref(), Some("__future__")) {
-                    if names
+                if !import_from.is_lazy && import_from.is_future_import(self.parser_version()) {
+                    if import_from
+                        .names
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
                     {
@@ -1220,8 +1228,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
 
+                let is_future = stmt
+                    .as_import_from_stmt()
+                    .is_some_and(|import_from| import_from.is_future_import(self.parser_version()));
+
                 for alias in names {
-                    if !is_lazy && matches!(module, Some("__future__")) {
+                    if !is_lazy && is_future {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,

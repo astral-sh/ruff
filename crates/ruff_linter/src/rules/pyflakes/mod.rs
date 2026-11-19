@@ -16,7 +16,7 @@ mod tests {
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
-    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_trivia::textwrap::dedent;
@@ -31,7 +31,9 @@ mod tests {
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
-    use crate::{Locator, assert_diagnostics, assert_diagnostics_diff, directives};
+    use crate::{
+        Applicability, Fix, Locator, assert_diagnostics, assert_diagnostics_diff, directives,
+    };
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"))]
@@ -3258,6 +3260,94 @@ lambda: fu
         from __future__ import *
         ",
             &[Rule::FutureFeatureNotDefined],
+        );
+    }
+
+    #[test_case(PythonVersion::PY312, &[Rule::LateFutureImport]; "py312")]
+    #[test_case(PythonVersion::PY313, &[]; "py313")]
+    fn relative_future_import_position(target_version: PythonVersion, expected: &[Rule]) {
+        let diagnostics = test_snippet(
+            "
+            x = 5
+            from .__future__ import division
+            ",
+            &LinterSettings::for_rule(Rule::LateFutureImport).with_target_version(target_version),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            expected
+                .iter()
+                .map(|rule| rule.name().as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test_case(PythonVersion::PY312, &[Rule::FutureFeatureNotDefined]; "py312")]
+    #[test_case(PythonVersion::PY313, &[]; "py313")]
+    fn relative_future_import_feature(target_version: PythonVersion, expected: &[Rule]) {
+        let diagnostics = test_snippet(
+            "from .__future__ import unknown_feature",
+            &LinterSettings::for_rule(Rule::FutureFeatureNotDefined)
+                .with_target_version(target_version),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            expected
+                .iter()
+                .map(|rule| rule.name().as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn relative_future_import_star() {
+        let diagnostics = test_snippet(
+            "from .__future__ import *",
+            &LinterSettings::for_rule(Rule::UndefinedLocalWithImportStar)
+                .with_target_version(PythonVersion::PY313),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            [Rule::UndefinedLocalWithImportStar.name().as_str()]
+        );
+    }
+
+    #[test]
+    fn unused_relative_future_import_py313() {
+        let diagnostics = test_snippet(
+            "from .__future__ import annotations",
+            &LinterSettings::for_rule(Rule::UnusedImport).with_target_version(PythonVersion::PY313),
+        );
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(|diagnostic| (diagnostic.name(), diagnostic.fix().map(Fix::applicability)))
+                .collect::<Vec<_>>(),
+            [(
+                Rule::UnusedImport.name().as_str(),
+                Some(Applicability::Safe)
+            )]
+        );
+    }
+
+    #[test]
+    fn unused_relative_future_import_py312() {
+        let diagnostics = test_snippet(
+            "from .__future__ import annotations",
+            &LinterSettings::for_rule(Rule::UnusedImport).with_target_version(PythonVersion::PY312),
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn unused_relative_future_import_without_target_version() {
+        let diagnostics = test_snippet(
+            "from .__future__ import division",
+            &LinterSettings::for_rule(Rule::UnusedImport),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            [Rule::UnusedImport.name().as_str()]
         );
     }
 

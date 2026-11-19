@@ -1,0 +1,6 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+expression: fixed.source_code()
+---
+from .__future__ import annotations
+x: int
