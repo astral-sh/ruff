@@ -121,7 +121,8 @@ impl Support {
         !self.has_skipped_lazy_attributes
     }
 
-    /// Closes this support over a set of constraints.
+    /// Closes this support over a set of constraints. Returns whether the result
+    /// contains every type variable in the storage.
     ///
     /// We perform a fixed-point loop, where we find the constraints that mention any of the
     /// typevars in the support, and add any _other_ typevars they mention. (That might add
@@ -131,8 +132,18 @@ impl Support {
         &mut self,
         storage: &ConstraintSetStorage<'_>,
         constraints: impl Iterator<Item = ConstraintId> + Clone,
-    ) {
+    ) -> bool {
+        let typevar_count = storage.typevar_count();
         loop {
+            // Each set bit identifies a variable interned in this storage.
+            let support_len = self
+                .iter_chunks()
+                .map(|chunk| chunk.count_ones() as usize)
+                .sum::<usize>();
+            if support_len == typevar_count {
+                return true;
+            }
+
             let mut any_added = false;
             for constraint in constraints.clone() {
                 let constraint_support = storage.constraint_support(constraint);
@@ -145,7 +156,7 @@ impl Support {
             }
 
             if !any_added {
-                return;
+                return false;
             }
         }
     }

@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 
 use indexmap::map::Slice;
+use ruff_index::Idx;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
@@ -157,24 +158,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         path.assignments
             .iter()
             .filter_map(|(assignment, _)| assignment.as_constrained())
-    }
-
-    /// Returns an iterator of the constraints on the current path that mention any typevar in the
-    /// given support
-    fn constrained_assignments_mentioning(
-        storage: &ConstraintSetStorage<'db>,
-        path: &PathAssignments,
-        support: &Support,
-    ) -> impl Iterator<Item = (Assignment<AtomicConstraintId>, AtomicConstraintId)> {
-        path.assignments
-            .iter()
-            .filter_map(|(assignment, (source_constraint, _))| {
-                let constraint = assignment.as_constrained()?;
-                let constraint_support = storage.constraint_support(constraint.into_inner());
-                constraint_support
-                    .overlaps_with(support)
-                    .then_some((*assignment, *source_constraint))
-            })
     }
 
     /// With every atom on this path false, the diagram reaches its false terminal.
@@ -593,16 +576,27 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         if let Some(node_support) = node_support {
             relevant_typevars |= node_support;
         }
-        relevant_typevars.close_over_constraints(
+        let all_relevant = relevant_typevars.close_over_constraints(
             storage,
             Self::constrained_assignments(path).map(AtomicConstraintId::into_inner),
         );
-        let mut relevant_path: Box<[_]> =
-            Self::constrained_assignments_mentioning(storage, path, &relevant_typevars).collect();
-        relevant_path.sort_unstable_by_key(|(assignment, _)| {
-            assignment.constraint().into_inner().ordering()
-        });
-        (polarity, node, relevant_path)
+
+        // Every constraint has a subject type variable. If all variables are relevant,
+        // every positive or negative assignment on the path belongs in the key.
+        let mut relevant_path = Vec::with_capacity(path.assignments.len());
+        for (assignment, (source, _)) in &path.assignments {
+            if let Some(constraint) = assignment.as_constrained()
+                && (all_relevant
+                    || storage
+                        .constraint_support(constraint.into_inner())
+                        .overlaps_with(&relevant_typevars))
+            {
+                relevant_path.push((*assignment, *source));
+            }
+        }
+        // Constraint IDs give us a canonical order within this walk.
+        relevant_path.sort_unstable_by_key(|(assignment, _)| assignment.constraint().index());
+        (polarity, node, relevant_path.into_boxed_slice())
     }
 
     #[expect(clippy::too_many_arguments)]

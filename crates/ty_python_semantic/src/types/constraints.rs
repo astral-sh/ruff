@@ -1199,6 +1199,15 @@ impl<'db> ConstraintSetStorage<'db> {
         id
     }
 
+    /// Number of type variables interned in this storage, including its compacted prefix.
+    fn typevar_count(&self) -> usize {
+        let compacted = self
+            .compacted
+            .as_ref()
+            .map_or(0, |inner| inner.typevars.len());
+        compacted + self.typevars.len()
+    }
+
     fn adjusted_typevar_id(&self, id: TypeVarId) -> TypeVarId {
         if let Some(compacted) = &self.compacted {
             return id + compacted.typevars.len();
