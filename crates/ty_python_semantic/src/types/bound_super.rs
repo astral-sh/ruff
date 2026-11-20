@@ -3,7 +3,7 @@
 use crate::ProgramEnvironment;
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::Diagnostic;
-use ruff_python_ast::{AnyNodeRef, name::Name};
+use ruff_python_ast::{SyntaxNode, name::Name};
 
 use crate::{
     Db, DisplaySettings,
@@ -100,7 +100,7 @@ pub(crate) enum BoundSuperError<'db> {
 }
 
 impl<'db> BoundSuperError<'db> {
-    pub(super) fn report_diagnostic(&self, context: &'db InferContext<'db, '_>, node: AnyNodeRef) {
+    pub(super) fn report_diagnostic(&self, context: &'db InferContext<'db, '_>, node: SyntaxNode) {
         let db = context.db();
         match self {
             BoundSuperError::AbstractOwnerType {

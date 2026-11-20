@@ -56,7 +56,7 @@ fn unresolved_fixes(
 ) -> Option<impl Iterator<Item = QuickFix>> {
     let parsed = parsed_module(db, file.python_file(db)).load(db);
     let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
-    let symbol = &node.expr_name()?.id;
+    let symbol = &node.as_expr_name()?.id();
     Some(
         completion::unresolved_fixes(db, file, &parsed, symbol, node)
             .into_iter()

@@ -14,7 +14,7 @@ use crate::types::infer::builder::{
     },
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, AstNode, ExprKind};
 use ty_python_core::definition::Definition;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -25,23 +25,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// is called.
     pub(super) fn infer_new_class_call(
         &mut self,
-        call_expr: &ast::ExprCall,
+        call_expr: ast::ExprCall<'_>,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
         let env = self.program_environment();
         let db = self.db();
 
-        let arguments = &call_expr.arguments;
+        let arguments = call_expr.arguments();
 
         // `new_class(name, bases=(), kwds=None, exec_body=None)`
         let [name_kw, bases_kw, exec_body_kw] = arguments
             .find_keywords(["name", "bases", "exec_body"])
-            .map(|kw| kw.map(|kw| kw.value.as_ref()));
-        let mut positional = arguments.args();
+            .map(|kw| kw.map(ast::Keyword::value));
+        let mut positional = arguments.args().iter();
         let Some(name_node) = positional.next().or(name_kw) else {
             // Infer all keyword values for side effects.
             for keyword in arguments.keywords() {
-                self.infer_expression(&keyword.value, TypeContext::default());
+                self.infer_expression(keyword.value(), TypeContext::default());
             }
             if let Some(builder) = self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr) {
                 builder.into_diagnostic("No overload of `types.new_class` matches arguments");
@@ -142,7 +142,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         |index| {
                             bases_arg
                                 .as_tuple_expr()
-                                .and_then(|tuple| tuple.elts.get(index))
+                                .and_then(|tuple| tuple.elts().get(index))
                         },
                         &disjoint_bases,
                     );
@@ -179,11 +179,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_new_class_deferred(
         &mut self,
         definition: Definition<'db>,
-        call_expr: &ast::Expr,
+        call_expr: ast::Expr<'_>,
     ) {
         let db = self.db();
 
-        let ast::Expr::Call(call) = call_expr else {
+        let ExprKind::Call(call) = call_expr.classify() else {
             return;
         };
 
@@ -193,7 +193,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return;
         };
 
-        let Some(bases_arg) = dynamic_class_bases_argument(&call.arguments) else {
+        let Some(bases_arg) = dynamic_class_bases_argument(call.arguments()) else {
             return;
         };
 
@@ -223,29 +223,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// special inference of the name and bases arguments.
     fn validate_new_class_call_arguments(
         &mut self,
-        call_expr: &ast::ExprCall,
-        name_node: &ast::Expr,
-        bases_arg: Option<&ast::Expr>,
+        call_expr: ast::ExprCall<'_>,
+        name_node: ast::Expr<'_>,
+        bases_arg: Option<ast::Expr<'_>>,
         definition: Option<Definition<'db>>,
     ) {
         let db = self.db();
         let env = self.program_environment();
-        let callable_type = self.expression_type(call_expr.func.as_ref());
+        let callable_type = self.expression_type(call_expr.func());
         let iterable_object =
             KnownClass::Iterable.to_specialized_instance(db, env, &[Type::object()]);
-        let mut call_arguments = self.prepare_call_arguments(&call_expr.arguments);
+        let mut call_arguments = self.prepare_call_arguments(call_expr.arguments());
 
         let bindings = callable_type
             .bindings(db, env)
             .match_parameters(db, env, &call_arguments);
         let bindings_result = self.infer_and_check_argument_types(
-            ArgumentsIter::from_ast(&call_expr.arguments),
+            ArgumentsIter::from_ast(call_expr.arguments()),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                if std::ptr::eq(expr, name_node) {
+                if expr.is_same_node(name_node) {
                     let _ = builder.infer_expression(expr, tcx);
                     KnownClass::Str.to_instance(db, env)
-                } else if bases_arg.is_some_and(|bases| std::ptr::eq(expr, bases)) {
+                } else if bases_arg.is_some_and(|bases| expr.is_same_node(bases)) {
                     if definition.is_none() {
                         let _ = builder.infer_expression(expr, tcx);
                     }

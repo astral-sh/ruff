@@ -1,4 +1,4 @@
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 
 use crate::DisplaySettings;
 use crate::types::Type;
@@ -13,7 +13,7 @@ use crate::types::diagnostic::{
 pub(crate) fn check_type_guard_definition<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
-    node: &ast::StmtFunctionDef,
+    node: ast::StmtFunctionDef<'_>,
 ) {
     let Type::FunctionLiteral(function) = ty else {
         return;
@@ -34,7 +34,7 @@ pub(crate) fn check_type_guard_definition<'db>(
     };
 
     // The return type annotation must exist since we matched `TypeIs`/`TypeGuard`.
-    let Some(returns_expr) = node.returns.as_deref() else {
+    let Some(returns_expr) = node.returns() else {
         return;
     };
 

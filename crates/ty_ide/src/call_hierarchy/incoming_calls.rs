@@ -9,7 +9,7 @@ use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, AnyNode, SyntaxNode};
 use ruff_python_trivia::NameMatcher;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
@@ -189,7 +189,7 @@ fn call_sites_for_file(
         sites: &mut sites,
         ancestors: Vec::new(),
     };
-    AnyNodeRef::from(module.syntax()).visit_source_order(&mut finder);
+    module.syntax().visit_source_order(&mut finder);
 
     sites
 }
@@ -211,41 +211,42 @@ struct CallSitesFinder<'a, 'db> {
     /// Bare-name leaves are not gated by this and always resolve semantically.
     needle: Option<&'a str>,
     sites: &'a mut Vec<RawCallSite>,
-    ancestors: Vec<AnyNodeRef<'a>>,
+    ancestors: Vec<SyntaxNode<'a>>,
 }
 
 impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
-    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+    fn enter_node(&mut self, kind: AnyNode<'a>) -> TraversalSignal {
+        let node = kind.syntax_node();
         self.ancestors.push(node);
 
-        match node {
+        match kind {
             // Walk by call site rather than by identifier. This is structurally
             // faster (call sites are much rarer than identifier occurrences)
             // and — critically — it makes alias-routed calls work: `bar()`
             // where `bar` is a local rebinding/alias of the target resolves
             // semantically without needing the alias name in the text needle.
-            AnyNodeRef::ExprCall(call) => {
-                if let Some(leaf) = CalleeLeaf::from_expr(&call.func)
+            AnyNode::ExprCall(call) => {
+                if let Some(leaf) = CalleeLeaf::from_expr(call.func())
                     && self.leaf_matches_needle(leaf)
                 {
-                    self.check_call_site(leaf, AnyNodeRef::from(call));
+                    self.check_call_site(leaf, SyntaxNode::from(call));
                 }
             }
-            AnyNodeRef::Decorator(decorator) => {
+            AnyNode::Decorator(decorator) => {
                 // `@foo` without parens is a runtime call; `@foo()` is handled
                 // by the `ExprCall` arm above.
-                if let Some(leaf) = CalleeLeaf::from_expr(&decorator.expression)
+                if let Some(leaf) = CalleeLeaf::from_expr(decorator.expression())
                     && self.leaf_matches_needle(leaf)
                 {
-                    self.check_call_site(leaf, AnyNodeRef::from(&decorator.expression));
+                    self.check_call_site(leaf, SyntaxNode::from(decorator.expression()));
                 }
             }
             // A property access is an implicit invocation of its matching
             // accessor. Skip attributes used as explicit callees because the
             // `ExprCall` / `Decorator` arms already record those sites.
-            AnyNodeRef::ExprAttribute(attribute) => {
+            AnyNode::ExprAttribute(attribute) => {
                 if !attribute_is_callee_of_parent(&self.ancestors, attribute)
-                    && self.attribute_name_could_match(attribute.attr.as_str())
+                    && self.attribute_name_could_match(attribute.attr().as_str())
                 {
                     self.check_property_access(attribute);
                 }
@@ -256,8 +257,8 @@ impl<'a> SourceOrderVisitor<'a> for CallSitesFinder<'a, '_> {
         TraversalSignal::Traverse
     }
 
-    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
-        debug_assert_eq!(self.ancestors.last(), Some(&node));
+    fn leave_node(&mut self, node: AnyNode<'a>) {
+        debug_assert_eq!(self.ancestors.last(), Some(&node.syntax_node()));
         self.ancestors.pop();
     }
 }
@@ -279,7 +280,7 @@ impl<'a> CallSitesFinder<'a, '_> {
         self.needle.is_none_or(|target_name| target_name == name)
     }
 
-    fn check_call_site(&mut self, leaf: CalleeLeaf<'a>, scope_node: AnyNodeRef<'a>) {
+    fn check_call_site(&mut self, leaf: CalleeLeaf<'a>, scope_node: SyntaxNode<'a>) {
         let Some((goto_target, call_site_range)) =
             leaf.resolve(self.model, self.tokens, &self.ancestors)
         else {
@@ -309,7 +310,7 @@ impl<'a> CallSitesFinder<'a, '_> {
     /// Record `@property` accesses as implicit invocations of their matching
     /// accessor: a read calls the getter, a write calls the setter, and a
     /// `del` calls the deleter.
-    fn check_property_access(&mut self, attribute: &'a ast::ExprAttribute) {
+    fn check_property_access(&mut self, attribute: ast::ExprAttribute<'a>) {
         let db = self.db;
         let Some(Type::PropertyInstance(property)) =
             static_member_type_for_attribute(self.model, attribute)
@@ -319,7 +320,7 @@ impl<'a> CallSitesFinder<'a, '_> {
 
         let leaf = CalleeLeaf::AttrIdentifier {
             attribute,
-            identifier: &attribute.attr,
+            identifier: attribute.attr(),
         };
         // Strip the trailing self-push so the slice mirrors what `ExprCall` and
         // `Decorator` pass to `resolve_callee` (they resolve before descending).
@@ -344,7 +345,7 @@ impl<'a> CallSitesFinder<'a, '_> {
             let role = resolved
                 .definition()
                 .and_then(|def| property.accessor_role(db, def));
-            let matches_site_kind = match attribute.ctx {
+            let matches_site_kind = match attribute.ctx() {
                 ast::ExprContext::Load => {
                     matches!(role, Some(PropertyAccessorRole::Getter) | None)
                 }
@@ -373,7 +374,7 @@ impl<'a> CallSitesFinder<'a, '_> {
             return;
         }
 
-        let from = self.enclosing_scope_item(AnyNodeRef::from(attribute));
+        let from = self.enclosing_scope_item(SyntaxNode::from(attribute));
         self.sites.push(RawCallSite {
             from,
             call_site_range,
@@ -387,7 +388,7 @@ impl<'a> CallSitesFinder<'a, '_> {
     /// default is evaluated in its class scope, even though it is nested below the
     /// method's AST node. Comprehension and annotation scopes have no callable
     /// hierarchy item of their own, so walk outward until reaching one that does.
-    fn enclosing_scope_item(&self, scope_node: AnyNodeRef<'_>) -> CallHierarchyItem {
+    fn enclosing_scope_item(&self, scope_node: SyntaxNode<'_>) -> CallHierarchyItem {
         let program_file = self.model.program_file();
         let resolver_file = program_file.resolver_file(self.db);
         let file = program_file.file(self.db);
@@ -415,7 +416,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                     })
                     .unwrap_or(false);
                 CallHierarchyItem {
-                    name: func.name.id.clone(),
+                    name: func.name().id().clone(),
                     kind: if is_method {
                         SymbolKind::Method
                     } else {
@@ -424,26 +425,25 @@ impl<'a> CallSitesFinder<'a, '_> {
                     detail: module_detail(self.db, resolver_file),
                     file,
                     full_range: func.range(),
-                    selection_range: func.name.range(),
+                    selection_range: func.name().range(),
                 }
             }
             NodeWithScopeKind::Class(class) => {
                 let class = class.node(self.module);
                 CallHierarchyItem {
-                    name: class.name.id.clone(),
+                    name: class.name().id().clone(),
                     kind: SymbolKind::Class,
                     detail: module_detail(self.db, resolver_file),
                     file,
                     full_range: class.range(),
-                    selection_range: class.name.range(),
+                    selection_range: class.name().range(),
                 }
             }
             NodeWithScopeKind::Lambda(lambda) => {
                 let lambda = lambda.node(self.module);
                 let end = lambda
-                    .parameters
-                    .as_deref()
-                    .map(Ranged::end)
+                    .parameters()
+                    .map(|node| node.end())
                     .unwrap_or(lambda.start() + "lambda".text_len());
 
                 CallHierarchyItem {
@@ -485,8 +485,8 @@ fn module_item(db: &dyn Db, file: ResolverFile<'_>) -> CallHierarchyItem {
 /// `CallSitesFinder::enter_node` already record those sites — skipping here
 /// avoids the descriptor-+-call double-count pyright exhibits.
 fn attribute_is_callee_of_parent<'a>(
-    ancestors: &[AnyNodeRef<'a>],
-    attribute: &'a ast::ExprAttribute,
+    ancestors: &[SyntaxNode<'a>],
+    attribute: ast::ExprAttribute<'a>,
 ) -> bool {
     // `enter_node` has already pushed `attribute` onto `ancestors`, so the
     // parent is at index `len - 2`.
@@ -494,9 +494,9 @@ fn attribute_is_callee_of_parent<'a>(
         return false;
     };
     let attribute_range = attribute.range();
-    match ancestors[parent_idx] {
-        AnyNodeRef::ExprCall(call) => call.func.range() == attribute_range,
-        AnyNodeRef::Decorator(decorator) => decorator.expression.range() == attribute_range,
+    match ancestors[parent_idx].classify() {
+        AnyNode::ExprCall(call) => call.func().range() == attribute_range,
+        AnyNode::Decorator(decorator) => decorator.expression().range() == attribute_range,
         _ => false,
     }
 }
