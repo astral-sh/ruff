@@ -1270,7 +1270,7 @@ def outer(_: Callable[P, None]):
     reveal_type(generic_context(inner))  # revealed: None
 ```
 
-### Immediate literal forwarding
+### Forwarding unpacked arguments
 
 A literal unpack can supply several arguments to a forwarded `ParamSpec`. The wrapped callable
 checks their individual types and argument count.
@@ -1304,6 +1304,19 @@ reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1, "y": 2}))  # revealed
 reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1}, y=2))  # revealed: int
 forward_prefix(target, **{"prefix": "wrong", "x": 1, "y": 2})  # error: [invalid-argument-type]
 forward_prefix(target, **{"prefix": 0, "x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
+If `values` is empty, `first` returns the trailing string.
+
+```py
+T = TypeVar("T")
+
+def first(value: T, *rest: object) -> T:
+    return value
+
+def _(values: tuple[int, ...]) -> None:
+    reveal_type(forward(first, *values, "fallback"))  # revealed: int | Literal["fallback"]
+    number: int = forward(first, *values, "fallback")  # error: [invalid-assignment]
 ```
 
 ### Constructor overrides with receiver-inferred parameters
@@ -1949,6 +1962,8 @@ def _(value: int, text: str) -> None:
     reveal_type(invoke(identity, value))  # revealed: int
     reveal_type(invoke(identity, value=text))  # revealed: str
     reveal_type(invoke(boxed, value))  # revealed: list[int]
+    objects: list[object] = invoke(boxed, value)  # ok
+    strings: list[str] = invoke(boxed, value)  # error: [invalid-assignment]
     reveal_type(invoke(pair, value, second=text))  # revealed: tuple[int | str, int | str]
     invoke(pair, value)  # error: [missing-argument]
     # error: [missing-argument]
@@ -1959,6 +1974,18 @@ def outer(value: U) -> U:
     result = invoke(identity, value)
     reveal_type(result)  # revealed: U@outer
     return result
+```
+
+Either callback accepts the literal `[1]`. Only `identity` accepts an existing `list[int]`.
+
+```py
+def append_object(value: list[object]) -> None:
+    value.append(object())
+
+def _(flag: bool, numbers: list[int]) -> None:
+    callback = identity if flag else append_object
+    reveal_type(invoke(callback, [1]))  # revealed: list[int] | None
+    invoke(callback, numbers)  # error: [invalid-argument-type]
 ```
 
 ### Nested generic forwarding
@@ -2061,12 +2088,21 @@ def _(value: int) -> None:
     reveal_type(kept("a"))  # revealed: Literal["a"]
 ```
 
-A recursive callback invocation also keeps its local type variable separate from its caller's.
+When `identity` returns `invoke` itself, the returned wrapper stays generic across calls.
 
 ```py
 def invoke(callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
     return callback(*args, **kwargs)
 
+def _(value: int, text: str) -> None:
+    wrapper = invoke(identity, invoke)
+    reveal_type(wrapper(identity, value))  # revealed: int
+    reveal_type(wrapper(identity, text))  # revealed: str
+```
+
+A recursive callback invocation also keeps its local type variable separate from its caller's.
+
+```py
 def recursive(value: T) -> T:
     result = invoke(recursive, value)
     reveal_type(result)  # revealed: T@recursive
