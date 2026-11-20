@@ -1008,7 +1008,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "TypeVarTuple",
                 target_name,
                 name_param.ok_or(name_param_ty),
-                Applicability::Safe,
+                Some(Applicability::Safe),
             );
         }
 
@@ -1262,7 +1262,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "ParamSpec",
                 target_name,
                 name_param.ok_or(name_param_ty),
-                Applicability::Safe,
+                Some(Applicability::Safe),
             );
         }
 
@@ -1506,7 +1506,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "TypeVar",
                 target_name,
                 name_param.ok_or(name_param_ty),
-                Applicability::Safe,
+                Some(Applicability::Safe),
             );
         }
         let previous_definition_in = |scope, place, before| {

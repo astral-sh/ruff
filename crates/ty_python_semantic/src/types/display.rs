@@ -40,8 +40,8 @@ use crate::types::{
     visitor,
 };
 use ty_python_core::definition::Definition;
-use ty_python_core::scope::{FileScopeId, NodeWithScopeKind};
-use ty_python_core::{ProgramFile, SemanticIndex, semantic_index};
+use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
+use ty_python_core::{SemanticIndex, semantic_index};
 
 /// Bound display expansion even when recursive specialization keeps changing the signature.
 const MAX_SIGNATURE_DISPLAY_DEPTH: usize = 4;
@@ -862,25 +862,24 @@ fn fmt_file_location<'db>(
     write!(f, " @ {path}:{line}:{column}")
 }
 
-/// Returns the qualified name components for a scope, excluding the item itself.
+/// Returns the path from the module to the scope enclosing an item, excluding the item itself.
 ///
 /// This is the shared logic used by both [`QualifiedClassName`](super::class::QualifiedClassName)
 /// and [`QualifiedTypeAliasName`] to compute the path
 /// components (module, enclosing classes, functions) leading to an item.
 ///
-/// # Returns
-/// A vector of path components in order (e.g., `["module", "OuterClass", "InnerClass"]`)
+/// For an item `D` defined in class `C` in module `a.b`, pass the scope of `C` to get
+/// `["a.b", "C"]`. The path includes the module name when it can be resolved.
 pub(super) fn qualified_name_components_from_scope(
     db: &dyn Db,
-    file: ProgramFile<'_>,
-    file_scope_id: FileScopeId,
-    skip_count: usize,
+    enclosing_scope: ScopeId<'_>,
 ) -> Vec<String> {
+    let file = enclosing_scope.program_file(db);
     let module_ast = parsed_module(db, file.python_file(db)).load(db);
     let index = semantic_index(db, file);
 
     let mut name_parts: Vec<_> =
-        scope_name_components(&module_ast, index, file_scope_id, skip_count)
+        scope_name_components(&module_ast, index, enclosing_scope.file_scope_id(db))
             .map(Cow::into_owned)
             .collect();
 
@@ -893,17 +892,15 @@ pub(super) fn qualified_name_components_from_scope(
     name_parts
 }
 
-/// Walks from `file_scope_id` towards the module, skipping the first `skip_count` scopes.
-/// Yields class names and function labels such as `<locals of function 'f'>`, innermost first.
+/// Yields class names and function labels such as `<locals of function 'f'>`,
+/// starting at `enclosing_scope` and walking outwards towards the module.
 pub(super) fn scope_name_components<'ast>(
     module: &'ast ParsedModuleRef,
     index: &SemanticIndex<'_>,
-    file_scope_id: FileScopeId,
-    skip_count: usize,
+    enclosing_scope: FileScopeId,
 ) -> impl Iterator<Item = Cow<'ast, str>> {
     index
-        .ancestor_scopes(file_scope_id)
-        .skip(skip_count)
+        .ancestor_scopes(enclosing_scope)
         .filter_map(move |(_, scope)| match scope.node() {
             NodeWithScopeKind::Class(class) => {
                 Some(Cow::Borrowed(class.node(module).name.as_str()))

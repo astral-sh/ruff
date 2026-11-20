@@ -1763,6 +1763,17 @@ pub struct TypeCheckDiagnostics {
     used_suppressions: FxHashSet<FileSuppressionId>,
 }
 
+/// Reports `rule` on `name_arg` when ty cannot establish that the name passed to
+/// `constructor` matches the assignment target, `expected_name`.
+///
+/// Pass `Ok(name)` as `actual_name` after checking that the argument resolves to a string
+/// different from `expected_name`. If the rule also diagnoses names whose exact value ty
+/// cannot determine, pass `Err(ty)` with the argument's inferred type in that case.
+///
+/// Pass `None` for `fix_applicability` to report the mismatch without suggesting an edit,
+/// for example when the factory would reject `expected_name`. With `Some(applicability)`,
+/// [`add_mismatched_name_fix`] suggests replacing `name_arg` with a string literal containing
+/// `expected_name` and may mark the edit unsafe depending on the argument and its scope.
 pub(crate) fn report_mismatched_type_name<'db>(
     context: &InferContext<'db, '_>,
     rule: &'static LintMetadata,
@@ -1770,7 +1781,7 @@ pub(crate) fn report_mismatched_type_name<'db>(
     constructor: impl fmt::Display,
     expected_name: &str,
     actual_name: Result<&str, Type<'db>>,
-    applicability: Applicability,
+    fix_applicability: Option<Applicability>,
 ) {
     // We infer `LiteralString` for very long strings, so `actual_name` can be `Err` even
     // for a matching literal. Check its value directly so applying the fix clears the diagnostic.
@@ -1800,18 +1811,20 @@ pub(crate) fn report_mismatched_type_name<'db>(
             ));
         }
     }
-    add_mismatched_name_fix(
-        context,
-        &mut diagnostic,
-        name_arg,
-        expected_name,
-        applicability,
-    );
+    if let Some(applicability) = fix_applicability {
+        add_mismatched_name_fix(
+            context,
+            &mut diagnostic,
+            name_arg,
+            expected_name,
+            applicability,
+        );
+    }
 }
 
 /// Adds a fix that replaces `name_arg` with a string literal containing `expected_name`.
-/// Uses the supplied applicability for a bare name or a single string literal and marks
-/// every other replacement as unsafe.
+/// At module scope or in a stub, a bare name or a single string literal gets the supplied
+/// applicability. Every other replacement is unsafe.
 pub(super) fn add_mismatched_name_fix(
     context: &InferContext<'_, '_>,
     diagnostic: &mut Diagnostic,
@@ -1819,10 +1832,10 @@ pub(super) fn add_mismatched_name_fix(
     expected_name: &str,
     applicability: Applicability,
 ) {
+    let db = context.db();
     let flags = if let ast::Expr::StringLiteral(literal) = name_arg {
         literal.value.first_literal_flags()
     } else {
-        let db = context.db();
         let quote = stylist(db, context.program_file().python_file(db)).quote();
         ast::StringLiteralFlags::empty().with_quote_style(quote)
     };
@@ -1830,12 +1843,19 @@ pub(super) fn add_mismatched_name_fix(
 
     // Replacing an implicitly concatenated string can remove comments between its parts.
     // Replacing a more complex expression can remove side effects.
-    let applicability = match name_arg {
-        ast::Expr::Name(_) => applicability,
-        ast::Expr::StringLiteral(literal) if !literal.value.is_implicit_concatenated() => {
-            applicability
-        }
-        _ => Applicability::Unsafe,
+    let simple_argument = match name_arg {
+        ast::Expr::Name(_) => true,
+        ast::Expr::StringLiteral(literal) => !literal.value.is_implicit_concatenated(),
+        _ => false,
+    };
+    // Using the local name can break pickling when pickle needs a class-qualified name
+    // like "C.Id" or the module-level name bound to a factory function's return value.
+    let applicability = if simple_argument
+        && (context.scope().file_scope_id(db).is_global() || context.in_stub())
+    {
+        applicability
+    } else {
+        Applicability::Unsafe
     };
 
     diagnostic.help(format_args!("Use `{replacement}` as the name"));

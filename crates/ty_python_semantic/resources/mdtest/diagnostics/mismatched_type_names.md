@@ -59,6 +59,7 @@ help: Use `"U"` as the name
 30 +     U = TypeVar("U")  # snapshot: mismatched-typevar-name
 31 |
    |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Type parameters named at runtime
@@ -112,6 +113,59 @@ def invoke(callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int
 
 def keep_tuple(values: tuple[*Ts]) -> tuple[*Ts]:
     return values
+```
+
+## Names in nested scopes
+
+ty marks the fix as unsafe for definitions inside a class or function. For a type returned by a
+factory function, pickle may need the module-level name the caller assigns to it. For the class
+attribute below, pickle needs the qualified name `"C.Id"` to find the type from the module.
+
+```py
+from typing import NewType
+
+class C:
+    Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+```
+
+```snapshot
+warning[mismatched-newtype-name]: The name passed to `NewType` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:4:18
+  |
+4 |     Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+  |                  ^^^^^^ Expected "Id", got "C.Id"
+help: Use `"Id"` as the name
+  |
+3 | class C:
+  -     Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+4 +     Id = NewType("Id", int)  # snapshot: mismatched-newtype-name
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+In a stub, changing the name has no effect on pickling, so the same fix is safe.
+
+`models.pyi`:
+
+```pyi
+from typing import NewType
+
+class C:
+    Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+```
+
+```snapshot
+warning[mismatched-newtype-name]: The name passed to `NewType` must match the variable it is assigned to
+ --> src/models.pyi:4:18
+  |
+4 |     Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+  |                  ^^^^^^ Expected "Id", got "C.Id"
+help: Use `"Id"` as the name
+  |
+3 | class C:
+  -     Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+4 +     Id = NewType("Id", int)  # snapshot: mismatched-newtype-name
+  |
 ```
 
 ## Non-string arguments

@@ -297,7 +297,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "TypedDict",
                 &assigned_name,
                 name.ok_or(name_type),
-                Applicability::Safe,
+                Some(Applicability::Safe),
             );
         }
 

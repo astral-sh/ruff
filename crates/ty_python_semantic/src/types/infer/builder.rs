@@ -3882,7 +3882,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "NewType",
                 target_name,
                 name.ok_or(name_param_ty),
-                Applicability::Safe,
+                Some(Applicability::Safe),
             );
         }
 
@@ -3988,7 +3988,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// The caller checks [`Self::sentinel_definition_scope_is_supported`], so every scope
     /// between the definition and the module is a class scope.
     fn expected_sentinel_name<'a>(&self, name: &str, target_name: &'a str) -> Cow<'a, str> {
-        if !name.contains('.') {
+        let scope = self.scope.file_scope_id(self.db());
+        if !name.contains('.') || scope.is_global() {
             return Cow::Borrowed(target_name);
         }
 
@@ -3996,12 +3997,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // four components inline (three enclosing classes and the sentinel itself).
         let mut components = SmallVec::<[_; 4]>::new();
         components.push(Cow::Borrowed(target_name));
-        components.extend(scope_name_components(
-            self.module(),
-            self.index,
-            self.scope.file_scope_id(self.db()),
-            0,
-        ));
+        components.extend(scope_name_components(self.module(), self.index, scope));
         components.reverse();
         Cow::Owned(components.join("."))
     }
@@ -4312,7 +4308,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "TypeAliasType",
                 target_name,
                 name.ok_or(name_param_ty),
-                Applicability::Safe,
+                Some(Applicability::Safe),
             );
         }
 

@@ -228,7 +228,7 @@ pub(crate) fn module_docstring(db: &dyn Db, file: PythonFile<'_>) -> Option<Stri
 }
 
 /// Detects source style once per file revision, shared by diagnostics and IDE features.
-#[salsa::tracked(returns(ref), no_eq)]
+#[salsa::tracked(returns(ref))]
 pub(crate) fn stylist(db: &dyn Db, file: PythonFile<'_>) -> Stylist<'static> {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file.file(db));

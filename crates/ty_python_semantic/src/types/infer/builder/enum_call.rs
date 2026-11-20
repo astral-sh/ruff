@@ -426,7 +426,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 base_class.name(env.python_version(db)),
                 &assigned_name,
                 Ok(actual_name),
-                Applicability::Unsafe,
+                Some(Applicability::Unsafe),
             );
         }
 

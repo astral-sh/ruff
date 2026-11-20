@@ -134,23 +134,23 @@ class C:
     class Nested:
         MARKER = Sentinel("C.Nested.MARKER")  # ok
         UNQUALIFIED = Sentinel("UNQUALIFIED")  # ok
-        PARTIALLY_QUALIFIED = Sentinel("Nested.PARTIALLY_QUALIFIED")  # error: [mismatched-sentinel-name]
+        PARTIALLY_QUALIFIED = Sentinel("Nested.PARTIALLY_QUALIFIED")  # snapshot: mismatched-sentinel-name
         WRONG_CLASS = Sentinel("Other.Nested.WRONG_CLASS")  # error: [mismatched-sentinel-name]
-        WRONG_NAME = Sentinel("C.Nested.OTHER")  # snapshot: mismatched-sentinel-name
+        WRONG_NAME = Sentinel("C.Nested.OTHER")  # error: [mismatched-sentinel-name]
 ```
 
 ```snapshot
 info[mismatched-sentinel-name]: The name passed to `sentinel` does not match the variable it is assigned to
-  --> src/mdtest_snippet.py:88:31
+  --> src/mdtest_snippet.py:86:40
    |
-88 |         WRONG_NAME = Sentinel("C.Nested.OTHER")  # snapshot: mismatched-sentinel-name
-   |                               ^^^^^^^^^^^^^^^^ Expected "C.Nested.WRONG_NAME", got "C.Nested.OTHER"
-help: Use `"C.Nested.WRONG_NAME"` as the name
+86 |         PARTIALLY_QUALIFIED = Sentinel("Nested.PARTIALLY_QUALIFIED")  # snapshot: mismatched-sentinel-name
+   |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected "C.Nested.PARTIALLY_QUALIFIED", got "Nested.PARTIALLY_QUALIFIED"
+help: Use `"C.Nested.PARTIALLY_QUALIFIED"` as the name
    |
+85 |         UNQUALIFIED = Sentinel("UNQUALIFIED")  # ok
+   -         PARTIALLY_QUALIFIED = Sentinel("Nested.PARTIALLY_QUALIFIED")  # snapshot: mismatched-sentinel-name
+86 +         PARTIALLY_QUALIFIED = Sentinel("C.Nested.PARTIALLY_QUALIFIED")  # snapshot: mismatched-sentinel-name
 87 |         WRONG_CLASS = Sentinel("Other.Nested.WRONG_CLASS")  # error: [mismatched-sentinel-name]
-   -         WRONG_NAME = Sentinel("C.Nested.OTHER")  # snapshot: mismatched-sentinel-name
-88 +         WRONG_NAME = Sentinel("C.Nested.WRONG_NAME")  # snapshot: mismatched-sentinel-name
-89 | def accepts_marker(x: C.MARKER) -> None: ...
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
