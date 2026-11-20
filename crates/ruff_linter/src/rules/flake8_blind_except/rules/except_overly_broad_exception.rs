@@ -81,14 +81,14 @@ impl Violation for ExceptOverlyBroadException {
     }
 }
 
-fn contains_blind_exception<'a>(
+fn contains_overly_broad_exception<'a>(
     semantic: &'a SemanticModel,
     expr: &'a Expr,
 ) -> Option<(&'a str, ruff_text_size::TextRange)> {
     match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
             .iter()
-            .find_map(|elt| contains_blind_exception(semantic, elt)),
+            .find_map(|elt| contains_overly_broad_exception(semantic, elt)),
         _ => {
             let builtin_exception_type = semantic.resolve_builtin_symbol(expr)?;
             matches!(builtin_exception_type, "BaseException" | "Exception")
@@ -109,7 +109,8 @@ pub(crate) fn except_overly_broad_exception(
     };
 
     let semantic = checker.semantic();
-    let Some((builtin_exception_type, range)) = contains_blind_exception(semantic, type_) else {
+    let Some((builtin_exception_type, range)) = contains_overly_broad_exception(semantic, type_)
+    else {
         return;
     };
 

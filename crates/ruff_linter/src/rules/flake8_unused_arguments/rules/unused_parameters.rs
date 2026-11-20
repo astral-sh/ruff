@@ -253,9 +253,9 @@ impl Violation for UnusedLambdaParameter {
     }
 }
 
-/// An AST node that can contain arguments.
+/// The kind of callable whose parameters are checked.
 #[derive(Debug, Copy, Clone)]
-enum Argumentable {
+enum CallableKind {
     Function,
     Method,
     ClassMethod,
@@ -263,7 +263,7 @@ enum Argumentable {
     Lambda,
 }
 
-impl Argumentable {
+impl CallableKind {
     fn check_for(self, checker: &Checker, name: String, range: TextRange) {
         let mut diagnostic = match self {
             Self::Function => checker.report_diagnostic(UnusedFunctionParameter { name }, range),
@@ -290,13 +290,18 @@ impl Argumentable {
     }
 }
 
-/// Check a plain function for unused arguments.
-fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
+/// Check a plain function for unused parameters.
+fn function(
+    callable_kind: CallableKind,
+    parameters: &Parameters,
+    scope: &Scope,
+    checker: &Checker,
+) {
     let ignore_variadic_names = checker
         .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
-    let args = parameters
+    let params = parameters
         .iter_non_variadic_params()
         .map(|parameter_with_default| &parameter_with_default.parameter)
         .chain(
@@ -313,16 +318,16 @@ fn function(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, 
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
-    call(argumentable, args, scope, checker);
+    call(callable_kind, params, scope, checker);
 }
 
-/// Check a method for unused arguments.
-fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, checker: &Checker) {
+/// Check a method for unused parameters.
+fn method(callable_kind: CallableKind, parameters: &Parameters, scope: &Scope, checker: &Checker) {
     let ignore_variadic_names = checker
         .settings()
         .flake8_unused_arguments
         .ignore_variadic_names;
-    let args = parameters
+    let params = parameters
         .iter_non_variadic_params()
         .skip(1)
         .map(|parameter_with_default| &parameter_with_default.parameter)
@@ -340,29 +345,29 @@ fn method(argumentable: Argumentable, parameters: &Parameters, scope: &Scope, ch
                 .into_iter()
                 .skip(usize::from(ignore_variadic_names)),
         );
-    call(argumentable, args, scope, checker);
+    call(callable_kind, params, scope, checker);
 }
 
 fn call<'a>(
-    argumentable: Argumentable,
+    callable_kind: CallableKind,
     parameters: impl Iterator<Item = &'a Parameter>,
     scope: &Scope,
     checker: &Checker,
 ) {
     let semantic = checker.semantic();
     let dummy_variable_rgx = &checker.settings().dummy_variable_rgx;
-    for arg in parameters {
+    for parameter in parameters {
         let Some(binding) = scope
-            .get(arg.name())
+            .get(parameter.name())
             .map(|binding_id| semantic.binding(binding_id))
         else {
             continue;
         };
         if binding.kind.is_argument()
             && binding.is_unused()
-            && !dummy_variable_rgx.is_match(arg.name())
+            && !dummy_variable_rgx.is_match(parameter.name())
         {
-            argumentable.check_for(checker, arg.name.to_string(), binding.range());
+            callable_kind.check_for(checker, parameter.name.to_string(), binding.range());
         }
     }
 }
@@ -455,16 +460,16 @@ pub(crate) fn unused_parameters(checker: &Checker, scope: &Scope) {
                 &checker.settings().pep8_naming.staticmethod_decorators,
             ) {
                 function_type::FunctionType::Function => {
-                    if checker.is_rule_enabled(Argumentable::Function.rule_code())
+                    if checker.is_rule_enabled(CallableKind::Function.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        function(Argumentable::Function, parameters, scope, checker);
+                        function(CallableKind::Function, parameters, scope, checker);
                     }
                 }
                 function_type::FunctionType::Method => {
-                    if checker.is_rule_enabled(Argumentable::Method.rule_code())
+                    if checker.is_rule_enabled(CallableKind::Method.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
@@ -474,11 +479,11 @@ pub(crate) fn unused_parameters(checker: &Checker, scope: &Scope) {
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        method(Argumentable::Method, parameters, scope, checker);
+                        method(CallableKind::Method, parameters, scope, checker);
                     }
                 }
                 function_type::FunctionType::ClassMethod => {
-                    if checker.is_rule_enabled(Argumentable::ClassMethod.rule_code())
+                    if checker.is_rule_enabled(CallableKind::ClassMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
@@ -488,11 +493,11 @@ pub(crate) fn unused_parameters(checker: &Checker, scope: &Scope) {
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        method(Argumentable::ClassMethod, parameters, scope, checker);
+                        method(CallableKind::ClassMethod, parameters, scope, checker);
                     }
                 }
                 function_type::FunctionType::StaticMethod => {
-                    if checker.is_rule_enabled(Argumentable::StaticMethod.rule_code())
+                    if checker.is_rule_enabled(CallableKind::StaticMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && (!visibility::is_magic(name)
@@ -502,11 +507,11 @@ pub(crate) fn unused_parameters(checker: &Checker, scope: &Scope) {
                         && !visibility::is_override(decorator_list, checker.semantic())
                         && !visibility::is_overload(decorator_list, checker.semantic())
                     {
-                        function(Argumentable::StaticMethod, parameters, scope, checker);
+                        function(CallableKind::StaticMethod, parameters, scope, checker);
                     }
                 }
                 function_type::FunctionType::NewMethod => {
-                    if checker.is_rule_enabled(Argumentable::StaticMethod.rule_code())
+                    if checker.is_rule_enabled(CallableKind::StaticMethod.rule_code())
                         && !function_type::is_stub(function_def, checker.semantic())
                         && !is_not_implemented_stub_with_variable(function_def, checker.semantic())
                         && !visibility::is_abstract(decorator_list, checker.semantic())
@@ -515,15 +520,15 @@ pub(crate) fn unused_parameters(checker: &Checker, scope: &Scope) {
                     {
                         // we use `method()` here rather than `function()`, as although `__new__` is
                         // an implicit staticmethod, `__new__` methods must always have at least one parameter
-                        method(Argumentable::StaticMethod, parameters, scope, checker);
+                        method(CallableKind::StaticMethod, parameters, scope, checker);
                     }
                 }
             }
         }
         ScopeKind::Lambda(ast::ExprLambda { parameters, .. }) => {
             if let Some(parameters) = parameters {
-                if checker.is_rule_enabled(Argumentable::Lambda.rule_code()) {
-                    function(Argumentable::Lambda, parameters, scope, checker);
+                if checker.is_rule_enabled(CallableKind::Lambda.rule_code()) {
+                    function(CallableKind::Lambda, parameters, scope, checker);
                 }
             }
         }

@@ -1,5 +1,5 @@
 use crate::codes::Category;
-use crate::preview::is_enumerate_for_loop_int_index_enabled;
+use crate::preview::is_manual_loop_counter_int_index_enabled;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Int, Number, Operator, Stmt};
@@ -104,7 +104,7 @@ pub(crate) fn manual_loop_counter(checker: &Checker, for_stmt: &ast::StmtFor) {
             ) || matches!(
                 ResolvedPythonType::from(value),
                 ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
-            ) && is_enumerate_for_loop_int_index_enabled(checker.settings()))
+            ) && is_manual_loop_counter_int_index_enabled(checker.settings()))
             {
                 continue;
             }

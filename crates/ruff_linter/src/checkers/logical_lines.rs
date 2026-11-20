@@ -85,7 +85,7 @@ pub(crate) fn check_logical_lines(
         Rule::NoSpaceAfterBlockComment,
         Rule::MultipleLeadingHashesForBlockComment,
     ]);
-    let enforce_whitespace_before_parameters =
+    let enforce_whitespace_before_open_bracket =
         context.is_rule_enabled(Rule::WhitespaceBeforeOpenBracket);
     let enforce_redundant_backslash = context.is_rule_enabled(Rule::RedundantBackslash);
     let enforce_indentation = context.any_rule_enabled(&[
@@ -144,7 +144,7 @@ pub(crate) fn check_logical_lines(
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
-            if enforce_whitespace_before_parameters {
+            if enforce_whitespace_before_open_bracket {
                 whitespace_before_open_bracket(&line, context);
             }
 

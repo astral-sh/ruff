@@ -87,12 +87,12 @@ impl Violation for FunctionCallInParameterDefault {
     }
 }
 
-struct ArgumentDefaultVisitor<'a, 'b> {
+struct ParameterDefaultVisitor<'a, 'b> {
     checker: &'a Checker<'b>,
     extend_immutable_calls: &'a [QualifiedName<'b>],
 }
 
-impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
+impl<'a, 'b> ParameterDefaultVisitor<'a, 'b> {
     fn new(checker: &'a Checker<'b>, extend_immutable_calls: &'a [QualifiedName<'b>]) -> Self {
         Self {
             checker,
@@ -101,7 +101,7 @@ impl<'a, 'b> ArgumentDefaultVisitor<'a, 'b> {
     }
 }
 
-impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
+impl Visitor<'_> for ParameterDefaultVisitor<'_, '_> {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Call(ast::ExprCall { func, .. }) => {
@@ -147,7 +147,7 @@ pub(crate) fn function_call_in_parameter_default(checker: &Checker, parameters: 
         .map(|target| QualifiedName::from_dotted_name(target))
         .collect();
 
-    let mut visitor = ArgumentDefaultVisitor::new(checker, &extend_immutable_calls);
+    let mut visitor = ParameterDefaultVisitor::new(checker, &extend_immutable_calls);
     for parameter in parameters.iter_non_variadic_params() {
         if let Some(default) = parameter.default() {
             if !parameter.annotation().is_some_and(|expr| {
