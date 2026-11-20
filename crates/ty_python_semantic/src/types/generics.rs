@@ -3623,9 +3623,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.inferable,
             SolutionBudget::default(),
             ReportDiagnostics::Yes,
-            |_variance, path_bound| {
-                CandidateSolutions::preliminary_solve(db, self.env, self.constraints, path_bound)
-            },
+            |_variance, path_bound| CandidateSolutions::preliminary_solve(db, self.env, path_bound),
         );
 
         match solutions {

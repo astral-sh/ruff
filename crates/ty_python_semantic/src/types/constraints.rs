@@ -1979,38 +1979,56 @@ impl<'db> UpperBound<'db> {
         self.clauses.shrink_to_fit();
     }
 
-    fn is_satisfied_by(
+    /// Can `lower` satisfy every upper clause with the same specialization?
+    fn can_be_satisfied_by(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        source: EvidenceSource,
-        ty: Type<'db>,
-    ) -> bool {
-        self.iter_clauses(source)
-            .all(|clause| ty.is_constraint_set_assignable_to(db, env, clause))
-    }
-
-    /// Returns the constraints under which `lower` is assignable to every stored upper clause.
-    fn when_satisfied_by(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
         source: EvidenceSource,
         lower: Type<'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let mut node = ALWAYS_TRUE;
-        let mut source_order = None;
+    ) -> bool {
+        if self
+            .iter_clauses(source)
+            .all(|clause| lower.is_constraint_set_assignable_to(db, env, clause))
+        {
+            return true;
+        }
+
+        let mut relations = SmallVec::<[_; 2]>::new();
         for clause in self.iter_clauses(source) {
-            let when_clause = lower.when_constraint_set_assignable_to_owned(db, env, clause);
-            let (clause_node, clause_source_order) = storage.load(db, env, &when_clause);
-            node = node.and(storage, clause_node);
-            source_order = storage.ordered_source_order(source_order, clause_source_order);
-            if node == ALWAYS_FALSE {
-                break;
+            let relation = lower.when_constraint_set_assignable_to_owned(db, env, clause);
+            match relation.node {
+                ALWAYS_FALSE => return false,
+                ALWAYS_TRUE => {}
+                _ => relations.push(relation),
             }
         }
-        (node, source_order)
+
+        // Loading a diagram into a builder that already has some of its constraints
+        // can change their relative order. For instance, a conjunction of independent
+        // choices (Aᵢ ∨ Bᵢ) has a linear diagram when each Aᵢ is adjacent to Bᵢ,
+        // but an exponential one when all Aᵢ precede all Bᵢ. Keep the largest
+        // relation's diagram intact and load the others into its builder.
+        let Some((largest_index, largest)) = relations
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, relation)| relation.inner.as_ref().map(|inner| inner.nodes.len()))
+        else {
+            return true;
+        };
+        largest.query(|builder, largest| {
+            let all = relations
+                .iter()
+                .enumerate()
+                .when_all(db, builder, |(index, relation)| {
+                    if index == largest_index {
+                        largest
+                    } else {
+                        builder.load(db, env, relation)
+                    }
+                });
+            !all.is_never_satisfied(db, env, TypeVarSet::None)
+        })
     }
 }
 
@@ -3187,7 +3205,6 @@ impl<'db> CandidateTypeVarSolver<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
         inferable: TypeVarSet<'db>,
     ) -> Option<CandidateTypeVarSolution<'db>> {
@@ -3269,17 +3286,9 @@ impl<'db> CandidateTypeVarSolver<'db> {
         let lower = range.effective_lower(db, env, EvidenceSource::All);
         if !range
             .upper
-            .is_satisfied_by(db, env, EvidenceSource::All, lower)
+            .can_be_satisfied_by(db, env, EvidenceSource::All, lower)
         {
-            let (when_upper, source_order) =
-                range
-                    .upper
-                    .when_satisfied_by(db, env, storage, EvidenceSource::All, lower);
-            if when_upper.is_never_satisfied(db, env, storage, TypeVarSet::None, source_order) {
-                // This path does not satisfy the accumulated upper bound, and is
-                // therefore not a valid specialization.
-                return None;
-            }
+            return None;
         }
 
         Some(range)
@@ -4042,7 +4051,7 @@ impl<'db> CandidateSolutions<'db> {
         limits.satisfied_path()?;
         let mut typevars = Vec::with_capacity(mappings.len());
         for (bound_typevar, bounds) in mappings {
-            let Some(solution) = bounds.finish(db, env, storage, bound_typevar, inferable) else {
+            let Some(solution) = bounds.finish(db, env, bound_typevar, inferable) else {
                 return ControlFlow::Continue(match report_diagnostics {
                     ReportDiagnostics::No => Some(Self::Unsatisfiable),
                     // If any of the typevars doesn't have a solution (either because the constraint
@@ -4077,10 +4086,9 @@ impl<'db> CandidateSolutions<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
         self.solve_with(|_variance, path_bound| {
-            match Self::preliminary_solve(db, env, builder, path_bound) {
+            match Self::preliminary_solve(db, env, path_bound) {
                 PathBoundSolution::Solved(ty) if ty.is_provisional_marker() => {
                     PathBoundSolution::Unsolved
                 }
@@ -4275,8 +4283,7 @@ impl<'db> CandidateSolutions<'db> {
         path_bound: &CandidateTypeVarSolution<'db>,
         prefer_declared: bool,
     ) -> PathBoundSolution<'db> {
-        let default_solution =
-            Self::solve_from_evidence(db, env, builder, path_bound, EvidenceSource::All);
+        let default_solution = Self::solve_from_evidence(db, env, path_bound, EvidenceSource::All);
         let PathBoundSolution::Solved(restricted) = default_solution else {
             return default_solution;
         };
@@ -4295,8 +4302,7 @@ impl<'db> CandidateSolutions<'db> {
         }
 
         let inferred =
-            match Self::solve_from_evidence(db, env, builder, path_bound, EvidenceSource::Inferred)
-            {
+            match Self::solve_from_evidence(db, env, path_bound, EvidenceSource::Inferred) {
                 PathBoundSolution::Solved(inferred) => Some(inferred),
                 PathBoundSolution::Unsolved => None,
                 PathBoundSolution::Unsatisfiable | PathBoundSolution::BudgetExceeded { .. } => {
@@ -4342,16 +4348,14 @@ impl<'db> CandidateSolutions<'db> {
     pub(crate) fn preliminary_solve(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
         path_bound: &CandidateTypeVarSolution<'db>,
     ) -> PathBoundSolution<'db> {
-        Self::solve_bounds(db, env, builder, path_bound, EvidenceSource::All)
+        Self::solve_bounds(db, env, path_bound, EvidenceSource::All)
     }
 
     fn solve_bounds(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
         path_bound: &CandidateTypeVarSolution<'db>,
         source: EvidenceSource,
     ) -> PathBoundSolution<'db> {
@@ -4366,23 +4370,8 @@ impl<'db> CandidateSolutions<'db> {
         // should only be used as a fallback when no concrete type was inferred.
         if path_bound.lower_bound(source).is_some() {
             let lower = path_bound.effective_lower(db, env, source);
-            if !path_bound.upper.is_satisfied_by(db, env, source, lower) {
-                let mut storage = builder.storage.borrow_mut();
-                let (when_upper, source_order) =
-                    path_bound
-                        .upper
-                        .when_satisfied_by(db, env, &mut storage, source, lower);
-                if when_upper.is_never_satisfied(
-                    db,
-                    env,
-                    &mut storage,
-                    TypeVarSet::None,
-                    source_order,
-                ) {
-                    // This path does not satisfy the accumulated upper bound, and is
-                    // therefore not a valid specialization.
-                    return PathBoundSolution::Unsatisfiable;
-                }
+            if !path_bound.upper.can_be_satisfied_by(db, env, source, lower) {
+                return PathBoundSolution::Unsatisfiable;
             }
 
             return PathBoundSolution::Solved(lower);
@@ -4415,11 +4404,10 @@ impl<'db> CandidateSolutions<'db> {
     fn solve_from_evidence(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
         path_bound: &CandidateTypeVarSolution<'db>,
         source: EvidenceSource,
     ) -> PathBoundSolution<'db> {
-        let preliminary = Self::solve_bounds(db, env, builder, path_bound, source);
+        let preliminary = Self::solve_bounds(db, env, path_bound, source);
         let PathBoundSolution::Solved(solution) = preliminary else {
             return preliminary;
         };
@@ -5934,11 +5922,9 @@ mod tests {
             ConstraintProvenance::INFERRED,
             known_instance(db, KnownClass::Str),
         );
-        let mut storage = builder.storage.borrow_mut();
         let inferable = TypeVarSet::from_typevars(db, [t]);
-        let invalid = bounds.finish(db, &env, &mut storage, t, inferable);
+        let invalid = bounds.finish(db, &env, t, inferable);
         assert_eq!(invalid, None);
-        drop(storage);
 
         assert_eq!(PathBoundSolution::Unsatisfiable.as_type(), None);
         assert_eq!(
@@ -6039,14 +6025,12 @@ class E: ...
             }
             bounds.add_upper(ConstraintProvenance::INFERRED, left);
             bounds.add_upper(ConstraintProvenance::INFERRED, right);
-            let mut storage = builder.storage.borrow_mut();
             let exhausted = bounds
-                .finish(db, &env, &mut storage, t, inferable)
+                .finish(db, &env, t, inferable)
                 .expect("expected a valid solution");
-            drop(storage);
             let expected = PathBoundSolution::BudgetExceeded { fallback: lower };
             assert_eq!(
-                CandidateSolutions::preliminary_solve(db, &env, &builder, &exhausted),
+                CandidateSolutions::preliminary_solve(db, &env, &exhausted),
                 lower.map_or(expected, PathBoundSolution::Solved)
             );
             assert_eq!(
@@ -6105,20 +6089,17 @@ class E: ...
         for upper in gradual_upper {
             bounds.add_upper(ConstraintProvenance::INFERRED, upper);
         }
-        let mut storage = builder.storage.borrow_mut();
         let exhausted = bounds
             .finish(
                 db,
                 &env,
-                &mut storage,
                 constrained,
                 TypeVarSet::from_typevars(db, [constrained]),
             )
             .expect("expected a valid solution");
-        drop(storage);
         assert_eq!(exhausted.has_only_non_concrete_evidence, Some(true));
         assert_eq!(
-            CandidateSolutions::preliminary_solve(db, &env, &builder, &exhausted),
+            CandidateSolutions::preliminary_solve(db, &env, &exhausted),
             PathBoundSolution::BudgetExceeded { fallback: None }
         );
         assert_eq!(

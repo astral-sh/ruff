@@ -7066,12 +7066,7 @@ impl<'db> CallInference<'_, 'db> {
                 );
 
                 let solutions = path_bounds.solve_with(|variance, path_bound| {
-                    let outcome = CandidateSolutions::preliminary_solve(
-                        db,
-                        self.env,
-                        constraints,
-                        path_bound,
-                    );
+                    let outcome = CandidateSolutions::preliminary_solve(db, self.env, path_bound);
                     // Each path has already combined its lower and upper evidence; having both
                     // makes its variance invariant. Paths are alternatives, so invariant evidence
                     // on one path cannot justify selecting an upper-only preference on another.
@@ -8913,7 +8908,6 @@ impl<'db> Binding<'db> {
                         env,
                         generic,
                         specialized_overload.inference,
-                        constraints,
                         call_expression_tcx,
                     );
                     parameter_type =
@@ -9070,7 +9064,6 @@ impl<'db> Binding<'db> {
                         env,
                         generic_context,
                         self.inference,
-                        constraints,
                         call_expression_tcx,
                     )
                 })
@@ -9268,15 +9261,8 @@ impl<'db> Binding<'db> {
             return None;
         }
         Some(
-            self.argument_type_context_specialization(
-                db,
-                env,
-                generic,
-                Some(inference),
-                constraints,
-                tcx,
-            )
-            .specialization,
+            self.argument_type_context_specialization(db, env, generic, Some(inference), tcx)
+                .specialization,
         )
     }
 
@@ -9296,7 +9282,6 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         generic_context: GenericContext<'db>,
         inference: Option<TypeVarInference<'db>>,
-        constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Cow<'db, ArgumentContextSpecialization<'db>> {
         /// With no evidence from the expected return type, every call in this program
@@ -9351,7 +9336,7 @@ impl<'db> Binding<'db> {
                 )
         });
         if let Some(path_bounds) = return_bounds {
-            let solutions = path_bounds.solve_for_argument_context(db, env, constraints);
+            let solutions = path_bounds.solve_for_argument_context(db, env);
             if let Solutions::Constrained(solutions) = solutions {
                 for solution in solutions.into_vec() {
                     for binding in solution.solved_typevars {

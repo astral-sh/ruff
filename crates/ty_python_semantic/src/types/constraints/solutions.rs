@@ -804,7 +804,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 evidence.add_constraint(db, bound_typevar, constraint);
             }
         }
-        evidence.finish(db, env, storage, bound_typevar, self.inferable)
+        evidence.finish(db, env, bound_typevar, self.inferable)
     }
 
     /// Check an inferable variable's lower bound against its declared upper bound without
@@ -1662,8 +1662,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let typevars: Option<Box<[_]>> = mappings
             .into_iter()
             .map(|(bound_typevar, solver)| {
-                let mut solution =
-                    solver.finish(db, env, storage, bound_typevar, self.inferable)?;
+                let mut solution = solver.finish(db, env, bound_typevar, self.inferable)?;
                 let argument = match self
                     .declared_constraint_solutions
                     .get(&bound_typevar.identity(db))
