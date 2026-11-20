@@ -173,7 +173,7 @@ bitflags! {
 
 #[derive(Clone, Copy, Debug, is_macro::Is)]
 pub enum ScopeKind<'a> {
-    Class(&'a ast::StmtClassDef),
+    Class(ast::StmtClassDef<'a>),
     /// The implicit `__class__` scope surrounding a method which allows code in the
     ///  method to access `__class__` at runtime. The closure sits in between the class
     ///  scope and the function scope.
@@ -214,7 +214,7 @@ pub enum ScopeKind<'a> {
     ///
     /// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object>.
     DunderClassCell,
-    Function(&'a ast::StmtFunctionDef),
+    Function(ast::StmtFunctionDef<'a>),
     Generator {
         kind: GeneratorKind,
         is_async: bool,
@@ -222,7 +222,7 @@ pub enum ScopeKind<'a> {
     Module,
     /// A Python 3.12+ [annotation scope](https://docs.python.org/3/reference/executionmodel.html#annotation-scopes)
     Type,
-    Lambda(&'a ast::ExprLambda),
+    Lambda(ast::ExprLambda<'a>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

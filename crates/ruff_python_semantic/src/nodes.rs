@@ -1,8 +1,5 @@
-use std::ops::Index;
-
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::{Expr, Stmt};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{AstNode, Expr, Stmt, SyntaxNode};
 
 use crate::BranchId;
 
@@ -18,8 +15,8 @@ pub struct NodeId;
 /// An AST node in a program, along with a pointer to its parent node (if any).
 #[derive(Debug)]
 struct NodeWithParent<'a> {
-    /// A pointer to the AST node.
-    node: NodeRef<'a>,
+    // Quoted annotations can belong to a different AST from the enclosing module.
+    node: SyntaxNode<'a>,
     /// The ID of the parent of this node, if any.
     parent: Option<NodeId>,
     /// The branch ID of this node, if any.
@@ -29,18 +26,19 @@ struct NodeWithParent<'a> {
 /// The nodes of a program indexed by [`NodeId`]
 #[derive(Debug, Default)]
 pub struct Nodes<'a> {
-    nodes: IndexVec<NodeId, NodeWithParent<'a>>,
+    entries: IndexVec<NodeId, NodeWithParent<'a>>,
 }
 
 impl<'a> Nodes<'a> {
     /// Inserts a new AST node into the tree and returns its unique ID.
+    #[inline]
     pub(crate) fn insert(
         &mut self,
-        node: NodeRef<'a>,
+        node: SyntaxNode<'a>,
         parent: Option<NodeId>,
         branch: Option<BranchId>,
     ) -> NodeId {
-        self.nodes.push(NodeWithParent {
+        self.entries.push(NodeWithParent {
             node,
             parent,
             branch,
@@ -50,87 +48,73 @@ impl<'a> Nodes<'a> {
     /// Return the [`NodeId`] of the parent node.
     #[inline]
     pub(crate) fn parent_id(&self, node_id: NodeId) -> Option<NodeId> {
-        self.nodes[node_id].parent
+        self.entries[node_id].parent
     }
 
     /// Return the [`BranchId`] of the branch node.
     #[inline]
     pub(crate) fn branch_id(&self, node_id: NodeId) -> Option<BranchId> {
-        self.nodes[node_id].branch
+        self.entries[node_id].branch
     }
 
     /// Returns an iterator over all [`NodeId`] ancestors, starting from the given [`NodeId`].
     pub(crate) fn ancestor_ids(&self, node_id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
-        std::iter::successors(Some(node_id), |&node_id| self.nodes[node_id].parent)
+        std::iter::successors(Some(node_id), |&node_id| self.entries[node_id].parent)
     }
-}
-
-impl<'a> Index<NodeId> for Nodes<'a> {
-    type Output = NodeRef<'a>;
 
     #[inline]
-    fn index(&self, index: NodeId) -> &Self::Output {
-        &self.nodes[index].node
+    pub(crate) fn node(&self, id: NodeId) -> SyntaxNode<'a> {
+        self.entries[id].node
+    }
+
+    #[inline]
+    pub(crate) fn statement(&self, id: NodeId) -> Option<Stmt<'a>> {
+        self.entries[id].node.cast::<Stmt>()
+    }
+
+    #[inline]
+    pub(crate) fn expression(&self, id: NodeId) -> Option<Expr<'a>> {
+        self.entries[id].node.cast::<Expr>()
+    }
+
+    #[inline]
+    pub(crate) fn is_statement(&self, id: NodeId) -> bool {
+        self.entries[id].node.is_statement()
     }
 }
 
-/// A reference to an AST node. Like [`ruff_python_ast::AnyNodeRef`], but wraps the node
-/// itself (like [`Stmt`]) rather than the narrowed type (like [`ruff_python_ast::StmtAssign`]).
-///
-/// TODO(charlie): Replace with [`ruff_python_ast::AnyNodeRef`]. This requires migrating
-/// the rest of the codebase to use [`ruff_python_ast::AnyNodeRef`] and related abstractions,
-/// like [`ruff_python_ast::ExprRef`] instead of [`Expr`].
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum NodeRef<'a> {
-    Stmt(&'a Stmt),
-    Expr(&'a Expr),
-}
+#[cfg(test)]
+mod tests {
+    use ruff_python_ast::AstNode as _;
+    use ruff_python_parser::{parse_expression, parse_module};
 
-impl<'a> NodeRef<'a> {
-    /// Returns the [`Stmt`] if this is a statement, or `None` if the reference is to another
-    /// kind of AST node.
-    pub(crate) fn as_statement(&self) -> Option<&'a Stmt> {
-        match self {
-            NodeRef::Stmt(stmt) => Some(stmt),
-            NodeRef::Expr(_) => None,
+    use super::Nodes;
+
+    #[test]
+    fn borrowed_nodes_keep_their_original_tree() {
+        let module = parse_module("module").unwrap();
+        let first = parse_expression("first").unwrap();
+        let second = parse_expression("second").unwrap();
+        let mut nodes = Nodes::default();
+
+        let stmt = module.suite().first().unwrap();
+        let expr = stmt.as_expr_stmt().unwrap().value();
+        let parent = nodes.insert(stmt.syntax_node(), None, None);
+        assert!(nodes.is_statement(parent));
+        assert!(nodes.statement(parent).unwrap().is_same_node(stmt));
+        assert!(nodes.expression(parent).is_none());
+
+        assert_eq!(expr.node_id(), first.expr().node_id());
+        assert_eq!(expr.node_id(), second.expr().node_id());
+        let records = [expr, first.expr(), second.expr(), expr]
+            .map(|expr| (nodes.insert(expr.syntax_node(), Some(parent), None), expr));
+
+        for (id, original) in records {
+            assert_eq!(nodes.parent_id(id), Some(parent));
+            assert!(!nodes.is_statement(id));
+            assert!(nodes.statement(id).is_none());
+            assert!(nodes.expression(id).unwrap().is_same_node(original));
+            assert_eq!(nodes.node(id), original.syntax_node());
         }
-    }
-
-    /// Returns the [`Expr`] if this is a expression, or `None` if the reference is to another
-    /// kind of AST node.
-    pub(crate) fn as_expression(&self) -> Option<&'a Expr> {
-        match self {
-            NodeRef::Stmt(_) => None,
-            NodeRef::Expr(expr) => Some(expr),
-        }
-    }
-
-    pub(crate) fn is_statement(&self) -> bool {
-        self.as_statement().is_some()
-    }
-
-    pub(crate) fn is_expression(&self) -> bool {
-        self.as_expression().is_some()
-    }
-}
-
-impl Ranged for NodeRef<'_> {
-    fn range(&self) -> TextRange {
-        match self {
-            NodeRef::Stmt(stmt) => stmt.range(),
-            NodeRef::Expr(expr) => expr.range(),
-        }
-    }
-}
-
-impl<'a> From<&'a Expr> for NodeRef<'a> {
-    fn from(expr: &'a Expr) -> Self {
-        NodeRef::Expr(expr)
-    }
-}
-
-impl<'a> From<&'a Stmt> for NodeRef<'a> {
-    fn from(stmt: &'a Stmt) -> Self {
-        NodeRef::Stmt(stmt)
     }
 }
