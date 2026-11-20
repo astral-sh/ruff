@@ -926,6 +926,8 @@ fn self_environment_search_paths(
 pub struct ProjectManagerOptions {
     /// The project manager to use for discovering the project's workspace and Python environment.
     ///
+    /// This setting is in preview and may change between ty releases.
+    ///
     /// - With `"none"` (the default), ty discovers the project and Python environment itself.
     /// - With `"uv"`, ty uses [uv](https://docs.astral.sh/uv/) to discover the workspace root,
     ///   Python environment, and dependency metadata. The environment must already be synchronized;
@@ -943,6 +945,8 @@ pub struct ProjectManagerOptions {
     pub project: Option<RangedValue<ProjectManager>>,
 
     /// The project manager to use for scripts with PEP 723 inline metadata.
+    ///
+    /// This setting is in preview and may change between ty releases.
     ///
     /// - With `"none"` (the default), ty looks for imported packages in your Python environment.
     ///   Install any third-party packages the script needs in that environment.

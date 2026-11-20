@@ -1125,6 +1125,8 @@ Defaults to `false`.
 
 The project manager to use for discovering the project's workspace and Python environment.
 
+This setting is in preview and may change between ty releases.
+
 - With `"none"` (the default), ty discovers the project and Python environment itself.
 - With `"uv"`, ty uses [uv](https://docs.astral.sh/uv/) to discover the workspace root,
   Python environment, and dependency metadata. The environment must already be synchronized;
@@ -1159,6 +1161,8 @@ as untrusted, ty discovers the project without running uv.
 ### `script`
 
 The project manager to use for scripts with PEP 723 inline metadata.
+
+This setting is in preview and may change between ty releases.
 
 - With `"none"` (the default), ty looks for imported packages in your Python environment.
   Install any third-party packages the script needs in that environment.
