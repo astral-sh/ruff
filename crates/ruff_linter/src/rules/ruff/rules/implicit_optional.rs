@@ -4,12 +4,12 @@ use anyhow::{Context, Result};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{Builder, Expr, ExprKind, Parameters};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use ruff_python_ast::PythonVersion;
@@ -137,17 +137,13 @@ impl From<PythonVersion> for ConversionType {
 }
 
 /// Generate a [`Fix`] for the given [`Expr`] as per the [`ConversionType`].
-fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr) -> Result<Fix> {
+fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: Expr<'_>) -> Result<Fix> {
     match conversion_type {
         ConversionType::BinOpOr => {
-            let new_expr = Expr::BinOp(ast::ExprBinOp {
-                left: Box::new(expr.clone()),
-                op: Operator::BitOr,
-                right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            });
-            let content = checker.generator().expr(&new_expr);
+            let mut builder = Builder::default();
+            let value = builder.copy_node(expr);
+            let replacement = syntax::pep_604_optional(&mut builder, value);
+            let content = checker.generator().expr(builder.get(replacement));
             let edit = Edit::range_replacement(content, expr.range());
             if checker.target_version() < PythonVersion::PY310 {
                 Ok(Fix::unsafe_edits(
@@ -163,19 +159,11 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 .typing_importer("Optional", PythonVersion::lowest())
                 .context("Optional should be available on all supported Python versions")?;
             let (import_edit, binding) = importer.import(expr.start())?;
-            let new_expr = Expr::Subscript(ast::ExprSubscript {
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                value: Box::new(Expr::Name(ast::ExprName {
-                    id: Name::new(binding),
-                    ctx: ast::ExprContext::Store,
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                })),
-                slice: Box::new(expr.clone()),
-                ctx: ast::ExprContext::Load,
-            });
-            let content = checker.generator().expr(&new_expr);
+            let mut builder = Builder::default();
+            let optional = syntax::name(&mut builder, &binding);
+            let value = builder.copy_node(expr);
+            let replacement = syntax::subscript(&mut builder, optional, value);
+            let content = checker.generator().expr(builder.get(replacement));
             Ok(Fix::unsafe_edits(
                 Edit::range_replacement(content, expr.range()),
                 [import_edit],
@@ -185,16 +173,16 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 }
 
 /// RUF013
-pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
+pub(crate) fn implicit_optional(checker: &Checker, parameters: Parameters<'_>) {
     for parameter in parameters.iter_non_variadic_params() {
-        let Some(Expr::NoneLiteral(_)) = parameter.default() else {
+        let Some(ExprKind::NoneLiteral(_)) = parameter.default().map(Expr::classify) else {
             continue;
         };
         let Some(annotation) = parameter.annotation() else {
             continue;
         };
 
-        if let Expr::StringLiteral(string_expr) = annotation {
+        if let ExprKind::StringLiteral(string_expr) = annotation.classify() {
             // Quoted annotation.
             if let Ok(parsed_annotation) = checker.parse_type_annotation(string_expr) {
                 let Some(expr) = type_hint_explicitly_allows_none(

@@ -1,14 +1,15 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, CmpOp, Expr, Stmt};
+use ruff_python_ast::{self as ast, Builder, CmpOp, Expr, ExprKind};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_set;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::fix::syntax;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -69,9 +70,9 @@ impl AlwaysFixableViolation for CheckAndRemoveFromSet {
 }
 
 /// FURB132
-pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf) {
+pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: ast::StmtIf<'_>) {
     // In order to fit the profile, we need if without else clauses and with only one statement in its body.
-    if if_stmt.body.len() != 1 || !if_stmt.elif_else_clauses.is_empty() {
+    if if_stmt.body().len() != 1 || !if_stmt.elif_else_clauses().is_empty() {
         return;
     }
 
@@ -86,7 +87,7 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
     };
 
     // `set` in the check should be the same as `set` in the body
-    if check_set.id != remove_set.id {
+    if check_set.name_id() != remove_set.name_id() {
         return;
     }
 
@@ -115,14 +116,14 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
     let mut diagnostic = checker.report_diagnostic(
         CheckAndRemoveFromSet {
             element: SourceCodeSnippet::from_str(checker.locator().slice(check_element)),
-            set: check_set.id.to_string(),
+            set: check_set.id().to_string(),
         },
         if_stmt.range(),
     );
     diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
         make_suggestion(check_set, check_element, checker.generator()),
-        if_stmt.start(),
-        if_stmt.end(),
+        if_stmt.range().start(),
+        if_stmt.range().end(),
     )));
 }
 
@@ -131,8 +132,11 @@ fn compare(lhs: &ComparableExpr, rhs: &ComparableExpr) -> bool {
 }
 
 /// Match `if` condition to be `expr in name`, returns a tuple of (`expr`, `name`) on success.
-fn match_check(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
-    let (left, CmpOp::In, Expr::Name(right)) = if_stmt.test.as_compare_expr()?.as_single()? else {
+fn match_check(if_stmt: ast::StmtIf<'_>) -> Option<(Expr<'_>, ast::ExprName<'_>)> {
+    let (left, CmpOp::In, expr) = if_stmt.test().as_compare_expr()?.as_single()? else {
+        return None;
+    };
+    let ExprKind::Name(right) = expr.classify() else {
         return None;
     };
 
@@ -140,24 +144,17 @@ fn match_check(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
 }
 
 /// Match `if` body to be `name.remove(expr)`, returns a tuple of (`expr`, `name`) on success.
-fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
-    let [Stmt::Expr(ast::StmtExpr { value: expr, .. })] = if_stmt.body.as_slice() else {
-        return None;
-    };
+fn match_remove(if_stmt: ast::StmtIf<'_>) -> Option<(Expr<'_>, ast::ExprName<'_>)> {
+    let [stmt] = if_stmt.body().as_array()?;
+    let expr_call = stmt.as_expr_stmt()?.value().as_call_expr()?;
+    let attr = expr_call.func();
+    let arguments = expr_call.arguments();
 
-    let ast::ExprCall {
-        func: attr,
-        arguments,
-        ..
-    } = expr.as_call_expr()?;
+    let expr_attribute = attr.as_attribute_expr()?;
+    let receiver = expr_attribute.value();
+    let func_name = expr_attribute.attr();
 
-    let ast::ExprAttribute {
-        value: receiver,
-        attr: func_name,
-        ..
-    } = attr.as_attribute_expr()?;
-
-    let Expr::Name(set @ ast::ExprName { .. }) = receiver.as_ref() else {
+    let ExprKind::Name(set) = receiver.classify() else {
         return None;
     };
 
@@ -169,33 +166,11 @@ fn match_remove(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
 }
 
 /// Construct the fix suggestion, ie `set.discard(element)`.
-fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) -> String {
-    // Here we construct `set.discard(element)`
-    //
-    // Let's make `set.discard`.
-    let attr = ast::ExprAttribute {
-        value: Box::new(set.clone().into()),
-        attr: ast::Identifier::new("discard".to_string(), TextRange::default()),
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    // Make the actual call `set.discard(element)`
-    let call = ast::ExprCall {
-        func: Box::new(attr.into()),
-        arguments: ast::Arguments {
-            items: [ast::Argument::Positional(element.clone())].into(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    // And finally, turn it into a statement.
-    let stmt = ast::StmtExpr {
-        value: Box::new(call.into()),
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    generator.stmt(&stmt.into())
+fn make_suggestion(set: ast::ExprName<'_>, element: Expr<'_>, generator: Generator) -> String {
+    let mut builder = Builder::default();
+    let set = builder.copy_node(set).into();
+    let args = builder.copy_nodes([element]);
+    let call = syntax::call_method(&mut builder, set, "discard", args);
+    let statement = syntax::expression_statement(&mut builder, call);
+    generator.stmt(builder.get(statement))
 }
