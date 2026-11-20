@@ -594,10 +594,41 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             TypeVarSet::from_typevars(db, support.iter().map(|id| storage.typevar_data(id)))
         };
 
-        matches!(
-            self.solutions(db, env, inferable),
-            Ok(Solutions::Unsatisfiable(_))
-        )
+        // Comparing invariant arguments like `Literal["a", "b", ...]` and `T | U`
+        // can produce a distinct specialization for every partition of the literals
+        // between T and U. A single valid solution establishes overlap.
+        let budget = SolutionBudget::default();
+        let Ok(candidates) = CandidateSolutions::compute_bounded(
+            db,
+            env,
+            self,
+            inferable,
+            budget,
+            CandidateSearch::FirstValid,
+        ) else {
+            return false;
+        };
+        let result = candidates.solve_with_budget(db, budget, |_variance, bounds| {
+            CandidateSolutions::default_solve(db, env, self.builder, bounds)
+        });
+        if !matches!(result, Ok(Solutions::Unsatisfiable(_))) {
+            return false;
+        }
+
+        // Selection can reject a candidate after the walker has validated its declared
+        // domains. If such a candidate stopped the walk, check all paths before
+        // concluding that the arguments are disjoint.
+        if let CandidateSolutions::Constrained(paths) = &candidates
+            && paths
+                .iter()
+                .any(|path| matches!(path.validity, SolutionValidity::Valid))
+        {
+            return matches!(
+                self.solutions(db, env, inferable),
+                Ok(Solutions::Unsatisfiable(_))
+            );
+        }
+        true
     }
 
     /// Returns whether this constraint set is the `never` terminal.
@@ -3799,6 +3830,14 @@ impl SolutionLimits for BoundedSolutionLimits {
     }
 }
 
+#[derive(Clone, Copy)]
+enum CandidateSearch {
+    /// Collect the complete family of candidate solutions.
+    All(ReportDiagnostics),
+    /// Collect candidates through the first terminal that produces a valid candidate.
+    FirstValid,
+}
+
 impl<'db> CandidateSolutions<'db> {
     /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path.
     ///
@@ -3822,12 +3861,12 @@ impl<'db> CandidateSolutions<'db> {
             source_order,
             UnboundedSolutionLimits,
             unspecialized_type_var_policy,
-            ReportDiagnostics::Yes,
+            CandidateSearch::All(ReportDiagnostics::Yes),
         );
         result
     }
 
-    /// Computes complete path bounds within limits shared by preprocessing and collection.
+    /// Computes path bounds within limits shared by preprocessing and collection.
     ///
     /// Visits include the concrete-conjunction fast path and both BDD walks. The path limit
     /// counts materialized constrained paths; an unconstrained or unsatisfiable result needs no
@@ -3838,7 +3877,7 @@ impl<'db> CandidateSolutions<'db> {
         set: ConstraintSet<'db, '_>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
-        report_diagnostics: ReportDiagnostics,
+        search: CandidateSearch,
     ) -> Result<Self, ProjectionError> {
         let limits = BoundedSolutionLimits {
             remaining_paths: budget.paths,
@@ -3853,7 +3892,7 @@ impl<'db> CandidateSolutions<'db> {
             set.source_order,
             limits,
             UnspecializedTypeVarPolicy::Ignore,
-            report_diagnostics,
+            search,
         ) {
             ControlFlow::Continue(result) => Ok(result),
             ControlFlow::Break(error) => Err(error),
@@ -3870,7 +3909,7 @@ impl<'db> CandidateSolutions<'db> {
         source_order: Option<SourceOrderId>,
         mut limits: L,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
-        report_diagnostics: ReportDiagnostics,
+        search: CandidateSearch,
     ) -> ControlFlow<L::Break, Self> {
         let source_orders = storage.calculate_source_orders(source_order);
         if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
@@ -3882,13 +3921,17 @@ impl<'db> CandidateSolutions<'db> {
             inferable,
             &mut limits,
             unspecialized_type_var_policy,
-            report_diagnostics,
+            match search {
+                CandidateSearch::All(report_diagnostics) => report_diagnostics,
+                CandidateSearch::FirstValid => ReportDiagnostics::Yes,
+            },
         )? {
             return ControlFlow::Continue(path_bounds);
         }
 
         let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, limits, node)
-            .with_unspecialized_type_var_policy(unspecialized_type_var_policy);
+            .with_unspecialized_type_var_policy(unspecialized_type_var_policy)
+            .with_search(search);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
@@ -5354,7 +5397,7 @@ mod tests {
                 visits: max_visits,
                 ..SolutionBudget::default()
             },
-            ReportDiagnostics::Yes,
+            CandidateSearch::All(ReportDiagnostics::Yes),
         )
     }
 

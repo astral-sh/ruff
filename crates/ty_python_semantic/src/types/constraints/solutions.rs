@@ -15,9 +15,10 @@ use crate::types::constraints::variables::{
 };
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, Assignment, AtomicConstraintId, BoundedSolutionLimits,
-    CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, CandidateTypeVarSolver,
-    ConstraintFailureEvidence, ConstraintSetStorage, EvidenceSource, InteriorNodeData, Node,
-    NodeId, SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
+    CandidateSearch, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
+    CandidateTypeVarSolver, ConstraintFailureEvidence, ConstraintSetStorage, EvidenceSource,
+    InteriorNodeData, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
+    SolutionViolationKind,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -79,6 +80,7 @@ pub(super) struct SolutionWalker<'db, L> {
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
     limits: L,
+    find_first_valid: bool,
     /// How many rejected paths can be rechecked within the traversal budget.
     remaining_failed_paths: Option<usize>,
 
@@ -132,6 +134,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             inferable,
             inferable_support,
             limits,
+            find_first_valid: false,
             remaining_failed_paths: None,
             declared_constraint_solutions: FxHashMap::default(),
             explored_nodes: FxHashSet::default(),
@@ -140,6 +143,11 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             unspecialized_type_var_policy: UnspecializedTypeVarPolicy::Ignore,
             _phantom: PhantomData,
         }
+    }
+
+    pub(super) fn with_search(mut self, search: CandidateSearch) -> Self {
+        self.find_first_valid = matches!(search, CandidateSearch::FirstValid);
+        self
     }
 
     pub(super) fn with_unspecialized_type_var_policy(
@@ -360,6 +368,15 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         node: NodeId,
         validations: Option<&Validations<'db>>,
     ) -> ControlFlow<L::Break> {
+        // Validation can retract tentative candidates while choosing a declared
+        // constraint. Only stop between nodes, once the whole terminal is validated.
+        if self.find_first_valid
+            && self.pending.last().is_some_and(|pending| {
+                matches!(pending.candidate.validity, SolutionValidity::Valid)
+            })
+        {
+            return ControlFlow::Continue(());
+        }
         self.limits.visit_node()?;
         if let (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) =
             (polarity, node)

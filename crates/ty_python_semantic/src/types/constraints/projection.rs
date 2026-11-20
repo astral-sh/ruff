@@ -3,8 +3,8 @@
 use rustc_hash::FxHashSet;
 
 use super::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, PathBoundSolution,
-    ReportDiagnostics, Solutions, TypeVarSolution,
+    CandidateSearch, CandidateSolutions, CandidateTypeVarSolution, ConstraintSet,
+    PathBoundSolution, ReportDiagnostics, Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
@@ -111,6 +111,28 @@ impl ProjectionTypeBudget {
     }
 }
 
+impl<'db> CandidateSolutions<'db> {
+    pub(super) fn solve_with_budget(
+        &self,
+        db: &'db dyn Db,
+        budget: SolutionBudget,
+        choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
+        self.try_solve_with(choose, |solution| {
+            for violation in solution.violations() {
+                for evidence in violation.evidence_types() {
+                    type_budget.charge_type(db, *evidence)?;
+                }
+            }
+            for binding in &solution.solved_typevars {
+                type_budget.charge_type(db, binding.solution)?;
+            }
+            Ok(())
+        })
+    }
+}
+
 impl<'db> ConstraintSet<'db, '_> {
     /// Computes default solutions for each BDD path within the default projection budget.
     /// Constraints on non-inferable typevars are not necessarily retained in the solutions.
@@ -159,20 +181,9 @@ impl<'db> ConstraintSet<'db, '_> {
             self,
             inferable,
             budget,
-            report_diagnostics,
+            CandidateSearch::All(report_diagnostics),
         )?;
-        let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
-        path_bounds.try_solve_with(choose, |solution| {
-            for violation in solution.violations() {
-                for evidence in violation.evidence_types() {
-                    type_budget.charge_type(db, *evidence)?;
-                }
-            }
-            for binding in &solution.solved_typevars {
-                type_budget.charge_type(db, binding.solution)?;
-            }
-            Ok(())
-        })
+        path_bounds.solve_with_budget(db, budget, choose)
     }
 
     /// Folds complete, correlated solutions without first allocating every solved path.
@@ -210,7 +221,7 @@ impl<'db> ConstraintSet<'db, '_> {
             self,
             inferable,
             budget,
-            ReportDiagnostics::Yes,
+            CandidateSearch::All(ReportDiagnostics::Yes),
         )?;
 
         path_bounds.try_fold_with(
