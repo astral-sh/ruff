@@ -36,12 +36,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.69", category = Category::Pedantic)]
-pub(crate) struct UncapitalizedFirstWordOfDocstring {
+pub(crate) struct DocstringStartsWithLowercaseLetter {
     first_word: String,
     capitalized_word: String,
 }
 
-impl AlwaysFixableViolation for UncapitalizedFirstWordOfDocstring {
+impl AlwaysFixableViolation for DocstringStartsWithLowercaseLetter {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -97,7 +97,7 @@ pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
     let leading_whitespace_len = body.text_len() - trim_start_body.text_len();
 
     let mut diagnostic = checker.report_diagnostic(
-        UncapitalizedFirstWordOfDocstring {
+        DocstringStartsWithLowercaseLetter {
             first_word: first_word.to_string(),
             capitalized_word: capitalized_word.clone(),
         },

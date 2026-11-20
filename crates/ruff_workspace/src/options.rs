@@ -3500,16 +3500,16 @@ pub struct PydocstyleOptions {
     /// [`D214`](rules/over-indented-docstring-section.md),
     /// [`D215`](rules/over-indented-docstring-section-underline.md),
     /// [`D404`](rules/docstring-starts-with-this.md),
-    /// [`D405`](rules/non-capitalized-docstring-section-name.md),
-    /// [`D406`](rules/missing-new-line-after-docstring-section-name.md),
+    /// [`D405`](rules/incorrectly-capitalized-docstring-section-name.md),
+    /// [`D406`](rules/missing-newline-after-docstring-section-name.md),
     /// [`D407`](rules/missing-docstring-section-underline.md),
     /// [`D408`](rules/blank-line-before-docstring-section-underline.md),
-    /// [`D409`](rules/mismatched-docstring-section-underline-length.md),
+    /// [`D409`](rules/incorrect-docstring-section-underline-length.md),
     /// [`D410`](rules/missing-blank-line-after-docstring-section.md),
     /// [`D411`](rules/missing-blank-line-before-docstring-section.md),
     /// [`D413`](rules/missing-blank-line-after-last-docstring-section.md),
-    /// [`D415`](rules/missing-docstring-summary-punctuation.md),
-    /// [`D416`](rules/missing-docstring-section-name-colon.md),
+    /// [`D415`](rules/docstring-summary-without-terminal-punctuation.md),
+    /// [`D416`](rules/docstring-section-name-without-colon.md),
     /// [`D417`](rules/undocumented-parameter.md), and
     /// [`D420`](rules/incorrect-docstring-section-order.md).
     ///
@@ -3520,8 +3520,8 @@ pub struct PydocstyleOptions {
     /// [`D213`](rules/multiline-docstring-summary-on-first-line.md),
     /// [`D402`](rules/signature-in-docstring.md),
     /// [`D413`](rules/missing-blank-line-after-last-docstring-section.md),
-    /// [`D415`](rules/missing-docstring-summary-punctuation.md),
-    /// [`D416`](rules/missing-docstring-section-name-colon.md), and
+    /// [`D415`](rules/docstring-summary-without-terminal-punctuation.md),
+    /// [`D416`](rules/docstring-section-name-without-colon.md), and
     /// [`D417`](rules/undocumented-parameter.md).
     ///
     /// The Google convention includes all `D` errors apart from:
@@ -3529,13 +3529,13 @@ pub struct PydocstyleOptions {
     /// [`D204`](rules/incorrect-blank-line-after-class-docstring.md),
     /// [`D213`](rules/multiline-docstring-summary-on-first-line.md),
     /// [`D215`](rules/over-indented-docstring-section-underline.md),
-    /// [`D400`](rules/missing-docstring-summary-period.md),
+    /// [`D400`](rules/docstring-summary-without-period.md),
     /// [`D401`](rules/non-imperative-docstring-summary.md),
     /// [`D404`](rules/docstring-starts-with-this.md),
-    /// [`D406`](rules/missing-new-line-after-docstring-section-name.md),
+    /// [`D406`](rules/missing-newline-after-docstring-section-name.md),
     /// [`D407`](rules/missing-docstring-section-underline.md),
     /// [`D408`](rules/blank-line-before-docstring-section-underline.md),
-    /// [`D409`](rules/mismatched-docstring-section-underline-length.md), and
+    /// [`D409`](rules/incorrect-docstring-section-underline-length.md), and
     /// [`D413`](rules/missing-blank-line-after-last-docstring-section.md).
     ///
     /// For more information see the [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings) entry.
