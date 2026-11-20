@@ -4468,6 +4468,39 @@ fn isolated_ignores_script_settings() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn script_requires_python_stdin() -> Result<()> {
+    let test = CliTest::with_file(
+        "ruff.toml",
+        r#"
+            target-version = 'py39'
+            lint.select = ['UP045']
+        "#,
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--fix", "-"]).pass_stdin(
+        indoc! {r#"
+            # /// script
+            # requires-python = '>=3.10'
+            # ///
+            from typing import Optional
+            x: Optional[int]
+        "#}
+    ), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # requires-python = '>=3.10'
+    # ///
+    from typing import Optional
+    x: int | None
+
+    ----- stderr -----
+    Found 1 error (1 fixed, 0 remaining).
+    ");
+    Ok(())
+}
+
 /// Test that the linter respects per-file-target-version.
 #[test]
 fn per_file_target_version_linter() {
