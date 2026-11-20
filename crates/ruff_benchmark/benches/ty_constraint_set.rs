@@ -230,6 +230,29 @@ fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
     });
 }
 
+/// Bokeh's overloaded constructors compare a literal alias with a union of type variables
+/// in an invariant receiver argument (ty#5063).
+fn benchmark_invariant_argument_overlap(criterion: &mut Criterion) {
+    setup_rayon();
+    let code = r#"
+        from typing import Literal
+        from ty_extensions import static_assert
+        from ty_extensions._internal import is_disjoint_from
+
+        type Names = Literal["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n"]
+
+        def overlap[T, U]() -> None:
+            static_assert(not is_disjoint_from(list[Names], list[T | U]))
+    "#;
+    criterion.bench_function("ty_micro[invariant_argument_overlap]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Bokeh's constructor combines a large literal alias with `str` in its receiver (ty#5046).
 fn benchmark_constructor_literal_alias(criterion: &mut Criterion) {
     setup_rayon();
@@ -963,6 +986,7 @@ criterion_group!(
     benchmark_constraint_quantification,
     benchmark_bottom_and_top_signature_comparisons,
     benchmark_factored_upper_bounds,
+    benchmark_invariant_argument_overlap,
     benchmark_constructor_literal_alias,
     benchmark_constructor_union_specialization,
     benchmark_counterexample_behind_implied_bound,
