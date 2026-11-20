@@ -1,3 +1,4 @@
+use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
@@ -9,6 +10,25 @@ use ruff_index::{Idx, IndexSlice, IndexVec, newtype_index};
 use crate::binding::BindingId;
 use crate::globals::GlobalsId;
 use crate::star_import::StarImport;
+
+#[derive(Clone, Copy, Debug, Eq)]
+struct Spelling<'a>(&'a str);
+
+impl PartialEq for Spelling<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        // The AST interns names, so a reference and its binding usually share a slice.
+        // Checking its address and length saves a byte comparison on those hits.
+        // Names from separately parsed annotations still need to match by spelling.
+        std::ptr::eq(self.0, other.0) || self.0 == other.0
+    }
+}
+
+impl Hash for Spelling<'_> {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
 
 #[derive(Debug)]
 pub struct Scope<'a> {
@@ -23,7 +43,7 @@ pub struct Scope<'a> {
     star_imports: Vec<StarImport<'a>>,
 
     /// A map from bound name to binding ID.
-    bindings: FxHashMap<&'a str, BindingId>,
+    bindings: FxHashMap<Spelling<'a>, BindingId>,
 
     /// A map from binding ID to binding ID that it shadows.
     ///
@@ -71,12 +91,12 @@ impl<'a> Scope<'a> {
 
     /// Returns the [id](BindingId) of the binding bound to the given name.
     pub fn get(&self, name: &str) -> Option<BindingId> {
-        self.bindings.get(name).copied()
+        self.bindings.get(&Spelling(name)).copied()
     }
 
     /// Adds a new binding with the given name to this scope.
     pub fn add(&mut self, name: &'a str, id: BindingId) -> Option<BindingId> {
-        if let Some(shadowed) = self.bindings.insert(name, id) {
+        if let Some(shadowed) = self.bindings.insert(Spelling(name), id) {
             self.shadowed_bindings.insert(id, shadowed);
             Some(shadowed)
         } else {
@@ -91,7 +111,7 @@ impl<'a> Scope<'a> {
 
     /// Returns `true` if this scope has a binding with the given name.
     pub fn has(&self, name: &str) -> bool {
-        self.bindings.contains_key(name)
+        self.bindings.contains_key(&Spelling(name))
     }
 
     /// Returns the IDs of all bindings defined in this scope.
@@ -101,13 +121,13 @@ impl<'a> Scope<'a> {
 
     /// Returns a tuple of the name and ID of all bindings defined in this scope.
     pub fn bindings(&self) -> impl Iterator<Item = (&'a str, BindingId)> + '_ {
-        self.bindings.iter().map(|(&name, &id)| (name, id))
+        self.bindings.iter().map(|(&name, &id)| (name.0, id))
     }
 
     /// Like [`Scope::get`], but returns all bindings with the given name, including
     /// those that were shadowed by later bindings.
     pub fn get_all(&self, name: &str) -> impl Iterator<Item = BindingId> + '_ {
-        std::iter::successors(self.bindings.get(name).copied(), |id| {
+        std::iter::successors(self.bindings.get(&Spelling(name)).copied(), |id| {
             self.shadowed_bindings.get(id).copied()
         })
     }
@@ -117,7 +137,7 @@ impl<'a> Scope<'a> {
     pub fn all_bindings(&self) -> impl Iterator<Item = (&str, BindingId)> + '_ {
         self.bindings.iter().flat_map(|(&name, &id)| {
             std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
-                .map(move |id| (name, id))
+                .map(move |id| (name.0, id))
         })
     }
 
