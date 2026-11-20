@@ -213,7 +213,8 @@ pub(crate) struct CheckCommand {
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
 
-    /// Exclude files containing PEP 723 inline script metadata unless passed explicitly.
+    /// Exclude files containing PEP 723 inline script metadata.
+    /// ty checks scripts passed explicitly on the command line unless you use `--force-exclude`.
     /// Use `--include-scripts` to disable.
     #[arg(
         long,

@@ -4,7 +4,7 @@ use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{GlobFilterCheckMode, ProjectMetadata, ProjectReloadResult};
 use std::collections::BTreeSet;
 
-use crate::walk::{ProjectFilesWalker, create_walker_builder};
+use crate::walk::{ProjectFilesFilter, ProjectFilesWalker, create_walker_builder};
 use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
@@ -267,10 +267,9 @@ impl ProjectDatabase {
                         };
 
                         if is_file {
-                            if !project
-                                .is_file_included(self, path)
-                                .should_index_file(self.system(), path)
-                            {
+                            let filter = ProjectFilesFilter::from_project(self, project);
+                            let matched = filter.match_file(path, GlobFilterCheckMode::Adhoc);
+                            if !matched.should_index_file(self.system(), path) {
                                 continue;
                             }
 
@@ -280,12 +279,7 @@ impl ProjectDatabase {
                                 && let Ok(file) = system_path_to_file(self, path)
                             {
                                 let is_script = script_tag(self, file).is_some();
-                                // Explicitly included files are checked even when scripts are otherwise excluded.
-                                let exclude_script = is_script
-                                    && project.settings(self).src().exclude_scripts
-                                    && !project.is_file_explicitly_included(self, file);
-
-                                if exclude_script {
+                                if is_script && filter.excludes_scripts(matched.is_explicit) {
                                     project.remove_file(self, file);
                                 } else {
                                     project.add_file(self, file, is_script);

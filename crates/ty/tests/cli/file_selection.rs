@@ -3,7 +3,7 @@ use insta_cmd::assert_cmd_snapshot;
 use crate::CliTest;
 
 #[test]
-fn exclude_scripts_only_applies_to_implicitly_discovered_files() -> anyhow::Result<()> {
+fn exclude_scripts_respects_explicit_paths_and_force_exclude() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("main.py", "value: int = 'project'"),
         (
@@ -65,6 +65,12 @@ fn exclude_scripts_only_applies_to_implicitly_discovered_files() -> anyhow::Resu
         exclude-scripts = true
         "#,
     )?;
+
+    let output = case
+        .command()
+        .args(["--force-exclude", "script.py"])
+        .output()?;
+    assert!(output.status.success(), "{output:?}");
 
     assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "concise"), @r#"
     success: false

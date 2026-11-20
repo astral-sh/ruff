@@ -1,5 +1,6 @@
 use crate::files::IndexedFile;
-use crate::glob::IncludeExcludeFilter;
+use crate::glob::FileMatch;
+use crate::metadata::settings::SrcSettings;
 use crate::script::script_tag;
 use crate::{Db, GlobFilterCheckMode, IncludeResult, Project};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
@@ -16,8 +17,6 @@ use thiserror::Error;
 
 /// Filter that decides which files are included in the project.
 ///
-/// In the future, this will hold a reference to the `include` and `exclude` pattern.
-///
 /// This struct mainly exists because `dyn Db` isn't `Send` or `Sync`, making it impossible
 /// to access fields from within the walker.
 #[derive(Debug)]
@@ -25,9 +24,7 @@ pub(crate) struct ProjectFilesFilter<'a> {
     /// The same as [`Project::included_paths_or_root`].
     included_paths: &'a [SystemPathBuf],
 
-    /// The resolved `src.include` and `src.exclude` filter.
-    src_filter: &'a IncludeExcludeFilter,
-
+    src: &'a SrcSettings,
     force_exclude: bool,
 }
 
@@ -35,13 +32,17 @@ impl<'a> ProjectFilesFilter<'a> {
     pub(crate) fn from_project(db: &'a dyn Db, project: Project) -> Self {
         Self {
             included_paths: project.included_paths_or_root(db),
-            src_filter: &project.settings(db).src().files,
+            src: project.settings(db).src(),
             force_exclude: project.force_exclude(db),
         }
     }
 
-    fn force_exclude(&self) -> bool {
-        self.force_exclude
+    fn should_apply_filters(&self, is_explicit: bool) -> bool {
+        !is_explicit || self.force_exclude
+    }
+
+    pub(crate) fn excludes_scripts(&self, is_explicit: bool) -> bool {
+        self.src.exclude_scripts && self.should_apply_filters(is_explicit)
     }
 
     fn match_included_paths(
@@ -50,51 +51,48 @@ impl<'a> ProjectFilesFilter<'a> {
         mode: GlobFilterCheckMode,
     ) -> Option<CheckPathMatch> {
         match mode {
+            // The walker uses this mode only for descendants of a check path.
             GlobFilterCheckMode::TopDown => Some(CheckPathMatch::Partial),
-            GlobFilterCheckMode::Adhoc => {
-                self.included_paths
-                    .iter()
-                    .filter_map(|included_path| {
-                        if let Ok(relative_path) = path.strip_prefix(included_path) {
-                            // Exact matches are always included, unless forced to exclude
-                            if relative_path.as_str().is_empty() && !self.force_exclude {
-                                Some(CheckPathMatch::Full)
-                            } else {
-                                Some(CheckPathMatch::Partial)
-                            }
+            GlobFilterCheckMode::Adhoc => self
+                .included_paths
+                .iter()
+                .filter_map(|included_path| {
+                    if let Ok(relative_path) = path.strip_prefix(included_path) {
+                        if relative_path.as_str().is_empty() {
+                            Some(CheckPathMatch::Full)
                         } else {
-                            None
+                            Some(CheckPathMatch::Partial)
                         }
-                    })
-                    .max()
-            }
+                    } else {
+                        None
+                    }
+                })
+                .max(),
         }
     }
 
-    /// Returns `true` if a file is part of the project and included in the paths to check.
+    /// Matches `path` against the paths passed to `ty check` (the project root by default).
     ///
-    /// A file is included in the checked files if it is a sub path of the project's root
-    /// (when no CLI path arguments are specified) or if it is a sub path of any path provided on the CLI (`ty check <paths>`) AND:
+    /// Files under a check path must match `src.include` and pass `src.exclude`.
+    /// In [`GlobFilterCheckMode::Adhoc`], an exact match on a check path sets
+    /// `is_explicit`. The globs apply to explicit files only with `--force-exclude`.
     ///
-    /// * It matches a positive `include` pattern and isn't excluded by a later negative `include` pattern.
-    /// * It doesn't match a positive `exclude` pattern or is re-included by a later negative `exclude` pattern.
-    ///
-    /// ## Note
-    ///
-    /// This method may return `true` for files that don't end up being included when walking the
-    /// project tree because it doesn't consider `.gitignore` and other ignore files when deciding
-    /// if a file's included.
-    pub(crate) fn is_file_included(
-        &self,
-        path: &SystemPath,
-        mode: GlobFilterCheckMode,
-    ) -> IncludeResult {
-        match self.match_included_paths(path, mode) {
+    /// Callers check ignore files, source types, and script metadata separately when indexing.
+    pub(crate) fn match_file(&self, path: &SystemPath, mode: GlobFilterCheckMode) -> FileMatch {
+        let path_match = self.match_included_paths(path, mode);
+        let is_explicit = path_match == Some(CheckPathMatch::Full);
+        let inclusion = match path_match {
             None => IncludeResult::NotIncluded,
-            Some(CheckPathMatch::Partial) => self.src_filter.is_file_included(path, mode),
-            Some(CheckPathMatch::Full) => IncludeResult::Included {
+            Some(_) if self.should_apply_filters(is_explicit) => {
+                self.src.files.is_file_included(path, mode)
+            }
+            Some(_) => IncludeResult::Included {
                 literal_match: Some(true),
             },
+        };
+        FileMatch {
+            inclusion,
+            is_explicit,
         }
     }
 
@@ -105,10 +103,10 @@ impl<'a> ProjectFilesFilter<'a> {
     ) -> IncludeResult {
         match self.match_included_paths(path, mode) {
             None => IncludeResult::NotIncluded,
-            Some(CheckPathMatch::Partial) => {
-                self.src_filter.is_directory_maybe_included(path, mode)
+            Some(path_match) if self.should_apply_filters(path_match == CheckPathMatch::Full) => {
+                self.src.files.is_directory_maybe_included(path, mode)
             }
-            Some(CheckPathMatch::Full) => IncludeResult::Included {
+            Some(_) => IncludeResult::Included {
                 literal_match: Some(true),
             },
         }
@@ -179,7 +177,6 @@ impl ProjectFilesWalker {
         };
 
         let filter = ProjectFilesFilter::from_project(db, project);
-        let exclude_scripts = project.settings(db).src().exclude_scripts;
         let files = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
         let cancellation = OnceLock::new();
@@ -191,7 +188,6 @@ impl ProjectFilesWalker {
             let files = &files;
             let diagnostics = &diagnostics;
             let cancellation = &cancellation;
-            let force_exclude = filter.force_exclude();
 
             // The memory walker runs on the caller's thread, where a different database may
             // already be attached. The caller tracks the file-set input, not this visitor's reads.
@@ -207,7 +203,9 @@ impl ProjectFilesWalker {
                                 return WalkState::Skip;
                             }
 
-                            let match_mode = if entry.depth() == 0 && force_exclude {
+                            let is_explicit = entry.depth() == 0;
+                            let apply_filters = filter.should_apply_filters(is_explicit);
+                            let match_mode = if is_explicit {
                                 GlobFilterCheckMode::Adhoc
                             } else {
                                 GlobFilterCheckMode::TopDown
@@ -215,7 +213,7 @@ impl ProjectFilesWalker {
 
                             // Skip excluded directories, including explicitly passed ones with `--force-exclude`.
                             if entry.file_type().is_directory() {
-                                if entry.depth() > 0 || force_exclude {
+                                if apply_filters {
                                     let directory_included =
                                         filter.is_directory_included(entry.path(), match_mode);
                                     return match directory_included {
@@ -239,16 +237,11 @@ impl ProjectFilesWalker {
                                     };
                                 }
                             } else {
-                                // For all files, except the ones that were explicitly passed to the walker (CLI),
-                                // check if they're included in the project.
-                                if entry.depth() > 0 || force_exclude {
-                                    match filter.is_file_included(entry.path(), match_mode) {
-                                        include_result @ IncludeResult::Included { .. } => {
-                                            // Ignore any non python files to avoid creating too many entries in `Files`.
-                                            // Unless the file is explicitly passed on the CLI or a literal match in the `include`, we then always assume it's a file ty can analyze
-                                            if entry.depth() > 0
-                                                && !include_result
-                                                    .should_index_file(db.system(), entry.path())
+                                if apply_filters {
+                                    let matched = filter.match_file(entry.path(), match_mode);
+                                    match matched.inclusion {
+                                        IncludeResult::Included { .. } => {
+                                            if !matched.should_index_file(db.system(), entry.path())
                                             {
                                                 return WalkState::Skip;
                                             }
@@ -276,9 +269,9 @@ impl ProjectFilesWalker {
                                 // We can ignore this.
                                 if let Ok(file) = system_path_to_file(&*db, entry.path()) {
                                     let is_script = script_tag(&*db, file).is_some();
-                                    if entry.depth() > 0 && exclude_scripts && is_script {
+                                    if is_script && filter.excludes_scripts(is_explicit) {
                                         tracing::debug!(
-                                            "Ignoring implicitly discovered PEP 723 script `{path}` \
+                                            "Ignoring PEP 723 script `{path}` \
                                             because `exclude-scripts` is enabled.",
                                             path = entry.path()
                                         );
