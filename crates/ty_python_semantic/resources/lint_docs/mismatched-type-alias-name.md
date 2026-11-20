@@ -21,6 +21,16 @@ def f(x: str):
     Id = TypeAliasType(x, int)
 ```
 
+## Fix safety
+
+This rule's autofix is usually marked as safe. ty marks it as unsafe if either of the following
+conditions holds:
+
+- The definition is outside module scope in a non-stub file. Changing the name can break pickling in
+    these scenarios.
+- The name argument is more complex than a bare name or a single string literal. Replacing it can
+    remove comments between adjacent literals or skip side effects.
+
 ## Rule history
 
 - v0.0.108: Split out from `mismatched-type-name`.

@@ -14,7 +14,8 @@ python-version = "3.12"
 ```py
 from typing import Literal, NewType, ParamSpec, TypeAliasType, TypedDict, TypeVar, TypeVarTuple
 
-type TypeVarName = Literal["T"]
+# The first string literal sets the quote style for the autofix below.
+type TypeVarName = Literal['T']  # fmt: skip
 type ParamSpecName = Literal["P"]
 type TypeVarTupleName = Literal["Ts"]
 type NewTypeName = Literal["UserId"]
@@ -48,16 +49,16 @@ def define_types(
 
 ```snapshot
 warning[mismatched-typevar-name]: The name passed to `TypeVar` must match the variable it is assigned to
-  --> src/mdtest_snippet.py:30:17
+  --> src/mdtest_snippet.py:31:17
    |
-30 |     U = TypeVar(type_var)  # snapshot: mismatched-typevar-name
+31 |     U = TypeVar(type_var)  # snapshot: mismatched-typevar-name
    |                 ^^^^^^^^ Expected "U", got "T"
-help: Use `"U"` as the name
+help: Use `'U'` as the name
    |
-29 |
+30 |
    -     U = TypeVar(type_var)  # snapshot: mismatched-typevar-name
-30 +     U = TypeVar("U")  # snapshot: mismatched-typevar-name
-31 |
+31 +     U = TypeVar('U')  # snapshot: mismatched-typevar-name
+32 |
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
