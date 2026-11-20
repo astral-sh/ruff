@@ -5,7 +5,6 @@ use ruff_text_size::TextRange;
 
 use crate::Db;
 use crate::place::{Place, PlaceAndQualifiers};
-use crate::types::class::known::KnownClass;
 use crate::types::class::{
     ClassLiteral, ClassType, DynamicClassHeaderAnchor, DynamicClassScopeOffset, MemberLookupPolicy,
     dynamic_class_header_range,
@@ -17,11 +16,22 @@ use crate::types::{Type, TypeQualifiers};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
+/// A member from a functional enum call, before applying user-defined construction methods.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub struct FunctionalEnumMember<'db> {
+    pub(crate) name: Name,
+    /// The inferred value at the call site, including standard generation and any
+    /// supported `type=` conversion.
+    pub(crate) value: Type<'db>,
+    /// For bare names and `auto()`, a custom `_generate_next_value_` can replace `value`.
+    pub(crate) is_auto: bool,
+}
+
 /// Functional enum member specification captured from the call site.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumSpec<'db> {
     #[returns(deref)]
-    pub(crate) members: Box<[(Name, Type<'db>)]>,
+    pub(crate) members: Box<[FunctionalEnumMember<'db>]>,
     #[returns(copy)]
     pub(crate) has_known_members: bool,
 }
@@ -37,10 +47,14 @@ impl<'db> EnumSpec<'db> {
         let members = self
             .members(db)
             .iter()
-            .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, env, div, true);
-                let ty = if nested { ty? } else { ty.unwrap_or(div) };
-                Some((name.clone(), ty))
+            .map(|member| {
+                let value = member
+                    .value
+                    .recursive_type_normalized_impl(db, env, div, true);
+                Some(FunctionalEnumMember {
+                    value: if nested { value? } else { value.unwrap_or(div) },
+                    ..member.clone()
+                })
             })
             .collect::<Option<Box<_>>>()?;
 
@@ -102,7 +116,7 @@ pub struct DynamicEnumLiteral<'db> {
     #[returns(ref)]
     pub anchor: DynamicEnumAnchor<'db>,
     #[returns(copy)]
-    pub base_class: KnownClass,
+    pub base_class: ClassLiteral<'db>,
     #[returns(copy)]
     pub mixin_type: Option<Type<'db>>,
 }
@@ -130,7 +144,8 @@ impl<'db> DynamicEnumLiteral<'db> {
             self.name(db),
             self.anchor(db)
                 .recursive_type_normalized_impl(db, env, div, nested)?,
-            self.base_class(db),
+            self.base_class(db)
+                .recursive_type_normalized_impl(db, env, div, nested)?,
             mixin_type,
         ))
     }
@@ -164,8 +179,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         if let Some(mixin) = self.mixin_type(db) {
             bases.push(mixin);
         }
-        let env = ProgramEnvironment::from_scope(self.scope(db));
-        bases.push(self.base_class(db).to_class_literal(db, &env));
+        bases.push(Type::from(self.base_class(db)));
         bases.into_boxed_slice()
     }
 
@@ -186,8 +200,7 @@ impl<'db> DynamicEnumLiteral<'db> {
     }
 
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let env = ProgramEnvironment::from_scope(self.scope(db));
-        KnownClass::EnumType.to_class_literal(db, &env)
+        self.base_class(db).metaclass(db)
     }
 
     #[salsa::tracked(
@@ -206,14 +219,6 @@ impl<'db> DynamicEnumLiteral<'db> {
 
     fn has_known_members(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_members(db)
-    }
-
-    fn mixin_class(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<ClassType<'db>> {
-        let mixin = self.mixin_type(db)?;
-        let ClassBase::Class(class) = ClassBase::try_from_type(db, env, mixin, None)? else {
-            return None;
-        };
-        Some(class)
     }
 
     fn with_unknown_member_fallback(
@@ -255,10 +260,9 @@ impl<'db> DynamicEnumLiteral<'db> {
     /// If members are unknown and nothing was found in the MRO, returns `Unknown`
     /// as a last resort to avoid false `missing-attribute` errors.
     ///
-    /// `policy` is forwarded to the mixin and enum-base lookups so that those lookups resolve the
-    /// same way they would on an equivalent class-syntax enum. For example, a caller asking for
-    /// `__eq__` with `MRO_NO_OBJECT_FALLBACK` must not be given `object.__eq__`: that would
-    /// describe the enum as defining its own equality and hide its real comparison semantics.
+    /// Looking up inherited members through the MRO respects `policy`. For example,
+    /// `MRO_NO_OBJECT_FALLBACK` lets a caller check whether any class before `object`
+    /// in the MRO supplies `__eq__`.
     ///
     /// The unknown-member fallback at the end does not consult `policy`. It exists to avoid false
     /// `missing-attribute` errors when the member names are not statically known, which is a
@@ -270,22 +274,8 @@ impl<'db> DynamicEnumLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let own = self.own_class_member(db, name);
-        if !own.is_undefined() {
-            return own.inner;
-        }
-        if let Some(mixin_class) = self.mixin_class(db, env) {
-            let result = mixin_class.class_member(db, env, name, policy);
-            if !result.place.is_undefined() {
-                return result;
-            }
-        }
-        let result = self
-            .base_class(db)
-            .to_class_literal(db, env)
-            .as_class_literal()
-            .map(|cls| cls.class_member(db, env, name, policy))
-            .unwrap_or_else(|| Place::Undefined.into());
+        let class = ClassLiteral::DynamicEnum(self);
+        let result = class.class_member_from_mro(db, env, name, policy, class.iter_mro(db));
 
         // When members are unknown (e.g. `Enum("E", some_var)`), any name could
         // still be a member. Only fall back to `Unknown` after exhausting the
@@ -304,17 +294,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        if let Some(mixin_class) = self.mixin_class(db, env) {
-            let result = mixin_class.instance_member(db, env, name);
-            if !result.place.is_undefined() {
-                return result;
-            }
-        }
-        let result = self
-            .base_class(db)
-            .to_instance(db, env)
-            .instance_member(db, env, name);
-
+        let result = ClassLiteral::DynamicEnum(self).dynamic_instance_member(db, env, name);
         self.with_unknown_member_fallback(db, result)
     }
 

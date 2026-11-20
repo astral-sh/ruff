@@ -100,9 +100,12 @@ reveal_type(Planet(1, 3.303e23, 2.4397e6))  # revealed: Planet
 
 class EmptyEnum(Enum): ...
 
-# TODO: these raise `TypeError` at runtime, but we do not yet emit diagnostics for them.
+# TODO: this raises `TypeError` at runtime, but we do not yet emit a diagnostic for it.
 reveal_type(EmptyEnum(foo=1))  # revealed: EmptyEnum
-reveal_type(EmptyEnum(1, 2))  # revealed: EmptyEnum
+
+# error: [invalid-argument-type] "parameter `value` of `EmptyEnum()`"
+# error: [invalid-argument-type] "parameter `names` of `EmptyEnum()`"
+EmptyEnum(1, 2)
 
 Dynamic = Enum("Dynamic", {"RED": "red", "GREEN": "green"})
 
@@ -124,6 +127,18 @@ class Triple(Enum):
     OTHER = 4, 5, 6
 
 reveal_type(Triple(1, 2, 3))  # revealed: Triple
+```
+
+Because `Pair` already has members, `Pair("key", 1)` looks up `Pair.ITEM` by its tuple value.
+`mismatched-enum-name` only applies when a call creates an enum class, so we can assign this member
+to a variable with any name.
+
+```py
+class Pair(Enum):
+    ITEM = "key", 1
+
+item = Pair("key", 1)
+reveal_type(item)  # revealed: Pair
 ```
 
 ## Enum members
@@ -2813,6 +2828,123 @@ Color = Enum("Color", names="RED GREEN BLUE")
 reveal_type(enum_members(Color))
 ```
 
+### User-defined enum bases
+
+Calling a memberless enum with a class name and members creates a subclass.
+
+```py
+from enum import IntEnum
+from typing import Self
+
+class Base(IntEnum):
+    def duplicate(self) -> Self:
+        return self
+
+Color = Base("Color", "RED BLUE")
+reveal_type(Color)  # revealed: <class 'Color'>
+reveal_type(Color.BLUE)  # revealed: Literal[Color.BLUE]
+reveal_type(Color.BLUE.value)  # revealed: Literal[2]
+reveal_type(Color(1).duplicate())  # revealed: Color
+
+# error: [mismatched-enum-name] "Expected "Shade", got "Shades""
+Shade = Base("Shades", "LIGHT DARK")
+reveal_type(Shade.LIGHT)  # revealed: Literal[Shades.LIGHT]
+
+def make(name: str):
+    reveal_type(Base(name, names="A B"))  # revealed: type[Base]
+```
+
+### Custom metaclasses
+
+The generated subclass has the same metaclass as the memberless enum.
+
+```py
+from enum import Enum, EnumMeta
+
+class Meta(EnumMeta): ...
+class Base(Enum, metaclass=Meta): ...
+
+Color = Base("Color", "RED BLUE")
+reveal_type(type(Color))  # revealed: <class 'Meta'>
+```
+
+Here `CustomCall.__call__` returns its positional arguments as a tuple. `mismatched-enum-name` only
+compares the first argument with the assignment target when the call creates an enum class.
+
+```py
+class CustomCall(EnumMeta):
+    def __call__(cls, *args, **kwargs):
+        return args
+
+class Custom(Enum, metaclass=CustomCall): ...
+
+pair = Custom("first", "second")  # ok
+```
+
+### Inherited value generation
+
+The base enum's `_generate_next_value_` supplies the values for bare names and `auto()`.
+
+```py
+from enum import Enum, Flag, StrEnum, auto
+from typing import Literal
+
+class Text(StrEnum): ...
+class Bits(Flag): ...
+
+Color = Text("Color", "RED BLUE")
+Access = Bits("Access", "READ WRITE EXECUTE")
+reveal_type(Color.BLUE.value)  # revealed: Literal["blue"]
+reveal_type(Access.EXECUTE.value)  # revealed: Literal[4]
+```
+
+A generated value can match an explicit value, making the later member an alias.
+
+```py
+class Constant(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[42]:
+        return 42
+
+Numbers = Constant("Numbers", {"ZERO": 0, "FIRST": 42, "SECOND": auto()})
+reveal_type(Numbers.SECOND)  # revealed: Literal[Numbers.FIRST]
+```
+
+The generator's return annotation can refer to the enum being created.
+
+```py
+class TreeBase(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> list["Tree"]:
+        return []
+
+Tree = TreeBase("Tree", "ROOT")
+reveal_type(Tree.ROOT.value)  # revealed: list[Tree]
+```
+
+### Inherited member constructors
+
+A base enum's `__new__` can replace the supplied value, so ty uses `Any` for `.value` unless the
+enum inherits a `_value_` annotation.
+
+```py
+from enum import Enum
+
+class Stringify(Enum):
+    def __new__(cls, value: int):
+        obj = object.__new__(cls)
+        obj._value_ = str(value)
+        return obj
+
+class Annotated(Stringify):
+    _value_: str
+
+First = Stringify("First", "A B")
+Second = Annotated("Second", "A B")
+reveal_type(First.A.value)  # revealed: Any
+reveal_type(Second.A.value)  # revealed: str
+```
+
 ### Name mismatch diagnostics
 
 When enabled, `mismatched-enum-name` checks whether a class name with a string literal type matches
@@ -3192,7 +3324,7 @@ Color = Enum("Color", 123)
 reveal_type(enum_members(Color))  # revealed: Unknown
 ```
 
-Empty functional enums are valid, even though they have no members:
+An empty functional enum can serve as a base for another enum in either syntax.
 
 ```py
 from enum import Enum
@@ -3205,6 +3337,9 @@ EmptyFromDict = Enum("EmptyFromDict", {})
 reveal_type(enum_members(EmptyFromString))  # revealed: tuple[()]
 reveal_type(enum_members(EmptyFromList))  # revealed: tuple[()]
 reveal_type(enum_members(EmptyFromDict))  # revealed: tuple[()]
+
+Shape = EmptyFromList(value="Shape", names="CIRCLE SQUARE")
+reveal_type(Shape.CIRCLE)  # revealed: Literal[Shape.CIRCLE]
 
 class ExtendedEmpty(EmptyFromString):
     A = 1
@@ -3439,6 +3574,23 @@ class StaticHttp(int, Enum):
     NOT_FOUND = 2
 
 reveal_mro(StaticHttp)  # revealed: (<class 'StaticHttp'>, <class 'int'>, <class 'Enum'>, <class 'object'>)
+```
+
+When the mixin and the enum base share an ancestor, an override on the enum base takes precedence
+over the shared ancestor's method.
+
+```py
+class Parent:
+    def label(self) -> object: ...
+
+class Mixin(Parent): ...
+
+class Base(Parent, Enum):
+    def label(self) -> str:
+        return "label"
+
+Child = Base("Child", "A B", type=Mixin)
+reveal_type(Child(1).label())  # revealed: str
 ```
 
 ### Fallback MROs

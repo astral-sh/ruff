@@ -4,7 +4,9 @@ use std::fmt::Write;
 pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
-pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
+pub(super) use self::enum_literal::{
+    DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec, FunctionalEnumMember,
+};
 use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
@@ -1084,10 +1086,28 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::Static(class) => class.instance_member(db, env, specialization, name),
-            Self::Dynamic(class) => class.instance_member(db, env, name),
+            Self::Dynamic(_) => self.dynamic_instance_member(db, env, name),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.instance_member(db, env, name),
             Self::DynamicTypedDict(_) => PlaceAndQualifiers::default(),
             Self::DynamicEnum(enum_lit) => enum_lit.instance_member(db, env, name),
+        }
+    }
+
+    /// Look up instance attributes along the MRO of a dynamically created class.
+    fn dynamic_instance_member(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
+        match MroLookup::new(db, env, self.iter_mro(db)).instance_member(name) {
+            InstanceMemberResult::Done(result) => result,
+            InstanceMemberResult::TypedDict => {
+                // Simplified `TypedDict` handling without type mapping.
+                KnownClass::TypedDictFallback
+                    .to_instance(db, env)
+                    .instance_member(db, env, name)
+            }
         }
     }
 
@@ -2211,20 +2231,7 @@ impl<'db> ClassType<'db> {
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::NonGeneric(ClassLiteral::Dynamic(class)) => class.instance_member(db, env, name),
-            Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
-                namedtuple.instance_member(db, env, name)
-            }
-            Self::NonGeneric(ClassLiteral::DynamicTypedDict(_)) => PlaceAndQualifiers::default(),
-            Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
-                enum_lit.instance_member(db, env, name)
-            }
-            Self::NonGeneric(ClassLiteral::Static(class)) => {
-                if class.is_typed_dict(db) {
-                    return Place::Undefined.into();
-                }
-                class.instance_member(db, env, None, name)
-            }
+            Self::NonGeneric(class) => class.instance_member(db, env, None, name),
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
                 let specialization = Some(generic.specialization(db));

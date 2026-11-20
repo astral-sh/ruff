@@ -11,7 +11,7 @@ use crate::{
         SubclassOfType, Type,
         class::{
             ClassMemberResult, ClassMetaclass, CodeGeneratorKind, DisjointBase,
-            DynamicClassHeaderAnchor, DynamicClassScopeOffset, InstanceMemberResult, MroLookup,
+            DynamicClassHeaderAnchor, DynamicClassScopeOffset, MroLookup,
             dynamic_class_header_range, typed_dict::typed_dict_fallback_class_member,
         },
         definition_expression_type, extract_fixed_length_iterable_element_types,
@@ -383,24 +383,6 @@ impl<'db> DynamicClassLiteral<'db> {
     /// to iterating over base MROs sequentially with deduplication.
     pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
         MroIterator::new(db, ClassLiteral::Dynamic(self), None)
-    }
-
-    /// Look up an instance member by iterating through the MRO.
-    pub(crate) fn instance_member(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        name: &str,
-    ) -> PlaceAndQualifiers<'db> {
-        match MroLookup::new(db, env, self.iter_mro(db)).instance_member(name) {
-            InstanceMemberResult::Done(result) => result,
-            InstanceMemberResult::TypedDict => {
-                // Simplified `TypedDict` handling without type mapping.
-                KnownClass::TypedDictFallback
-                    .to_instance(db, env)
-                    .instance_member(db, env, name)
-            }
-        }
     }
 
     /// Look up a class-level member by iterating through the MRO.

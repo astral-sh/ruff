@@ -457,6 +457,127 @@ impl KnownClass {
         }
     }
 
+    /// Return `true` for a memberless base class from the standard library's `enum` module
+    /// that supports the functional enum API.
+    pub(in crate::types) const fn is_stdlib_enum_base(self) -> bool {
+        match self {
+            Self::Enum | Self::StrEnum | Self::IntEnum | Self::Flag | Self::IntFlag => true,
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
+            | Self::Type
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::Slice
+            | Self::Property
+            | Self::BaseException
+            | Self::NotImplementedError
+            | Self::Exception
+            | Self::Warning
+            | Self::BaseExceptionGroup
+            | Self::ExceptionGroup
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
+            | Self::AsyncGenerator
+            | Self::Deprecated
+            | Self::Super
+            | Self::EnumProperty
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::ABCMeta
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::WrapperDescriptorType
+            | Self::MemberDescriptorType
+            | Self::GetSetDescriptorType
+            | Self::UnionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::CoroutineType
+            | Self::NoneType
+            | Self::StdlibAlias
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ExtensionsTypeVar
+            | Self::ParamSpec
+            | Self::ExtensionsParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::TypeVarTuple
+            | Self::ExtensionsTypeVarTuple
+            | Self::Sentinel
+            | Self::TypeAliasType
+            | Self::ExtensionsTypeAliasType
+            | Self::NoDefaultType
+            | Self::NewType
+            | Self::Hashable
+            | Self::SupportsIndex
+            | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::Iterator
+            | Self::TyExtensionsIterator
+            | Self::AsyncIterator
+            | Self::Sequence
+            | Self::Mapping
+            | Self::MutableMapping
+            | Self::SupportsKeysAndGetItem
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
+            | Self::VersionInfo
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::Field
+            | Self::KwOnly
+            | Self::NamedTupleFallback
+            | Self::NamedTupleLike
+            | Self::ConstraintSet
+            | Self::ConstraintSetSolution
+            | Self::GenericContext
+            | Self::Specialization
+            | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
+            | Self::BuiltinFunctionType
+            | Self::ProtocolMeta
+            | Self::Template
+            | Self::Path
+            | Self::FunctoolsPartial
+            | Self::UnittestTestCase
+            | Self::DjangoModel
+            | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
+            | Self::PydanticRootModel
+            | Self::PydanticStrict
+            | Self::PytestParametrizeMarkDecorator => false,
+        }
+    }
+
     /// Return `true` if this class is a subclass of `enum.Enum` *and* has enum members, i.e.
     /// if it is an "actual" enum, not `enum.Enum` itself or a similar custom enum class.
     pub(crate) const fn is_enum_subclass_with_members(self) -> bool {

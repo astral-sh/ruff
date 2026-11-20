@@ -3677,12 +3677,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && function.is_known(self.db(), KnownFunction::NewClass)
                     {
                         self.infer_new_class_call(call_expr, Some(definition))
-                    } else if let Some(base_class) =
-                        enum_call::enum_functional_call_base(self.db(), callable_type)
-                        && let Some(ty) =
-                            self.infer_enum_call_expression(call_expr, Some(definition), base_class)
-                    {
-                        ty
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -3738,11 +3732,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(KnownClass::Sentinel) => self
                                 .infer_sentinel_expression(target, call_expr, definition)
                                 .unwrap_or_else(|| {
-                                    self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                                    self.infer_call_expression_impl(
+                                        call_expr,
+                                        callable_type,
+                                        tcx,
+                                        Some(definition),
+                                    )
                                 }),
-                            Some(_) | None => {
-                                self.infer_call_expression_impl(call_expr, callable_type, tcx)
-                            }
+                            Some(_) | None => self.infer_call_expression_impl(
+                                call_expr,
+                                callable_type,
+                                tcx,
+                                Some(definition),
+                            ),
                         }
                     };
 
@@ -9612,7 +9614,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let callable_type = self.infer_callee(&call_expression.func);
 
-        self.infer_call_expression_impl(call_expression, callable_type, tcx)
+        self.infer_call_expression_impl(call_expression, callable_type, tcx, None)
     }
 
     /// Infer a callable expression without introducing new type variable bindings.
@@ -9717,6 +9719,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression: &ast::ExprCall,
         mut callable_type: Type<'db>,
         call_expression_tcx: TypeContext<'db>,
+        definition: Option<Definition<'db>>,
     ) -> Type<'db> {
         fn report_missing_implicit_constructor_call<'db>(
             context: &InferContext<'db, '_>,
@@ -9829,8 +9832,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Handle `Enum(name, members)`.
-        if let Some(base_class) = enum_call::enum_functional_call_base(self.db(), callable_type)
-            && let Some(ty) = self.infer_enum_call_expression(call_expression, None, base_class)
+        if let Some(ty) =
+            self.infer_enum_call_expression(call_expression, definition, callable_type)
         {
             return ty;
         }
