@@ -34,46 +34,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let arguments = &call_expr.arguments;
 
         // `new_class(name, bases=(), kwds=None, exec_body=None)`
-        // We need at least the `name` argument.
-        let no_positional_args = arguments.args().next().is_none();
-        if no_positional_args {
-            // Check if `name` is provided as a keyword argument.
-            let name_keyword = arguments
-                .keywords()
-                .find(|kw| kw.arg.as_deref() == Some("name"));
-
-            if name_keyword.is_none() {
-                // Infer all keyword values for side effects.
-                for keyword in arguments.keywords() {
-                    self.infer_expression(&keyword.value, TypeContext::default());
-                }
-                if let Some(builder) = self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr) {
-                    builder.into_diagnostic("No overload of `types.new_class` matches arguments");
-                }
-                return SubclassOfType::subclass_of_unknown();
+        let [name_kw, bases_kw, exec_body_kw] = arguments
+            .find_keywords(["name", "bases", "exec_body"])
+            .map(|kw| kw.map(|kw| kw.value.as_ref()));
+        let mut positional = arguments.args();
+        let Some(name_node) = positional.next().or(name_kw) else {
+            // Infer all keyword values for side effects.
+            for keyword in arguments.keywords() {
+                self.infer_expression(&keyword.value, TypeContext::default());
             }
-        }
-
-        // Find the arguments we treat specially while preserving normal call-binding diagnostics.
-        let name_node = arguments.args().next().or_else(|| {
-            arguments
-                .keywords()
-                .find(|kw| kw.arg.as_deref() == Some("name"))
-                .map(|kw| kw.value.as_ref())
-        });
-        let bases_arg = dynamic_class_bases_argument(&call_expr.arguments);
+            if let Some(builder) = self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr) {
+                builder.into_diagnostic("No overload of `types.new_class` matches arguments");
+            }
+            return SubclassOfType::subclass_of_unknown();
+        };
+        let bases_arg = positional.next().or(bases_kw);
+        let exec_body_arg = positional.nth(1).or(exec_body_kw);
 
         self.validate_new_class_call_arguments(call_expr, name_node, bases_arg, definition);
 
-        let name_type = name_node
-            .map(|node| self.expression_type(node))
-            .unwrap_or_else(Type::unknown);
+        let name_type = self.expression_type(name_node);
 
         let name = if let Some(literal) = name_type.as_string_literal() {
             literal.value(db)
         } else {
-            if let Some(name_node) = name_node
-                && !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+            if !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_node)
             {
                 let mut diagnostic = builder.into_diagnostic(
@@ -128,12 +113,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // TODO: Model `kwds`, especially `{"metaclass": Meta}`. `types.new_class()` uses the
         // third argument for explicit metaclass overrides, but we currently only account for
         // metaclass behavior that follows from the resolved bases.
-        let exec_body_arg = arguments.args().nth(3).or_else(|| {
-            arguments
-                .keywords()
-                .find(|kw| kw.arg.as_deref() == Some("exec_body"))
-                .map(|kw| kw.value.as_ref())
-        });
         let has_exec_body = exec_body_arg.is_some_and(|arg| !arg.is_none_literal_expr());
         let members: Box<[(ast::name::Name, Type<'db>)]> = Box::new([]);
         let dynamic_class =
@@ -245,7 +224,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn validate_new_class_call_arguments(
         &mut self,
         call_expr: &ast::ExprCall,
-        name_node: Option<&ast::Expr>,
+        name_node: &ast::Expr,
         bases_arg: Option<&ast::Expr>,
         definition: Option<Definition<'db>>,
     ) {
@@ -263,7 +242,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ArgumentsIter::from_ast(&call_expr.arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                if name_node.is_some_and(|name| std::ptr::eq(expr, name)) {
+                if std::ptr::eq(expr, name_node) {
                     let _ = builder.infer_expression(expr, tcx);
                     KnownClass::Str.to_instance(db, env)
                 } else if bases_arg.is_some_and(|bases| std::ptr::eq(expr, bases)) {

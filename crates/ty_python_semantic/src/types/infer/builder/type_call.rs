@@ -95,7 +95,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (Some(name), Some(bases), Some(namespace), None) => [name, bases, namespace],
 
             _ => {
+                let mut count = 0;
                 for arg in arguments.args() {
+                    count += 1;
                     self.infer_expression(arg, TypeContext::default());
                 }
 
@@ -104,8 +106,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         builder.into_diagnostic("No overload of class `type` matches arguments");
                     diagnostic.help(format_args!(
                         "`builtins.type()` can either be called with one or three \
-                        positional arguments (got {})",
-                        arguments.args().count()
+                        positional arguments (got {count})"
                     ));
                 }
 
@@ -132,7 +133,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // If any argument is a starred expression, we can't know how many positional arguments
         // we're receiving, so fall back to `type[Unknown]` to avoid false-positive errors.
-        if arguments.args().any(ast::Expr::is_starred_expr) {
+        if [name_arg, bases_arg, namespace_arg]
+            .into_iter()
+            .any(ast::Expr::is_starred_expr)
+        {
             return SubclassOfType::subclass_of_unknown();
         }
 

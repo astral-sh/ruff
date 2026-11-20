@@ -4250,20 +4250,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         let arguments = &call_expr.arguments;
 
-        if let Some(starred) = arguments.args().find(|arg| arg.is_starred_expr()) {
-            return error(
-                &self.context,
-                "Starred arguments are not supported in `TypeAliasType` creation",
-                starred,
-            );
+        let mut count = 0;
+        for arg in arguments.args() {
+            if arg.is_starred_expr() {
+                return error(
+                    &self.context,
+                    "Starred arguments are not supported in `TypeAliasType` creation",
+                    arg,
+                );
+            }
+            count += 1;
         }
 
-        if arguments.args().count() > 2 {
+        if count > 2 {
             return error(
                 &self.context,
                 format_args!(
-                    "Expected at most 2 positional arguments to `TypeAliasType`, got {}",
-                    arguments.args().count()
+                    "Expected at most 2 positional arguments to `TypeAliasType`, got {count}"
                 ),
                 call_expr,
             );
