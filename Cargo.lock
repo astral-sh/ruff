@@ -4997,6 +4997,7 @@ dependencies = [
  "char_str",
  "dunce",
  "mdtest",
+ "rayon",
  "ruff_db",
  "ruff_diagnostics",
  "ruff_macros",
