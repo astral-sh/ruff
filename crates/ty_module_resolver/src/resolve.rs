@@ -1667,18 +1667,8 @@ fn is_legacy_namespace_package(
     context: &ResolverContext,
     init: File,
 ) -> bool {
-    static PKG_FINDER: LazyLock<Finder<'static>> = LazyLock::new(|| Finder::new("pkg"));
-
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
     if package_path.search_path().is_standard_library() {
-        return false;
-    }
-
-    // Both namespace idioms reference `pkgutil` or `pkg_resources`. Keep non-ASCII
-    // sources as candidates because Python normalizes identifiers with NFKC.
-    // This best-effort filter does not account for escaped or concatenated module names.
-    let source = source_text(context.db, init);
-    if source.is_ascii() && PKG_FINDER.find(source.as_bytes()).is_none() {
         return false;
     }
 
@@ -1706,6 +1696,16 @@ fn is_legacy_namespace_package(
 /// ```
 #[salsa::tracked(returns(copy))]
 fn has_legacy_namespace_declaration(db: &dyn Db, init: PythonFile<'_>) -> bool {
+    static PKG_FINDER: LazyLock<Finder<'static>> = LazyLock::new(|| Finder::new("pkg"));
+
+    // Both namespace idioms reference `pkgutil` or `pkg_resources`. Keep non-ASCII
+    // sources as candidates because Python normalizes identifiers with NFKC.
+    // This best-effort filter does not account for escaped or concatenated module names.
+    let source = source_text(db, init.file(db));
+    if source.is_ascii() && PKG_FINDER.find(source.as_bytes()).is_none() {
+        return false;
+    }
+
     // This is all syntax-only analysis so it *could* be fooled but it's really unlikely.
     //
     // The benefit of being syntax-only is speed and avoiding circular dependencies
