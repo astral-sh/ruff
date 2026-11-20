@@ -161,6 +161,7 @@ impl RuffSettingsIndex {
 
         tracing::debug!("Indexing settings for workspace: {}", root.display());
 
+        let configuration_cache = ruff_workspace::resolver::ConfigurationCache::default();
         let mut has_error = false;
         let mut respect_gitignore = None;
         let mut index = BTreeMap::default();
@@ -175,10 +176,11 @@ impl RuffSettingsIndex {
         for directory in root.ancestors().skip(should_skip_workspace) {
             match settings_toml(directory) {
                 Ok(Some(pyproject)) => {
-                    match ruff_workspace::resolver::resolve_root_settings(
+                    match ruff_workspace::resolver::resolve_scoped_settings(
                         &pyproject,
                         &transformer,
                         ConfigurationOrigin::Ancestor,
+                        Some(&configuration_cache),
                     ) {
                         Ok(resolved) => {
                             tracing::debug!("Loaded settings from: `{}`", pyproject.display());
@@ -302,10 +304,11 @@ impl RuffSettingsIndex {
 
                 match settings_toml(&directory) {
                     Ok(Some(pyproject)) => {
-                        match ruff_workspace::resolver::resolve_root_settings(
+                        match ruff_workspace::resolver::resolve_scoped_settings(
                             &pyproject,
                             &transformer,
                             ConfigurationOrigin::Ancestor,
+                            Some(&configuration_cache),
                         ) {
                             Ok(settings) => {
                                 tracing::debug!(

@@ -291,7 +291,7 @@ pub trait ConfigurationTransformer {
 /// Paths are already normalized, so the project root is part of the cache key.
 /// Target-version fallbacks and CLI overrides remain specific to each chain.
 #[derive(Default)]
-struct ConfigurationCache {
+pub struct ConfigurationCache {
     configurations: RwLock<FxHashMap<(PathBuf, PathBuf), Arc<Configuration>>>,
 }
 
@@ -407,7 +407,7 @@ fn resolve_configuration_with_cache(
 }
 
 /// Resolve settings from a configuration file, reusing configuration files shared by the traversal.
-fn resolve_scoped_settings(
+pub fn resolve_scoped_settings(
     pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin<'_>,
