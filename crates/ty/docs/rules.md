@@ -1027,8 +1027,8 @@ This rule is disabled by default. It is intended for advanced users wanting addi
 checks from their type checker, not for users who have just started to use type checkers on their
 Python code.
 
-[ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
-[ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/
+[ann201]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-public-function/
+[ann202]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-private-function/
 [dynamic type]: https://typing.python.org/en/latest/spec/glossary.html#term-dynamic-type
 
 ## `escape-character-in-forward-annotation`
@@ -1450,16 +1450,16 @@ second argument.
 
 Ruff has several rules that will encourage you to rename a parameter, or change its type signature,
 if it thinks you're falling into a certain anti-pattern. For example, Ruff's
-[ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an unused
-parameter should either be removed or renamed to start with `_`. Renaming the parameter in an
+[`ARG002`](https://docs.astral.sh/ruff/rules/unused-method-parameter/) rule recommends that an
+unused parameter should either be removed or renamed to start with `_`. Renaming the parameter in an
 override can trigger [`lost-keyword-for-regular-parameter`](#lost-keyword-for-regular-parameter) if the base method accepts it by keyword.
 Removing the parameter can trigger [`incompatible-method-override`](#incompatible-method-override) if the override no longer accepts
 a call allowed by the base method.
 
 This can usually be resolved by adding [`@typing.override`][override] to your method definition.
 Ruff knows that a method decorated with `@typing.override` is intended to override a method by the
-same name on a superclass, and avoids reporting rules like ARG002 for such methods; it knows that
-the changes recommended by ARG002 would violate the Liskov Substitution Principle.
+same name on a superclass, and avoids reporting rules like `ARG002` for such methods; it knows that
+the changes recommended by `ARG002` would violate the Liskov Substitution Principle.
 
 Correct use of `@override` is enforced by ty's [`invalid-explicit-override`](#invalid-explicit-override) rule.
 
@@ -8385,11 +8385,11 @@ Python code.
 - v0.0.102: Renamed to [`unsound-return`](#unsound-return). [`unsound-return-statement`](#unsound-return-statement) remains as a compatibility alias
     for this rule.
 
-[ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
-[ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/
-[ann204]: https://docs.astral.sh/ruff/rules/missing-return-type-special-method/
-[ann205]: https://docs.astral.sh/ruff/rules/missing-return-type-static-method/
-[ann206]: https://docs.astral.sh/ruff/rules/missing-return-type-class-method/
+[ann201]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-public-function/
+[ann202]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-private-function/
+[ann204]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-special-method/
+[ann205]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-static-method/
+[ann206]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-class-method/
 [assignable]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 [fully-static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
 [mypy-strict]: https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-strict
@@ -8535,11 +8535,11 @@ generator boundaries.
     unsound `yield` expressions
 - [`unsound-assignment`](#unsound-assignment) is a similar rule that triggers on unsound assignments
 
-[ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
-[ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/
-[ann204]: https://docs.astral.sh/ruff/rules/missing-return-type-special-method/
-[ann205]: https://docs.astral.sh/ruff/rules/missing-return-type-static-method/
-[ann206]: https://docs.astral.sh/ruff/rules/missing-return-type-class-method/
+[ann201]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-public-function/
+[ann202]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-private-function/
+[ann204]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-special-method/
+[ann205]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-static-method/
+[ann206]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-class-method/
 [assignable]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 [fully-static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
 [subtype]: https://typing.python.org/en/latest/spec/glossary.html#term-subtype

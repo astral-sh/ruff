@@ -122,11 +122,11 @@ Python code.
 - v0.0.102: Renamed to `unsound-return`. `unsound-return-statement` remains as a compatibility alias
     for this rule.
 
-[ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
-[ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/
-[ann204]: https://docs.astral.sh/ruff/rules/missing-return-type-special-method/
-[ann205]: https://docs.astral.sh/ruff/rules/missing-return-type-static-method/
-[ann206]: https://docs.astral.sh/ruff/rules/missing-return-type-class-method/
+[ann201]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-public-function/
+[ann202]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-private-function/
+[ann204]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-special-method/
+[ann205]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-static-method/
+[ann206]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-class-method/
 [assignable]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 [fully-static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
 [mypy-strict]: https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-strict
