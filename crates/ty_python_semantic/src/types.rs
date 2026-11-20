@@ -10139,10 +10139,7 @@ impl<'db> Type<'db> {
         // Inferred types can share entire unions across multiple alternatives.
         // Materialize each shared union once per direction.
         if matches!(self, Type::Callable(_) | Type::FunctionLiteral(_))
-            || matches!(
-                (self, type_mapping),
-                (Type::Union(_), TypeMapping::Materialize(_))
-            )
+            || (self.is_union() && matches!(type_mapping, TypeMapping::Materialize(_)))
         {
             visitor.visit(db, self, type_mapping, map)
         } else {

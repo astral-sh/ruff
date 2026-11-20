@@ -1365,6 +1365,25 @@ fn benchmark_nested_generic_materialization(criterion: &mut Criterion) {
     }
 }
 
+/// Both alternatives contain the same union at the previous depth. Materializing
+/// the shared type separately for each alternative doubles the work at each level.
+fn benchmark_shared_union_materialization(criterion: &mut Criterion) {
+    for depth in [10, 14] {
+        let mut code =
+            String::from("from typing import Any\nfrom ty_extensions import Top\nA0 = Any\n");
+        for i in 1..=depth {
+            let previous = i - 1;
+            writeln!(code, "A{i} = list[A{previous}] | set[A{previous}]").unwrap();
+        }
+        writeln!(code, "def f(x: Top[A{depth}]): ...").unwrap();
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[shared_union_materialization_{depth}]"),
+            &code,
+        );
+    }
+}
+
 /// Materializing nested callables reuses shared parameter and return types. A recursive leaf
 /// permits reuse after its cycle closes; a cycle through the whole graph also needs reuse while
 /// the cycle is still active. Both cases should avoid exponential work as the nesting grows.
@@ -3006,6 +3025,7 @@ criterion_group!(
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
     benchmark_nested_generic_materialization,
+    benchmark_shared_union_materialization,
     benchmark_recursive_callable_materialization,
     benchmark_recursive_protocol_growing_specialization,
     benchmark_recursive_protocol_specialized_receiver,
