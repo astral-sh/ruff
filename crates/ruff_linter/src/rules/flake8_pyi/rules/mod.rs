@@ -2,11 +2,12 @@ use std::fmt;
 
 use anyhow::Result;
 
-use ruff_python_ast::{Expr, ExprContext, ExprName, ExprSubscript, ExprTuple, name::Name};
+use ruff_python_ast::{BuildId, Builder, Expr, ExprSubscript};
 use ruff_python_codegen::Generator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::TypingImporter;
+use crate::fix::syntax;
 use crate::{Applicability, Edit, Fix};
 
 pub(crate) use any_eq_ne_annotation::*;
@@ -119,40 +120,81 @@ impl fmt::Display for TypingModule {
 }
 
 /// Generate a [`Fix`] for two or more type expressions, e.g. `typing.Union[int, float, complex]`.
-fn generate_union_fix(
+fn generate_union_fix<'a>(
     generator: Generator,
     importer: &TypingImporter,
-    nodes: Vec<&Expr>,
-    annotation: &Expr,
+    nodes: impl ExactSizeIterator<Item = Option<Expr<'a>>>,
+    annotation: Expr<'_>,
     applicability: Applicability,
 ) -> Result<Fix> {
     debug_assert!(nodes.len() >= 2, "At least two nodes required");
 
     let (import_edit, binding) = importer.import(annotation.start())?;
 
-    // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
-    let new_expr = Expr::Subscript(ExprSubscript {
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        value: Box::new(Expr::Name(ExprName {
-            id: Name::new(binding),
-            ctx: ExprContext::Store,
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })),
-        slice: Box::new(Expr::Tuple(ExprTuple {
-            elts: nodes.into_iter().cloned().collect(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            ctx: ExprContext::Load,
-            parenthesized: false,
-        })),
-        ctx: ExprContext::Load,
-    });
+    let mut builder = Builder::default();
+    let value = syntax::name(&mut builder, &binding);
+    let elts = builder.map_list(nodes, union_member);
+    let union = syntax::subscript_tuple(&mut builder, value, elts);
 
     Ok(Fix::applicable_edits(
-        Edit::range_replacement(generator.expr(&new_expr), annotation.range()),
+        Edit::range_replacement(generator.expr(builder.get(union)), annotation.range()),
         [import_edit],
         applicability,
     ))
+}
+
+/// Generate a union expression from the remaining members of a PEP 604 union.
+fn generate_pep604_fix<'a>(
+    generator: Generator,
+    mut nodes: impl Iterator<Item = Option<Expr<'a>>>,
+    annotation: Expr<'_>,
+    applicability: Applicability,
+) -> Option<Fix> {
+    let mut builder = Builder::default();
+    let mut union = union_member(&mut builder, nodes.next()?);
+    for node in nodes {
+        let member = union_member(&mut builder, node);
+        union = syntax::bit_or(&mut builder, union, member);
+    }
+    Some(Fix::applicable_edit(
+        Edit::range_replacement(generator.expr(builder.get(union)), annotation.range()),
+        applicability,
+    ))
+}
+
+/// `Optional[T]` contributes a `None` member without a corresponding source node.
+fn union_member(
+    builder: &mut Builder,
+    member: Option<Expr<'_>>,
+) -> BuildId<ruff_python_ast::kind::Expr> {
+    match member {
+        Some(node) => builder.copy_node(node),
+        None => syntax::none(builder),
+    }
+}
+
+/// Replaces a group of union members while keeping the other members and the union's spelling.
+fn union_with_replacement<'a>(
+    builder: &mut Builder,
+    replacement: BuildId<ruff_python_ast::kind::Expr>,
+    remaining: Vec<Expr<'a>>,
+    subscript: Option<ExprSubscript<'a>>,
+) -> BuildId<ruff_python_ast::kind::Expr> {
+    if remaining.is_empty() {
+        return replacement;
+    }
+    if let Some(subscript) = subscript {
+        let value = builder.copy_node(subscript.value());
+        let mut members = Vec::with_capacity(remaining.len() + 1);
+        members.push(replacement);
+        members.extend(
+            remaining
+                .into_iter()
+                .map(|member| builder.copy_node(member)),
+        );
+        let elts = builder.list(members);
+        syntax::subscript_tuple(builder, value, elts)
+    } else {
+        syntax::extend_union(builder, replacement, remaining)
+    }
 }

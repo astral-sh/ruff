@@ -1,13 +1,13 @@
-use ast::ExprContext;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Builder, Expr, ExprKind};
 use ruff_python_semantic::analyze::typing::traverse_union;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
+use super::union_with_replacement;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -60,7 +60,7 @@ impl Violation for UnnecessaryTypeUnion {
 }
 
 /// PYI055
-pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
+pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, &union: &Expr<'a>) {
     let semantic = checker.semantic();
 
     // The `|` operator isn't always safe to allow to runtime-evaluated annotations.
@@ -69,33 +69,32 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
     }
 
     // Check if `union` is a PEP604 union (e.g. `float | int`) or a `typing.Union[float, int]`
-    let subscript = union.as_subscript_expr();
-    let mut union_kind = match subscript {
-        Some(subscript) => {
-            if !semantic.match_typing_expr(&subscript.value, "Union") {
-                return;
-            }
-            UnionKind::TypingUnion
-        }
-        None => UnionKind::PEP604,
-    };
+    let mut union_subscript = union.as_subscript_expr();
+    if union_subscript
+        .is_some_and(|subscript| !semantic.match_typing_expr(subscript.value(), "Union"))
+    {
+        return;
+    }
+    let mut type_exprs: Vec<Expr<'_>> = Vec::new();
+    let mut other_exprs: Vec<Expr<'_>> = Vec::new();
 
-    let mut type_exprs: Vec<&Expr> = Vec::new();
-    let mut other_exprs: Vec<&Expr> = Vec::new();
-
-    let mut collect_type_exprs = |expr: &'a Expr, parent: &'a Expr| {
+    let mut collect_type_exprs = |expr: Expr<'a>, parent: Expr<'a>| {
         // If a PEP604-style union is used within a `typing.Union`, then the fix can
         // use PEP604-style unions.
-        if matches!(parent, Expr::BinOp(_)) {
-            union_kind = UnionKind::PEP604;
+        if matches!(parent.classify(), ExprKind::BinOp(_)) {
+            union_subscript = None;
         }
-        match expr {
-            Expr::Subscript(ast::ExprSubscript { slice, value, .. }) => {
+        match expr.classify() {
+            ExprKind::Subscript(expr_subscript) => {
+                let slice = expr_subscript.slice();
+                let value = expr_subscript.value();
+
                 // The annotation `type[a, b]` is not valid since `type` accepts
                 // a single parameter. This likely is a confusion with `type[a | b]` or
                 // `type[Union[a, b]]`. Do not emit a diagnostic for invalid type
                 // annotations.
-                if !matches!(**slice, Expr::Tuple(_)) && semantic.match_builtin_expr(value, "type")
+                if !matches!(slice.classify(), ExprKind::Tuple(_))
+                    && semantic.match_builtin_expr(value, "type")
                 {
                     type_exprs.push(slice);
                 } else {
@@ -121,102 +120,30 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &Checker, union: &'a Expr) {
     let mut diagnostic = checker.report_diagnostic(
         UnnecessaryTypeUnion {
             members: type_members.clone(),
-            union_kind,
+            union_kind: if union_subscript.is_some() {
+                UnionKind::TypingUnion
+            } else {
+                UnionKind::PEP604
+            },
         },
         union.range(),
     );
 
     if semantic.has_builtin_binding("type") {
-        // Construct the content for the [`Fix`] based on if we encountered a PEP604 union.
-        let content = match union_kind {
-            UnionKind::PEP604 => {
-                let elts: Vec<Expr> = type_exprs.into_iter().cloned().collect();
-                let types = Expr::Subscript(ast::ExprSubscript {
-                    value: Box::new(Expr::Name(ast::ExprName {
-                        id: Name::new_static("type"),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    })),
-                    slice: Box::new(pep_604_union(&elts)),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                });
-
-                if other_exprs.is_empty() {
-                    checker.generator().expr(&types)
-                } else {
-                    let elts: Vec<Expr> = std::iter::once(types)
-                        .chain(other_exprs.into_iter().cloned())
-                        .collect();
-                    checker.generator().expr(&pep_604_union(&elts))
-                }
-            }
-            UnionKind::TypingUnion => {
-                // When subscript is None, it uses the previous match case.
-                let subscript = subscript.unwrap();
-                let types = &Expr::Subscript(ast::ExprSubscript {
-                    value: Box::new(Expr::Name(ast::ExprName {
-                        id: Name::new_static("type"),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    })),
-                    slice: Box::new(Expr::Subscript(ast::ExprSubscript {
-                        value: subscript.value.clone(),
-                        slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                            elts: type_members
-                                .into_iter()
-                                .map(|type_member| {
-                                    Expr::Name(ast::ExprName {
-                                        id: type_member,
-                                        ctx: ExprContext::Load,
-                                        range: TextRange::default(),
-                                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                                    })
-                                })
-                                .collect(),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            parenthesized: true,
-                        })),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    })),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                });
-
-                if other_exprs.is_empty() {
-                    checker.generator().expr(types)
-                } else {
-                    let mut exprs = Vec::new();
-                    exprs.push(types);
-                    exprs.extend(other_exprs);
-
-                    let union = Expr::Subscript(ast::ExprSubscript {
-                        value: subscript.value.clone(),
-                        slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                            elts: exprs.into_iter().cloned().collect(),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            parenthesized: true,
-                        })),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    });
-
-                    checker.generator().expr(&union)
-                }
-            }
+        let mut builder = Builder::default();
+        let type_name = syntax::name(&mut builder, "type");
+        let slice = if let Some(subscript) = union_subscript {
+            let value = builder.copy_node(subscript.value());
+            let elts = builder.map_list(type_members, |builder, member| {
+                syntax::name(builder, member.as_str())
+            });
+            syntax::subscript_tuple(&mut builder, value, elts)
+        } else {
+            syntax::pep_604_union(&mut builder, type_exprs)
         };
-
+        let types = syntax::subscript(&mut builder, type_name, slice);
+        let replacement = union_with_replacement(&mut builder, types, other_exprs, union_subscript);
+        let content = checker.generator().expr(builder.get(replacement));
         // Mark [`Fix`] as unsafe when comments are in range.
         let applicability = if checker.comment_ranges().intersects(union.range()) {
             Applicability::Unsafe
