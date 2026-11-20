@@ -8,7 +8,7 @@ use std::hash::BuildHasher;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::name::Name;
 use hashbrown::HashTable;
@@ -646,6 +646,7 @@ impl Ast {
 #[derive(Debug)]
 pub struct Builder {
     ast: Ast,
+    source: TextRange,
     scratch: Vec<u32>,
     name_ids: HashTable<u32>,
 }
@@ -673,21 +674,37 @@ pub struct Checkpoint {
 
 impl Default for Builder {
     fn default() -> Self {
-        let mut nodes = NodeStorage::with_capacity(4);
-        // No view can refer to this row. Its presence makes every child slot a nonzero index.
-        assert!(nodes.try_push(Row::new(NodeKind::ModModule), TextRange::default()));
-        Self {
-            ast: Ast {
-                nodes,
-                ..Ast::default()
-            },
-            name_ids: HashTable::new(),
-            scratch: Vec::new(),
-        }
+        Self::for_source(TextRange::default())
     }
 }
 
 impl Builder {
+    /// Start with a small sample of rows so a file with little syntax needs little storage.
+    pub fn for_source(source: TextRange) -> Self {
+        const MAX_INITIAL_ROW_BYTES: usize = 8 * 1024;
+
+        let bytes = source.len().to_usize();
+        let estimated = (bytes / 18).min(4096);
+        let row_limit = MAX_INITIAL_ROW_BYTES / (size_of::<Row>() + size_of::<TextRange>()) - 1;
+        let estimated_rows = estimated.min(row_limit);
+        // A small expression such as `x | y` needs three rows in addition to the sentinel.
+        let mut nodes = NodeStorage::with_capacity((estimated_rows + 1).max(4));
+        // No view can refer to this row. Its presence makes every child slot a nonzero index.
+        assert!(nodes.try_push(Row::new(NodeKind::ModModule), TextRange::default()));
+        Self {
+            source,
+            ast: Ast {
+                nodes,
+                extra: Vec::with_capacity(estimated + estimated / 8),
+                text: String::with_capacity((bytes / 8).min(4096)),
+                names: Vec::with_capacity(estimated / 8),
+                ..Ast::default()
+            },
+            name_ids: HashTable::with_capacity(estimated * 3 / 8),
+            scratch: Vec::new(),
+        }
+    }
+
     /// Turns a name expression into the identifier for a keyword argument. When the name is
     /// the last row, its expression handle expires and the identifier can reuse that row.
     pub fn take_name(
@@ -768,6 +785,10 @@ impl Builder {
         self.ast.bytes.truncate(checkpoint.bytes);
         self.ast.numbers.truncate(checkpoint.numbers);
         self.ast.debug_text.truncate(checkpoint.debug_text);
+    }
+
+    fn node_count(&self) -> usize {
+        self.ast.nodes.len() - 1
     }
 
     pub fn finish_tree<T>(self, root: BuildId<T>) -> Tree<T> {
@@ -887,10 +908,51 @@ impl Builder {
 
     #[cold]
     fn grow_and_push(&mut self, row: Row, range: TextRange) {
-        self.ast
-            .nodes
-            .reserve_exact(self.ast.nodes.capacity().max(4));
+        if self.source.is_empty() {
+            self.ast
+                .nodes
+                .reserve_exact(self.ast.nodes.capacity().max(4));
+        } else {
+            self.reserve_rows(range.end());
+        }
         assert!(self.ast.nodes.try_push(row, range));
+    }
+
+    fn reserve_rows(&mut self, end: TextSize) {
+        // A module can start with a long docstring or a license header. Allow its remaining
+        // source to be denser than the prefix, and leave some room for variation after it.
+        // Conversely, a dense prefix followed by a long comment needs few more rows. Limit
+        // speculative reservations to one MiB per buffer. Once a large row buffer fills,
+        // keep growing it geometrically so repeated reallocations stay amortized.
+        const MAX_SPECULATIVE_BYTES: usize = 1 << 20;
+
+        let rows = self.node_count();
+        let consumed = end.saturating_sub(self.source.start()).to_usize();
+        let remaining = self.source.end().saturating_sub(end).to_usize();
+        let estimate = rows.saturating_add(
+            remaining
+                .saturating_mul(rows)
+                .checked_div(consumed)
+                .unwrap_or(0)
+                .max(remaining / 10),
+        );
+        let minimum_growth = rows.div_ceil(4).max(4);
+        let additional = estimate
+            .saturating_add(estimate / 8)
+            .saturating_sub(rows)
+            .min(rows.saturating_mul(128))
+            .min(MAX_SPECULATIVE_BYTES / (size_of::<Row>() + size_of::<TextRange>()))
+            .max(minimum_growth);
+        self.ast.nodes.reserve_exact(additional);
+        let extra = self
+            .ast
+            .extra
+            .len()
+            .saturating_mul(additional)
+            .checked_div(rows)
+            .unwrap_or(0)
+            .min(MAX_SPECULATIVE_BYTES / size_of::<u32>());
+        self.ast.extra.reserve_exact(extra);
     }
 
     fn store_bytes(&mut self, bytes: &[u8]) -> u64 {
@@ -1121,4 +1183,33 @@ fn offset(len: usize) -> u32 {
         .ok()
         .filter(|n| *n != ABSENT)
         .expect("Python AST exceeds the 32-bit storage limit")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Builder, NodeKind, Row, TextRange, TextSize};
+
+    #[test]
+    fn dense_prefix_bounds_speculative_reservations() {
+        let source = TextRange::up_to(TextSize::new(8 << 20));
+        let mut builder = Builder::for_source(source);
+        builder.ast.nodes.reserve_exact(16_384);
+        for _ in 0..16_384 {
+            assert!(
+                builder
+                    .ast
+                    .nodes
+                    .try_push(Row::new(NodeKind::StmtPass), TextRange::default())
+            );
+        }
+        builder.ast.extra.resize(128 << 10, 0);
+
+        builder.reserve_rows(TextSize::new(32 << 10));
+        let nodes = &builder.ast.nodes;
+        let extra = &builder.ast.extra;
+        let spare_bytes =
+            (nodes.capacity() - nodes.len()) * (size_of::<Row>() + size_of::<TextRange>());
+        assert!(spare_bytes <= 1 << 20);
+        assert!((extra.capacity() - extra.len()) * size_of::<u32>() <= 1 << 20);
+    }
 }

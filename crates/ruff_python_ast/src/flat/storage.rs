@@ -175,7 +175,7 @@ impl NodeStorage {
         }
     }
 
-    /// Returns false when the builder needs to reserve space.
+    /// Returns false when the builder must reserve space using its source-density estimate.
     #[inline]
     pub(super) fn try_push(&mut self, row: Row, range: TextRange) -> bool {
         if self.len == self.capacity {
