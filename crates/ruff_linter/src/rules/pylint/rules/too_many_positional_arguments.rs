@@ -8,20 +8,20 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for function definitions that include too many positional arguments.
+/// Checks for function definitions that include too many positional parameters.
 ///
-/// By default, this rule allows up to five arguments, as configured by the
+/// By default, this rule allows up to five positional parameters, as configured by the
 /// [`lint.pylint.max-positional-args`] option.
 ///
 /// ## Why is this bad?
-/// Functions with many arguments are harder to understand, maintain, and call.
-/// This is especially true for functions with many positional arguments, as
+/// Functions with many parameters are harder to understand, maintain, and call.
+/// This is especially true for functions with many positional parameters, as
 /// providing arguments positionally is more error-prone and less clear to
 /// readers than providing arguments by name.
 ///
-/// Consider refactoring functions with many arguments into smaller functions
-/// with fewer arguments, using objects to group related arguments, or migrating to
-/// [keyword-only arguments](https://docs.python.org/3/tutorial/controlflow.html#special-parameters).
+/// Consider refactoring functions with many parameters into smaller functions
+/// with fewer parameters, using objects to group related values, or migrating to
+/// [keyword-only parameters](https://docs.python.org/3/tutorial/controlflow.html#special-parameters).
 ///
 /// This rule exempts methods decorated with [`@typing.override`][override].
 /// Changing the signature of a subclass method may cause type checkers to
@@ -31,7 +31,7 @@ use crate::codes::Category;
 /// signals to Ruff that the method is intended to override a superclass
 /// method and that a type checker will enforce that it does so; Ruff
 /// therefore knows that it should not enforce rules about methods having
-/// too many arguments.
+/// too many positional parameters.
 ///
 /// ## Example
 ///

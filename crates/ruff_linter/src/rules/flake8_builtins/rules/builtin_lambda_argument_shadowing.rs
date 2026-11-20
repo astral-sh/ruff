@@ -8,10 +8,10 @@ use crate::codes::Category;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
-/// Checks for lambda arguments that use the same names as Python builtins.
+/// Checks for lambda parameters that use the same names as Python builtins.
 ///
 /// ## Why is this bad?
-/// Reusing a builtin name for the name of a lambda argument increases the
+/// Reusing a builtin name for the name of a lambda parameter increases the
 /// difficulty of reading and maintaining the code and can cause
 /// non-obvious errors. Readers may mistake the variable for the
 /// builtin, and vice versa.

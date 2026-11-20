@@ -85,7 +85,7 @@ impl Violation for PatchVersionComparisonInStub {
 }
 
 /// ## What it does
-/// Checks for Python version comparisons that compare against a tuple of the
+/// Checks for Python version comparisons in stubs that compare against a tuple of the
 /// wrong length.
 ///
 /// ## Why is this bad?

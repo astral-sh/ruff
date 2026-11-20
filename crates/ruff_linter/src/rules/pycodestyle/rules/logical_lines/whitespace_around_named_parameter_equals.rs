@@ -8,12 +8,12 @@ use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLi
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
-/// Checks for missing whitespace around the equals sign in an unannotated
-/// function keyword parameter.
+/// Checks for extraneous whitespace around the equals sign in an unannotated
+/// function parameter default or a keyword argument.
 ///
 /// ## Why is this bad?
 /// According to [PEP 8], there should be no spaces around the equals sign in a
-/// keyword parameter, if it is unannotated:
+/// keyword argument or an unannotated parameter default:
 ///
 /// > Don’t use spaces around the = sign when used to indicate a keyword
 /// > argument, or when used to indicate a default value for an unannotated
