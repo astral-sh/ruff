@@ -102,7 +102,7 @@ pub struct Project {
     /// However, it's sometimes desired to only check a subset of the project, e.g. to see
     /// the diagnostics for a single file or a folder.
     ///
-    /// This list gets initialized by the paths passed to `ty check <paths>`
+    /// The paths passed to `ty check <paths>` are sorted for binary search during inclusion checks.
     ///
     /// ## How is this different from `open_files`?
     ///
@@ -618,9 +618,10 @@ impl Project {
         removed
     }
 
-    pub fn set_included_paths(self, db: &mut dyn Db, paths: Vec<SystemPathBuf>) {
+    pub fn set_included_paths(self, db: &mut dyn Db, mut paths: Vec<SystemPathBuf>) {
         tracing::debug!("Setting included paths: {paths}", paths = paths.len());
 
+        paths.sort_unstable();
         self.set_included_paths_list(db).to(paths);
         self.reload_files(db);
     }
@@ -1259,7 +1260,7 @@ mod tests {
         let mut db = TestDb::new(project);
         let project = db.project();
 
-        project.set_included_paths(&mut db, vec![root, explicit_file.clone()]);
+        project.set_included_paths(&mut db, vec![explicit_file.clone(), root]);
 
         assert_eq!(
             project.is_file_included(&db, &explicit_file),

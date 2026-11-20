@@ -52,21 +52,22 @@ impl<'a> ProjectFilesFilter<'a> {
         match mode {
             GlobFilterCheckMode::TopDown => Some(CheckPathMatch::Partial),
             GlobFilterCheckMode::Adhoc => {
-                self.included_paths
-                    .iter()
-                    .filter_map(|included_path| {
-                        if let Ok(relative_path) = path.strip_prefix(included_path) {
-                            // Exact matches are always included, unless forced to exclude
-                            if relative_path.as_str().is_empty() && !self.force_exclude {
-                                Some(CheckPathMatch::Full)
-                            } else {
-                                Some(CheckPathMatch::Partial)
-                            }
-                        } else {
-                            None
-                        }
-                    })
-                    .max()
+                let exact = match self.included_paths {
+                    [root] => path.strip_prefix(root).ok()?.as_str().is_empty(),
+                    paths => {
+                        let included = path.ancestors().find(|ancestor| {
+                            paths
+                                .binary_search_by_key(ancestor, SystemPathBuf::as_path)
+                                .is_ok()
+                        })?;
+                        included == path
+                    }
+                };
+                if exact && !self.force_exclude {
+                    Some(CheckPathMatch::Full)
+                } else {
+                    Some(CheckPathMatch::Partial)
+                }
             }
         }
     }
@@ -115,7 +116,7 @@ impl<'a> ProjectFilesFilter<'a> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum CheckPathMatch {
     /// The path is a partial match of the checked path (it's a sub path)
     Partial,
