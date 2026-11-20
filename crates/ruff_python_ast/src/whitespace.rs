@@ -2,8 +2,6 @@ use ruff_python_trivia::{PythonWhitespace, indentation_at_offset, is_python_whit
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::Stmt;
-
 /// Extract the leading indentation from a line.
 #[inline]
 pub fn indentation<'a, T>(source: &'a str, located: &T) -> Option<&'a str>
@@ -14,7 +12,7 @@ where
 }
 
 /// Return the end offset at which the empty lines following a statement.
-pub fn trailing_lines_end(stmt: &Stmt, source: &str) -> TextSize {
+pub fn trailing_lines_end(stmt: impl Ranged, source: &str) -> TextSize {
     let line_end = source.full_line_end(stmt.end());
     UniversalNewlineIterator::with_offset(&source[line_end.to_usize()..], line_end)
         .take_while(|line| line.trim_whitespace().is_empty())
