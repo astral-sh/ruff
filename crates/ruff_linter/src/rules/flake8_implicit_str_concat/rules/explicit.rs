@@ -1,7 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::{TokenKind, parenthesized_range};
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, ExprBinOp, ExprKind, Operator};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -63,7 +63,7 @@ impl Violation for ExplicitStringConcatenation {
 }
 
 /// ISC003
-pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
+pub(crate) fn explicit(checker: &Checker, &expr: &Expr<'_>) {
     // If the user sets `allow-multiline` to `false`, then we should allow explicitly concatenated
     // strings that span multiple lines even if this rule is enabled. Otherwise, there's no way
     // for the user to write multiline strings, and that setting is "more explicit" than this rule
@@ -76,21 +76,21 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    if let Expr::BinOp(bin_op) = expr {
-        if let ast::ExprBinOp {
+    if let ExprKind::BinOp(bin_op) = expr.classify() {
+        if let ast::ExprBinOpFields {
             left,
             right,
             op: Operator::Add,
             ..
-        } = bin_op
+        } = bin_op.fields()
         {
             let concatable = matches!(
-                (left.as_ref(), right.as_ref()),
+                (left.classify(), right.classify()),
                 (
-                    Expr::StringLiteral(_) | Expr::FString(_),
-                    Expr::StringLiteral(_) | Expr::FString(_)
-                ) | (Expr::BytesLiteral(_), Expr::BytesLiteral(_))
-                    | (Expr::TString(_), Expr::TString(_))
+                    ExprKind::StringLiteral(_) | ExprKind::FString(_),
+                    ExprKind::StringLiteral(_) | ExprKind::FString(_)
+                ) | (ExprKind::BytesLiteral(_), ExprKind::BytesLiteral(_))
+                    | (ExprKind::TString(_), ExprKind::TString(_))
             );
             if concatable
                 && checker
@@ -100,8 +100,8 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                 let mut diagnostic =
                     checker.report_diagnostic(ExplicitStringConcatenation, expr.range());
 
-                let is_parenthesized = |expr: &Expr| {
-                    parenthesized_range(expr.into(), bin_op.into(), checker.tokens()).is_some()
+                let is_parenthesized = |expr: Expr<'_>| {
+                    parenthesized_range(expr, bin_op.into(), checker.tokens()).is_some()
                 };
                 // If either `left` or `right` is parenthesized, generating
                 // a fix would be too involved. Just report the diagnostic.
@@ -122,13 +122,13 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
 /// Returns `true` if removing the `+` operator would turn the enclosing
 /// expression statement into a docstring, which would change the program's
 /// behavior (e.g., by setting `__doc__`). See #27979.
-fn fix_creates_docstring(checker: &Checker, expr: &ast::ExprBinOp) -> bool {
+fn fix_creates_docstring(checker: &Checker, expr: ExprBinOp<'_>) -> bool {
     // Only concatenations of plain string literals can produce a docstring
     // after the fix; f-strings, byte strings, and template strings are not
     // recognized as docstrings by Python.
     if !matches!(
-        (expr.left.as_ref(), expr.right.as_ref()),
-        (Expr::StringLiteral(_), Expr::StringLiteral(_))
+        (expr.left().classify(), expr.right().classify()),
+        (ExprKind::StringLiteral(_), ExprKind::StringLiteral(_))
     ) {
         return false;
     }
@@ -136,8 +136,9 @@ fn fix_creates_docstring(checker: &Checker, expr: &ast::ExprBinOp) -> bool {
     checker.in_docstring_position(expr.range())
 }
 
-fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> {
-    let ast::ExprBinOp { left, right, .. } = expr_bin_op;
+fn generate_fix(checker: &Checker, expr_bin_op: ExprBinOp<'_>) -> Option<Fix> {
+    let left = expr_bin_op.left();
+    let right = expr_bin_op.right();
 
     let between_operands_range = TextRange::new(left.end(), right.start());
     let plus_token = checker

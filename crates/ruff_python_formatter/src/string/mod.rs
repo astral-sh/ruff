@@ -1,10 +1,9 @@
 use memchr::memchr2;
 pub(crate) use normalize::{NormalizedString, StringNormalizer, normalize_string};
-use ruff_python_ast::StringLikePart;
 use ruff_python_ast::str::{Quote, TripleQuotes};
+use ruff_python_ast::str_prefix::{AnyStringPrefix, StringLiteralPrefix};
 use ruff_python_ast::{
-    self as ast, AnyStringFlags, StringFlags,
-    str_prefix::{AnyStringPrefix, StringLiteralPrefix},
+    self as ast, AnyStringFlags, InterpolatedStringElementKind, StringFlags, StringLikePartKind,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -87,15 +86,15 @@ impl StringLikeExtensions for ast::StringLike<'_> {
     fn is_multiline(&self, context: &PyFormatContext) -> bool {
         // Helper for f-string and t-string parts
         fn contains_line_break_or_comments(
-            elements: &ast::InterpolatedStringElements,
+            elements: ruff_python_ast::InterpolatedStringElements<'_>,
             context: &PyFormatContext,
             triple_quotes: TripleQuotes,
         ) -> bool {
-            elements.iter().any(|element| match element {
-                ast::InterpolatedStringElement::Literal(literal) => {
+            elements.iter().any(|element| match element.classify() {
+                InterpolatedStringElementKind::Literal(literal) => {
                     triple_quotes.is_yes() && context.source().contains_line_break(literal.range())
                 }
-                ast::InterpolatedStringElement::Interpolation(expression) => {
+                InterpolatedStringElementKind::Interpolation(expression) => {
                     // Expressions containing comments can't be joined.
                     //
                     // Format specifiers needs to be checked as well. For example, the
@@ -108,10 +107,10 @@ impl StringLikeExtensions for ast::StringLike<'_> {
                     // } world"
                     // ```
                     context.comments().contains_comments(expression.into())
-                        || expression.format_spec.as_deref().is_some_and(|spec| {
-                            contains_line_break_or_comments(&spec.elements, context, triple_quotes)
+                        || expression.format_spec().is_some_and(|spec| {
+                            contains_line_break_or_comments(spec.elements(), context, triple_quotes)
                         })
-                        || expression.debug_text.as_ref().is_some_and(|debug_text| {
+                        || expression.debug_text().as_ref().is_some_and(|debug_text| {
                             memchr2(b'\n', b'\r', debug_text.leading().as_bytes()).is_some()
                                 || memchr2(b'\n', b'\r', debug_text.trailing().as_bytes()).is_some()
                         })
@@ -119,20 +118,20 @@ impl StringLikeExtensions for ast::StringLike<'_> {
             })
         }
 
-        self.parts().any(|part| match part {
-            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+        self.parts().any(|part| match part.classify() {
+            StringLikePartKind::String(_) | StringLikePartKind::Bytes(_) => {
                 part.flags().is_triple_quoted()
                     && context.source().contains_line_break(part.range())
             }
-            StringLikePart::FString(f_string) => contains_line_break_or_comments(
-                &f_string.elements,
+            StringLikePartKind::FString(f_string) => contains_line_break_or_comments(
+                f_string.elements(),
                 context,
-                f_string.flags.triple_quotes(),
+                f_string.flags().triple_quotes(),
             ),
-            StringLikePart::TString(t_string) => contains_line_break_or_comments(
-                &t_string.elements,
+            StringLikePartKind::TString(t_string) => contains_line_break_or_comments(
+                t_string.elements(),
                 context,
-                t_string.flags.triple_quotes(),
+                t_string.flags().triple_quotes(),
             ),
         })
     }

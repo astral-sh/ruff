@@ -2,9 +2,10 @@
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
 use itertools::Either;
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
+use ruff_python_ast::{
+    self as ast, Arguments, Decorator, Expr, ExprKind, InterpolatedStringElementKind, Operator,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_text_size::{Ranged, TextRange};
@@ -974,21 +975,20 @@ impl Violation for SuspiciousFtplibUsage {
     }
 }
 
-pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
-    suspicious_function(
-        checker,
-        call.func.as_ref(),
-        Some(&call.arguments),
-        call.range(),
-    );
+pub(crate) fn suspicious_function_call(checker: &Checker, call: ast::ExprCall<'_>) {
+    suspicious_function(checker, call.func(), Some(call.arguments()), call.range());
 }
 
-pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
+pub(crate) fn suspicious_function_reference(checker: &Checker, &func: &Expr<'_>) {
     if !is_suspicious_function_reference_enabled(checker.settings()) {
         return;
     }
 
-    match checker.semantic().current_expression_parent() {
+    match checker
+        .semantic()
+        .current_expression_parent()
+        .map(Expr::classify)
+    {
         // Avoid duplicate diagnostics. For example:
         //
         // ```python
@@ -996,10 +996,10 @@ pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
         //   shelve.open(lorem, ipsum)
         // # ^^^^^^ Should not be reported as a reference
         // ```
-        Some(Expr::Call(parent)) if parent.func.range().contains_range(func.range()) => {
+        Some(ExprKind::Call(parent)) if parent.func().range().contains_range(func.range()) => {
             return;
         }
-        Some(Expr::Attribute(_)) => {
+        Some(ExprKind::Attribute(_)) => {
             // Avoid duplicate diagnostics. For example:
             //
             // ```python
@@ -1018,12 +1018,12 @@ pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
 /// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
 fn suspicious_function(
     checker: &Checker,
-    func: &Expr,
-    arguments: Option<&Arguments>,
+    func: Expr<'_>,
+    arguments: Option<Arguments<'_>>,
     range: TextRange,
 ) {
     /// Return the explicit URL only when no argument unpacking can affect the call.
-    fn url_without_unpacking(arguments: &Arguments) -> Option<&Expr> {
+    fn url_without_unpacking(arguments: Arguments<'_>) -> Option<Expr<'_>> {
         let mut positional = None;
         let mut named = None;
         for item in arguments.iter_source_order() {
@@ -1035,9 +1035,9 @@ fn suspicious_function(
                     positional.get_or_insert(arg);
                 }
                 ast::ArgOrKeyword::Keyword(keyword) => {
-                    let name = keyword.arg.as_ref()?;
+                    let name = keyword.arg()?;
                     if named.is_none() && name.as_str() == "url" {
-                        named = Some(keyword.value.as_ref());
+                        named = Some(keyword.value());
                     }
                 }
             }
@@ -1065,7 +1065,7 @@ fn suspicious_function(
     }
 
     /// Resolves `expr` to its binding and checks if the resolved expression starts with an HTTP or HTTPS prefix.
-    fn expression_starts_with_http_prefix(expr: &Expr, semantic: &SemanticModel) -> bool {
+    fn expression_starts_with_http_prefix(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
         let resolved_expression = if let Some(name_expr) = expr.as_name_expr()
             && let Some(binding_id) = semantic.only_binding(name_expr)
             && let Some(value) = find_binding_value(semantic.binding(binding_id), semantic)
@@ -1080,19 +1080,21 @@ fn suspicious_function(
 
     /// Return the leading characters for an expression, if it's a string literal, f-string, or
     /// string concatenation.
-    fn leading_chars(expr: &Expr) -> Option<impl Iterator<Item = char> + Clone + '_> {
-        match expr {
+    fn leading_chars(expr: Expr<'_>) -> Option<impl Iterator<Item = char> + Clone + '_> {
+        match expr.classify() {
             // Ex) `"foo"`
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            ExprKind::StringLiteral(expr_string_literal) => {
+                let value = expr_string_literal.value();
                 Some(Either::Left(value.chars()))
             }
             // Ex) f"foo"
-            Expr::FString(ast::ExprFString { value, .. }) => {
+            ExprKind::FString(expr_f_string) => {
+                let value = expr_f_string.value();
+
                 value.elements().next().and_then(|element| {
-                    if let ast::InterpolatedStringElement::Literal(
-                        ast::InterpolatedStringLiteralElement { value, .. },
-                    ) = element
+                    if let InterpolatedStringElementKind::Literal(literal_node) = element.classify()
                     {
+                        let value = literal_node.value();
                         Some(Either::Right(value.chars()))
                     } else {
                         None
@@ -1100,11 +1102,10 @@ fn suspicious_function(
                 })
             }
             // Ex) "foo" + "bar"
-            Expr::BinOp(ast::ExprBinOp {
-                op: Operator::Add,
-                left,
-                ..
-            }) => leading_chars(left),
+            ExprKind::BinOp(expr_bin_op) if expr_bin_op.op() == Operator::Add => {
+                let left = expr_bin_op.left();
+                leading_chars(left)
+            }
             _ => None,
         }
     }
@@ -1187,7 +1188,7 @@ fn suspicious_function(
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
             if let Some(arguments) = arguments {
-                if let Some([single]) = arguments.args().collect_array() {
+                if let Some([single]) = arguments.args().as_array() {
                     if single.is_string_literal_expr() {
                         return;
                     }
@@ -1215,13 +1216,13 @@ fn suspicious_function(
             "request",
             "urlopen" | "urlretrieve",
         ] => {
-            match arguments.and_then(url_without_unpacking) {
+            match arguments.and_then(url_without_unpacking).map(Expr::fields) {
                 // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
-                Some(Expr::Call(ExprCall {
+                Some(ast::ExprFields::Call(ast::ExprCallFields {
                     func, arguments, ..
                 })) if checker
                     .semantic()
-                    .matches_qualified_name(func.as_ref(), &["urllib", "request", "Request"]) =>
+                    .matches_qualified_name(func, &["urllib", "request", "Request"]) =>
                 {
                     if let Some(url_expr) = arguments.find_argument_value("url", 0)
                         && expression_starts_with_http_prefix(url_expr, checker.semantic())
@@ -1231,7 +1232,9 @@ fn suspicious_function(
                 }
 
                 // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
-                Some(expr) if expression_starts_with_http_prefix(expr, checker.semantic()) => {
+                Some(expr)
+                    if expression_starts_with_http_prefix(expr.view(), checker.semantic()) =>
+                {
                     return;
                 }
 
@@ -1322,9 +1325,9 @@ fn suspicious_function(
 }
 
 /// S308
-pub(crate) fn suspicious_function_decorator(checker: &Checker, decorator: &Decorator) {
+pub(crate) fn suspicious_function_decorator(checker: &Checker, decorator: Decorator<'_>) {
     // In preview mode, references are handled collectively by `suspicious_function_reference`
     if !is_suspicious_function_reference_enabled(checker.settings()) {
-        suspicious_function(checker, &decorator.expression, None, decorator.range);
+        suspicious_function(checker, decorator.expression(), None, decorator.range());
     }
 }

@@ -3,7 +3,7 @@ use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
 };
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, ExprKind, StmtKind, Suite};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
@@ -24,7 +24,7 @@ use ty_python_core::definition::Definition;
 pub(super) fn validate_typed_dict_class<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
-    class_node: &ast::StmtClassDef,
+    class_node: ast::StmtClassDef<'_>,
     direct_bases: &[ClassType<'db>],
 ) {
     validate_typed_dict_class_body(context, class_node);
@@ -32,7 +32,10 @@ pub(super) fn validate_typed_dict_class<'db>(
     validate_typed_dict_openness(context, class, class_node, direct_bases);
 }
 
-fn validate_typed_dict_class_body(context: &InferContext<'_, '_>, class_node: &ast::StmtClassDef) {
+fn validate_typed_dict_class_body(
+    context: &InferContext<'_, '_>,
+    class_node: ast::StmtClassDef<'_>,
+) {
     // Check that a class-based `TypedDict` doesn't include any invalid statements:
     // https://typing.python.org/en/latest/spec/typeddict.html#class-based-syntax
     //
@@ -40,21 +43,20 @@ fn validate_typed_dict_class_body(context: &InferContext<'_, '_>, class_node: &a
     //     may also contain a docstring or pass statements (primarily to allow the creation
     //     of an empty `TypedDict`). No other statements are allowed, and type checkers
     //     should report an error if any are present.
-    validate_typed_dict_class_body_statements(context, &class_node.body);
+    validate_typed_dict_class_body_statements(context, class_node.body());
 }
 
 fn validate_typed_dict_class_body_statements(
     context: &InferContext<'_, '_>,
-    statements: &[ast::Stmt],
+    statements: Suite<'_>,
 ) {
     for stmt in statements {
-        match stmt {
+        match stmt.classify() {
             // Annotated assignments are allowed (that's the whole point), but they're
             // not allowed to have a value.
-            ast::Stmt::AnnAssign(ann_assign) => {
-                if let Some(value) = &ann_assign.value
-                    && let Some(builder) =
-                        context.report_lint(&INVALID_TYPED_DICT_STATEMENT, &**value)
+            StmtKind::AnnAssign(ann_assign) => {
+                if let Some(value) = ann_assign.value()
+                    && let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_STATEMENT, value)
                 {
                     builder.into_diagnostic("TypedDict item cannot have a value");
                 }
@@ -62,23 +64,23 @@ fn validate_typed_dict_class_body_statements(
                 continue;
             }
             // Pass statements are allowed.
-            ast::Stmt::Pass(_) => continue,
+            StmtKind::Pass(_) => continue,
             // If statements are allowed; the body statements must validate.
-            ast::Stmt::If(if_stmt) => {
-                validate_typed_dict_class_body_statements(context, &if_stmt.body);
-                for elif_else_clause in &if_stmt.elif_else_clauses {
-                    validate_typed_dict_class_body_statements(context, &elif_else_clause.body);
+            StmtKind::If(if_stmt) => {
+                validate_typed_dict_class_body_statements(context, if_stmt.body());
+                for elif_else_clause in if_stmt.elif_else_clauses() {
+                    validate_typed_dict_class_body_statements(context, elif_else_clause.body());
                 }
                 continue;
             }
-            ast::Stmt::Expr(expr) => {
+            StmtKind::Expr(expr) => {
                 // Docstrings are allowed.
-                if matches!(*expr.value, ast::Expr::StringLiteral(_)) {
+                if matches!(expr.value().classify(), ExprKind::StringLiteral(_)) {
                     continue;
                 }
                 // As a non-standard but common extension, we also interpret `...` as
                 // equivalent to `pass`.
-                if matches!(*expr.value, ast::Expr::EllipsisLiteral(_)) {
+                if matches!(expr.value().classify(), ExprKind::EllipsisLiteral(_)) {
                     continue;
                 }
             }
@@ -86,7 +88,7 @@ fn validate_typed_dict_class_body_statements(
             _ => {}
         }
         if let Some(builder) = context.report_lint(&INVALID_TYPED_DICT_STATEMENT, stmt) {
-            if matches!(stmt, ast::Stmt::FunctionDef(_)) {
+            if matches!(stmt.classify(), StmtKind::FunctionDef(_)) {
                 builder.into_diagnostic(format_args!("TypedDict class cannot have methods"));
             } else {
                 let mut diagnostic = builder
@@ -149,7 +151,7 @@ fn validate_typed_dict_field_overrides<'db>(
 fn validate_typed_dict_openness<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
-    class_node: &ast::StmtClassDef,
+    class_node: ast::StmtClassDef<'_>,
     direct_bases: &[ClassType<'db>],
 ) {
     let db = context.db();
@@ -158,7 +160,7 @@ fn validate_typed_dict_openness<'db>(
     let child_openness = child.openness(db);
     let child_items = child.items(db);
 
-    if let Some(arguments) = class_node.arguments.as_deref()
+    if let Some(arguments) = class_node.arguments()
         && arguments.find_keyword("closed").is_some()
         && arguments.find_keyword("extra_items").is_some()
     {

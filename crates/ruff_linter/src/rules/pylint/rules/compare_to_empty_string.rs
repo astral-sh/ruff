@@ -1,5 +1,5 @@
 use anyhow::bail;
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprCompare};
+use ruff_python_ast::{CmpOp, Expr, ExprCompare};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -59,9 +59,8 @@ impl Violation for CompareToEmptyString {
 }
 
 /// PLC1901
-pub(crate) fn compare_to_empty_string(checker: &Checker, compare: &ExprCompare) {
-    // Omit string comparison rules within subscripts. This is mostly commonly used within
-    // DataFrame and np.ndarray indexing.
+pub(crate) fn compare_to_empty_string(checker: &Checker, compare: ExprCompare<'_>) {
+    // Omit string comparisons within subscripts used for DataFrame and ndarray indexing.
     if checker
         .semantic()
         .current_expressions()
@@ -75,8 +74,8 @@ pub(crate) fn compare_to_empty_string(checker: &Checker, compare: &ExprCompare) 
         if let Ok(op) = EmptyStringCmpOp::try_from(op) {
             if std::mem::take(&mut first) {
                 // Check the left-most expression.
-                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &lhs {
-                    if value.is_empty() {
+                if let Some(literal) = lhs.as_string_literal_expr() {
+                    if literal.value().is_empty() {
                         let literal = checker.generator().expr(lhs);
                         let expr = checker.generator().expr(rhs);
                         let existing = format!("{literal} {op} {expr}");
@@ -93,8 +92,8 @@ pub(crate) fn compare_to_empty_string(checker: &Checker, compare: &ExprCompare) 
             }
 
             // Check all right-hand expressions.
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &rhs {
-                if value.is_empty() {
+            if let Some(literal) = rhs.as_string_literal_expr() {
+                if literal.value().is_empty() {
                     let expr = checker.generator().expr(lhs);
                     let literal = checker.generator().expr(rhs);
                     let existing = format!("{expr} {op} {literal}");
@@ -120,10 +119,10 @@ enum EmptyStringCmpOp {
     NotEq,
 }
 
-impl TryFrom<&CmpOp> for EmptyStringCmpOp {
+impl TryFrom<CmpOp> for EmptyStringCmpOp {
     type Error = anyhow::Error;
 
-    fn try_from(value: &CmpOp) -> Result<Self, Self::Error> {
+    fn try_from(value: CmpOp) -> Result<Self, Self::Error> {
         match value {
             CmpOp::Is => Ok(Self::Is),
             CmpOp::IsNot => Ok(Self::IsNot),

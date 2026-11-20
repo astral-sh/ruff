@@ -158,6 +158,8 @@ At the time of writing, the repository includes the following crates:
 - `crates/ruff_macros`: proc macro crate containing macros used by Ruff.
 - `crates/ruff_notebook`: library crate for parsing and manipulating Jupyter notebooks.
 - `crates/ruff_python_ast`: library crate containing Python-specific AST types and utilities.
+    The [AST architecture](https://github.com/astral-sh/ruff/blob/main/crates/ruff_python_ast/architecture.md)
+    describes how Ruff and ty store and traverse parsed syntax.
 - `crates/ruff_python_codegen`: library crate containing utilities for generating Python source code.
 - `crates/ruff_python_formatter`: library crate implementing the Python formatter. Emits an
     intermediate representation for each node, which `ruff_formatter` prints based on the configured

@@ -168,9 +168,9 @@ impl<'db> StaticClassLiteral<'db> {
             let mut is_classmethod = false;
             let mut is_staticmethod = false;
 
-            for decorator in &function_node.decorator_list {
+            for decorator in function_node.decorator_list() {
                 let decorator_ty =
-                    definition_expression_type(db, definition, &decorator.expression);
+                    definition_expression_type(db, definition, decorator.expression());
                 if let Type::ClassLiteral(class) = decorator_ty {
                     match class.known(db) {
                         Some(KnownClass::Classmethod) => is_classmethod = true,
@@ -181,7 +181,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             // Also check for implicit classmethods/staticmethods based on method name
-            let method_name = function_node.name.as_str();
+            let method_name = function_node.name().as_str();
             if is_implicit_classmethod(method_name) {
                 is_classmethod = true;
             }
@@ -264,7 +264,9 @@ impl<'db> StaticClassLiteral<'db> {
             let Some(method_def) = enclosing_method(attribute_binding_scope_id) else {
                 continue;
             };
-            let Some(method_place) = class_table.symbol_id(&method_def.node(&module).name) else {
+            let Some(method_place) =
+                class_table.symbol_id(method_def.node(&module).name().as_str())
+            else {
                 continue;
             };
             let method = index.expect_single_definition(method_def);

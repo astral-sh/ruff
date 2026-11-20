@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use ruff_python_ast::{Decorator, ParameterItem, Parameters, Stmt};
+use ruff_python_ast::{NodeList, ParameterItem, Parameters, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -139,10 +139,10 @@ impl Violation for UnexpectedSpecialMethodSignature {
 /// PLE0302
 pub(crate) fn unexpected_special_method_signature(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     name: &str,
-    decorator_list: &[Decorator],
-    parameters: &Parameters,
+    decorator_list: NodeList<'_, ruff_python_ast::kind::Decorator>,
+    parameters: Parameters<'_>,
 ) {
     if !checker.semantic().current_scope().kind.is_class() {
         return;
@@ -152,7 +152,7 @@ pub(crate) fn unexpected_special_method_signature(
     let mut mandatory_params = 0;
     let mut has_positional_or_keyword = false;
     let mut has_vararg = false;
-    for item in &parameters.items {
+    for item in parameters.items().iter() {
         let parameter = match item {
             ParameterItem::KeywordOnly(_) | ParameterItem::Kwarg(_) => return,
             ParameterItem::Vararg(_) => {

@@ -52,7 +52,7 @@ impl Violation for OpenAlias {
 }
 
 /// UP020
-pub(crate) fn open_alias(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
+pub(crate) fn open_alias(checker: &Checker, call: ExprCall<'_>, qualified_name: &QualifiedName) {
     if matches!(qualified_name.segments(), ["io", "open"]) {
         let mut diagnostic = checker.report_diagnostic(OpenAlias, call.range());
         diagnostic.try_set_fix(|| {
@@ -62,14 +62,14 @@ pub(crate) fn open_alias(checker: &Checker, call: &ExprCall, qualified_name: &Qu
                 checker.semantic(),
             )?;
 
-            let applicability = if checker.comment_ranges().intersects(call.func.range()) {
+            let applicability = if checker.comment_ranges().intersects(call.func().range()) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
             };
 
             Ok(Fix::applicable_edits(
-                Edit::range_replacement(binding, call.func.range()),
+                Edit::range_replacement(binding, call.func().range()),
                 import_edit,
                 applicability,
             ))

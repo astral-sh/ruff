@@ -1,12 +1,13 @@
-use ruff_python_ast::{Stmt, StmtTry};
+use ruff_python_ast::StmtKind;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextSize};
 
 pub(super) fn outside_handlers(offset: TextSize, semantic: &SemanticModel) -> bool {
     for stmt in semantic.current_statements() {
-        let Stmt::Try(StmtTry { handlers, .. }) = stmt else {
+        let StmtKind::Try(try_stmt) = stmt.classify() else {
             continue;
         };
+        let handlers = try_stmt.handlers();
 
         if handlers
             .iter()

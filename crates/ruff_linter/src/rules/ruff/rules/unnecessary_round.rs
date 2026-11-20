@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprKind, Number};
 use ruff_python_edits::unwrapped_call_argument;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
@@ -49,13 +49,13 @@ impl AlwaysFixableViolation for UnnecessaryRound {
 }
 
 /// RUF057
-pub(crate) fn unnecessary_round(checker: &Checker, call: &ExprCall) {
-    if !checker.semantic().match_builtin_expr(&call.func, "round") {
+pub(crate) fn unnecessary_round(checker: &Checker, call: ast::ExprCall<'_>) {
+    if !checker.semantic().match_builtin_expr(call.func(), "round") {
         return;
     }
 
     let Some((rounded, rounded_value, ndigits_value)) =
-        rounded_and_ndigits(&call.arguments, checker.semantic())
+        rounded_and_ndigits(call.arguments(), checker.semantic())
     else {
         return;
     };
@@ -147,16 +147,16 @@ pub(super) enum NdigitsValue {
 /// Returns a tripled where the first element is the rounded value's expression, the second is the rounded value,
 ///and the third is the `ndigits` value.
 pub(super) fn rounded_and_ndigits<'a>(
-    arguments: &'a Arguments,
+    arguments: Arguments<'a>,
     semantic: &'a SemanticModel,
-) -> Option<(&'a Expr, RoundedValue, NdigitsValue)> {
+) -> Option<(Expr<'a>, RoundedValue, NdigitsValue)> {
     if arguments.len() > 2 {
         return None;
     }
 
     if arguments
         .iter_source_order()
-        .any(ruff_python_ast::ArgOrKeyword::is_variadic)
+        .any(ast::ArgOrKeyword::is_variadic)
     {
         return None;
     }
@@ -165,8 +165,8 @@ pub(super) fn rounded_and_ndigits<'a>(
         return None;
     };
 
-    let rounded_kind = match rounded {
-        Expr::Name(name) => match semantic.only_binding(name).map(|id| semantic.binding(id)) {
+    let rounded_kind = match rounded.classify() {
+        ExprKind::Name(name) => match semantic.only_binding(name).map(|id| semantic.binding(id)) {
             Some(binding) if typing::is_int(binding, semantic) => {
                 RoundedValue::Int(InferredType::AssignableTo)
             }
@@ -187,10 +187,10 @@ pub(super) fn rounded_and_ndigits<'a>(
         },
     };
 
-    let ndigits_kind = match ndigits {
-        None | Some(Expr::NoneLiteral(_)) => NdigitsValue::NotGivenOrNone,
+    let ndigits_kind = match ndigits.map(Expr::classify) {
+        None | Some(ExprKind::NoneLiteral(_)) => NdigitsValue::NotGivenOrNone,
 
-        Some(Expr::Name(name)) => {
+        Some(ExprKind::Name(name)) => {
             match semantic.only_binding(name).map(|id| semantic.binding(id)) {
                 Some(binding) if typing::is_int(binding, semantic) => {
                     NdigitsValue::Int(InferredType::AssignableTo)
@@ -199,17 +199,16 @@ pub(super) fn rounded_and_ndigits<'a>(
             }
         }
 
-        Some(Expr::NumberLiteral(ExprNumberLiteral {
-            value: Number::Int(int),
-            ..
-        })) => match int.as_i64() {
-            None => NdigitsValue::Int(InferredType::Equivalent),
-            Some(value) => NdigitsValue::LiteralInt {
-                is_negative: value < 0,
-            },
-        },
+        Some(ExprKind::NumberLiteral(number)) if let Number::Int(int) = number.value() => {
+            match int.as_i64() {
+                None => NdigitsValue::Int(InferredType::Equivalent),
+                Some(value) => NdigitsValue::LiteralInt {
+                    is_negative: value < 0,
+                },
+            }
+        }
 
-        Some(ndigits) => match ResolvedPythonType::from(ndigits) {
+        Some(ndigits) => match ResolvedPythonType::from(ndigits.view()) {
             ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)) => {
                 NdigitsValue::Int(InferredType::Equivalent)
             }

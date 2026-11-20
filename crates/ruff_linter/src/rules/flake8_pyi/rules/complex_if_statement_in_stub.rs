@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -45,13 +45,14 @@ impl Violation for ComplexIfStatementInStub {
 }
 
 /// PYI002
-pub(crate) fn complex_if_statement_in_stub(checker: &Checker, test: &Expr) {
-    let Expr::Compare(ast::ExprCompare { operands, .. }) = test else {
+pub(crate) fn complex_if_statement_in_stub(checker: &Checker, test: Expr<'_>) {
+    let ExprKind::Compare(compare) = test.classify() else {
         checker.report_diagnostic(ComplexIfStatementInStub, test.range());
         return;
     };
+    let operands = compare.operands();
 
-    let [left, _] = &**operands else {
+    let Some([left, _]) = operands.as_array() else {
         checker.report_diagnostic(ComplexIfStatementInStub, test.range());
         return;
     };

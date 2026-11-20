@@ -4,7 +4,7 @@ use anyhow::Result;
 use libcst_native::CompOp;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, CmpOp, Expr, UnaryOp};
+use ruff_python_ast::{CmpOp, Expr, ExprCompare, ExprKind, UnaryOp};
 use ruff_python_codegen::Stylist;
 use ruff_python_stdlib::str::{self};
 use ruff_text_size::{Ranged, TextRange};
@@ -84,42 +84,42 @@ enum ConstantLikelihood {
     Definitely = 2,
 }
 
-impl From<&Expr> for ConstantLikelihood {
+impl From<Expr<'_>> for ConstantLikelihood {
     /// Determine the [`ConstantLikelihood`] of an expression.
-    fn from(expr: &Expr) -> Self {
-        match expr {
+    fn from(expr: Expr<'_>) -> Self {
+        match expr.classify() {
             _ if expr.is_literal_expr() => ConstantLikelihood::Definitely,
-            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                ConstantLikelihood::from_identifier(attr)
+            ExprKind::Attribute(attribute) => {
+                ConstantLikelihood::from_identifier(attribute.attr().as_str())
             }
-            Expr::Name(ast::ExprName { id, .. }) => ConstantLikelihood::from_identifier(id),
-            Expr::Tuple(tuple) => tuple
+            ExprKind::Name(name) => ConstantLikelihood::from_identifier(name.id()),
+            ExprKind::Tuple(tuple) => tuple
                 .iter()
                 .map(ConstantLikelihood::from)
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::List(list) => list
+            ExprKind::List(list) => list
+                .elts()
                 .iter()
                 .map(ConstantLikelihood::from)
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::Dict(dict) => dict
-                .items
+            ExprKind::Dict(dict) => dict
+                .items()
                 .iter()
-                .flat_map(|item| std::iter::once(&item.value).chain(item.key.as_ref()))
+                .flat_map(|item| std::iter::once(item.value()).chain(item.key()))
                 .map(ConstantLikelihood::from)
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::BinOp(ast::ExprBinOp { left, right, .. }) => cmp::min(
-                ConstantLikelihood::from(&**left),
-                ConstantLikelihood::from(&**right),
+            ExprKind::BinOp(binary) => cmp::min(
+                ConstantLikelihood::from(binary.left()),
+                ConstantLikelihood::from(binary.right()),
             ),
-            Expr::UnaryOp(ast::ExprUnaryOp {
-                op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
-                operand,
-                range: _,
-                node_index: _,
-            }) => ConstantLikelihood::from(&**operand),
+            ExprKind::UnaryOp(unary)
+                if matches!(unary.op(), UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert) =>
+            {
+                ConstantLikelihood::from(unary.operand())
+            }
             _ => ConstantLikelihood::Unlikely,
         }
     }
@@ -204,7 +204,7 @@ fn reverse_comparison(range: TextRange, locator: &Locator, stylist: &Stylist) ->
 }
 
 /// SIM300
-pub(crate) fn yoda_conditions(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn yoda_conditions(checker: &Checker, compare: ExprCompare<'_>) {
     let Some((left, op, right)) = compare.as_single() else {
         return;
     };

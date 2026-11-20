@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_empty_f_string;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Builder, Expr, ExprKind, build};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
@@ -77,22 +77,22 @@ impl Violation for PrintEmptyString {
 }
 
 /// FURB105
-pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
-    if !checker.semantic().match_builtin_expr(&call.func, "print") {
+pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
+    if !checker.semantic().match_builtin_expr(call.func(), "print") {
         return;
     }
 
-    let mut positional = call.arguments.args();
+    let mut positional = call.arguments().args().iter();
     let first = positional.next();
     let (reason, separator) = if let Some(second) = positional.next() {
         // An unpacked mapping can supply the separator at runtime.
         let mut sep = None;
-        for kw in call.arguments.keywords() {
-            let Some(name) = &kw.arg else {
+        for kw in call.arguments().keywords() {
+            let Some(name) = kw.arg() else {
                 return;
             };
             if name == "sep" && sep.is_none() {
-                sep = Some(kw.value.as_ref());
+                sep = Some(kw.value());
             }
         }
         if !sep.is_some_and(is_empty_string) {
@@ -122,10 +122,10 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
             (Reason::Both, Separator::Remove)
         }
     } else {
-        if first.is_some_and(Expr::is_starred_expr) {
+        if first.is_some_and(ast::Expr::is_starred_expr) {
             return;
         }
-        let has_sep = call.arguments.find_keyword("sep").is_some();
+        let has_sep = call.arguments().find_keyword("sep").is_some();
         let reason = match (first.is_some_and(is_empty_string), has_sep) {
             (true, true) => Reason::Both,
             (true, false) => Reason::EmptyArgument,
@@ -148,15 +148,19 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
 }
 
 /// Check if an expression is a constant empty string.
-fn is_empty_string(expr: &Expr) -> bool {
-    match expr {
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
-        Expr::FString(f_string) => is_empty_f_string(f_string),
+fn is_empty_string(expr: Expr<'_>) -> bool {
+    match expr.classify() {
+        ExprKind::StringLiteral(expr_string_literal) => {
+            let value = expr_string_literal.value();
+
+            value.is_empty()
+        }
+        ExprKind::FString(f_string) => is_empty_f_string(f_string),
         _ => false,
     }
 }
 
-fn is_known_valid_separator(expr: &Expr) -> bool {
+fn is_known_valid_separator(expr: Expr<'_>) -> bool {
     expr.is_string_literal_expr() || expr.is_none_literal_expr()
 }
 
@@ -173,34 +177,51 @@ impl EmptyStringFix {
     /// Generate a suggestion to remove the empty string positional argument and
     /// the `sep` keyword argument, if it exists.
     fn from_call(
-        call: &ast::ExprCall,
+        call: ast::ExprCall<'_>,
         separator: Separator,
         generator: Generator,
         comment_ranges: &CommentRanges,
     ) -> Self {
         let range = call.range();
-        let mut call = call.clone();
         let mut applicability = Applicability::Safe;
 
         if comment_ranges.intersects(range) {
             applicability = Applicability::Unsafe;
         }
 
-        call.arguments.items.retain(|item| match item {
-            ast::Argument::Positional(arg) => !is_empty_string(arg),
-            ast::Argument::Keyword(keyword)
-                if separator == Separator::Remove && keyword.arg.as_deref() == Some("sep") =>
-            {
-                if !is_known_valid_separator(&keyword.value) {
-                    applicability = Applicability::Unsafe;
+        let mut builder = Builder::default();
+        let kept = call
+            .arguments()
+            .items()
+            .iter()
+            .filter(|argument| match argument {
+                ast::ArgOrKeyword::Arg(arg) => !is_empty_string(*arg),
+                ast::ArgOrKeyword::Keyword(keyword)
+                    if separator == Separator::Remove
+                        && keyword.arg().is_some_and(|name| name == "sep") =>
+                {
+                    if !is_known_valid_separator(keyword.value()) {
+                        applicability = Applicability::Unsafe;
+                    }
+                    false
                 }
-                false
-            }
-            ast::Argument::Keyword(_) => true,
+                ast::ArgOrKeyword::Keyword(_) => true,
+            });
+        let items = builder.map_list(kept, |b, argument| match argument {
+            ast::ArgOrKeyword::Arg(arg) => ast::ArgumentId::Positional(b.copy_node(arg)),
+            ast::ArgOrKeyword::Keyword(kw) => ast::ArgumentId::Keyword(b.copy_node(kw)),
         });
-
-        let contents = generator.expr(&call.into());
-
+        let arguments = builder.add(build::Arguments {
+            range: call.arguments().range(),
+            items,
+        });
+        let func = builder.copy_node(call.func());
+        let replacement = builder.add(build::ExprCall {
+            range,
+            func,
+            arguments,
+        });
+        let contents = generator.expr(builder.get(replacement).into());
         Self(Fix::applicable_edit(
             Edit::range_replacement(contents, range),
             applicability,

@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableKeyword;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Arguments, FilteredNodes};
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -71,21 +72,21 @@ impl AlwaysFixableViolation for UnnecessaryDoubleCastOrProcess {
 /// C414
 pub(crate) fn unnecessary_double_cast_or_process(
     checker: &Checker,
-    expr: &Expr,
-    outer_func: &Expr,
-    outer_arguments: &ast::Arguments,
+    &expr: &Expr<'_>,
+    outer_func: Expr<'_>,
+    arguments: Arguments<'_>,
+    outer_kw: FilteredNodes<'_, ruff_python_ast::kind::Keyword>,
 ) {
-    let Some(arg) = outer_arguments.args().next() else {
+    let args = arguments.args();
+    let Some(arg) = args.first() else {
         return;
     };
-    let Expr::Call(ast::ExprCall {
-        func: inner_func,
-        arguments,
-        ..
-    }) = arg
-    else {
+    let ExprKind::Call(call_node) = arg.classify() else {
         return;
     };
+    let inner_func = call_node.func();
+    let arguments = call_node.arguments();
+    let inner_kw = arguments.keywords();
     let semantic = checker.semantic();
     let Some(outer_func_name) = semantic.resolve_builtin_symbol(outer_func) else {
         return;
@@ -103,12 +104,12 @@ pub(crate) fn unnecessary_double_cast_or_process(
     // Avoid collapsing nested `sorted` calls with non-identical keyword arguments
     // (i.e., `key`, `reverse`).
     if inner_func_name == "sorted" && outer_func_name == "sorted" {
-        if arguments.keywords().count() != outer_arguments.keywords().count() {
+        if inner_kw.len() != outer_kw.len() {
             return;
         }
-        if !arguments.keywords().all(|inner| {
-            outer_arguments
-                .keywords()
+        if !inner_kw.iter().all(|inner| {
+            outer_kw
+                .iter()
                 .any(|outer| ComparableKeyword::from(inner) == ComparableKeyword::from(outer))
         }) {
             return;

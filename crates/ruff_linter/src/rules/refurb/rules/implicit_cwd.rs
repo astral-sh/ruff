@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprKind;
 use ruff_text_size::Ranged;
 
 use crate::codes::Category;
@@ -47,37 +48,39 @@ impl Violation for ImplicitCwd {
 }
 
 /// FURB177
-pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCall) {
-    if !call.arguments.is_empty() {
+pub(crate) fn no_implicit_cwd(checker: &Checker, call: ExprCall<'_>) {
+    if !call.arguments().is_empty() {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
+    let ExprKind::Attribute(attribute) = call.func().classify() else {
         return;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if attr != "resolve" {
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let ExprKind::Call(call_node) = value.classify() else {
         return;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     // Match on arguments, but ignore keyword arguments. `Path()` accepts keyword arguments, but
     // ignores them. See: https://github.com/python/cpython/issues/98094.
-    let mut args = arguments.args();
+    let mut args = arguments.args().iter();
     match (args.next(), args.next()) {
         // Ex) `Path().resolve()`
         (None, _) => {}
         // Ex) `Path(".").resolve()`
         (Some(arg), None) => {
-            let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg else {
+            let ExprKind::StringLiteral(string_literal) = arg.classify() else {
                 return;
             };
+            let value = string_literal.value();
             if !matches!(value.to_str(), "" | ".") {
                 return;
             }
@@ -98,7 +101,7 @@ pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCall) {
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
-            call.start(),
+            call.range().start(),
             checker.semantic(),
         )?;
         Ok(Fix::unsafe_edits(

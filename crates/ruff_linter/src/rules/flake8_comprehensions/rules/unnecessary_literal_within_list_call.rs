@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -65,10 +65,8 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinListCall {
 }
 
 /// C410
-pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast::ExprCall) {
-    let Some(argument) =
-        helpers::exactly_one_argument_with_matching_function("list", &call.func, &call.arguments)
-    else {
+pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: ast::ExprCall<'_>) {
+    let Some(argument) = helpers::exactly_one_argument_with_matching_function("list", call) else {
         return;
     };
     let Some(argument_kind) = LiteralKind::try_from_expr(argument) else {
@@ -125,10 +123,10 @@ enum LiteralKind {
 }
 
 impl LiteralKind {
-    const fn try_from_expr(expr: &Expr) -> Option<Self> {
-        match expr {
-            Expr::Tuple(_) => Some(Self::Tuple),
-            Expr::List(_) => Some(Self::List),
+    fn try_from_expr(expr: Expr<'_>) -> Option<Self> {
+        match expr.classify() {
+            ExprKind::Tuple(_) => Some(Self::Tuple),
+            ExprKind::List(_) => Some(Self::List),
             _ => None,
         }
     }

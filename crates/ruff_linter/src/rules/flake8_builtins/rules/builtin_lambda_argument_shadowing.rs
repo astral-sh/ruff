@@ -36,14 +36,14 @@ impl Violation for BuiltinLambdaArgumentShadowing {
 }
 
 /// A006
-pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &ExprLambda) {
-    let Some(parameters) = lambda.parameters.as_ref() else {
+pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: ExprLambda<'_>) {
+    let Some(parameters) = lambda.parameters() else {
         return;
     };
     for param in parameters.iter_non_variadic_params() {
         let name = param.name();
         if shadows_builtin(
-            name,
+            name.as_str(),
             checker.source_type,
             &checker.settings().flake8_builtins.ignorelist,
             checker.target_version(),

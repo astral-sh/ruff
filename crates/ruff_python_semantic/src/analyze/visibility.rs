@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Decorator, Expr};
+use ruff_python_ast::{self as ast, NodeList};
 
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
@@ -13,38 +13,53 @@ pub enum Visibility {
 }
 
 /// Returns `true` if a function is a "static method".
-pub fn is_staticmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+pub fn is_staticmethod(
+    decorator_list: NodeList<'_, ast::kind::Decorator>,
+    semantic: &SemanticModel,
+) -> bool {
     decorator_list
         .iter()
-        .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "staticmethod"))
+        .any(|decorator| semantic.match_builtin_expr(decorator.expression(), "staticmethod"))
 }
 
 /// Returns `true` if a function is a "class method".
-pub fn is_classmethod(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+pub fn is_classmethod(
+    decorator_list: NodeList<'_, ast::kind::Decorator>,
+    semantic: &SemanticModel,
+) -> bool {
     decorator_list
         .iter()
-        .any(|decorator| semantic.match_builtin_expr(&decorator.expression, "classmethod"))
+        .any(|decorator| semantic.match_builtin_expr(decorator.expression(), "classmethod"))
 }
 
 /// Returns `true` if a function definition is an `@overload`.
-pub fn is_overload(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+pub fn is_overload(
+    decorator_list: NodeList<'_, ast::kind::Decorator>,
+    semantic: &SemanticModel,
+) -> bool {
     decorator_list
         .iter()
-        .any(|decorator| semantic.match_typing_expr(&decorator.expression, "overload"))
+        .any(|decorator| semantic.match_typing_expr(decorator.expression(), "overload"))
 }
 
 /// Returns `true` if a function definition is an `@override` (PEP 698).
-pub fn is_override(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+pub fn is_override(
+    decorator_list: NodeList<'_, ast::kind::Decorator>,
+    semantic: &SemanticModel,
+) -> bool {
     decorator_list
         .iter()
-        .any(|decorator| semantic.match_typing_expr(&decorator.expression, "override"))
+        .any(|decorator| semantic.match_typing_expr(decorator.expression(), "override"))
 }
 
 /// Returns `true` if a function definition is an abstract method based on its decorators.
-pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+pub fn is_abstract(
+    decorator_list: NodeList<'_, ast::kind::Decorator>,
+    semantic: &SemanticModel,
+) -> bool {
     decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_qualified_name(&decorator.expression)
+            .resolve_qualified_name(decorator.expression())
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
@@ -64,7 +79,7 @@ pub fn is_abstract(decorator_list: &[Decorator], semantic: &SemanticModel) -> bo
 /// `extra_properties` can be used to check additional non-standard
 /// `@property`-like decorators.
 pub fn is_property<'a, P, I>(
-    decorator_list: &[Decorator],
+    decorator_list: NodeList<'_, ast::kind::Decorator>,
     extra_properties: P,
     semantic: &SemanticModel,
 ) -> bool
@@ -75,7 +90,7 @@ where
     let extra_properties = extra_properties.into_iter();
     decorator_list.iter().any(|decorator| {
         semantic
-            .resolve_qualified_name(map_callable(&decorator.expression))
+            .resolve_qualified_name(map_callable(decorator.expression()))
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),
@@ -91,17 +106,22 @@ where
 }
 
 /// Returns `true` if a function definition is an `attrs`-like validator based on its decorators.
-pub fn is_validator(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+pub fn is_validator(
+    decorator_list: NodeList<'_, ast::kind::Decorator>,
+    semantic: &SemanticModel,
+) -> bool {
     decorator_list.iter().any(|decorator| {
-        let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &decorator.expression else {
+        let Some(attribute) = decorator.expression().as_attribute_expr() else {
             return false;
         };
+        let value = attribute.value();
+        let attr = attribute.attr();
 
         if attr.as_str() != "validator" {
             return false;
         }
 
-        let Expr::Name(value) = value.as_ref() else {
+        let Some(value) = value.as_name_expr() else {
             return false;
         };
 
@@ -112,10 +132,13 @@ pub fn is_validator(decorator_list: &[Decorator], semantic: &SemanticModel) -> b
 }
 
 /// Returns `true` if a class is an `final`.
-pub fn is_final(decorator_list: &[Decorator], semantic: &SemanticModel) -> bool {
+pub fn is_final(
+    decorator_list: NodeList<'_, ast::kind::Decorator>,
+    semantic: &SemanticModel,
+) -> bool {
     decorator_list
         .iter()
-        .any(|decorator| semantic.match_typing_expr(&decorator.expression, "final"))
+        .any(|decorator| semantic.match_typing_expr(decorator.expression(), "final"))
 }
 
 /// Returns `true` if a function is a "magic method".
@@ -187,8 +210,8 @@ pub(crate) fn module_visibility(module: Module) -> Visibility {
 }
 
 /// Infer the [`Visibility`] of a function from its name.
-pub(crate) fn function_visibility(function: &ast::StmtFunctionDef) -> Visibility {
-    if function.name.starts_with('_') {
+pub(crate) fn function_visibility(function: ast::StmtFunctionDef<'_>) -> Visibility {
+    if function.name().starts_with('_') {
         Visibility::Private
     } else {
         Visibility::Public
@@ -196,24 +219,24 @@ pub(crate) fn function_visibility(function: &ast::StmtFunctionDef) -> Visibility
 }
 
 /// Infer the [`Visibility`] of a method from its name and decorators.
-pub fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
+pub fn method_visibility(function: ast::StmtFunctionDef<'_>) -> Visibility {
     // Is this a setter or deleter?
-    if function.decorator_list.iter().any(|decorator| {
-        UnqualifiedName::from_expr(&decorator.expression).is_some_and(|name| {
-            name.segments() == [function.name.as_str(), "setter"]
-                || name.segments() == [function.name.as_str(), "deleter"]
+    if function.decorator_list().iter().any(|decorator| {
+        UnqualifiedName::from_expr(decorator.expression()).is_some_and(|name| {
+            name.segments() == [function.name().as_str(), "setter"]
+                || name.segments() == [function.name().as_str(), "deleter"]
         })
     }) {
         return Visibility::Private;
     }
 
     // Is the method non-private?
-    if !function.name.starts_with('_') {
+    if !function.name().starts_with('_') {
         return Visibility::Public;
     }
 
     // Is this a magic method?
-    if is_magic(&function.name) {
+    if is_magic(function.name().as_str()) {
         return Visibility::Public;
     }
 
@@ -221,8 +244,8 @@ pub fn method_visibility(function: &ast::StmtFunctionDef) -> Visibility {
 }
 
 /// Infer the [`Visibility`] of a class from its name.
-pub(crate) fn class_visibility(class: &ast::StmtClassDef) -> Visibility {
-    if class.name.starts_with('_') {
+pub(crate) fn class_visibility(class: ast::StmtClassDef<'_>) -> Visibility {
+    if class.name().starts_with('_') {
         Visibility::Private
     } else {
         Visibility::Public

@@ -50,7 +50,7 @@ impl Violation for Debugger {
 
 /// T100
 /// Checks for the presence of a debugger call.
-pub(crate) fn debugger_call(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
+pub(crate) fn debugger_call(checker: &Checker, call: ExprCall<'_>, qualified_name: &QualifiedName) {
     if is_debugger_call(qualified_name) {
         checker.report_diagnostic(
             Debugger {
@@ -63,7 +63,7 @@ pub(crate) fn debugger_call(checker: &Checker, call: &ExprCall, qualified_name: 
 
 /// T100
 /// Checks for the presence of a debugger import.
-pub(crate) fn debugger_import(checker: &Checker, stmt: &Stmt, module: Option<&str>, name: &str) {
+pub(crate) fn debugger_import(checker: &Checker, stmt: Stmt<'_>, module: Option<&str>, name: &str) {
     if let Some(module) = module {
         let qualified_name = QualifiedName::user_defined(module).append_member(name);
 

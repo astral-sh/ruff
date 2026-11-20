@@ -1,6 +1,5 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::{AnyNodeRef, StringLike};
-use ruff_python_ast::{CmpOp, ExprCompare};
+use ruff_python_ast::{CmpOp, ExprCompare, StringLike, SyntaxNode};
 
 use crate::expression::binary_like::BinaryLike;
 use crate::expression::has_parentheses;
@@ -11,17 +10,17 @@ use crate::string::StringLikeExtensions;
 #[derive(Default)]
 pub struct FormatExprCompare;
 
-impl FormatNodeRule<ExprCompare> for FormatExprCompare {
+impl FormatNodeRule<ruff_python_ast::kind::ExprCompare> for FormatExprCompare {
     #[inline]
-    fn fmt_fields(&self, item: &ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: ExprCompare<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         BinaryLike::Compare(item).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprCompare {
+impl NeedsParentheses for ExprCompare<'_> {
     fn needs_parentheses(
         &self,
-        parent: AnyNodeRef,
+        parent: SyntaxNode,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         if parent.is_expr_await() {

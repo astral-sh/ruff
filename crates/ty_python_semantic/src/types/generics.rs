@@ -1,4 +1,5 @@
 use crate::{Program, ProgramEnvironment};
+use ruff_python_ast::TypeParamKind;
 use std::borrow::Cow;
 use std::cell::{Cell, LazyCell, RefCell};
 use std::collections::hash_map::Entry;
@@ -379,7 +380,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         index: &SemanticIndex<'db>,
         binding_context: Definition<'db>,
-        type_params_node: &ast::TypeParams,
+        type_params_node: ast::TypeParams<'_>,
     ) -> Option<Self> {
         let variables = type_params_node.iter().filter_map(|type_param| {
             Self::variable_from_type_param(db, index, binding_context, type_param)
@@ -594,12 +595,12 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         index: &SemanticIndex<'db>,
         binding_context: Definition<'db>,
-        type_param_node: &ast::TypeParam,
+        type_param_node: ast::TypeParam<'_>,
     ) -> Option<BoundTypeVarInstance<'db>> {
-        let definition = match type_param_node {
-            ast::TypeParam::TypeVar(node) => index.expect_single_definition(node),
-            ast::TypeParam::ParamSpec(node) => index.expect_single_definition(node),
-            ast::TypeParam::TypeVarTuple(node) => index.expect_single_definition(node),
+        let definition = match type_param_node.classify() {
+            TypeParamKind::TypeVar(node) => index.expect_single_definition(node),
+            TypeParamKind::ParamSpec(node) => index.expect_single_definition(node),
+            TypeParamKind::TypeVarTuple(node) => index.expect_single_definition(node),
         };
         let declared = inferred_declaration(db, definition).declared()?;
         let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = declared.inner_type()?

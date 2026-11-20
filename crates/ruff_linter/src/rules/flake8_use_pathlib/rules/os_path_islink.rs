@@ -63,7 +63,7 @@ impl Violation for OsPathIslink {
 }
 
 /// PTH114
-pub(crate) fn os_path_islink(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_islink(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "path", "islink"] {
         return;
     }

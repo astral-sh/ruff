@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Arguments;
 use ruff_python_ast::Expr;
@@ -59,11 +58,12 @@ impl Violation for TypeOfPrimitive {
 /// UP003
 pub(crate) fn type_of_primitive(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    arguments: &Arguments,
+    &expr: &Expr<'_>,
+    func: Expr<'_>,
+    arguments: Arguments<'_>,
 ) {
-    let Some([arg]) = arguments.args().collect_array() else {
+    let args = arguments.args();
+    let Some([arg]) = args.as_array() else {
         return;
     };
     let Some(primitive) = Primitive::from_expr(arg) else {

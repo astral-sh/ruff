@@ -66,9 +66,14 @@ impl Violation for FStringInGettextCall {
 }
 
 /// INT001
-pub(crate) fn f_string_in_gettext_func_call(checker: &Checker, func: &Expr, arguments: &Arguments) {
+pub(crate) fn f_string_in_gettext_func_call(
+    checker: &Checker,
+    func: Expr<'_>,
+    arguments: Arguments<'_>,
+) {
+    let args = arguments.args();
     // Check first argument (singular)
-    if let Some(first) = arguments.args().next() {
+    if let Some(first) = args.first() {
         if first.is_f_string_expr() {
             checker.report_diagnostic(FStringInGettextCall { is_plural: false }, first.range());
         }
@@ -76,7 +81,7 @@ pub(crate) fn f_string_in_gettext_func_call(checker: &Checker, func: &Expr, argu
 
     // Check second argument (plural) for ngettext calls
     if is_ngettext_call(checker, func)
-        && let Some(second) = arguments.args().nth(1)
+        && let Some(second) = args.get(1)
         && second.is_f_string_expr()
     {
         checker.report_diagnostic(FStringInGettextCall { is_plural: true }, second.range());

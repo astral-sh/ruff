@@ -66,7 +66,7 @@ impl Violation for OsSymlink {
 }
 
 /// PTH211
-pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_symlink(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "symlink"] {
         return;
     }
@@ -77,30 +77,30 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
     //            0    1    2                             3
     // os.symlink(src, dst, target_is_directory=False, *, dir_fd=None)
     // ```
-    if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
+    if is_keyword_only_argument_non_default(call.arguments(), "dir_fd") {
         return;
     }
 
     let range = call.range();
-    let mut diagnostic = checker.report_diagnostic(OsSymlink, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(OsSymlink, call.func().range());
 
     if !is_fix_os_symlink_enabled(checker.settings()) {
         return;
     }
 
-    if call.arguments.len() > 3 {
+    if call.arguments().len() > 3 {
         return;
     }
 
     if has_unknown_keywords_or_starred_expr(
-        &call.arguments,
+        call.arguments(),
         &["src", "dst", "target_is_directory", "dir_fd"],
     ) {
         return;
     }
 
     let [Some(src), Some(dst), target_is_directory] =
-        call.arguments
+        call.arguments()
             .find_argument_values(["src", "dst", "target_is_directory"])
     else {
         return;
@@ -109,7 +109,7 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
-            call.start(),
+            call.range().start(),
             checker.semantic(),
         )?;
 
@@ -127,7 +127,7 @@ pub(crate) fn os_symlink(checker: &Checker, call: &ExprCall, segments: &[&str]) 
             .and_then(|expr| {
                 let code = locator.slice(expr.range());
                 expr.as_boolean_literal_expr()
-                    .is_none_or(|bl| bl.value)
+                    .is_none_or(ruff_python_ast::ExprBooleanLiteral::value)
                     .then_some(format!(", target_is_directory={code}"))
             })
             .unwrap_or_default();

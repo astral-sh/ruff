@@ -3,31 +3,130 @@
 
 use crate::context::PyFormatContext;
 use crate::{AsFormat, FormatNodeRule, IntoFormat, PyFormatter};
-use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatResult, FormatRule};
+use ruff_formatter::{FormatOwnedWithRule, FormatResult, FormatRule};
 use ruff_python_ast as ast;
 
-impl FormatRule<ast::ModModule, PyFormatContext<'_>>
+macro_rules! impl_as_format {
+    ($($node:ident),* $(,)?) => { $(
+        impl<C> AsFormat<C> for ast::$node<'_> where Self: IntoFormat<C> {
+            type Format<'a> = <Self as IntoFormat<C>>::Format where Self: 'a;
+            fn format(&self) -> Self::Format<'_> { (*self).into_format() }
+        }
+    )* };
+}
+impl_as_format!(
+    Mod,
+    Stmt,
+    Expr,
+    ExceptHandler,
+    InterpolatedStringElement,
+    Pattern,
+    TypeParam,
+    Identifier,
+    ModModule,
+    ModExpression,
+    StmtFunctionDef,
+    StmtClassDef,
+    StmtReturn,
+    StmtDelete,
+    StmtTypeAlias,
+    StmtAssign,
+    StmtAugAssign,
+    StmtAnnAssign,
+    StmtFor,
+    StmtWhile,
+    StmtIf,
+    StmtWith,
+    StmtMatch,
+    StmtRaise,
+    StmtTry,
+    StmtAssert,
+    StmtImport,
+    StmtImportFrom,
+    StmtGlobal,
+    StmtNonlocal,
+    StmtExpr,
+    StmtPass,
+    StmtBreak,
+    StmtContinue,
+    StmtIpyEscapeCommand,
+    ExprBoolOp,
+    ExprNamed,
+    ExprBinOp,
+    ExprUnaryOp,
+    ExprLambda,
+    ExprIf,
+    ExprDict,
+    ExprSet,
+    ExprListComp,
+    ExprSetComp,
+    ExprDictComp,
+    ExprGenerator,
+    ExprAwait,
+    ExprYield,
+    ExprYieldFrom,
+    ExprCompare,
+    ExprCall,
+    ExprFString,
+    ExprTString,
+    ExprStringLiteral,
+    ExprBytesLiteral,
+    ExprNumberLiteral,
+    ExprBooleanLiteral,
+    ExprNoneLiteral,
+    ExprEllipsisLiteral,
+    ExprAttribute,
+    ExprSubscript,
+    ExprStarred,
+    ExprName,
+    ExprList,
+    ExprTuple,
+    ExprSlice,
+    ExprIpyEscapeCommand,
+    ExceptHandlerExceptHandler,
+    PatternMatchValue,
+    PatternMatchSingleton,
+    PatternMatchSequence,
+    PatternMatchMapping,
+    PatternMatchClass,
+    PatternMatchStar,
+    PatternMatchAs,
+    PatternMatchOr,
+    TypeParamTypeVar,
+    TypeParamTypeVarTuple,
+    TypeParamParamSpec,
+    PatternArguments,
+    PatternKeyword,
+    Comprehension,
+    Arguments,
+    Parameters,
+    Parameter,
+    ParameterWithDefault,
+    DictItem,
+    Keyword,
+    Alias,
+    WithItem,
+    MatchCase,
+    Decorator,
+    ElifElseClause,
+    TypeParams,
+    FString,
+    TString,
+    StringLiteral,
+    BytesLiteral
+);
+
+impl FormatRule<ast::ModModule<'_>, PyFormatContext<'_>>
     for crate::module::mod_module::FormatModModule
 {
     #[inline]
-    fn fmt(&self, node: &ast::ModModule, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ModModule>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ModModule<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ModModule>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ModModule {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ModModule,
-        crate::module::mod_module::FormatModModule,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::module::mod_module::FormatModModule::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ModModule {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ModModule<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ModModule,
+        Self,
         crate::module::mod_module::FormatModModule,
         PyFormatContext<'ast>,
     >;
@@ -36,31 +135,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ModModule {
     }
 }
 
-impl FormatRule<ast::ModExpression, PyFormatContext<'_>>
+impl FormatRule<ast::ModExpression<'_>, PyFormatContext<'_>>
     for crate::module::mod_expression::FormatModExpression
 {
     #[inline]
-    fn fmt(&self, node: &ast::ModExpression, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ModExpression>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ModExpression<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ModExpression>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ModExpression {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ModExpression,
-        crate::module::mod_expression::FormatModExpression,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::module::mod_expression::FormatModExpression::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ModExpression {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ModExpression<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ModExpression,
+        Self,
         crate::module::mod_expression::FormatModExpression,
         PyFormatContext<'ast>,
     >;
@@ -72,31 +157,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ModExpression {
     }
 }
 
-impl FormatRule<ast::StmtFunctionDef, PyFormatContext<'_>>
+impl FormatRule<ast::StmtFunctionDef<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_function_def::FormatStmtFunctionDef
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtFunctionDef, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtFunctionDef>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtFunctionDef<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtFunctionDef>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtFunctionDef {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtFunctionDef,
-        crate::statement::stmt_function_def::FormatStmtFunctionDef,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_function_def::FormatStmtFunctionDef::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtFunctionDef {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtFunctionDef<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtFunctionDef,
+        Self,
         crate::statement::stmt_function_def::FormatStmtFunctionDef,
         PyFormatContext<'ast>,
     >;
@@ -108,31 +179,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtFunctionDef {
     }
 }
 
-impl FormatRule<ast::StmtClassDef, PyFormatContext<'_>>
+impl FormatRule<ast::StmtClassDef<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_class_def::FormatStmtClassDef
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtClassDef, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtClassDef>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtClassDef<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtClassDef>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtClassDef {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtClassDef,
-        crate::statement::stmt_class_def::FormatStmtClassDef,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_class_def::FormatStmtClassDef::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtClassDef {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtClassDef<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtClassDef,
+        Self,
         crate::statement::stmt_class_def::FormatStmtClassDef,
         PyFormatContext<'ast>,
     >;
@@ -144,31 +201,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtClassDef {
     }
 }
 
-impl FormatRule<ast::StmtReturn, PyFormatContext<'_>>
+impl FormatRule<ast::StmtReturn<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_return::FormatStmtReturn
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtReturn, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtReturn>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtReturn<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtReturn>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtReturn {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtReturn,
-        crate::statement::stmt_return::FormatStmtReturn,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_return::FormatStmtReturn::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtReturn {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtReturn<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtReturn,
+        Self,
         crate::statement::stmt_return::FormatStmtReturn,
         PyFormatContext<'ast>,
     >;
@@ -180,31 +223,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtReturn {
     }
 }
 
-impl FormatRule<ast::StmtDelete, PyFormatContext<'_>>
+impl FormatRule<ast::StmtDelete<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_delete::FormatStmtDelete
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtDelete, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtDelete>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtDelete<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtDelete>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtDelete {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtDelete,
-        crate::statement::stmt_delete::FormatStmtDelete,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_delete::FormatStmtDelete::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtDelete {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtDelete<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtDelete,
+        Self,
         crate::statement::stmt_delete::FormatStmtDelete,
         PyFormatContext<'ast>,
     >;
@@ -216,31 +245,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtDelete {
     }
 }
 
-impl FormatRule<ast::StmtTypeAlias, PyFormatContext<'_>>
+impl FormatRule<ast::StmtTypeAlias<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_type_alias::FormatStmtTypeAlias
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtTypeAlias, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtTypeAlias>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtTypeAlias<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtTypeAlias>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtTypeAlias {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtTypeAlias,
-        crate::statement::stmt_type_alias::FormatStmtTypeAlias,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_type_alias::FormatStmtTypeAlias::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtTypeAlias {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtTypeAlias<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtTypeAlias,
+        Self,
         crate::statement::stmt_type_alias::FormatStmtTypeAlias,
         PyFormatContext<'ast>,
     >;
@@ -252,31 +267,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtTypeAlias {
     }
 }
 
-impl FormatRule<ast::StmtAssign, PyFormatContext<'_>>
+impl FormatRule<ast::StmtAssign<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_assign::FormatStmtAssign
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtAssign, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtAssign>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtAssign<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtAssign>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtAssign {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtAssign,
-        crate::statement::stmt_assign::FormatStmtAssign,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_assign::FormatStmtAssign::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAssign {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAssign<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtAssign,
+        Self,
         crate::statement::stmt_assign::FormatStmtAssign,
         PyFormatContext<'ast>,
     >;
@@ -288,31 +289,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAssign {
     }
 }
 
-impl FormatRule<ast::StmtAugAssign, PyFormatContext<'_>>
+impl FormatRule<ast::StmtAugAssign<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_aug_assign::FormatStmtAugAssign
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtAugAssign, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtAugAssign>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtAugAssign<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtAugAssign>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtAugAssign {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtAugAssign,
-        crate::statement::stmt_aug_assign::FormatStmtAugAssign,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_aug_assign::FormatStmtAugAssign::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAugAssign {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAugAssign<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtAugAssign,
+        Self,
         crate::statement::stmt_aug_assign::FormatStmtAugAssign,
         PyFormatContext<'ast>,
     >;
@@ -324,31 +311,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAugAssign {
     }
 }
 
-impl FormatRule<ast::StmtAnnAssign, PyFormatContext<'_>>
+impl FormatRule<ast::StmtAnnAssign<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_ann_assign::FormatStmtAnnAssign
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtAnnAssign, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtAnnAssign>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtAnnAssign<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtAnnAssign>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtAnnAssign {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtAnnAssign,
-        crate::statement::stmt_ann_assign::FormatStmtAnnAssign,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_ann_assign::FormatStmtAnnAssign::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAnnAssign {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAnnAssign<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtAnnAssign,
+        Self,
         crate::statement::stmt_ann_assign::FormatStmtAnnAssign,
         PyFormatContext<'ast>,
     >;
@@ -360,59 +333,33 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAnnAssign {
     }
 }
 
-impl FormatRule<ast::StmtFor, PyFormatContext<'_>> for crate::statement::stmt_for::FormatStmtFor {
+impl FormatRule<ast::StmtFor<'_>, PyFormatContext<'_>>
+    for crate::statement::stmt_for::FormatStmtFor
+{
     #[inline]
-    fn fmt(&self, node: &ast::StmtFor, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtFor>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtFor<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtFor>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtFor {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtFor,
-        crate::statement::stmt_for::FormatStmtFor,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::statement::stmt_for::FormatStmtFor::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtFor {
-    type Format = FormatOwnedWithRule<
-        ast::StmtFor,
-        crate::statement::stmt_for::FormatStmtFor,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtFor<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::statement::stmt_for::FormatStmtFor, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::statement::stmt_for::FormatStmtFor::default())
     }
 }
 
-impl FormatRule<ast::StmtWhile, PyFormatContext<'_>>
+impl FormatRule<ast::StmtWhile<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_while::FormatStmtWhile
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtWhile, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtWhile>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtWhile<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtWhile>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtWhile {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtWhile,
-        crate::statement::stmt_while::FormatStmtWhile,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_while::FormatStmtWhile::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtWhile {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtWhile<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtWhile,
+        Self,
         crate::statement::stmt_while::FormatStmtWhile,
         PyFormatContext<'ast>,
     >;
@@ -424,56 +371,31 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtWhile {
     }
 }
 
-impl FormatRule<ast::StmtIf, PyFormatContext<'_>> for crate::statement::stmt_if::FormatStmtIf {
+impl FormatRule<ast::StmtIf<'_>, PyFormatContext<'_>> for crate::statement::stmt_if::FormatStmtIf {
     #[inline]
-    fn fmt(&self, node: &ast::StmtIf, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtIf>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtIf<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtIf>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtIf {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtIf,
-        crate::statement::stmt_if::FormatStmtIf,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::statement::stmt_if::FormatStmtIf::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtIf {
-    type Format = FormatOwnedWithRule<
-        ast::StmtIf,
-        crate::statement::stmt_if::FormatStmtIf,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtIf<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::statement::stmt_if::FormatStmtIf, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::statement::stmt_if::FormatStmtIf::default())
     }
 }
 
-impl FormatRule<ast::StmtWith, PyFormatContext<'_>>
+impl FormatRule<ast::StmtWith<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_with::FormatStmtWith
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtWith>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtWith<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtWith>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtWith {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtWith,
-        crate::statement::stmt_with::FormatStmtWith,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::statement::stmt_with::FormatStmtWith::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtWith {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtWith<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtWith,
+        Self,
         crate::statement::stmt_with::FormatStmtWith,
         PyFormatContext<'ast>,
     >;
@@ -482,31 +404,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtWith {
     }
 }
 
-impl FormatRule<ast::StmtMatch, PyFormatContext<'_>>
+impl FormatRule<ast::StmtMatch<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_match::FormatStmtMatch
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtMatch, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtMatch>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtMatch<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtMatch>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtMatch {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtMatch,
-        crate::statement::stmt_match::FormatStmtMatch,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_match::FormatStmtMatch::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtMatch {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtMatch<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtMatch,
+        Self,
         crate::statement::stmt_match::FormatStmtMatch,
         PyFormatContext<'ast>,
     >;
@@ -518,31 +426,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtMatch {
     }
 }
 
-impl FormatRule<ast::StmtRaise, PyFormatContext<'_>>
+impl FormatRule<ast::StmtRaise<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_raise::FormatStmtRaise
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtRaise, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtRaise>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtRaise<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtRaise>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtRaise {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtRaise,
-        crate::statement::stmt_raise::FormatStmtRaise,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_raise::FormatStmtRaise::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtRaise {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtRaise<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtRaise,
+        Self,
         crate::statement::stmt_raise::FormatStmtRaise,
         PyFormatContext<'ast>,
     >;
@@ -554,59 +448,33 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtRaise {
     }
 }
 
-impl FormatRule<ast::StmtTry, PyFormatContext<'_>> for crate::statement::stmt_try::FormatStmtTry {
+impl FormatRule<ast::StmtTry<'_>, PyFormatContext<'_>>
+    for crate::statement::stmt_try::FormatStmtTry
+{
     #[inline]
-    fn fmt(&self, node: &ast::StmtTry, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtTry>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtTry<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtTry>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtTry {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtTry,
-        crate::statement::stmt_try::FormatStmtTry,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::statement::stmt_try::FormatStmtTry::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtTry {
-    type Format = FormatOwnedWithRule<
-        ast::StmtTry,
-        crate::statement::stmt_try::FormatStmtTry,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtTry<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::statement::stmt_try::FormatStmtTry, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::statement::stmt_try::FormatStmtTry::default())
     }
 }
 
-impl FormatRule<ast::StmtAssert, PyFormatContext<'_>>
+impl FormatRule<ast::StmtAssert<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_assert::FormatStmtAssert
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtAssert, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtAssert>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtAssert<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtAssert>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtAssert {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtAssert,
-        crate::statement::stmt_assert::FormatStmtAssert,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_assert::FormatStmtAssert::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAssert {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAssert<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtAssert,
+        Self,
         crate::statement::stmt_assert::FormatStmtAssert,
         PyFormatContext<'ast>,
     >;
@@ -618,31 +486,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtAssert {
     }
 }
 
-impl FormatRule<ast::StmtImport, PyFormatContext<'_>>
+impl FormatRule<ast::StmtImport<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_import::FormatStmtImport
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtImport, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtImport>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtImport<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtImport>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtImport {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtImport,
-        crate::statement::stmt_import::FormatStmtImport,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_import::FormatStmtImport::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtImport {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtImport<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtImport,
+        Self,
         crate::statement::stmt_import::FormatStmtImport,
         PyFormatContext<'ast>,
     >;
@@ -654,31 +508,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtImport {
     }
 }
 
-impl FormatRule<ast::StmtImportFrom, PyFormatContext<'_>>
+impl FormatRule<ast::StmtImportFrom<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_import_from::FormatStmtImportFrom
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtImportFrom, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtImportFrom>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtImportFrom<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtImportFrom>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtImportFrom {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtImportFrom,
-        crate::statement::stmt_import_from::FormatStmtImportFrom,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_import_from::FormatStmtImportFrom::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtImportFrom {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtImportFrom<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtImportFrom,
+        Self,
         crate::statement::stmt_import_from::FormatStmtImportFrom,
         PyFormatContext<'ast>,
     >;
@@ -690,31 +530,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtImportFrom {
     }
 }
 
-impl FormatRule<ast::StmtGlobal, PyFormatContext<'_>>
+impl FormatRule<ast::StmtGlobal<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_global::FormatStmtGlobal
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtGlobal, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtGlobal>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtGlobal<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtGlobal>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtGlobal {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtGlobal,
-        crate::statement::stmt_global::FormatStmtGlobal,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_global::FormatStmtGlobal::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtGlobal {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtGlobal<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtGlobal,
+        Self,
         crate::statement::stmt_global::FormatStmtGlobal,
         PyFormatContext<'ast>,
     >;
@@ -726,31 +552,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtGlobal {
     }
 }
 
-impl FormatRule<ast::StmtNonlocal, PyFormatContext<'_>>
+impl FormatRule<ast::StmtNonlocal<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_nonlocal::FormatStmtNonlocal
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtNonlocal, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtNonlocal>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtNonlocal<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtNonlocal>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtNonlocal {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtNonlocal,
-        crate::statement::stmt_nonlocal::FormatStmtNonlocal,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_nonlocal::FormatStmtNonlocal::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtNonlocal {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtNonlocal<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtNonlocal,
+        Self,
         crate::statement::stmt_nonlocal::FormatStmtNonlocal,
         PyFormatContext<'ast>,
     >;
@@ -762,28 +574,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtNonlocal {
     }
 }
 
-impl FormatRule<ast::StmtExpr, PyFormatContext<'_>>
+impl FormatRule<ast::StmtExpr<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_expr::FormatStmtExpr
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtExpr, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtExpr>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtExpr<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtExpr>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtExpr {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtExpr,
-        crate::statement::stmt_expr::FormatStmtExpr,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::statement::stmt_expr::FormatStmtExpr::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtExpr {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtExpr<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtExpr,
+        Self,
         crate::statement::stmt_expr::FormatStmtExpr,
         PyFormatContext<'ast>,
     >;
@@ -792,28 +593,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtExpr {
     }
 }
 
-impl FormatRule<ast::StmtPass, PyFormatContext<'_>>
+impl FormatRule<ast::StmtPass<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_pass::FormatStmtPass
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtPass, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtPass>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtPass<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtPass>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtPass {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtPass,
-        crate::statement::stmt_pass::FormatStmtPass,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::statement::stmt_pass::FormatStmtPass::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtPass {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtPass<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtPass,
+        Self,
         crate::statement::stmt_pass::FormatStmtPass,
         PyFormatContext<'ast>,
     >;
@@ -822,31 +612,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtPass {
     }
 }
 
-impl FormatRule<ast::StmtBreak, PyFormatContext<'_>>
+impl FormatRule<ast::StmtBreak<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_break::FormatStmtBreak
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtBreak, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtBreak>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtBreak<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtBreak>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtBreak {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtBreak,
-        crate::statement::stmt_break::FormatStmtBreak,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_break::FormatStmtBreak::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtBreak {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtBreak<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtBreak,
+        Self,
         crate::statement::stmt_break::FormatStmtBreak,
         PyFormatContext<'ast>,
     >;
@@ -858,31 +634,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtBreak {
     }
 }
 
-impl FormatRule<ast::StmtContinue, PyFormatContext<'_>>
+impl FormatRule<ast::StmtContinue<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_continue::FormatStmtContinue
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtContinue, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtContinue>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtContinue<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtContinue>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtContinue {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtContinue,
-        crate::statement::stmt_continue::FormatStmtContinue,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_continue::FormatStmtContinue::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtContinue {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtContinue<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtContinue,
+        Self,
         crate::statement::stmt_continue::FormatStmtContinue,
         PyFormatContext<'ast>,
     >;
@@ -894,31 +656,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtContinue {
     }
 }
 
-impl FormatRule<ast::StmtIpyEscapeCommand, PyFormatContext<'_>>
+impl FormatRule<ast::StmtIpyEscapeCommand<'_>, PyFormatContext<'_>>
     for crate::statement::stmt_ipy_escape_command::FormatStmtIpyEscapeCommand
 {
     #[inline]
-    fn fmt(&self, node: &ast::StmtIpyEscapeCommand, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StmtIpyEscapeCommand>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StmtIpyEscapeCommand<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StmtIpyEscapeCommand>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StmtIpyEscapeCommand {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StmtIpyEscapeCommand,
-        crate::statement::stmt_ipy_escape_command::FormatStmtIpyEscapeCommand,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::statement::stmt_ipy_escape_command::FormatStmtIpyEscapeCommand::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtIpyEscapeCommand {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtIpyEscapeCommand<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StmtIpyEscapeCommand,
+        Self,
         crate::statement::stmt_ipy_escape_command::FormatStmtIpyEscapeCommand,
         PyFormatContext<'ast>,
     >;
@@ -930,31 +678,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StmtIpyEscapeCommand {
     }
 }
 
-impl FormatRule<ast::ExprBoolOp, PyFormatContext<'_>>
+impl FormatRule<ast::ExprBoolOp<'_>, PyFormatContext<'_>>
     for crate::expression::expr_bool_op::FormatExprBoolOp
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprBoolOp, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprBoolOp>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprBoolOp<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprBoolOp>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprBoolOp {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprBoolOp,
-        crate::expression::expr_bool_op::FormatExprBoolOp,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_bool_op::FormatExprBoolOp::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBoolOp {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBoolOp<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprBoolOp,
+        Self,
         crate::expression::expr_bool_op::FormatExprBoolOp,
         PyFormatContext<'ast>,
     >;
@@ -966,31 +700,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBoolOp {
     }
 }
 
-impl FormatRule<ast::ExprNamed, PyFormatContext<'_>>
+impl FormatRule<ast::ExprNamed<'_>, PyFormatContext<'_>>
     for crate::expression::expr_named::FormatExprNamed
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprNamed, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprNamed>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprNamed<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprNamed>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprNamed {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprNamed,
-        crate::expression::expr_named::FormatExprNamed,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_named::FormatExprNamed::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprNamed {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprNamed<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprNamed,
+        Self,
         crate::expression::expr_named::FormatExprNamed,
         PyFormatContext<'ast>,
     >;
@@ -1002,31 +722,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprNamed {
     }
 }
 
-impl FormatRule<ast::ExprBinOp, PyFormatContext<'_>>
+impl FormatRule<ast::ExprBinOp<'_>, PyFormatContext<'_>>
     for crate::expression::expr_bin_op::FormatExprBinOp
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprBinOp, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprBinOp>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprBinOp<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprBinOp>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprBinOp {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprBinOp,
-        crate::expression::expr_bin_op::FormatExprBinOp,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_bin_op::FormatExprBinOp::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBinOp {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBinOp<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprBinOp,
+        Self,
         crate::expression::expr_bin_op::FormatExprBinOp,
         PyFormatContext<'ast>,
     >;
@@ -1038,31 +744,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBinOp {
     }
 }
 
-impl FormatRule<ast::ExprUnaryOp, PyFormatContext<'_>>
+impl FormatRule<ast::ExprUnaryOp<'_>, PyFormatContext<'_>>
     for crate::expression::expr_unary_op::FormatExprUnaryOp
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprUnaryOp, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprUnaryOp>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprUnaryOp<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprUnaryOp>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprUnaryOp {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprUnaryOp,
-        crate::expression::expr_unary_op::FormatExprUnaryOp,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_unary_op::FormatExprUnaryOp::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprUnaryOp {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprUnaryOp<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprUnaryOp,
+        Self,
         crate::expression::expr_unary_op::FormatExprUnaryOp,
         PyFormatContext<'ast>,
     >;
@@ -1074,31 +766,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprUnaryOp {
     }
 }
 
-impl FormatRule<ast::ExprLambda, PyFormatContext<'_>>
+impl FormatRule<ast::ExprLambda<'_>, PyFormatContext<'_>>
     for crate::expression::expr_lambda::FormatExprLambda
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprLambda, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprLambda>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprLambda<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprLambda>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprLambda {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprLambda,
-        crate::expression::expr_lambda::FormatExprLambda,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_lambda::FormatExprLambda::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprLambda {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprLambda<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprLambda,
+        Self,
         crate::expression::expr_lambda::FormatExprLambda,
         PyFormatContext<'ast>,
     >;
@@ -1110,59 +788,31 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprLambda {
     }
 }
 
-impl FormatRule<ast::ExprIf, PyFormatContext<'_>> for crate::expression::expr_if::FormatExprIf {
+impl FormatRule<ast::ExprIf<'_>, PyFormatContext<'_>> for crate::expression::expr_if::FormatExprIf {
     #[inline]
-    fn fmt(&self, node: &ast::ExprIf, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprIf>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprIf<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprIf>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprIf {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprIf,
-        crate::expression::expr_if::FormatExprIf,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::expression::expr_if::FormatExprIf::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprIf {
-    type Format = FormatOwnedWithRule<
-        ast::ExprIf,
-        crate::expression::expr_if::FormatExprIf,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprIf<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::expression::expr_if::FormatExprIf, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::expression::expr_if::FormatExprIf::default())
     }
 }
 
-impl FormatRule<ast::ExprDict, PyFormatContext<'_>>
+impl FormatRule<ast::ExprDict<'_>, PyFormatContext<'_>>
     for crate::expression::expr_dict::FormatExprDict
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprDict, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprDict>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprDict<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprDict>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprDict {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprDict,
-        crate::expression::expr_dict::FormatExprDict,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_dict::FormatExprDict::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprDict {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprDict<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprDict,
+        Self,
         crate::expression::expr_dict::FormatExprDict,
         PyFormatContext<'ast>,
     >;
@@ -1174,26 +824,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprDict {
     }
 }
 
-impl FormatRule<ast::ExprSet, PyFormatContext<'_>> for crate::expression::expr_set::FormatExprSet {
+impl FormatRule<ast::ExprSet<'_>, PyFormatContext<'_>>
+    for crate::expression::expr_set::FormatExprSet
+{
     #[inline]
-    fn fmt(&self, node: &ast::ExprSet, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprSet>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprSet<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprSet>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprSet {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprSet,
-        crate::expression::expr_set::FormatExprSet,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::expression::expr_set::FormatExprSet::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSet {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSet<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprSet,
+        Self,
         crate::expression::expr_set::FormatExprSet,
         PyFormatContext<'ast>,
     >;
@@ -1202,31 +843,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSet {
     }
 }
 
-impl FormatRule<ast::ExprListComp, PyFormatContext<'_>>
+impl FormatRule<ast::ExprListComp<'_>, PyFormatContext<'_>>
     for crate::expression::expr_list_comp::FormatExprListComp
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprListComp, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprListComp>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprListComp<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprListComp>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprListComp {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprListComp,
-        crate::expression::expr_list_comp::FormatExprListComp,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_list_comp::FormatExprListComp::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprListComp {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprListComp<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprListComp,
+        Self,
         crate::expression::expr_list_comp::FormatExprListComp,
         PyFormatContext<'ast>,
     >;
@@ -1238,31 +865,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprListComp {
     }
 }
 
-impl FormatRule<ast::ExprSetComp, PyFormatContext<'_>>
+impl FormatRule<ast::ExprSetComp<'_>, PyFormatContext<'_>>
     for crate::expression::expr_set_comp::FormatExprSetComp
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprSetComp, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprSetComp>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprSetComp<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprSetComp>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprSetComp {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprSetComp,
-        crate::expression::expr_set_comp::FormatExprSetComp,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_set_comp::FormatExprSetComp::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSetComp {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSetComp<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprSetComp,
+        Self,
         crate::expression::expr_set_comp::FormatExprSetComp,
         PyFormatContext<'ast>,
     >;
@@ -1274,31 +887,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSetComp {
     }
 }
 
-impl FormatRule<ast::ExprDictComp, PyFormatContext<'_>>
+impl FormatRule<ast::ExprDictComp<'_>, PyFormatContext<'_>>
     for crate::expression::expr_dict_comp::FormatExprDictComp
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprDictComp, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprDictComp>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprDictComp<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprDictComp>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprDictComp {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprDictComp,
-        crate::expression::expr_dict_comp::FormatExprDictComp,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_dict_comp::FormatExprDictComp::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprDictComp {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprDictComp<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprDictComp,
+        Self,
         crate::expression::expr_dict_comp::FormatExprDictComp,
         PyFormatContext<'ast>,
     >;
@@ -1310,31 +909,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprDictComp {
     }
 }
 
-impl FormatRule<ast::ExprGenerator, PyFormatContext<'_>>
+impl FormatRule<ast::ExprGenerator<'_>, PyFormatContext<'_>>
     for crate::expression::expr_generator::FormatExprGenerator
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprGenerator, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprGenerator>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprGenerator<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprGenerator>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprGenerator {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprGenerator,
-        crate::expression::expr_generator::FormatExprGenerator,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_generator::FormatExprGenerator::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprGenerator {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprGenerator<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprGenerator,
+        Self,
         crate::expression::expr_generator::FormatExprGenerator,
         PyFormatContext<'ast>,
     >;
@@ -1346,31 +931,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprGenerator {
     }
 }
 
-impl FormatRule<ast::ExprAwait, PyFormatContext<'_>>
+impl FormatRule<ast::ExprAwait<'_>, PyFormatContext<'_>>
     for crate::expression::expr_await::FormatExprAwait
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprAwait, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprAwait>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprAwait<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprAwait>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprAwait {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprAwait,
-        crate::expression::expr_await::FormatExprAwait,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_await::FormatExprAwait::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprAwait {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprAwait<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprAwait,
+        Self,
         crate::expression::expr_await::FormatExprAwait,
         PyFormatContext<'ast>,
     >;
@@ -1382,31 +953,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprAwait {
     }
 }
 
-impl FormatRule<ast::ExprYield, PyFormatContext<'_>>
+impl FormatRule<ast::ExprYield<'_>, PyFormatContext<'_>>
     for crate::expression::expr_yield::FormatExprYield
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprYield, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprYield>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprYield<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprYield>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprYield {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprYield,
-        crate::expression::expr_yield::FormatExprYield,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_yield::FormatExprYield::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprYield {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprYield<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprYield,
+        Self,
         crate::expression::expr_yield::FormatExprYield,
         PyFormatContext<'ast>,
     >;
@@ -1418,31 +975,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprYield {
     }
 }
 
-impl FormatRule<ast::ExprYieldFrom, PyFormatContext<'_>>
+impl FormatRule<ast::ExprYieldFrom<'_>, PyFormatContext<'_>>
     for crate::expression::expr_yield_from::FormatExprYieldFrom
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprYieldFrom, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprYieldFrom>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprYieldFrom<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprYieldFrom>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprYieldFrom {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprYieldFrom,
-        crate::expression::expr_yield_from::FormatExprYieldFrom,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_yield_from::FormatExprYieldFrom::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprYieldFrom {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprYieldFrom<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprYieldFrom,
+        Self,
         crate::expression::expr_yield_from::FormatExprYieldFrom,
         PyFormatContext<'ast>,
     >;
@@ -1454,31 +997,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprYieldFrom {
     }
 }
 
-impl FormatRule<ast::ExprCompare, PyFormatContext<'_>>
+impl FormatRule<ast::ExprCompare<'_>, PyFormatContext<'_>>
     for crate::expression::expr_compare::FormatExprCompare
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprCompare>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprCompare<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprCompare>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprCompare {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprCompare,
-        crate::expression::expr_compare::FormatExprCompare,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_compare::FormatExprCompare::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprCompare {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprCompare<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprCompare,
+        Self,
         crate::expression::expr_compare::FormatExprCompare,
         PyFormatContext<'ast>,
     >;
@@ -1490,31 +1019,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprCompare {
     }
 }
 
-impl FormatRule<ast::ExprCall, PyFormatContext<'_>>
+impl FormatRule<ast::ExprCall<'_>, PyFormatContext<'_>>
     for crate::expression::expr_call::FormatExprCall
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprCall, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprCall>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprCall<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprCall>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprCall {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprCall,
-        crate::expression::expr_call::FormatExprCall,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_call::FormatExprCall::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprCall {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprCall<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprCall,
+        Self,
         crate::expression::expr_call::FormatExprCall,
         PyFormatContext<'ast>,
     >;
@@ -1526,31 +1041,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprCall {
     }
 }
 
-impl FormatRule<ast::ExprFString, PyFormatContext<'_>>
+impl FormatRule<ast::ExprFString<'_>, PyFormatContext<'_>>
     for crate::expression::expr_f_string::FormatExprFString
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprFString, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprFString>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprFString<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprFString>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprFString {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprFString,
-        crate::expression::expr_f_string::FormatExprFString,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_f_string::FormatExprFString::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprFString {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprFString<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprFString,
+        Self,
         crate::expression::expr_f_string::FormatExprFString,
         PyFormatContext<'ast>,
     >;
@@ -1562,31 +1063,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprFString {
     }
 }
 
-impl FormatRule<ast::ExprTString, PyFormatContext<'_>>
+impl FormatRule<ast::ExprTString<'_>, PyFormatContext<'_>>
     for crate::expression::expr_t_string::FormatExprTString
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprTString, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprTString>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprTString<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprTString>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprTString {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprTString,
-        crate::expression::expr_t_string::FormatExprTString,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_t_string::FormatExprTString::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprTString {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprTString<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprTString,
+        Self,
         crate::expression::expr_t_string::FormatExprTString,
         PyFormatContext<'ast>,
     >;
@@ -1598,31 +1085,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprTString {
     }
 }
 
-impl FormatRule<ast::ExprStringLiteral, PyFormatContext<'_>>
+impl FormatRule<ast::ExprStringLiteral<'_>, PyFormatContext<'_>>
     for crate::expression::expr_string_literal::FormatExprStringLiteral
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprStringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprStringLiteral>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprStringLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprStringLiteral>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprStringLiteral {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprStringLiteral,
-        crate::expression::expr_string_literal::FormatExprStringLiteral,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_string_literal::FormatExprStringLiteral::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprStringLiteral {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprStringLiteral<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprStringLiteral,
+        Self,
         crate::expression::expr_string_literal::FormatExprStringLiteral,
         PyFormatContext<'ast>,
     >;
@@ -1634,31 +1107,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprStringLiteral {
     }
 }
 
-impl FormatRule<ast::ExprBytesLiteral, PyFormatContext<'_>>
+impl FormatRule<ast::ExprBytesLiteral<'_>, PyFormatContext<'_>>
     for crate::expression::expr_bytes_literal::FormatExprBytesLiteral
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprBytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprBytesLiteral>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprBytesLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprBytesLiteral>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprBytesLiteral {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprBytesLiteral,
-        crate::expression::expr_bytes_literal::FormatExprBytesLiteral,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_bytes_literal::FormatExprBytesLiteral::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBytesLiteral {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBytesLiteral<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprBytesLiteral,
+        Self,
         crate::expression::expr_bytes_literal::FormatExprBytesLiteral,
         PyFormatContext<'ast>,
     >;
@@ -1670,31 +1129,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBytesLiteral {
     }
 }
 
-impl FormatRule<ast::ExprNumberLiteral, PyFormatContext<'_>>
+impl FormatRule<ast::ExprNumberLiteral<'_>, PyFormatContext<'_>>
     for crate::expression::expr_number_literal::FormatExprNumberLiteral
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprNumberLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprNumberLiteral>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprNumberLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprNumberLiteral>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprNumberLiteral {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprNumberLiteral,
-        crate::expression::expr_number_literal::FormatExprNumberLiteral,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_number_literal::FormatExprNumberLiteral::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprNumberLiteral {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprNumberLiteral<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprNumberLiteral,
+        Self,
         crate::expression::expr_number_literal::FormatExprNumberLiteral,
         PyFormatContext<'ast>,
     >;
@@ -1706,31 +1151,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprNumberLiteral {
     }
 }
 
-impl FormatRule<ast::ExprBooleanLiteral, PyFormatContext<'_>>
+impl FormatRule<ast::ExprBooleanLiteral<'_>, PyFormatContext<'_>>
     for crate::expression::expr_boolean_literal::FormatExprBooleanLiteral
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprBooleanLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprBooleanLiteral>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprBooleanLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprBooleanLiteral>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprBooleanLiteral {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprBooleanLiteral,
-        crate::expression::expr_boolean_literal::FormatExprBooleanLiteral,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_boolean_literal::FormatExprBooleanLiteral::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBooleanLiteral {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBooleanLiteral<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprBooleanLiteral,
+        Self,
         crate::expression::expr_boolean_literal::FormatExprBooleanLiteral,
         PyFormatContext<'ast>,
     >;
@@ -1742,31 +1173,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprBooleanLiteral {
     }
 }
 
-impl FormatRule<ast::ExprNoneLiteral, PyFormatContext<'_>>
+impl FormatRule<ast::ExprNoneLiteral<'_>, PyFormatContext<'_>>
     for crate::expression::expr_none_literal::FormatExprNoneLiteral
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprNoneLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprNoneLiteral>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprNoneLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprNoneLiteral>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprNoneLiteral {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprNoneLiteral,
-        crate::expression::expr_none_literal::FormatExprNoneLiteral,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_none_literal::FormatExprNoneLiteral::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprNoneLiteral {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprNoneLiteral<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprNoneLiteral,
+        Self,
         crate::expression::expr_none_literal::FormatExprNoneLiteral,
         PyFormatContext<'ast>,
     >;
@@ -1778,31 +1195,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprNoneLiteral {
     }
 }
 
-impl FormatRule<ast::ExprEllipsisLiteral, PyFormatContext<'_>>
+impl FormatRule<ast::ExprEllipsisLiteral<'_>, PyFormatContext<'_>>
     for crate::expression::expr_ellipsis_literal::FormatExprEllipsisLiteral
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprEllipsisLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprEllipsisLiteral>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprEllipsisLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprEllipsisLiteral>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprEllipsisLiteral {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprEllipsisLiteral,
-        crate::expression::expr_ellipsis_literal::FormatExprEllipsisLiteral,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_ellipsis_literal::FormatExprEllipsisLiteral::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprEllipsisLiteral {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprEllipsisLiteral<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprEllipsisLiteral,
+        Self,
         crate::expression::expr_ellipsis_literal::FormatExprEllipsisLiteral,
         PyFormatContext<'ast>,
     >;
@@ -1814,31 +1217,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprEllipsisLiteral {
     }
 }
 
-impl FormatRule<ast::ExprAttribute, PyFormatContext<'_>>
+impl FormatRule<ast::ExprAttribute<'_>, PyFormatContext<'_>>
     for crate::expression::expr_attribute::FormatExprAttribute
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprAttribute, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprAttribute>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprAttribute<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprAttribute>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprAttribute {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprAttribute,
-        crate::expression::expr_attribute::FormatExprAttribute,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_attribute::FormatExprAttribute::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprAttribute {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprAttribute<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprAttribute,
+        Self,
         crate::expression::expr_attribute::FormatExprAttribute,
         PyFormatContext<'ast>,
     >;
@@ -1850,31 +1239,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprAttribute {
     }
 }
 
-impl FormatRule<ast::ExprSubscript, PyFormatContext<'_>>
+impl FormatRule<ast::ExprSubscript<'_>, PyFormatContext<'_>>
     for crate::expression::expr_subscript::FormatExprSubscript
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprSubscript, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprSubscript>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprSubscript<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprSubscript>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprSubscript {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprSubscript,
-        crate::expression::expr_subscript::FormatExprSubscript,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_subscript::FormatExprSubscript::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSubscript {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSubscript<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprSubscript,
+        Self,
         crate::expression::expr_subscript::FormatExprSubscript,
         PyFormatContext<'ast>,
     >;
@@ -1886,31 +1261,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSubscript {
     }
 }
 
-impl FormatRule<ast::ExprStarred, PyFormatContext<'_>>
+impl FormatRule<ast::ExprStarred<'_>, PyFormatContext<'_>>
     for crate::expression::expr_starred::FormatExprStarred
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprStarred, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprStarred>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprStarred<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprStarred>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprStarred {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprStarred,
-        crate::expression::expr_starred::FormatExprStarred,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_starred::FormatExprStarred::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprStarred {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprStarred<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprStarred,
+        Self,
         crate::expression::expr_starred::FormatExprStarred,
         PyFormatContext<'ast>,
     >;
@@ -1922,31 +1283,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprStarred {
     }
 }
 
-impl FormatRule<ast::ExprName, PyFormatContext<'_>>
+impl FormatRule<ast::ExprName<'_>, PyFormatContext<'_>>
     for crate::expression::expr_name::FormatExprName
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprName, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprName>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprName<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprName>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprName {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprName,
-        crate::expression::expr_name::FormatExprName,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_name::FormatExprName::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprName {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprName<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprName,
+        Self,
         crate::expression::expr_name::FormatExprName,
         PyFormatContext<'ast>,
     >;
@@ -1958,31 +1305,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprName {
     }
 }
 
-impl FormatRule<ast::ExprList, PyFormatContext<'_>>
+impl FormatRule<ast::ExprList<'_>, PyFormatContext<'_>>
     for crate::expression::expr_list::FormatExprList
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprList, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprList>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprList<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprList>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprList {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprList,
-        crate::expression::expr_list::FormatExprList,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_list::FormatExprList::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprList {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprList<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprList,
+        Self,
         crate::expression::expr_list::FormatExprList,
         PyFormatContext<'ast>,
     >;
@@ -1994,31 +1327,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprList {
     }
 }
 
-impl FormatRule<ast::ExprTuple, PyFormatContext<'_>>
+impl FormatRule<ast::ExprTuple<'_>, PyFormatContext<'_>>
     for crate::expression::expr_tuple::FormatExprTuple
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprTuple, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprTuple>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprTuple<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprTuple>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprTuple {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprTuple,
-        crate::expression::expr_tuple::FormatExprTuple,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_tuple::FormatExprTuple::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprTuple {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprTuple<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprTuple,
+        Self,
         crate::expression::expr_tuple::FormatExprTuple,
         PyFormatContext<'ast>,
     >;
@@ -2030,31 +1349,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprTuple {
     }
 }
 
-impl FormatRule<ast::ExprSlice, PyFormatContext<'_>>
+impl FormatRule<ast::ExprSlice<'_>, PyFormatContext<'_>>
     for crate::expression::expr_slice::FormatExprSlice
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprSlice, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprSlice>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprSlice<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprSlice>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprSlice {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprSlice,
-        crate::expression::expr_slice::FormatExprSlice,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_slice::FormatExprSlice::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSlice {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSlice<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprSlice,
+        Self,
         crate::expression::expr_slice::FormatExprSlice,
         PyFormatContext<'ast>,
     >;
@@ -2066,31 +1371,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprSlice {
     }
 }
 
-impl FormatRule<ast::ExprIpyEscapeCommand, PyFormatContext<'_>>
+impl FormatRule<ast::ExprIpyEscapeCommand<'_>, PyFormatContext<'_>>
     for crate::expression::expr_ipy_escape_command::FormatExprIpyEscapeCommand
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExprIpyEscapeCommand, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprIpyEscapeCommand>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ExprIpyEscapeCommand<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExprIpyEscapeCommand>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprIpyEscapeCommand {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprIpyEscapeCommand,
-        crate::expression::expr_ipy_escape_command::FormatExprIpyEscapeCommand,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_ipy_escape_command::FormatExprIpyEscapeCommand::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprIpyEscapeCommand {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprIpyEscapeCommand<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExprIpyEscapeCommand,
+        Self,
         crate::expression::expr_ipy_escape_command::FormatExprIpyEscapeCommand,
         PyFormatContext<'ast>,
     >;
@@ -2102,32 +1393,21 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprIpyEscapeCommand {
     }
 }
 
-impl FormatRule<ast::ExceptHandlerExceptHandler, PyFormatContext<'_>>
+impl FormatRule<ast::ExceptHandlerExceptHandler<'_>, PyFormatContext<'_>>
     for crate::other::except_handler_except_handler::FormatExceptHandlerExceptHandler
 {
     #[inline]
-    fn fmt(&self, node: &ast::ExceptHandlerExceptHandler, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExceptHandlerExceptHandler>::fmt(self, node, f)
+    fn fmt(
+        &self,
+        node: &ast::ExceptHandlerExceptHandler<'_>,
+        f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ExceptHandlerExceptHandler>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExceptHandlerExceptHandler {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExceptHandlerExceptHandler,
-        crate::other::except_handler_except_handler::FormatExceptHandlerExceptHandler,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::other::except_handler_except_handler::FormatExceptHandlerExceptHandler::default(
-            ),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExceptHandlerExceptHandler {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExceptHandlerExceptHandler<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ExceptHandlerExceptHandler,
+        Self,
         crate::other::except_handler_except_handler::FormatExceptHandlerExceptHandler,
         PyFormatContext<'ast>,
     >;
@@ -2140,31 +1420,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExceptHandlerExceptHandler
     }
 }
 
-impl FormatRule<ast::PatternMatchValue, PyFormatContext<'_>>
+impl FormatRule<ast::PatternMatchValue<'_>, PyFormatContext<'_>>
     for crate::pattern::pattern_match_value::FormatPatternMatchValue
 {
     #[inline]
-    fn fmt(&self, node: &ast::PatternMatchValue, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternMatchValue>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::PatternMatchValue<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::PatternMatchValue>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternMatchValue {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternMatchValue,
-        crate::pattern::pattern_match_value::FormatPatternMatchValue,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_match_value::FormatPatternMatchValue::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchValue {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchValue<'_> {
     type Format = FormatOwnedWithRule<
-        ast::PatternMatchValue,
+        Self,
         crate::pattern::pattern_match_value::FormatPatternMatchValue,
         PyFormatContext<'ast>,
     >;
@@ -2176,31 +1442,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchValue {
     }
 }
 
-impl FormatRule<ast::PatternMatchSingleton, PyFormatContext<'_>>
+impl FormatRule<ast::PatternMatchSingleton<'_>, PyFormatContext<'_>>
     for crate::pattern::pattern_match_singleton::FormatPatternMatchSingleton
 {
     #[inline]
-    fn fmt(&self, node: &ast::PatternMatchSingleton, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternMatchSingleton>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::PatternMatchSingleton<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::PatternMatchSingleton>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternMatchSingleton {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternMatchSingleton,
-        crate::pattern::pattern_match_singleton::FormatPatternMatchSingleton,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_match_singleton::FormatPatternMatchSingleton::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchSingleton {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchSingleton<'_> {
     type Format = FormatOwnedWithRule<
-        ast::PatternMatchSingleton,
+        Self,
         crate::pattern::pattern_match_singleton::FormatPatternMatchSingleton,
         PyFormatContext<'ast>,
     >;
@@ -2212,31 +1464,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchSingleton {
     }
 }
 
-impl FormatRule<ast::PatternMatchSequence, PyFormatContext<'_>>
+impl FormatRule<ast::PatternMatchSequence<'_>, PyFormatContext<'_>>
     for crate::pattern::pattern_match_sequence::FormatPatternMatchSequence
 {
     #[inline]
-    fn fmt(&self, node: &ast::PatternMatchSequence, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternMatchSequence>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::PatternMatchSequence<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::PatternMatchSequence>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternMatchSequence {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternMatchSequence,
-        crate::pattern::pattern_match_sequence::FormatPatternMatchSequence,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_match_sequence::FormatPatternMatchSequence::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchSequence {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchSequence<'_> {
     type Format = FormatOwnedWithRule<
-        ast::PatternMatchSequence,
+        Self,
         crate::pattern::pattern_match_sequence::FormatPatternMatchSequence,
         PyFormatContext<'ast>,
     >;
@@ -2248,31 +1486,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchSequence {
     }
 }
 
-impl FormatRule<ast::PatternMatchMapping, PyFormatContext<'_>>
+impl FormatRule<ast::PatternMatchMapping<'_>, PyFormatContext<'_>>
     for crate::pattern::pattern_match_mapping::FormatPatternMatchMapping
 {
     #[inline]
-    fn fmt(&self, node: &ast::PatternMatchMapping, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternMatchMapping>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::PatternMatchMapping<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::PatternMatchMapping>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternMatchMapping {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternMatchMapping,
-        crate::pattern::pattern_match_mapping::FormatPatternMatchMapping,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_match_mapping::FormatPatternMatchMapping::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchMapping {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchMapping<'_> {
     type Format = FormatOwnedWithRule<
-        ast::PatternMatchMapping,
+        Self,
         crate::pattern::pattern_match_mapping::FormatPatternMatchMapping,
         PyFormatContext<'ast>,
     >;
@@ -2284,31 +1508,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchMapping {
     }
 }
 
-impl FormatRule<ast::PatternMatchClass, PyFormatContext<'_>>
+impl FormatRule<ast::PatternMatchClass<'_>, PyFormatContext<'_>>
     for crate::pattern::pattern_match_class::FormatPatternMatchClass
 {
     #[inline]
-    fn fmt(&self, node: &ast::PatternMatchClass, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternMatchClass>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::PatternMatchClass<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::PatternMatchClass>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternMatchClass {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternMatchClass,
-        crate::pattern::pattern_match_class::FormatPatternMatchClass,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_match_class::FormatPatternMatchClass::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchClass {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchClass<'_> {
     type Format = FormatOwnedWithRule<
-        ast::PatternMatchClass,
+        Self,
         crate::pattern::pattern_match_class::FormatPatternMatchClass,
         PyFormatContext<'ast>,
     >;
@@ -2320,31 +1530,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchClass {
     }
 }
 
-impl FormatRule<ast::PatternMatchStar, PyFormatContext<'_>>
+impl FormatRule<ast::PatternMatchStar<'_>, PyFormatContext<'_>>
     for crate::pattern::pattern_match_star::FormatPatternMatchStar
 {
     #[inline]
-    fn fmt(&self, node: &ast::PatternMatchStar, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternMatchStar>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::PatternMatchStar<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::PatternMatchStar>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternMatchStar {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternMatchStar,
-        crate::pattern::pattern_match_star::FormatPatternMatchStar,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_match_star::FormatPatternMatchStar::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchStar {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchStar<'_> {
     type Format = FormatOwnedWithRule<
-        ast::PatternMatchStar,
+        Self,
         crate::pattern::pattern_match_star::FormatPatternMatchStar,
         PyFormatContext<'ast>,
     >;
@@ -2356,31 +1552,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchStar {
     }
 }
 
-impl FormatRule<ast::PatternMatchAs, PyFormatContext<'_>>
+impl FormatRule<ast::PatternMatchAs<'_>, PyFormatContext<'_>>
     for crate::pattern::pattern_match_as::FormatPatternMatchAs
 {
     #[inline]
-    fn fmt(&self, node: &ast::PatternMatchAs, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternMatchAs>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::PatternMatchAs<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::PatternMatchAs>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternMatchAs {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternMatchAs,
-        crate::pattern::pattern_match_as::FormatPatternMatchAs,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_match_as::FormatPatternMatchAs::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchAs {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchAs<'_> {
     type Format = FormatOwnedWithRule<
-        ast::PatternMatchAs,
+        Self,
         crate::pattern::pattern_match_as::FormatPatternMatchAs,
         PyFormatContext<'ast>,
     >;
@@ -2392,31 +1574,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchAs {
     }
 }
 
-impl FormatRule<ast::PatternMatchOr, PyFormatContext<'_>>
+impl FormatRule<ast::PatternMatchOr<'_>, PyFormatContext<'_>>
     for crate::pattern::pattern_match_or::FormatPatternMatchOr
 {
     #[inline]
-    fn fmt(&self, node: &ast::PatternMatchOr, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternMatchOr>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::PatternMatchOr<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::PatternMatchOr>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternMatchOr {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternMatchOr,
-        crate::pattern::pattern_match_or::FormatPatternMatchOr,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_match_or::FormatPatternMatchOr::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchOr {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchOr<'_> {
     type Format = FormatOwnedWithRule<
-        ast::PatternMatchOr,
+        Self,
         crate::pattern::pattern_match_or::FormatPatternMatchOr,
         PyFormatContext<'ast>,
     >;
@@ -2428,31 +1596,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternMatchOr {
     }
 }
 
-impl FormatRule<ast::TypeParamTypeVar, PyFormatContext<'_>>
+impl FormatRule<ast::TypeParamTypeVar<'_>, PyFormatContext<'_>>
     for crate::type_param::type_param_type_var::FormatTypeParamTypeVar
 {
     #[inline]
-    fn fmt(&self, node: &ast::TypeParamTypeVar, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::TypeParamTypeVar>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::TypeParamTypeVar<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::TypeParamTypeVar>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVar {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::TypeParamTypeVar,
-        crate::type_param::type_param_type_var::FormatTypeParamTypeVar,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::type_param::type_param_type_var::FormatTypeParamTypeVar::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVar {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVar<'_> {
     type Format = FormatOwnedWithRule<
-        ast::TypeParamTypeVar,
+        Self,
         crate::type_param::type_param_type_var::FormatTypeParamTypeVar,
         PyFormatContext<'ast>,
     >;
@@ -2464,31 +1618,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVar {
     }
 }
 
-impl FormatRule<ast::TypeParamTypeVarTuple, PyFormatContext<'_>>
+impl FormatRule<ast::TypeParamTypeVarTuple<'_>, PyFormatContext<'_>>
     for crate::type_param::type_param_type_var_tuple::FormatTypeParamTypeVarTuple
 {
     #[inline]
-    fn fmt(&self, node: &ast::TypeParamTypeVarTuple, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::TypeParamTypeVarTuple>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::TypeParamTypeVarTuple<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::TypeParamTypeVarTuple>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVarTuple {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::TypeParamTypeVarTuple,
-        crate::type_param::type_param_type_var_tuple::FormatTypeParamTypeVarTuple,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::type_param::type_param_type_var_tuple::FormatTypeParamTypeVarTuple::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVarTuple {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVarTuple<'_> {
     type Format = FormatOwnedWithRule<
-        ast::TypeParamTypeVarTuple,
+        Self,
         crate::type_param::type_param_type_var_tuple::FormatTypeParamTypeVarTuple,
         PyFormatContext<'ast>,
     >;
@@ -2500,31 +1640,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamTypeVarTuple {
     }
 }
 
-impl FormatRule<ast::TypeParamParamSpec, PyFormatContext<'_>>
+impl FormatRule<ast::TypeParamParamSpec<'_>, PyFormatContext<'_>>
     for crate::type_param::type_param_param_spec::FormatTypeParamParamSpec
 {
     #[inline]
-    fn fmt(&self, node: &ast::TypeParamParamSpec, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::TypeParamParamSpec>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::TypeParamParamSpec<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::TypeParamParamSpec>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TypeParamParamSpec {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::TypeParamParamSpec,
-        crate::type_param::type_param_param_spec::FormatTypeParamParamSpec,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::type_param::type_param_param_spec::FormatTypeParamParamSpec::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamParamSpec {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamParamSpec<'_> {
     type Format = FormatOwnedWithRule<
-        ast::TypeParamParamSpec,
+        Self,
         crate::type_param::type_param_param_spec::FormatTypeParamParamSpec,
         PyFormatContext<'ast>,
     >;
@@ -2536,31 +1662,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParamParamSpec {
     }
 }
 
-impl FormatRule<ast::PatternArguments, PyFormatContext<'_>>
+impl FormatRule<ast::PatternArguments<'_>, PyFormatContext<'_>>
     for crate::pattern::pattern_arguments::FormatPatternArguments
 {
     #[inline]
-    fn fmt(&self, node: &ast::PatternArguments, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternArguments>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::PatternArguments<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::PatternArguments>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternArguments {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternArguments,
-        crate::pattern::pattern_arguments::FormatPatternArguments,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_arguments::FormatPatternArguments::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternArguments {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternArguments<'_> {
     type Format = FormatOwnedWithRule<
-        ast::PatternArguments,
+        Self,
         crate::pattern::pattern_arguments::FormatPatternArguments,
         PyFormatContext<'ast>,
     >;
@@ -2572,31 +1684,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternArguments {
     }
 }
 
-impl FormatRule<ast::PatternKeyword, PyFormatContext<'_>>
+impl FormatRule<ast::PatternKeyword<'_>, PyFormatContext<'_>>
     for crate::pattern::pattern_keyword::FormatPatternKeyword
 {
     #[inline]
-    fn fmt(&self, node: &ast::PatternKeyword, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::PatternKeyword>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::PatternKeyword<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::PatternKeyword>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::PatternKeyword {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::PatternKeyword,
-        crate::pattern::pattern_keyword::FormatPatternKeyword,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::pattern::pattern_keyword::FormatPatternKeyword::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternKeyword {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternKeyword<'_> {
     type Format = FormatOwnedWithRule<
-        ast::PatternKeyword,
+        Self,
         crate::pattern::pattern_keyword::FormatPatternKeyword,
         PyFormatContext<'ast>,
     >;
@@ -2608,31 +1706,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::PatternKeyword {
     }
 }
 
-impl FormatRule<ast::Comprehension, PyFormatContext<'_>>
+impl FormatRule<ast::Comprehension<'_>, PyFormatContext<'_>>
     for crate::other::comprehension::FormatComprehension
 {
     #[inline]
-    fn fmt(&self, node: &ast::Comprehension, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::Comprehension>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::Comprehension<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::Comprehension>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Comprehension {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::Comprehension,
-        crate::other::comprehension::FormatComprehension,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::other::comprehension::FormatComprehension::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Comprehension {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Comprehension<'_> {
     type Format = FormatOwnedWithRule<
-        ast::Comprehension,
+        Self,
         crate::other::comprehension::FormatComprehension,
         PyFormatContext<'ast>,
     >;
@@ -2644,56 +1728,33 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Comprehension {
     }
 }
 
-impl FormatRule<ast::Arguments, PyFormatContext<'_>> for crate::other::arguments::FormatArguments {
+impl FormatRule<ast::Arguments<'_>, PyFormatContext<'_>>
+    for crate::other::arguments::FormatArguments
+{
     #[inline]
-    fn fmt(&self, node: &ast::Arguments, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::Arguments>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::Arguments<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::Arguments>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Arguments {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::Arguments,
-        crate::other::arguments::FormatArguments,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::arguments::FormatArguments::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Arguments {
-    type Format = FormatOwnedWithRule<
-        ast::Arguments,
-        crate::other::arguments::FormatArguments,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Arguments<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::other::arguments::FormatArguments, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::arguments::FormatArguments::default())
     }
 }
 
-impl FormatRule<ast::Parameters, PyFormatContext<'_>>
+impl FormatRule<ast::Parameters<'_>, PyFormatContext<'_>>
     for crate::other::parameters::FormatParameters
 {
     #[inline]
-    fn fmt(&self, node: &ast::Parameters, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::Parameters>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::Parameters<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::Parameters>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Parameters {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::Parameters,
-        crate::other::parameters::FormatParameters,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::parameters::FormatParameters::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Parameters {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Parameters<'_> {
     type Format = FormatOwnedWithRule<
-        ast::Parameters,
+        Self,
         crate::other::parameters::FormatParameters,
         PyFormatContext<'ast>,
     >;
@@ -2702,59 +1763,33 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Parameters {
     }
 }
 
-impl FormatRule<ast::Parameter, PyFormatContext<'_>> for crate::other::parameter::FormatParameter {
+impl FormatRule<ast::Parameter<'_>, PyFormatContext<'_>>
+    for crate::other::parameter::FormatParameter
+{
     #[inline]
-    fn fmt(&self, node: &ast::Parameter, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::Parameter>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::Parameter<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::Parameter>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Parameter {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::Parameter,
-        crate::other::parameter::FormatParameter,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::parameter::FormatParameter::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Parameter {
-    type Format = FormatOwnedWithRule<
-        ast::Parameter,
-        crate::other::parameter::FormatParameter,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Parameter<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::other::parameter::FormatParameter, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::parameter::FormatParameter::default())
     }
 }
 
-impl FormatRule<ast::ParameterWithDefault, PyFormatContext<'_>>
+impl FormatRule<ast::ParameterWithDefault<'_>, PyFormatContext<'_>>
     for crate::other::parameter_with_default::FormatParameterWithDefault
 {
     #[inline]
-    fn fmt(&self, node: &ast::ParameterWithDefault, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ParameterWithDefault>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ParameterWithDefault<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ParameterWithDefault>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ParameterWithDefault {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ParameterWithDefault,
-        crate::other::parameter_with_default::FormatParameterWithDefault,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::other::parameter_with_default::FormatParameterWithDefault::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ParameterWithDefault {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ParameterWithDefault<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ParameterWithDefault,
+        Self,
         crate::other::parameter_with_default::FormatParameterWithDefault,
         PyFormatContext<'ast>,
     >;
@@ -2766,192 +1801,109 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ParameterWithDefault {
     }
 }
 
-impl FormatRule<ast::DictItem, PyFormatContext<'_>> for crate::other::dict_item::FormatDictItem {
+impl FormatRule<ast::DictItem<'_>, PyFormatContext<'_>>
+    for crate::other::dict_item::FormatDictItem
+{
     #[inline]
-    fn fmt(&self, node: &ast::DictItem, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::DictItem>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::DictItem<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::DictItem>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::DictItem {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::DictItem,
-        crate::other::dict_item::FormatDictItem,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::dict_item::FormatDictItem::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::DictItem {
-    type Format = FormatOwnedWithRule<
-        ast::DictItem,
-        crate::other::dict_item::FormatDictItem,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::DictItem<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::other::dict_item::FormatDictItem, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::dict_item::FormatDictItem::default())
     }
 }
 
-impl FormatRule<ast::Keyword, PyFormatContext<'_>> for crate::other::keyword::FormatKeyword {
+impl FormatRule<ast::Keyword<'_>, PyFormatContext<'_>> for crate::other::keyword::FormatKeyword {
     #[inline]
-    fn fmt(&self, node: &ast::Keyword, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::Keyword>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::Keyword<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::Keyword>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Keyword {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::Keyword,
-        crate::other::keyword::FormatKeyword,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::keyword::FormatKeyword::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Keyword {
-    type Format = FormatOwnedWithRule<
-        ast::Keyword,
-        crate::other::keyword::FormatKeyword,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Keyword<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::other::keyword::FormatKeyword, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::keyword::FormatKeyword::default())
     }
 }
 
-impl FormatRule<ast::Alias, PyFormatContext<'_>> for crate::other::alias::FormatAlias {
+impl FormatRule<ast::Alias<'_>, PyFormatContext<'_>> for crate::other::alias::FormatAlias {
     #[inline]
-    fn fmt(&self, node: &ast::Alias, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::Alias>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::Alias<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::Alias>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Alias {
-    type Format<'a> =
-        FormatRefWithRule<'a, ast::Alias, crate::other::alias::FormatAlias, PyFormatContext<'ast>>;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::alias::FormatAlias::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Alias {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Alias<'_> {
     type Format =
-        FormatOwnedWithRule<ast::Alias, crate::other::alias::FormatAlias, PyFormatContext<'ast>>;
+        FormatOwnedWithRule<Self, crate::other::alias::FormatAlias, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::alias::FormatAlias::default())
     }
 }
 
-impl FormatRule<ast::WithItem, PyFormatContext<'_>> for crate::other::with_item::FormatWithItem {
+impl FormatRule<ast::WithItem<'_>, PyFormatContext<'_>>
+    for crate::other::with_item::FormatWithItem
+{
     #[inline]
-    fn fmt(&self, node: &ast::WithItem, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::WithItem>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::WithItem<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::WithItem>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::WithItem {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::WithItem,
-        crate::other::with_item::FormatWithItem,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::with_item::FormatWithItem::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::WithItem {
-    type Format = FormatOwnedWithRule<
-        ast::WithItem,
-        crate::other::with_item::FormatWithItem,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::WithItem<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::other::with_item::FormatWithItem, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::with_item::FormatWithItem::default())
     }
 }
 
-impl FormatRule<ast::MatchCase, PyFormatContext<'_>> for crate::other::match_case::FormatMatchCase {
+impl FormatRule<ast::MatchCase<'_>, PyFormatContext<'_>>
+    for crate::other::match_case::FormatMatchCase
+{
     #[inline]
-    fn fmt(&self, node: &ast::MatchCase, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::MatchCase>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::MatchCase<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::MatchCase>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::MatchCase {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::MatchCase,
-        crate::other::match_case::FormatMatchCase,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::match_case::FormatMatchCase::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::MatchCase {
-    type Format = FormatOwnedWithRule<
-        ast::MatchCase,
-        crate::other::match_case::FormatMatchCase,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::MatchCase<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::other::match_case::FormatMatchCase, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::match_case::FormatMatchCase::default())
     }
 }
 
-impl FormatRule<ast::Decorator, PyFormatContext<'_>> for crate::other::decorator::FormatDecorator {
+impl FormatRule<ast::Decorator<'_>, PyFormatContext<'_>>
+    for crate::other::decorator::FormatDecorator
+{
     #[inline]
-    fn fmt(&self, node: &ast::Decorator, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::Decorator>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::Decorator<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::Decorator>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::Decorator {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::Decorator,
-        crate::other::decorator::FormatDecorator,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::decorator::FormatDecorator::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Decorator {
-    type Format = FormatOwnedWithRule<
-        ast::Decorator,
-        crate::other::decorator::FormatDecorator,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::Decorator<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::other::decorator::FormatDecorator, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::decorator::FormatDecorator::default())
     }
 }
 
-impl FormatRule<ast::ElifElseClause, PyFormatContext<'_>>
+impl FormatRule<ast::ElifElseClause<'_>, PyFormatContext<'_>>
     for crate::other::elif_else_clause::FormatElifElseClause
 {
     #[inline]
-    fn fmt(&self, node: &ast::ElifElseClause, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ElifElseClause>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::ElifElseClause<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::ElifElseClause>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ElifElseClause {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ElifElseClause,
-        crate::other::elif_else_clause::FormatElifElseClause,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::other::elif_else_clause::FormatElifElseClause::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ElifElseClause {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ElifElseClause<'_> {
     type Format = FormatOwnedWithRule<
-        ast::ElifElseClause,
+        Self,
         crate::other::elif_else_clause::FormatElifElseClause,
         PyFormatContext<'ast>,
     >;
@@ -2963,31 +1915,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ElifElseClause {
     }
 }
 
-impl FormatRule<ast::TypeParams, PyFormatContext<'_>>
+impl FormatRule<ast::TypeParams<'_>, PyFormatContext<'_>>
     for crate::type_param::type_params::FormatTypeParams
 {
     #[inline]
-    fn fmt(&self, node: &ast::TypeParams, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::TypeParams>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::TypeParams<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::TypeParams>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TypeParams {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::TypeParams,
-        crate::type_param::type_params::FormatTypeParams,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::type_param::type_params::FormatTypeParams::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParams {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParams<'_> {
     type Format = FormatOwnedWithRule<
-        ast::TypeParams,
+        Self,
         crate::type_param::type_params::FormatTypeParams,
         PyFormatContext<'ast>,
     >;
@@ -2999,87 +1937,45 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TypeParams {
     }
 }
 
-impl FormatRule<ast::FString, PyFormatContext<'_>> for crate::other::f_string::FormatFString {
+impl FormatRule<ast::FString<'_>, PyFormatContext<'_>> for crate::other::f_string::FormatFString {
     #[inline]
-    fn fmt(&self, node: &ast::FString, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::FString>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::FString<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::FString>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::FString {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::FString,
-        crate::other::f_string::FormatFString,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::f_string::FormatFString::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::FString {
-    type Format = FormatOwnedWithRule<
-        ast::FString,
-        crate::other::f_string::FormatFString,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::FString<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::other::f_string::FormatFString, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::f_string::FormatFString::default())
     }
 }
 
-impl FormatRule<ast::TString, PyFormatContext<'_>> for crate::other::t_string::FormatTString {
+impl FormatRule<ast::TString<'_>, PyFormatContext<'_>> for crate::other::t_string::FormatTString {
     #[inline]
-    fn fmt(&self, node: &ast::TString, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::TString>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::TString<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::TString>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::TString {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::TString,
-        crate::other::t_string::FormatTString,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, crate::other::t_string::FormatTString::default())
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TString {
-    type Format = FormatOwnedWithRule<
-        ast::TString,
-        crate::other::t_string::FormatTString,
-        PyFormatContext<'ast>,
-    >;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::TString<'_> {
+    type Format =
+        FormatOwnedWithRule<Self, crate::other::t_string::FormatTString, PyFormatContext<'ast>>;
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, crate::other::t_string::FormatTString::default())
     }
 }
 
-impl FormatRule<ast::StringLiteral, PyFormatContext<'_>>
+impl FormatRule<ast::StringLiteral<'_>, PyFormatContext<'_>>
     for crate::other::string_literal::FormatStringLiteral
 {
     #[inline]
-    fn fmt(&self, node: &ast::StringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::StringLiteral>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::StringLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::StringLiteral>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::StringLiteral {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::StringLiteral,
-        crate::other::string_literal::FormatStringLiteral,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::other::string_literal::FormatStringLiteral::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StringLiteral {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StringLiteral<'_> {
     type Format = FormatOwnedWithRule<
-        ast::StringLiteral,
+        Self,
         crate::other::string_literal::FormatStringLiteral,
         PyFormatContext<'ast>,
     >;
@@ -3091,31 +1987,17 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::StringLiteral {
     }
 }
 
-impl FormatRule<ast::BytesLiteral, PyFormatContext<'_>>
+impl FormatRule<ast::BytesLiteral<'_>, PyFormatContext<'_>>
     for crate::other::bytes_literal::FormatBytesLiteral
 {
     #[inline]
-    fn fmt(&self, node: &ast::BytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::BytesLiteral>::fmt(self, node, f)
+    fn fmt(&self, node: &ast::BytesLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::kind::BytesLiteral>::fmt(self, *node, f)
     }
 }
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::BytesLiteral {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::BytesLiteral,
-        crate::other::bytes_literal::FormatBytesLiteral,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::other::bytes_literal::FormatBytesLiteral::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::BytesLiteral {
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::BytesLiteral<'_> {
     type Format = FormatOwnedWithRule<
-        ast::BytesLiteral,
+        Self,
         crate::other::bytes_literal::FormatBytesLiteral,
         PyFormatContext<'ast>,
     >;
