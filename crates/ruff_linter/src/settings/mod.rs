@@ -659,7 +659,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::AssertWithPrintMessage), // RUF030
     RuleSelector::rule(Rule::DecimalFromFloatLiteral), // RUF032
     RuleSelector::rule(Rule::PostInitDefault), // RUF033
-    RuleSelector::rule(Rule::IfExprWithSameArms), // RUF034
+    RuleSelector::rule(Rule::IfExprWithIdenticalBranches), // RUF034
     RuleSelector::rule(Rule::InvalidAssertMessageLiteralArgument), // RUF040
     RuleSelector::rule(Rule::UnnecessaryNestedLiteral), // RUF041
     RuleSelector::rule(Rule::UnnecessaryCastToInt), // RUF046
@@ -683,7 +683,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::NeedlessBool), // SIM103
     RuleSelector::rule(Rule::ReturnInTryExceptFinally), // SIM107
     RuleSelector::rule(Rule::ManualLoopCounter), // SIM113
-    RuleSelector::rule(Rule::IfWithSameArms), // SIM114
+    RuleSelector::rule(Rule::IfWithIdenticalBranches), // SIM114
     RuleSelector::rule(Rule::OpenFileWithContextHandler), // SIM115
     RuleSelector::rule(Rule::MultipleWithStatements), // SIM117
     RuleSelector::rule(Rule::InDictKeys), // SIM118
@@ -1022,7 +1022,7 @@ mod tests {
         	while-one (UP048),
         	deprecated-abc-decorator (UP051),
         	context-manager-iterator (UP052),
-        	if-expr-with-redundant-test (FURB110),
+        	if-expr-with-body-as-condition (FURB110),
         	repeated-append (FURB113),
         	delete-full-slice (FURB131),
         	for-loop-set-mutations (FURB142),

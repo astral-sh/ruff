@@ -242,7 +242,7 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "if-exp-instead-of-or-operator",
-        Rule::IfExprWithRedundantTest,
+        Rule::IfExprWithBodyAsCondition,
     ),
     (
         "repeated-global",
@@ -260,21 +260,22 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("superfluous-else-break", Rule::UnnecessaryElseAfterBreak),
     (
         "parenthesize-chained-operators",
-        Rule::AmbiguousBooleanChain,
+        Rule::UnclearBooleanPrecedence,
     ),
     (
         "missing-f-string-syntax",
         Rule::PossiblyMissingFStringPrefix,
     ),
-    ("useless-if-else", Rule::IfExprWithSameArms),
+    ("useless-if-else", Rule::IfExprWithIdenticalBranches),
     (
         "if-else-block-instead-of-if-exp",
         Rule::IfElseAssignmentToSameVariable,
     ),
     ("enumerate-for-loop", Rule::ManualLoopCounter),
+    ("if-with-same-arms", Rule::IfWithIdenticalBranches),
     (
         "if-expr-with-twisted-arms",
-        Rule::UnnecessaryNegationInIfExpr,
+        Rule::IfExprWithNegatedElseAsCondition,
     ),
 ];
 

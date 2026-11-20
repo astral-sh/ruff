@@ -1026,7 +1026,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.semantic.current_statement_parent(),
                 );
             }
-            if checker.is_rule_enabled(Rule::IfWithSameArms) {
+            if checker.is_rule_enabled(Rule::IfWithIdenticalBranches) {
                 flake8_simplify::rules::if_with_same_arms(checker, if_);
             }
             if checker.is_rule_enabled(Rule::NeedlessBool) {
