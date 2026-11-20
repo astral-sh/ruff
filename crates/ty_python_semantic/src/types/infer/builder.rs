@@ -7254,7 +7254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 type_context_mappings
                     .entry(binding.bound_typevar.identity(db))
-                    .and_modify(|existing| existing.add(db, env, inferred_ty))
+                    .and_modify(|existing| existing.add(inferred_ty))
                     .or_insert_with(|| UnionAccumulator::new(inferred_ty));
             }
         }
@@ -8278,7 +8278,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 elt_tcx_constraints
                                     .entry(identity)
                                     .and_modify(|existing| {
-                                        existing.add(db, env, inferred_ty);
+                                        existing.add(inferred_ty);
                                     })
                                     .or_insert_with(|| UnionAccumulator::new(inferred_ty));
                             }
@@ -8673,7 +8673,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 match &mut yield_tcx {
                     Some(accumulator) => {
-                        accumulator.add(db, env, binding.solution);
+                        accumulator.add(binding.solution);
                     }
                     None => yield_tcx = Some(UnionAccumulator::new(binding.solution)),
                 }
@@ -12116,7 +12116,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         (Truthiness::Ambiguous, _) => {
                             if track_peer_types {
                                 match &mut peer_types {
-                                    Some(peer_types) => peer_types.add(db, env, ty),
+                                    Some(peer_types) => peer_types.add(ty),
                                     None => peer_types = Some(UnionAccumulator::new(ty)),
                                 }
                             }

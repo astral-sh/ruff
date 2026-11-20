@@ -667,35 +667,24 @@ pub(crate) struct UnionBuilder<'db> {
     recursively_defined: RecursivelyDefined,
 }
 
-/// Accumulates types into a union.
+/// Accumulates types in insertion order and normalizes the union when a consumer needs it.
 ///
-/// Most real-world type variables only accumulate one or two constraints. We keep those cases as
-/// plain `Type`s and only allocate a `UnionBuilder` once we know the accumulation is larger.
-pub(crate) enum UnionAccumulator<'db> {
-    One(Type<'db>),
-    Two(Type<'db>, Type<'db>),
-    Deferred(UnionBuilder<'db>),
+/// Specialization records a fallback mapping while solving constraints. When solving succeeds,
+/// it can discard the fallback without comparing its members for redundancy. Most type variables
+/// accumulate only one or two types, so keep those inputs inline.
+pub(crate) struct UnionAccumulator<'db> {
+    inputs: SmallVec<[Type<'db>; 2]>,
 }
 
 impl<'db> UnionAccumulator<'db> {
     pub(crate) fn new(ty: Type<'db>) -> Self {
-        UnionAccumulator::One(ty)
+        Self {
+            inputs: SmallVec::from_slice(&[ty]),
+        }
     }
 
-    pub(crate) fn add(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
-        match self {
-            UnionAccumulator::One(existing) => {
-                *self = UnionAccumulator::Two(*existing, ty);
-            }
-            UnionAccumulator::Two(first, second) => {
-                let mut builder = UnionBuilder::new(db, env);
-                builder.add_in_place(*first);
-                builder.add_in_place(*second);
-                builder.add_in_place(ty);
-                *self = UnionAccumulator::Deferred(builder);
-            }
-            UnionAccumulator::Deferred(builder) => builder.add_in_place(ty),
-        }
+    pub(crate) fn add(&mut self, ty: Type<'db>) {
+        self.inputs.push(ty);
     }
 
     pub(crate) fn get_or_build(
@@ -703,30 +692,23 @@ impl<'db> UnionAccumulator<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        match self {
-            UnionAccumulator::One(ty) => *ty,
-            UnionAccumulator::Two(first, second) => {
-                let ty = UnionType::from_two_elements(db, env, *first, *second);
-                *self = UnionAccumulator::One(ty);
-                ty
+        let ty = match self.inputs.as_slice() {
+            [ty] => return *ty,
+            [first, second] => UnionType::from_two_elements(db, env, *first, *second),
+            inputs => {
+                let mut builder = UnionBuilder::new(db, env);
+                for &ty in inputs {
+                    builder.add_in_place(ty);
+                }
+                builder.build()
             }
-            UnionAccumulator::Deferred(_) => {
-                let ty =
-                    std::mem::replace(self, UnionAccumulator::new(Type::Never)).into_type(db, env);
-                *self = UnionAccumulator::new(ty);
-                ty
-            }
-        }
+        };
+        *self = Self::new(ty);
+        ty
     }
 
-    pub(crate) fn into_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        match self {
-            UnionAccumulator::One(ty) => ty,
-            UnionAccumulator::Two(first, second) => {
-                UnionType::from_two_elements(db, env, first, second)
-            }
-            UnionAccumulator::Deferred(builder) => builder.build(),
-        }
+    pub(crate) fn into_type(mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        self.get_or_build(db, env)
     }
 }
 

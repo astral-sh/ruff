@@ -7132,7 +7132,7 @@ impl<'db> CallInference<'_, 'db> {
                         preferred
                             .entry(identity)
                             .and_modify(|existing| {
-                                existing.add(db, self.env, inferred_ty);
+                                existing.add(inferred_ty);
                             })
                             .or_insert_with(|| UnionAccumulator::new(inferred_ty));
                     }

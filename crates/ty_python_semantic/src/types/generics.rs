@@ -3533,7 +3533,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         )));
                     }
                     _ => {
-                        entry.get_mut().add(db, self.env, ty);
+                        entry.get_mut().add(ty);
                     }
                 }
             }
