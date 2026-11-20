@@ -107,14 +107,11 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
         };
 
         // Ex) `foo(**{**bar})`
-        if let [
-            ast::DictItem {
-                key: None, value, ..
-            },
-        ] = dict.items.as_slice()
+        if let [item] = dict.items.as_slice()
+            && item.is_unpacking()
         {
             let edit =
-                Edit::range_replacement(format!("**{}", value_source(value)), keyword.range());
+                Edit::range_replacement(checker.locator().slice(item).to_string(), keyword.range());
             checker
                 .report_diagnostic(UnnecessaryDictKwargs, keyword.range())
                 .set_fix(Fix::safe_edit(edit));

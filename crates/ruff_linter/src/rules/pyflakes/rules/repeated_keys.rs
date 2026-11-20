@@ -3,7 +3,6 @@ use std::collections::hash_map::Entry;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
-use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -158,8 +157,8 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
     let mut seen_keys = FxHashMap::with_capacity_and_hasher(dict.len(), FxBuildHasher);
     let mut seen_values = FxHashMap::default();
 
-    for (i, ast::DictItem { key, value, .. }) in dict.iter().enumerate() {
-        let Some(key) = key else {
+    for (i, item) in dict.iter().enumerate() {
+        let Some(key) = &item.key else {
             continue;
         };
 
@@ -198,15 +197,10 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
         let values = seen_values.entry(first_index).or_insert_with(|| {
             FxHashSet::from_iter([ComparableExpr::from(dict.value(first_index))])
         });
-        if !values.insert(ComparableExpr::from(value)) {
-            let previous = dict.value(i - 1);
+        if !values.insert(ComparableExpr::from(&item.value)) {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-                parenthesized_range(previous.into(), dict.into(), checker.tokens())
-                    .unwrap_or_else(|| previous.range())
-                    .end(),
-                parenthesized_range(value.into(), dict.into(), checker.tokens())
-                    .unwrap_or_else(|| value.range())
-                    .end(),
+                dict.items[i - 1].end(),
+                item.end(),
             )));
         }
     }
