@@ -31,7 +31,7 @@ impl Violation for LambdaParameterShadowsBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
         let LambdaParameterShadowsBuiltin { name } = self;
-        format!("Lambda argument `{name}` is shadowing a Python builtin")
+        format!("Lambda parameter `{name}` is shadowing a Python builtin")
     }
 }
 

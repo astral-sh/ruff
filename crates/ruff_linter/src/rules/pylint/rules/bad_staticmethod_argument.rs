@@ -52,7 +52,7 @@ impl Violation for BadStaticmethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { argument_name } = self;
-        format!("First argument of a static method should not be named `{argument_name}`")
+        format!("First parameter of a static method should not be named `{argument_name}`")
     }
 }
 

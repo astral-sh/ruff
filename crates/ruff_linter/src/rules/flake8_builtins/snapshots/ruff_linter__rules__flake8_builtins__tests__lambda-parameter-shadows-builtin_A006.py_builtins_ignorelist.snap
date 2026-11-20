@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
 ---
-A006 Lambda argument `print` is shadowing a Python builtin
+A006 Lambda parameter `print` is shadowing a Python builtin
  --> A006.py:1:8
   |
 1 | lambda print, copyright: print
@@ -10,7 +10,7 @@ A006 Lambda argument `print` is shadowing a Python builtin
 3 | lambda min, max: min
   |
 
-A006 Lambda argument `copyright` is shadowing a Python builtin
+A006 Lambda parameter `copyright` is shadowing a Python builtin
  --> A006.py:1:15
   |
 1 | lambda print, copyright: print
@@ -19,7 +19,7 @@ A006 Lambda argument `copyright` is shadowing a Python builtin
 3 | lambda min, max: min
   |
 
-A006 Lambda argument `float` is shadowing a Python builtin
+A006 Lambda parameter `float` is shadowing a Python builtin
  --> A006.py:2:11
   |
 1 | lambda print, copyright: print
@@ -29,7 +29,7 @@ A006 Lambda argument `float` is shadowing a Python builtin
 4 | lambda id: id
   |
 
-A006 Lambda argument `min` is shadowing a Python builtin
+A006 Lambda parameter `min` is shadowing a Python builtin
  --> A006.py:3:8
   |
 1 | lambda print, copyright: print
@@ -40,7 +40,7 @@ A006 Lambda argument `min` is shadowing a Python builtin
 5 | lambda dir: dir
   |
 
-A006 Lambda argument `max` is shadowing a Python builtin
+A006 Lambda parameter `max` is shadowing a Python builtin
  --> A006.py:3:13
   |
 1 | lambda print, copyright: print

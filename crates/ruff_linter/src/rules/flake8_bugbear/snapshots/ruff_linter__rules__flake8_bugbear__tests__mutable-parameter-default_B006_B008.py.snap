@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
   --> B006_B008.py:63:25
    |
 63 | def this_is_wrong(value=[1, 2, 3]):
@@ -17,7 +17,7 @@ help: Replace with `None`; initialize within function
    |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
   --> B006_B008.py:67:30
    |
 67 | def this_is_also_wrong(value={}):
@@ -33,7 +33,7 @@ help: Replace with `None`; initialize within function
    |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
   --> B006_B008.py:73:52
    |
 71 | class Foo:
@@ -51,7 +51,7 @@ help: Replace with `None`; initialize within function
    |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
   --> B006_B008.py:77:31
    |
 77 |   def multiline_arg_wrong(value={
@@ -72,7 +72,7 @@ help: Replace with `None`; initialize within function
    |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 Do not use mutable data structures for argument defaults
+B006 Do not use mutable data structures for parameter defaults
   --> B006_B008.py:82:36
    |
 80 |     ...
@@ -81,7 +81,7 @@ B006 Do not use mutable data structures for argument defaults
    |                                    ^^
 help: Replace with `None`; initialize within function
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
   --> B006_B008.py:85:20
    |
 85 | def and_this(value=set()):
@@ -97,7 +97,7 @@ help: Replace with `None`; initialize within function
    |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
   --> B006_B008.py:89:20
    |
 89 | def this_too(value=collections.OrderedDict()):
@@ -113,7 +113,7 @@ help: Replace with `None`; initialize within function
    |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
   --> B006_B008.py:93:32
    |
 93 | async def async_this_too(value=collections.defaultdict()):
@@ -129,7 +129,7 @@ help: Replace with `None`; initialize within function
    |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
   --> B006_B008.py:97:26
    |
 97 | def dont_forget_me(value=collections.deque()):
@@ -145,7 +145,7 @@ help: Replace with `None`; initialize within function
    |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:102:46
     |
 101 | # B006 still flags mutable comprehension defaults.
@@ -162,7 +162,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:106:46
     |
 106 | def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
@@ -178,7 +178,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:110:45
     |
 110 | def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
@@ -194,7 +194,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:114:33
     |
 114 | def kwonlyargs_mutable(*, value=[]):
@@ -210,7 +210,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:242:20
     |
 240 | # B006 and B008
@@ -228,7 +228,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:279:27
     |
 278 | def mutable_annotations(
@@ -246,7 +246,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:280:35
     |
 278 | def mutable_annotations(
@@ -265,7 +265,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:281:62
     |
 279 |     a: list[int] | None = [],
@@ -284,7 +284,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:282:80
     |
 280 |     b: Optional[Dict[int, int]] = {},
@@ -303,7 +303,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:287:52
     |
 287 | def single_line_func_wrong(value: dict[str, str] = {}):
@@ -319,7 +319,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:291:52
     |
 291 | def single_line_func_wrong(value: dict[str, str] = {}):
@@ -336,7 +336,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:296:52
     |
 296 | def single_line_func_wrong(value: dict[str, str] = {}):
@@ -352,7 +352,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:300:52
     |
 300 | def single_line_func_wrong(value: dict[str, str] = {}):
@@ -369,7 +369,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:305:52
     |
 305 |   def single_line_func_wrong(value: dict[str, str] = {
@@ -390,7 +390,7 @@ help: Replace with `None`; initialize within function
     |
 note: This is an unsafe fix and may change runtime behavior
 
-B006 Do not use mutable data structures for argument defaults
+B006 Do not use mutable data structures for parameter defaults
    --> B006_B008.py:311:52
     |
 311 | def single_line_func_wrong(value: dict[str, str] = {}) \
@@ -400,7 +400,7 @@ B006 Do not use mutable data structures for argument defaults
     |
 help: Replace with `None`; initialize within function
 
-B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for parameter defaults
    --> B006_B008.py:316:52
     |
 316 | def single_line_func_wrong(value: dict[str, str] = {}):

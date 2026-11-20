@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
 ---
-ARG001 Unused function argument: `self`
+ARG001 Unused function parameter: `self`
   --> ARG.py:9:7
    |
  7 | # Unused arguments on functions.
@@ -11,7 +11,7 @@ ARG001 Unused function argument: `self`
 10 |     print("Hello, world!")
    |
 
-ARG001 Unused function argument: `x`
+ARG001 Unused function parameter: `x`
   --> ARG.py:9:13
    |
  7 | # Unused arguments on functions.
@@ -21,7 +21,7 @@ ARG001 Unused function argument: `x`
 10 |     print("Hello, world!")
    |
 
-ARG001 Unused function argument: `cls`
+ARG001 Unused function parameter: `cls`
   --> ARG.py:13:7
    |
 13 | def f(cls, x):
@@ -29,7 +29,7 @@ ARG001 Unused function argument: `cls`
 14 |     print("Hello, world!")
    |
 
-ARG001 Unused function argument: `x`
+ARG001 Unused function parameter: `x`
   --> ARG.py:13:12
    |
 13 | def f(cls, x):

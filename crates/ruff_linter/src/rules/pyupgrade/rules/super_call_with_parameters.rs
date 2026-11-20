@@ -65,7 +65,7 @@ impl Violation for SuperCallWithArguments {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove `super()` parameters".to_string())
+        Some("Remove `super()` arguments".to_string())
     }
 }
 

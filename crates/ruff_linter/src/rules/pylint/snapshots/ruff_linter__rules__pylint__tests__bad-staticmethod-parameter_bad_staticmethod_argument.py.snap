@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-PLW0211 First argument of a static method should not be named `self`
+PLW0211 First parameter of a static method should not be named `self`
  --> bad_staticmethod_argument.py:3:13
   |
 1 | class Wolf:
@@ -11,7 +11,7 @@ PLW0211 First argument of a static method should not be named `self`
 4 |         pass
   |
 
-PLW0211 First argument of a static method should not be named `cls`
+PLW0211 First parameter of a static method should not be named `cls`
   --> bad_staticmethod_argument.py:15:13
    |
 13 | class Sheep:
@@ -21,7 +21,7 @@ PLW0211 First argument of a static method should not be named `cls`
 16 |         pass
    |
 
-PLW0211 First argument of a static method should not be named `self`
+PLW0211 First parameter of a static method should not be named `self`
   --> bad_staticmethod_argument.py:19:15
    |
 18 |     @staticmethod
@@ -30,7 +30,7 @@ PLW0211 First argument of a static method should not be named `self`
 20 |         pass
    |
 
-PLW0211 First argument of a static method should not be named `self`
+PLW0211 First parameter of a static method should not be named `self`
   --> bad_staticmethod_argument.py:55:17
    |
 53 | # `self` but not with `cls` as first argument - see above).

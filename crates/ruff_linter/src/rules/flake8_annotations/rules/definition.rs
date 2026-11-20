@@ -48,7 +48,7 @@ impl Violation for UnannotatedParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name } = self;
-        format!("Missing type annotation for function argument `{name}`")
+        format!("Missing type annotation for function parameter `{name}`")
     }
 }
 

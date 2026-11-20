@@ -64,7 +64,7 @@ impl Violation for ParameterShadowsBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ParameterShadowsBuiltin { name } = self;
-        format!("Function argument `{name}` is shadowing a Python builtin")
+        format!("Function parameter `{name}` is shadowing a Python builtin")
     }
 }
 

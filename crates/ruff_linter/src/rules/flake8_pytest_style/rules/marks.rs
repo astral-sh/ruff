@@ -127,11 +127,11 @@ pub(crate) struct PytestUseFixturesWithoutArguments;
 impl AlwaysFixableViolation for PytestUseFixturesWithoutArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Useless `pytest.mark.usefixtures` without parameters".to_string()
+        "Useless `pytest.mark.usefixtures` without arguments".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Remove `usefixtures` decorator or pass parameters".to_string()
+        "Remove `usefixtures` decorator or pass arguments".to_string()
     }
 }
 

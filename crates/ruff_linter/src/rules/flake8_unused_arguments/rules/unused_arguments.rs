@@ -46,7 +46,7 @@ impl Violation for UnusedFunctionParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedFunctionParameter { name } = self;
-        format!("Unused function argument: `{name}`")
+        format!("Unused function parameter: `{name}`")
     }
 }
 
@@ -99,7 +99,7 @@ impl Violation for UnusedMethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedMethodParameter { name } = self;
-        format!("Unused method argument: `{name}`")
+        format!("Unused method parameter: `{name}`")
     }
 }
 
@@ -154,7 +154,7 @@ impl Violation for UnusedClassMethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedClassMethodParameter { name } = self;
-        format!("Unused class method argument: `{name}`")
+        format!("Unused class method parameter: `{name}`")
     }
 }
 
@@ -209,7 +209,7 @@ impl Violation for UnusedStaticMethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedStaticMethodParameter { name } = self;
-        format!("Unused static method argument: `{name}`")
+        format!("Unused static method parameter: `{name}`")
     }
 }
 
@@ -249,7 +249,7 @@ impl Violation for UnusedLambdaParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnusedLambdaParameter { name } = self;
-        format!("Unused lambda argument: `{name}`")
+        format!("Unused lambda parameter: `{name}`")
     }
 }
 
