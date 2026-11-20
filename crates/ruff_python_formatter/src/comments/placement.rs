@@ -4,7 +4,7 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters, StringLike,
 };
 use ruff_python_trivia::{
-    BackwardsTokenizer, SimpleToken, SimpleTokenKind, SimpleTokenizer, TriviaRanges,
+    PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer, TriviaRanges,
     find_only_token_in_range, first_non_trivia_token, indentation_at_offset,
 };
 use ruff_source_file::LineRanges;
@@ -239,15 +239,13 @@ fn handle_enclosed_comment<'a>(
             .or_else(|comment| handle_key_value_comment(comment, source))
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source)),
         AnyNodeRef::ExprIf(expr_if) => handle_expr_if_comment(comment, expr_if, source),
-        AnyNodeRef::ExprSlice(expr_slice) => {
-            handle_slice_comments(comment, expr_slice, trivia, source)
-        }
+        AnyNodeRef::ExprSlice(expr_slice) => handle_slice_comments(comment, expr_slice, source),
         AnyNodeRef::ExprStarred(starred) => {
             handle_trailing_expression_starred_star_end_of_line_comment(comment, starred, source)
         }
         AnyNodeRef::ExprSubscript(expr_subscript) => {
             if let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() {
-                return handle_slice_comments(comment, expr_slice, trivia, source);
+                return handle_slice_comments(comment, expr_slice, source);
             }
 
             // Handle non-slice subscript end-of-line comments coming after the `[`
@@ -1133,7 +1131,6 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
 fn handle_slice_comments<'a>(
     comment: DecoratedComment<'a>,
     expr_slice: &'a ast::ExprSlice,
-    trivia: &TriviaRanges,
     source: &str,
 ) -> CommentPlacement<'a> {
     let ast::ExprSlice {
@@ -1144,17 +1141,11 @@ fn handle_slice_comments<'a>(
         step,
     } = expr_slice;
 
-    // Check for `foo[ # comment`, but only if they are on the same line
-    let after_lbracket = matches!(
-        BackwardsTokenizer::up_to(comment.start(), source, trivia.comments())
-            .skip_trivia()
-            .next(),
-        Some(SimpleToken {
-            kind: SimpleTokenKind::LBracket,
-            ..
-        })
-    );
-    if comment.line_position().is_end_of_line() && after_lbracket {
+    if comment.line_position().is_end_of_line()
+        && source[TextRange::up_to(comment.start())]
+            .trim_whitespace_end()
+            .ends_with('[')
+    {
         // Keep comments after the opening bracket there by formatting them outside the
         // soft block indent
         // ```python
