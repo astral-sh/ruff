@@ -21,9 +21,7 @@ use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::{IOError, Violation, fs, warn_user_once};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
-use ruff_workspace::resolver::{
-    ResolvedFile, RootSettings, match_exclusion, project_files_in_path,
-};
+use ruff_workspace::resolver::{ResolvedFile, RootProject, match_exclusion, project_files_in_path};
 
 use crate::args::ConfigArguments;
 use crate::cache::{Cache, PackageCacheMap, PackageCaches};
@@ -32,7 +30,7 @@ use crate::diagnostics::Diagnostics;
 /// Run the linter over a collection of files.
 pub(crate) fn check(
     files: &[PathBuf],
-    root_settings: &RootSettings,
+    root_project: &RootProject,
     config_arguments: &ConfigArguments,
     cache: flags::Cache,
     noqa: flags::Noqa,
@@ -41,7 +39,7 @@ pub(crate) fn check(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (mut paths, resolver) = project_files_in_path(files, root_settings, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(files, root_project, config_arguments)?;
     debug!("Identified files to lint in: {:?}", start.elapsed());
 
     // Filter out paths for file types not supported for linting
@@ -227,12 +225,13 @@ mod test {
 
     use ruff_db::diagnostic::DisplayDiagnosticConfig;
     use ruff_db::diagnostic::render::{ConciseRenderer, Renderer};
+    use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::message::RenderContext;
     use ruff_linter::registry::Rule;
+    use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
-    use ruff_linter::settings::{LinterSettings, flags};
-    use ruff_workspace::Settings;
-    use ruff_workspace::resolver::{PyprojectDiscoveryStrategy, ResolvedSettings, RootSettings};
+    use ruff_workspace::configuration::{Configuration, RuleSelection};
+    use ruff_workspace::resolver::{Project, PyprojectDiscoveryStrategy, RootProject};
 
     use crate::args::ConfigArguments;
 
@@ -262,20 +261,25 @@ mod test {
         // Configure
         let snapshot = format!("{}_{}", rule_code.name(), path);
         // invalid pyproject.toml is not active by default
-        let settings = Settings {
-            linter: LinterSettings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
-            ..Settings::default()
-        };
-        let root_settings = RootSettings {
+        let mut configuration = Configuration::default();
+        configuration.lint.rule_selections.push(RuleSelection {
+            select: Some(vec![
+                UnresolvedRuleSelector::cli("E902"),
+                UnresolvedRuleSelector::cli("RUF200"),
+            ]),
+            ..RuleSelection::default()
+        });
+        let overrides = ConfigArguments::default();
+        let root_project = RootProject {
             strategy: PyprojectDiscoveryStrategy::Fixed,
-            resolved: ResolvedSettings::new(settings),
+            project: Project::resolve(configuration, tempdir.path(), &overrides)?,
         };
 
         // Run
         let diagnostics = check(
             &[tempdir.path().to_path_buf()],
-            &root_settings,
-            &ConfigArguments::default(),
+            &root_project,
+            &overrides,
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,

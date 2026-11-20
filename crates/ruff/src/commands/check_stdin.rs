@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 use ruff_linter::message::RenderContext;
 use ruff_linter::settings::flags;
-use ruff_workspace::resolver::{Resolver, RootSettings, match_exclusion, project_file_at_path};
+use ruff_workspace::resolver::{Resolver, RootProject, match_exclusion, project_file_at_path};
 
 use crate::args::ConfigArguments;
 use crate::diagnostics::{Diagnostics, lint_stdin};
@@ -12,12 +12,12 @@ use crate::stdin::{parrot_stdin, read_from_stdin};
 /// Run the linter over a single file, read from `stdin`.
 pub(crate) fn check_stdin(
     filename: Option<&Path>,
-    root_settings: &RootSettings,
+    root_project: &RootProject,
     overrides: &ConfigArguments,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
-    let mut resolver = Resolver::new(root_settings);
+    let mut resolver = Resolver::new(root_project);
 
     if resolver.force_exclude() {
         if let Some(filename) = filename {
