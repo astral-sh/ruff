@@ -3951,6 +3951,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
+        let sentinel = Type::KnownInstance(KnownInstanceType::Sentinel(SentinelInstance::new(
+            self.db(),
+            target_name,
+            definition,
+        )));
+        if !self.context.is_lint_enabled(&MISMATCHED_SENTINEL_NAME) {
+            return Some(sentinel);
+        }
+
         let name = name_literal.value.to_str();
         let expected_name = self.expected_sentinel_name(name, target_name);
 
@@ -3975,9 +3984,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        Some(Type::KnownInstance(KnownInstanceType::Sentinel(
-            SentinelInstance::new(self.db(), target_name, definition),
-        )))
+        Some(sentinel)
     }
 
     /// Returns the expected name for a sentinel assigned to `target_name`. If the supplied name

@@ -4765,6 +4765,12 @@ from enum import Enum
 Color = Enum("Colour", "RED BLUE")
 ```
 
+**Fix safety**
+
+
+This rule's autofix is always marked as unsafe because the runtime name may intentionally differ
+from the variable name.
+
 **Rule history**
 
 
@@ -4814,6 +4820,12 @@ Point = NamedTuple("Vector", [("x", int)])
 Pair = namedtuple("Coordinates", "x y")
 ```
 
+**Fix safety**
+
+
+This rule's autofix is always marked as unsafe because the runtime name may intentionally differ
+from the variable name.
+
 **See also**
 
 
@@ -4862,6 +4874,17 @@ def f(x: str):
     Id = NewType(x, int)
 ```
 
+**Fix safety**
+
+
+This rule's autofix is usually marked as safe. ty marks it as unsafe if either of the following
+conditions holds:
+
+- The definition is outside module scope in a non-stub file. Changing the name can break pickling in
+    these scenarios.
+- The name argument is more complex than a bare name or a single string literal. Replacing it can
+    remove comments between adjacent literals or skip side effects.
+
 **Rule history**
 
 
@@ -4903,6 +4926,17 @@ def f(x: str):
     # error: "Cannot verify that a value of type `str` matches "Q""
     Q = ParamSpec(x)
 ```
+
+**Fix safety**
+
+
+This rule's autofix is usually marked as safe. ty marks it as unsafe if either of the following
+conditions holds:
+
+- The definition is outside module scope in a non-stub file. Changing the name can break pickling in
+    these scenarios.
+- The name argument is more complex than a bare name or a single string literal. Replacing it can
+    remove comments between adjacent literals or skip side effects.
 
 **Rule history**
 
@@ -4961,6 +4995,12 @@ class Container:
     UNSET = Sentinel("Container.UNSET")
 ```
 
+**Fix safety**
+
+
+This rule's autofix is always marked as unsafe because the runtime name may intentionally differ
+from the variable name.
+
 ## `mismatched-type-alias-name`
 
 <small>
@@ -4996,6 +5036,17 @@ def f(x: str):
     # error: "Cannot verify that a value of type `str` matches "Id""
     Id = TypeAliasType(x, int)
 ```
+
+**Fix safety**
+
+
+This rule's autofix is usually marked as safe. ty marks it as unsafe if either of the following
+conditions holds:
+
+- The definition is outside module scope in a non-stub file. Changing the name can break pickling in
+    these scenarios.
+- The name argument is more complex than a bare name or a single string literal. Replacing it can
+    remove comments between adjacent literals or skip side effects.
 
 **Rule history**
 
@@ -5038,6 +5089,17 @@ def f(x: str):
     Film = TypedDict(x, {"title": str})
 ```
 
+**Fix safety**
+
+
+This rule's autofix is usually marked as safe. ty marks it as unsafe if either of the following
+conditions holds:
+
+- The definition is outside module scope in a non-stub file. Changing the name can break pickling in
+    these scenarios.
+- The name argument is more complex than a bare name or a single string literal. Replacing it can
+    remove comments between adjacent literals or skip side effects.
+
 **Rule history**
 
 
@@ -5079,6 +5141,17 @@ def f(x: str):
     U = TypeVar(x)
 ```
 
+**Fix safety**
+
+
+This rule's autofix is usually marked as safe. ty marks it as unsafe if either of the following
+conditions holds:
+
+- The definition is outside module scope in a non-stub file. Changing the name can break pickling in
+    these scenarios.
+- The name argument is more complex than a bare name or a single string literal. Replacing it can
+    remove comments between adjacent literals or skip side effects.
+
 **Rule history**
 
 
@@ -5119,6 +5192,17 @@ def f(x: str):
     # error: "Cannot verify that a value of type `str` matches "Us""
     Us = TypeVarTuple(x)
 ```
+
+**Fix safety**
+
+
+This rule's autofix is usually marked as safe. ty marks it as unsafe if either of the following
+conditions holds:
+
+- The definition is outside module scope in a non-stub file. Changing the name can break pickling in
+    these scenarios.
+- The name argument is more complex than a bare name or a single string literal. Replacing it can
+    remove comments between adjacent literals or skip side effects.
 
 **Rule history**
 
