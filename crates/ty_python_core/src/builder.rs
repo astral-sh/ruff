@@ -1765,6 +1765,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .take_while(|e| !e.is_starred_expr())
                 .enumerate()
             {
+                if !matches!(
+                    item,
+                    ast::Expr::Dict(_) | ast::Expr::List(_) | ast::Expr::Tuple(_)
+                ) {
+                    continue;
+                }
+
                 if let Some(target) = MemberExprBuilder::visit_subscript_expr(
                     target,
                     &ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
