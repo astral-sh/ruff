@@ -1693,6 +1693,12 @@ mod tests {
     }
 
     #[test]
+    fn class_pattern_arguments() {
+        let source = "match value:\n    case shape.Point(Empty(), y=other):\n        pass";
+        assert_round_trip!(source);
+    }
+
+    #[test]
     fn unparse_magic_commands() {
         assert_eq!(
             jupyter_round_trip("%matplotlib inline"),
