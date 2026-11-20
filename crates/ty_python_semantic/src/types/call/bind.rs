@@ -8127,14 +8127,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         // Unpacking can make it ambiguous which value fills a callback parameter, e.g.
         // `forward(first, *values, fallback)` when `values` may be empty.
-        if self
-            .arguments
-            .iter()
-            .any(|arg| matches!(arg, CallArgument::Variadic(_) | CallArgument::Keywords(_)))
-        {
+        if (0..self.arguments.len()).any(|i| self.arguments.is_variadic(i)) {
             return None;
         }
-        let (index, variable) = self.signature.forwarded_callback_result(db, self.env)?;
+        let (parameter_index, variable) = self.signature.forwarded_callback_result(db, self.env)?;
         let result = outer.get(db, variable)?;
         let (free, _) = result.free_typevars(db, self.env);
         // Preserve a return type that outer inference has already refined independently.
@@ -8144,14 +8140,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return None;
         }
 
-        let argument_index = self
-            .argument_matches
-            .iter()
-            .position(|matches| matches.iter().any(|matched| matched.index == index))?;
+        let argument_index = self.argument_matches.iter().position(|matches| {
+            matches
+                .iter()
+                .any(|matched| matched.index == parameter_index)
+        })?;
         let actual = self
             .arguments
             .source_types(argument_index)?
-            .get_for_parameter(&self.signature.parameters()[index]);
+            .get_for_parameter(&self.signature.parameters()[parameter_index]);
         // For a union of callbacks, P may only supply context from the first alternative
         // when inferring the forwarded arguments. One callable can still have overloads.
         let callback = actual.try_upcast_to_callable(db, self.env)?.exactly_one()?;
@@ -8213,13 +8210,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let error_argument_indices = error_argument_indices.as_deref();
 
         let (callback, result_variable) = self.forwarded_callback(callable, outer).unzip();
-        let mut return_context = self.call_expression_tcx;
-        if let Some(variable) = result_variable
-            && self.signature.return_ty.resolve_type_alias(db) != Type::TypeVar(variable)
-        {
+        let return_context = match result_variable {
             // For a wrapper returning list[R], the expected type describes the list as a whole.
-            return_context = TypeContext::default();
-        }
+            Some(var) if self.signature.return_ty.resolve_type_alias(db) != Type::TypeVar(var) => {
+                TypeContext::default()
+            }
+            _ => self.call_expression_tcx,
+        };
         let bindings = match callback
             .unwrap_or(callable)
             .bindings(db, self.env)

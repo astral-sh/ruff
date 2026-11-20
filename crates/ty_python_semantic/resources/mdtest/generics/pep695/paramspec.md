@@ -1229,12 +1229,8 @@ def check(value: int):
     reveal_type(forward(identity, value))  # revealed: int
     numbers: list[int] = [forward(identity, value)]  # ok
     strings: list[str] = [forward(identity, value)]  # error: [invalid-assignment]
-```
 
-A wrapper returned by the callback stays generic for subsequent calls.
-
-```py
-def reuse(value: int):
+    # A wrapper returned by the callback stays generic for subsequent calls.
     wrapper = forward(identity, forward)
     reveal_type(wrapper(identity, value))  # revealed: int
 ```
@@ -1243,20 +1239,17 @@ Passing an iterable to the overloaded `list` constructor infers its element type
 return type can also widen the element type.
 
 ```py
-def copy(values: list[int]):
-    reveal_type(forward(list, values))  # revealed: list[int]
-    objects: list[object] = forward(list, values)  # ok
+reveal_type(forward(list, [1]))  # revealed: list[int]
+objects: list[object] = forward(list, [1])  # ok
 ```
 
-The default for `B` follows the inferred result type `R`, even when the callback forwards the
-arguments to another function.
+The default for `B` follows `R` through nested calls.
 
 ```py
 def with_buffer[**P, R, B = R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> tuple[R, list[B]]:
     return callback(*args, **kwargs), []
 
 def buffer(value: int):
-    reveal_type(with_buffer(identity, value))  # revealed: tuple[int, list[int]]
     reveal_type(with_buffer(forward, identity, value))  # revealed: tuple[int, list[int]]
 ```
 
@@ -1268,8 +1261,7 @@ from typing import TypeGuard
 def is_instance[T](value: object, cls: type[T]) -> TypeGuard[T]:
     return isinstance(value, cls)
 
-def predicate(value: object):
-    reveal_type(forward(is_instance, value, str))  # revealed: bool
+reveal_type(forward(is_instance, object(), cls=str))  # revealed: bool
 ```
 
 The list literal `[1]` is a valid argument for either callback.

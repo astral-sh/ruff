@@ -1094,20 +1094,20 @@ impl<'db> Signature<'db> {
         if result.typevar(db).bound_or_constraints(db, env).is_some() {
             return None;
         }
-        // Another parameter could constrain R or supply a different P. A returned
-        // Callable[P, R] needs to preserve the relationship between P and R for future
-        // calls. A skipped lazy attribute could hide either variable.
-        let free_typevars = |ty: Type<'db>| ty.resolve_type_alias(db).free_typevars(db, env);
-        let (returned, skipped) = free_typevars(self.return_ty);
-        if skipped || !result.is_inferable(db, returned) || paramspec.is_inferable(db, returned) {
+        // An additional use of P could supply another parameter list or tie the result to
+        // a future call, as in `-> Callable[P, R]`. A skipped attribute could hide P or R.
+        let uses_result = |ty: Type<'db>| {
+            let (free, skipped) = ty.resolve_type_alias(db).free_typevars(db, env);
+            if skipped || paramspec.is_inferable(db, free) {
+                return None;
+            }
+            Some(result.is_inferable(db, free))
+        };
+        if !uses_result(self.return_ty)? {
             return None;
         }
         for (i, parameter) in prefix.iter().enumerate() {
-            if i == index {
-                continue;
-            }
-            let (free, skipped) = free_typevars(parameter.annotated_type());
-            if skipped || result.is_inferable(db, free) || paramspec.is_inferable(db, free) {
+            if i != index && uses_result(parameter.annotated_type())? {
                 return None;
             }
         }
