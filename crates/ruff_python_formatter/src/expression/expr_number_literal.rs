@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{ExprNumberLiteral, Number};
+use ruff_python_ast::{ExprNumberLiteral, Number, SyntaxNode};
 use ruff_text_size::{Ranged, TextSize, TextSlice};
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -10,9 +9,9 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprNumberLiteral;
 
-impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
-    fn fmt_fields(&self, item: &ExprNumberLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        match item.value {
+impl FormatNodeRule<ruff_python_ast::kind::ExprNumberLiteral> for FormatExprNumberLiteral {
+    fn fmt_fields(&self, item: ExprNumberLiteral<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        match item.value() {
             Number::Int(_) => {
                 let content = f.context().source().slice(item);
                 let normalized = normalize_integer(content);
@@ -51,10 +50,10 @@ impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
     }
 }
 
-impl NeedsParentheses for ExprNumberLiteral {
+impl NeedsParentheses for ExprNumberLiteral<'_> {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        _parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::BestFit
