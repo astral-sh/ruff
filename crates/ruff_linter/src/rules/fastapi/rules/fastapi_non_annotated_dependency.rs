@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::Modules;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -114,50 +114,21 @@ pub(crate) fn fastapi_non_annotated_dependency(
         return;
     }
 
-    // For each positional parameter, the source code is checked to see if any preceding parameter
-    // has a default value. This prevents potential errors due to `noqa` and overlaps, which would
-    // break the syntax: the fix of a preceding parameter may not be applied, so that parameter
-    // keeps its default. Keyword-only parameters are always set to `false`; this does not apply to
-    // them, because Python allows a keyword-only parameter without a default after one with a
-    // default.
+    // Only remove a positional default if all earlier positional parameters are already required.
+    // A `noqa` or a conflicting edit can prevent an earlier fix from removing its default.
     let parameters = &function_def.parameters;
-    let first_positional_default = parameters
+    let mut seen_default = parameters
         .posonlyargs
         .iter()
-        .chain(&parameters.args)
-        .find(|parameter| parameter.default.is_some())
-        .map(Ranged::start);
-    let positional = parameters.args.iter().map(|parameter| {
-        let has_prior_default =
-            first_positional_default.is_some_and(|first| first < parameter.start());
-        (parameter, has_prior_default)
-    });
-    let keyword_only = parameters
-        .kwonlyargs
-        .iter()
-        .map(|parameter| (parameter, false));
-    for (parameter, seen_default) in positional.chain(keyword_only) {
-        let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default())
-        else {
-            continue;
-        };
+        .any(|parameter| parameter.default.is_some());
+    for parameter in &parameters.args {
+        check_parameter(checker, parameter, seen_default);
+        seen_default |= parameter.default.is_some();
+    }
 
-        if let Some(dependency) = is_fastapi_dependency(checker, default) {
-            let dependency_call = DependencyCall::from_expression(default);
-            let dependency_parameter = DependencyParameter {
-                annotation,
-                default,
-                kind: dependency,
-                name: parameter.name(),
-                range: parameter.range,
-            };
-            create_diagnostic(
-                checker,
-                &dependency_parameter,
-                dependency_call,
-                seen_default,
-            );
-        }
+    // Keyword-only parameters can be required after a parameter with a default.
+    for parameter in &parameters.kwonlyargs {
+        check_parameter(checker, parameter, false);
     }
 }
 
@@ -195,14 +166,6 @@ enum FastApiDependency {
     Security,
 }
 
-struct DependencyParameter<'a> {
-    annotation: &'a ast::Expr,
-    default: &'a ast::Expr,
-    range: TextRange,
-    name: &'a str,
-    kind: FastApiDependency,
-}
-
 struct DependencyCall<'a> {
     default_argument: ast::ArgOrKeyword<'a>,
     keyword_arguments: Vec<&'a ast::Keyword>,
@@ -226,12 +189,13 @@ impl<'a> DependencyCall<'a> {
     }
 }
 
-fn create_diagnostic(
-    checker: &Checker,
-    parameter: &DependencyParameter,
-    dependency_call: Option<DependencyCall>,
-    seen_default: bool,
-) {
+fn check_parameter(checker: &Checker, parameter: &ast::ParameterWithDefault, seen_default: bool) {
+    let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default()) else {
+        return;
+    };
+    let Some(kind) = is_fastapi_dependency(checker, default) else {
+        return;
+    };
     let Some(importer) = checker.typing_importer("Annotated", PythonVersion::PY39) else {
         return;
     };
@@ -243,6 +207,7 @@ fn create_diagnostic(
         parameter.range,
     );
 
+    let dependency_call = DependencyCall::from_expression(default);
     let try_generate_fix = || {
         let (import_edit, binding) = importer.import(parameter.range.start())?;
 
@@ -255,7 +220,7 @@ fn create_diagnostic(
         // Annotated[str, Query()] = ""` for example, but Depends and
         // Security need to stay like `Annotated[str, Depends(callable)]`
         let is_route_param = !matches!(
-            parameter.kind,
+            kind,
             FastApiDependency::Depends | FastApiDependency::Security
         );
 
@@ -286,11 +251,9 @@ fn create_diagnostic(
 
                 let base_format = format!(
                     "{parameter_name}: {binding}[{annotation}, {default_}({kwarg_list})]",
-                    parameter_name = parameter.name,
-                    annotation = checker.locator().slice(parameter.annotation.range()),
-                    default_ = checker
-                        .locator()
-                        .slice(map_callable(parameter.default).range()),
+                    parameter_name = parameter.name(),
+                    annotation = checker.locator().slice(annotation.range()),
+                    default_ = checker.locator().slice(map_callable(default).range()),
                 );
 
                 if is_default_argument_ellipsis {
@@ -316,9 +279,9 @@ fn create_diagnostic(
                 }
                 format!(
                     "{parameter_name}: {binding}[{annotation}, {default_}]",
-                    parameter_name = parameter.name,
-                    annotation = checker.locator().slice(parameter.annotation.range()),
-                    default_ = checker.locator().slice(parameter.default.range())
+                    parameter_name = parameter.name(),
+                    annotation = checker.locator().slice(annotation.range()),
+                    default_ = checker.locator().slice(default.range())
                 )
             }
         };
