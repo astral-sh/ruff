@@ -2,6 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
+use rustc_hash::FxHashMap;
+
 // If we have a Python package layout like:
 // - root/
 //   - foo/
@@ -23,13 +25,16 @@ use std::path::{Path, PathBuf};
 // Thus, for each file, we iterate up its ancestors, returning the last
 // directory containing an `__init__.py`.
 
-/// Return `true` if the directory at the given `Path` appears to be a Python
-/// package.
-pub fn is_package(path: &Path, namespace_packages: &[PathBuf]) -> bool {
+fn is_namespace_package(path: &Path, namespace_packages: &[PathBuf]) -> bool {
     namespace_packages
         .iter()
         .any(|namespace_package| path.starts_with(namespace_package))
-        || path.join("__init__.py").is_file()
+}
+
+/// Return `true` if the directory at the given `Path` appears to be a Python
+/// package.
+fn is_package(path: &Path, namespace_packages: &[PathBuf]) -> bool {
+    is_namespace_package(path, namespace_packages) || path.join("__init__.py").is_file()
 }
 
 /// Return the package root for the given path to a directory with Python file.
@@ -42,6 +47,47 @@ pub fn detect_package_root<'a>(path: &'a Path, namespace_packages: &[PathBuf]) -
         current = Some(parent);
     }
     current
+}
+
+/// Cache whether each directory contains an `__init__.py`. Namespace package membership
+/// depends on the configuration of the file whose root we're looking for.
+#[derive(Default)]
+pub struct InitFiles<'a>(FxHashMap<&'a Path, bool>);
+
+impl<'a> InitFiles<'a> {
+    /// Pre-populate the cache with the `__init__.py` files found during discovery.
+    pub fn from_files(files: &[&'a Path]) -> Self {
+        let mut cache = Self::default();
+        for file in files {
+            if file.ends_with("__init__.py")
+                && let Some(parent) = file.parent()
+            {
+                cache.0.insert(parent, true);
+            }
+        }
+        cache
+    }
+
+    /// Detect the package root, recording filesystem lookups for subsequent files.
+    pub fn discover_package_root(
+        &mut self,
+        path: &'a Path,
+        namespace_packages: &[PathBuf],
+    ) -> Option<&'a Path> {
+        let mut current = None;
+        for parent in path.ancestors() {
+            let is_package = is_namespace_package(parent, namespace_packages)
+                || *self
+                    .0
+                    .entry(parent)
+                    .or_insert_with(|| parent.join("__init__.py").is_file());
+            if !is_package {
+                return current;
+            }
+            current = Some(parent);
+        }
+        current
+    }
 }
 
 #[cfg(test)]

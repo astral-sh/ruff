@@ -20,7 +20,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_linter::fs;
 use ruff_linter::package::PackageRoot;
-use ruff_linter::packaging::is_package;
+use ruff_linter::packaging::InitFiles;
 
 use crate::configuration::Configuration;
 use crate::pyproject::settings_toml;
@@ -149,16 +149,7 @@ impl<'a> Resolver<'a> {
         &'a self,
         files: &[&'a Path],
     ) -> FxHashMap<&'a Path, Option<PackageRoot<'a>>> {
-        // Pre-populate the module cache, since the list of files could (but isn't
-        // required to) contain some `__init__.py` files.
-        let mut package_cache: FxHashMap<&Path, bool> = FxHashMap::default();
-        for file in files {
-            if file.ends_with("__init__.py") {
-                if let Some(parent) = file.parent() {
-                    package_cache.insert(parent, true);
-                }
-            }
-        }
+        let mut init_files = InitFiles::from_files(files);
 
         // Determine whether any of the settings require namespace packages. If not, we can save
         // a lookup for every file.
@@ -176,7 +167,8 @@ impl<'a> Resolver<'a> {
                     } else {
                         &[]
                     };
-                    detect_package_root_with_cache(package, namespace_packages, &mut package_cache)
+                    init_files
+                        .discover_package_root(package, namespace_packages)
                         .map(|path| PackageRoot::Root { path })
                 });
             }
@@ -250,33 +242,6 @@ impl ResolvedSettings {
     pub fn config_path(&self) -> Option<&Path> {
         self.config_path.as_deref()
     }
-}
-
-/// A wrapper around `detect_package_root` to cache filesystem lookups.
-fn detect_package_root_with_cache<'a>(
-    path: &'a Path,
-    namespace_packages: &[PathBuf],
-    package_cache: &mut FxHashMap<&'a Path, bool>,
-) -> Option<&'a Path> {
-    let mut current = None;
-    for parent in path.ancestors() {
-        if !is_package_with_cache(parent, namespace_packages, package_cache) {
-            return current;
-        }
-        current = Some(parent);
-    }
-    current
-}
-
-/// A wrapper around `is_package` to cache filesystem lookups.
-fn is_package_with_cache<'a>(
-    path: &'a Path,
-    namespace_packages: &[PathBuf],
-    package_cache: &mut FxHashMap<&'a Path, bool>,
-) -> bool {
-    *package_cache
-        .entry(path)
-        .or_insert_with(|| is_package(path, namespace_packages))
 }
 
 /// Applies a transformation to a [`Configuration`].

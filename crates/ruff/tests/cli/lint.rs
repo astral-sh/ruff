@@ -3526,6 +3526,39 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn nested_configuration_changes_namespace_package_root() -> Result<()> {
+    let source = "from .helpers import value";
+    let test = CliTest::with_files([
+        ("pkg/plain/__init__.py", ""),
+        ("pkg/plain/module.py", source),
+        ("pkg/nested/ruff.toml", "namespace-packages = ['..']"),
+        ("pkg/nested/module.py", source),
+    ])?;
+
+    assert_cmd_snapshot!(test.check_command().args([
+        "--select", "TID252",
+        "--config", "lint.flake8-tidy-imports.ban-relative-imports = 'all'",
+        "--fix", "--unsafe-fixes", "pkg",
+    ]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Found 2 errors (2 fixed, 0 remaining).
+
+    ----- stderr -----
+    ");
+    assert_eq!(
+        test.read_file("pkg/plain/module.py")?,
+        "from plain.helpers import value"
+    );
+    assert_eq!(
+        test.read_file("pkg/nested/module.py")?,
+        "from pkg.nested.helpers import value"
+    );
+    Ok(())
+}
+
 /// Verify that implicit namespace packages are detected even when they are nested.
 ///
 /// See: <https://github.com/astral-sh/ruff/issues/13519>
