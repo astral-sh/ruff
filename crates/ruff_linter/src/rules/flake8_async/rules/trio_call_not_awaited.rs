@@ -59,7 +59,7 @@ impl Violation for TrioCallNotAwaited {
 }
 
 /// ASYNC105
-pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
+pub(crate) fn trio_call_not_awaited(checker: &Checker, call: &ExprCall) {
     if !checker.semantic().seen_module(Modules::TRIO) {
         return;
     }

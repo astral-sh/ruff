@@ -268,7 +268,7 @@ pub(crate) fn check_noqa(
     if context.is_rule_enabled(Rule::RenamedRuleInSuppressionComment)
         && !exemption.includes(Rule::RenamedRuleInSuppressionComment)
     {
-        ruff::rules::redirected_noqa(context, &noqa_directives);
+        ruff::rules::renamed_rule_in_suppression_comment(context, &noqa_directives);
         ruff::rules::redirected_file_noqa(context, &file_noqa_directives);
     }
 

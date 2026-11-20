@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for SubprocessRunWithUniversalNewlines {
 }
 
 /// UP021
-pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn subprocess_run_with_universal_newlines(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }

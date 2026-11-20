@@ -54,7 +54,7 @@ impl Violation for IfWithIdenticalBranches {
 }
 
 /// SIM114
-pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_with_identical_branches(checker: &Checker, stmt_if: &ast::StmtIf) {
     let mut branches_iter = if_elif_branches(stmt_if).peekable();
     while let Some(current_branch) = branches_iter.next() {
         let Some(following_branch) = branches_iter.peek() else {

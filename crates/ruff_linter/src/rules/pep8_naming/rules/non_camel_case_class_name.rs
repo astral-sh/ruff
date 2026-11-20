@@ -56,7 +56,7 @@ impl Violation for NonCamelCaseClassName {
 }
 
 /// N801
-pub(crate) fn invalid_class_name(
+pub(crate) fn non_camel_case_class_name(
     checker: &Checker,
     class_def: &Stmt,
     name: &str,

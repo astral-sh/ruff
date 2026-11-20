@@ -71,7 +71,7 @@ impl Violation for TooManyPositionalParameters {
 }
 
 /// PLR0917
-pub(crate) fn too_many_positional_arguments(
+pub(crate) fn too_many_positional_parameters(
     checker: &Checker,
     function_def: &ast::StmtFunctionDef,
 ) {

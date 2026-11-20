@@ -75,7 +75,7 @@ impl Violation for FunctionalNamedTuple {
 }
 
 /// UP014
-pub(crate) fn convert_named_tuple_functional_to_class(
+pub(crate) fn functional_named_tuple(
     checker: &Checker,
     stmt: &Stmt,
     targets: &[Expr],

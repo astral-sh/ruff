@@ -56,7 +56,7 @@ impl AlwaysFixableViolation for WhitespaceBeforeOpenBracket {
 }
 
 /// E211
-pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &LintContext) {
+pub(crate) fn whitespace_before_open_bracket(line: &LogicalLine, context: &LintContext) {
     let previous = line.tokens().first().unwrap();
 
     let mut pre_pre_kind: Option<TokenKind> = None;

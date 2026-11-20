@@ -50,7 +50,10 @@ impl Violation for RedundantExceptionInLoggingMessage {
 }
 
 /// TRY401
-pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler]) {
+pub(crate) fn redundant_exception_in_logging_message(
+    checker: &Checker,
+    handlers: &[ExceptHandler],
+) {
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
 

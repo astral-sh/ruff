@@ -64,7 +64,10 @@ impl AlwaysFixableViolation for MissingNewlineAfterLastDocstringParagraph {
 }
 
 /// D209
-pub(crate) fn newline_after_last_paragraph(checker: &Checker, docstring: &Docstring) {
+pub(crate) fn missing_newline_after_last_docstring_paragraph(
+    checker: &Checker,
+    docstring: &Docstring,
+) {
     let contents = docstring.contents();
     let body = docstring.body();
 

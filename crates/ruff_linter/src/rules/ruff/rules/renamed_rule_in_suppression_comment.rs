@@ -52,7 +52,10 @@ impl AlwaysFixableViolation for RenamedRuleInSuppressionComment {
 }
 
 /// RUF101 for in-line noqa directives
-pub(crate) fn redirected_noqa(context: &LintContext, noqa_directives: &NoqaDirectives) {
+pub(crate) fn renamed_rule_in_suppression_comment(
+    context: &LintContext,
+    noqa_directives: &NoqaDirectives,
+) {
     for line in noqa_directives.lines() {
         let Directive::Codes(directive) = &line.directive else {
             continue;

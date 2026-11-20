@@ -59,7 +59,7 @@ impl Violation for MethodWithoutParameters {
 }
 
 /// PLE0211
-pub(crate) fn no_method_argument(checker: &Checker, scope: &Scope) {
+pub(crate) fn method_without_parameters(checker: &Checker, scope: &Scope) {
     let Some(function) = scope.kind.as_function() else {
         return;
     };

@@ -85,7 +85,7 @@ impl Violation for FunctionalTypedDict {
 }
 
 /// UP013
-pub(crate) fn convert_typed_dict_functional_to_class(
+pub(crate) fn functional_typed_dict(
     checker: &Checker,
     stmt: &Stmt,
     targets: &[Expr],

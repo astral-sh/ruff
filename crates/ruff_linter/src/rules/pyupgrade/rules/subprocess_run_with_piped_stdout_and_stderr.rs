@@ -61,7 +61,7 @@ impl Violation for SubprocessRunWithPipedStdoutAndStderr {
 }
 
 /// UP022
-pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn subprocess_run_with_piped_stdout_and_stderr(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }

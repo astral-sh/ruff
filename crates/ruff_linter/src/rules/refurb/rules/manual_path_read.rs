@@ -82,7 +82,7 @@ impl Violation for ManualPathRead<'_> {
 }
 
 /// FURB101
-pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
+pub(crate) fn manual_path_read(checker: &Checker, with: &ast::StmtWith) {
     // `async` check here is more of a precaution.
     if with.is_async {
         return;

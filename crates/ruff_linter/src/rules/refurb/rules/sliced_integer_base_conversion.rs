@@ -71,7 +71,7 @@ impl Violation for SlicedIntegerBaseConversion {
 }
 
 /// FURB116
-pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubscript) {
+pub(crate) fn sliced_integer_base_conversion(checker: &Checker, subscript: &ast::ExprSubscript) {
     // The slice must be exactly `[2:]`.
     let Expr::Slice(ast::ExprSlice {
         lower: Some(lower),

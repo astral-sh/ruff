@@ -51,7 +51,7 @@ impl Violation for LoggingWarnConstant {
 }
 
 /// LOG009
-pub(crate) fn undocumented_warn(checker: &Checker, expr: &Expr) {
+pub(crate) fn logging_warn_constant(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }

@@ -183,7 +183,7 @@ fn is_redundant_keyword(builtin: &str, keyword: &ast::Keyword) -> bool {
 }
 
 /// UP018
-pub(crate) fn native_literals(
+pub(crate) fn unnecessary_literal_constructor(
     checker: &Checker,
     call: &ast::ExprCall,
     parent_expr: Option<&ast::Expr>,

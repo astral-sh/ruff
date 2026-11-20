@@ -65,7 +65,7 @@ impl Violation for FStringInGettextCall {
 }
 
 /// INT001
-pub(crate) fn f_string_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn f_string_in_gettext_call(checker: &Checker, func: &Expr, args: &[Expr]) {
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if first.is_f_string_expr() {

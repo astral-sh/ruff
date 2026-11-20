@@ -63,7 +63,7 @@ impl Violation for FilePathAsLoggerName {
 }
 
 /// LOG002
-pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn file_path_as_logger_name(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }

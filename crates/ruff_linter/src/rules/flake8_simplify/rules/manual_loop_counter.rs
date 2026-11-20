@@ -58,7 +58,7 @@ impl Violation for ManualLoopCounter {
 }
 
 /// SIM113
-pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn manual_loop_counter(checker: &Checker, for_stmt: &ast::StmtFor) {
     // If the loop is async, abort.
     if for_stmt.is_async {
         return;

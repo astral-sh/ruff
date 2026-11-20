@@ -58,7 +58,7 @@ impl Violation for CamelCaseImportedAsAcronym {
 }
 
 /// N817
-pub(crate) fn camelcase_imported_as_acronym(
+pub(crate) fn camel_case_imported_as_acronym(
     name: &str,
     asname: &str,
     alias: &Alias,

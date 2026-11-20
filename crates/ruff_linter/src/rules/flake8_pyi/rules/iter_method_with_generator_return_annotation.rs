@@ -90,7 +90,10 @@ impl Violation for IterMethodWithGeneratorReturnAnnotation {
 }
 
 /// PYI058
-pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, checker: &Checker) {
+pub(crate) fn iter_method_with_generator_return_annotation(
+    function_def: &ast::StmtFunctionDef,
+    checker: &Checker,
+) {
     if function_def.is_async {
         return;
     }

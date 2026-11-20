@@ -34,7 +34,7 @@ impl Violation for IfExprWithIdenticalBranches {
 }
 
 /// RUF034
-pub(crate) fn useless_if_else(checker: &Checker, if_expr: &ast::ExprIf) {
+pub(crate) fn if_expr_with_identical_branches(checker: &Checker, if_expr: &ast::ExprIf) {
     let ast::ExprIf {
         body,
         orelse,

@@ -54,7 +54,10 @@ impl Violation for RaiseStopIterationInGenerator {
 }
 
 /// PLR1708
-pub(crate) fn stop_iteration_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn raise_stop_iteration_in_generator(
+    checker: &Checker,
+    function_def: &ast::StmtFunctionDef,
+) {
     let mut analyzer = GeneratorAnalyzer {
         checker,
         has_yield: false,

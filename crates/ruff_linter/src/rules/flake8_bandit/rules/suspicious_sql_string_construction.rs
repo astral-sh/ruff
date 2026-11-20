@@ -57,7 +57,7 @@ impl Violation for SuspiciousSqlStringConstruction {
 }
 
 /// S608
-pub(crate) fn hardcoded_sql_expression(checker: &Checker, expr: &Expr) {
+pub(crate) fn suspicious_sql_string_construction(checker: &Checker, expr: &Expr) {
     let content = match expr {
         // "select * from table where val = " + "str" + ...
         Expr::BinOp(ast::ExprBinOp {

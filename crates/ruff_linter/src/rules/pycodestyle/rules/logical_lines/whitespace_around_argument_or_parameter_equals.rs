@@ -88,7 +88,10 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundParameterEquals {
 }
 
 /// E251, E252
-pub(crate) fn whitespace_around_named_parameter_equals(line: &LogicalLine, context: &LintContext) {
+pub(crate) fn whitespace_around_argument_or_parameter_equals(
+    line: &LogicalLine,
+    context: &LintContext,
+) {
     let mut parens = 0u32;
     let mut fstrings = 0u32;
     let mut annotated_func_arg = false;

@@ -67,7 +67,7 @@ impl Violation for CamelCaseImportedAsConstant {
 }
 
 /// N814
-pub(crate) fn camelcase_imported_as_constant(
+pub(crate) fn camel_case_imported_as_constant(
     checker: &Checker,
     name: &str,
     asname: &str,

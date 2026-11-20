@@ -79,7 +79,7 @@ impl Violation for FunctionCallInDataclassFieldDefault {
 }
 
 /// RUF009
-pub(crate) fn function_call_in_dataclass_default(
+pub(crate) fn function_call_in_dataclass_field_default(
     checker: &Checker,
     class_def: &ast::StmtClassDef,
     scope_id: ScopeId,

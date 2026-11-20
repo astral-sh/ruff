@@ -54,7 +54,7 @@ impl Violation for WhitespaceAroundDocstringText {
 }
 
 /// D210
-pub(crate) fn no_surrounding_whitespace(checker: &Checker, docstring: &Docstring) {
+pub(crate) fn whitespace_around_docstring_text(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     let mut lines = NewlineWithTrailingNewline::from(body.as_str());

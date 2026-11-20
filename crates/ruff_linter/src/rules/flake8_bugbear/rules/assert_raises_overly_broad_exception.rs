@@ -104,7 +104,7 @@ fn detect_blind_exception(
 }
 
 /// B017
-pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
+pub(crate) fn assert_raises_overly_broad_exception(checker: &Checker, items: &[WithItem]) {
     for item in items {
         let Expr::Call(ast::ExprCall {
             func,
@@ -129,7 +129,7 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
 }
 
 /// B017 (call form)
-pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn assert_raises_overly_broad_exception_call(checker: &Checker, call: &ast::ExprCall) {
     let ast::ExprCall {
         func,
         arguments,

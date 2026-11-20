@@ -64,7 +64,10 @@ impl Violation for DocstringSummaryWithoutTerminalPunctuation {
 }
 
 /// D415
-pub(crate) fn ends_with_punctuation(checker: &Checker, docstring: &Docstring) {
+pub(crate) fn docstring_summary_without_terminal_punctuation(
+    checker: &Checker,
+    docstring: &Docstring,
+) {
     let body = docstring.body();
 
     if let Some(first_line) = body.trim().universal_newlines().next() {

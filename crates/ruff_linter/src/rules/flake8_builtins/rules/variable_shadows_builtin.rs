@@ -60,7 +60,7 @@ impl Violation for VariableShadowsBuiltin {
 }
 
 /// A001
-pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: TextRange) {
+pub(crate) fn variable_shadows_builtin(checker: &Checker, name: &str, range: TextRange) {
     // These should not report violations as discussed in
     // https://github.com/astral-sh/ruff/issues/16373
     if matches!(

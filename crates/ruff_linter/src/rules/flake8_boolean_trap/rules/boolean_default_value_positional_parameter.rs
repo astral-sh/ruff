@@ -111,7 +111,7 @@ impl Violation for BooleanDefaultValuePositionalParameter {
 }
 
 /// FBT002
-pub(crate) fn boolean_default_value_positional_argument(
+pub(crate) fn boolean_default_value_positional_parameter(
     checker: &Checker,
     name: &str,
     decorator_list: &[Decorator],

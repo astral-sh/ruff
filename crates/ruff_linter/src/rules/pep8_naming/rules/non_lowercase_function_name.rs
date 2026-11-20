@@ -62,7 +62,7 @@ impl Violation for NonLowercaseFunctionName {
 }
 
 /// N802
-pub(crate) fn invalid_function_name(
+pub(crate) fn non_lowercase_function_name(
     checker: &Checker,
     stmt: &Stmt,
     name: &str,

@@ -61,7 +61,10 @@ impl Violation for NonLowercaseParameterName {
 }
 
 /// N803
-pub(crate) fn invalid_argument_name_function(checker: &Checker, function_def: &StmtFunctionDef) {
+pub(crate) fn non_lowercase_parameter_name_function(
+    checker: &Checker,
+    function_def: &StmtFunctionDef,
+) {
     let semantic = checker.semantic();
     let scope = semantic.current_scope();
 
@@ -71,20 +74,20 @@ pub(crate) fn invalid_argument_name_function(checker: &Checker, function_def: &S
         return;
     }
 
-    invalid_argument_name(checker, &function_def.parameters);
+    non_lowercase_parameter_name(checker, &function_def.parameters);
 }
 
 /// N803
-pub(crate) fn invalid_argument_name_lambda(checker: &Checker, lambda: &ExprLambda) {
+pub(crate) fn non_lowercase_parameter_name_lambda(checker: &Checker, lambda: &ExprLambda) {
     let Some(parameters) = &lambda.parameters else {
         return;
     };
 
-    invalid_argument_name(checker, parameters);
+    non_lowercase_parameter_name(checker, parameters);
 }
 
 /// N803
-fn invalid_argument_name(checker: &Checker, parameters: &Parameters) {
+fn non_lowercase_parameter_name(checker: &Checker, parameters: &Parameters) {
     let ignore_names = &checker.settings().pep8_naming.ignore_names;
 
     for parameter in parameters {

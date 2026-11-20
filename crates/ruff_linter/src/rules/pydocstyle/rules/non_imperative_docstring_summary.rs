@@ -66,7 +66,11 @@ impl Violation for NonImperativeDocstringSummary {
 }
 
 /// D401
-pub(crate) fn non_imperative_mood(checker: &Checker, docstring: &Docstring, settings: &Settings) {
+pub(crate) fn non_imperative_docstring_summary(
+    checker: &Checker,
+    docstring: &Docstring,
+    settings: &Settings,
+) {
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };

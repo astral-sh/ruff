@@ -74,7 +74,7 @@ impl Violation for StripWithDuplicateCharacters {
 }
 
 /// B005
-pub(crate) fn strip_with_multi_characters(
+pub(crate) fn strip_with_duplicate_characters(
     checker: &Checker,
     expr: &Expr,
     func: &Expr,

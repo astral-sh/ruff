@@ -36,7 +36,7 @@ impl Violation for LambdaParameterShadowsBuiltin {
 }
 
 /// A006
-pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &ExprLambda) {
+pub(crate) fn lambda_parameter_shadows_builtin(checker: &Checker, lambda: &ExprLambda) {
     let Some(parameters) = lambda.parameters.as_ref() else {
         return;
     };
