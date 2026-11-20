@@ -45,11 +45,7 @@ Module(
                     parameters: Parameters {
                         range: 8..10,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: Some(
                         Await(
@@ -119,43 +115,41 @@ Module(
                     parameters: Parameters {
                         range: 37..53,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 38..52,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 38..52,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("arg"),
-                                        range: 38..41,
+                                    parameter: Parameter {
+                                        range: 38..52,
                                         node_index: NodeIndex(None),
-                                    },
-                                    annotation: Some(
-                                        Await(
-                                            ExprAwait {
-                                                node_index: NodeIndex(None),
-                                                range: 44..51,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 50..51,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
+                                        name: Identifier {
+                                            id: Name("arg"),
+                                            range: 38..41,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: Some(
+                                            Await(
+                                                ExprAwait {
+                                                    node_index: NodeIndex(None),
+                                                    range: 44..51,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 50..51,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
                                         ),
-                                    ),
+                                    },
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [
@@ -209,11 +203,7 @@ Module(
                     parameters: Parameters {
                         range: 67..69,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: Some(
                         Named(
@@ -291,51 +281,49 @@ Module(
                     parameters: Parameters {
                         range: 95..110,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 96..109,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 96..109,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("arg"),
-                                        range: 96..99,
+                                    parameter: Parameter {
+                                        range: 96..109,
                                         node_index: NodeIndex(None),
-                                    },
-                                    annotation: Some(
-                                        Named(
-                                            ExprNamed {
-                                                node_index: NodeIndex(None),
-                                                range: 102..108,
-                                                target: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 102..103,
-                                                        id: Name("x"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 107..108,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
+                                        name: Identifier {
+                                            id: Name("arg"),
+                                            range: 96..99,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: Some(
+                                            Named(
+                                                ExprNamed {
+                                                    node_index: NodeIndex(None),
+                                                    range: 102..108,
+                                                    target: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 102..103,
+                                                            id: Name("x"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 107..108,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
                                         ),
-                                    ),
+                                    },
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [
@@ -389,45 +377,43 @@ Module(
                     parameters: Parameters {
                         range: 124..138,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 125..137,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 125..137,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("x"),
-                                        range: 125..126,
+                                    parameter: Parameter {
+                                        range: 125..137,
                                         node_index: NodeIndex(None),
-                                    },
-                                    annotation: Some(
-                                        Yield(
-                                            ExprYield {
-                                                node_index: NodeIndex(None),
-                                                range: 129..136,
-                                                value: Some(
-                                                    NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 135..136,
-                                                            value: Int(
-                                                                1,
-                                                            ),
-                                                        },
+                                        name: Identifier {
+                                            id: Name("x"),
+                                            range: 125..126,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: Some(
+                                            Yield(
+                                                ExprYield {
+                                                    node_index: NodeIndex(None),
+                                                    range: 129..136,
+                                                    value: Some(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 135..136,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
                                                     ),
-                                                ),
-                                            },
+                                                },
+                                            ),
                                         ),
-                                    ),
+                                    },
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [
@@ -481,11 +467,7 @@ Module(
                     parameters: Parameters {
                         range: 152..154,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: Some(
                         Yield(
@@ -557,43 +539,41 @@ Module(
                     parameters: Parameters {
                         range: 181..200,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 182..199,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 182..199,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("x"),
-                                        range: 182..183,
+                                    parameter: Parameter {
+                                        range: 182..199,
                                         node_index: NodeIndex(None),
-                                    },
-                                    annotation: Some(
-                                        YieldFrom(
-                                            ExprYieldFrom {
-                                                node_index: NodeIndex(None),
-                                                range: 186..198,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 197..198,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
+                                        name: Identifier {
+                                            id: Name("x"),
+                                            range: 182..183,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: Some(
+                                            YieldFrom(
+                                                ExprYieldFrom {
+                                                    node_index: NodeIndex(None),
+                                                    range: 186..198,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 197..198,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
                                         ),
-                                    ),
+                                    },
+                                    default: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [
@@ -647,11 +627,7 @@ Module(
                     parameters: Parameters {
                         range: 214..216,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: Some(
                         YieldFrom(
@@ -739,11 +715,7 @@ Module(
                     parameters: Parameters {
                         range: 259..261,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -815,11 +787,7 @@ Module(
                     parameters: Parameters {
                         range: 317..319,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -890,11 +858,7 @@ Module(
                     parameters: Parameters {
                         range: 378..380,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -965,11 +929,7 @@ Module(
                     parameters: Parameters {
                         range: 443..445,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -1047,11 +1007,7 @@ Module(
                     parameters: Parameters {
                         range: 499..501,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -1129,11 +1085,7 @@ Module(
                     parameters: Parameters {
                         range: 562..564,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -1210,11 +1162,7 @@ Module(
                     parameters: Parameters {
                         range: 628..630,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -1291,11 +1239,7 @@ Module(
                     parameters: Parameters {
                         range: 698..700,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -1365,11 +1309,7 @@ Module(
                     parameters: Parameters {
                         range: 761..763,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -1439,11 +1379,7 @@ Module(
                     parameters: Parameters {
                         range: 820..822,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -1512,11 +1448,7 @@ Module(
                     parameters: Parameters {
                         range: 882..884,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -1585,11 +1517,7 @@ Module(
                     parameters: Parameters {
                         range: 948..950,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [

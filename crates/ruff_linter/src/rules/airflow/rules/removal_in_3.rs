@@ -527,8 +527,7 @@ fn is_kwarg_parameter(semantic: &SemanticModel, name: &ExprName) -> bool {
         return false;
     };
     parameters
-        .kwarg
-        .as_deref()
+        .kwarg()
         .is_some_and(|kwarg| kwarg.name.as_str() == name.id.as_str())
 }
 

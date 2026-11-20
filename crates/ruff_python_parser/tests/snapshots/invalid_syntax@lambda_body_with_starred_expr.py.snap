@@ -22,27 +22,25 @@ Module(
                                 Parameters {
                                     range: 7..8,
                                     node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [
-                                        ParameterWithDefault {
-                                            range: 7..8,
-                                            node_index: NodeIndex(None),
-                                            parameter: Parameter {
+                                    items: [
+                                        PositionalOrKeyword(
+                                            ParameterWithDefault {
                                                 range: 7..8,
                                                 node_index: NodeIndex(None),
-                                                name: Identifier {
-                                                    id: Name("x"),
+                                                parameter: Parameter {
                                                     range: 7..8,
                                                     node_index: NodeIndex(None),
+                                                    name: Identifier {
+                                                        id: Name("x"),
+                                                        range: 7..8,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                    annotation: None,
                                                 },
-                                                annotation: None,
+                                                default: None,
                                             },
-                                            default: None,
-                                        },
+                                        ),
                                     ],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
                                 },
                             ),
                             body: Starred(
@@ -81,27 +79,25 @@ Module(
                                             Parameters {
                                                 range: 20..21,
                                                 node_index: NodeIndex(None),
-                                                posonlyargs: [],
-                                                args: [
-                                                    ParameterWithDefault {
-                                                        range: 20..21,
-                                                        node_index: NodeIndex(None),
-                                                        parameter: Parameter {
+                                                items: [
+                                                    PositionalOrKeyword(
+                                                        ParameterWithDefault {
                                                             range: 20..21,
                                                             node_index: NodeIndex(None),
-                                                            name: Identifier {
-                                                                id: Name("x"),
+                                                            parameter: Parameter {
                                                                 range: 20..21,
                                                                 node_index: NodeIndex(None),
+                                                                name: Identifier {
+                                                                    id: Name("x"),
+                                                                    range: 20..21,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                                annotation: None,
                                                             },
-                                                            annotation: None,
+                                                            default: None,
                                                         },
-                                                        default: None,
-                                                    },
+                                                    ),
                                                 ],
-                                                vararg: None,
-                                                kwonlyargs: [],
-                                                kwarg: None,
                                             },
                                         ),
                                         body: Starred(
@@ -145,27 +141,25 @@ Module(
                                             Parameters {
                                                 range: 34..35,
                                                 node_index: NodeIndex(None),
-                                                posonlyargs: [],
-                                                args: [
-                                                    ParameterWithDefault {
-                                                        range: 34..35,
-                                                        node_index: NodeIndex(None),
-                                                        parameter: Parameter {
+                                                items: [
+                                                    PositionalOrKeyword(
+                                                        ParameterWithDefault {
                                                             range: 34..35,
                                                             node_index: NodeIndex(None),
-                                                            name: Identifier {
-                                                                id: Name("x"),
+                                                            parameter: Parameter {
                                                                 range: 34..35,
                                                                 node_index: NodeIndex(None),
+                                                                name: Identifier {
+                                                                    id: Name("x"),
+                                                                    range: 34..35,
+                                                                    node_index: NodeIndex(None),
+                                                                },
+                                                                annotation: None,
                                                             },
-                                                            annotation: None,
+                                                            default: None,
                                                         },
-                                                        default: None,
-                                                    },
+                                                    ),
                                                 ],
-                                                vararg: None,
-                                                kwonlyargs: [],
-                                                kwarg: None,
                                             },
                                         ),
                                         body: Starred(
@@ -212,27 +206,25 @@ Module(
                                 Parameters {
                                     range: 50..51,
                                     node_index: NodeIndex(None),
-                                    posonlyargs: [],
-                                    args: [
-                                        ParameterWithDefault {
-                                            range: 50..51,
-                                            node_index: NodeIndex(None),
-                                            parameter: Parameter {
+                                    items: [
+                                        PositionalOrKeyword(
+                                            ParameterWithDefault {
                                                 range: 50..51,
                                                 node_index: NodeIndex(None),
-                                                name: Identifier {
-                                                    id: Name("x"),
+                                                parameter: Parameter {
                                                     range: 50..51,
                                                     node_index: NodeIndex(None),
+                                                    name: Identifier {
+                                                        id: Name("x"),
+                                                        range: 50..51,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                    annotation: None,
                                                 },
-                                                annotation: None,
+                                                default: None,
                                             },
-                                            default: None,
-                                        },
+                                        ),
                                     ],
-                                    vararg: None,
-                                    kwonlyargs: [],
-                                    kwarg: None,
                                 },
                             ),
                             body: Starred(

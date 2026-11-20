@@ -25,11 +25,7 @@ Module(
                     parameters: Parameters {
                         range: 4..6,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -63,11 +59,7 @@ Module(
                     parameters: Parameters {
                         range: 16..18,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: Some(
                         Name(

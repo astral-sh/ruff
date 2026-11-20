@@ -486,7 +486,7 @@ impl SemanticSyntaxChecker {
                     return;
                 }
                 for param in parameters
-                    .iter()
+                    .iter_source_order()
                     .filter_map(ast::AnyParameterRef::annotation)
                 {
                     visitor.visit_expr(param);
@@ -621,7 +621,7 @@ impl SemanticSyntaxChecker {
                         Self::check_identifier(type_param.name(), ctx);
                     }
                 }
-                for parameter in parameters {
+                for parameter in parameters.iter_source_order() {
                     Self::check_identifier(parameter.name(), ctx);
                 }
             }
@@ -782,7 +782,7 @@ impl SemanticSyntaxChecker {
         let mut all_arg_names =
             FxHashSet::with_capacity_and_hasher(parameters.len(), FxBuildHasher);
 
-        for parameter in parameters {
+        for parameter in parameters.iter_source_order() {
             let range = parameter.name().range();
             let param_name = parameter.name().as_str();
             if !all_arg_names.insert(param_name) {
@@ -1111,7 +1111,7 @@ impl SemanticSyntaxChecker {
                 parameters: Some(parameters),
                 ..
             }) => {
-                for parameter in parameters {
+                for parameter in parameters.iter_source_order() {
                     Self::check_identifier(parameter.name(), ctx);
                 }
                 Self::duplicate_parameter_name(parameters, ctx);

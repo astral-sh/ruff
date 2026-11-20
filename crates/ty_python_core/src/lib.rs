@@ -1625,7 +1625,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                 }
             }
             assert_eq!(use_def, &reference.finish());
-            for parameter in &function.parameters {
+            for parameter in function.parameters.iter() {
                 let definition = index.expect_single_definition(parameter);
                 let symbol = table.symbol_id(parameter.name()).unwrap();
                 assert_eq!(use_def.first_public_binding(symbol), Some(definition));
