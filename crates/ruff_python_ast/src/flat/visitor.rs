@@ -347,6 +347,12 @@ pub fn walk_decorator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, decorator: D
     visitor.visit_expr(decorator.expression());
 }
 
+// In unoptimized builds, forcing the walker inline enlarges each recursive stack frame.
+#[cfg_attr(
+    not(debug_assertions),
+    expect(clippy::inline_always, reason = "Avoid passing ExprKind on the stack"),
+    inline(always)
+)]
 pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, kind: flat::ExprKind<'a>) {
     match kind {
         flat::ExprKind::BoolOp(bool_op) => {
