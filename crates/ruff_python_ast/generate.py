@@ -804,10 +804,12 @@ def generate_flat_patterns(ast: Ast, nodes: set[str]) -> list[str]:
         out.append(
             f"impl crate::HasNodeIndex for {ty}Kind<'_> {{ fn node_index(&self) -> crate::NodeIndex {{ self.view().node_index() }} }}"
         )
+        # All variants wrap the same two pointers. Making their conversions visible
+        # across crate boundaries lets LLVM eliminate the match in Kind::view.
         for node in group.nodes:
             out.append(f"impl<'a> From<crate::{node.name}<'a>> for crate::{ty}<'a> {{")
             out.append(
-                f"fn from(node: crate::{node.name}<'a>) -> Self {{ node.syntax_node().retype() }} }}"
+                f"#[inline] fn from(node: crate::{node.name}<'a>) -> Self {{ node.syntax_node().retype() }} }}"
             )
     out.append("#[derive(Clone, Copy)] pub enum AnyFields<'a> {")
     for node in ast.nodes_in_tag_order:
@@ -877,12 +879,12 @@ def generate_flat_any(ast: Ast) -> list[str]:
     out.append("} }")
     for ty in [n.name for n in ast.all_nodes] + [g.name for g in ast.groups]:
         out.append(
-            f"impl<'a> From<crate::{ty}<'a>> for SyntaxNode<'a> {{ fn from(node: crate::{ty}<'a>) -> Self {{ node.syntax_node() }} }}"
+            f"impl<'a> From<crate::{ty}<'a>> for SyntaxNode<'a> {{ #[inline] fn from(node: crate::{ty}<'a>) -> Self {{ node.syntax_node() }} }}"
         )
     for group in ast.groups:
         ty = group.name
         out.append(
-            f"impl<'a> From<{ty}Kind<'a>> for SyntaxNode<'a> {{ fn from(node: {ty}Kind<'a>) -> Self {{ node.view().syntax_node() }} }}"
+            f"impl<'a> From<{ty}Kind<'a>> for SyntaxNode<'a> {{ #[inline] fn from(node: {ty}Kind<'a>) -> Self {{ node.view().syntax_node() }} }}"
         )
     out.append(
         "impl<'a> From<SyntaxNode<'a>> for AnyNode<'a> { #[inline] fn from(node: SyntaxNode<'a>) -> Self { node.classify() } }"

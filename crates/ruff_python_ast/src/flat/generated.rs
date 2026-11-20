@@ -11312,11 +11312,13 @@ pub(crate) mod fields {
         }
     }
     impl<'a> From<crate::ModModule<'a>> for crate::Mod<'a> {
+        #[inline]
         fn from(node: crate::ModModule<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ModExpression<'a>> for crate::Mod<'a> {
+        #[inline]
         fn from(node: crate::ModExpression<'a>) -> Self {
             node.syntax_node().retype()
         }
@@ -11657,126 +11659,151 @@ pub(crate) mod fields {
         }
     }
     impl<'a> From<crate::StmtFunctionDef<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtFunctionDef<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtClassDef<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtClassDef<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtReturn<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtReturn<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtDelete<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtDelete<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtTypeAlias<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtTypeAlias<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtAssign<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtAssign<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtAugAssign<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtAugAssign<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtAnnAssign<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtAnnAssign<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtFor<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtFor<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtWhile<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtWhile<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtIf<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtIf<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtWith<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtWith<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtMatch<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtMatch<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtRaise<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtRaise<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtTry<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtTry<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtAssert<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtAssert<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtImport<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtImport<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtImportFrom<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtImportFrom<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtGlobal<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtGlobal<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtNonlocal<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtNonlocal<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtExpr<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtExpr<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtPass<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtPass<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtBreak<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtBreak<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtContinue<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtContinue<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::StmtIpyEscapeCommand<'a>> for crate::Stmt<'a> {
+        #[inline]
         fn from(node: crate::StmtIpyEscapeCommand<'a>) -> Self {
             node.syntax_node().retype()
         }
@@ -12213,166 +12240,199 @@ pub(crate) mod fields {
         }
     }
     impl<'a> From<crate::ExprBoolOp<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprBoolOp<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprNamed<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprNamed<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprBinOp<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprBinOp<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprUnaryOp<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprUnaryOp<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprLambda<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprLambda<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprIf<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprIf<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprDict<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprDict<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprSet<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprSet<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprListComp<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprListComp<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprSetComp<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprSetComp<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprDictComp<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprDictComp<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprGenerator<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprGenerator<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprAwait<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprAwait<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprYield<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprYield<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprYieldFrom<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprYieldFrom<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprCompare<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprCompare<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprCall<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprCall<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprFString<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprFString<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprTString<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprTString<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprStringLiteral<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprStringLiteral<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprBytesLiteral<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprBytesLiteral<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprNumberLiteral<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprNumberLiteral<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprBooleanLiteral<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprBooleanLiteral<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprNoneLiteral<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprNoneLiteral<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprEllipsisLiteral<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprEllipsisLiteral<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprAttribute<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprAttribute<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprSubscript<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprSubscript<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprStarred<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprStarred<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprName<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprName<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprList<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprList<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprTuple<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprTuple<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprSlice<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprSlice<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::ExprIpyEscapeCommand<'a>> for crate::Expr<'a> {
+        #[inline]
         fn from(node: crate::ExprIpyEscapeCommand<'a>) -> Self {
             node.syntax_node().retype()
         }
@@ -12427,6 +12487,7 @@ pub(crate) mod fields {
         }
     }
     impl<'a> From<crate::ExceptHandlerExceptHandler<'a>> for crate::ExceptHandler<'a> {
+        #[inline]
         fn from(node: crate::ExceptHandlerExceptHandler<'a>) -> Self {
             node.syntax_node().retype()
         }
@@ -12495,6 +12556,7 @@ pub(crate) mod fields {
         }
     }
     impl<'a> From<crate::InterpolatedElement<'a>> for crate::InterpolatedStringElement<'a> {
+        #[inline]
         fn from(node: crate::InterpolatedElement<'a>) -> Self {
             node.syntax_node().retype()
         }
@@ -12502,6 +12564,7 @@ pub(crate) mod fields {
     impl<'a> From<crate::InterpolatedStringLiteralElement<'a>>
         for crate::InterpolatedStringElement<'a>
     {
+        #[inline]
         fn from(node: crate::InterpolatedStringLiteralElement<'a>) -> Self {
             node.syntax_node().retype()
         }
@@ -12638,41 +12701,49 @@ pub(crate) mod fields {
         }
     }
     impl<'a> From<crate::PatternMatchValue<'a>> for crate::Pattern<'a> {
+        #[inline]
         fn from(node: crate::PatternMatchValue<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::PatternMatchSingleton<'a>> for crate::Pattern<'a> {
+        #[inline]
         fn from(node: crate::PatternMatchSingleton<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::PatternMatchSequence<'a>> for crate::Pattern<'a> {
+        #[inline]
         fn from(node: crate::PatternMatchSequence<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::PatternMatchMapping<'a>> for crate::Pattern<'a> {
+        #[inline]
         fn from(node: crate::PatternMatchMapping<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::PatternMatchClass<'a>> for crate::Pattern<'a> {
+        #[inline]
         fn from(node: crate::PatternMatchClass<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::PatternMatchStar<'a>> for crate::Pattern<'a> {
+        #[inline]
         fn from(node: crate::PatternMatchStar<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::PatternMatchAs<'a>> for crate::Pattern<'a> {
+        #[inline]
         fn from(node: crate::PatternMatchAs<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::PatternMatchOr<'a>> for crate::Pattern<'a> {
+        #[inline]
         fn from(node: crate::PatternMatchOr<'a>) -> Self {
             node.syntax_node().retype()
         }
@@ -12749,16 +12820,19 @@ pub(crate) mod fields {
         }
     }
     impl<'a> From<crate::TypeParamTypeVar<'a>> for crate::TypeParam<'a> {
+        #[inline]
         fn from(node: crate::TypeParamTypeVar<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::TypeParamTypeVarTuple<'a>> for crate::TypeParam<'a> {
+        #[inline]
         fn from(node: crate::TypeParamTypeVarTuple<'a>) -> Self {
             node.syntax_node().retype()
         }
     }
     impl<'a> From<crate::TypeParamParamSpec<'a>> for crate::TypeParam<'a> {
+        #[inline]
         fn from(node: crate::TypeParamParamSpec<'a>) -> Self {
             node.syntax_node().retype()
         }
@@ -14488,546 +14562,655 @@ pub(super) fn same_fields(left: SyntaxNode<'_>, right: SyntaxNode<'_>) -> bool {
     }
 }
 impl<'a> From<crate::ModModule<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ModModule<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ModExpression<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ModExpression<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtFunctionDef<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtFunctionDef<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtClassDef<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtClassDef<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtReturn<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtReturn<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtDelete<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtDelete<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtTypeAlias<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtTypeAlias<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtAssign<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtAssign<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtAugAssign<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtAugAssign<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtAnnAssign<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtAnnAssign<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtFor<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtFor<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtWhile<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtWhile<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtIf<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtIf<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtWith<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtWith<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtMatch<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtMatch<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtRaise<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtRaise<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtTry<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtTry<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtAssert<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtAssert<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtImport<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtImport<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtImportFrom<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtImportFrom<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtGlobal<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtGlobal<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtNonlocal<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtNonlocal<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtExpr<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtExpr<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtPass<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtPass<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtBreak<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtBreak<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtContinue<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtContinue<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StmtIpyEscapeCommand<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StmtIpyEscapeCommand<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprBoolOp<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprBoolOp<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprNamed<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprNamed<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprBinOp<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprBinOp<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprUnaryOp<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprUnaryOp<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprLambda<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprLambda<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprIf<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprIf<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprDict<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprDict<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprSet<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprSet<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprListComp<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprListComp<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprSetComp<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprSetComp<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprDictComp<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprDictComp<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprGenerator<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprGenerator<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprAwait<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprAwait<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprYield<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprYield<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprYieldFrom<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprYieldFrom<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprCompare<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprCompare<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprCall<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprCall<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprFString<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprFString<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprTString<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprTString<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprStringLiteral<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprStringLiteral<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprBytesLiteral<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprBytesLiteral<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprNumberLiteral<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprNumberLiteral<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprBooleanLiteral<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprBooleanLiteral<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprNoneLiteral<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprNoneLiteral<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprEllipsisLiteral<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprEllipsisLiteral<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprAttribute<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprAttribute<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprSubscript<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprSubscript<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprStarred<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprStarred<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprName<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprName<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprList<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprList<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprTuple<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprTuple<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprSlice<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprSlice<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExprIpyEscapeCommand<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExprIpyEscapeCommand<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExceptHandlerExceptHandler<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExceptHandlerExceptHandler<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::InterpolatedElement<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::InterpolatedElement<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::InterpolatedStringLiteralElement<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::InterpolatedStringLiteralElement<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::PatternMatchValue<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::PatternMatchValue<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::PatternMatchSingleton<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::PatternMatchSingleton<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::PatternMatchSequence<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::PatternMatchSequence<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::PatternMatchMapping<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::PatternMatchMapping<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::PatternMatchClass<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::PatternMatchClass<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::PatternMatchStar<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::PatternMatchStar<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::PatternMatchAs<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::PatternMatchAs<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::PatternMatchOr<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::PatternMatchOr<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::TypeParamTypeVar<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::TypeParamTypeVar<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::TypeParamTypeVarTuple<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::TypeParamTypeVarTuple<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::TypeParamParamSpec<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::TypeParamParamSpec<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::InterpolatedStringFormatSpec<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::InterpolatedStringFormatSpec<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::PatternArguments<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::PatternArguments<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::PatternKeyword<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::PatternKeyword<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Comprehension<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Comprehension<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Arguments<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Arguments<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Parameters<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Parameters<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Parameter<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Parameter<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ParameterWithDefault<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ParameterWithDefault<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::DictItem<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::DictItem<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Keyword<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Keyword<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Alias<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Alias<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::WithItem<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::WithItem<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::MatchCase<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::MatchCase<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Decorator<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Decorator<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ElifElseClause<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ElifElseClause<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::TypeParams<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::TypeParams<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::FString<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::FString<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::TString<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::TString<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::StringLiteral<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::StringLiteral<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::BytesLiteral<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::BytesLiteral<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Identifier<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Identifier<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Mod<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Mod<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Stmt<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Stmt<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Expr<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Expr<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::ExceptHandler<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::ExceptHandler<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::InterpolatedStringElement<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::InterpolatedStringElement<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::Pattern<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::Pattern<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<crate::TypeParam<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: crate::TypeParam<'a>) -> Self {
         node.syntax_node()
     }
 }
 impl<'a> From<ModKind<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: ModKind<'a>) -> Self {
         node.view().syntax_node()
     }
 }
 impl<'a> From<StmtKind<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: StmtKind<'a>) -> Self {
         node.view().syntax_node()
     }
 }
 impl<'a> From<ExprKind<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: ExprKind<'a>) -> Self {
         node.view().syntax_node()
     }
 }
 impl<'a> From<ExceptHandlerKind<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: ExceptHandlerKind<'a>) -> Self {
         node.view().syntax_node()
     }
 }
 impl<'a> From<InterpolatedStringElementKind<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: InterpolatedStringElementKind<'a>) -> Self {
         node.view().syntax_node()
     }
 }
 impl<'a> From<PatternKind<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: PatternKind<'a>) -> Self {
         node.view().syntax_node()
     }
 }
 impl<'a> From<TypeParamKind<'a>> for SyntaxNode<'a> {
+    #[inline]
     fn from(node: TypeParamKind<'a>) -> Self {
         node.view().syntax_node()
     }
