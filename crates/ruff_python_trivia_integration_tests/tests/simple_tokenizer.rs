@@ -128,7 +128,7 @@ fn tokenize_invalid_operators() {
 
     assert_debug_snapshot!(test_case.tokens());
 
-    // note: not reversible: [other, bogus, bogus] vs [bogus, bogus, other]
+    // note: not reversible: [other, bogus] vs [bogus, other]
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn ignore_word_with_only_id_continuing_chars() {
     let test_case = tokenize(source);
     assert_debug_snapshot!(test_case.tokens());
 
-    // note: not reversible: [other, bogus, bogus] vs [bogus, bogus, other]
+    // note: not reversible: [other, bogus] vs [bogus, other]
 }
 
 #[test]
@@ -256,6 +256,23 @@ fn tokenize_bogus() {
 
     assert_debug_snapshot!(test_case.tokens());
     assert_debug_snapshot!("Reverse", test_case.tokenize_reverse());
+}
+
+#[test]
+fn bogus_token_stays_within_requested_range() {
+    let source = "a!<<bbbb";
+    let range = TextRange::new(1.into(), 4.into());
+    let tokens: Vec<_> = SimpleTokenizer::new(source, range)
+        .map(|token| (token.kind, token.range))
+        .collect();
+
+    assert_eq!(
+        tokens,
+        [
+            (SimpleTokenKind::Other, TextRange::new(1.into(), 2.into())),
+            (SimpleTokenKind::Bogus, TextRange::new(2.into(), 4.into())),
+        ]
+    );
 }
 
 #[test]
