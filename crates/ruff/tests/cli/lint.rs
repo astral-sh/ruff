@@ -4276,6 +4276,31 @@ fn invalid_script_python_requirement() -> Result<()> {
 }
 
 #[test]
+fn fix_only_preserves_stdin_on_invalid_script_metadata() -> Result<()> {
+    let test = CliTest::new()?;
+    let source = indoc! {r#"
+        # /// script
+        # requires-python = "invalid"
+        # ///
+        print(42)
+    "#};
+    assert_cmd_snapshot!(test.check_command()
+        .args(["--preview", "--fix-only", "--stdin-filename=input.py", "-"])
+        .pass_stdin(source), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # requires-python = "invalid"
+    # ///
+    print(42)
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
 fn invalid_inline_script_configuration() -> Result<()> {
     let test = CliTest::with_file(
         "script.py",
@@ -4485,6 +4510,70 @@ fn isolated_ignores_script_settings() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     script.py:3:11: invalid-script-metadata: key with no value, expected `=`
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_requires_python_stdin() -> Result<()> {
+    let test = CliTest::with_file(
+        "ruff.toml",
+        r#"
+            target-version = 'py39'
+            lint.select = ['UP045']
+        "#,
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--fix", "-"]).pass_stdin(
+        indoc! {r#"
+            # /// script
+            # requires-python = '>=3.10'
+            # ///
+            from typing import Optional
+            x: Optional[int]
+        "#}
+    ), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # requires-python = '>=3.10'
+    # ///
+    from typing import Optional
+    x: int | None
+
+    ----- stderr -----
+    Found 1 error (1 fixed, 0 remaining).
+    ");
+    Ok(())
+}
+
+#[test]
+fn invalid_script_metadata_stdin() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.command()
+        .args(["check", "--no-cache", "--preview", "--output-format", "full", "--stdin-filename", "script.py", "-"])
+        .pass_stdin(indoc! {r#"
+            # /// script
+            # requires-python = 'invalid'
+            # ///
+        "#}), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    invalid-script-metadata: Failed to parse version: Unexpected end of version specifier, expected operator:
+    invalid
+    ^^^^^^^
+     --> script.py:2:21
+      |
+    1 | # /// script
+    2 | # requires-python = 'invalid'
+      |                     ^^^^^^^^^
+    3 | # ///
+      |
+
     Found 1 error.
 
     ----- stderr -----

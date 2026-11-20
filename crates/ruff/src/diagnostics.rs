@@ -408,15 +408,16 @@ pub(crate) fn lint_path(
 /// Generate `Diagnostic`s from source code content derived from stdin.
 pub(crate) fn lint_stdin(
     path: Option<&Path>,
+    source_type: SourceType,
     contents: String,
     settings: &LinterSettings,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
-    let (source_type, py_source_type) =
-        match path.map_or_default(|path| settings.extension.get_source_type(path)) {
-            SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
+    let py_source_type = match source_type {
+        SourceType::Toml(source_type) => match source_type {
+            TomlSourceType::Pyproject | TomlSourceType::Ruff => {
                 if !settings
                     .rules
                     .iter_enabled()
@@ -425,7 +426,7 @@ pub(crate) fn lint_stdin(
                     return Ok(Diagnostics::default());
                 }
 
-                let path = path.unwrap();
+                let path = path.context("Expected a filename for TOML input")?;
 
                 let (diagnostics, fixed) =
                     if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
@@ -470,9 +471,11 @@ pub(crate) fn lint_stdin(
                 });
             }
 
-            SourceType::Toml(_) | SourceType::Markdown => return Ok(Diagnostics::default()),
-            source_type @ SourceType::Python(py_source_type) => (source_type, py_source_type),
-        };
+            _ => return Ok(Diagnostics::default()),
+        },
+        SourceType::Markdown => return Ok(Diagnostics::default()),
+        SourceType::Python(py_source_type) => py_source_type,
+    };
 
     // Extract the sources from the file.
     let source_kind = match SourceKind::from_source_code(contents, source_type) {
