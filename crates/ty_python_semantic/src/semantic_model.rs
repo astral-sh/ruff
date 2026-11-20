@@ -21,7 +21,7 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{builtins_module_scope, implicit_builtins_symbol_scope};
 use crate::place_load::{PlaceLoadMode, PlaceLoadResolver};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
-use crate::types::list_members::{all_members, all_reachable_members};
+use crate::types::list_members::{all_members, all_members_matching, all_reachable_members};
 use crate::types::{
     CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
     infer_complete_scope_types, infer_definition_types, inferred_declaration,
@@ -221,7 +221,7 @@ impl<'db> SemanticModel<'db> {
                 return vec![];
             }
         };
-        self.module_completions(&module_name)
+        self.module_completions(&module_name, None)
     }
 
     /// Returns submodule-only completions for the given module.
@@ -245,7 +245,11 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns completions for symbols available in the given module as if
     /// it were imported by this model's `File`.
-    fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion<'db>> {
+    fn module_completions(
+        &self,
+        module_name: &ModuleName,
+        name_filter: Option<&dyn Fn(&str) -> bool>,
+    ) -> Vec<Completion<'db>> {
         let db = self.db;
         let Some(module) = resolve_module(
             self.db,
@@ -266,7 +270,12 @@ impl<'db> SemanticModel<'db> {
             clippy::iter_over_hash_type,
             reason = "completion order is determined later by relevance ranking"
         )]
-        for member in all_members(db, &self.program_environment(), ty) {
+        for member in match name_filter {
+            Some(name_filter) => {
+                all_members_matching(db, &self.program_environment(), ty, name_filter)
+            }
+            None => all_members(db, &self.program_environment(), ty),
+        } {
             completions.push(Completion {
                 name: CompactString::new(member.name),
                 ty: Some(member.ty),
@@ -315,11 +324,15 @@ impl<'db> SemanticModel<'db> {
     }
 
     /// Returns completions for symbols available in the scope containing the
-    /// given expression.
+    /// given expression whose names match `name_filter`.
     ///
     /// If a scope could not be determined, then completions for the global
     /// scope of this model's `File` are returned.
-    pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
+    pub fn scoped_completions(
+        &self,
+        node: ast::AnyNodeRef<'_>,
+        name_filter: &dyn Fn(&str) -> bool,
+    ) -> Vec<Completion<'db>> {
         let db = self.db;
         let program_file = self.program_file();
         let index = semantic_index(self.db, program_file);
@@ -359,7 +372,7 @@ impl<'db> SemanticModel<'db> {
             ImportingFile::File(self.file(), self.file.resolver_environment(self.db));
         if resolve_module(self.db, importing_file, &project_builtins).is_some() {
             completions.extend(
-                self.module_completions(&project_builtins)
+                self.module_completions(&project_builtins, Some(name_filter))
                     .into_iter()
                     .filter(|completion| !completion.is_type_check_only)
                     .map(|mut completion| {
@@ -372,10 +385,12 @@ impl<'db> SemanticModel<'db> {
         // Builtins are available in all scopes.
         let builtins = KnownModule::Builtins.name();
         completions.extend(
-            self.module_completions(&builtins)
+            self.module_completions(&builtins, Some(name_filter))
                 .into_iter()
                 .filter(|completion| !completion.is_type_check_only),
         );
+
+        completions.retain(|completion| name_filter(completion.name.as_str()));
 
         // The above can sometimes result in duplicates. Get rid of them.
         completions.sort_by(|c1, c2| c1.name.cmp(&c2.name));
