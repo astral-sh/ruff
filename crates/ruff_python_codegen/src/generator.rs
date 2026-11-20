@@ -1399,9 +1399,8 @@ impl<'a> Generator<'a> {
     fn unparse_parameters(&mut self, parameters: &Parameters) {
         let mut first = true;
         let slash_after = parameters
-            .items
-            .iter()
-            .rposition(|item| matches!(item, ast::ParameterItem::PositionalOnly(_)));
+            .roles()
+            .rposition(|role| role == ast::ParameterRole::PositionalOnly);
         let mut seen_star = false;
 
         for (index, item) in parameters.items.iter().enumerate() {
