@@ -1,18 +1,18 @@
 use std::sync::Mutex;
 
 use lsp_types::{LspRequestMethod, MessageDirection, Range, Request, Uri};
-use ruff_db::Db as _;
 use ruff_db::files::{File, system_path_to_directory, system_path_to_file};
 use ruff_db::system::walk_directory::WalkState;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
+use salsa::Database as _;
 use serde::{Deserialize, Serialize};
 use ty_ide::{DiscoveredPytestTestKind, discover_pytest_tests};
 use ty_project::{ProjectDatabase, SemanticDb as _};
 use ty_python_semantic::is_default_pytest_test_file_name;
 
 use crate::PositionEncoding;
-use crate::document::ToRangeExt;
+use crate::document::{DocumentKey, ToRangeExt};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -37,6 +37,10 @@ pub(in crate::server::api) struct DiscoverTestsParams {
     /// A URI pointing at a directory discovers every test under that directory. A URI
     /// pointing at a file discovers only the tests in that file. An absent `uri`
     /// discovers every test in every project in the session.
+    ///
+    /// Only files and directories saved on disk are discovered. A URI that doesn't use the `file`
+    /// scheme, or a document that is open in the editor but was never saved, gives an empty
+    /// result.
     ///
     /// Test files are found the way pytest finds them by default, not by the project's `include`
     /// and `exclude` settings, so files that are excluded from type checking are discovered too.
@@ -115,13 +119,8 @@ impl BackgroundRequestHandler for DiscoverTestsRequestHandler {
             }
             return Ok(DiscoverTestsResult::new(test_items));
         };
-
-        let Ok(path) = uri.to_file_path() else {
-            tracing::warn!("`{uri}` is not a file path.");
-            return Ok(DiscoverTestsResult::new(vec![]));
-        };
-        let Ok(path) = SystemPathBuf::from_path_buf(path) else {
-            tracing::warn!("`{uri}` is not valid UTF-8.");
+        let DocumentKey::File(path) = DocumentKey::from_uri(&uri) else {
+            tracing::debug!("Skipped test discovery for non-file URI: `{uri}`");
             return Ok(DiscoverTestsResult::new(vec![]));
         };
 
@@ -130,12 +129,12 @@ impl BackgroundRequestHandler for DiscoverTestsRequestHandler {
             return Ok(DiscoverTestsResult::new(vec![]));
         };
 
-        if !path_is_in_project(db, workspace_root, &path) {
+        if !path_is_in_project(snapshot.system(), workspace_root, &path) {
             tracing::debug!("`{path}` is not discoverable in `{workspace_root}`.");
             return Ok(DiscoverTestsResult::new(vec![]));
         }
 
-        if db.system().is_directory(&path) {
+        if snapshot.system().is_directory(&path) {
             tracing::debug!(
                 "Discovering the tests under directory `{path}` of workspace `{workspace_root}`"
             );
@@ -167,12 +166,14 @@ fn test_id(file_path: &str, qualified_name: &str) -> String {
 /// Returns `true` if discovering the tests under `root` reaches `path`: `path` is inside
 /// `root`, exists, and neither `path` nor one of its parent directories below `root` is a
 /// directory that pytest skips by default.
+///
+/// `system` should be the session's native system. A project database's system also reports
+/// documents that are open in the editor but were never saved, and pytest can't run those.
 pub(super) fn path_is_in_project(
-    db: &ProjectDatabase,
+    system: &dyn System,
     root: &SystemPath,
     path: &SystemPath,
 ) -> bool {
-    let system = db.system();
     path.starts_with(root)
         && system.path_exists(path)
         && !path
@@ -187,6 +188,8 @@ pub(super) fn path_is_in_project(
 ///
 /// Each file is reported by the project of its closest workspace folder, so the tests under a
 /// nested workspace folder appear under a separate top-level item for that folder.
+///
+/// `db` is the project database of the workspace folder that contains `directory`.
 fn collect_directory_tests(
     db: &ProjectDatabase,
     snapshot: &SessionSnapshot,
@@ -194,7 +197,7 @@ fn collect_directory_tests(
     items: &mut FxHashSet<TestItem>,
 ) {
     let encoding = snapshot.position_encoding();
-    for path in walk_test_files(db, directory) {
+    for path in walk_test_files(db, snapshot.system(), directory) {
         let Some((workspace_root, owner)) = snapshot.project_db_for_path(&path) else {
             continue;
         };
@@ -208,16 +211,33 @@ fn collect_directory_tests(
 /// descending into the directories that pytest skips by default. Like pytest, the walk ignores
 /// the project's `include` and `exclude` settings and ignore files such as `.gitignore`. See
 /// <https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery>.
-fn walk_test_files(db: &ProjectDatabase, directory: &SystemPath) -> Vec<SystemPathBuf> {
-    let system = db.system();
+///
+/// `system` should be the session's native system, for the same reason as in
+/// [`path_is_in_project`].
+///
+/// Unwinds with [`salsa::Cancelled`] if `db` is cancelled during the walk, so a pending change
+/// doesn't have to wait for the walk to finish.
+fn walk_test_files(
+    db: &ProjectDatabase,
+    system: &dyn System,
+    directory: &SystemPath,
+) -> Vec<SystemPathBuf> {
     let paths = Mutex::new(Vec::new());
 
     system
         .walk_directory(directory)
         .standard_filters(false)
         .run(|| {
+            let db = db.clone();
             let paths = &paths;
             Box::new(move |entry| {
+                // The walker runs this visitor on worker threads and joins them with `unwrap`,
+                // which replaces a `Cancelled` panic raised here with a plain panic. Stop the
+                // walk instead, and raise the cancellation again once the walk returns.
+                if salsa::Cancelled::catch(|| db.unwind_if_revision_cancelled()).is_err() {
+                    return WalkState::Quit;
+                }
+
                 let entry = match entry {
                     Ok(entry) => entry,
                     Err(error) => {
@@ -250,6 +270,7 @@ fn walk_test_files(db: &ProjectDatabase, directory: &SystemPath) -> Vec<SystemPa
             })
         });
 
+    db.unwind_if_revision_cancelled();
     paths.into_inner().unwrap()
 }
 
@@ -318,8 +339,13 @@ fn collect_file_pytest_tests(
         }
 
         let is_stop = dir == stop_at;
-        let uri = Uri::from_directory_path(dir);
-        debug_assert!(uri.is_ok(), "Parent directory must be convertible to Uri");
+        let Ok(uri) = Uri::from_directory_path(dir) else {
+            debug_assert!(
+                false,
+                "Parent directory `{dir}` must be convertible to a URI"
+            );
+            break;
+        };
         items.insert(TestItem {
             id: dir.to_string(),
             kind: TestItemKind::Directory,
@@ -330,7 +356,7 @@ fn collect_file_pytest_tests(
                 dir.parent().map(ToString::to_string)
             },
             range: None,
-            uri: uri.ok(),
+            uri: Some(uri),
         });
 
         if is_stop {
@@ -370,5 +396,64 @@ fn collect_file_pytest_tests(
             range: Some(range.local_range()),
             uri: text_document.clone(),
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::panic::{self, AssertUnwindSafe};
+    use std::thread;
+    use std::time::{Duration, Instant};
+
+    use anyhow::Context;
+    use ruff_db::Db as _;
+    use ruff_db::system::{OsSystem, SystemPath};
+    use salsa::{Database as _, Durability};
+    use ty_project::{ProjectDatabase, ProjectMetadata};
+
+    use super::walk_test_files;
+
+    /// The walk runs its visitors on worker threads, and the cancellation must still reach the
+    /// calling thread as a `salsa::Cancelled` panic, so that the server retries the request.
+    #[test]
+    fn walk_test_files_unwinds_when_the_database_is_cancelled() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let root = SystemPath::from_std_path(directory.path()).context("UTF-8 project path")?;
+        for index in 0..100 {
+            std::fs::write(root.join(format!("test_{index}.py")).as_std_path(), "")?;
+        }
+
+        let mut db = ProjectDatabase::use_defaults(
+            ProjectMetadata::new("project", root.to_path_buf()),
+            OsSystem::new(root),
+        );
+        let snapshot = db.clone();
+
+        let payload = thread::scope(|scope| {
+            // The write marks every other handle as cancelled, then waits until they are dropped.
+            let writer = scope.spawn(move || db.synthetic_write(Durability::LOW));
+
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while salsa::Cancelled::catch(|| snapshot.unwind_if_revision_cancelled()).is_ok() {
+                assert!(Instant::now() < deadline, "the snapshot was not cancelled");
+                thread::sleep(Duration::from_millis(1));
+            }
+
+            let result = panic::catch_unwind(AssertUnwindSafe(|| {
+                walk_test_files(&snapshot, snapshot.system(), root)
+            }));
+            drop(snapshot);
+            writer.join().expect("the write to finish");
+
+            result.err()
+        })
+        .context("the walk finished without noticing the cancellation")?;
+
+        assert!(
+            payload.downcast_ref::<salsa::Cancelled>().is_some(),
+            "the walk raised a plain panic instead of `salsa::Cancelled`"
+        );
+
+        Ok(())
     }
 }

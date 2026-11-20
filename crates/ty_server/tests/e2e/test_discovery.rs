@@ -1,6 +1,6 @@
 use anyhow::Result;
 use lsp_types::{LspRequestMethod, MessageDirection, Request};
-use ruff_db::system::SystemPath;
+use ruff_db::system::{SystemPath, SystemVirtualPath};
 use serde_json::{Value, json};
 
 use crate::{TestServer, TestServerBuilder};
@@ -1148,6 +1148,109 @@ fn discover_tests_for_a_uri_outside_any_workspace() -> Result<()> {
     insta::assert_json_snapshot!(tests, @r#"
     {
       "tests": []
+    }
+    "#);
+
+    Ok(())
+}
+
+/// A document that doesn't use the `file` scheme isn't reported, even when its path matches a
+/// test file saved on disk.
+#[test]
+fn discover_tests_for_an_untitled_document() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let module = SystemPath::new("src/tests/test_module.py");
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(module, DUMMY_TEST)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let untitled = format!("untitled://{}", server.file_uri(module).path());
+    server.open_virtual_text_document(SystemVirtualPath::new(&untitled), DUMMY_TEST, 1)?;
+
+    let tests = server.send_request_await::<DiscoverTests>(json!({ "uri": untitled }));
+
+    insta::assert_json_snapshot!(tests, @r#"
+    {
+      "tests": []
+    }
+    "#);
+
+    Ok(())
+}
+
+/// pytest can't run a document that is open in the editor but was never saved to disk, so
+/// neither a request for the document itself nor a request for its directory reports it.
+#[test]
+fn discover_tests_for_an_unsaved_file() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let saved = SystemPath::new("src/tests/test_saved.py");
+    let unsaved = SystemPath::new("src/tests/test_unsaved.py");
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(saved, DUMMY_TEST)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(unsaved, DUMMY_TEST, 1);
+
+    let uri = server.file_uri(unsaved);
+    let tests = server.send_request_await::<DiscoverTests>(json!({ "uri": uri }));
+
+    insta::assert_json_snapshot!(tests, @r#"
+    {
+      "tests": []
+    }
+    "#);
+
+    let directory_uri = server.file_uri(SystemPath::new("src/tests"));
+    let tests =
+        sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": directory_uri })));
+
+    insta::assert_json_snapshot!(tests, @r#"
+    {
+      "tests": [
+        {
+          "id": "<temp_dir>/src",
+          "kind": "directory",
+          "label": "src",
+          "uri": "file://<temp_dir>/src/"
+        },
+        {
+          "id": "<temp_dir>/src/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/src",
+          "uri": "file://<temp_dir>/src/tests/"
+        },
+        {
+          "id": "<temp_dir>/src/tests/test_saved.py",
+          "kind": "file",
+          "label": "test_saved.py",
+          "parent": "<temp_dir>/src/tests",
+          "uri": "file://<temp_dir>/src/tests/test_saved.py"
+        },
+        {
+          "id": "<temp_dir>/src/tests/test_saved.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/src/tests/test_saved.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/src/tests/test_saved.py"
+        }
+      ]
     }
     "#);
 

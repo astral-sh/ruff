@@ -55,13 +55,20 @@ impl BackgroundRequestHandler for ResolveTestRunParamsRequestHandler {
             .split_once("::")
             .map_or(params.test_id.as_str(), |(path, _)| path);
 
-        let path = SystemPath::new(path);
-        let Some((workspace_root, db)) = snapshot.project_db_for_path(path) else {
+        let system_path = SystemPath::new(path);
+        if !snapshot.system().path_exists(system_path) {
+            tracing::debug!(
+                "skip resolving run test parameters for a file that does not exist: `{path}`"
+            );
+            return Ok(None);
+        }
+
+        let Some((workspace_root, db)) = snapshot.project_db_for_path(system_path) else {
             tracing::debug!("`{path}` is not inside any workspace folder; returning null");
             return Ok(None);
         };
 
-        if !path_is_in_project(db, workspace_root, path) {
+        if !path_is_in_project(snapshot.system(), workspace_root, system_path) {
             tracing::debug!("`{path}` is not discoverable in `{workspace_root}`; returning null");
             return Ok(None);
         }

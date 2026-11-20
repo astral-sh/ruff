@@ -196,6 +196,22 @@ fn resolve_run_params_for_a_path_that_is_not_in_the_project() -> Result<()> {
     Ok(())
 }
 
+/// pytest can't run a document that is open in the editor but was never saved to disk.
+#[test]
+fn resolve_run_params_for_an_unsaved_file() -> Result<()> {
+    let mut server = server_with_one_test_module()?;
+
+    let unsaved = "src/tests/test_unsaved.py";
+    server.open_text_document(SystemPath::new(unsaved), MODULE_CONTENT, 1);
+
+    let id = test_id(&server, unsaved, Some("test_one"));
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @"null");
+
+    Ok(())
+}
+
 #[test]
 fn resolve_run_params_for_a_module_with_same_relative_path_in_another_workspace() -> Result<()> {
     let workspace_one = SystemPath::new("workspace_one");

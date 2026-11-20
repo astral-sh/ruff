@@ -1307,6 +1307,7 @@ impl Session {
     /// Creates a snapshot of the current state of the [`Session`].
     pub(crate) fn snapshot_session(&self) -> SessionSnapshot {
         SessionSnapshot {
+            native_system: self.native_system.clone(),
             projects: self
                 .projects
                 .iter()
@@ -1684,6 +1685,7 @@ fn closest_workspace_entry<'a, T>(
 
 /// An immutable snapshot of the current state of [`Session`].
 pub(crate) struct SessionSnapshot {
+    native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
     index: Arc<Index>,
     global_settings: Arc<GlobalSettings>,
     position_encoding: PositionEncoding,
@@ -1707,6 +1709,12 @@ pub(crate) struct SessionSnapshot {
 }
 
 impl SessionSnapshot {
+    /// Returns the system that reads the disk directly. Unlike a project database's system, it
+    /// doesn't see documents that are open in the editor but were never saved.
+    pub(crate) fn system(&self) -> &dyn System {
+        &*self.native_system
+    }
+
     pub(crate) fn projects(&self) -> impl Iterator<Item = &ProjectDatabase> {
         self.projects.values()
     }
