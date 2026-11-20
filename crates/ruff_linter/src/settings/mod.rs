@@ -386,7 +386,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UselessContextlibSuppress), // B022
     RuleSelector::rule(Rule::FunctionUsesLoopVariable), // B023
     RuleSelector::rule(Rule::DuplicateTryBlockException), // B025
-    RuleSelector::rule(Rule::StarArgUnpackingAfterKeywordArg), // B026
+    RuleSelector::rule(Rule::StarArgAfterKeyword), // B026
     RuleSelector::rule(Rule::ExceptWithEmptyTuple), // B029
     RuleSelector::rule(Rule::ExceptWithNonExceptionClasses), // B030
     RuleSelector::rule(Rule::ReuseOfGroupbyGenerator), // B031
@@ -555,7 +555,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::PropertyWithParameters), // PLR0206
     RuleSelector::rule(Rule::ManualFromImport), // PLR0402
     RuleSelector::rule(Rule::RedefinedArgumentFromLocal), // PLR1704
-    RuleSelector::rule(Rule::StopIterationReturn), // PLR1708
+    RuleSelector::rule(Rule::RaiseStopIterationInGenerator), // PLR1708
     RuleSelector::rule(Rule::UselessReturn), // PLR1711
     RuleSelector::rule(Rule::BooleanChainedComparison), // PLR1716
     RuleSelector::rule(Rule::SysExitAlias), // PLR1722
@@ -566,7 +566,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UselessElseOnLoop), // PLW0120
     RuleSelector::rule(Rule::SelfAssigningVariable), // PLW0127
     RuleSelector::rule(Rule::RedeclaredAssignedName), // PLW0128
-    RuleSelector::rule(Rule::AssertOnStringLiteral), // PLW0129
+    RuleSelector::rule(Rule::AssertStringLiteral), // PLW0129
     RuleSelector::rule(Rule::NamedExprWithoutContext), // PLW0131
     RuleSelector::rule(Rule::UselessExceptionStatement), // PLW0133
     RuleSelector::rule(Rule::NanComparison), // PLW0177
@@ -659,7 +659,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::AssertWithPrintMessage), // RUF030
     RuleSelector::rule(Rule::DecimalFromFloatLiteral), // RUF032
     RuleSelector::rule(Rule::PostInitDefault), // RUF033
-    RuleSelector::rule(Rule::UselessIfElse), // RUF034
+    RuleSelector::rule(Rule::IfExprWithIdenticalBranches), // RUF034
     RuleSelector::rule(Rule::InvalidAssertMessageLiteralArgument), // RUF040
     RuleSelector::rule(Rule::UnnecessaryNestedLiteral), // RUF041
     RuleSelector::rule(Rule::UnnecessaryCastToInt), // RUF046
@@ -682,8 +682,8 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::CollapsibleIf), // SIM102
     RuleSelector::rule(Rule::NeedlessBool), // SIM103
     RuleSelector::rule(Rule::ReturnInTryExceptFinally), // SIM107
-    RuleSelector::rule(Rule::EnumerateForLoop), // SIM113
-    RuleSelector::rule(Rule::IfWithSameArms), // SIM114
+    RuleSelector::rule(Rule::ManualLoopCounter), // SIM113
+    RuleSelector::rule(Rule::IfWithIdenticalBranches), // SIM114
     RuleSelector::rule(Rule::OpenFileWithContextHandler), // SIM115
     RuleSelector::rule(Rule::MultipleWithStatements), // SIM117
     RuleSelector::rule(Rule::InDictKeys), // SIM118
@@ -1022,7 +1022,7 @@ mod tests {
         	while-one (UP048),
         	deprecated-abc-decorator (UP051),
         	context-manager-iterator (UP052),
-        	if-exp-instead-of-or-operator (FURB110),
+        	if-expr-with-body-as-condition (FURB110),
         	repeated-append (FURB113),
         	delete-full-slice (FURB131),
         	for-loop-set-mutations (FURB142),
@@ -1033,7 +1033,7 @@ mod tests {
         	single-item-membership-test (FURB171),
         	meta-class-abc-meta (FURB180),
         	subclass-builtin (FURB189),
-        	missing-f-string-syntax (RUF027),
+        	possibly-missing-f-string-prefix (RUF027),
         	none-not-at-end-of-union (RUF036),
         	unnecessary-empty-iterable-within-deque-call (RUF037),
         	redundant-bool-literal (RUF038),

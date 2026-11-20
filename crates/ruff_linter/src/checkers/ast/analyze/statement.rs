@@ -135,7 +135,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::IterMethodWithGeneratorReturnAnnotation) {
                 flake8_pyi::rules::bad_generator_return_type(function_def, checker);
             }
-            if checker.is_rule_enabled(Rule::StopIterationReturn) {
+            if checker.is_rule_enabled(Rule::RaiseStopIterationInGenerator) {
                 pylint::rules::stop_iteration_return(checker, function_def);
             }
             if checker.source_type.is_stub() {
@@ -201,10 +201,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::UnnecessaryReturnNone,
                 Rule::ImplicitReturnValue,
                 Rule::ImplicitReturn,
-                Rule::SuperfluousElseReturn,
-                Rule::SuperfluousElseRaise,
-                Rule::SuperfluousElseContinue,
-                Rule::SuperfluousElseBreak,
+                Rule::UnnecessaryElseAfterReturn,
+                Rule::UnnecessaryElseAfterRaise,
+                Rule::UnnecessaryElseAfterContinue,
+                Rule::UnnecessaryElseAfterBreak,
             ]) {
                 flake8_return::rules::function(checker, function_def);
             }
@@ -1026,7 +1026,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.semantic.current_statement_parent(),
                 );
             }
-            if checker.is_rule_enabled(Rule::IfWithSameArms) {
+            if checker.is_rule_enabled(Rule::IfWithIdenticalBranches) {
                 flake8_simplify::rules::if_with_same_arms(checker, if_);
             }
             if checker.is_rule_enabled(Rule::NeedlessBool) {
@@ -1035,7 +1035,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfDictLookup) {
                 flake8_simplify::rules::if_else_block_instead_of_dict_lookup(checker, if_);
             }
-            if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfIfExp) {
+            if checker.is_rule_enabled(Rule::IfElseAssignmentToSameVariable) {
                 flake8_simplify::rules::if_else_block_instead_of_if_exp(checker, if_);
             }
             if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfDictGet) {
@@ -1177,7 +1177,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     msg.as_deref(),
                 );
             }
-            if checker.is_rule_enabled(Rule::AssertOnStringLiteral) {
+            if checker.is_rule_enabled(Rule::AssertStringLiteral) {
                 pylint::rules::assert_on_string_literal(checker, test);
             }
             if checker.is_rule_enabled(Rule::InvalidMockAccess) {
@@ -1210,7 +1210,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.semantic.current_statement_parent(),
                 );
             }
-            if checker.is_rule_enabled(Rule::RedefinedLoopName) {
+            if checker.is_rule_enabled(Rule::RedefinedForOrWithTarget) {
                 pylint::rules::redefined_loop_name(checker, stmt);
             }
             if checker.any_rule_enabled(&[Rule::ReadWholeFile, Rule::WriteWholeFile]) {
@@ -1265,7 +1265,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.any_rule_enabled(&[
                 Rule::DictIndexMissingItems,
-                Rule::EnumerateForLoop,
+                Rule::ManualLoopCounter,
                 Rule::IncorrectDictIterator,
                 Rule::LoopIteratorMutation,
                 Rule::UnnecessaryEnumerate,
@@ -1288,7 +1288,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UselessElseOnLoop) {
                 pylint::rules::useless_else_on_loop(checker, stmt, body, orelse);
             }
-            if checker.is_rule_enabled(Rule::RedefinedLoopName) {
+            if checker.is_rule_enabled(Rule::RedefinedForOrWithTarget) {
                 pylint::rules::redefined_loop_name(checker, stmt);
             }
             if checker.is_rule_enabled(Rule::IterationOverSet) {

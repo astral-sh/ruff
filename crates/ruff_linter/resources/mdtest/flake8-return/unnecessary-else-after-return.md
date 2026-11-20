@@ -1,4 +1,4 @@
-# `superfluous-else-return` (`RET505`)
+# `unnecessary-else-after-return` (`RET505`)
 
 ```toml
 lint.select = ["RET505"]
@@ -13,7 +13,7 @@ leading comments. The second `return` stays outside the `if`, so `f(False)` stil
 def f(condition):
     if condition:
         return 1
-    else:  # snapshot: superfluous-else-return
+    else:  # snapshot: unnecessary-else-after-return
         # First comment.
           # Second comment.
         return 2
@@ -23,16 +23,16 @@ def f(condition):
 error[RET505]: Unnecessary `else` after `return` statement
  --> src/mdtest_snippet.py:4:5
   |
-4 |     else:  # snapshot: superfluous-else-return
+4 |     else:  # snapshot: unnecessary-else-after-return
   |     ^^^^
 help: Remove unnecessary `else`
   |
 3 |         return 1
-  -     else:  # snapshot: superfluous-else-return
+  -     else:  # snapshot: unnecessary-else-after-return
   -         # First comment.
   -           # Second comment.
   -         return 2
-4 +     # snapshot: superfluous-else-return
+4 +     # snapshot: unnecessary-else-after-return
 5 +     # First comment.
 6 +       # Second comment.
 7 +     return 2

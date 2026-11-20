@@ -58,7 +58,7 @@ mod tests {
     #[test_case(Rule::ReuseOfGroupbyGenerator, Path::new("B031.py"))]
     #[test_case(Rule::DelattrWithConstant, Path::new("B043.py"))]
     #[test_case(Rule::SetattrWithConstant, Path::new("B009_B010.py"))]
-    #[test_case(Rule::StarArgUnpackingAfterKeywordArg, Path::new("B026.py"))]
+    #[test_case(Rule::StarArgAfterKeyword, Path::new("B026.py"))]
     #[test_case(Rule::StaticKeyDictComprehension, Path::new("B035.py"))]
     #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"))]
     #[test_case(Rule::UnaryPrefixIncrementDecrement, Path::new("B002.py"))]

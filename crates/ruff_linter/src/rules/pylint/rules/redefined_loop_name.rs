@@ -58,16 +58,16 @@ use crate::codes::Category;
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.252", category = Category::Pedantic)]
-pub(crate) struct RedefinedLoopName {
+pub(crate) struct RedefinedForOrWithTarget {
     name: String,
     outer_kind: OuterBindingKind,
     inner_kind: InnerBindingKind,
 }
 
-impl Violation for RedefinedLoopName {
+impl Violation for RedefinedForOrWithTarget {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedLoopName {
+        let RedefinedForOrWithTarget {
             name,
             outer_kind,
             inner_kind,
@@ -415,7 +415,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
                 checker.report_diagnostic(
-                    RedefinedLoopName {
+                    RedefinedForOrWithTarget {
                         name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,
                         inner_kind: inner_assignment_target.binding_kind,

@@ -48,9 +48,9 @@ use crate::codes::Category;
 /// - [Disallow iterable argument unpacking after a keyword argument?](https://github.com/python/cpython/issues/82741)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.109", category = Category::Suspicious)]
-pub(crate) struct StarArgUnpackingAfterKeywordArg;
+pub(crate) struct StarArgAfterKeyword;
 
-impl Violation for StarArgUnpackingAfterKeywordArg {
+impl Violation for StarArgAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Star-arg unpacking after a keyword argument is strongly discouraged".to_string()
@@ -73,6 +73,6 @@ pub(crate) fn star_arg_unpacking_after_keyword_arg(
         if arg.start() <= keyword.start() {
             continue;
         }
-        checker.report_diagnostic(StarArgUnpackingAfterKeywordArg, arg.range());
+        checker.report_diagnostic(StarArgAfterKeyword, arg.range());
     }
 }

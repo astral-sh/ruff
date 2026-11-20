@@ -61,21 +61,21 @@ mod tests {
     #[test_case(Rule::AssignmentInAssert, Path::new("RUF018.py"))]
     #[test_case(Rule::UnnecessaryKeyCheck, Path::new("RUF019.py"))]
     #[test_case(Rule::NeverUnion, Path::new("RUF020.py"))]
-    #[test_case(Rule::ParenthesizeChainedOperators, Path::new("RUF021.py"))]
+    #[test_case(Rule::UnclearBooleanPrecedence, Path::new("RUF021.py"))]
     #[test_case(Rule::UnsortedDunderAll, Path::new("RUF022.py"))]
     #[test_case(Rule::UnsortedDunderSlots, Path::new("RUF023.py"))]
     #[test_case(Rule::MutableFromkeysValue, Path::new("RUF024.py"))]
     #[test_case(Rule::DefaultFactoryKwarg, Path::new("RUF026.py"))]
-    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_0.py"))]
-    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
-    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
+    #[test_case(Rule::PossiblyMissingFStringPrefix, Path::new("RUF027_0.py"))]
+    #[test_case(Rule::PossiblyMissingFStringPrefix, Path::new("RUF027_1.py"))]
+    #[test_case(Rule::PossiblyMissingFStringPrefix, Path::new("RUF027_2.py"))]
     #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     #[test_case(Rule::UnusedAsync, Path::new("RUF029.py"))]
     #[test_case(Rule::AssertWithPrintMessage, Path::new("RUF030.py"))]
     #[test_case(Rule::IncorrectlyParenthesizedTupleInSubscript, Path::new("RUF031.py"))]
     #[test_case(Rule::DecimalFromFloatLiteral, Path::new("RUF032.py"))]
     #[test_case(Rule::PostInitDefault, Path::new("RUF033.py"))]
-    #[test_case(Rule::UselessIfElse, Path::new("RUF034.py"))]
+    #[test_case(Rule::IfExprWithIdenticalBranches, Path::new("RUF034.py"))]
     #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.py"))]
     #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.pyi"))]
     #[test_case(Rule::UnnecessaryEmptyIterableWithinDequeCall, Path::new("RUF037.py"))]
@@ -244,9 +244,9 @@ mod tests {
     fn missing_fstring_syntax_backslash_py311() -> Result<()> {
         assert_diagnostics_diff!(
             Path::new("ruff/RUF027_0.py"),
-            &LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            &LinterSettings::for_rule(Rule::PossiblyMissingFStringPrefix)
                 .with_target_version(PythonVersion::PY312),
-            &LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            &LinterSettings::for_rule(Rule::PossiblyMissingFStringPrefix)
                 .with_target_version(PythonVersion::PY311),
         );
         Ok(())

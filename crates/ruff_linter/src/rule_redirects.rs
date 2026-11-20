@@ -236,6 +236,47 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     ("unused-noqa", Rule::UnusedSuppressionComment),
     ("redirected-noqa", Rule::RenamedRuleInSuppressionComment),
+    (
+        "star-arg-unpacking-after-keyword-arg",
+        Rule::StarArgAfterKeyword,
+    ),
+    (
+        "if-exp-instead-of-or-operator",
+        Rule::IfExprWithBodyAsCondition,
+    ),
+    (
+        "repeated-global",
+        Rule::ConsecutiveGlobalOrNonlocalStatements,
+    ),
+    ("stop-iteration-return", Rule::RaiseStopIterationInGenerator),
+    ("assert-on-string-literal", Rule::AssertStringLiteral),
+    ("redefined-loop-name", Rule::RedefinedForOrWithTarget),
+    ("superfluous-else-return", Rule::UnnecessaryElseAfterReturn),
+    ("superfluous-else-raise", Rule::UnnecessaryElseAfterRaise),
+    (
+        "superfluous-else-continue",
+        Rule::UnnecessaryElseAfterContinue,
+    ),
+    ("superfluous-else-break", Rule::UnnecessaryElseAfterBreak),
+    (
+        "parenthesize-chained-operators",
+        Rule::UnclearBooleanPrecedence,
+    ),
+    (
+        "missing-f-string-syntax",
+        Rule::PossiblyMissingFStringPrefix,
+    ),
+    ("useless-if-else", Rule::IfExprWithIdenticalBranches),
+    (
+        "if-else-block-instead-of-if-exp",
+        Rule::IfElseAssignmentToSameVariable,
+    ),
+    ("enumerate-for-loop", Rule::ManualLoopCounter),
+    ("if-with-same-arms", Rule::IfWithIdenticalBranches),
+    (
+        "if-expr-with-twisted-arms",
+        Rule::IfExprWithNegatedElseAsCondition,
+    ),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
