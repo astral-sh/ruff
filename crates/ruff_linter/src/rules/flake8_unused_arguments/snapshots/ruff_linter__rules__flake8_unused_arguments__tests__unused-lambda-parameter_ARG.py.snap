@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
 ---
-ARG005 Unused lambda argument: `x`
+ARG005 Unused lambda parameter: `x`
   --> ARG.py:28:8
    |
 26 | # Unused arguments on lambdas.

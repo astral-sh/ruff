@@ -66,7 +66,7 @@ impl Violation for TooManyPositionalParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TooManyPositionalParameters { c_pos, max_pos } = self;
-        format!("Too many positional arguments ({c_pos} > {max_pos})")
+        format!("Too many positional parameters ({c_pos} > {max_pos})")
     }
 }
 

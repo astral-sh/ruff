@@ -43,7 +43,7 @@ impl Violation for RedefinedParameterFromLocal {
     #[derive_message_formats]
     fn message(&self) -> String {
         let RedefinedParameterFromLocal { name } = self;
-        format!("Redefining argument with the local name `{name}`")
+        format!("Redefining parameter with the local name `{name}`")
     }
 }
 

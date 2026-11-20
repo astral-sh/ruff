@@ -88,7 +88,7 @@ impl Violation for MutableParameterDefault {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Do not use mutable data structures for argument defaults".to_string()
+        "Do not use mutable data structures for parameter defaults".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

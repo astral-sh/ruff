@@ -41,13 +41,13 @@ impl Violation for PytestParameterWithDefaultValue {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Test function parameter `{}` has default argument",
+            "Test function parameter `{}` has a default value",
             self.parameter_name
         )
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove default argument".to_string())
+        Some("Remove default value".to_string())
     }
 }
 

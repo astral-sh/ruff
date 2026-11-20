@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_unused_arguments/mod.rs
 ---
-ARG001 Unused function argument: `a`
+ARG001 Unused function parameter: `a`
  --> ignore_variadic_names.py:1:7
   |
 1 | def f(a, b):
@@ -9,7 +9,7 @@ ARG001 Unused function argument: `a`
 2 |     print("Hello, world!")
   |
 
-ARG001 Unused function argument: `b`
+ARG001 Unused function parameter: `b`
  --> ignore_variadic_names.py:1:10
   |
 1 | def f(a, b):
@@ -17,7 +17,7 @@ ARG001 Unused function argument: `b`
 2 |     print("Hello, world!")
   |
 
-ARG001 Unused function argument: `a`
+ARG001 Unused function parameter: `a`
  --> ignore_variadic_names.py:5:7
   |
 5 | def f(a, b, *args, **kwargs):
@@ -25,7 +25,7 @@ ARG001 Unused function argument: `a`
 6 |     print("Hello, world!")
   |
 
-ARG001 Unused function argument: `b`
+ARG001 Unused function parameter: `b`
  --> ignore_variadic_names.py:5:10
   |
 5 | def f(a, b, *args, **kwargs):
@@ -33,7 +33,7 @@ ARG001 Unused function argument: `b`
 6 |     print("Hello, world!")
   |
 
-ARG002 Unused method argument: `a`
+ARG002 Unused method parameter: `a`
   --> ignore_variadic_names.py:10:17
    |
  9 | class C:
@@ -42,7 +42,7 @@ ARG002 Unused method argument: `a`
 11 |         print("Hello, world!")
    |
 
-ARG002 Unused method argument: `b`
+ARG002 Unused method parameter: `b`
   --> ignore_variadic_names.py:10:20
    |
  9 | class C:
@@ -51,7 +51,7 @@ ARG002 Unused method argument: `b`
 11 |         print("Hello, world!")
    |
 
-ARG002 Unused method argument: `a`
+ARG002 Unused method parameter: `a`
   --> ignore_variadic_names.py:13:17
    |
 11 |         print("Hello, world!")
@@ -61,7 +61,7 @@ ARG002 Unused method argument: `a`
 14 |         print("Hello, world!")
    |
 
-ARG002 Unused method argument: `b`
+ARG002 Unused method parameter: `b`
   --> ignore_variadic_names.py:13:20
    |
 11 |         print("Hello, world!")

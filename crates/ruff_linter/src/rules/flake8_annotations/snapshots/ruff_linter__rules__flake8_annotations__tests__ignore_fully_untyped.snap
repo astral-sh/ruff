@@ -17,7 +17,7 @@ help: Add return type annotation: `None`
    |
 note: This is an unsafe fix and may change runtime behavior
 
-ANN001 Missing type annotation for function argument `b`
+ANN001 Missing type annotation for function parameter `b`
   --> ignore_fully_untyped.py:24:37
    |
 24 | def error_partially_typed_1(a: int, b):
@@ -25,7 +25,7 @@ ANN001 Missing type annotation for function argument `b`
 25 |     pass
    |
 
-ANN001 Missing type annotation for function argument `b`
+ANN001 Missing type annotation for function parameter `b`
   --> ignore_fully_untyped.py:28:37
    |
 28 | def error_partially_typed_2(a: int, b) -> int:

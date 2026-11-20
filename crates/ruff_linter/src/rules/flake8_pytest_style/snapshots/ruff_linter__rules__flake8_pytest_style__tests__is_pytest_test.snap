@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT028 [*] Test function parameter `a` has default argument
+PT028 [*] Test function parameter `a` has a default value
  --> is_pytest_test.py:3:27
   |
 1 | # Errors
@@ -10,7 +10,7 @@ PT028 [*] Test function parameter `a` has default argument
   |                           ^
 4 | def testThisIsAlsoATest(a=1): ...
   |
-help: Remove default argument
+help: Remove default value
   |
 2 |
   - def test_this_is_a_test(a=1): ...
@@ -19,7 +19,7 @@ help: Remove default argument
   |
 note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
-PT028 [*] Test function parameter `a` has default argument
+PT028 [*] Test function parameter `a` has a default value
  --> is_pytest_test.py:4:27
   |
 3 | def test_this_is_a_test(a=1): ...
@@ -28,7 +28,7 @@ PT028 [*] Test function parameter `a` has default argument
 5 |
 6 | class TestClass:
   |
-help: Remove default argument
+help: Remove default value
   |
 3 | def test_this_is_a_test(a=1): ...
   - def testThisIsAlsoATest(a=1): ...
@@ -37,7 +37,7 @@ help: Remove default argument
   |
 note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
-PT028 [*] Test function parameter `a` has default argument
+PT028 [*] Test function parameter `a` has a default value
  --> is_pytest_test.py:7:41
   |
 6 | class TestClass:
@@ -45,7 +45,7 @@ PT028 [*] Test function parameter `a` has default argument
   |                                         ^
 8 |     def testAndOfCourseThis(self, a=1): ...
   |
-help: Remove default argument
+help: Remove default value
   |
 6 | class TestClass:
   -     def test_this_too_is_a_test(self, a=1): ...
@@ -54,14 +54,14 @@ help: Remove default argument
   |
 note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
-PT028 [*] Test function parameter `a` has default argument
+PT028 [*] Test function parameter `a` has a default value
  --> is_pytest_test.py:8:37
   |
 6 | class TestClass:
 7 |     def test_this_too_is_a_test(self, a=1): ...
 8 |     def testAndOfCourseThis(self, a=1): ...
   |                                     ^
-help: Remove default argument
+help: Remove default value
   |
 7 |     def test_this_too_is_a_test(self, a=1): ...
   -     def testAndOfCourseThis(self, a=1): ...
