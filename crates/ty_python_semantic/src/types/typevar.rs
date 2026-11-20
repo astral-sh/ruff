@@ -929,7 +929,7 @@ pub enum TypeVarFreshening<'db> {
     Capture(BoundTypeVarIdentity<'db>),
 }
 
-/// A solver capture pairs the original binding context with the receiving ParamSpec's identity.
+/// A capture pairs the original binding context with the receiving ParamSpec's identity.
 /// Repeated derivations share the same binding, even across materializations of its bounds.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct CapturedBinding<'db> {
@@ -1938,9 +1938,9 @@ impl std::fmt::Display for ParamSpecAttrKind {
 ///
 /// The binding context distinguishes occurrences such as `T@ClassC` and `T@FunctionF`.
 /// Within a context, the nonce distinguishes fresh occurrences of a callable's binders.
-/// A binder captured while deriving a solver bound also records the receiving `ParamSpec`,
-/// so deriving the same bound again reproduces the same identity. Materializing the
-/// binder's bounds or constraints preserves its identity.
+/// A captured binder also records the receiving `ParamSpec`, so deriving the same capture
+/// again reproduces the same identity. Materializing its bounds or constraints preserves
+/// that identity.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
