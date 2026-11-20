@@ -192,3 +192,28 @@ help: Move into type-checking block
 51 |
    |
 note: This is an unsafe fix and may change runtime behavior
+
+TC002 [*] Move third-party import `module.Member` into a type-checking block
+   --> TC002.py:172:24
+    |
+170 |     global Member
+171 |
+172 |     from module import Member
+    |                        ^^^^^^
+173 |
+174 |     x: Member = 1
+    |
+help: Move into type-checking block
+    |
+1   | """Tests to determine accurate detection of typing-only imports."""
+2   + from typing import TYPE_CHECKING
+3   +
+4   + if TYPE_CHECKING:
+5   +     from module import Member
+6   |
+--------------------------------------------------------------------------------
+175 |
+    -     from module import Member
+176 |
+    |
+note: This is an unsafe fix and may change runtime behavior

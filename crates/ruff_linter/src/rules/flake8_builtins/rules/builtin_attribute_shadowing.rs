@@ -91,6 +91,7 @@ pub(crate) fn builtin_attribute_shadowing(
 
         // We only care about methods and attributes.
         let kind = match binding.kind {
+            BindingKind::Annotation if !checker.source_type.is_stub() => continue,
             BindingKind::Assignment | BindingKind::Annotation => Kind::Attribute,
             BindingKind::FunctionDefinition(_) => Kind::Method,
             _ => continue,

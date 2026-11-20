@@ -2201,7 +2201,9 @@ impl<'a> SemanticModel<'a> {
     /// ```
     const fn in_forward_reference(&self) -> bool {
         self.in_string_type_definition()
-            || (self.in_future_type_definition() && self.in_typing_only_annotation())
+            || (self.in_future_type_definition()
+                && self.in_typing_only_annotation()
+                && self.future_annotations_or_stub())
     }
 
     /// Return `true` if the model is visiting the value expression
