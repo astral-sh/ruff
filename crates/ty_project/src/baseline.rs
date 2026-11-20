@@ -28,7 +28,7 @@
 //! of lines it spans. Adding the import changes the line number of `get_name()`, but preserves all
 //! four values. Reindenting the assignment changes the columns and can make the error reappear.
 //! Each entry can suppress one diagnostic in its original file. Renaming the file makes its errors
-//! reappear. An entry written before a rule split can match a diagnostic from any of its replacements.
+//! reappear.
 //!
 //! # Why match in source order?
 //!
@@ -79,8 +79,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use similar::{Algorithm, DiffTag, capture_diff, capture_diff_slices};
-use ty_python_semantic::lint::LintId;
+use similar::{Algorithm, DiffTag, capture_diff_slices};
 
 use crate::Db;
 
@@ -101,17 +100,10 @@ pub(crate) fn demote_diagnostics(db: &dyn Db, file: File, diagnostics: &mut [Dia
     let registry = db.lint_registry();
     let mut stored = Cow::Borrowed(baseline.entries);
     // The writer records all entries for a file together, so each rule has one spelling in
-    // that file. Keep that spelling to reproduce the writer's ordering for equal ranges, using
-    // the old name for each replacement of a split rule.
+    // that file. Keep that spelling to reproduce the writer's ordering for equal ranges.
     let mut stored_names = FxHashMap::default();
-    let mut split_entries = FxHashMap::default();
     for (index, entry) in baseline.entries.iter().enumerate() {
-        if let Some(replacements) = registry.replacement_lints(&entry.rule) {
-            split_entries.insert(index, replacements);
-            for lint in replacements {
-                stored_names.insert(lint.name(), entry.rule.as_str());
-            }
-        } else if let Some(lint) = registry.alias_target(&entry.rule) {
+        if let Some(lint) = registry.alias_target(&entry.rule) {
             stored.to_mut()[index].rule = CompactString::const_new(lint.name().as_str());
             stored_names.insert(lint.name(), entry.rule.as_str());
         }
@@ -149,29 +141,7 @@ pub(crate) fn demote_diagnostics(db: &dyn Db, file: File, diagnostics: &mut [Dia
         demote(0..entries.len());
         return;
     }
-    let ops = if split_entries.is_empty() {
-        capture_diff_slices(Algorithm::Myers, stored.as_ref(), &entries)
-    } else {
-        // Each stored entry occupies a single slot in the diff, even when it can match
-        // more than one lint name.
-        let stored: Vec<_> = stored
-            .iter()
-            .enumerate()
-            .map(|(index, entry)| EntryWithReplacements {
-                entry,
-                replacements: split_entries.get(&index).copied().unwrap_or_default(),
-            })
-            .collect();
-        capture_diff(
-            Algorithm::Myers,
-            &stored,
-            0..stored.len(),
-            &entries,
-            0..entries.len(),
-        )
-    };
-
-    for op in ops {
+    for op in capture_diff_slices(Algorithm::Myers, stored.as_ref(), &entries) {
         if op.tag() == DiffTag::Equal {
             demote(op.new_range());
         }
@@ -360,26 +330,6 @@ struct BaselineEntry {
     end_column: usize,
     /// Includes both the start and end lines.
     line_count: usize,
-}
-
-/// A stored baseline entry and the rules that can match its old name.
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct EntryWithReplacements<'a> {
-    entry: &'a BaselineEntry,
-    replacements: &'static [LintId],
-}
-
-impl PartialEq<EntryWithReplacements<'_>> for BaselineEntry {
-    fn eq(&self, stored: &EntryWithReplacements<'_>) -> bool {
-        self.start_column == stored.entry.start_column
-            && self.end_column == stored.entry.end_column
-            && self.line_count == stored.entry.line_count
-            && (self.rule == stored.entry.rule
-                || stored
-                    .replacements
-                    .iter()
-                    .any(|lint| lint.name() == self.rule.as_str()))
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, thiserror::Error, get_size2::GetSize)]

@@ -268,8 +268,7 @@ reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Lite
 The name comparison follows a type alias to a single string literal. The rule is meant to spot
 simple, obvious typos. It allows names of type `str` so callers can still construct named tuples
 dynamically when that's desirable. If the name argument has a union of string literals as its type,
-the caller is likely doing the same thing. The rule allows it even when none of the possible names
-match the assigned variable.
+the caller is likely doing the same thing.
 
 ```toml
 [environment]
@@ -298,7 +297,7 @@ def choose_name(name: Literal["Vector", "Coordinate"], aliased_name: PointNames)
 
 ### Invalid literal names
 
-Both factories reject names that are keywords or invalid identifiers. A bad name is reported by
+Both factories reject names that are keywords or invalid identifiers. An invalid name is reported by
 `invalid-named-tuple` even when the name mismatch rule is enabled.
 
 ```py

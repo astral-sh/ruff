@@ -1374,16 +1374,6 @@
             }
           ]
         },
-        "mismatched-type-name": {
-          "title": "detects functional typing definitions whose declared name does not match the assigned variable",
-          "description": "## Migration\n\nThis diagnostic code is deprecated. ty now reports name mismatches under a separate rule for each\nkind of type:\n\n- `mismatched-enum-name`\n- `mismatched-namedtuple-name`\n- `mismatched-newtype-name`\n- `mismatched-paramspec-name`\n- `mismatched-type-alias-name`\n- `mismatched-typeddict-name`\n- `mismatched-typevar-name`\n- `mismatched-typevartuple-name`\n\nExisting configuration entries and ignore comments using `mismatched-type-name` still apply to all\neight rules. However, users are encouraged to migrate to using the new rules in configuration files\nand suppression comments wherever possible.\n\n## Rule history\n\n- v0.0.108: Split into the eight rules listed under Migration.",
-          "deprecated": true,
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "mismatched-typeddict-name": {
           "title": "detects mismatched names in typed dictionaries",
           "description": "## What it does\n\nChecks whether the name passed to the functional form of `TypedDict` differs from the assigned\nvariable, or if ty cannot determine the value of a string passed to the `typename` argument.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a `TypedDict`'s runtime representation confusing.\n\n## Examples\n\n```python\nfrom typing import TypedDict\n\n# error: \"Expected \"Movie\", got \"Film\"\"\nMovie = TypedDict(\"Film\", {\"title\": str})\n\n\ndef f(x: str):\n    # error: \"Cannot verify that a value of type `str` matches \"Film\"\"\n    Film = TypedDict(x, {\"title\": str})\n```\n\n## Rule history\n\n- v0.0.108: Split out from `mismatched-type-name`.",

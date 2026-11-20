@@ -193,16 +193,21 @@ impl Options {
     /// From highest to lowest precedence
     /// * normal rule names
     /// * An alias for another rule (the new name wins over the old name)
-    /// * A selector that expands to replacement rules
     /// * `all`
     ///
     /// TOML tables are unordered. Establish the order before merging so an alias in a
     /// higher-precedence table can still override the current name in a lower-precedence table.
     pub(crate) fn order_rule_selectors(&mut self, registry: &LintRegistry) {
         let sort = |rules: &mut Rules| {
-            rules
-                .inner
-                .sort_by_cached_key(|name, _| registry.selector_sort_key(name));
+            rules.inner.sort_by_cached_key(|name, _| {
+                if name.as_str() == "all" {
+                    0
+                } else if registry.is_alias(name) {
+                    1
+                } else {
+                    2
+                }
+            });
         };
 
         if let Some(rules) = &mut self.rules {
@@ -2531,9 +2536,10 @@ mod schema {
                     if lint.status.is_deprecated() {
                         object.insert("deprecated".to_string(), Value::Bool(true));
                     }
-                    if let Some(level) = lint.default_level() {
-                        object.insert("default".to_string(), Value::String(level.to_string()));
-                    }
+                    object.insert(
+                        "default".to_string(),
+                        Value::String(lint.default_level.to_string()),
+                    );
                     object.insert(
                         "oneOf".to_string(),
                         Value::Array(vec![level_schema.clone().into()]),

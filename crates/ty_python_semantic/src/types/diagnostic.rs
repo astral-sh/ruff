@@ -12,7 +12,7 @@ use super::{
 use crate::dependency::is_direct_dependency;
 use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::importer::{ImportAction, ImportRequest, MembersInScope};
-use crate::lint::{Level, LintId, LintMetadata, LintRegistryBuilder, LintStatus};
+use crate::lint::{Level, LintMetadata, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
 use crate::types::abstract_methods::AbstractMethods;
@@ -753,22 +753,14 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/mismatched-type-name.md")]
-    pub(crate) static MISMATCHED_TYPE_NAME = {
+    /// Name mismatches now have a separate rule for each kind of type.
+    static MISMATCHED_TYPE_NAME = {
         summary: "detects functional typing definitions whose declared name does not match the assigned variable",
-        status: LintStatus::deprecated(
+        status: LintStatus::removed(
             "0.0.108",
-            "Name mismatches now have a separate rule for each kind of type.",
-            &[
-                LintId::of(&MISMATCHED_ENUM_NAME),
-                LintId::of(&MISMATCHED_NAMEDTUPLE_NAME),
-                LintId::of(&MISMATCHED_NEWTYPE_NAME),
-                LintId::of(&MISMATCHED_PARAMSPEC_NAME),
-                LintId::of(&MISMATCHED_TYPE_ALIAS_NAME),
-                LintId::of(&MISMATCHED_TYPEDDICT_NAME),
-                LintId::of(&MISMATCHED_TYPEVAR_NAME),
-                LintId::of(&MISMATCHED_TYPEVARTUPLE_NAME),
-            ],
+            "Use `mismatched-enum-name`, `mismatched-namedtuple-name`, `mismatched-newtype-name`, \
+             `mismatched-paramspec-name`, `mismatched-type-alias-name`, `mismatched-typeddict-name`, \
+             `mismatched-typevar-name`, and/or `mismatched-typevartuple-name`.",
         ),
         default_level: Level::Warn,
     }

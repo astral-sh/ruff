@@ -13,8 +13,7 @@ struct Explanation<'a> {
     name: &'a str,
     summary: &'a str,
     documentation: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    default_level: Option<Level>,
+    default_level: Level,
     status: LintStatus,
 }
 
@@ -37,17 +36,13 @@ impl std::fmt::Display for Explanation<'_> {
         let status = match self.status {
             LintStatus::Preview { since } => format!("Preview (since {since})"),
             LintStatus::Stable { since } => format!("Stable (since {since})"),
-            LintStatus::Deprecated { since, reason, .. } => {
+            LintStatus::Deprecated { since, reason } => {
                 format!("Deprecated (since {since}): {reason}")
             }
             LintStatus::Removed { since, reason } => format!("Removed (since {since}): {reason}"),
         };
 
-        if let Some(level) = self.default_level {
-            writeln!(f, "Default level: {level} | {status}\n")?;
-        } else {
-            writeln!(f, "Default level: varies by replacement rule | {status}\n")?;
-        }
+        writeln!(f, "Default level: {} | {status}\n", self.default_level)?;
 
         f.write_str(self.documentation.trim())
     }
