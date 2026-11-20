@@ -1,15 +1,16 @@
-use std::ops::Deref;
+use crate::parser::syntax as id;
+use ruff_python_ast::AstNode as _;
+use ruff_python_ast::{Builder, Emit, ExprKind, FStringPartId, ListId, build};
+use std::iter;
 
 use bitflags::bitflags;
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
-use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    self as ast, AnyStringFlags, AtomicNodeIndex, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext,
-    FString, InterpolatedStringElement, InterpolatedStringElements, IpyEscapeKind, Number,
-    Operator, OperatorPrecedence, StringFlags, TString, UnaryOp,
+    self as ast, AnyStringFlags, BoolOp, CmpOp, ConversionFlag, ExprContext, IpyEscapeKind, Number,
+    Operator, OperatorPrecedence, StringFlags, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -155,7 +156,7 @@ impl<'src> Parser<'src> {
 
         if self.at(TokenKind::Comma) {
             let subsequent_context = context.disallow_yield_expressions();
-            Expr::Tuple(self.parse_tuple_expression(
+            id::Expr::from(self.parse_tuple_expression(
                 parsed_expr.expr,
                 start,
                 Parenthesized::No,
@@ -184,7 +185,7 @@ impl<'src> Parser<'src> {
         let parsed_expr = self.parse_conditional_expression_or_higher_impl(context);
 
         if self.at(TokenKind::ColonEqual) {
-            Expr::Named(self.parse_named_expression(parsed_expr.expr, start)).into()
+            id::Expr::from(self.parse_named_expression(parsed_expr.expr, start)).into()
         } else {
             parsed_expr
         }
@@ -211,13 +212,13 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         if self.at(TokenKind::Lambda) {
-            Expr::Lambda(self.parse_lambda_expr()).into()
+            id::Expr::from(self.parse_lambda_expr()).into()
         } else {
             let start = self.node_start();
             let parsed_expr = self.parse_simple_expression(context);
 
             if self.at(TokenKind::If) {
-                Expr::If(self.parse_if_expression(parsed_expr.expr, start)).into()
+                id::Expr::from(self.parse_if_expression(parsed_expr.expr, start)).into()
             } else {
                 parsed_expr
             }
@@ -296,10 +297,10 @@ impl<'src> Parser<'src> {
             }
 
             left.expr = match operator {
-                BinaryLikeOperator::Boolean(bool_op) => {
-                    Expr::BoolOp(self.parse_boolean_expression(left.expr, start, bool_op, context))
-                }
-                BinaryLikeOperator::Comparison(cmp_op) => Expr::Compare(
+                BinaryLikeOperator::Boolean(bool_op) => id::Expr::from(
+                    self.parse_boolean_expression(left.expr, start, bool_op, context),
+                ),
+                BinaryLikeOperator::Comparison(cmp_op) => id::Expr::from(
                     self.parse_comparison_expression(left.expr, start, cmp_op, context),
                 ),
                 BinaryLikeOperator::Binary(bin_op) => {
@@ -307,13 +308,15 @@ impl<'src> Parser<'src> {
 
                     let right = self.parse_binary_expression_or_higher(new_precedence, context);
 
-                    Expr::BinOp(ast::ExprBinOp {
-                        left: Box::new(left.expr),
-                        op: bin_op,
-                        right: Box::new(right.expr),
-                        range: self.node_range(start),
-                        node_index: AtomicNodeIndex::NONE,
-                    })
+                    id::Expr::from(
+                        build::ExprBinOp {
+                            left: left.expr,
+                            op: bin_op,
+                            right: right.expr,
+                            range: self.node_range(start),
+                        }
+                        .emit(&mut self.storage),
+                    )
                 }
             };
         }
@@ -347,7 +350,7 @@ impl<'src> Parser<'src> {
                             ParseErrorType::OtherError(
                                 "Boolean 'not' expression cannot be used here".to_string(),
                             ),
-                            &expr,
+                            self.storage.range(expr),
                         );
                     }
                 } else {
@@ -362,12 +365,12 @@ impl<'src> Parser<'src> {
                             ParseErrorType::OtherError(format!(
                                 "Unary '{unary_op}' expression cannot be used here",
                             )),
-                            &expr,
+                            self.storage.range(expr),
                         );
                     }
                 }
 
-                return Expr::UnaryOp(expr).into();
+                return id::Expr::from(expr).into();
             }
 
             match token {
@@ -379,11 +382,11 @@ impl<'src> Parser<'src> {
                     {
                         self.add_error(
                             ParseErrorType::InvalidStarredExpressionUsage,
-                            &starred_expr,
+                            self.storage.range(starred_expr),
                         );
                     }
 
-                    return Expr::Starred(starred_expr).into();
+                    return id::Expr::from(starred_expr).into();
                 }
                 TokenKind::Await => {
                     let await_expr = self.parse_await_expression();
@@ -394,18 +397,21 @@ impl<'src> Parser<'src> {
                             ParseErrorType::OtherError(
                                 "Await expression cannot be used here".to_string(),
                             ),
-                            &await_expr,
+                            self.storage.range(await_expr),
                         );
                     }
 
-                    return Expr::Await(await_expr).into();
+                    return id::Expr::from(await_expr).into();
                 }
                 TokenKind::Lambda => {
                     // Lambda expression isn't allowed in this context but we'll still parse it and
                     // report an error for better recovery.
                     let lambda_expr = self.parse_lambda_expr();
-                    self.add_error(ParseErrorType::InvalidLambdaExpressionUsage, &lambda_expr);
-                    return Expr::Lambda(lambda_expr).into();
+                    self.add_error(
+                        ParseErrorType::InvalidLambdaExpressionUsage,
+                        self.storage.range(lambda_expr),
+                    );
+                    return id::Expr::from(lambda_expr).into();
                 }
                 TokenKind::Yield => {
                     let expr = self.parse_yield_expression();
@@ -413,7 +419,10 @@ impl<'src> Parser<'src> {
                     if left_precedence > OperatorPrecedence::None
                         || !context.is_yield_expression_allowed()
                     {
-                        self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
+                        self.add_error(
+                            ParseErrorType::InvalidYieldExpressionUsage,
+                            self.storage.range(expr),
+                        );
                     }
 
                     return expr.into();
@@ -440,21 +449,18 @@ impl<'src> Parser<'src> {
             return parsed_expr;
         }
 
-        let expr_name = match parsed_expr.expr {
-            Expr::Compare(_) => "Comparison",
-            Expr::BoolOp(_)
-            | Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::Not,
-                ..
-            }) => "Boolean",
-            Expr::If(_) => "Conditional",
-            Expr::Lambda(_) => "Lambda",
+        let expr_name = match self.storage.get(parsed_expr.expr).classify() {
+            ExprKind::Compare(_) => "Comparison",
+            ExprKind::BoolOp(_) => "Boolean",
+            ExprKind::UnaryOp(node) if node.op() == ast::UnaryOp::Not => "Boolean",
+            ExprKind::If(_) => "Conditional",
+            ExprKind::Lambda(_) => "Lambda",
             _ => return parsed_expr,
         };
 
         self.add_error(
             ParseErrorType::OtherError(format!("{expr_name} expression cannot be used here")),
-            &parsed_expr,
+            self.storage.range(parsed_expr.expr),
         );
 
         parsed_expr
@@ -466,32 +472,29 @@ impl<'src> Parser<'src> {
     /// field will be [`ExprContext::Invalid`].
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
-    pub(super) fn parse_name(&mut self, context: ExpressionContext) -> ast::ExprName {
-        let identifier = self.parse_identifier_with_context(context);
-
-        let ctx = if identifier.is_valid() {
-            ExprContext::Load
-        } else {
+    pub(super) fn parse_name(&mut self, context: ExpressionContext) -> id::ExprName {
+        let value = self.parse_identifier_with_context(context);
+        let ctx = if value.range.is_empty() {
             ExprContext::Invalid
+        } else {
+            ExprContext::Load
         };
-
-        ast::ExprName {
-            range: identifier.range,
-            id: identifier.id,
+        build::ExprName {
+            range: value.range,
+            id: value.id,
             ctx,
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
-    pub(super) fn parse_missing_name(&mut self) -> ast::ExprName {
-        let identifier = self.parse_missing_identifier();
-
-        ast::ExprName {
-            range: identifier.range,
-            id: identifier.id,
+    pub(super) fn parse_missing_name(&mut self) -> id::ExprName {
+        let value = self.missing_identifier();
+        build::ExprName {
+            range: value.range,
+            id: value.id,
             ctx: ExprContext::Invalid,
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses an identifier.
@@ -499,31 +502,27 @@ impl<'src> Parser<'src> {
     /// For an invalid identifier, the `id` field will be an empty string.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
-    pub(super) fn parse_identifier(&mut self) -> ast::Identifier {
+    pub(super) fn parse_identifier(&mut self) -> id::Identifier {
         self.parse_identifier_with_context(ExpressionContext::default())
+            .emit(&mut self.storage)
     }
 
-    fn parse_identifier_with_context(&mut self, context: ExpressionContext) -> ast::Identifier {
+    pub(super) fn parse_identifier_with_context(
+        &mut self,
+        context: ExpressionContext,
+    ) -> build::Identifier {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Identifier) {
             let name = self.bump_identifier();
-            return ast::Identifier {
-                id: name,
-                range,
-                node_index: AtomicNodeIndex::NONE,
-            };
+            return build::Identifier { id: name, range };
         }
 
         if self.current_token_kind().is_soft_keyword() {
             let text = self.src_text(range);
             let id = self.intern_name(text);
             self.bump_soft_keyword_as_identifier();
-            return ast::Identifier {
-                id,
-                range,
-                node_index: AtomicNodeIndex::NONE,
-            };
+            return build::Identifier { id, range };
         }
 
         // test_err incomplete_attribute_before_for_in_delimiter
@@ -538,7 +537,7 @@ impl<'src> Parser<'src> {
                 || (self.at(TokenKind::Async) && self.peek() == TokenKind::For))
             || (context.is_in_excluded() && self.at(TokenKind::In))
         {
-            return self.parse_missing_identifier();
+            return self.missing_identifier();
         }
 
         if self.current_token_kind().is_keyword() {
@@ -554,26 +553,21 @@ impl<'src> Parser<'src> {
             let text = self.src_text(range);
             let id = self.intern_name(text);
             self.bump_any();
-            ast::Identifier {
-                id,
-                range,
-                node_index: AtomicNodeIndex::NONE,
-            }
+            build::Identifier { id, range }
         } else {
-            self.parse_missing_identifier()
+            self.missing_identifier()
         }
     }
 
-    fn parse_missing_identifier(&mut self) -> ast::Identifier {
+    fn missing_identifier(&mut self) -> build::Identifier {
         self.add_error(
             ParseErrorType::OtherError("Expected an identifier".into()),
             self.current_token_range(),
         );
 
-        ast::Identifier {
-            id: Name::empty(),
+        build::Identifier {
+            id: self.storage.intern_name(""),
             range: self.missing_node_range(),
-            node_index: AtomicNodeIndex::NONE,
         }
     }
 
@@ -588,61 +582,75 @@ impl<'src> Parser<'src> {
             TokenKind::Float => {
                 let value = self.bump_float();
 
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Float(value),
-                    range: self.node_range(start),
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                id::Expr::from(
+                    build::ExprNumberLiteral {
+                        value: Number::Float(value),
+                        range: self.node_range(start),
+                    }
+                    .emit(&mut self.storage),
+                )
             }
             TokenKind::Complex => {
                 let (real, imag) = self.bump_complex();
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Complex { real, imag },
-                    range: self.node_range(start),
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                id::Expr::from(
+                    build::ExprNumberLiteral {
+                        value: Number::Complex { real, imag },
+                        range: self.node_range(start),
+                    }
+                    .emit(&mut self.storage),
+                )
             }
             TokenKind::Int => {
                 let value = self.bump_int();
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Int(value),
-                    range: self.node_range(start),
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                id::Expr::from(
+                    build::ExprNumberLiteral {
+                        value: Number::Int(value),
+                        range: self.node_range(start),
+                    }
+                    .emit(&mut self.storage),
+                )
             }
             TokenKind::True => {
                 self.bump(TokenKind::True);
-                Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                    value: true,
-                    range: self.node_range(start),
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                id::Expr::from(
+                    build::ExprBooleanLiteral {
+                        value: true,
+                        range: self.node_range(start),
+                    }
+                    .emit(&mut self.storage),
+                )
             }
             TokenKind::False => {
                 self.bump(TokenKind::False);
-                Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                    value: false,
-                    range: self.node_range(start),
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                id::Expr::from(
+                    build::ExprBooleanLiteral {
+                        value: false,
+                        range: self.node_range(start),
+                    }
+                    .emit(&mut self.storage),
+                )
             }
             TokenKind::None => {
                 self.bump(TokenKind::None);
-                Expr::NoneLiteral(ast::ExprNoneLiteral {
-                    range: self.node_range(start),
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                id::Expr::from(
+                    build::ExprNoneLiteral {
+                        range: self.node_range(start),
+                    }
+                    .emit(&mut self.storage),
+                )
             }
             TokenKind::Ellipsis => {
                 self.bump(TokenKind::Ellipsis);
-                Expr::EllipsisLiteral(ast::ExprEllipsisLiteral {
-                    range: self.node_range(start),
-                    node_index: AtomicNodeIndex::NONE,
-                })
+                id::Expr::from(
+                    build::ExprEllipsisLiteral {
+                        range: self.node_range(start),
+                    }
+                    .emit(&mut self.storage),
+                )
             }
-            TokenKind::Identifier => Expr::Name(self.parse_name(context)),
+            TokenKind::Identifier => id::Expr::from(self.parse_name(context)),
             TokenKind::IpyEscapeCommand => {
-                Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
+                id::Expr::from(self.parse_ipython_escape_command_expression())
             }
             TokenKind::String | TokenKind::FStringStart | TokenKind::TStringStart => {
                 self.parse_strings()
@@ -657,28 +665,30 @@ impl<'src> Parser<'src> {
 
             kind => {
                 if kind.is_keyword() {
-                    Expr::Name(self.parse_name(context))
+                    id::Expr::from(self.parse_name(context))
                 } else {
                     self.add_error(
                         ParseErrorType::ExpectedExpression,
                         self.current_token_range(),
                     );
-                    Expr::Name(ast::ExprName {
-                        range: self.missing_node_range(),
-                        id: Name::empty(),
-                        ctx: ExprContext::Invalid,
-                        node_index: AtomicNodeIndex::NONE,
-                    })
+                    id::Expr::from(
+                        build::ExprName {
+                            range: self.missing_node_range(),
+                            id: self.storage.intern_name(""),
+                            ctx: ExprContext::Invalid,
+                        }
+                        .emit(&mut self.storage),
+                    )
                 }
             }
         };
 
         loop {
             lhs = match self.current_token_kind() {
-                TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
-                TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
+                TokenKind::Lpar => id::Expr::from(self.parse_call_expression(lhs, start)),
+                TokenKind::Lsqb => id::Expr::from(self.parse_subscript_expression(lhs, start)),
                 TokenKind::Dot => {
-                    Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
+                    id::Expr::from(self.parse_attribute_expression(lhs, start, context))
                 }
                 _ => break,
             };
@@ -700,16 +710,19 @@ impl<'src> Parser<'src> {
     /// If the parser isn't position at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
-    fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
+    fn parse_call_expression(&mut self, func: id::Expr, start: TextSize) -> id::ExprCall {
         let arguments = self.parse_arguments(ArgumentsContext::Call);
-        debug_assert_eq!(self.node_range(start).end(), arguments.end());
+        debug_assert_eq!(
+            self.node_range(start).end(),
+            self.storage.range(arguments).end()
+        );
 
-        ast::ExprCall {
-            func: Box::new(func),
+        build::ExprCall {
+            func,
             arguments,
-            range_start: start,
-            node_index: AtomicNodeIndex::NONE,
+            range: self.node_range(start),
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses an argument list.
@@ -719,19 +732,20 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#grammar-token-python-grammar-argument_list>
-    pub(super) fn parse_arguments(&mut self, context: ArgumentsContext) -> ast::Arguments {
+    pub(super) fn parse_arguments(&mut self, context: ArgumentsContext) -> id::Arguments {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
         if self.eat(TokenKind::Rpar) {
-            return ast::Arguments {
+            return build::Arguments {
                 range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-                items: ThinVec::new(),
-            };
+
+                items: ListId::default(),
+            }
+            .emit(&mut self.storage);
         }
 
-        let snapshot = self.argument_scratch.snapshot();
+        let items_snapshot = self.argument_scratch.snapshot();
         let mut bare_generators = SmallVec::<[TextRange; 1]>::new();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
@@ -740,17 +754,7 @@ impl<'src> Parser<'src> {
             self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
                 let argument_start = parser.node_start();
                 if parser.eat(TokenKind::DoubleStar) {
-                    let value = parser.parse_conditional_expression_or_higher();
-
-                    parser
-                        .argument_scratch
-                        .push(ast::Argument::Keyword(ast::Keyword {
-                            arg: None,
-                            value: Box::new(value.expr),
-                            range: parser.node_range(argument_start),
-                            node_index: AtomicNodeIndex::NONE,
-                        }));
-
+                    parser.parse_keyword_argument(argument_start, None);
                     seen_keyword_unpacking = true;
                 } else {
                     let start = parser.node_start();
@@ -759,16 +763,16 @@ impl<'src> Parser<'src> {
 
                     match parser.current_token_kind() {
                         TokenKind::Async | TokenKind::For => {
-                            if parsed_expr.is_unparenthesized_starred_expr() {
+                            if parsed_expr.is_unparenthesized_starred_expr(&parser.storage) {
                                 parser.add_unsupported_syntax_error(
                                     UnsupportedSyntaxErrorKind::UnpackingInComprehension(
                                         ComprehensionUnpackingKind::IterableInGenerator,
                                     ),
-                                    parsed_expr.range(),
+                                    parser.storage.range(parsed_expr.expr),
                                 );
                             }
 
-                            parsed_expr = Expr::Generator(parser.parse_generator_expression(
+                            parsed_expr = id::Expr::from(parser.parse_generator_expression(
                                 parsed_expr.expr,
                                 start,
                                 Parenthesized::No,
@@ -776,16 +780,16 @@ impl<'src> Parser<'src> {
                             .into();
                             // A recovered `expr = value` becomes a keyword and loses its left side.
                             if !parser.at(TokenKind::Equal) {
-                                bare_generators.push(parsed_expr.range());
+                                bare_generators.push(parser.storage.range(parsed_expr.expr));
                             }
                         }
                         _ => {
                             if seen_keyword_unpacking
-                                && parsed_expr.is_unparenthesized_starred_expr()
+                                && parsed_expr.is_unparenthesized_starred_expr(&parser.storage)
                             {
                                 parser.add_error(
                                     ParseErrorType::InvalidArgumentUnpackingOrder,
-                                    &parsed_expr,
+                                    parser.storage.range(parsed_expr.expr),
                                 );
                             }
                         }
@@ -794,10 +798,8 @@ impl<'src> Parser<'src> {
                     let arg_range = parser.node_range(start);
                     if parser.eat(TokenKind::Equal) {
                         seen_keyword_argument = true;
-                        let arg = if let ParsedExpr {
-                            expr: Expr::Name(ident_expr),
-                            is_parenthesized,
-                        } = parsed_expr
+                        let arg = if let Some(ident_expr) =
+                            parser.storage.get(parsed_expr.expr).cast::<ast::ExprName>()
                         {
                             // test_ok parenthesized_kwarg_py37
                             // # parse_options: {"target-version": "3.7"}
@@ -809,77 +811,62 @@ impl<'src> Parser<'src> {
                             // f((a) = 1)
                             // f( ( a ) = 1)
 
-                            if is_parenthesized {
+                            let name = ident_expr.build_id();
+                            if parsed_expr.is_parenthesized {
                                 parser.add_unsupported_syntax_error(
                                     UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName,
                                     arg_range,
                                 );
                             }
 
-                            ast::Identifier {
-                                id: ident_expr.id,
-                                range: ident_expr.range,
-                                node_index: AtomicNodeIndex::NONE,
-                            }
+                            parser.storage.take_name(name)
                         } else {
                             // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
                             // not a name expression. We could add the expression into `args` but
                             // that means the error is a missing comma instead.
                             parser.add_error(
                                 ParseErrorType::OtherError("Expected a parameter name".to_string()),
-                                &parsed_expr,
+                                parser.storage.range(parsed_expr.expr),
                             );
-                            ast::Identifier {
-                                id: Name::empty(),
-                                range: parsed_expr.range(),
-                                node_index: AtomicNodeIndex::NONE,
-                            }
+                            let id = parser.storage.intern_name("");
+                            parser.storage.add(build::Identifier {
+                                id,
+                                range: parser.storage.range(parsed_expr.expr),
+                            })
                         };
 
-                        let value = parser.parse_conditional_expression_or_higher();
-
-                        parser
-                            .argument_scratch
-                            .push(ast::Argument::Keyword(ast::Keyword {
-                                arg: Some(arg),
-                                value: Box::new(value.expr),
-                                range: parser.node_range(argument_start),
-                                node_index: AtomicNodeIndex::NONE,
-                            }));
+                        parser.parse_keyword_argument(argument_start, Some(arg));
                     } else {
-                        if !parsed_expr.is_unparenthesized_starred_expr() {
+                        if !parsed_expr.is_unparenthesized_starred_expr(&parser.storage) {
                             if seen_keyword_unpacking {
                                 parser.add_error(
                                     ParseErrorType::PositionalAfterKeywordUnpacking,
-                                    &parsed_expr,
+                                    parser.storage.range(parsed_expr.expr),
                                 );
                             } else if seen_keyword_argument {
                                 parser.add_error(
                                     ParseErrorType::PositionalAfterKeywordArgument,
-                                    &parsed_expr,
+                                    parser.storage.range(parsed_expr.expr),
                                 );
                             }
                         }
                         parser
                             .argument_scratch
-                            .push(ast::Argument::Positional(parsed_expr.expr));
+                            .push(ast::ArgumentId::Positional(parsed_expr.expr));
                     }
                 }
             });
 
         self.expect(TokenKind::Rpar);
 
-        let arguments = ast::Arguments {
-            range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
-            items: self.argument_scratch.take_thin_vec(snapshot),
-        };
-
+        let items = self
+            .argument_scratch
+            .take_range(items_snapshot, &mut self.storage);
         // A call may omit parentheses around its sole generator. Class bases always require them.
         if !bare_generators.is_empty()
             && (matches!(context, ArgumentsContext::ClassDefinition)
                 || has_trailing_comma
-                || arguments.len() > 1)
+                || items.len() > 1)
         {
             for range in bare_generators {
                 // test_ok args_unparenthesized_generator
@@ -894,8 +881,27 @@ impl<'src> Parser<'src> {
                 self.add_error(ParseErrorType::UnparenthesizedGeneratorExpression, range);
             }
         }
+        build::Arguments {
+            range: self.node_range(start),
+            items,
+        }
+        .emit(&mut self.storage)
+    }
 
-        arguments
+    fn parse_keyword_argument(
+        &mut self,
+        start: TextSize,
+        name: Option<ast::BuildId<ast::kind::Identifier>>,
+    ) {
+        let value = self.parse_conditional_expression_or_higher();
+        self.argument_scratch.push(ast::ArgumentId::Keyword(
+            build::Keyword {
+                arg: name,
+                value: value.expr,
+                range: self.node_range(start),
+            }
+            .emit(&mut self.storage),
+        ));
     }
 
     /// Parses a subscript expression.
@@ -907,14 +913,14 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#subscriptions>
     fn parse_subscript_expression(
         &mut self,
-        mut value: Expr,
+        value: id::Expr,
         start: TextSize,
-    ) -> ast::ExprSubscript {
+    ) -> id::ExprSubscript {
         self.bump(TokenKind::Lsqb);
 
         // To prevent the `value` context from being `Del` within a `del` statement,
         // we set the context as `Load` here.
-        helpers::set_expr_ctx(&mut value, ExprContext::Load);
+        self.storage.set_expr_context(value, ExprContext::Load);
 
         // Slice range doesn't include the `[` token.
         let slice_start = self.node_start();
@@ -924,18 +930,20 @@ impl<'src> Parser<'src> {
             let slice_range = self.node_range(slice_start);
             self.add_error(ParseErrorType::EmptySlice, slice_range);
 
-            return ast::ExprSubscript {
-                value: Box::new(value),
-                slice: Box::new(Expr::Name(ast::ExprName {
-                    range: slice_range,
-                    id: Name::empty(),
-                    ctx: ExprContext::Invalid,
-                    node_index: AtomicNodeIndex::NONE,
-                })),
+            return build::ExprSubscript {
+                value,
+                slice: id::Expr::from(
+                    build::ExprName {
+                        range: slice_range,
+                        id: self.storage.intern_name(""),
+                        ctx: ExprContext::Invalid,
+                    }
+                    .emit(&mut self.storage),
+                ),
                 ctx: ExprContext::Load,
                 range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-            };
+            }
+            .emit(&mut self.storage);
         }
 
         let mut slice = self.parse_slice();
@@ -951,24 +959,30 @@ impl<'src> Parser<'src> {
                 parser.expr_scratch.push(slice);
             });
 
-            slice = Expr::Tuple(ast::ExprTuple {
-                elts: self.expr_scratch.take(slices_snapshot),
-                ctx: ExprContext::Load,
-                range: self.node_range(slice_start),
-                parenthesized: false,
-                node_index: AtomicNodeIndex::NONE,
-            });
-        } else if slice.is_starred_expr() {
+            slice = id::Expr::from(
+                build::ExprTuple {
+                    elts: self
+                        .expr_scratch
+                        .take_range(slices_snapshot, &mut self.storage),
+                    ctx: ExprContext::Load,
+                    range: self.node_range(slice_start),
+                    parenthesized: false,
+                }
+                .emit(&mut self.storage),
+            );
+        } else if self.storage.get(slice).is_starred_expr() {
             // If the only slice element is a starred expression, that is represented
             // using a tuple expression with a single element. This is the second case
             // in the `slices` rule in the Python grammar.
-            slice = Expr::Tuple(ast::ExprTuple {
-                elts: vec![slice],
-                ctx: ExprContext::Load,
-                range: self.node_range(slice_start),
-                parenthesized: false,
-                node_index: AtomicNodeIndex::NONE,
-            });
+            slice = id::Expr::from(
+                build::ExprTuple {
+                    elts: self.storage.list([slice]),
+                    ctx: ExprContext::Load,
+                    range: self.node_range(slice_start),
+                    parenthesized: false,
+                }
+                .emit(&mut self.storage),
+            );
         }
 
         self.expect(TokenKind::Rsqb);
@@ -997,33 +1011,21 @@ impl<'src> Parser<'src> {
         // test_ok parenthesized_star_index_py310
         // # parse_options: {"target-version": "3.10"}
         // out[(*(slice(None) for _ in range(2)), *ind)] = 1
-        if let Expr::Tuple(ast::ExprTuple {
-            elts,
-            parenthesized: false,
-            ..
-        }) = &slice
-        {
-            for elt in elts.iter().filter(|elt| elt.is_starred_expr()) {
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::StarExpressionInIndex,
-                    elt.range(),
-                );
-            }
-        }
+        self.check_tuple_unpacking(slice, UnsupportedSyntaxErrorKind::StarExpressionInIndex);
 
-        ast::ExprSubscript {
-            value: Box::new(value),
-            slice: Box::new(slice),
+        build::ExprSubscript {
+            value,
+            slice,
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a slice expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#slicings>
-    fn parse_slice(&mut self) -> Expr {
+    fn parse_slice(&mut self) -> id::Expr {
         const UPPER_END_SET: TokenSet =
             TokenSet::new([TokenKind::Comma, TokenKind::Colon, TokenKind::Rsqb])
                 .union(NEWLINE_EOF_SET);
@@ -1060,12 +1062,12 @@ impl<'src> Parser<'src> {
                 // test_err unparenthesized_named_expr_index_py38
                 // # parse_options: {"target-version": "3.8"}
                 // lst[x:=1]
-                if lower.is_unparenthesized_named_expr() {
+                if lower.is_unparenthesized_named_expr(&self.storage) {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
                             UnparenthesizedNamedExprKind::SequenceIndex,
                         ),
-                        lower.range(),
+                        self.storage.range(lower.expr),
                     );
                 }
                 return lower.expr;
@@ -1073,12 +1075,18 @@ impl<'src> Parser<'src> {
 
             // Now we know we're in a slice.
             if !lower.is_parenthesized {
-                match lower.expr {
-                    Expr::Starred(_) => {
-                        self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &lower);
+                match self.storage.get(lower.expr).node_kind() {
+                    ast::NodeKind::ExprStarred => {
+                        self.add_error(
+                            ParseErrorType::InvalidStarredExpressionUsage,
+                            self.storage.range(lower.expr),
+                        );
                     }
-                    Expr::Named(_) => {
-                        self.add_error(ParseErrorType::UnparenthesizedNamedExpression, &lower);
+                    ast::NodeKind::ExprNamed => {
+                        self.add_error(
+                            ParseErrorType::UnparenthesizedNamedExpression,
+                            self.storage.range(lower.expr),
+                        );
                     }
                     _ => {}
                 }
@@ -1091,30 +1099,31 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Colon);
 
-        let lower = lower.map(Box::new);
         let upper = if self.at_ts(UPPER_END_SET) {
             None
         } else {
-            Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+            Some(self.parse_conditional_expression_or_higher().expr)
         };
 
         let step = if self.eat(TokenKind::Colon) {
             if self.at_ts(STEP_END_SET) {
                 None
             } else {
-                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
+                Some(self.parse_conditional_expression_or_higher().expr)
             }
         } else {
             None
         };
 
-        Expr::Slice(ast::ExprSlice {
-            range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
-            lower,
-            upper,
-            step,
-        })
+        id::Expr::from(
+            build::ExprSlice {
+                range: self.node_range(start),
+                lower,
+                upper,
+                step,
+            }
+            .emit(&mut self.storage),
+        )
     }
 
     /// Parses a unary expression.
@@ -1131,18 +1140,18 @@ impl<'src> Parser<'src> {
         &mut self,
         op: UnaryOp,
         context: ExpressionContext,
-    ) -> ast::ExprUnaryOp {
+    ) -> id::ExprUnaryOp {
         let start = self.node_start();
         self.bump(TokenKind::from(op));
 
         let operand = self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
 
-        ast::ExprUnaryOp {
+        build::ExprUnaryOp {
             op,
-            operand: Box::new(operand.expr),
+            operand: operand.expr,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses an attribute expression.
@@ -1154,21 +1163,23 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#attribute-references>
     pub(super) fn parse_attribute_expression(
         &mut self,
-        value: Expr,
+        value: id::Expr,
         start: TextSize,
         context: ExpressionContext,
-    ) -> ast::ExprAttribute {
+    ) -> id::ExprAttribute {
         self.bump(TokenKind::Dot);
 
-        let attr = self.parse_identifier_with_context(context);
+        let attr = self
+            .parse_identifier_with_context(context)
+            .emit(&mut self.storage);
 
-        ast::ExprAttribute {
-            value: Box::new(value),
+        build::ExprAttribute {
+            value,
             attr,
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a boolean operation expression.
@@ -1183,11 +1194,11 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#boolean-operations>
     fn parse_boolean_expression(
         &mut self,
-        lhs: Expr,
+        lhs: id::Expr,
         start: TextSize,
         op: BoolOp,
         context: ExpressionContext,
-    ) -> ast::ExprBoolOp {
+    ) -> id::ExprBoolOp {
         self.bump(TokenKind::from(op));
 
         let values_snapshot = self.expr_scratch.snapshot();
@@ -1208,12 +1219,14 @@ impl<'src> Parser<'src> {
             }
         }
 
-        ast::ExprBoolOp {
-            values: self.expr_scratch.take(values_snapshot),
+        build::ExprBoolOp {
+            values: self
+                .expr_scratch
+                .take_range(values_snapshot, &mut self.storage),
             op,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Bump the appropriate token(s) for the given comparison operator.
@@ -1251,16 +1264,16 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#comparisons>
     fn parse_comparison_expression(
         &mut self,
-        lhs: Expr,
+        lhs: id::Expr,
         start: TextSize,
         op: CmpOp,
         context: ExpressionContext,
-    ) -> ast::ExprCompare {
+    ) -> id::ExprCompare {
         self.bump_cmp_op(op);
 
         let operands_snapshot = self.expr_scratch.snapshot();
         self.expr_scratch.push(lhs);
-        let mut operators = vec![op];
+        let mut additional_ops = ThinVec::new();
 
         let mut progress = ParserProgress::default();
 
@@ -1287,15 +1300,17 @@ impl<'src> Parser<'src> {
             };
 
             self.bump_cmp_op(next_op);
-            operators.push(next_op);
+            additional_ops.push(next_op);
         }
 
-        ast::ExprCompare {
-            ops: operators.into_boxed_slice(),
-            operands: self.expr_scratch.take(operands_snapshot),
+        build::ExprCompare {
+            ops: self.storage.list(iter::once(op).chain(additional_ops)),
+            operands: self
+                .expr_scratch
+                .take_range(operands_snapshot, &mut self.storage),
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses all kinds of strings and implicitly concatenated strings.
@@ -1305,7 +1320,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `String`, `FStringStart`, or `TStringStart` token.
     ///
     /// See: <https://docs.python.org/3/reference/grammar.html> (Search "strings:")
-    pub(super) fn parse_strings(&mut self) -> Expr {
+    pub(super) fn parse_strings(&mut self) -> id::Expr {
         const STRING_START_SET: TokenSet = TokenSet::new([
             TokenKind::String,
             TokenKind::FStringStart,
@@ -1316,7 +1331,38 @@ impl<'src> Parser<'src> {
         let first = self.parse_string();
 
         if !self.at_ts(STRING_START_SET) {
-            return first.into();
+            let range = first.range(&self.storage);
+
+            return match first {
+                StringType::Str(value) => build::ExprStringLiteral {
+                    range,
+
+                    value: self.storage.list([value]),
+                }
+                .emit(&mut self.storage)
+                .into(),
+                StringType::Bytes(value) => build::ExprBytesLiteral {
+                    range,
+
+                    value: self.storage.list([value]),
+                }
+                .emit(&mut self.storage)
+                .into(),
+                StringType::FString(value) => build::ExprFString {
+                    range,
+
+                    value: self.storage.list([FStringPartId::FString(value)]),
+                }
+                .emit(&mut self.storage)
+                .into(),
+                StringType::TString(value) => build::ExprTString {
+                    range,
+
+                    value: self.storage.list([value]),
+                }
+                .emit(&mut self.storage)
+                .into(),
+            };
         }
 
         let mut strings = Vec::with_capacity(2);
@@ -1340,7 +1386,7 @@ impl<'src> Parser<'src> {
         } else if self.at(TokenKind::FStringStart) {
             StringType::FString(
                 self.parse_interpolated_string(InterpolatedStringKind::FString)
-                    .into(),
+                    .into_fstring(&mut self.storage),
             )
         } else if self.at(TokenKind::TStringStart) {
             // test_ok template_strings_py314
@@ -1358,11 +1404,11 @@ impl<'src> Parser<'src> {
             // happening?"""
             let string_type = StringType::TString(
                 self.parse_interpolated_string(InterpolatedStringKind::TString)
-                    .into(),
+                    .into_tstring(&mut self.storage),
             );
             self.add_unsupported_syntax_error(
                 UnsupportedSyntaxErrorKind::TemplateStrings,
-                string_type.range(),
+                string_type.range(&self.storage),
             );
             string_type
         } else {
@@ -1379,7 +1425,7 @@ impl<'src> Parser<'src> {
         &mut self,
         strings: Vec<StringType>,
         range: TextRange,
-    ) -> Expr {
+    ) -> id::Expr {
         assert!(strings.len() > 1);
 
         let mut has_fstring = false;
@@ -1424,18 +1470,17 @@ impl<'src> Parser<'src> {
             // otherwise, we'll try either string, t-string, or f-string. This is to retain
             // as much information as possible.
             else {
-                let mut values = Vec::with_capacity(strings.len());
-                for string in strings {
-                    values.push(match string {
-                        StringType::Bytes(value) => value,
-                        _ => unreachable!("Expected `StringType::Bytes`"),
-                    });
-                }
-                return Expr::from(ast::ExprBytesLiteral {
-                    value: ast::BytesLiteralValue::concatenated(values),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
+                let values = strings.into_iter().filter_map(|string| match string {
+                    StringType::Bytes(value) => Some(value),
+                    _ => None,
                 });
+                return id::Expr::from(
+                    build::ExprBytesLiteral {
+                        value: self.storage.list(values),
+                        range,
+                    }
+                    .emit(&mut self.storage),
+                );
             }
         } else if has_tstring {
             if tstring_count < strings.len() {
@@ -1445,18 +1490,17 @@ impl<'src> Parser<'src> {
             // otherwise, we'll try either string or f-string. This is to retain
             // as much information as possible.
             else {
-                let mut values = Vec::with_capacity(strings.len());
-                for string in strings {
-                    values.push(match string {
-                        StringType::TString(value) => value,
-                        _ => unreachable!("Expected `StringType::TString`"),
-                    });
-                }
-                return Expr::from(ast::ExprTString {
-                    value: ast::TStringValue::concatenated(values),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
+                let values = strings.into_iter().filter_map(|string| match string {
+                    StringType::TString(value) => Some(value),
+                    _ => None,
                 });
+                return id::Expr::from(
+                    build::ExprTString {
+                        value: self.storage.list(values),
+                        range,
+                    }
+                    .emit(&mut self.storage),
+                );
             }
         }
 
@@ -1483,41 +1527,40 @@ impl<'src> Parser<'src> {
         // 2 + 2
 
         if !has_fstring && !has_tstring {
-            let mut values = Vec::with_capacity(strings.len());
-            for string in strings {
-                values.push(match string {
+            let value = self
+                .storage
+                .map_list(strings, |builder, string| match string {
                     StringType::Str(value) => value,
-                    _ => ast::StringLiteral::invalid(string.range()),
+                    other => Self::invalid_string_literal(builder, other.range(builder)),
                 });
-            }
-            return Expr::from(ast::ExprStringLiteral {
-                value: ast::StringLiteralValue::concatenated(values),
-                range,
-                node_index: AtomicNodeIndex::NONE,
+            return id::Expr::from(
+                build::ExprStringLiteral { value, range }.emit(&mut self.storage),
+            );
+        }
+
+        let value = self
+            .storage
+            .map_list(strings, |builder, string| match string {
+                StringType::FString(fstring) => FStringPartId::FString(fstring),
+                StringType::Str(literal) => FStringPartId::Literal(literal),
+                // Mixed bytes and template strings become invalid literal parts for recovery.
+                other => FStringPartId::Literal(Self::invalid_string_literal(
+                    builder,
+                    other.range(builder),
+                )),
             });
-        }
 
-        let mut parts = Vec::with_capacity(strings.len());
-        for string in strings {
-            match string {
-                StringType::FString(fstring) => parts.push(ast::FStringPart::FString(fstring)),
-                StringType::Str(string) => parts.push(ast::FStringPart::Literal(string)),
-                // Bytes and Template strings are invalid at this point
-                // and stored as invalid string literal parts in the
-                // f-string
-                StringType::TString(tstring) => parts.push(ast::FStringPart::Literal(
-                    ast::StringLiteral::invalid(tstring.range()),
-                )),
-                StringType::Bytes(bytes) => parts.push(ast::FStringPart::Literal(
-                    ast::StringLiteral::invalid(bytes.range()),
-                )),
-            }
-        }
+        id::Expr::from(build::ExprFString { value, range }.emit(&mut self.storage))
+    }
 
-        Expr::from(ast::ExprFString {
-            value: ast::FStringValue::concatenated(parts),
+    fn invalid_string_literal(
+        builder: &mut Builder,
+        range: TextRange,
+    ) -> ast::BuildId<ast::kind::StringLiteral> {
+        builder.add(build::StringLiteral {
             range,
-            node_index: AtomicNodeIndex::NONE,
+            value: "",
+            flags: ast::StringLiteralFlags::empty().with_invalid(),
         })
     }
 
@@ -1556,7 +1599,7 @@ impl<'src> Parser<'src> {
 
         let value = self.bump_string_value();
 
-        match parse_string_literal(value, flags, range) {
+        match parse_string_literal(&mut self.storage, value, flags, range) {
             Ok(string) => string,
             Err(error) => {
                 let location = error.location();
@@ -1567,22 +1610,26 @@ impl<'src> Parser<'src> {
                     // b'123a𝐁c'
                     // rb"a𝐁c123"
                     // b"""123a𝐁c"""
-                    StringType::Bytes(ast::BytesLiteral {
-                        value: Box::new([]),
-                        range,
-                        flags: ast::BytesLiteralFlags::from(flags).with_invalid(),
-                        node_index: AtomicNodeIndex::NONE,
-                    })
+                    StringType::Bytes(
+                        build::BytesLiteral {
+                            value: &[],
+                            range,
+                            flags: ast::BytesLiteralFlags::from(flags).with_invalid(),
+                        }
+                        .emit(&mut self.storage),
+                    )
                 } else {
                     // test_err invalid_string_literal
                     // 'hello \N{INVALID} world'
                     // """hello \N{INVALID} world"""
-                    StringType::Str(ast::StringLiteral {
-                        value: "".into(),
-                        range,
-                        flags: ast::StringLiteralFlags::from(flags).with_invalid(),
-                        node_index: AtomicNodeIndex::NONE,
-                    })
+                    StringType::Str(
+                        build::StringLiteral {
+                            value: "",
+                            range,
+                            flags: ast::StringLiteralFlags::from(flags).with_invalid(),
+                        }
+                        .emit(&mut self.storage),
+                    )
                 }
             }
         }
@@ -1658,38 +1705,40 @@ impl<'src> Parser<'src> {
         flags: ast::AnyStringFlags,
         elements_kind: InterpolatedStringElementsKind,
         string_kind: InterpolatedStringKind,
-    ) -> ast::InterpolatedStringElements {
-        let mut elements = vec![];
+    ) -> ListId<ast::AstNodeId<ast::kind::InterpolatedStringElement>> {
+        let mut elements = SmallVec::<[_; 1]>::new();
         let middle_token_kind = string_kind.middle_token();
 
         self.parse_list(
             RecoveryContextKind::InterpolatedStringElements(elements_kind),
             |parser| {
                 let element = match parser.current_token_kind() {
-                    TokenKind::Lbrace => ast::InterpolatedStringElement::from(
+                    TokenKind::Lbrace => id::InterpolatedStringElement::from(
                         parser.parse_interpolated_element(flags, string_kind),
                     ),
                     tok if tok == middle_token_kind => {
                         let range = parser.current_token_range();
                         let value = parser.current_token_text();
                         parser.bump(middle_token_kind);
-                        InterpolatedStringElement::Literal(
-                            parse_interpolated_string_literal_element(value, flags, range)
-                                .unwrap_or_else(|lex_error| {
-                                    // test_err invalid_fstring_literal_element
-                                    // f'hello \N{INVALID} world'
-                                    // f"""hello \N{INVALID} world"""
-                                    let location = lex_error.location();
-                                    parser.add_error(
-                                        ParseErrorType::Lexical(lex_error.into_error()),
-                                        location,
-                                    );
-                                    ast::InterpolatedStringLiteralElement {
-                                        value: "".into(),
-                                        range,
-                                        node_index: AtomicNodeIndex::NONE,
-                                    }
-                                }),
+                        id::InterpolatedStringElement::from(
+                            parse_interpolated_string_literal_element(
+                                &mut parser.storage,
+                                value,
+                                flags,
+                                range,
+                            )
+                            .unwrap_or_else(|lex_error| {
+                                // test_err invalid_fstring_literal_element
+                                // f'hello \N{INVALID} world'
+                                // f"""hello \N{INVALID} world"""
+                                let location = lex_error.location();
+                                parser.add_error(
+                                    ParseErrorType::Lexical(lex_error.into_error()),
+                                    location,
+                                );
+                                build::InterpolatedStringLiteralElement { value: "", range }
+                                    .emit(&mut parser.storage)
+                            }),
                         )
                     }
                     // `Invalid` tokens are created when there's a lexical error, so
@@ -1713,7 +1762,7 @@ impl<'src> Parser<'src> {
             },
         );
 
-        ast::InterpolatedStringElements::from(elements)
+        self.storage.list(elements)
     }
 
     /// Parses an f/t-string expression element.
@@ -1725,7 +1774,7 @@ impl<'src> Parser<'src> {
         &mut self,
         flags: ast::AnyStringFlags,
         string_kind: InterpolatedStringKind,
-    ) -> ast::InterpolatedElement {
+    ) -> id::InterpolatedElement {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
@@ -1756,7 +1805,7 @@ impl<'src> Parser<'src> {
 
         let value = self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
-        if !value.is_parenthesized && value.expr.is_lambda_expr() {
+        if !value.is_parenthesized && self.storage.get(value.expr).is_lambda_expr() {
             // TODO(dhruvmanila): This requires making some changes in lambda expression
             // parsing logic to handle the emitted `FStringMiddle` token in case the
             // lambda expression is not parenthesized.
@@ -1772,15 +1821,21 @@ impl<'src> Parser<'src> {
                     InterpolatedStringErrorType::LambdaWithoutParentheses,
                     string_kind,
                 ),
-                value.range(),
+                self.storage.range(value.expr),
             );
         }
         let debug_text = if self.eat(TokenKind::Equal) {
-            let leading_range = TextRange::new(start + "{".text_len(), value.start());
-            let trailing_range = TextRange::new(value.end(), self.current_token_range().start());
+            let leading_range = TextRange::new(
+                start + "{".text_len(),
+                self.storage.range(value.expr).start(),
+            );
+            let trailing_range = TextRange::new(
+                self.storage.range(value.expr).end(),
+                self.current_token_range().start(),
+            );
             Some(ast::DebugText::new(
                 self.src_text(leading_range),
-                self.src_text(value.range()),
+                self.src_text(self.storage.range(value.expr)),
                 self.src_text(trailing_range),
             ))
         } else {
@@ -1808,7 +1863,7 @@ impl<'src> Parser<'src> {
                     );
                 }
                 let name = self.bump_identifier();
-                match &*name {
+                match self.storage.name(name).as_str() {
                     "s" => ConversionFlag::Str,
                     "r" => ConversionFlag::Repr,
                     "a" => ConversionFlag::Ascii,
@@ -1862,11 +1917,13 @@ impl<'src> Parser<'src> {
                     string_kind,
                 )
             });
-            Some(Box::new(ast::InterpolatedStringFormatSpec {
-                range: self.node_range(spec_start),
-                elements,
-                node_index: AtomicNodeIndex::NONE,
-            }))
+            Some(
+                build::InterpolatedStringFormatSpec {
+                    range: self.node_range(spec_start),
+                    elements,
+                }
+                .emit(&mut self.storage),
+            )
         } else {
             None
         };
@@ -1994,8 +2051,9 @@ impl<'src> Parser<'src> {
             // debug text, but exclude the format spec, where escapes and escaped, reused quotes
             // are allowed.
             let range = format_spec
-                .as_ref()
-                .map(|format_spec| TextRange::new(range.start(), format_spec.start()))
+                .map(|format_spec| {
+                    TextRange::new(range.start(), self.storage.range(format_spec).start())
+                })
                 .unwrap_or(range);
 
             let quote_bytes = flags.quote_str().as_bytes();
@@ -2036,14 +2094,14 @@ impl<'src> Parser<'src> {
             }
         }
 
-        ast::InterpolatedElement {
-            expression: Box::new(value.expr),
+        build::InterpolatedElement {
+            expression: value.expr,
             debug_text,
             conversion,
             format_spec,
             range,
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a list or a list comprehension expression.
@@ -2053,7 +2111,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `[` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#list-displays>
-    fn parse_list_like_expression(&mut self) -> Expr {
+    fn parse_list_like_expression(&mut self) -> id::Expr {
         let start = self.node_start();
 
         self.bump(TokenKind::Lsqb);
@@ -2068,12 +2126,14 @@ impl<'src> Parser<'src> {
 
         // Return an empty `ListExpr` when finding a `]` right after the `[`
         if self.eat(TokenKind::Rsqb) {
-            return Expr::List(ast::ExprList {
-                elts: vec![],
-                ctx: ExprContext::Load,
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-            });
+            return id::Expr::from(
+                build::ExprList {
+                    elts: ListId::default(),
+                    ctx: ExprContext::Load,
+                    range: self.node_range(start),
+                }
+                .emit(&mut self.storage),
+            );
         }
 
         // Parse the first element with a more general rule and limit it later.
@@ -2094,18 +2154,18 @@ impl<'src> Parser<'src> {
                 // test_err starred_list_comp_py314
                 // # parse_options: {"target-version": "3.14"}
                 // [*x for x in y]
-                if first_element.is_unparenthesized_starred_expr() {
+                if first_element.is_unparenthesized_starred_expr(&self.storage) {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::UnpackingInComprehension(
                             ComprehensionUnpackingKind::IterableInList,
                         ),
-                        first_element.range(),
+                        self.storage.range(first_element.expr),
                     );
                 }
 
-                Expr::ListComp(self.parse_list_comprehension_expression(first_element.expr, start))
+                id::Expr::from(self.parse_list_comprehension_expression(first_element.expr, start))
             }
-            _ => Expr::List(self.parse_list_expression(first_element.expr, start)),
+            _ => id::Expr::from(self.parse_list_expression(first_element.expr, start)),
         }
     }
 
@@ -2119,7 +2179,7 @@ impl<'src> Parser<'src> {
     /// - <https://docs.python.org/3/reference/expressions.html#set-displays>
     /// - <https://docs.python.org/3/reference/expressions.html#dictionary-displays>
     /// - <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
-    fn parse_set_or_dict_like_expression(&mut self) -> Expr {
+    fn parse_set_or_dict_like_expression(&mut self) -> id::Expr {
         // test_ok pep_798_unpacking_comprehensions_py315
         // # parse_options: {"target-version": "3.15"}
         // [*x for x in y]
@@ -2160,11 +2220,13 @@ impl<'src> Parser<'src> {
 
         // Return an empty `DictExpr` when finding a `}` right after the `{`
         if self.eat(TokenKind::Rbrace) {
-            return Expr::Dict(ast::ExprDict {
-                items: vec![],
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-            });
+            return id::Expr::from(
+                build::ExprDict {
+                    items: ListId::default(),
+                    range: self.node_range(start),
+                }
+                .emit(&mut self.storage),
+            );
         }
 
         let after_brace = self.node_start();
@@ -2173,7 +2235,7 @@ impl<'src> Parser<'src> {
             // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
             // which requires limiting the expression.
             let value = self.parse_expression_with_bitwise_or_precedence();
-            let unpack_range = TextRange::new(after_brace, value.range().end());
+            let unpack_range = TextRange::new(after_brace, self.storage.range(value.expr).end());
 
             if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
                 self.add_unsupported_syntax_error(
@@ -2183,7 +2245,7 @@ impl<'src> Parser<'src> {
                     unpack_range,
                 );
 
-                return Expr::DictComp(
+                return id::Expr::from(
                     self.parse_dictionary_comprehension_expression(None, value.expr, start),
                 );
             }
@@ -2195,21 +2257,27 @@ impl<'src> Parser<'src> {
                 let dict_value = self.parse_conditional_expression_or_higher();
 
                 if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
-                    return Expr::DictComp(self.parse_dictionary_comprehension_expression(
+                    return id::Expr::from(self.parse_dictionary_comprehension_expression(
                         Some(value.expr),
                         dict_value.expr,
                         start,
                     ));
                 }
 
-                return Expr::Dict(self.parse_dictionary_expression(
+                return id::Expr::from(self.parse_dictionary_expression(
                     Some(value.expr),
                     dict_value.expr,
+                    after_brace,
                     start,
                 ));
             }
 
-            return Expr::Dict(self.parse_dictionary_expression(None, value.expr, start));
+            return id::Expr::from(self.parse_dictionary_expression(
+                None,
+                value.expr,
+                after_brace,
+                start,
+            ));
         }
 
         // For dictionary expressions, the key uses the `expression` rule while for
@@ -2221,14 +2289,14 @@ impl<'src> Parser<'src> {
 
         match self.current_token_kind() {
             TokenKind::Async | TokenKind::For => {
-                if key_or_element.is_unparenthesized_starred_expr() {
+                if key_or_element.is_unparenthesized_starred_expr(&self.storage) {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::UnpackingInComprehension(
                             ComprehensionUnpackingKind::IterableInSet,
                         ),
-                        key_or_element.range(),
+                        self.storage.range(key_or_element.expr),
                     );
-                } else if key_or_element.is_unparenthesized_named_expr() {
+                } else if key_or_element.is_unparenthesized_named_expr(&self.storage) {
                     // test_ok parenthesized_named_expr_py38
                     // # parse_options: {"target-version": "3.8"}
                     // {(x := 1), 2, 3}
@@ -2246,24 +2314,24 @@ impl<'src> Parser<'src> {
                         UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
                             UnparenthesizedNamedExprKind::SetComprehension,
                         ),
-                        key_or_element.range(),
+                        self.storage.range(key_or_element.expr),
                     );
                 }
 
-                Expr::SetComp(self.parse_set_comprehension_expression(key_or_element.expr, start))
+                id::Expr::from(self.parse_set_comprehension_expression(key_or_element.expr, start))
             }
             TokenKind::Colon => {
                 // Now, we know that it's either a dictionary expression or a dictionary comprehension.
                 // In either case, the key is limited to an `expression`.
                 if !key_or_element.is_parenthesized {
-                    match key_or_element.expr {
-                        Expr::Starred(_) => self.add_error(
+                    match self.storage.get(key_or_element.expr).node_kind() {
+                        ast::NodeKind::ExprStarred => self.add_error(
                             ParseErrorType::InvalidStarredExpressionUsage,
-                            &key_or_element.expr,
+                            self.storage.range(key_or_element.expr),
                         ),
-                        Expr::Named(_) => self.add_error(
+                        ast::NodeKind::ExprNamed => self.add_error(
                             ParseErrorType::UnparenthesizedNamedExpression,
-                            &key_or_element,
+                            self.storage.range(key_or_element.expr),
                         ),
                         _ => {}
                     }
@@ -2276,7 +2344,7 @@ impl<'src> Parser<'src> {
                     let value = self.parse_expression_with_bitwise_or_precedence();
                     self.add_error(
                         ParseErrorType::InvalidStarredExpressionUsage,
-                        TextRange::new(unpack_start, value.range().end()),
+                        TextRange::new(unpack_start, self.storage.range(value.expr).end()),
                     );
                     value
                 } else {
@@ -2284,20 +2352,21 @@ impl<'src> Parser<'src> {
                 };
 
                 if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
-                    Expr::DictComp(self.parse_dictionary_comprehension_expression(
+                    id::Expr::from(self.parse_dictionary_comprehension_expression(
                         Some(key_or_element.expr),
                         value.expr,
                         start,
                     ))
                 } else {
-                    Expr::Dict(self.parse_dictionary_expression(
+                    id::Expr::from(self.parse_dictionary_expression(
                         Some(key_or_element.expr),
                         value.expr,
+                        after_brace,
                         start,
                     ))
                 }
             }
-            _ => Expr::Set(self.parse_set_expression(key_or_element, start)),
+            _ => id::Expr::from(self.parse_set_expression(key_or_element, start)),
         }
     }
 
@@ -2321,13 +2390,16 @@ impl<'src> Parser<'src> {
 
         // Return an empty `TupleExpr` when finding a `)` right after the `(`
         if self.eat(TokenKind::Rpar) {
-            return Expr::Tuple(ast::ExprTuple {
-                elts: vec![],
-                ctx: ExprContext::Load,
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-                parenthesized: true,
-            })
+            return id::Expr::from(
+                build::ExprTuple {
+                    elts: ListId::default(),
+                    ctx: ExprContext::Load,
+                    range: self.node_range(start),
+
+                    parenthesized: true,
+                }
+                .emit(&mut self.storage),
+            )
             .into();
         }
 
@@ -2352,16 +2424,16 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Async | TokenKind::For => {
                 // grammar: `genexp`
-                if parsed_expr.is_unparenthesized_starred_expr() {
+                if parsed_expr.is_unparenthesized_starred_expr(&self.storage) {
                     self.add_unsupported_syntax_error(
                         UnsupportedSyntaxErrorKind::UnpackingInComprehension(
                             ComprehensionUnpackingKind::IterableInGenerator,
                         ),
-                        parsed_expr.range(),
+                        self.storage.range(parsed_expr.expr),
                     );
                 }
 
-                let generator = Expr::Generator(self.parse_generator_expression(
+                let generator = id::Expr::from(self.parse_generator_expression(
                     parsed_expr.expr,
                     start,
                     Parenthesized::Yes,
@@ -2374,8 +2446,11 @@ impl<'src> Parser<'src> {
             }
             _ => {
                 // grammar: `group`
-                if parsed_expr.expr.is_starred_expr() {
-                    self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &parsed_expr);
+                if self.storage.get(parsed_expr.expr).is_starred_expr() {
+                    self.add_error(
+                        ParseErrorType::InvalidStarredExpressionUsage,
+                        self.storage.range(parsed_expr.expr),
+                    );
                 }
 
                 self.expect(TokenKind::Rpar);
@@ -2391,11 +2466,11 @@ impl<'src> Parser<'src> {
     /// Uses the `parse_func` to parse each item in the tuple.
     pub(super) fn parse_tuple_expression(
         &mut self,
-        first_element: Expr,
+        first_element: id::Expr,
         start: TextSize,
         parenthesized: Parenthesized,
         mut parse_func: impl FnMut(&mut Parser<'src>) -> ParsedExpr,
-    ) -> ast::ExprTuple {
+    ) -> id::ExprTuple {
         // TODO(dhruvmanila): Can we remove `parse_func` and use `parenthesized` to
         // determine the parsing function?
 
@@ -2415,19 +2490,22 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
-        ast::ExprTuple {
-            elts: self.expr_scratch.take(elts_snapshot),
+        build::ExprTuple {
+            elts: self
+                .expr_scratch
+                .take_range(elts_snapshot, &mut self.storage),
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
+
             parenthesized: parenthesized.is_yes(),
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a list expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#list-displays>
-    fn parse_list_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprList {
+    fn parse_list_expression(&mut self, first_element: id::Expr, start: TextSize) -> id::ExprList {
         if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
@@ -2444,18 +2522,20 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rsqb);
 
-        ast::ExprList {
-            elts: self.expr_scratch.take(elts_snapshot),
+        build::ExprList {
+            elts: self
+                .expr_scratch
+                .take_range(elts_snapshot, &mut self.storage),
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a set expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#set-displays>
-    fn parse_set_expression(&mut self, first_element: ParsedExpr, start: TextSize) -> ast::ExprSet {
+    fn parse_set_expression(&mut self, first_element: ParsedExpr, start: TextSize) -> id::ExprSet {
         if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
@@ -2466,12 +2546,12 @@ impl<'src> Parser<'src> {
         // {1, x := 2, 3}
         // {1, 2, x := 3}
 
-        if first_element.is_unparenthesized_named_expr() {
+        if first_element.is_unparenthesized_named_expr(&self.storage) {
             self.add_unsupported_syntax_error(
                 UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
                     UnparenthesizedNamedExprKind::SetLiteral,
                 ),
-                first_element.range(),
+                self.storage.range(first_element.expr),
             );
         }
 
@@ -2482,12 +2562,12 @@ impl<'src> Parser<'src> {
             let parsed_expr =
                 parser.parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or());
 
-            if parsed_expr.is_unparenthesized_named_expr() {
+            if parsed_expr.is_unparenthesized_named_expr(&parser.storage) {
                 parser.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(
                         UnparenthesizedNamedExprKind::SetLiteral,
                     ),
-                    parsed_expr.range(),
+                    parser.storage.range(parsed_expr.expr),
                 );
             }
 
@@ -2496,11 +2576,14 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Rbrace);
 
-        ast::ExprSet {
+        build::ExprSet {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
-            elts: self.expr_scratch.take(elts_snapshot),
+
+            elts: self
+                .expr_scratch
+                .take_range(elts_snapshot, &mut self.storage),
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a dictionary expression.
@@ -2508,44 +2591,58 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#dictionary-displays>
     fn parse_dictionary_expression(
         &mut self,
-        key: Option<Expr>,
-        value: Expr,
+        key: Option<id::Expr>,
+        value: id::Expr,
+        first_item_start: TextSize,
         start: TextSize,
-    ) -> ast::ExprDict {
+    ) -> id::ExprDict {
+        let first = build::DictItem {
+            range: self.node_range(first_item_start),
+            key,
+            value,
+        }
+        .emit(&mut self.storage);
         if !self.at_sequence_end() {
             self.expect(TokenKind::Comma);
         }
 
-        let mut items = vec![ast::DictItem { key, value }];
-
+        let additional = self.dict_item_scratch.snapshot();
         self.parse_comma_separated_list(RecoveryContextKind::DictElements, |parser| {
-            if parser.eat(TokenKind::DoubleStar) {
-                // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
-                // which requires limiting the expression.
-                items.push(ast::DictItem {
-                    key: None,
-                    value: parser.parse_expression_with_bitwise_or_precedence().expr,
-                });
+            let item_start = parser.node_start();
+            let (key, value) = if parser.eat(TokenKind::DoubleStar) {
+                // Dictionary unpacking limits the value to a bitwise-or expression.
+                (
+                    None,
+                    parser.parse_expression_with_bitwise_or_precedence().expr,
+                )
             } else {
                 let key = parser.parse_conditional_expression_or_higher().expr;
                 parser.expect(TokenKind::Colon);
-
-                items.push(ast::DictItem {
-                    key: Some(key),
-                    value: parser.parse_conditional_expression_or_higher().expr,
-                });
-            }
+                (
+                    Some(key),
+                    parser.parse_conditional_expression_or_higher().expr,
+                )
+            };
+            parser.dict_item_scratch.push(
+                build::DictItem {
+                    range: parser.node_range(item_start),
+                    key,
+                    value,
+                }
+                .emit(&mut parser.storage),
+            );
         });
 
         self.expect(TokenKind::Rbrace);
 
-        items.shrink_to_fit();
-
-        ast::ExprDict {
+        build::ExprDict {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
-            items,
+            items: self.dict_item_scratch.take(additional, |items| {
+                self.storage
+                    .list(iter::once(first).chain(items.iter().copied()))
+            }),
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a list of comprehension generators.
@@ -2554,10 +2651,10 @@ impl<'src> Parser<'src> {
     /// followed by `if` clauses.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#grammar-token-python-grammar-comp_for>
-    fn parse_generators(&mut self) -> Vec<ast::Comprehension> {
+    fn parse_generators(&mut self) -> ListId<ast::AstNodeId<ast::kind::Comprehension>> {
         const GENERATOR_SET: TokenSet = TokenSet::new([TokenKind::For, TokenKind::Async]);
 
-        let mut generators = Vec::with_capacity(1);
+        let mut generators = SmallVec::<[_; 1]>::new();
         let mut progress = ParserProgress::default();
 
         while self.at_ts(GENERATOR_SET) {
@@ -2565,9 +2662,7 @@ impl<'src> Parser<'src> {
             generators.push(self.parse_comprehension());
         }
 
-        generators.shrink_to_fit();
-
-        generators
+        self.storage.list(generators)
     }
 
     /// Parses a comprehension.
@@ -2577,7 +2672,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `async` or `for` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
-    fn parse_comprehension(&mut self) -> ast::Comprehension {
+    fn parse_comprehension(&mut self) -> id::Comprehension {
         let start = self.node_start();
 
         let is_async = self.eat(TokenKind::Async);
@@ -2591,11 +2686,12 @@ impl<'src> Parser<'src> {
             self.bump(TokenKind::For);
         }
 
-        let mut target =
+        let target =
             self.parse_expression_list(ExpressionContext::starred_conditional().with_in_excluded());
 
-        helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
-        self.validate_assignment_target(&target.expr);
+        self.storage
+            .set_expr_context(target.expr, ExprContext::Store);
+        self.validate_assignment_target(target.expr);
 
         self.expect(TokenKind::In);
         let iter = self.parse_simple_expression(ExpressionContext::default());
@@ -2611,14 +2707,17 @@ impl<'src> Parser<'src> {
             self.expr_scratch.push(parsed_expr.expr);
         }
 
-        ast::Comprehension {
+        build::Comprehension {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
+
             target: target.expr,
             iter: iter.expr,
-            ifs: self.expr_scratch.take(ifs_snapshot),
+            ifs: self
+                .expr_scratch
+                .take_range(ifs_snapshot, &mut self.storage),
             is_async,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a generator expression.
@@ -2629,23 +2728,24 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#generator-expressions>
     fn parse_generator_expression(
         &mut self,
-        element: Expr,
+        element: id::Expr,
         start: TextSize,
         parenthesized: Parenthesized,
-    ) -> ast::ExprGenerator {
+    ) -> id::ExprGenerator {
         let generators = self.parse_generators();
 
         if parenthesized.is_yes() {
             self.expect(TokenKind::Rpar);
         }
 
-        ast::ExprGenerator {
-            elt: Box::new(element),
+        build::ExprGenerator {
+            elt: element,
             generators,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
+
             parenthesized: parenthesized.is_yes(),
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a list comprehension expression.
@@ -2653,19 +2753,19 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_list_comprehension_expression(
         &mut self,
-        element: Expr,
+        element: id::Expr,
         start: TextSize,
-    ) -> ast::ExprListComp {
+    ) -> id::ExprListComp {
         let generators = self.parse_generators();
 
         self.expect(TokenKind::Rsqb);
 
-        ast::ExprListComp {
-            elt: Box::new(element),
+        build::ExprListComp {
+            elt: element,
             generators,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a dictionary comprehension expression.
@@ -2673,21 +2773,21 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_dictionary_comprehension_expression(
         &mut self,
-        key: Option<Expr>,
-        value: Expr,
+        key: Option<id::Expr>,
+        value: id::Expr,
         start: TextSize,
-    ) -> ast::ExprDictComp {
+    ) -> id::ExprDictComp {
         let generators = self.parse_generators();
 
         self.expect(TokenKind::Rbrace);
 
-        ast::ExprDictComp {
-            key: key.map(Box::new),
-            value: Box::new(value),
-            generators: generators.into_boxed_slice(),
+        build::ExprDictComp {
+            key,
+            value,
+            generators,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a set comprehension expression.
@@ -2695,19 +2795,19 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries>
     fn parse_set_comprehension_expression(
         &mut self,
-        element: Expr,
+        element: id::Expr,
         start: TextSize,
-    ) -> ast::ExprSetComp {
+    ) -> id::ExprSetComp {
         let generators = self.parse_generators();
 
         self.expect(TokenKind::Rbrace);
 
-        ast::ExprSetComp {
-            elt: Box::new(element),
+        build::ExprSetComp {
+            elt: element,
             generators,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a starred expression with the given precedence.
@@ -2726,7 +2826,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `*` token.
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_starred_expression(&mut self, context: ExpressionContext) -> ast::ExprStarred {
+    fn parse_starred_expression(&mut self, context: ExpressionContext) -> id::ExprStarred {
         let start = self.node_start();
         self.bump(TokenKind::Star);
 
@@ -2744,12 +2844,12 @@ impl<'src> Parser<'src> {
             }
         };
 
-        ast::ExprStarred {
-            value: Box::new(parsed_expr.expr),
+        build::ExprStarred {
+            value: parsed_expr.expr,
             ctx: ExprContext::Load,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses an `await` expression.
@@ -2759,7 +2859,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `await` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#await-expression>
-    fn parse_await_expression(&mut self) -> ast::ExprAwait {
+    fn parse_await_expression(&mut self) -> id::ExprAwait {
         let start = self.node_start();
         self.bump(TokenKind::Await);
 
@@ -2768,11 +2868,11 @@ impl<'src> Parser<'src> {
             ExpressionContext::default(),
         );
 
-        ast::ExprAwait {
-            value: Box::new(parsed_expr.expr),
+        build::ExprAwait {
+            value: parsed_expr.expr,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a `yield` expression.
@@ -2782,7 +2882,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `yield` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
-    fn parse_yield_expression(&mut self) -> Expr {
+    fn parse_yield_expression(&mut self) -> id::Expr {
         let start = self.node_start();
         self.bump(TokenKind::Yield);
 
@@ -2810,18 +2910,20 @@ impl<'src> Parser<'src> {
             // def g(): yield 1, 2, 3, *rest
             // def h(): yield 1, (yield 2, *rest), 3
             self.check_tuple_unpacking(
-                &parsed_expr,
+                parsed_expr.expr,
                 UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield),
             );
 
-            Box::new(parsed_expr.expr)
+            parsed_expr.expr
         });
 
-        Expr::Yield(ast::ExprYield {
-            value,
-            range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
-        })
+        id::Expr::from(
+            build::ExprYield {
+                value,
+                range: self.node_range(start),
+            }
+            .emit(&mut self.storage),
+        )
     }
 
     /// Parses a `yield from` expression.
@@ -2830,7 +2932,7 @@ impl<'src> Parser<'src> {
     /// even when parsing a `yield from` expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#yield-expressions>
-    fn parse_yield_from_expression(&mut self, start: TextSize) -> Expr {
+    fn parse_yield_from_expression(&mut self, start: TextSize) -> id::Expr {
         // Grammar:
         //     'yield' 'from' expression
         //
@@ -2850,18 +2952,23 @@ impl<'src> Parser<'src> {
             .parse_expression_list(ExpressionContext::default())
             .expr;
 
-        match &expr {
-            Expr::Tuple(tuple) if !tuple.parenthesized => {
-                self.add_error(ParseErrorType::UnparenthesizedTupleExpression, &expr);
+        match self.storage.get(expr).classify() {
+            ExprKind::Tuple(tuple) if !tuple.parenthesized() => {
+                self.add_error(
+                    ParseErrorType::UnparenthesizedTupleExpression,
+                    self.storage.range(expr),
+                );
             }
             _ => {}
         }
 
-        Expr::YieldFrom(ast::ExprYieldFrom {
-            value: Box::new(expr),
-            range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
-        })
+        id::Expr::from(
+            build::ExprYieldFrom {
+                value: expr,
+                range: self.node_range(start),
+            }
+            .emit(&mut self.storage),
+        )
     }
 
     /// Parses a named expression (`:=`).
@@ -2871,13 +2978,16 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `:=` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#assignment-expressions>
-    fn parse_named_expression(&mut self, mut target: Expr, start: TextSize) -> ast::ExprNamed {
+    fn parse_named_expression(&mut self, target: id::Expr, start: TextSize) -> id::ExprNamed {
         self.bump(TokenKind::ColonEqual);
 
-        if !target.is_name_expr() {
-            self.add_error(ParseErrorType::InvalidNamedAssignmentTarget, target.range());
+        if !self.storage.get(target).is_name_expr() {
+            self.add_error(
+                ParseErrorType::InvalidNamedAssignmentTarget,
+                self.storage.range(target),
+            );
         }
-        helpers::set_expr_ctx(&mut target, ExprContext::Store);
+        self.storage.set_expr_context(target, ExprContext::Store);
 
         let value = self.parse_conditional_expression_or_higher();
 
@@ -2893,12 +3003,13 @@ impl<'src> Parser<'src> {
 
         self.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::Walrus, range);
 
-        ast::ExprNamed {
-            target: Box::new(target),
-            value: Box::new(value.expr),
+        let [target, value] = [target, value.expr];
+        build::ExprNamed {
+            target,
+            value,
             range,
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses a lambda expression.
@@ -2908,7 +3019,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `lambda` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#lambda>
-    fn parse_lambda_expr(&mut self) -> ast::ExprLambda {
+    fn parse_lambda_expr(&mut self) -> id::ExprLambda {
         let start = self.node_start();
         self.bump(TokenKind::Lambda);
 
@@ -2917,7 +3028,7 @@ impl<'src> Parser<'src> {
             // lambda: 1
             None
         } else {
-            Some(Box::new(self.parse_parameters(FunctionKind::Lambda)))
+            Some(self.parse_parameters(FunctionKind::Lambda))
         };
 
         self.expect(TokenKind::Colon);
@@ -2943,12 +3054,12 @@ impl<'src> Parser<'src> {
         // Lambda bodies recurse through the conditional layer without entering the binary parser.
         let body = self.with_recursion(Self::parse_conditional_expression_or_higher);
 
-        ast::ExprLambda {
-            body: Box::new(body.expr),
+        build::ExprLambda {
+            body: body.expr,
             parameters,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses an `if` expression.
@@ -2958,7 +3069,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `if` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#conditional-expressions>
-    fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
+    fn parse_if_expression(&mut self, body: id::Expr, start: TextSize) -> id::ExprIf {
         self.bump(TokenKind::If);
 
         let test = self.parse_simple_expression(ExpressionContext::default());
@@ -2968,13 +3079,14 @@ impl<'src> Parser<'src> {
         // The binary-expression guard has already returned before parsing the `else` branch.
         let orelse = self.with_recursion(Self::parse_conditional_expression_or_higher);
 
-        ast::ExprIf {
-            body: Box::new(body),
-            test: Box::new(test.expr),
-            orelse: Box::new(orelse.expr),
+        let [body, test, orelse] = [body, test.expr, orelse.expr];
+        build::ExprIf {
+            body,
+            test,
+            orelse,
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
         }
+        .emit(&mut self.storage)
     }
 
     /// Parses an IPython escape command at the expression level.
@@ -2983,7 +3095,7 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at a `IpyEscapeCommand` token.
     /// If the escape command kind is not `%` or `!`.
-    fn parse_ipython_escape_command_expression(&mut self) -> ast::ExprIpyEscapeCommand {
+    fn parse_ipython_escape_command_expression(&mut self) -> id::ExprIpyEscapeCommand {
         let start = self.node_start();
 
         let (value, kind) = self.bump_ipython_escape_command(IpyEscapeContext::Assignment);
@@ -2993,15 +3105,19 @@ impl<'src> Parser<'src> {
             unreachable!("IPython escape command expression is only allowed for % and !");
         }
 
-        let command = ast::ExprIpyEscapeCommand {
+        let command = build::ExprIpyEscapeCommand {
             range: self.node_range(start),
-            node_index: AtomicNodeIndex::NONE,
+
             kind,
             value,
-        };
+        }
+        .emit(&mut self.storage);
 
         if self.options.mode != Mode::Ipython {
-            self.add_error(ParseErrorType::UnexpectedIpythonEscapeCommand, &command);
+            self.add_error(
+                ParseErrorType::UnexpectedIpythonEscapeCommand,
+                self.storage.range(command),
+            );
         }
 
         command
@@ -3022,46 +3138,33 @@ pub(super) enum ArgumentsContext {
     ClassDefinition,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub(super) struct ParsedExpr {
-    pub(super) expr: Expr,
+    // The builder already stores the kind and range. Carrying just the ID and parenthesis
+    // flag lets recursive parser calls return this result in registers.
+    pub(super) expr: id::Expr,
     pub(super) is_parenthesized: bool,
 }
 
 impl ParsedExpr {
     #[inline]
-    pub(super) const fn is_unparenthesized_starred_expr(&self) -> bool {
-        !self.is_parenthesized && self.expr.is_starred_expr()
+    pub(super) fn is_unparenthesized_starred_expr(self, storage: &ast::Builder) -> bool {
+        !self.is_parenthesized && storage.get(self.expr).is_starred_expr()
     }
 
     #[inline]
-    const fn is_unparenthesized_named_expr(&self) -> bool {
-        !self.is_parenthesized && self.expr.is_named_expr()
+    fn is_unparenthesized_named_expr(self, storage: &ast::Builder) -> bool {
+        !self.is_parenthesized && storage.get(self.expr).is_named_expr()
     }
 }
 
-impl From<Expr> for ParsedExpr {
+impl From<id::Expr> for ParsedExpr {
     #[inline]
-    fn from(expr: Expr) -> Self {
+    fn from(expr: id::Expr) -> Self {
         ParsedExpr {
             expr,
             is_parenthesized: false,
         }
-    }
-}
-
-impl Deref for ParsedExpr {
-    type Target = Expr;
-
-    fn deref(&self) -> &Self::Target {
-        &self.expr
-    }
-}
-
-impl Ranged for ParsedExpr {
-    #[inline]
-    fn range(&self) -> TextRange {
-        self.expr.range()
     }
 }
 
@@ -3236,29 +3339,26 @@ impl ExpressionContext {
 
 #[derive(Debug)]
 struct InterpolatedStringData {
-    elements: InterpolatedStringElements,
+    elements: ListId<ast::AstNodeId<ast::kind::InterpolatedStringElement>>,
     range: TextRange,
     flags: AnyStringFlags,
 }
 
-impl From<InterpolatedStringData> for FString {
-    fn from(value: InterpolatedStringData) -> Self {
-        Self {
-            elements: value.elements,
-            range: value.range,
-            flags: value.flags.into(),
-            node_index: AtomicNodeIndex::NONE,
+impl InterpolatedStringData {
+    fn into_fstring(self, builder: &mut Builder) -> id::FString {
+        build::FString {
+            range: self.range,
+            elements: self.elements,
+            flags: self.flags.into(),
         }
+        .emit(builder)
     }
-}
-
-impl From<InterpolatedStringData> for TString {
-    fn from(value: InterpolatedStringData) -> Self {
-        Self {
-            elements: value.elements,
-            range: value.range,
-            flags: value.flags.into(),
-            node_index: AtomicNodeIndex::NONE,
+    fn into_tstring(self, builder: &mut Builder) -> id::TString {
+        build::TString {
+            range: self.range,
+            elements: self.elements,
+            flags: self.flags.into(),
         }
+        .emit(builder)
     }
 }

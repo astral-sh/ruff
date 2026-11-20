@@ -5,6 +5,8 @@ Python source code into an [Abstract Syntax Tree (AST)](https://crates.io/crates
 parsing](https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html)
 technique to parse expressions with different [precedence](https://docs.python.org/3/reference/expressions.html#operator-precedence).
 
+The [AST architecture](../ruff_python_ast/architecture.md) describes how Python syntax is stored and traversed.
+
 Try out the parser in the [playground](https://play.ruff.rs/?secondary=AST).
 
 ## Contributing
