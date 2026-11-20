@@ -22,7 +22,7 @@ use crate::fix::edits::delete_comment;
 use crate::preview::{is_human_readable_names_enabled, is_redirected_suppression_code_enabled};
 use crate::rule_redirects::{get_redirect, get_redirect_target};
 use crate::rules::ruff::rules::{
-    InvalidRuleCodeKind, InvalidRuleSelectorInSuppressionComment, InvalidSuppressionComment,
+    InvalidRuleSelectorInSuppressionComment, InvalidRuleSelectorKind, InvalidSuppressionComment,
     InvalidSuppressionCommentKind, RenamedRuleInSuppressionComment, RuleCodesInSuppressionComments,
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQAKind, UnusedSuppressionComment,
     code_is_valid,
@@ -496,7 +496,7 @@ impl Suppressions {
                     true,
                     InvalidRuleSelectorInSuppressionComment {
                         rule: group.invalid_codes.iter().join(", "),
-                        kind: InvalidRuleCodeKind::Suppression,
+                        kind: InvalidRuleSelectorKind::Suppression,
                         whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
                     },
                 ) {

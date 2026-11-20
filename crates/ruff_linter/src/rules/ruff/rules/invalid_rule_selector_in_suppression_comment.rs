@@ -13,23 +13,23 @@ use crate::rule_redirects::get_redirect_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum InvalidRuleCodeKind {
+pub(crate) enum InvalidRuleSelectorKind {
     Noqa,
     Suppression,
 }
 
-impl InvalidRuleCodeKind {
+impl InvalidRuleSelectorKind {
     fn as_str(&self) -> &str {
         match self {
-            InvalidRuleCodeKind::Noqa => "`# noqa`",
-            InvalidRuleCodeKind::Suppression => "suppression",
+            InvalidRuleSelectorKind::Noqa => "`# noqa`",
+            InvalidRuleSelectorKind::Suppression => "suppression",
         }
     }
 
     fn selector(&self) -> &str {
         match self {
-            InvalidRuleCodeKind::Noqa => "code",
-            InvalidRuleCodeKind::Suppression => "selector",
+            InvalidRuleSelectorKind::Noqa => "code",
+            InvalidRuleSelectorKind::Suppression => "selector",
         }
     }
 }
@@ -75,7 +75,7 @@ impl InvalidRuleCodeKind {
 #[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct InvalidRuleSelectorInSuppressionComment {
     pub(crate) rule: String,
-    pub(crate) kind: InvalidRuleCodeKind,
+    pub(crate) kind: InvalidRuleSelectorKind,
     pub(crate) whole_comment: bool,
 }
 
@@ -165,7 +165,7 @@ fn all_codes_invalid_diagnostic(
                 .map(Code::as_str)
                 .collect::<Vec<_>>()
                 .join(", "),
-            kind: InvalidRuleCodeKind::Noqa,
+            kind: InvalidRuleSelectorKind::Noqa,
             whole_comment: true,
         },
         directive.range(),
@@ -183,7 +183,7 @@ fn some_codes_are_invalid_diagnostic(
     let mut diagnostic = context.report_custom_diagnostic(
         InvalidRuleSelectorInSuppressionComment {
             rule: invalid_code.to_string(),
-            kind: InvalidRuleCodeKind::Noqa,
+            kind: InvalidRuleSelectorKind::Noqa,
             whole_comment: false,
         },
         invalid_code.range(),

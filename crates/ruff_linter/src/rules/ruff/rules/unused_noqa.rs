@@ -81,7 +81,7 @@ impl UnusedNOQAKind {
 ///
 /// This rule ignores any codes that are unknown to Ruff, as it can't determine
 /// if the codes are valid or used by other tools. Enable
-/// [`invalid-rule-selector-in-suppression-comment`][RUF102] to flag any unknown rule codes.
+/// [`invalid-rule-selector-in-suppression-comment`][RUF102] to flag any unknown rule names or codes.
 ///
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
