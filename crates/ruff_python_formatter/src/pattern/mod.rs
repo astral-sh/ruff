@@ -1,9 +1,7 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::{AnyNodeRef, Expr, PatternMatchAs};
 use ruff_python_ast::{MatchCase, Pattern};
-use ruff_python_trivia::{
-    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, first_non_trivia_token,
-};
+use ruff_python_trivia::TriviaRanges;
 use ruff_text_size::Ranged;
 use std::cmp::Ordering;
 
@@ -53,11 +51,7 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
         });
 
         let parenthesize = match self.parentheses {
-            Parentheses::Preserve => is_pattern_parenthesized(
-                pattern,
-                f.context().trivia().comments(),
-                f.context().source(),
-            ),
+            Parentheses::Preserve => is_pattern_parenthesized(pattern, f.context().trivia()),
             Parentheses::Always => true,
             Parentheses::Never => false,
         };
@@ -105,31 +99,8 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Pattern {
     }
 }
 
-fn is_pattern_parenthesized(
-    pattern: &Pattern,
-    comment_ranges: &CommentRanges,
-    contents: &str,
-) -> bool {
-    // First test if there's a closing parentheses because it tends to be cheaper.
-    if matches!(
-        first_non_trivia_token(pattern.end(), contents),
-        Some(SimpleToken {
-            kind: SimpleTokenKind::RParen,
-            ..
-        })
-    ) {
-        matches!(
-            BackwardsTokenizer::up_to(pattern.start(), contents, comment_ranges)
-                .skip_trivia()
-                .next(),
-            Some(SimpleToken {
-                kind: SimpleTokenKind::LParen,
-                ..
-            })
-        )
-    } else {
-        false
-    }
+fn is_pattern_parenthesized(pattern: &Pattern, trivia: &TriviaRanges) -> bool {
+    trivia.parenthesized().contains(pattern.range())
 }
 
 impl NeedsParentheses for Pattern {
@@ -255,7 +226,7 @@ fn can_pattern_omit_optional_parentheses(pattern: &Pattern, context: &PyFormatCo
                 true
             } else {
                 // If the pattern has no own parentheses or it is empty (e.g. ([])), check for surrounding parentheses (that should be preserved).
-                is_pattern_parenthesized(pattern, context.trivia().comments(), context.source())
+                is_pattern_parenthesized(pattern, context.trivia())
             }
         }
 
@@ -343,7 +314,7 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
         self.last = Some(pattern);
 
         // Rule only applies for non-parenthesized patterns.
-        if is_pattern_parenthesized(pattern, context.trivia().comments(), context.source()) {
+        if is_pattern_parenthesized(pattern, context.trivia()) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_pattern(pattern, context);
