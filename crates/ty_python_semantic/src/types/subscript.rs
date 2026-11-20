@@ -72,7 +72,7 @@ impl DunderMethod {
         }
     }
 
-    fn call<'db>(
+    pub(super) fn call<'db>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

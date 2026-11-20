@@ -7059,6 +7059,15 @@ impl<'db> Type<'db> {
             .map(|key| Type::string_literal(db, key))
             .unwrap_or(Type::unknown());
 
+        // Matching `**kwargs` against several overloads can request the same key for each
+        // overload. Reuse the cached subscript call where the lookup agrees. Unpacking a
+        // union or intersection calls its combined member, so handle those types below.
+        if !matches!(self, Type::Union(_) | Type::Intersection(_)) {
+            return subscript::DunderMethod::GetItem
+                .call(db, env, self, key)?
+                .ok();
+        }
+
         match self
             .member_lookup_with_policy(
                 db,
