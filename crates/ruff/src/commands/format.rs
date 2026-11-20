@@ -38,8 +38,9 @@ use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFile, SourceFile
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{
-    ResolvedFile, Resolver, RootProject, match_exclusion, project_files_in_path,
+    Project, ResolvedFile, Resolver, RootProject, match_exclusion, project_files_in_path,
 };
+use ruff_workspace::script::{ScriptSettingsError, script};
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
@@ -120,7 +121,8 @@ pub(crate) fn format(
             match entry {
                 Ok(resolved_file) => {
                     let path = resolved_file.path();
-                    let settings = resolver.resolve(path);
+                    let project = resolver.resolve_with_path(path);
+                    let settings = &project.settings;
 
                     let source_type = settings.formatter.extension.get_source_type(path);
                     if source_type.is_toml() {
@@ -152,7 +154,8 @@ pub(crate) fn format(
                         match catch_unwind(|| {
                             format_path(
                                 path,
-                                &settings.formatter,
+                                project,
+                                config_arguments,
                                 source_type,
                                 mode,
                                 cli.range,
@@ -251,7 +254,8 @@ pub(crate) fn format(
 #[tracing::instrument(level = "debug", skip_all, fields(path = %path.display()))]
 pub(crate) fn format_path(
     path: &Path,
-    settings: &FormatterSettings,
+    project: &Project,
+    overrides: &ConfigArguments,
     source_type: SourceType,
     mode: FormatMode,
     range: Option<FormatRange>,
@@ -277,6 +281,20 @@ pub(crate) fn format_path(
         Err(err) => {
             return Err(FormatCommandError::Read(Some(path.to_path_buf()), err));
         }
+    };
+
+    let script = script(
+        project,
+        overrides,
+        overrides.script_configuration(),
+        Some(path),
+        source_type,
+        unformatted.source_code(),
+    )
+    .map_err(|error| FormatCommandError::Configuration(path.to_owned(), error))?;
+    let settings = match &script {
+        Some(script) => &script.settings.formatter,
+        None => &project.settings.formatter,
     };
 
     // Don't write back to the cache if formatting a range.
@@ -826,6 +844,7 @@ impl<'a> FormatResults<'a> {
 #[derive(Error, Debug)]
 pub(crate) enum FormatCommandError {
     Ignore(#[from] ignore::Error),
+    Configuration(PathBuf, ScriptSettingsError),
     Parse {
         error: DisplayParseError,
         source_file: SourceFile,
@@ -866,6 +885,7 @@ impl FormatCommandError {
                     None
                 }
             }
+            Self::Configuration(path, _) => Some(path),
             Self::Parse { error, .. } => error.path(),
             Self::Panic(path, _)
             | Self::Read(path, _)
@@ -887,6 +907,7 @@ impl From<&FormatCommandError> for Diagnostic {
         });
 
         let mut diagnostic = match error {
+            FormatCommandError::Configuration(_, error) => return error.diagnostic.clone(),
             FormatCommandError::Ignore(error) => {
                 Diagnostic::new(DiagnosticId::Io, Severity::Error, error)
             }
@@ -947,6 +968,7 @@ impl Display for FormatCommandError {
                     )
                 }
             }
+            Self::Configuration(_, error) => error.fmt(f),
             Self::Parse { error, .. } => {
                 write!(f, "{error}")
             }
