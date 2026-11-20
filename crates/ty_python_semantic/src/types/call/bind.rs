@@ -3599,6 +3599,120 @@ impl FailingOverloadSelection {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+struct OverloadFilterSlot<'db> {
+    parameter: Type<'db>,
+    argument: Type<'db>,
+    variadic_argument: Option<Type<'db>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+struct OverloadFilterCandidate<'db> {
+    inferable: TypeVarSet<'db>,
+    slots: Box<[OverloadFilterSlot<'db>]>,
+}
+
+/// The specialized argument and parameter types that affect step 5 of overload resolution.
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+struct OverloadFilter<'db> {
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(deref)]
+    candidates: Box<[OverloadFilterCandidate<'db>]>,
+}
+
+impl<'db> OverloadFilter<'db> {
+    /// Find the first prefix whose parameters accept every materialization of the arguments.
+    /// Keep all candidates if no prefix covers them.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None when an overload comparison participates in a cycle"
+    )]
+    fn covering_prefix_len(self, db: &'db dyn Db) -> usize {
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn cached<'db>(db: &'db dyn Db, filter: OverloadFilter<'db>) -> Option<usize> {
+            Some(filter.compute_covering_prefix_len(db))
+        }
+
+        // A provisional type can change which prefix covers the arguments on the next iteration.
+        cached(db, self).unwrap_or_else(|| self.compute_covering_prefix_len(db))
+    }
+
+    fn compute_covering_prefix_len(self, db: &'db dyn Db) -> usize {
+        let env = &ProgramEnvironment::from_program(self.program(db));
+        let candidates = self.candidates(db);
+        let max_slot_count = candidates
+            .iter()
+            .map(|candidate| candidate.slots.len())
+            .max()
+            .unwrap_or(0);
+
+        // Each overload adds its parameter types to the same prefix. Keep the builders so
+        // earlier parameters don't need to be compared for redundancy again at every step.
+        let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db, env))
+            .take(max_slot_count)
+            .collect::<Vec<_>>();
+
+        for (index, current) in candidates.iter().enumerate().take(candidates.len() - 1) {
+            let mut union_argument_type_builders =
+                std::iter::repeat_with(|| UnionBuilder::new(db, env))
+                    .take(max_slot_count)
+                    .collect::<Vec<_>>();
+
+            for candidate in candidates {
+                for (slot_index, slot) in candidate.slots.iter().enumerate() {
+                    let argument_type = slot.variadic_argument.unwrap_or_else(|| {
+                        current
+                            .slots
+                            .get(slot_index)
+                            .map_or(Type::unknown(), |slot| slot.argument)
+                    });
+                    union_argument_type_builders[slot_index]
+                        .add_in_place(argument_type.top_materialization(db, env));
+                }
+            }
+
+            let top_materialized_argument_type = Type::heterogeneous_tuple(
+                db,
+                env,
+                union_argument_type_builders
+                    .into_iter()
+                    .filter_map(|builder| {
+                        if builder.is_empty() {
+                            None
+                        } else {
+                            Some(builder.build())
+                        }
+                    }),
+            );
+
+            for (builder, slot) in union_parameter_types.iter_mut().zip(&current.slots) {
+                builder.add_in_place(slot.parameter);
+            }
+
+            let parameter_types = Type::heterogeneous_tuple(
+                db,
+                env,
+                union_parameter_types
+                    .iter()
+                    .filter(|builder| !builder.is_empty())
+                    .cloned()
+                    .map(UnionBuilder::build),
+            );
+
+            let inferable = current.inferable;
+            if top_materialized_argument_type
+                .when_assignable_to_owned(db, env, parameter_types, inferable)
+                .query(|_, when| when.is_always_satisfied(db, env, inferable))
+            {
+                return index + 1;
+            }
+        }
+
+        candidates.len()
+    }
+}
+
 impl<'db> CallableBinding<'db> {
     pub(crate) fn from_overloads(
         signature_type: Type<'db>,
@@ -4403,12 +4517,6 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
-        struct OverloadFilterSlot<'db> {
-            parameter: Type<'db>,
-            argument: Type<'db>,
-            variadic_argument: Option<Type<'db>>,
-        }
-
         let matching_overload_slots = matching_overload_indexes
             .iter()
             .map(|&index| {
@@ -4448,7 +4556,7 @@ impl<'db> CallableBinding<'db> {
             .max()
             .unwrap_or(0);
 
-        let mut participating_slot_indices = HashSet::new();
+        let mut participating_slot_indices = Vec::new();
         for slot_index in 0..max_slot_count {
             let mut first_parameter_type: Option<Type<'db>> = None;
             for (_, overload_slots) in &matching_overload_slots {
@@ -4460,12 +4568,12 @@ impl<'db> CallableBinding<'db> {
                             .when_equivalent_to(db, env, current_parameter_type, constraints)
                             .is_always_satisfied(db, env, TypeVarSet::None)
                         {
-                            participating_slot_indices.insert(slot_index);
+                            participating_slot_indices.push(slot_index);
                             break;
                         }
                     }
                     (Some(_), None) => {
-                        participating_slot_indices.insert(slot_index);
+                        participating_slot_indices.push(slot_index);
                         break;
                     }
                     (None, Some(current_parameter_type)) => {
@@ -4476,77 +4584,22 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
-        // Each overload adds its parameter types to the same prefix. Keep the builders so
-        // earlier parameters don't need to be compared for redundancy again at every step.
-        let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db, env))
-            .take(max_slot_count)
-            .collect::<Vec<_>>();
-
-        for (upto, (current_index, current_slots)) in matching_overload_slots.iter().enumerate() {
-            let remaining = &matching_overload_indexes[upto + 1..];
-            if remaining.is_empty() {
-                break;
-            }
-
-            let mut union_argument_type_builders =
-                std::iter::repeat_with(|| UnionBuilder::new(db, env))
-                    .take(max_slot_count)
-                    .collect::<Vec<_>>();
-
-            for (_, slots) in &matching_overload_slots {
-                for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
-                        let argument_type = slot.variadic_argument.unwrap_or_else(|| {
-                            current_slots
-                                .get(slot_index)
-                                .map_or(Type::unknown(), |slot| slot.argument)
-                        });
-                        union_argument_type_builders[slot_index]
-                            .add_in_place(argument_type.top_materialization(db, env));
-                    }
-                }
-            }
-
-            let top_materialized_argument_type = Type::heterogeneous_tuple(
-                db,
-                env,
-                union_argument_type_builders
-                    .into_iter()
-                    .filter_map(|builder| {
-                        if builder.is_empty() {
-                            None
-                        } else {
-                            Some(builder.build())
-                        }
-                    }),
-            );
-
-            for (slot_index, slot) in current_slots.iter().enumerate() {
-                if participating_slot_indices.contains(&slot_index) {
-                    union_parameter_types[slot_index].add_in_place(slot.parameter);
-                }
-            }
-
-            let parameter_types = Type::heterogeneous_tuple(
-                db,
-                env,
-                union_parameter_types
+        // Project every overload onto the same participating slots. Calls that differ only
+        // in the other arguments can share the search for a covering prefix.
+        let candidates = matching_overload_slots
+            .iter()
+            .map(|(index, slots)| OverloadFilterCandidate {
+                inferable: self.overloads[*index].inferable_typevars,
+                slots: participating_slot_indices
                     .iter()
-                    .filter(|builder| !builder.is_empty())
-                    .cloned()
-                    .map(UnionBuilder::build),
-            );
-
-            let inferable = self.overloads[*current_index].inferable_typevars;
-            if top_materialized_argument_type
-                .when_assignable_to_owned(db, env, parameter_types, inferable)
-                .query(|_, when| when.is_always_satisfied(db, env, inferable))
-            {
-                for &index in remaining {
-                    self.overloads[index].mark_as_unmatched_overload();
-                }
-                break;
-            }
+                    .filter_map(|&index| slots.get(index).copied())
+                    .collect(),
+            })
+            .collect::<Box<[_]>>();
+        let prefix_len =
+            OverloadFilter::new(db, env.program(db), candidates).covering_prefix_len(db);
+        for &index in &matching_overload_indexes[prefix_len..] {
+            self.overloads[index].mark_as_unmatched_overload();
         }
 
         // Once this filtering process is applied for all arguments, examine the return types of
