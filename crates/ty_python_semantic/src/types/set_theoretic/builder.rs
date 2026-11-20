@@ -54,6 +54,7 @@ use crate::types::{
     StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
+use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
@@ -1152,7 +1153,8 @@ impl<'db> UnionBuilder<'db> {
     /// and that their union cannot cover `object`. The caller must handle equal types first.
     /// A `false` result leaves the decision to the general relation checks.
     ///
-    /// Distinct class and module literals identify different objects. Methods bound to distinct
+    /// Distinct class and module literals identify different objects. Applying the same truthiness
+    /// guard to two class literals preserves that distinction. Methods bound to distinct
     /// singleton literals also remain distinct because `__self__` exposes their captured receiver:
     ///
     /// ```python
@@ -1176,6 +1178,18 @@ impl<'db> UnionBuilder<'db> {
         match (left, right) {
             (Type::ClassLiteral(_), Type::ClassLiteral(_))
             | (Type::ModuleLiteral(_), Type::ModuleLiteral(_)) => true,
+            (Type::Intersection(left), Type::Intersection(right)) => {
+                let class_guard = |ty: IntersectionType<'db>| {
+                    let Ok(Type::ClassLiteral(_)) = ty.iter_positive(db).exactly_one() else {
+                        return None;
+                    };
+                    match ty.iter_negative(db).exactly_one() {
+                        Ok(guard @ (Type::AlwaysTruthy | Type::AlwaysFalsy)) => Some(guard),
+                        _ => None,
+                    }
+                };
+                class_guard(left).is_some_and(|guard| class_guard(right) == Some(guard))
+            }
             (Type::Dynamic(_), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::Dynamic(_))
                 if !instance.is_object() =>
