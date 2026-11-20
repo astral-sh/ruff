@@ -995,6 +995,25 @@ reveal_type(left(3))  # revealed: Literal[1, "a"]
 reveal_type(right(3))  # revealed: Literal["a", 1]
 ```
 
+### Recursive mapping unpacking
+
+Unpacking a child node inside `__getitem__` depends on the return type we are inferring.
+
+```py
+class Node:
+    child: Node | None = None
+
+    def keys(self) -> list[str]:
+        return ["child"]
+
+    def __getitem__(self, key: str):
+        if self.child is None:
+            return None
+        return {**self.child}
+
+reveal_type({**Node()})  # revealed: dict[str, None | dict[str, Divergent] | Unknown]
+```
+
 ## Edge cases
 
 ### `functools.wraps`

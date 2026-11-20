@@ -441,12 +441,11 @@ impl<'db> KeywordArgument<'db> {
                 .find_map(|(key, value)| (Some(key.as_str()) == name).then_some(value.value_ty))
                 .unwrap_or(Type::unknown());
         }
-        self.source_type()
-            .and_then(|ty| {
-                ty.as_paramspec_typevar(db)
-                    .or_else(|| ty.getitem_dunder_call(db, env, name))
-            })
-            .unwrap_or(Type::unknown())
+        let Some(ty) = self.source_type() else {
+            return Type::unknown();
+        };
+        ty.as_paramspec_typevar(db)
+            .unwrap_or_else(|| ty.unpacked_value_type(db, env, name))
     }
 }
 
