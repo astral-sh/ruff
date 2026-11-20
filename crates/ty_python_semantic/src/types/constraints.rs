@@ -3747,6 +3747,14 @@ impl ReportDiagnostics {
     }
 }
 
+/// How a caller uses the solver's failure evidence and constraint storage.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum SolutionMode {
+    Reusable(ReportDiagnostics),
+    /// The caller discards failure evidence and the constraint storage after projection.
+    FinalProjection,
+}
+
 /// Limits shared by the preprocessing and collection walks used to extract solutions.
 trait SolutionLimits {
     type Break;
@@ -3822,7 +3830,7 @@ impl<'db> CandidateSolutions<'db> {
             source_order,
             UnboundedSolutionLimits,
             unspecialized_type_var_policy,
-            ReportDiagnostics::Yes,
+            SolutionMode::Reusable(ReportDiagnostics::Yes),
         );
         result
     }
@@ -3838,7 +3846,7 @@ impl<'db> CandidateSolutions<'db> {
         set: ConstraintSet<'db, '_>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
-        report_diagnostics: ReportDiagnostics,
+        mode: SolutionMode,
     ) -> Result<Self, ProjectionError> {
         let limits = BoundedSolutionLimits {
             remaining_paths: budget.paths,
@@ -3853,7 +3861,7 @@ impl<'db> CandidateSolutions<'db> {
             set.source_order,
             limits,
             UnspecializedTypeVarPolicy::Ignore,
-            report_diagnostics,
+            mode,
         ) {
             ControlFlow::Continue(result) => Ok(result),
             ControlFlow::Break(error) => Err(error),
@@ -3870,7 +3878,7 @@ impl<'db> CandidateSolutions<'db> {
         source_order: Option<SourceOrderId>,
         mut limits: L,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
-        report_diagnostics: ReportDiagnostics,
+        mode: SolutionMode,
     ) -> ControlFlow<L::Break, Self> {
         let source_orders = storage.calculate_source_orders(source_order);
         if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
@@ -3882,7 +3890,7 @@ impl<'db> CandidateSolutions<'db> {
             inferable,
             &mut limits,
             unspecialized_type_var_policy,
-            report_diagnostics,
+            mode,
         )? {
             return ControlFlow::Continue(path_bounds);
         }
@@ -3925,7 +3933,7 @@ impl<'db> CandidateSolutions<'db> {
         inferable: TypeVarSet<'db>,
         limits: &mut L,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
-        report_diagnostics: ReportDiagnostics,
+        mode: SolutionMode,
     ) -> ControlFlow<L::Break, Option<Self>> {
         let mentions_typevar =
             |bound| any_over_type_expanding_aliases(db, env, bound, Type::is_type_var);
@@ -4043,8 +4051,12 @@ impl<'db> CandidateSolutions<'db> {
         let mut typevars = Vec::with_capacity(mappings.len());
         for (bound_typevar, bounds) in mappings {
             let Some(solution) = bounds.finish(db, env, storage, bound_typevar, inferable) else {
-                if !report_diagnostics.is_yes() {
-                    return ControlFlow::Continue(Some(Self::Unsatisfiable));
+                if let SolutionMode::Reusable(report_diagnostics) = mode {
+                    // The retry can register type variables that affect subsequent solves
+                    // on the same storage, even if it ultimately rejects the only path.
+                    return ControlFlow::Continue(
+                        (!report_diagnostics.is_yes()).then_some(Self::Unsatisfiable),
+                    );
                 }
 
                 // The walker can use derived bounds to find a solution or explain a failure.
@@ -5366,7 +5378,7 @@ mod tests {
                 visits: max_visits,
                 ..SolutionBudget::default()
             },
-            ReportDiagnostics::Yes,
+            SolutionMode::Reusable(ReportDiagnostics::Yes),
         )
     }
 

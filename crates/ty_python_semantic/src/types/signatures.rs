@@ -24,7 +24,7 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::constraints::{
     CandidateSolutions, ConstraintProvenance, ConstraintSet, ConstraintSetBuilder,
-    IteratorConstraintsExtension, OwnedConstraintSet, Solutions,
+    IteratorConstraintsExtension, OwnedConstraintSet, ReportDiagnostics, SolutionMode, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -1729,7 +1729,8 @@ impl<'db> Signature<'db> {
             .variables(db)
             .any(|typevar| typevar.is_paramspec(db))
             && receiver_type.try_upcast_to_callable(db, env).is_some();
-        let specialization = builder.build_merged_with(|typevar, bounds| {
+        let mode = SolutionMode::Reusable(ReportDiagnostics::Yes);
+        let specialization = builder.build_merged_with(mode, |typevar, bounds| {
             if let Some(bounds) = bounds
                 && bounds.as_exact(db, env).is_some()
                 && let Some(solution) =

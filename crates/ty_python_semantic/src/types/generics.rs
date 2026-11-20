@@ -16,8 +16,8 @@ use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution,
-    ReportDiagnostics, Solution, SolutionPaths, SolutionViolation, SolutionViolationKind,
-    Solutions, TypeVarSolution,
+    ReportDiagnostics, Solution, SolutionMode, SolutionPaths, SolutionViolation,
+    SolutionViolationKind, Solutions, TypeVarSolution,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
@@ -2842,6 +2842,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// `None` to use the inferred type unchanged.
     pub(crate) fn build_merged_with(
         &mut self,
+        mode: SolutionMode,
         mut choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             Option<&CandidateTypeVarSolution<'db>>,
@@ -2858,6 +2859,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     builder.env,
                     builder.inferable,
                     SolutionBudget::default(),
+                    mode,
                     |_variance, path_bound| {
                         let outcome = choose(path_bound.bound_typevar, Some(path_bound))
                             .unwrap_or_else(|| {

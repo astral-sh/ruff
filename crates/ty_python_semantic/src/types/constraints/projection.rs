@@ -4,7 +4,7 @@ use rustc_hash::FxHashSet;
 
 use super::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, PathBoundSolution,
-    ReportDiagnostics, Solutions, TypeVarSolution,
+    ReportDiagnostics, SolutionMode, Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
@@ -159,7 +159,7 @@ impl<'db> ConstraintSet<'db, '_> {
             self,
             inferable,
             budget,
-            report_diagnostics,
+            SolutionMode::Reusable(report_diagnostics),
         )?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
         path_bounds.try_solve_with(choose, |solution| {
@@ -196,6 +196,7 @@ impl<'db> ConstraintSet<'db, '_> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
+        mode: SolutionMode,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
         initial: T,
         fold: impl FnMut(
@@ -204,14 +205,8 @@ impl<'db> ConstraintSet<'db, '_> {
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {
-        let path_bounds = CandidateSolutions::compute_bounded(
-            db,
-            env,
-            self,
-            inferable,
-            budget,
-            ReportDiagnostics::Yes,
-        )?;
+        let path_bounds =
+            CandidateSolutions::compute_bounded(db, env, self, inferable, budget, mode)?;
 
         path_bounds.try_fold_with(
             choose,

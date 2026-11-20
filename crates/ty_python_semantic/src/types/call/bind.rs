@@ -42,8 +42,8 @@ use crate::types::constraints::projection::{ProjectionTypeBudget, SolutionBudget
 use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
-    ConstraintSet, ConstraintSetBuilder, PathBoundSolution, ReportDiagnostics, SolutionPaths,
-    Solutions,
+    ConstraintSet, ConstraintSetBuilder, PathBoundSolution, ReportDiagnostics, SolutionMode,
+    SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::cyclic::PairVisitor;
@@ -7536,7 +7536,8 @@ impl<'db> CallInference<'_, 'db> {
         }
 
         if self.signature.generic_context.is_some() {
-            let specialization = builder.build_merged_with(|_, _| None);
+            let specialization = builder
+                .build_merged_with(SolutionMode::Reusable(ReportDiagnostics::Yes), |_, _| None);
             let expected_ty = formal.apply_specialization(db, specialization);
 
             // The legacy solver keeps the first pack when another occurrence has a different length.

@@ -11,7 +11,7 @@ use crate::place::global_symbol;
 use crate::types::constraints::{
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
     ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    PathBoundSolution, ReportDiagnostics, Solution, SolutionPaths, SolutionValidity,
+    PathBoundSolution, ReportDiagnostics, Solution, SolutionMode, SolutionPaths, SolutionValidity,
     SolutionViolationKind, Solutions, TypeVarSolution, UnspecializedTypeVarPolicy,
 };
 use crate::types::signatures::{Parameter, Parameters, Signature};
@@ -105,6 +105,7 @@ fn collect_paths<'db, 'c>(
         &env,
         inferable,
         budget,
+        SolutionMode::FinalProjection,
         |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
         Paths::default(),
         |mut paths, path, budget| {
@@ -148,6 +149,7 @@ fn path_limit_is_checked_before_solving() {
                 paths: max_paths,
                 ..SolutionBudget::default()
             },
+            SolutionMode::Reusable(ReportDiagnostics::Yes),
             |_, bound| {
                 selected += 1;
                 CandidateSolutions::default_solve(db, &env, &builder, bound)
@@ -819,9 +821,16 @@ fn incomplete_solution_discards_the_projection() {
             )))
         );
         assert_eq!(
-            set.try_fold_solutions(db, &env, inferable, budget, choose, 0, |count, _, _| {
-                Ok(count + 1)
-            }),
+            set.try_fold_solutions(
+                db,
+                &env,
+                inferable,
+                budget,
+                SolutionMode::Reusable(ReportDiagnostics::Yes),
+                choose,
+                0,
+                |count, _, _| { Ok(count + 1) }
+            ),
             Err(ProjectionError::IncompleteSolution)
         );
     }
@@ -890,6 +899,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                         &env,
                         inferable,
                         budget,
+                        SolutionMode::Reusable(ReportDiagnostics::Yes),
                         choose,
                         Vec::new(),
                         |mut paths, path, budget| {
@@ -957,6 +967,7 @@ fn valid_unsolved_path_is_not_unconstrained() {
                 &env,
                 inferable,
                 budget,
+                SolutionMode::Reusable(ReportDiagnostics::Yes),
                 |_, _| selected,
                 0,
                 |count, path, _| {
@@ -1010,6 +1021,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
             &env,
             inferable,
             budget,
+            SolutionMode::Reusable(ReportDiagnostics::Yes),
             |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
             Type::Never,
             |accumulated, path, budget| {
