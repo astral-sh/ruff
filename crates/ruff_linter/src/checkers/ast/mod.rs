@@ -2494,12 +2494,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
         // Step 1: Binding
-        let name = match pattern {
-            Pattern::MatchAs(pattern) => pattern.name.as_ref(),
-            Pattern::MatchStar(pattern) => pattern.name.as_ref(),
-            Pattern::MatchMapping(mapping) => mapping.rest(),
-            _ => None,
-        };
+        let name = pattern.capture_name();
         if let Some(name) = name {
             self.add_binding(
                 name,

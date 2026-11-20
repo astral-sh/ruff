@@ -1591,15 +1591,8 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
     }
 
     fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
-        let binding = match pattern {
-            ast::Pattern::MatchStar(pattern) => pattern.name.as_ref(),
-            ast::Pattern::MatchAs(pattern) => pattern.name.as_ref(),
-            ast::Pattern::MatchMapping(pattern) => pattern.rest(),
-            _ => None,
-        };
-
         let previous_binding = self.pattern_binding;
-        self.pattern_binding = binding;
+        self.pattern_binding = pattern.capture_name();
         source_order::walk_pattern(self, pattern);
         self.pattern_binding = previous_binding;
     }

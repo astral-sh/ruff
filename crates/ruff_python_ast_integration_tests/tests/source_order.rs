@@ -114,6 +114,30 @@ fn mapping_pattern_with_misplaced_captures() {
 }
 
 #[test]
+fn mapping_pattern_rest_finds_the_last_capture_in_recovered_syntax() {
+    for (pattern, expected) in [
+        ("{}", None),
+        ("{1: a, 2: b}", None),
+        ("{1: a, **only}", Some("only")),
+        ("{**first, **last, 1: a, 2: b}", Some("last")),
+        ("{**first, 1: a, **last, 2: b}", Some("last")),
+    ] {
+        let source = format!("match x:\n    case {pattern}: pass");
+        let parsed = parse_unchecked(&source, ParseOptions::from(Mode::Module))
+            .try_into_module()
+            .unwrap();
+        let stmt = parsed.suite().first().unwrap().as_match_stmt().unwrap();
+        let case = stmt.cases.first().unwrap();
+        let mapping = case.pattern.as_match_mapping().unwrap();
+        assert_eq!(
+            mapping.rest().map(ruff_python_ast::Identifier::as_str),
+            expected,
+            "{pattern}"
+        );
+    }
+}
+
+#[test]
 fn match_class_pattern() {
     let source = r"
 match x:

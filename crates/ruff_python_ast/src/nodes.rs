@@ -3100,6 +3100,16 @@ pub struct MatchCase {
 }
 
 impl Pattern {
+    /// The name bound by this pattern itself, excluding nested patterns.
+    pub fn capture_name(&self) -> Option<&Identifier> {
+        match self {
+            Self::MatchAs(pattern) => pattern.name.as_ref(),
+            Self::MatchStar(pattern) => pattern.name.as_ref(),
+            Self::MatchMapping(pattern) => pattern.rest(),
+            _ => None,
+        }
+    }
+
     /// Checks if the [`Pattern`] is an [irrefutable pattern].
     ///
     /// [irrefutable pattern]: https://peps.python.org/pep-0634/#irrefutable-case-blocks
