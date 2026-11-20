@@ -313,10 +313,10 @@ impl<'db> PEP695TypeAliasType<'db> {
 /// twice, use the positional argument for error recovery.
 pub(super) fn type_alias_arguments(arguments: &ast::Arguments) -> Option<(&ast::Expr, &ast::Expr)> {
     let name = factory_name_argument(arguments)?;
-    let value = arguments.args.get(1).or_else(|| {
+    let value = arguments.args().nth(1).or_else(|| {
         arguments
             .find_keyword("value")
-            .map(|keyword| &keyword.value)
+            .map(|keyword| keyword.value.as_ref())
     })?;
     Some((name, value))
 }

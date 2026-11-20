@@ -66,14 +66,8 @@ impl AlwaysFixableViolation for UnnecessaryLiteralWithinListCall {
 
 /// C410
 pub(crate) fn unnecessary_literal_within_list_call(checker: &Checker, call: &ast::ExprCall) {
-    if !call.arguments.keywords.is_empty() {
-        return;
-    }
-    if call.arguments.args.len() > 1 {
-        return;
-    }
     let Some(argument) =
-        helpers::first_argument_with_matching_function("list", &call.func, &call.arguments.args)
+        helpers::exactly_one_argument_with_matching_function("list", &call.func, &call.arguments)
     else {
         return;
     };

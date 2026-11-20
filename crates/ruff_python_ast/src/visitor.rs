@@ -4,11 +4,11 @@ pub mod source_order;
 pub mod transformer;
 
 use crate::{
-    self as ast, Alias, AnyParameterRef, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension,
-    Decorator, DictItem, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringPartRef,
-    InterpolatedStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
-    PatternArguments, PatternKeyword, Stmt, StringLiteral, TString, TypeParam, TypeParamParamSpec,
-    TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
+    self as ast, Alias, AnyParameterRef, ArgOrKeyword, Arguments, BoolOp, BytesLiteral, CmpOp,
+    Comprehension, Decorator, DictItem, ElifElseClause, ExceptHandler, Expr, ExprContext, FString,
+    FStringPartRef, InterpolatedStringElement, Keyword, MatchCase, Operator, Parameter, Parameters,
+    Pattern, PatternArguments, PatternKeyword, Stmt, StringLiteral, TString, TypeParam,
+    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -658,15 +658,10 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
 }
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
-    // Note that there might be keywords before the last arg, e.g. in
-    // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
-    // `keywords`. See also [Arguments::arguments_source_order`].
-    for arg in &*arguments.args {
-        visitor.visit_expr(arg);
-    }
-    for keyword in &*arguments.keywords {
-        visitor.visit_keyword(keyword);
-    }
+    arguments.for_each_in_evaluation_order(|argument| match argument {
+        ArgOrKeyword::Arg(expr) => visitor.visit_expr(expr),
+        ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),
+    });
 }
 
 pub fn walk_parameters<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameters: &'a Parameters) {

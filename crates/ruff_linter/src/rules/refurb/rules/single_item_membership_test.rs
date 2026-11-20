@@ -127,13 +127,11 @@ fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Ex
             range_start: _,
             node_index: _,
         }) => {
-            if arguments.len() != 1 || !is_set_method(func, semantic) {
+            let arg = arguments.as_single_positional()?;
+            if !is_set_method(func, semantic) {
                 return None;
             }
-
-            arguments
-                .find_positional(0)
-                .and_then(|arg| single_item(arg, semantic))
+            single_item(arg, semantic)
         }
         string_expr @ Expr::StringLiteral(ExprStringLiteral { value: string, .. })
             if string.chars().count() == 1 =>

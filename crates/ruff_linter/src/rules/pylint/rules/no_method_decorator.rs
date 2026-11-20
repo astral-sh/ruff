@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::collections::HashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -121,23 +122,15 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
             {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if id == method_name && checker.semantic().has_builtin_binding(method_name) {
-                        if arguments.args.len() != 1 {
+                        let Some([Expr::Name(ast::ExprName { id, .. })]) =
+                            arguments.args().collect_array()
+                        else {
                             continue;
-                        }
-
-                        if targets.len() != 1 {
-                            continue;
-                        }
-
-                        let target_name = match targets.first() {
-                            Some(Expr::Name(ast::ExprName { id, .. })) => id.to_string(),
-                            _ => continue,
                         };
-
-                        if let Expr::Name(ast::ExprName { id, .. }) = &arguments.args[0] {
-                            if target_name == *id {
-                                explicit_decorator_calls.insert(id.clone(), stmt);
-                            }
+                        if let [Expr::Name(target)] = targets.as_slice()
+                            && target.id == *id
+                        {
+                            explicit_decorator_calls.insert(id.clone(), stmt);
                         }
                     }
                 }

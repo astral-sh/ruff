@@ -863,8 +863,7 @@ Module(
                                 arguments: Arguments {
                                     range: 567..569,
                                     node_index: NodeIndex(None),
-                                    args: [],
-                                    keywords: [],
+                                    items: [],
                                 },
                             },
                         ),
@@ -1216,8 +1215,7 @@ Module(
                                         arguments: Arguments {
                                             range: 681..683,
                                             node_index: NodeIndex(None),
-                                            args: [],
-                                            keywords: [],
+                                            items: [],
                                         },
                                     },
                                 ),
@@ -1269,8 +1267,7 @@ Module(
                                             arguments: Arguments {
                                                 range: 696..698,
                                                 node_index: NodeIndex(None),
-                                                args: [],
-                                                keywords: [],
+                                                items: [],
                                             },
                                         },
                                     ),
@@ -1507,8 +1504,7 @@ Module(
                                             arguments: Arguments {
                                                 range: 766..768,
                                                 node_index: NodeIndex(None),
-                                                args: [],
-                                                keywords: [],
+                                                items: [],
                                             },
                                         },
                                     ),

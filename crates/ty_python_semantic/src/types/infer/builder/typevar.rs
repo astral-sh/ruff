@@ -147,9 +147,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(default_expr) = default.as_deref() {
             let default_ty = self.infer_type_expression(default_expr);
             if !self.check_default_for_outer_scope_typevars(default_ty, default_expr, &name.id) {
-                let bound_node = bound_node.map(|n| match n {
-                    ast::Expr::Tuple(tuple) => BoundOrConstraintsNodes::Constraints(&tuple.elts),
-                    _ => BoundOrConstraintsNodes::Bound(n),
+                let bound_node = bound_node.and_then(|node| match node {
+                    ast::Expr::Tuple(tuple) => {
+                        let [first, .., last] = tuple.elts.as_slice() else {
+                            return None;
+                        };
+                        Some(BoundOrConstraintsNodes::Constraints(TextRange::new(
+                            first.start(),
+                            last.end(),
+                        )))
+                    }
+                    _ => Some(BoundOrConstraintsNodes::Bound(node)),
                 });
                 self.validate_typevar_default(
                     Some(&name.id),
@@ -219,12 +227,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         "TypeVar default is inconsistent \
                                     with the TypeVar's constraints",
                     );
-                    if let Some(BoundOrConstraintsNodes::Constraints([first, .., last])) =
+                    if let Some(BoundOrConstraintsNodes::Constraints(range)) =
                         bound_or_constraints_nodes
                     {
-                        let secondary = self
-                            .context
-                            .secondary(TextRange::new(first.start(), last.end()));
+                        let secondary = self.context.secondary(range);
                         let secondary = if let Some(name) = name {
                             secondary.message(format_args!("Constraints of `{name}`"))
                         } else {
@@ -785,7 +791,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
-        if arguments.args.len() > 1 {
+        let mut positional = arguments.args();
+        let positional_name = positional.next();
+        if positional.next().is_some() {
             return error(
                 &self.context,
                 "`TypeVarTuple` can only have one positional argument",
@@ -793,7 +801,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = positional_name.filter(|arg| arg.is_starred_expr()) {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `TypeVarTuple` creation",
@@ -801,7 +809,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        for kwarg in &arguments.keywords {
+        for kwarg in arguments.keywords() {
             let Some(identifier) = kwarg.arg.as_ref() else {
                 return error(
                     &self.context,
@@ -811,16 +819,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             match identifier.id().as_str() {
                 "name" => {
-                    if !arguments.args.is_empty() {
+                    if positional_name.is_some() {
                         return error(
                             &self.context,
                             "The `name` parameter of `TypeVarTuple` can only be provided once",
                             kwarg,
                         );
                     }
-                    name_param_node = Some(&kwarg.value);
+                    name_param_node = Some(kwarg.value.as_ref());
                     name_param_ty =
-                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                        Some(self.infer_expression(kwarg.value.as_ref(), TypeContext::default()));
                 }
                 "default" => {
                     if !assume_all_features
@@ -861,7 +869,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .infer_expression(kwarg.value.as_ref(), TypeContext::default())
                         .bool(db, env)
                     {
                         Truthiness::AlwaysTrue => covariant = true,
@@ -872,7 +880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `covariant` parameter of `TypeVarTuple` \
                                 cannot have an ambiguous truthiness",
-                                &kwarg.value,
+                                kwarg.value.as_ref(),
                             );
                         }
                     }
@@ -888,7 +896,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .infer_expression(kwarg.value.as_ref(), TypeContext::default())
                         .bool(db, env)
                     {
                         Truthiness::AlwaysTrue => contravariant = true,
@@ -899,7 +907,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `contravariant` parameter of `TypeVarTuple` \
                                 cannot have an ambiguous truthiness",
-                                &kwarg.value,
+                                kwarg.value.as_ref(),
                             );
                         }
                     }
@@ -915,7 +923,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .infer_expression(kwarg.value.as_ref(), TypeContext::default())
                         .bool(db, env)
                     {
                         Truthiness::AlwaysTrue => infer_variance = true,
@@ -926,7 +934,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `infer_variance` parameter of `TypeVarTuple` \
                                 cannot have an ambiguous truthiness",
-                                &kwarg.value,
+                                kwarg.value.as_ref(),
                             );
                         }
                     }
@@ -939,7 +947,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ),
                         kwarg,
                     );
-                    self.infer_expression(&kwarg.value, TypeContext::default());
+                    self.infer_expression(kwarg.value.as_ref(), TypeContext::default());
                 }
             }
         }
@@ -966,9 +974,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
-            arguments
-                .find_positional(0)
-                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+            positional_name.map(|arg| self.infer_expression(arg, TypeContext::default()))
         }) else {
             return error(
                 &self.context,
@@ -989,7 +995,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         }
-        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
+        let name_param_node = name_param_node.or(positional_name);
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -1065,7 +1071,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
-        if arguments.args.len() > 1 {
+        let mut positional = arguments.args();
+        let positional_name = positional.next();
+        if positional.next().is_some() {
             return error(
                 &self.context,
                 "`ParamSpec` can only have one positional argument",
@@ -1073,7 +1081,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+        if let Some(starred) = positional_name.filter(|arg| arg.is_starred_expr()) {
             return error(
                 &self.context,
                 "Starred arguments are not supported in `ParamSpec` creation",
@@ -1081,7 +1089,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        for kwarg in &arguments.keywords {
+        for kwarg in arguments.keywords() {
             let Some(identifier) = kwarg.arg.as_ref() else {
                 return error(
                     &self.context,
@@ -1093,16 +1101,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "name" => {
                     // Duplicate keyword argument is a syntax error, so we don't have to check if
                     // `name_param_ty.is_some()` here.
-                    if !arguments.args.is_empty() {
+                    if positional_name.is_some() {
                         return error(
                             &self.context,
                             "The `name` parameter of `ParamSpec` can only be provided once",
                             kwarg,
                         );
                     }
-                    name_param_node = Some(&kwarg.value);
+                    name_param_node = Some(kwarg.value.as_ref());
                     name_param_ty =
-                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                        Some(self.infer_expression(kwarg.value.as_ref(), TypeContext::default()));
                 }
                 "bound" => {
                     return error(
@@ -1122,7 +1130,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .infer_expression(kwarg.value.as_ref(), TypeContext::default())
                         .bool(db, env)
                     {
                         Truthiness::AlwaysTrue => infer_variance = true,
@@ -1133,14 +1141,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `infer_variance` parameter of `ParamSpec` \
                                 cannot have an ambiguous truthiness",
-                                &kwarg.value,
+                                kwarg.value.as_ref(),
                             );
                         }
                     }
                 }
                 "covariant" => {
                     match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .infer_expression(kwarg.value.as_ref(), TypeContext::default())
                         .bool(db, env)
                     {
                         Truthiness::AlwaysTrue => covariant = true,
@@ -1151,14 +1159,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `covariant` parameter of `ParamSpec` \
                                 cannot have an ambiguous truthiness",
-                                &kwarg.value,
+                                kwarg.value.as_ref(),
                             );
                         }
                     }
                 }
                 "contravariant" => {
                     match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .infer_expression(kwarg.value.as_ref(), TypeContext::default())
                         .bool(db, env)
                     {
                         Truthiness::AlwaysTrue => contravariant = true,
@@ -1169,7 +1177,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `contravariant` parameter of `ParamSpec` \
                                 cannot have an ambiguous truthiness",
-                                &kwarg.value,
+                                kwarg.value.as_ref(),
                             );
                         }
                     }
@@ -1198,7 +1206,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         format_args!("Unknown keyword argument `{name}` in `ParamSpec` creation"),
                         kwarg,
                     );
-                    self.infer_expression(&kwarg.value, TypeContext::default());
+                    self.infer_expression(kwarg.value.as_ref(), TypeContext::default());
                 }
             }
         }
@@ -1225,9 +1233,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
-            arguments
-                .find_positional(0)
-                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+            positional_name.map(|arg| self.infer_expression(arg, TypeContext::default()))
         }) else {
             return error(
                 &self.context,
@@ -1248,7 +1254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         }
-        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
+        let name_param_node = name_param_node.or(positional_name);
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -1325,15 +1331,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut name_param_ty = None;
         let mut name_param_node = None;
 
-        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
-            return error(
-                &self.context,
-                "Starred arguments are not supported in `TypeVar` creation",
-                starred,
-            );
+        let mut positional_name = None;
+        let mut first_constraint = None;
+        let mut multiple_constraints = false;
+        for (index, arg) in arguments.args().enumerate() {
+            if arg.is_starred_expr() {
+                return error(
+                    &self.context,
+                    "Starred arguments are not supported in `TypeVar` creation",
+                    arg,
+                );
+            }
+            match index {
+                0 => positional_name = Some(arg),
+                1 => first_constraint = Some(arg),
+                _ => multiple_constraints = true,
+            }
         }
 
-        for kwarg in &arguments.keywords {
+        for kwarg in arguments.keywords() {
             let Some(identifier) = kwarg.arg.as_ref() else {
                 return error(
                     &self.context,
@@ -1345,21 +1361,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "name" => {
                     // Duplicate keyword argument is a syntax error, so we don't have to check if
                     // `name_param_ty.is_some()` here.
-                    if !arguments.args.is_empty() {
+                    if positional_name.is_some() {
                         return error(
                             &self.context,
                             "The `name` parameter of `TypeVar` can only be provided once.",
                             kwarg,
                         );
                     }
-                    name_param_node = Some(&kwarg.value);
+                    name_param_node = Some(kwarg.value.as_ref());
                     name_param_ty =
-                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                        Some(self.infer_expression(kwarg.value.as_ref(), TypeContext::default()));
                 }
                 "bound" => has_bound = true,
                 "covariant" => {
                     match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .infer_expression(kwarg.value.as_ref(), TypeContext::default())
                         .bool(db, env)
                     {
                         Truthiness::AlwaysTrue => covariant = true,
@@ -1370,14 +1386,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `covariant` parameter of `TypeVar` \
                                 cannot have an ambiguous truthiness",
-                                &kwarg.value,
+                                kwarg.value.as_ref(),
                             );
                         }
                     }
                 }
                 "contravariant" => {
                     match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .infer_expression(kwarg.value.as_ref(), TypeContext::default())
                         .bool(db, env)
                     {
                         Truthiness::AlwaysTrue => contravariant = true,
@@ -1388,7 +1404,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `contravariant` parameter of `TypeVar` \
                                 cannot have an ambiguous truthiness",
-                                &kwarg.value,
+                                kwarg.value.as_ref(),
                             );
                         }
                     }
@@ -1421,7 +1437,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
+                        .infer_expression(kwarg.value.as_ref(), TypeContext::default())
                         .bool(db, env)
                     {
                         Truthiness::AlwaysTrue => infer_variance = true,
@@ -1432,7 +1448,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &self.context,
                                 "The `infer_variance` parameter of `TypeVar` \
                                 cannot have an ambiguous truthiness",
-                                &kwarg.value,
+                                kwarg.value.as_ref(),
                             );
                         }
                     }
@@ -1447,7 +1463,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         format_args!("Unknown keyword argument `{name}` in `TypeVar` creation"),
                         kwarg,
                     );
-                    self.infer_expression(&kwarg.value, TypeContext::default());
+                    self.infer_expression(kwarg.value.as_ref(), TypeContext::default());
                 }
             }
         }
@@ -1474,9 +1490,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let Some(name_param_ty) = name_param_ty.or_else(|| {
-            arguments
-                .find_positional(0)
-                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+            positional_name.map(|arg| self.infer_expression(arg, TypeContext::default()))
         }) else {
             return error(
                 &self.context,
@@ -1497,7 +1511,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         }
-        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
+        let name_param_node = name_param_node.or(positional_name);
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -1602,19 +1616,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
         // only check presence/absence/number here.
 
-        let constraints = arguments.args.get(1..).unwrap_or_default();
-
-        let bound_or_constraints = match (has_bound, constraints) {
-            (false, []) => None,
-            (true, []) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
-            (true, _) => {
+        let bound_or_constraints = match (has_bound, first_constraint) {
+            (false, None) => None,
+            (true, None) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
+            (true, Some(_)) => {
                 return error(
                     &self.context,
                     "A `TypeVar` cannot have both a bound and constraints",
                     call_expr,
                 );
             }
-            (false, [constraint]) => {
+            (false, Some(constraint)) if !multiple_constraints => {
                 if let Some(builder) = self
                     .context
                     .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, constraint)

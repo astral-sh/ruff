@@ -79,17 +79,18 @@ Module(
                                     arguments: Arguments {
                                         range: 64..69,
                                         node_index: NodeIndex(None),
-                                        args: [
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 65..68,
-                                                    id: Name("foo"),
-                                                    ctx: Load,
-                                                },
+                                        items: [
+                                            Positional(
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 65..68,
+                                                        id: Name("foo"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
                                             ),
                                         ],
-                                        keywords: [],
                                     },
                                 },
                             ),

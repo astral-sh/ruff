@@ -198,8 +198,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
     let node3 = ast::ExprCall {
         func: Box::new(node2.into()),
         arguments: Arguments {
-            args: [node1, node].into(),
-            keywords: std::iter::empty().collect(),
+            items: [node1, node].map(ast::Argument::Positional).into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -300,8 +299,9 @@ pub(crate) fn if_exp_instead_of_dict_get(
     let fixed_node = ast::ExprCall {
         func: Box::new(dict_get_node.into()),
         arguments: Arguments {
-            args: [dict_key_node, default_value_node].into(),
-            keywords: std::iter::empty().collect(),
+            items: [dict_key_node, default_value_node]
+                .map(ast::Argument::Positional)
+                .into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },

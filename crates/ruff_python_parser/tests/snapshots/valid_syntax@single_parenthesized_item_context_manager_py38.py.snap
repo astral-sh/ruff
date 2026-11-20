@@ -34,30 +34,31 @@ Module(
                                     arguments: Arguments {
                                         range: 56..67,
                                         node_index: NodeIndex(None),
-                                        args: [
-                                            StringLiteral(
-                                                ExprStringLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 57..66,
-                                                    value: StringLiteralValue {
-                                                        inner: Single(
-                                                            StringLiteral {
-                                                                range: 57..66,
-                                                                node_index: NodeIndex(None),
-                                                                value: "foo.txt",
-                                                                flags: StringLiteralFlags {
-                                                                    quote_style: Single,
-                                                                    prefix: Empty,
-                                                                    triple_quoted: false,
-                                                                    unclosed: false,
+                                        items: [
+                                            Positional(
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 57..66,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 57..66,
+                                                                    node_index: NodeIndex(None),
+                                                                    value: "foo.txt",
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Single,
+                                                                        prefix: Empty,
+                                                                        triple_quoted: false,
+                                                                        unclosed: false,
+                                                                    },
                                                                 },
-                                                            },
-                                                        ),
+                                                            ),
+                                                        },
                                                     },
-                                                },
+                                                ),
                                             ),
                                         ],
-                                        keywords: [],
                                     },
                                 },
                             ),
@@ -113,30 +114,31 @@ Module(
                                     arguments: Arguments {
                                         range: 94..105,
                                         node_index: NodeIndex(None),
-                                        args: [
-                                            StringLiteral(
-                                                ExprStringLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 95..104,
-                                                    value: StringLiteralValue {
-                                                        inner: Single(
-                                                            StringLiteral {
-                                                                range: 95..104,
-                                                                node_index: NodeIndex(None),
-                                                                value: "foo.txt",
-                                                                flags: StringLiteralFlags {
-                                                                    quote_style: Single,
-                                                                    prefix: Empty,
-                                                                    triple_quoted: false,
-                                                                    unclosed: false,
+                                        items: [
+                                            Positional(
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 95..104,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 95..104,
+                                                                    node_index: NodeIndex(None),
+                                                                    value: "foo.txt",
+                                                                    flags: StringLiteralFlags {
+                                                                        quote_style: Single,
+                                                                        prefix: Empty,
+                                                                        triple_quoted: false,
+                                                                        unclosed: false,
+                                                                    },
                                                                 },
-                                                            },
-                                                        ),
+                                                            ),
+                                                        },
                                                     },
-                                                },
+                                                ),
                                             ),
                                         ],
-                                        keywords: [],
                                     },
                                 },
                             ),

@@ -158,15 +158,7 @@ fn single_argument_to_int_call<'a>(
         return None;
     }
 
-    if !arguments.keywords.is_empty() {
-        return None;
-    }
-
-    let [argument] = &*arguments.args else {
-        return None;
-    };
-
-    Some(argument)
+    arguments.as_single_positional()
 }
 
 /// Determines the [`Applicability`] for a `round(..)` call.

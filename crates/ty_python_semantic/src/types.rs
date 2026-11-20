@@ -419,9 +419,11 @@ fn definition_expression_type<'db>(
 /// Find a factory's `name` argument. If it is supplied twice, use the positional
 /// argument for error recovery.
 fn factory_name_argument(arguments: &ast::Arguments) -> Option<&ast::Expr> {
-    arguments
-        .find_positional(0)
-        .or_else(|| arguments.find_keyword("name").map(|keyword| &keyword.value))
+    arguments.find_positional(0).or_else(|| {
+        arguments
+            .find_keyword("name")
+            .map(|keyword| keyword.value.as_ref())
+    })
 }
 
 /// Infer the literal name argument in a `TypeAliasType`, `TypeVar`, `ParamSpec`, or

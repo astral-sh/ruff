@@ -29,8 +29,7 @@ Module(
                             arguments: Arguments {
                                 range: 118..120,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -67,8 +66,7 @@ Module(
                             arguments: Arguments {
                                 range: 130..132,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -128,8 +126,7 @@ Module(
                             arguments: Arguments {
                                 range: 148..150,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -180,8 +177,7 @@ Module(
                             arguments: Arguments {
                                 range: 160..162,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -234,8 +230,7 @@ Module(
                             arguments: Arguments {
                                 range: 172..174,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -289,8 +284,7 @@ Module(
                             arguments: Arguments {
                                 range: 184..186,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -346,8 +340,7 @@ Module(
                             arguments: Arguments {
                                 range: 204..206,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -399,8 +392,7 @@ Module(
                             arguments: Arguments {
                                 range: 216..218,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -473,8 +465,7 @@ Module(
                             arguments: Arguments {
                                 range: 231..233,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -507,8 +498,7 @@ Module(
                             arguments: Arguments {
                                 range: 243..245,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -532,8 +522,7 @@ Module(
                             arguments: Arguments {
                                 range: 310..312,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -557,8 +546,7 @@ Module(
                             arguments: Arguments {
                                 range: 318..320,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -581,8 +569,7 @@ Module(
                             arguments: Arguments {
                                 range: 325..327,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -620,8 +607,7 @@ Module(
                             arguments: Arguments {
                                 range: 336..338,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -647,8 +633,7 @@ Module(
                             arguments: Arguments {
                                 range: 340..342,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),
@@ -674,8 +659,7 @@ Module(
                             arguments: Arguments {
                                 range: 346..348,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),

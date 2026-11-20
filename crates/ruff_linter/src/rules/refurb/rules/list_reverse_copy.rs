@@ -116,15 +116,11 @@ fn peel_lists(expr: &Expr) -> &Expr {
         return expr;
     };
 
-    if !arguments.keywords.is_empty() {
-        return expr;
-    }
-
     if func.as_name_expr().is_none_or(|name| name.id != "list") {
         return expr;
     }
 
-    let [arg] = arguments.args.as_ref() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return expr;
     };
 
@@ -142,13 +138,7 @@ fn extract_name_from_reversed<'a>(
         func, arguments, ..
     } = expr.as_call_expr()?;
 
-    if !arguments.keywords.is_empty() {
-        return None;
-    }
-
-    let [arg] = arguments.args.as_ref() else {
-        return None;
-    };
+    let arg = arguments.as_single_positional()?;
 
     if !semantic.match_builtin_expr(func, "reversed") {
         return None;

@@ -192,8 +192,7 @@ pub(crate) fn if_expr_with_true_false(
                         .into(),
                     ),
                     arguments: Arguments {
-                        args: [test.clone()].into(),
-                        keywords: std::iter::empty().collect(),
+                        items: [ast::Argument::Positional(test.clone())].into(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },

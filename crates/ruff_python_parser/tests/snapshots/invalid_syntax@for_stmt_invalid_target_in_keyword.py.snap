@@ -30,36 +30,37 @@ Module(
                             arguments: Arguments {
                                 range: 5..13,
                                 node_index: NodeIndex(None),
-                                args: [
-                                    Compare(
-                                        ExprCompare {
-                                            node_index: NodeIndex(None),
-                                            range: 6..12,
-                                            ops: [
-                                                In,
-                                            ],
-                                            operands: [
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 6..7,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 11..12,
-                                                        id: Name("y"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            ],
-                                        },
+                                items: [
+                                    Positional(
+                                        Compare(
+                                            ExprCompare {
+                                                node_index: NodeIndex(None),
+                                                range: 6..12,
+                                                ops: [
+                                                    In,
+                                                ],
+                                                operands: [
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 6..7,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 11..12,
+                                                            id: Name("y"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
                                     ),
                                 ],
-                                keywords: [],
                             },
                         },
                     ),
@@ -127,8 +128,7 @@ Module(
                             arguments: Arguments {
                                 range: 41..43,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [],
+                                items: [],
                             },
                         },
                     ),

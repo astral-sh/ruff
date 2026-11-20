@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableKeyword;
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -73,17 +73,14 @@ pub(crate) fn unnecessary_double_cast_or_process(
     checker: &Checker,
     expr: &Expr,
     outer_func: &Expr,
-    args: &[Expr],
-    outer_kw: &[Keyword],
+    outer_arguments: &ast::Arguments,
 ) {
-    let Some(arg) = args.first() else {
+    let Some(arg) = outer_arguments.args().next() else {
         return;
     };
     let Expr::Call(ast::ExprCall {
         func: inner_func,
-        arguments: Arguments {
-            keywords: inner_kw, ..
-        },
+        arguments,
         ..
     }) = arg
     else {
@@ -106,12 +103,12 @@ pub(crate) fn unnecessary_double_cast_or_process(
     // Avoid collapsing nested `sorted` calls with non-identical keyword arguments
     // (i.e., `key`, `reverse`).
     if inner_func_name == "sorted" && outer_func_name == "sorted" {
-        if inner_kw.len() != outer_kw.len() {
+        if arguments.keywords().count() != outer_arguments.keywords().count() {
             return;
         }
-        if !inner_kw.iter().all(|inner| {
-            outer_kw
-                .iter()
+        if !arguments.keywords().all(|inner| {
+            outer_arguments
+                .keywords()
                 .any(|outer| ComparableKeyword::from(inner) == ComparableKeyword::from(outer))
         }) {
             return;
