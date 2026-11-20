@@ -224,6 +224,19 @@ pub enum ParseError {
 }
 
 impl RuleSelector {
+    /// Display an exact rule by name and optional code, or a broader selector by its text.
+    /// The alternate format surrounds names, codes, and selectors with backticks.
+    pub fn name_and_code(&self) -> impl std::fmt::Display + '_ {
+        std::fmt::from_fn(|f| match self {
+            Self::Rule { rule } => std::fmt::Display::fmt(&rule.name_and_code(), f),
+            _ => {
+                let (prefix, code) = self.prefix_and_code();
+                let quote = if f.alternate() { "`" } else { "" };
+                write!(f, "{quote}{prefix}{code}{quote}")
+            }
+        })
+    }
+
     pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
             RuleSelector::All => ("", "ALL"),
