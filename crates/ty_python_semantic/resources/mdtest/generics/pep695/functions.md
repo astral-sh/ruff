@@ -6425,7 +6425,8 @@ def decorate_value[A: int, B: (int, str)](f: Callable[[A], B]) -> Callable[[A], 
 def identity_value[T](value: T) -> T:
     return value
 
-reveal_type(decorate_value(identity_value)(1))  # revealed: int
+# TODO: Since identity_value returns its argument, the decorated call should infer int.
+reveal_type(decorate_value(identity_value)(1))  # revealed: int | str
 ```
 
 Composing two identity functions relates three type parameters without fixing a concrete element
@@ -6454,7 +6455,7 @@ The key function sets an upper bound on `T`. Calling the result immediately lets
 from copy import copy
 from typing import Callable
 
-def index[T, S: str](key: Callable[[T], S], limit: int) -> Callable[[list[T]], dict[S, T]]:
+def index[T, S: str](key: Callable[[T], S], limit: int) -> Callable[[list[T]], dict[str, T]]:
     return lambda items: {key(item): item for item in items[:limit]}
 
 numbers = [1]

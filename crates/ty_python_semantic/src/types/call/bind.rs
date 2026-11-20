@@ -6618,11 +6618,13 @@ impl<'db> CallInference<'_, 'db> {
         }) {
             return (specialize_return_ty(merged_specialization), false);
         }
+        // Check variance in the declared return type. Deferring `T` to the next call
+        // moves it into a fresh variable's bound, hiding invariant uses such as `list[T]`.
         let return_variables: SmallVec<[_; 4]> = generic_context
             .variables(db)
             .enumerate()
             .filter(|(_, variable)| {
-                any_over_type_expanding_aliases(db, env, self.return_ty, |ty| {
+                any_over_type_expanding_aliases(db, env, self.signature.return_ty, |ty| {
                     matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
                 })
             })
@@ -6843,7 +6845,8 @@ impl<'db> CallInference<'_, 'db> {
                 return false;
             }
             variance = variance.join(
-                self.return_ty
+                self.signature
+                    .return_ty
                     .variance_of(db, env, variable.identity(db))
                     .evaluate(db),
             );
