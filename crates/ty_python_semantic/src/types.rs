@@ -112,8 +112,8 @@ pub(crate) use crate::types::typevar::{
     BindingContext, BoundTypeVarIdentity, ParamSpecAttrKind, SelfTypeVarOrigin,
     TypeVarBoundOrConstraints, TypeVarNonce,
 };
-pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarFreshening, TypeVarKind};
-use crate::types::typevar::{TypeVarDomain, TypeVarInstance, TypeVarSet};
+pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
+use crate::types::typevar::{TypeVarDomain, TypeVarFreshening, TypeVarInstance, TypeVarSet};
 use crate::types::union_type_instance::UnionTypeInstance;
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
