@@ -359,7 +359,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     kind,
                     &assigned_name,
                     Ok(actual_name),
-                    Applicability::Unsafe,
+                    is_identifier(&assigned_name).then_some(Applicability::Unsafe),
                 );
             }
         } else if !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))

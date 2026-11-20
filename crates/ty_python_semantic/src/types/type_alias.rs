@@ -993,15 +993,9 @@ impl<'db> QualifiedTypeAliasName<'db> {
     /// Returns the components of the qualified name of this type alias, excluding the alias itself.
     ///
     /// For example, calling this method on a type alias `D` inside a class `C` in module `a.b`
-    /// would return `["a", "b", "C"]`.
+    /// would return `["a.b", "C"]`.
     pub(crate) fn components_excluding_self(&self) -> Vec<String> {
-        let definition = self.definition;
-        let file = definition.program_file(self.db);
-        let file_scope_id = definition.file_scope(self.db);
-
-        // Type aliases are defined directly in their enclosing scope (no body scope like classes),
-        // so we don't skip any ancestor scopes.
-        qualified_name_components_from_scope(self.db, file, file_scope_id, 0)
+        qualified_name_components_from_scope(self.db, self.definition.scope_id(self.db))
     }
 }
 

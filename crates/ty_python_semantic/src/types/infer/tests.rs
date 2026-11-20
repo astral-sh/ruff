@@ -313,16 +313,17 @@ fn not_literal_string() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Fixing a mismatched `TypeVar` name clears the diagnostic in one edit even when the
-/// replacement literal is long enough that ty infers `LiteralString` for it. Since that
+/// Fixing a mismatched `TypeVar` name clears the diagnostic in one edit even when both
+/// the original and replacement literals are long enough to infer `LiteralString`. Since that
 /// type doesn't encode the exact string, ty infers `str` for the type variable's `__name__`.
 #[test]
 fn fix_mismatched_typevar_name_above_literal_size_limit() -> anyhow::Result<()> {
     let mut db = setup_db();
     let target = "T".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1);
+    let wrong_name = format!("{target}_");
     let source = format!(
         r#"from typing import TypeVar
-{target} = TypeVar("Wrong")"#
+{target} = TypeVar("{wrong_name}")"#
     );
     db.write_file("src/main.py", &source)?;
     let file = system_path_to_file(&db, "src/main.py")?;
@@ -340,7 +341,10 @@ fn fix_mismatched_typevar_name_above_literal_size_limit() -> anyhow::Result<()> 
     )
     .unwrap();
     assert_eq!(result.count, 1);
-    assert_eq!(&*source_text(&db, file), source.replace("Wrong", &target));
+    assert_eq!(
+        &*source_text(&db, file),
+        source.replace(&wrong_name, &target)
+    );
     assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
 
     let env = db.program_environment();

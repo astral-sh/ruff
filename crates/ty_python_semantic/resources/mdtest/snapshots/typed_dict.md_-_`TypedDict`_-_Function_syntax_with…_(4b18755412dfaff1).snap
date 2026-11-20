@@ -178,6 +178,7 @@ help: Use `"Y"` as the name
 19 +     Y = TypedDict("Y", {})
 20 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 ```
 
