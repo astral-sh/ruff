@@ -5070,19 +5070,17 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
 
 pub(crate) fn report_invalid_type_param_order<'db>(
     context: &InferContext<'db, '_>,
-    class: StaticClassLiteral<'db>,
-    node: &ast::StmtClassDef,
+    bases: &[ExpandedClassBaseEntry<'_, 'db>],
     typevar_with_default: TypeVarInstance<'db>,
     invalid_later_typevars: &[TypeVarInstance<'db>],
 ) {
     let db = context.db();
 
-    let base_index = class
-        .explicit_bases(context.db())
+    let base_node = bases
         .iter()
-        .position(|base| {
+        .find(|entry| {
             matches!(
-                base,
+                entry.ty(),
                 Type::KnownInstance(
                     KnownInstanceType::SubscriptedProtocol(_)
                         | KnownInstanceType::SubscriptedGeneric(_)
@@ -5093,9 +5091,8 @@ pub(crate) fn report_invalid_type_param_order<'db>(
             "It should not be possible for a class to have \
             a legacy generic context if it does \
             not inherit from `Protocol[]` or `Generic[]`",
-        );
-
-    let base_node = &node.bases()[base_index];
+        )
+        .source_node();
 
     let primary_diagnostic_range = base_node
         .as_subscript_expr()

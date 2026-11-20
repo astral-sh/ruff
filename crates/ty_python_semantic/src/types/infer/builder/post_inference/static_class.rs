@@ -923,8 +923,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             {
                 report_invalid_type_param_order(
                     context,
-                    class,
-                    class_node,
+                    &expanded_base_entries,
                     state.typevar_with_default,
                     &state.invalid_later_tvars,
                 );

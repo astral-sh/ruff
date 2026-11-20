@@ -427,6 +427,28 @@ def _(value: T) -> None:
     Protocol[value]  # error: [invalid-argument-type]
 ```
 
+## Type parameter order in an unpacked generic base
+
+When a class unpacks a tuple of bases, we report an invalid type parameter order on the `Generic`
+base inside the tuple.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", default=int)
+U = TypeVar("U")
+
+class C(*(
+    int,
+    Generic[T, U],  # error: [invalid-generic-class]
+)): ...
+```
+
 ## Recursive structural types in generic arguments
 
 A recursive protocol instance is not a valid `Generic` argument, even when its members keep changing
