@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 use std::hash::{BuildHasher, RandomState};
 
+use ruff_python_ast::HasNodeIndex;
 use ruff_python_ast::comparable::{
     ComparableExpr, ComparableLiteral, ComparableMod, ComparableStmt, HashableExpr,
 };
-use ruff_python_ast::{HasNodeIndex, Mod, NodeIndex};
 use ruff_python_parser::{
     Mode, ParseError, ParseOptions, parse_expression, parse_module, parse_unchecked,
 };
@@ -71,24 +71,28 @@ fn call_arguments() -> Result<(), ParseError> {
 
 #[test]
 fn name_keys_ignore_context_location_and_node_index() -> Result<(), ParseError> {
-    let parsed = parse_expression("[item for item in items]")?;
-    let comprehension = parsed.expr().as_list_comp_expr().unwrap();
-    let key = ComparableExpr::from(&comprehension.elt);
-    let seen = HashSet::from([key]);
-    let hash = seen.hasher().hash_one(key);
+    let mut parsed = parse_module("item = item")?;
+    let value = parsed.suite().at(0).as_assign_stmt().unwrap().value();
+    let node_index = value.node_index();
+    let hasher = RandomState::new();
+    let hash = hasher.hash_one(ComparableExpr::from(value));
 
-    comprehension.elt.node_index().set(NodeIndex::from(7));
-    assert_eq!(seen.hasher().hash_one(key), hash);
-    let target = comprehension.generators[0].target.as_name_expr().unwrap();
-    assert!(seen.contains(&ComparableExpr::from(target)));
+    parsed.index_module();
+    let assignment = parsed.suite().at(0).as_assign_stmt().unwrap();
+    let value = assignment.value();
+    assert_ne!(value.node_index(), node_index);
+    let key = ComparableExpr::from(value);
+    assert_eq!(hasher.hash_one(key), hash);
+    let target = assignment.targets().at(0).as_name_expr().unwrap();
+    assert!(HashSet::from([key]).contains(&ComparableExpr::from(target)));
     Ok(())
 }
 
 #[test]
 fn formatter_ast_diff_shows_only_structural_changes() -> Result<(), ParseError> {
     fn debug_module(source: &str) -> Result<String, ParseError> {
-        let module = Mod::Module(parse_module(source)?.into_syntax());
-        Ok(format!("{:#?}", ComparableMod::from(&module)))
+        let module = parse_module(source)?;
+        Ok(format!("{:#?}", ComparableMod::from(module.syntax())))
     }
 
     let split = debug_module("x=b'a' b'b'")?;
@@ -102,18 +106,18 @@ fn match_statement_compares_its_pattern() -> Result<(), ParseError> {
     let left = parse_module("match x:\n    case [1, 2]: pass")?;
     let right = parse_module("match x:\n    case [0x1, 2]: pass")?;
     let different = parse_module("match x:\n    case 1 | 2: pass")?;
-    let left = ComparableStmt::from(&left.syntax().body[0]);
-    let right = ComparableStmt::from(&right.syntax().body[0]);
+    let left = ComparableStmt::from(left.suite().at(0));
+    let right = ComparableStmt::from(right.suite().at(0));
     assert_eq!(left, right);
     let hasher = RandomState::new();
     assert_eq!(hasher.hash_one(left), hasher.hash_one(right));
-    assert_ne!(left, ComparableStmt::from(&different.syntax().body[0]));
+    assert_ne!(left, ComparableStmt::from(different.suite().at(0)));
     Ok(())
 }
 
 #[test]
 fn literal_keys_preserve_part_boundaries() -> Result<(), ParseError> {
-    fn key(expr: &ruff_python_ast::Expr) -> ComparableLiteral<'_> {
+    fn key(expr: ruff_python_ast::Expr<'_>) -> ComparableLiteral<'_> {
         ComparableLiteral::from(expr.as_literal_expr().unwrap())
     }
 

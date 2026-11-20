@@ -2,7 +2,7 @@
 //! [`ruff_python_ast::token::parenthesized_range`].
 
 use ruff_python_ast::{
-    self as ast, Expr,
+    ExprKind, StmtKind,
     token::{parentheses_iterator, parenthesized_range},
 };
 use ruff_python_parser::{parse_expression, parse_module};
@@ -14,12 +14,15 @@ fn test_no_parentheses() {
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
-    let stmt = module.body.first().expect("module should have a statement");
-    let ast::Stmt::Assign(assign) = stmt else {
+    let stmt = module
+        .body()
+        .first()
+        .expect("module should have a statement");
+    let StmtKind::Assign(assign) = stmt.classify() else {
         panic!("expected `Assign` statement, got {stmt:?}");
     };
 
-    let result = parenthesized_range(assign.value.as_ref().into(), stmt.into(), tokens);
+    let result = parenthesized_range(assign.value(), stmt.into(), tokens);
     assert_eq!(result, None);
 }
 
@@ -30,12 +33,15 @@ fn test_single_parentheses() {
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
-    let stmt = module.body.first().expect("module should have a statement");
-    let ast::Stmt::Assign(assign) = stmt else {
+    let stmt = module
+        .body()
+        .first()
+        .expect("module should have a statement");
+    let StmtKind::Assign(assign) = stmt.classify() else {
         panic!("expected `Assign` statement, got {stmt:?}");
     };
 
-    let result = parenthesized_range(assign.value.as_ref().into(), stmt.into(), tokens);
+    let result = parenthesized_range(assign.value(), stmt.into(), tokens);
     let range = result.expect("should find parentheses");
     assert_eq!(&source[range], "(2 + 2)");
 }
@@ -47,12 +53,15 @@ fn test_double_parentheses() {
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
-    let stmt = module.body.first().expect("module should have a statement");
-    let ast::Stmt::Assign(assign) = stmt else {
+    let stmt = module
+        .body()
+        .first()
+        .expect("module should have a statement");
+    let StmtKind::Assign(assign) = stmt.classify() else {
         panic!("expected `Assign` statement, got {stmt:?}");
     };
 
-    let result = parenthesized_range(assign.value.as_ref().into(), stmt.into(), tokens);
+    let result = parenthesized_range(assign.value(), stmt.into(), tokens);
     let range = result.expect("should find parentheses");
     assert_eq!(&source[range], "((2 + 2))");
 }
@@ -64,12 +73,15 @@ fn test_parentheses_with_whitespace() {
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
-    let stmt = module.body.first().expect("module should have a statement");
-    let ast::Stmt::Assign(assign) = stmt else {
+    let stmt = module
+        .body()
+        .first()
+        .expect("module should have a statement");
+    let StmtKind::Assign(assign) = stmt.classify() else {
         panic!("expected `Assign` statement, got {stmt:?}");
     };
 
-    let result = parenthesized_range(assign.value.as_ref().into(), stmt.into(), tokens);
+    let result = parenthesized_range(assign.value(), stmt.into(), tokens);
     let range = result.expect("should find parentheses");
     assert_eq!(&source[range], "(  2 + 2  )");
 }
@@ -81,12 +93,15 @@ fn test_parentheses_with_comments() {
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
-    let stmt = module.body.first().expect("module should have a statement");
-    let ast::Stmt::Assign(assign) = stmt else {
+    let stmt = module
+        .body()
+        .first()
+        .expect("module should have a statement");
+    let StmtKind::Assign(assign) = stmt.classify() else {
         panic!("expected `Assign` statement, got {stmt:?}");
     };
 
-    let result = parenthesized_range(assign.value.as_ref().into(), stmt.into(), tokens);
+    let result = parenthesized_range(assign.value(), stmt.into(), tokens);
     let range = result.expect("should find parentheses");
     assert_eq!(&source[range], "( # comment\n    2 + 2\n)");
 }
@@ -98,12 +113,15 @@ fn test_parenthesized_range_multiple() {
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
-    let stmt = module.body.first().expect("module should have a statement");
-    let ast::Stmt::Assign(assign) = stmt else {
+    let stmt = module
+        .body()
+        .first()
+        .expect("module should have a statement");
+    let StmtKind::Assign(assign) = stmt.classify() else {
         panic!("expected `Assign` statement, got {stmt:?}");
     };
 
-    let result = parenthesized_range(assign.value.as_ref().into(), stmt.into(), tokens);
+    let result = parenthesized_range(assign.value(), stmt.into(), tokens);
     let range = result.expect("should find parentheses");
     assert_eq!(&source[range], "(((2 + 2)))");
 }
@@ -115,13 +133,15 @@ fn test_parentheses_iterator_multiple() {
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
-    let stmt = module.body.first().expect("module should have a statement");
-    let ast::Stmt::Assign(assign) = stmt else {
+    let stmt = module
+        .body()
+        .first()
+        .expect("module should have a statement");
+    let StmtKind::Assign(assign) = stmt.classify() else {
         panic!("expected `Assign` statement, got {stmt:?}");
     };
 
-    let ranges: Vec<_> =
-        parentheses_iterator(assign.value.as_ref().into(), Some(stmt.into()), tokens).collect();
+    let ranges: Vec<_> = parentheses_iterator(assign.value(), Some(stmt.into()), tokens).collect();
     assert_eq!(ranges.len(), 3);
     assert_eq!(&source[ranges[0]], "(2 + 2)");
     assert_eq!(&source[ranges[1]], "((2 + 2))");
@@ -135,21 +155,24 @@ fn test_call_arguments_not_counted() {
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
-    let stmt = module.body.first().expect("module should have a statement");
-    let ast::Stmt::Expr(expr_stmt) = stmt else {
+    let stmt = module
+        .body()
+        .first()
+        .expect("module should have a statement");
+    let StmtKind::Expr(expr_stmt) = stmt.classify() else {
         panic!("expected `Expr` statement, got {stmt:?}");
     };
 
-    let Expr::Call(call) = expr_stmt.value.as_ref() else {
-        panic!("expected Call expression, got {:?}", expr_stmt.value);
+    let ExprKind::Call(call) = expr_stmt.value().classify() else {
+        panic!("expected Call expression, got {:?}", expr_stmt.value());
     };
 
     let arg = call
-        .arguments
+        .arguments()
         .args()
-        .next()
+        .first()
         .expect("call should have an argument");
-    let result = parenthesized_range(arg.into(), (&call.arguments).into(), tokens);
+    let result = parenthesized_range(arg, call.arguments().into(), tokens);
     // The parentheses belong to the call, not the argument
     assert_eq!(result, None);
 }
@@ -161,21 +184,24 @@ fn test_call_with_parenthesized_argument() {
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
-    let stmt = module.body.first().expect("module should have a statement");
-    let ast::Stmt::Expr(expr_stmt) = stmt else {
+    let stmt = module
+        .body()
+        .first()
+        .expect("module should have a statement");
+    let StmtKind::Expr(expr_stmt) = stmt.classify() else {
         panic!("expected Expr statement, got {stmt:?}");
     };
 
-    let Expr::Call(call) = expr_stmt.value.as_ref() else {
-        panic!("expected `Call` expression, got {:?}", expr_stmt.value);
+    let ExprKind::Call(call) = expr_stmt.value().classify() else {
+        panic!("expected `Call` expression, got {:?}", expr_stmt.value());
     };
 
     let arg = call
-        .arguments
+        .arguments()
         .args()
-        .next()
+        .first()
         .expect("call should have an argument");
-    let result = parenthesized_range(arg.into(), (&call.arguments).into(), tokens);
+    let result = parenthesized_range(arg, call.arguments().into(), tokens);
 
     let range = result.expect("should find parentheses around argument");
     assert_eq!(&source[range], "(x)");
@@ -186,9 +212,9 @@ fn multiply_parenthesized_argument() {
     let source = "f(((a + 1)))";
     let parsed = parse_expression(source).expect("valid expression");
     let call = parsed.expr().as_call_expr().expect("call expression");
-    let argument = call.arguments.args().next().expect("call argument");
+    let argument = call.arguments().args().first().expect("call argument");
 
-    let range = parenthesized_range(argument.into(), (&call.arguments).into(), parsed.tokens())
+    let range = parenthesized_range(argument, call.arguments().into(), parsed.tokens())
         .expect("parenthesized argument");
     assert_eq!(&source[range], "((a + 1))");
 }
@@ -198,9 +224,9 @@ fn parenthesized_tuple_member() {
     let source = "(a, (b))";
     let parsed = parse_expression(source).expect("valid expression");
     let tuple = parsed.expr().as_tuple_expr().expect("tuple expression");
-    let member = tuple.elts.last().expect("tuple member");
+    let member = tuple.elts().last().expect("tuple member");
 
-    let range = parenthesized_range(member.into(), tuple.into(), parsed.tokens())
+    let range = parenthesized_range(member, tuple.into(), parsed.tokens())
         .expect("parenthesized tuple member");
     assert_eq!(&source[range], "(b)");
 }
@@ -210,10 +236,10 @@ fn tuple_parentheses_do_not_parenthesize_member() {
     let source = "(a, b)";
     let parsed = parse_expression(source).expect("valid expression");
     let tuple = parsed.expr().as_tuple_expr().expect("tuple expression");
-    let member = tuple.elts.last().expect("tuple member");
+    let member = tuple.elts().last().expect("tuple member");
 
     assert_eq!(
-        parenthesized_range(member.into(), tuple.into(), parsed.tokens()),
+        parenthesized_range(member, tuple.into(), parsed.tokens()),
         None
     );
 }
@@ -225,12 +251,15 @@ fn test_multiline_with_parentheses() {
     let tokens = parsed.tokens();
     let module = parsed.syntax();
 
-    let stmt = module.body.first().expect("module should have a statement");
-    let ast::Stmt::Assign(assign) = stmt else {
+    let stmt = module
+        .body()
+        .first()
+        .expect("module should have a statement");
+    let StmtKind::Assign(assign) = stmt.classify() else {
         panic!("expected `Assign` statement, got {stmt:?}");
     };
 
-    let result = parenthesized_range(assign.value.as_ref().into(), stmt.into(), tokens);
+    let result = parenthesized_range(assign.value(), stmt.into(), tokens);
     let range = result.expect("should find parentheses");
     assert_eq!(&source[range], "(\n    2 + 2 + 2\n)");
 }
