@@ -576,15 +576,18 @@ impl Builder {
         [body]: [u64; 1],
     ) -> BuildId<crate::kind::ModModule> {
         let mut row = Row::new(NodeKind::ModModule);
+        self.ast.validate_list(body);
         row.set_mod_module_body(body);
         self.push(row, range)
     }
 }
 impl<'a> crate::ModModule<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = self.syntax_node().row.mod_module_body();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_mod_module` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::ModExpression {
@@ -614,15 +617,18 @@ impl Builder {
         [body]: [u64; 1],
     ) -> BuildId<crate::kind::ModExpression> {
         let mut row = Row::new(NodeKind::ModExpression);
+        self.validate_child::<crate::kind::Expr, false>(split_words(body)[0]);
         row.set_mod_expression_body(split_words(body)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ModExpression<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.mod_expression_body());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_mod_expression` validates `body` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::StmtFunctionDef {
@@ -667,8 +673,14 @@ impl Builder {
     ) -> BuildId<crate::kind::StmtFunctionDef> {
         let mut row = Row::new(NodeKind::StmtFunctionDef);
         row.set_stmt_function_def_is_async(is_async.to_le_bytes()[0]);
+        self.ast.validate_list(decorator_list);
+        self.validate_child::<crate::kind::Identifier, false>(split_words(name)[0]);
         row.set_stmt_function_def_name(split_words(name)[0]);
+        self.validate_child::<crate::kind::TypeParams, true>(split_words(type_params)[0]);
         row.set_stmt_function_def_type_params(split_words(type_params)[0]);
+        self.validate_child::<crate::kind::Parameters, false>(split_words(parameters)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(returns)[0]);
+        self.ast.validate_list(body);
         row.set_stmt_function_def_extra_offset(offset(self.ast.extra.len()));
         self.ast.extra.extend([
             split_words(decorator_list)[0],
@@ -687,47 +699,65 @@ impl<'a> crate::StmtFunctionDef<'a> {
         let word = u64::from(self.syntax_node().row.stmt_function_def_is_async());
         word != 0
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn decorator_list(self) -> NodeList<'a, crate::kind::Decorator> {
         let word = {
             let base = self.syntax_node().row.stmt_function_def_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_function_def` validates `decorator_list` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> crate::Identifier<'a> {
         let word = u64::from(self.syntax_node().row.stmt_function_def_name());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_function_def` validates `name` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn type_params(self) -> Option<crate::TypeParams<'a>> {
         let word = u64::from(self.syntax_node().row.stmt_function_def_type_params());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_function_def` validates `type_params` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn parameters(self) -> crate::Parameters<'a> {
         let word = {
             let base = self.syntax_node().row.stmt_function_def_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<false>(base + 2)
         };
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_function_def` validates `parameters` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn returns(self) -> Option<crate::Expr<'a>> {
         let word = {
             let base = self.syntax_node().row.stmt_function_def_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<false>(base + 3)
         };
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_function_def` validates `returns` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.stmt_function_def_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base + 4)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_function_def` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::StmtClassDef {
@@ -761,8 +791,13 @@ impl Builder {
         [decorator_list, name, type_params, arguments, body]: [u64; 5],
     ) -> BuildId<crate::kind::StmtClassDef> {
         let mut row = Row::new(NodeKind::StmtClassDef);
+        self.ast.validate_list(decorator_list);
+        self.validate_child::<crate::kind::Identifier, false>(split_words(name)[0]);
         row.set_stmt_class_def_name(split_words(name)[0]);
+        self.validate_child::<crate::kind::TypeParams, true>(split_words(type_params)[0]);
         row.set_stmt_class_def_type_params(split_words(type_params)[0]);
+        self.validate_child::<crate::kind::Arguments, true>(split_words(arguments)[0]);
+        self.ast.validate_list(body);
         row.set_stmt_class_def_extra_offset(offset(self.ast.extra.len()));
         self.ast.extra.extend([
             split_words(decorator_list)[0],
@@ -775,39 +810,55 @@ impl Builder {
     }
 }
 impl<'a> crate::StmtClassDef<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn decorator_list(self) -> NodeList<'a, crate::kind::Decorator> {
         let word = {
             let base = self.syntax_node().row.stmt_class_def_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_class_def` validates `decorator_list` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> crate::Identifier<'a> {
         let word = u64::from(self.syntax_node().row.stmt_class_def_name());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_class_def` validates `name` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn type_params(self) -> Option<crate::TypeParams<'a>> {
         let word = u64::from(self.syntax_node().row.stmt_class_def_type_params());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_class_def` validates `type_params` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn arguments(self) -> Option<crate::Arguments<'a>> {
         let word = {
             let base = self.syntax_node().row.stmt_class_def_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<false>(base + 2)
         };
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_class_def` validates `arguments` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.stmt_class_def_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base + 3)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_class_def` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::StmtReturn {
@@ -837,15 +888,21 @@ impl Builder {
         [value]: [u64; 1],
     ) -> BuildId<crate::kind::StmtReturn> {
         let mut row = Row::new(NodeKind::StmtReturn);
+        self.validate_child::<crate::kind::Expr, true>(split_words(value)[0]);
         row.set_stmt_return_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtReturn<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.stmt_return_value());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_return` validates `value` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::StmtDelete {
@@ -875,15 +932,18 @@ impl Builder {
         [targets]: [u64; 1],
     ) -> BuildId<crate::kind::StmtDelete> {
         let mut row = Row::new(NodeKind::StmtDelete);
+        self.ast.validate_list(targets);
         row.set_stmt_delete_targets(targets);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtDelete<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn targets(self) -> NodeList<'a, crate::kind::Expr> {
         let word = self.syntax_node().row.stmt_delete_targets();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_delete` validates `targets` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::StmtTypeAlias {
@@ -915,27 +975,39 @@ impl Builder {
         [name, type_params, value]: [u64; 3],
     ) -> BuildId<crate::kind::StmtTypeAlias> {
         let mut row = Row::new(NodeKind::StmtTypeAlias);
+        self.validate_child::<crate::kind::Expr, false>(split_words(name)[0]);
         row.set_stmt_type_alias_name(split_words(name)[0]);
+        self.validate_child::<crate::kind::TypeParams, true>(split_words(type_params)[0]);
         row.set_stmt_type_alias_type_params(split_words(type_params)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_stmt_type_alias_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtTypeAlias<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_type_alias_name());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_type_alias` validates `name` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn type_params(self) -> Option<crate::TypeParams<'a>> {
         let word = u64::from(self.syntax_node().row.stmt_type_alias_type_params());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_type_alias` validates `type_params` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_type_alias_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_type_alias` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::StmtAssign {
@@ -966,21 +1038,27 @@ impl Builder {
         [targets, value]: [u64; 2],
     ) -> BuildId<crate::kind::StmtAssign> {
         let mut row = Row::new(NodeKind::StmtAssign);
+        self.ast.validate_list(targets);
         row.set_stmt_assign_targets(targets);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_stmt_assign_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtAssign<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn targets(self) -> NodeList<'a, crate::kind::Expr> {
         let word = self.syntax_node().row.stmt_assign_targets();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_assign` validates `targets` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_assign_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_assign` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::StmtAugAssign {
@@ -1012,27 +1090,33 @@ impl Builder {
         [target, op, value]: [u64; 3],
     ) -> BuildId<crate::kind::StmtAugAssign> {
         let mut row = Row::new(NodeKind::StmtAugAssign);
+        self.validate_child::<crate::kind::Expr, false>(split_words(target)[0]);
         row.set_stmt_aug_assign_target(split_words(target)[0]);
         row.set_stmt_aug_assign_op(op.to_le_bytes()[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_stmt_aug_assign_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtAugAssign<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn target(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_aug_assign_target());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_aug_assign` validates `target` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
     #[inline]
     pub fn op(self) -> crate::Operator {
         let word = u64::from(self.syntax_node().row.stmt_aug_assign_op());
         Word::decode(word)
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_aug_assign_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_aug_assign` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::StmtAnnAssign {
@@ -1065,28 +1149,40 @@ impl Builder {
         [target, annotation, value, simple]: [u64; 4],
     ) -> BuildId<crate::kind::StmtAnnAssign> {
         let mut row = Row::new(NodeKind::StmtAnnAssign);
+        self.validate_child::<crate::kind::Expr, false>(split_words(target)[0]);
         row.set_stmt_ann_assign_target(split_words(target)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(annotation)[0]);
         row.set_stmt_ann_assign_annotation(split_words(annotation)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(value)[0]);
         row.set_stmt_ann_assign_value(split_words(value)[0]);
         row.set_stmt_ann_assign_simple(simple.to_le_bytes()[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtAnnAssign<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn target(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_ann_assign_target());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_ann_assign` validates `target` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn annotation(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_ann_assign_annotation());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_ann_assign` validates `annotation` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.stmt_ann_assign_value());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_ann_assign` validates `value` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
     #[inline]
     pub fn simple(self) -> bool {
@@ -1126,8 +1222,12 @@ impl Builder {
     ) -> BuildId<crate::kind::StmtFor> {
         let mut row = Row::new(NodeKind::StmtFor);
         row.set_stmt_for_is_async(is_async.to_le_bytes()[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(target)[0]);
         row.set_stmt_for_target(split_words(target)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(iter)[0]);
         row.set_stmt_for_iter(split_words(iter)[0]);
+        self.ast.validate_list(body);
+        self.ast.validate_list(orelse);
         row.set_stmt_for_extra_offset(offset(self.ast.extra.len()));
         self.ast.extra.extend([
             split_words(body)[0],
@@ -1144,35 +1244,43 @@ impl<'a> crate::StmtFor<'a> {
         let word = u64::from(self.syntax_node().row.stmt_for_is_async());
         word != 0
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn target(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_for_target());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_for` validates `target` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
     #[expect(
         clippy::iter_not_returning_iterator,
         reason = "Python names the iterable expression in a for loop or comprehension `iter`."
     )]
+    #[expect(unsafe_code)]
     #[inline]
     pub fn iter(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_for_iter());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_for` validates `iter` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.stmt_for_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_for` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn orelse(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.stmt_for_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base + 2)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_for` validates `orelse` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::StmtWhile {
@@ -1204,7 +1312,10 @@ impl Builder {
         [test, body, orelse]: [u64; 3],
     ) -> BuildId<crate::kind::StmtWhile> {
         let mut row = Row::new(NodeKind::StmtWhile);
+        self.validate_child::<crate::kind::Expr, false>(split_words(test)[0]);
         row.set_stmt_while_test(split_words(test)[0]);
+        self.ast.validate_list(body);
+        self.ast.validate_list(orelse);
         row.set_stmt_while_extra_offset(offset(self.ast.extra.len()));
         self.ast.extra.extend([
             split_words(body)[0],
@@ -1216,26 +1327,32 @@ impl Builder {
     }
 }
 impl<'a> crate::StmtWhile<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn test(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_while_test());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_while` validates `test` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.stmt_while_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_while` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn orelse(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.stmt_while_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base + 2)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_while` validates `orelse` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::StmtIf {
@@ -1267,7 +1384,10 @@ impl Builder {
         [test, body, elif_else_clauses]: [u64; 3],
     ) -> BuildId<crate::kind::StmtIf> {
         let mut row = Row::new(NodeKind::StmtIf);
+        self.validate_child::<crate::kind::Expr, false>(split_words(test)[0]);
         row.set_stmt_if_test(split_words(test)[0]);
+        self.ast.validate_list(body);
+        self.ast.validate_list(elif_else_clauses);
         row.set_stmt_if_extra_offset(offset(self.ast.extra.len()));
         self.ast.extra.extend([
             split_words(body)[0],
@@ -1279,26 +1399,32 @@ impl Builder {
     }
 }
 impl<'a> crate::StmtIf<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn test(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_if_test());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_if` validates `test` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.stmt_if_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_if` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn elif_else_clauses(self) -> NodeList<'a, crate::kind::ElifElseClause> {
         let word = {
             let base = self.syntax_node().row.stmt_if_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base + 2)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_if` validates `elif_else_clauses` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::StmtWith {
@@ -1331,7 +1457,9 @@ impl Builder {
     ) -> BuildId<crate::kind::StmtWith> {
         let mut row = Row::new(NodeKind::StmtWith);
         row.set_stmt_with_is_async(is_async.to_le_bytes()[0]);
+        self.ast.validate_list(items);
         row.set_stmt_with_items(items);
+        self.ast.validate_list(body);
         row.set_stmt_with_extra_offset(offset(self.ast.extra.len()));
         self.ast
             .extra
@@ -1345,18 +1473,22 @@ impl<'a> crate::StmtWith<'a> {
         let word = u64::from(self.syntax_node().row.stmt_with_is_async());
         word != 0
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn items(self) -> NodeList<'a, crate::kind::WithItem> {
         let word = self.syntax_node().row.stmt_with_items();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_with` validates `items` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.stmt_with_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_with` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::StmtMatch {
@@ -1387,21 +1519,27 @@ impl Builder {
         [subject, cases]: [u64; 2],
     ) -> BuildId<crate::kind::StmtMatch> {
         let mut row = Row::new(NodeKind::StmtMatch);
+        self.validate_child::<crate::kind::Expr, false>(split_words(subject)[0]);
         row.set_stmt_match_subject(split_words(subject)[0]);
+        self.ast.validate_list(cases);
         row.set_stmt_match_cases(cases);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtMatch<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn subject(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_match_subject());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_match` validates `subject` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn cases(self) -> NodeList<'a, crate::kind::MatchCase> {
         let word = self.syntax_node().row.stmt_match_cases();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_match` validates `cases` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::StmtRaise {
@@ -1432,21 +1570,33 @@ impl Builder {
         [exc, cause]: [u64; 2],
     ) -> BuildId<crate::kind::StmtRaise> {
         let mut row = Row::new(NodeKind::StmtRaise);
+        self.validate_child::<crate::kind::Expr, true>(split_words(exc)[0]);
         row.set_stmt_raise_exc(split_words(exc)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(cause)[0]);
         row.set_stmt_raise_cause(split_words(cause)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtRaise<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn exc(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.stmt_raise_exc());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_raise` validates `exc` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn cause(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.stmt_raise_cause());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_raise` validates `cause` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::StmtTry {
@@ -1480,7 +1630,11 @@ impl Builder {
         [body, handlers, orelse, finalbody, is_star]: [u64; 5],
     ) -> BuildId<crate::kind::StmtTry> {
         let mut row = Row::new(NodeKind::StmtTry);
+        self.ast.validate_list(body);
         row.set_stmt_try_body(body);
+        self.ast.validate_list(handlers);
+        self.ast.validate_list(orelse);
+        self.ast.validate_list(finalbody);
         row.set_stmt_try_is_star(is_star.to_le_bytes()[0]);
         row.set_stmt_try_extra_offset(offset(self.ast.extra.len()));
         self.ast.extra.extend([
@@ -1495,34 +1649,42 @@ impl Builder {
     }
 }
 impl<'a> crate::StmtTry<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = self.syntax_node().row.stmt_try_body();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_try` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn handlers(self) -> NodeList<'a, crate::kind::ExceptHandler> {
         let word = {
             let base = self.syntax_node().row.stmt_try_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_try` validates `handlers` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn orelse(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.stmt_try_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base + 2)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_try` validates `orelse` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn finalbody(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.stmt_try_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base + 4)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_try` validates `finalbody` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
     #[inline]
     pub fn is_star(self) -> bool {
@@ -1558,21 +1720,30 @@ impl Builder {
         [test, msg]: [u64; 2],
     ) -> BuildId<crate::kind::StmtAssert> {
         let mut row = Row::new(NodeKind::StmtAssert);
+        self.validate_child::<crate::kind::Expr, false>(split_words(test)[0]);
         row.set_stmt_assert_test(split_words(test)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(msg)[0]);
         row.set_stmt_assert_msg(split_words(msg)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtAssert<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn test(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_assert_test());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_assert` validates `test` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn msg(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.stmt_assert_msg());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_assert` validates `msg` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::StmtImport {
@@ -1603,16 +1774,19 @@ impl Builder {
         [names, is_lazy]: [u64; 2],
     ) -> BuildId<crate::kind::StmtImport> {
         let mut row = Row::new(NodeKind::StmtImport);
+        self.ast.validate_list(names);
         row.set_stmt_import_names(names);
         row.set_stmt_import_is_lazy(is_lazy.to_le_bytes()[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtImport<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn names(self) -> NodeList<'a, crate::kind::Alias> {
         let word = self.syntax_node().row.stmt_import_names();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_import` validates `names` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
     #[inline]
     pub fn is_lazy(self) -> bool {
@@ -1650,7 +1824,9 @@ impl Builder {
         [module, names, level, is_lazy]: [u64; 4],
     ) -> BuildId<crate::kind::StmtImportFrom> {
         let mut row = Row::new(NodeKind::StmtImportFrom);
+        self.validate_child::<crate::kind::Identifier, true>(split_words(module)[0]);
         row.set_stmt_import_from_module(split_words(module)[0]);
+        self.ast.validate_list(names);
         row.set_stmt_import_from_level(split_words(level)[0]);
         row.set_stmt_import_from_is_lazy(is_lazy.to_le_bytes()[0]);
         row.set_stmt_import_from_extra_offset(offset(self.ast.extra.len()));
@@ -1661,18 +1837,25 @@ impl Builder {
     }
 }
 impl<'a> crate::StmtImportFrom<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn module(self) -> Option<crate::Identifier<'a>> {
         let word = u64::from(self.syntax_node().row.stmt_import_from_module());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_stmt_import_from` validates `module` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn names(self) -> NodeList<'a, crate::kind::Alias> {
         let word = {
             let base = self.syntax_node().row.stmt_import_from_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_import_from` validates `names` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
     #[inline]
     pub fn level(self) -> u32 {
@@ -1712,15 +1895,18 @@ impl Builder {
         [names]: [u64; 1],
     ) -> BuildId<crate::kind::StmtGlobal> {
         let mut row = Row::new(NodeKind::StmtGlobal);
+        self.ast.validate_list(names);
         row.set_stmt_global_names(names);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtGlobal<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn names(self) -> NodeList<'a, crate::kind::Identifier> {
         let word = self.syntax_node().row.stmt_global_names();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_global` validates `names` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::StmtNonlocal {
@@ -1750,15 +1936,18 @@ impl Builder {
         [names]: [u64; 1],
     ) -> BuildId<crate::kind::StmtNonlocal> {
         let mut row = Row::new(NodeKind::StmtNonlocal);
+        self.ast.validate_list(names);
         row.set_stmt_nonlocal_names(names);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtNonlocal<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn names(self) -> NodeList<'a, crate::kind::Identifier> {
         let word = self.syntax_node().row.stmt_nonlocal_names();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_stmt_nonlocal` validates `names` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::StmtExpr {
@@ -1788,15 +1977,18 @@ impl Builder {
         [value]: [u64; 1],
     ) -> BuildId<crate::kind::StmtExpr> {
         let mut row = Row::new(NodeKind::StmtExpr);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_stmt_expr_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::StmtExpr<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.stmt_expr_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_stmt_expr` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::StmtPass {
@@ -1960,6 +2152,7 @@ impl Builder {
     ) -> BuildId<crate::kind::ExprBoolOp> {
         let mut row = Row::new(NodeKind::ExprBoolOp);
         row.set_expr_bool_op_op(op.to_le_bytes()[0]);
+        self.ast.validate_list(values);
         row.set_expr_bool_op_values(values);
         self.push(row, range)
     }
@@ -1970,10 +2163,12 @@ impl<'a> crate::ExprBoolOp<'a> {
         let word = u64::from(self.syntax_node().row.expr_bool_op_op());
         Word::decode(word)
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn values(self) -> NodeList<'a, crate::kind::Expr> {
         let word = self.syntax_node().row.expr_bool_op_values();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_expr_bool_op` validates `values` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::ExprNamed {
@@ -2004,21 +2199,27 @@ impl Builder {
         [target, value]: [u64; 2],
     ) -> BuildId<crate::kind::ExprNamed> {
         let mut row = Row::new(NodeKind::ExprNamed);
+        self.validate_child::<crate::kind::Expr, false>(split_words(target)[0]);
         row.set_expr_named_target(split_words(target)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_expr_named_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprNamed<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn target(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_named_target());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_named` validates `target` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_named_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_named` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::ExprBinOp {
@@ -2050,27 +2251,33 @@ impl Builder {
         [left, op, right]: [u64; 3],
     ) -> BuildId<crate::kind::ExprBinOp> {
         let mut row = Row::new(NodeKind::ExprBinOp);
+        self.validate_child::<crate::kind::Expr, false>(split_words(left)[0]);
         row.set_expr_bin_op_left(split_words(left)[0]);
         row.set_expr_bin_op_op(op.to_le_bytes()[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(right)[0]);
         row.set_expr_bin_op_right(split_words(right)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprBinOp<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn left(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_bin_op_left());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_bin_op` validates `left` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
     #[inline]
     pub fn op(self) -> crate::Operator {
         let word = u64::from(self.syntax_node().row.expr_bin_op_op());
         Word::decode(word)
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn right(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_bin_op_right());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_bin_op` validates `right` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::ExprUnaryOp {
@@ -2102,6 +2309,7 @@ impl Builder {
     ) -> BuildId<crate::kind::ExprUnaryOp> {
         let mut row = Row::new(NodeKind::ExprUnaryOp);
         row.set_expr_unary_op_op(op.to_le_bytes()[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(operand)[0]);
         row.set_expr_unary_op_operand(split_words(operand)[0]);
         self.push(row, range)
     }
@@ -2112,10 +2320,12 @@ impl<'a> crate::ExprUnaryOp<'a> {
         let word = u64::from(self.syntax_node().row.expr_unary_op_op());
         Word::decode(word)
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn operand(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_unary_op_operand());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_unary_op` validates `operand` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::ExprLambda {
@@ -2146,21 +2356,30 @@ impl Builder {
         [parameters, body]: [u64; 2],
     ) -> BuildId<crate::kind::ExprLambda> {
         let mut row = Row::new(NodeKind::ExprLambda);
+        self.validate_child::<crate::kind::Parameters, true>(split_words(parameters)[0]);
         row.set_expr_lambda_parameters(split_words(parameters)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(body)[0]);
         row.set_expr_lambda_body(split_words(body)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprLambda<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn parameters(self) -> Option<crate::Parameters<'a>> {
         let word = u64::from(self.syntax_node().row.expr_lambda_parameters());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_expr_lambda` validates `parameters` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_lambda_body());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_lambda` validates `body` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::ExprIf {
@@ -2192,27 +2411,36 @@ impl Builder {
         [test, body, orelse]: [u64; 3],
     ) -> BuildId<crate::kind::ExprIf> {
         let mut row = Row::new(NodeKind::ExprIf);
+        self.validate_child::<crate::kind::Expr, false>(split_words(test)[0]);
         row.set_expr_if_test(split_words(test)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(body)[0]);
         row.set_expr_if_body(split_words(body)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(orelse)[0]);
         row.set_expr_if_orelse(split_words(orelse)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprIf<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn test(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_if_test());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_if` validates `test` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_if_body());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_if` validates `body` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn orelse(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_if_orelse());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_if` validates `orelse` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::ExprDict {
@@ -2242,15 +2470,18 @@ impl Builder {
         [items]: [u64; 1],
     ) -> BuildId<crate::kind::ExprDict> {
         let mut row = Row::new(NodeKind::ExprDict);
+        self.ast.validate_list(items);
         row.set_expr_dict_items(items);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprDict<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn items(self) -> NodeList<'a, crate::kind::DictItem> {
         let word = self.syntax_node().row.expr_dict_items();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_expr_dict` validates `items` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::ExprSet {
@@ -2280,15 +2511,18 @@ impl Builder {
         [elts]: [u64; 1],
     ) -> BuildId<crate::kind::ExprSet> {
         let mut row = Row::new(NodeKind::ExprSet);
+        self.ast.validate_list(elts);
         row.set_expr_set_elts(elts);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprSet<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn elts(self) -> NodeList<'a, crate::kind::Expr> {
         let word = self.syntax_node().row.expr_set_elts();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_expr_set` validates `elts` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::ExprListComp {
@@ -2319,21 +2553,27 @@ impl Builder {
         [elt, generators]: [u64; 2],
     ) -> BuildId<crate::kind::ExprListComp> {
         let mut row = Row::new(NodeKind::ExprListComp);
+        self.validate_child::<crate::kind::Expr, false>(split_words(elt)[0]);
         row.set_expr_list_comp_elt(split_words(elt)[0]);
+        self.ast.validate_list(generators);
         row.set_expr_list_comp_generators(generators);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprListComp<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn elt(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_list_comp_elt());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_list_comp` validates `elt` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn generators(self) -> NodeList<'a, crate::kind::Comprehension> {
         let word = self.syntax_node().row.expr_list_comp_generators();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_expr_list_comp` validates `generators` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::ExprSetComp {
@@ -2364,21 +2604,27 @@ impl Builder {
         [elt, generators]: [u64; 2],
     ) -> BuildId<crate::kind::ExprSetComp> {
         let mut row = Row::new(NodeKind::ExprSetComp);
+        self.validate_child::<crate::kind::Expr, false>(split_words(elt)[0]);
         row.set_expr_set_comp_elt(split_words(elt)[0]);
+        self.ast.validate_list(generators);
         row.set_expr_set_comp_generators(generators);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprSetComp<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn elt(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_set_comp_elt());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_set_comp` validates `elt` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn generators(self) -> NodeList<'a, crate::kind::Comprehension> {
         let word = self.syntax_node().row.expr_set_comp_generators();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_expr_set_comp` validates `generators` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::ExprDictComp {
@@ -2410,8 +2656,11 @@ impl Builder {
         [key, value, generators]: [u64; 3],
     ) -> BuildId<crate::kind::ExprDictComp> {
         let mut row = Row::new(NodeKind::ExprDictComp);
+        self.validate_child::<crate::kind::Expr, true>(split_words(key)[0]);
         row.set_expr_dict_comp_key(split_words(key)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_expr_dict_comp_value(split_words(value)[0]);
+        self.ast.validate_list(generators);
         row.set_expr_dict_comp_extra_offset(offset(self.ast.extra.len()));
         self.ast
             .extra
@@ -2420,23 +2669,32 @@ impl Builder {
     }
 }
 impl<'a> crate::ExprDictComp<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn key(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.expr_dict_comp_key());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_expr_dict_comp` validates `key` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_dict_comp_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_dict_comp` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn generators(self) -> NodeList<'a, crate::kind::Comprehension> {
         let word = {
             let base = self.syntax_node().row.expr_dict_comp_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_expr_dict_comp` validates `generators` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::ExprGenerator {
@@ -2468,22 +2726,28 @@ impl Builder {
         [elt, generators, parenthesized]: [u64; 3],
     ) -> BuildId<crate::kind::ExprGenerator> {
         let mut row = Row::new(NodeKind::ExprGenerator);
+        self.validate_child::<crate::kind::Expr, false>(split_words(elt)[0]);
         row.set_expr_generator_elt(split_words(elt)[0]);
+        self.ast.validate_list(generators);
         row.set_expr_generator_generators(generators);
         row.set_expr_generator_parenthesized(parenthesized.to_le_bytes()[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprGenerator<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn elt(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_generator_elt());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_generator` validates `elt` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn generators(self) -> NodeList<'a, crate::kind::Comprehension> {
         let word = self.syntax_node().row.expr_generator_generators();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_expr_generator` validates `generators` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
     #[inline]
     pub fn parenthesized(self) -> bool {
@@ -2518,15 +2782,18 @@ impl Builder {
         [value]: [u64; 1],
     ) -> BuildId<crate::kind::ExprAwait> {
         let mut row = Row::new(NodeKind::ExprAwait);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_expr_await_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprAwait<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_await_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_await` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::ExprYield {
@@ -2556,15 +2823,21 @@ impl Builder {
         [value]: [u64; 1],
     ) -> BuildId<crate::kind::ExprYield> {
         let mut row = Row::new(NodeKind::ExprYield);
+        self.validate_child::<crate::kind::Expr, true>(split_words(value)[0]);
         row.set_expr_yield_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprYield<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.expr_yield_value());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_expr_yield` validates `value` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::ExprYieldFrom {
@@ -2594,15 +2867,18 @@ impl Builder {
         [value]: [u64; 1],
     ) -> BuildId<crate::kind::ExprYieldFrom> {
         let mut row = Row::new(NodeKind::ExprYieldFrom);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_expr_yield_from_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprYieldFrom<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_yield_from_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_yield_from` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::ExprCompare {
@@ -2634,6 +2910,7 @@ impl Builder {
     ) -> BuildId<crate::kind::ExprCompare> {
         let mut row = Row::new(NodeKind::ExprCompare);
         row.set_expr_compare_ops(ops);
+        self.ast.validate_list(operands);
         row.set_expr_compare_extra_offset(offset(self.ast.extra.len()));
         self.ast
             .extra
@@ -2655,13 +2932,15 @@ impl<'a> crate::ExprCompare<'a> {
         let word = self.syntax_node().row.expr_compare_ops();
         List::new(self.syntax_node().ast, word)
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn operands(self) -> NodeList<'a, crate::kind::Expr> {
         let word = {
             let base = self.syntax_node().row.expr_compare_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_expr_compare` validates `operands` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::ExprCall {
@@ -2692,21 +2971,27 @@ impl Builder {
         [func, arguments]: [u64; 2],
     ) -> BuildId<crate::kind::ExprCall> {
         let mut row = Row::new(NodeKind::ExprCall);
+        self.validate_child::<crate::kind::Expr, false>(split_words(func)[0]);
         row.set_expr_call_func(split_words(func)[0]);
+        self.validate_child::<crate::kind::Arguments, false>(split_words(arguments)[0]);
         row.set_expr_call_arguments(split_words(arguments)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprCall<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn func(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_call_func());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_call` validates `func` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn arguments(self) -> crate::Arguments<'a> {
         let word = u64::from(self.syntax_node().row.expr_call_arguments());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_call` validates `arguments` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::ExprFString {
@@ -2736,15 +3021,20 @@ impl Builder {
         [value]: [u64; 1],
     ) -> BuildId<crate::kind::ExprFString> {
         let mut row = Row::new(NodeKind::ExprFString);
+        self.ast.validate_list(value);
         row.set_expr_f_string_value(value);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprFString<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::flat::FStringValue<'a> {
         let word = self.syntax_node().row.expr_f_string_value();
-        crate::flat::FStringValue::new(List::new(self.syntax_node().ast, word))
+        // SAFETY: `push_expr_f_string` validates `value` before storing it.
+        unsafe {
+            crate::flat::FStringValue::new(List::from_validated(self.syntax_node().ast, word))
+        }
     }
 }
 impl NodeType for crate::kind::ExprTString {
@@ -2774,15 +3064,20 @@ impl Builder {
         [value]: [u64; 1],
     ) -> BuildId<crate::kind::ExprTString> {
         let mut row = Row::new(NodeKind::ExprTString);
+        self.ast.validate_list(value);
         row.set_expr_t_string_value(value);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprTString<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::flat::TStringValue<'a> {
         let word = self.syntax_node().row.expr_t_string_value();
-        crate::flat::TStringValue::new(List::new(self.syntax_node().ast, word))
+        // SAFETY: `push_expr_t_string` validates `value` before storing it.
+        unsafe {
+            crate::flat::TStringValue::new(List::from_validated(self.syntax_node().ast, word))
+        }
     }
 }
 impl NodeType for crate::kind::ExprStringLiteral {
@@ -2812,22 +3107,26 @@ impl Builder {
         [value]: [u64; 1],
     ) -> BuildId<crate::kind::ExprStringLiteral> {
         let mut row = Row::new(NodeKind::ExprStringLiteral);
-        row.set_expr_string_literal_value(value);
         let (start, len) = self.string_literal_text(value);
+        row.set_expr_string_literal_value(value);
         row.set_expr_string_literal_text_offset(start);
         row.set_expr_string_literal_text_len(len);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprStringLiteral<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::flat::StringValue<'a> {
         let word = self.syntax_node().row.expr_string_literal_value();
-        crate::flat::StringValue::new(
-            List::new(self.syntax_node().ast, word),
-            u64::from(self.syntax_node().row.expr_string_literal_text_offset())
-                | (u64::from(self.syntax_node().row.expr_string_literal_text_len()) << 32),
-        )
+        // SAFETY: `push_expr_string_literal` validates `value` before storing it.
+        unsafe {
+            crate::flat::StringValue::new(
+                List::from_validated(self.syntax_node().ast, word),
+                u64::from(self.syntax_node().row.expr_string_literal_text_offset())
+                    | (u64::from(self.syntax_node().row.expr_string_literal_text_len()) << 32),
+            )
+        }
     }
 }
 impl NodeType for crate::kind::ExprBytesLiteral {
@@ -2857,15 +3156,18 @@ impl Builder {
         [value]: [u64; 1],
     ) -> BuildId<crate::kind::ExprBytesLiteral> {
         let mut row = Row::new(NodeKind::ExprBytesLiteral);
+        self.ast.validate_list(value);
         row.set_expr_bytes_literal_value(value);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprBytesLiteral<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::flat::BytesValue<'a> {
         let word = self.syntax_node().row.expr_bytes_literal_value();
-        crate::flat::BytesValue::new(List::new(self.syntax_node().ast, word))
+        // SAFETY: `push_expr_bytes_literal` validates `value` before storing it.
+        unsafe { crate::flat::BytesValue::new(List::from_validated(self.syntax_node().ast, word)) }
     }
 }
 impl NodeType for crate::kind::ExprNumberLiteral {
@@ -3031,22 +3333,28 @@ impl Builder {
         [value, attr, ctx]: [u64; 3],
     ) -> BuildId<crate::kind::ExprAttribute> {
         let mut row = Row::new(NodeKind::ExprAttribute);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_expr_attribute_value(split_words(value)[0]);
+        self.validate_child::<crate::kind::Identifier, false>(split_words(attr)[0]);
         row.set_expr_attribute_attr(split_words(attr)[0]);
         row.set_expr_attribute_ctx(ctx.to_le_bytes()[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprAttribute<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_attribute_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_attribute` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn attr(self) -> crate::Identifier<'a> {
         let word = u64::from(self.syntax_node().row.expr_attribute_attr());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_attribute` validates `attr` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
     #[inline]
     pub fn ctx(self) -> crate::ExprContext {
@@ -3083,22 +3391,28 @@ impl Builder {
         [value, slice, ctx]: [u64; 3],
     ) -> BuildId<crate::kind::ExprSubscript> {
         let mut row = Row::new(NodeKind::ExprSubscript);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_expr_subscript_value(split_words(value)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(slice)[0]);
         row.set_expr_subscript_slice(split_words(slice)[0]);
         row.set_expr_subscript_ctx(ctx.to_le_bytes()[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprSubscript<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_subscript_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_subscript` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn slice(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_subscript_slice());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_subscript` validates `slice` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
     #[inline]
     pub fn ctx(self) -> crate::ExprContext {
@@ -3134,16 +3448,19 @@ impl Builder {
         [value, ctx]: [u64; 2],
     ) -> BuildId<crate::kind::ExprStarred> {
         let mut row = Row::new(NodeKind::ExprStarred);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_expr_starred_value(split_words(value)[0]);
         row.set_expr_starred_ctx(ctx.to_le_bytes()[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprStarred<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.expr_starred_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_expr_starred` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
     #[inline]
     pub fn ctx(self) -> crate::ExprContext {
@@ -3179,6 +3496,7 @@ impl Builder {
         [id, ctx]: [u64; 2],
     ) -> BuildId<crate::kind::ExprName> {
         let mut row = Row::new(NodeKind::ExprName);
+        self.validate_name(split_words(id)[0]);
         row.set_expr_name_id(split_words(id)[0]);
         row.set_expr_name_ctx(ctx.to_le_bytes()[0]);
         self.push(row, range)
@@ -3189,10 +3507,12 @@ impl<'a> crate::ExprName<'a> {
     pub fn name_id(self) -> super::NameId {
         super::NameId(split_words(u64::from(self.syntax_node().row.expr_name_id()))[0])
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn id(self) -> &'a crate::name::Name {
         let word = u64::from(self.syntax_node().row.expr_name_id());
-        &self.syntax_node().ast.names[split_words(word)[0] as usize]
+        // SAFETY: `push_expr_name` validates `id` before storing it.
+        unsafe { self.syntax_node().stored_name(split_words(word)[0]) }
     }
     #[inline]
     pub fn ctx(self) -> crate::ExprContext {
@@ -3228,16 +3548,19 @@ impl Builder {
         [elts, ctx]: [u64; 2],
     ) -> BuildId<crate::kind::ExprList> {
         let mut row = Row::new(NodeKind::ExprList);
+        self.ast.validate_list(elts);
         row.set_expr_list_elts(elts);
         row.set_expr_list_ctx(ctx.to_le_bytes()[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprList<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn elts(self) -> NodeList<'a, crate::kind::Expr> {
         let word = self.syntax_node().row.expr_list_elts();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_expr_list` validates `elts` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
     #[inline]
     pub fn ctx(self) -> crate::ExprContext {
@@ -3274,6 +3597,7 @@ impl Builder {
         [elts, ctx, parenthesized]: [u64; 3],
     ) -> BuildId<crate::kind::ExprTuple> {
         let mut row = Row::new(NodeKind::ExprTuple);
+        self.ast.validate_list(elts);
         row.set_expr_tuple_elts(elts);
         row.set_expr_tuple_ctx(ctx.to_le_bytes()[0]);
         row.set_expr_tuple_parenthesized(parenthesized.to_le_bytes()[0]);
@@ -3281,10 +3605,12 @@ impl Builder {
     }
 }
 impl<'a> crate::ExprTuple<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn elts(self) -> NodeList<'a, crate::kind::Expr> {
         let word = self.syntax_node().row.expr_tuple_elts();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_expr_tuple` validates `elts` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
     #[inline]
     pub fn ctx(self) -> crate::ExprContext {
@@ -3326,27 +3652,45 @@ impl Builder {
         [lower, upper, step]: [u64; 3],
     ) -> BuildId<crate::kind::ExprSlice> {
         let mut row = Row::new(NodeKind::ExprSlice);
+        self.validate_child::<crate::kind::Expr, true>(split_words(lower)[0]);
         row.set_expr_slice_lower(split_words(lower)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(upper)[0]);
         row.set_expr_slice_upper(split_words(upper)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(step)[0]);
         row.set_expr_slice_step(split_words(step)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprSlice<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn lower(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.expr_slice_lower());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_expr_slice` validates `lower` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn upper(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.expr_slice_upper());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_expr_slice` validates `upper` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn step(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.expr_slice_step());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_expr_slice` validates `step` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::ExprIpyEscapeCommand {
@@ -3423,8 +3767,11 @@ impl Builder {
         [type_, name, body]: [u64; 3],
     ) -> BuildId<crate::kind::ExceptHandlerExceptHandler> {
         let mut row = Row::new(NodeKind::ExceptHandlerExceptHandler);
+        self.validate_child::<crate::kind::Expr, true>(split_words(type_)[0]);
         row.set_except_handler_except_handler_type_(split_words(type_)[0]);
+        self.validate_child::<crate::kind::Identifier, true>(split_words(name)[0]);
         row.set_except_handler_except_handler_name(split_words(name)[0]);
+        self.ast.validate_list(body);
         row.set_except_handler_except_handler_extra_offset(offset(self.ast.extra.len()));
         self.ast
             .extra
@@ -3433,16 +3780,27 @@ impl Builder {
     }
 }
 impl<'a> crate::ExceptHandlerExceptHandler<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn type_(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.except_handler_except_handler_type_());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_except_handler_except_handler` validates `type_` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> Option<crate::Identifier<'a>> {
         let word = u64::from(self.syntax_node().row.except_handler_except_handler_name());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_except_handler_except_handler` validates `name` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
@@ -3452,7 +3810,8 @@ impl<'a> crate::ExceptHandlerExceptHandler<'a> {
                 .except_handler_except_handler_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_except_handler_except_handler` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::InterpolatedElement {
@@ -3485,18 +3844,24 @@ impl Builder {
         [expression, debug_text, conversion, format_spec]: [u64; 4],
     ) -> BuildId<crate::kind::InterpolatedElement> {
         let mut row = Row::new(NodeKind::InterpolatedElement);
+        self.validate_child::<crate::kind::Expr, false>(split_words(expression)[0]);
         row.set_interpolated_element_expression(split_words(expression)[0]);
         row.set_interpolated_element_debug_text(split_words(debug_text)[0]);
         row.set_interpolated_element_conversion(conversion.to_le_bytes()[0]);
+        self.validate_child::<crate::kind::InterpolatedStringFormatSpec, true>(
+            split_words(format_spec)[0],
+        );
         row.set_interpolated_element_format_spec(split_words(format_spec)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::InterpolatedElement<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn expression(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.interpolated_element_expression());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_interpolated_element` validates `expression` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
     #[inline]
     pub fn debug_text(self) -> Option<&'a crate::DebugText> {
@@ -3509,10 +3874,15 @@ impl<'a> crate::InterpolatedElement<'a> {
         let word = u64::from(self.syntax_node().row.interpolated_element_conversion());
         Word::decode(word)
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn format_spec(self) -> Option<crate::InterpolatedStringFormatSpec<'a>> {
         let word = u64::from(self.syntax_node().row.interpolated_element_format_spec());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_interpolated_element` validates `format_spec` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::InterpolatedStringLiteralElement {
@@ -3583,15 +3953,18 @@ impl Builder {
         [value]: [u64; 1],
     ) -> BuildId<crate::kind::PatternMatchValue> {
         let mut row = Row::new(NodeKind::PatternMatchValue);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_pattern_match_value_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::PatternMatchValue<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.pattern_match_value_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_pattern_match_value` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::PatternMatchSingleton {
@@ -3659,15 +4032,18 @@ impl Builder {
         [patterns]: [u64; 1],
     ) -> BuildId<crate::kind::PatternMatchSequence> {
         let mut row = Row::new(NodeKind::PatternMatchSequence);
+        self.ast.validate_list(patterns);
         row.set_pattern_match_sequence_patterns(patterns);
         self.push(row, range)
     }
 }
 impl<'a> crate::PatternMatchSequence<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn patterns(self) -> NodeList<'a, crate::kind::Pattern> {
         let word = self.syntax_node().row.pattern_match_sequence_patterns();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_pattern_match_sequence` validates `patterns` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::PatternMatchMapping {
@@ -3697,15 +4073,18 @@ impl Builder {
         [items]: [u64; 1],
     ) -> BuildId<crate::kind::PatternMatchMapping> {
         let mut row = Row::new(NodeKind::PatternMatchMapping);
+        self.ast.validate_list(items);
         row.set_pattern_match_mapping_items(items);
         self.push(row, range)
     }
 }
 impl<'a> crate::PatternMatchMapping<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn items(self) -> crate::flat::MappingPatternItems<'a> {
         let word = self.syntax_node().row.pattern_match_mapping_items();
-        super::MappingPatternItems(List::new(self.syntax_node().ast, word))
+        // SAFETY: `push_pattern_match_mapping` validates `items` before storing it.
+        unsafe { super::MappingPatternItems(List::from_validated(self.syntax_node().ast, word)) }
     }
 }
 impl NodeType for crate::kind::PatternMatchClass {
@@ -3736,21 +4115,27 @@ impl Builder {
         [cls, arguments]: [u64; 2],
     ) -> BuildId<crate::kind::PatternMatchClass> {
         let mut row = Row::new(NodeKind::PatternMatchClass);
+        self.validate_child::<crate::kind::Expr, false>(split_words(cls)[0]);
         row.set_pattern_match_class_cls(split_words(cls)[0]);
+        self.validate_child::<crate::kind::PatternArguments, false>(split_words(arguments)[0]);
         row.set_pattern_match_class_arguments(split_words(arguments)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::PatternMatchClass<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn cls(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.pattern_match_class_cls());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_pattern_match_class` validates `cls` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn arguments(self) -> crate::PatternArguments<'a> {
         let word = u64::from(self.syntax_node().row.pattern_match_class_arguments());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_pattern_match_class` validates `arguments` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::PatternMatchStar {
@@ -3780,15 +4165,21 @@ impl Builder {
         [name]: [u64; 1],
     ) -> BuildId<crate::kind::PatternMatchStar> {
         let mut row = Row::new(NodeKind::PatternMatchStar);
+        self.validate_child::<crate::kind::Identifier, true>(split_words(name)[0]);
         row.set_pattern_match_star_name(split_words(name)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::PatternMatchStar<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> Option<crate::Identifier<'a>> {
         let word = u64::from(self.syntax_node().row.pattern_match_star_name());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_pattern_match_star` validates `name` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::PatternMatchAs {
@@ -3819,21 +4210,33 @@ impl Builder {
         [pattern, name]: [u64; 2],
     ) -> BuildId<crate::kind::PatternMatchAs> {
         let mut row = Row::new(NodeKind::PatternMatchAs);
+        self.validate_child::<crate::kind::Pattern, true>(split_words(pattern)[0]);
         row.set_pattern_match_as_pattern(split_words(pattern)[0]);
+        self.validate_child::<crate::kind::Identifier, true>(split_words(name)[0]);
         row.set_pattern_match_as_name(split_words(name)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::PatternMatchAs<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn pattern(self) -> Option<crate::Pattern<'a>> {
         let word = u64::from(self.syntax_node().row.pattern_match_as_pattern());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_pattern_match_as` validates `pattern` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> Option<crate::Identifier<'a>> {
         let word = u64::from(self.syntax_node().row.pattern_match_as_name());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_pattern_match_as` validates `name` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::PatternMatchOr {
@@ -3863,15 +4266,18 @@ impl Builder {
         [patterns]: [u64; 1],
     ) -> BuildId<crate::kind::PatternMatchOr> {
         let mut row = Row::new(NodeKind::PatternMatchOr);
+        self.ast.validate_list(patterns);
         row.set_pattern_match_or_patterns(patterns);
         self.push(row, range)
     }
 }
 impl<'a> crate::PatternMatchOr<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn patterns(self) -> NodeList<'a, crate::kind::Pattern> {
         let word = self.syntax_node().row.pattern_match_or_patterns();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_pattern_match_or` validates `patterns` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::TypeParamTypeVar {
@@ -3903,27 +4309,42 @@ impl Builder {
         [name, bound, default]: [u64; 3],
     ) -> BuildId<crate::kind::TypeParamTypeVar> {
         let mut row = Row::new(NodeKind::TypeParamTypeVar);
+        self.validate_child::<crate::kind::Identifier, false>(split_words(name)[0]);
         row.set_type_param_type_var_name(split_words(name)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(bound)[0]);
         row.set_type_param_type_var_bound(split_words(bound)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(default)[0]);
         row.set_type_param_type_var_default(split_words(default)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::TypeParamTypeVar<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> crate::Identifier<'a> {
         let word = u64::from(self.syntax_node().row.type_param_type_var_name());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_type_param_type_var` validates `name` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn bound(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.type_param_type_var_bound());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_type_param_type_var` validates `bound` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn default(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.type_param_type_var_default());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_type_param_type_var` validates `default` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::TypeParamTypeVarTuple {
@@ -3954,21 +4375,30 @@ impl Builder {
         [name, default]: [u64; 2],
     ) -> BuildId<crate::kind::TypeParamTypeVarTuple> {
         let mut row = Row::new(NodeKind::TypeParamTypeVarTuple);
+        self.validate_child::<crate::kind::Identifier, false>(split_words(name)[0]);
         row.set_type_param_type_var_tuple_name(split_words(name)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(default)[0]);
         row.set_type_param_type_var_tuple_default(split_words(default)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::TypeParamTypeVarTuple<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> crate::Identifier<'a> {
         let word = u64::from(self.syntax_node().row.type_param_type_var_tuple_name());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_type_param_type_var_tuple` validates `name` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn default(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.type_param_type_var_tuple_default());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_type_param_type_var_tuple` validates `default` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::TypeParamParamSpec {
@@ -3999,21 +4429,30 @@ impl Builder {
         [name, default]: [u64; 2],
     ) -> BuildId<crate::kind::TypeParamParamSpec> {
         let mut row = Row::new(NodeKind::TypeParamParamSpec);
+        self.validate_child::<crate::kind::Identifier, false>(split_words(name)[0]);
         row.set_type_param_param_spec_name(split_words(name)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(default)[0]);
         row.set_type_param_param_spec_default(split_words(default)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::TypeParamParamSpec<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> crate::Identifier<'a> {
         let word = u64::from(self.syntax_node().row.type_param_param_spec_name());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_type_param_param_spec` validates `name` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn default(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.type_param_param_spec_default());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_type_param_param_spec` validates `default` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::InterpolatedStringFormatSpec {
@@ -4043,18 +4482,21 @@ impl Builder {
         [elements]: [u64; 1],
     ) -> BuildId<crate::kind::InterpolatedStringFormatSpec> {
         let mut row = Row::new(NodeKind::InterpolatedStringFormatSpec);
+        self.ast.validate_list(elements);
         row.set_interpolated_string_format_spec_elements(elements);
         self.push(row, range)
     }
 }
 impl<'a> crate::InterpolatedStringFormatSpec<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn elements(self) -> NodeList<'a, crate::kind::InterpolatedStringElement> {
         let word = self
             .syntax_node()
             .row
             .interpolated_string_format_spec_elements();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_interpolated_string_format_spec` validates `elements` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::PatternArguments {
@@ -4084,15 +4526,18 @@ impl Builder {
         [items]: [u64; 1],
     ) -> BuildId<crate::kind::PatternArguments> {
         let mut row = Row::new(NodeKind::PatternArguments);
+        self.ast.validate_list(items);
         row.set_pattern_arguments_items(items);
         self.push(row, range)
     }
 }
 impl<'a> crate::PatternArguments<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn items(self) -> List<'a, crate::PatternArgumentId> {
         let word = self.syntax_node().row.pattern_arguments_items();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_pattern_arguments` validates `items` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::PatternKeyword {
@@ -4123,21 +4568,27 @@ impl Builder {
         [attr, pattern]: [u64; 2],
     ) -> BuildId<crate::kind::PatternKeyword> {
         let mut row = Row::new(NodeKind::PatternKeyword);
+        self.validate_child::<crate::kind::Identifier, false>(split_words(attr)[0]);
         row.set_pattern_keyword_attr(split_words(attr)[0]);
+        self.validate_child::<crate::kind::Pattern, false>(split_words(pattern)[0]);
         row.set_pattern_keyword_pattern(split_words(pattern)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::PatternKeyword<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn attr(self) -> crate::Identifier<'a> {
         let word = u64::from(self.syntax_node().row.pattern_keyword_attr());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_pattern_keyword` validates `attr` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn pattern(self) -> crate::Pattern<'a> {
         let word = u64::from(self.syntax_node().row.pattern_keyword_pattern());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_pattern_keyword` validates `pattern` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::Comprehension {
@@ -4170,8 +4621,11 @@ impl Builder {
         [target, iter, ifs, is_async]: [u64; 4],
     ) -> BuildId<crate::kind::Comprehension> {
         let mut row = Row::new(NodeKind::Comprehension);
+        self.validate_child::<crate::kind::Expr, false>(split_words(target)[0]);
         row.set_comprehension_target(split_words(target)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(iter)[0]);
         row.set_comprehension_iter(split_words(iter)[0]);
+        self.ast.validate_list(ifs);
         row.set_comprehension_is_async(is_async.to_le_bytes()[0]);
         row.set_comprehension_extra_offset(offset(self.ast.extra.len()));
         self.ast
@@ -4181,27 +4635,33 @@ impl Builder {
     }
 }
 impl<'a> crate::Comprehension<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn target(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.comprehension_target());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_comprehension` validates `target` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
     #[expect(
         clippy::iter_not_returning_iterator,
         reason = "Python names the iterable expression in a for loop or comprehension `iter`."
     )]
+    #[expect(unsafe_code)]
     #[inline]
     pub fn iter(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.comprehension_iter());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_comprehension` validates `iter` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn ifs(self) -> NodeList<'a, crate::kind::Expr> {
         let word = {
             let base = self.syntax_node().row.comprehension_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_comprehension` validates `ifs` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
     #[inline]
     pub fn is_async(self) -> bool {
@@ -4236,15 +4696,18 @@ impl Builder {
         [items]: [u64; 1],
     ) -> BuildId<crate::kind::Arguments> {
         let mut row = Row::new(NodeKind::Arguments);
+        self.ast.validate_list(items);
         row.set_arguments_items(items);
         self.push(row, range)
     }
 }
 impl<'a> crate::Arguments<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn items(self) -> List<'a, crate::ArgumentId> {
         let word = self.syntax_node().row.arguments_items();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_arguments` validates `items` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::Parameters {
@@ -4274,15 +4737,18 @@ impl Builder {
         [items]: [u64; 1],
     ) -> BuildId<crate::kind::Parameters> {
         let mut row = Row::new(NodeKind::Parameters);
+        self.ast.validate_list(items);
         row.set_parameters_items(items);
         self.push(row, range)
     }
 }
 impl<'a> crate::Parameters<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn items(self) -> crate::flat::ParameterItems<'a> {
         let word = self.syntax_node().row.parameters_items();
-        super::ParameterItems(List::new(self.syntax_node().ast, word))
+        // SAFETY: `push_parameters` validates `items` before storing it.
+        unsafe { super::ParameterItems(List::from_validated(self.syntax_node().ast, word)) }
     }
 }
 impl NodeType for crate::kind::Parameter {
@@ -4313,21 +4779,30 @@ impl Builder {
         [name, annotation]: [u64; 2],
     ) -> BuildId<crate::kind::Parameter> {
         let mut row = Row::new(NodeKind::Parameter);
+        self.validate_child::<crate::kind::Identifier, false>(split_words(name)[0]);
         row.set_parameter_name(split_words(name)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(annotation)[0]);
         row.set_parameter_annotation(split_words(annotation)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::Parameter<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> crate::Identifier<'a> {
         let word = u64::from(self.syntax_node().row.parameter_name());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_parameter` validates `name` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn annotation(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.parameter_annotation());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_parameter` validates `annotation` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::ParameterWithDefault {
@@ -4358,21 +4833,30 @@ impl Builder {
         [parameter, default]: [u64; 2],
     ) -> BuildId<crate::kind::ParameterWithDefault> {
         let mut row = Row::new(NodeKind::ParameterWithDefault);
+        self.validate_child::<crate::kind::Parameter, false>(split_words(parameter)[0]);
         row.set_parameter_with_default_parameter(split_words(parameter)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(default)[0]);
         row.set_parameter_with_default_default(split_words(default)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::ParameterWithDefault<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn parameter(self) -> crate::Parameter<'a> {
         let word = u64::from(self.syntax_node().row.parameter_with_default_parameter());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_parameter_with_default` validates `parameter` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn default(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.parameter_with_default_default());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_parameter_with_default` validates `default` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::DictItem {
@@ -4403,21 +4887,30 @@ impl Builder {
         [key, value]: [u64; 2],
     ) -> BuildId<crate::kind::DictItem> {
         let mut row = Row::new(NodeKind::DictItem);
+        self.validate_child::<crate::kind::Expr, true>(split_words(key)[0]);
         row.set_dict_item_key(split_words(key)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_dict_item_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::DictItem<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn key(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.dict_item_key());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_dict_item` validates `key` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.dict_item_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_dict_item` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::Keyword {
@@ -4448,21 +4941,30 @@ impl Builder {
         [arg, value]: [u64; 2],
     ) -> BuildId<crate::kind::Keyword> {
         let mut row = Row::new(NodeKind::Keyword);
+        self.validate_child::<crate::kind::Identifier, true>(split_words(arg)[0]);
         row.set_keyword_arg(split_words(arg)[0]);
+        self.validate_child::<crate::kind::Expr, false>(split_words(value)[0]);
         row.set_keyword_value(split_words(value)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::Keyword<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn arg(self) -> Option<crate::Identifier<'a>> {
         let word = u64::from(self.syntax_node().row.keyword_arg());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_keyword` validates `arg` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn value(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.keyword_value());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_keyword` validates `value` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::Alias {
@@ -4493,21 +4995,30 @@ impl Builder {
         [name, asname]: [u64; 2],
     ) -> BuildId<crate::kind::Alias> {
         let mut row = Row::new(NodeKind::Alias);
+        self.validate_child::<crate::kind::Identifier, false>(split_words(name)[0]);
         row.set_alias_name(split_words(name)[0]);
+        self.validate_child::<crate::kind::Identifier, true>(split_words(asname)[0]);
         row.set_alias_asname(split_words(asname)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::Alias<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn name(self) -> crate::Identifier<'a> {
         let word = u64::from(self.syntax_node().row.alias_name());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_alias` validates `name` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn asname(self) -> Option<crate::Identifier<'a>> {
         let word = u64::from(self.syntax_node().row.alias_asname());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_alias` validates `asname` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::WithItem {
@@ -4538,21 +5049,30 @@ impl Builder {
         [context_expr, optional_vars]: [u64; 2],
     ) -> BuildId<crate::kind::WithItem> {
         let mut row = Row::new(NodeKind::WithItem);
+        self.validate_child::<crate::kind::Expr, false>(split_words(context_expr)[0]);
         row.set_with_item_context_expr(split_words(context_expr)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(optional_vars)[0]);
         row.set_with_item_optional_vars(split_words(optional_vars)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::WithItem<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn context_expr(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.with_item_context_expr());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_with_item` validates `context_expr` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn optional_vars(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.with_item_optional_vars());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_with_item` validates `optional_vars` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
 }
 impl NodeType for crate::kind::MatchCase {
@@ -4584,8 +5104,11 @@ impl Builder {
         [pattern, guard, body]: [u64; 3],
     ) -> BuildId<crate::kind::MatchCase> {
         let mut row = Row::new(NodeKind::MatchCase);
+        self.validate_child::<crate::kind::Pattern, false>(split_words(pattern)[0]);
         row.set_match_case_pattern(split_words(pattern)[0]);
+        self.validate_child::<crate::kind::Expr, true>(split_words(guard)[0]);
         row.set_match_case_guard(split_words(guard)[0]);
+        self.ast.validate_list(body);
         row.set_match_case_extra_offset(offset(self.ast.extra.len()));
         self.ast
             .extra
@@ -4594,23 +5117,32 @@ impl Builder {
     }
 }
 impl<'a> crate::MatchCase<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn pattern(self) -> crate::Pattern<'a> {
         let word = u64::from(self.syntax_node().row.match_case_pattern());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_match_case` validates `pattern` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn guard(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.match_case_guard());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_match_case` validates `guard` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = {
             let base = self.syntax_node().row.match_case_extra_offset() as usize;
             self.syntax_node().ast.extra_word::<true>(base)
         };
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_match_case` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::Decorator {
@@ -4640,15 +5172,18 @@ impl Builder {
         [expression]: [u64; 1],
     ) -> BuildId<crate::kind::Decorator> {
         let mut row = Row::new(NodeKind::Decorator);
+        self.validate_child::<crate::kind::Expr, false>(split_words(expression)[0]);
         row.set_decorator_expression(split_words(expression)[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::Decorator<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn expression(self) -> crate::Expr<'a> {
         let word = u64::from(self.syntax_node().row.decorator_expression());
-        self.syntax_node().ast.child(word)
+        // SAFETY: `push_decorator` validates `expression` before storing it.
+        unsafe { self.syntax_node().stored_child(split_words(word)[0]) }
     }
 }
 impl NodeType for crate::kind::ElifElseClause {
@@ -4679,21 +5214,30 @@ impl Builder {
         [test, body]: [u64; 2],
     ) -> BuildId<crate::kind::ElifElseClause> {
         let mut row = Row::new(NodeKind::ElifElseClause);
+        self.validate_child::<crate::kind::Expr, true>(split_words(test)[0]);
         row.set_elif_else_clause_test(split_words(test)[0]);
+        self.ast.validate_list(body);
         row.set_elif_else_clause_body(body);
         self.push(row, range)
     }
 }
 impl<'a> crate::ElifElseClause<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn test(self) -> Option<crate::Expr<'a>> {
         let word = u64::from(self.syntax_node().row.elif_else_clause_test());
-        self.syntax_node().ast.optional_child(word)
+        // SAFETY: `push_elif_else_clause` validates `test` before storing it.
+        unsafe {
+            self.syntax_node()
+                .stored_optional_child(split_words(word)[0])
+        }
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn body(self) -> NodeList<'a, crate::kind::Stmt> {
         let word = self.syntax_node().row.elif_else_clause_body();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_elif_else_clause` validates `body` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::TypeParams {
@@ -4723,15 +5267,18 @@ impl Builder {
         [type_params]: [u64; 1],
     ) -> BuildId<crate::kind::TypeParams> {
         let mut row = Row::new(NodeKind::TypeParams);
+        self.ast.validate_list(type_params);
         row.set_type_params_type_params(type_params);
         self.push(row, range)
     }
 }
 impl<'a> crate::TypeParams<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn type_params(self) -> NodeList<'a, crate::kind::TypeParam> {
         let word = self.syntax_node().row.type_params_type_params();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_type_params` validates `type_params` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
 }
 impl NodeType for crate::kind::FString {
@@ -4762,16 +5309,19 @@ impl Builder {
         [elements, flags]: [u64; 2],
     ) -> BuildId<crate::kind::FString> {
         let mut row = Row::new(NodeKind::FString);
+        self.ast.validate_list(elements);
         row.set_f_string_elements(elements);
         row.set_f_string_flags(flags.to_le_bytes()[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::FString<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn elements(self) -> NodeList<'a, crate::kind::InterpolatedStringElement> {
         let word = self.syntax_node().row.f_string_elements();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_f_string` validates `elements` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
     #[inline]
     pub fn flags(self) -> crate::FStringFlags {
@@ -4807,16 +5357,19 @@ impl Builder {
         [elements, flags]: [u64; 2],
     ) -> BuildId<crate::kind::TString> {
         let mut row = Row::new(NodeKind::TString);
+        self.ast.validate_list(elements);
         row.set_t_string_elements(elements);
         row.set_t_string_flags(flags.to_le_bytes()[0]);
         self.push(row, range)
     }
 }
 impl<'a> crate::TString<'a> {
+    #[expect(unsafe_code)]
     #[inline]
     pub fn elements(self) -> NodeList<'a, crate::kind::InterpolatedStringElement> {
         let word = self.syntax_node().row.t_string_elements();
-        List::new(self.syntax_node().ast, word)
+        // SAFETY: `push_t_string` validates `elements` before storing it.
+        unsafe { List::from_validated(self.syntax_node().ast, word) }
     }
     #[inline]
     pub fn flags(self) -> crate::TStringFlags {
@@ -4954,6 +5507,7 @@ impl Builder {
         [id]: [u64; 1],
     ) -> BuildId<crate::kind::Identifier> {
         let mut row = Row::new(NodeKind::Identifier);
+        self.validate_name(split_words(id)[0]);
         row.set_identifier_id(split_words(id)[0]);
         self.push(row, range)
     }
@@ -4963,10 +5517,12 @@ impl<'a> crate::Identifier<'a> {
     pub fn name_id(self) -> super::NameId {
         super::NameId(split_words(u64::from(self.syntax_node().row.identifier_id()))[0])
     }
+    #[expect(unsafe_code)]
     #[inline]
     pub fn id(self) -> &'a crate::name::Name {
         let word = u64::from(self.syntax_node().row.identifier_id());
-        &self.syntax_node().ast.names[split_words(word)[0] as usize]
+        // SAFETY: `push_identifier` validates `id` before storing it.
+        unsafe { self.syntax_node().stored_name(split_words(word)[0]) }
     }
 }
 impl Builder {

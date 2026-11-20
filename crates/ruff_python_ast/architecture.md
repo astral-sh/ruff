@@ -119,6 +119,13 @@ temporary `Node<T>` carries the kind, source range and a `BuildId<T>`. A build I
 physical slot as a handle in a plain `u32`, so emitting a node and writing its slot into its
 parent need no nonzero check. The finished tree and consumers that retain a node use `AstNodeId<T>`.
 
+Before appending a parent such as `left + right`, the builder checks that both operand
+IDs resolve to rows in the destination arena. It also checks list references and interned
+name IDs when storing them. Children precede their parents, and a rewind restores the
+column lengths together. A getter on a borrowed row can therefore follow a stored ID
+without repeating the bounds check. `Ast::view` checks the slot and kind when a caller
+supplies an ID. [Builder invariants](src/flat/mod.rs)
+
 Nested lists of the same kind share a scratch buffer of four-byte slots. Each
 list records the buffer length on entry. When the list closes, the parser copies that suffix
 into the extra-data column and truncates the buffer to the recorded length. The enclosing list

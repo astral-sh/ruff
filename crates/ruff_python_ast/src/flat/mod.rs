@@ -2,6 +2,14 @@
 //!
 //! A handle identifies a row in one AST. A view borrows that AST to resolve the
 //! handle's fields. Growing the backing vectors does not invalidate handles.
+//!
+//! The builder validates each child slot, child list and interned name before
+//! appending the parent row. A child precedes its parent, and each list already
+//! occupies a slice of the extra-data arena. A rewind restores lengths saved
+//! together by this builder, so these references stay valid in the retained rows.
+//! Typed getters can rely on those checks for the lifetime of a shared AST borrow.
+//! When borrowing a concrete node from an external handle, we check the slot and
+//! its kind before interpreting the row as that layout.
 
 use std::fmt;
 use std::hash::BuildHasher;
@@ -216,12 +224,12 @@ impl get_size2::GetSize for SyntaxNode<'_> {}
 pub(crate) mod sealed {
     use super::SyntaxNode;
 
-    // Only a checked cast or an AST field with a known type can construct a wrapper.
-    pub struct Checked(());
-    pub(super) const CHECKED: Checked = Checked(());
-
     pub trait FromSyntax<'ast> {
-        fn from_syntax(syntax: SyntaxNode<'ast>, checked: Checked) -> Self;
+        /// # Safety
+        ///
+        /// For a concrete node type, the stored row's kind must match `Self`.
+        #[expect(unsafe_code)]
+        unsafe fn from_syntax(syntax: SyntaxNode<'ast>) -> Self;
     }
 }
 
@@ -312,8 +320,64 @@ impl<'ast> SyntaxNode<'ast> {
         }
     }
 
+    /// # Safety
+    ///
+    /// `slot` must index an initialized row of `ast`.
+    #[inline]
+    #[expect(unsafe_code)]
+    unsafe fn from_slot_unchecked(ast: &'ast Ast, slot: u32) -> Self {
+        // SAFETY: The caller guarantees the row exists in this arena.
+        let row = unsafe { ast.nodes.rows().get_unchecked(slot as usize) };
+        Self { row, ast }
+    }
+
+    /// # Safety
+    ///
+    /// `slot` must come from a present child field of type `N` in this row's layout.
+    #[inline]
+    #[expect(unsafe_code)]
+    unsafe fn stored_child<N: AstNode<'ast>>(self, slot: u32) -> N {
+        // SAFETY: Builder::validate_child checked the slot and concrete layout before
+        // appending this parent. Rewind and replacement can only remove or replace
+        // the child after removing its parent.
+        unsafe { N::from_syntax(Self::from_slot_unchecked(self.ast, slot)) }
+    }
+
+    /// # Safety
+    ///
+    /// `slot` must come from an optional child field of type `N` in this row's layout.
+    #[inline]
+    #[expect(unsafe_code)]
+    unsafe fn stored_optional_child<N: AstNode<'ast>>(self, slot: u32) -> Option<N> {
+        // SAFETY: A nonzero slot means this field is present and was validated.
+        (slot != 0).then(|| unsafe { self.stored_child(slot) })
+    }
+
+    /// # Safety
+    ///
+    /// `id` must come from a name field in this row's layout.
+    #[inline]
+    #[expect(unsafe_code)]
+    unsafe fn stored_name(self, id: u32) -> &'ast Name {
+        // SAFETY: The builder checked the pool index when it wrote the field. Rewind
+        // restores an earlier state in which every retained row had its name.
+        unsafe { self.ast.names.get_unchecked(id as usize) }
+    }
+
     fn retype<N: AstNode<'ast>>(self) -> N {
-        N::from_syntax(self, sealed::CHECKED)
+        // A build ID or list can come from another arena or refer to a reused slot.
+        // Check the layout before letting typed getters interpret words as stored IDs.
+        if let Some(kind) = N::Kind::KIND
+            && self.row.kind() != kind
+        {
+            invalid_child();
+        }
+        // SAFETY: For concrete types the stored kind matches. Group wrappers
+        // inspect the actual kind before dispatching to a concrete node.
+        #[expect(unsafe_code)]
+        unsafe {
+            N::from_syntax(self)
+        }
     }
 
     /// Yields this node's immediate children in source order.
@@ -339,7 +403,8 @@ impl<'ast> SyntaxNode<'ast> {
 }
 
 impl<'ast> sealed::FromSyntax<'ast> for SyntaxNode<'ast> {
-    fn from_syntax(syntax: Self, _: sealed::Checked) -> Self {
+    #[expect(unsafe_code)]
+    unsafe fn from_syntax(syntax: Self) -> Self {
         syntax
     }
 }
@@ -403,10 +468,8 @@ macro_rules! impl_ast_node {
 
         impl<'ast> crate::flat::sealed::FromSyntax<'ast> for $name<'ast> {
             #[inline]
-            fn from_syntax(
-                syntax: crate::SyntaxNode<'ast>,
-                _: crate::flat::sealed::Checked,
-            ) -> Self {
+            #[expect(unsafe_code)]
+            unsafe fn from_syntax(syntax: crate::SyntaxNode<'ast>) -> Self {
                 Self { syntax }
             }
         }
@@ -623,16 +686,28 @@ impl Ast {
             .any(predicate)
     }
 
+    #[inline]
+    fn list_words(&self, word: u64) -> &[u32] {
+        self.extra
+            .get(Interval::decode(word).indices())
+            .unwrap_or_else(|| invalid_child())
+    }
+
+    #[inline]
+    fn validate_list(&self, word: u64) {
+        let items = self.list_words(word);
+        let len = self.nodes.len();
+        if items.iter().any(|&slot| slot as usize >= len) {
+            invalid_child();
+        }
+    }
+
     fn at<T: NodeType>(&self, handle: AstNodeId<T>) -> T::Borrowed<'_> {
         SyntaxNode::from_slot(self, handle.slot()).retype()
     }
 
     fn child<'ast, N: AstNode<'ast>>(&'ast self, field: u64) -> N {
         SyntaxNode::from_slot(self, split_words(field)[0] as usize).retype()
-    }
-
-    fn optional_child<'ast, N: AstNode<'ast>>(&'ast self, field: u64) -> Option<N> {
-        (split_words(field)[0] != 0).then(|| self.child(field))
     }
 
     fn bytes(&self, field: u64) -> &[u8] {
@@ -652,6 +727,7 @@ pub struct Builder {
     source: TextRange,
     scratch: Vec<u32>,
     name_ids: HashTable<u32>,
+    checkpoints: Vec<ArenaLengths>,
 }
 
 /// The index of an identifier spelling in one builder's name pool.
@@ -664,8 +740,15 @@ impl NameId {
     }
 }
 
-/// The lengths of the rows and side tables before a speculative parse.
+/// A saved builder state before a speculative parse.
+#[must_use = "commit or rewind the checkpoint to release it from the builder"]
 pub struct Checkpoint {
+    index: usize,
+    lengths: ArenaLengths,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ArenaLengths {
     rows: usize,
     extra: usize,
     text: usize,
@@ -703,6 +786,7 @@ impl Builder {
                 names: Vec::with_capacity(estimated / 8),
                 ..Ast::default()
             },
+            checkpoints: Vec::new(),
             name_ids: HashTable::with_capacity(estimated * 3 / 8),
             scratch: Vec::new(),
         }
@@ -715,9 +799,10 @@ impl Builder {
         name: BuildId<crate::kind::ExprName>,
     ) -> BuildId<crate::kind::Identifier> {
         let slot = name.slot();
-        let expr = &self.ast.nodes.rows()[slot];
         let mut identifier = Row::new(NodeKind::Identifier);
-        identifier.set_identifier_id(expr.expr_name_id());
+        // Replacing the last row keeps its already-validated name in the same pool.
+        // All earlier rows only point backward, so none depends on this row's kind.
+        identifier.set_identifier_id(self.get(name).name_id().0);
         if slot + 1 == self.ast.nodes.len() {
             self.ast.nodes.rows_mut()[slot] = identifier;
             name.cast()
@@ -751,12 +836,21 @@ impl Builder {
 
     fn discard_if_last<T>(&mut self, id: BuildId<T>) {
         if id.slot() + 1 == self.ast.nodes.len() {
+            while self
+                .checkpoints
+                .last()
+                .is_some_and(|saved| saved.rows > id.slot())
+            {
+                self.checkpoints.pop();
+            }
             self.ast.nodes.truncate(id.slot());
         }
     }
 
-    pub fn checkpoint(&self) -> Checkpoint {
-        Checkpoint {
+    /// Saves the lengths of the rows and side tables. Call [`Self::commit`] or
+    /// [`Self::rewind`] to release the saved state and any nested checkpoints.
+    pub fn checkpoint(&mut self) -> Checkpoint {
+        let lengths = ArenaLengths {
             rows: self.ast.nodes.len(),
             extra: self.ast.extra.len(),
             text: self.ast.text.len(),
@@ -764,20 +858,38 @@ impl Builder {
             bytes: self.ast.bytes.len(),
             numbers: self.ast.numbers.len(),
             debug_text: self.ast.debug_text.len(),
-        }
+        };
+        let index = self.checkpoints.len();
+        self.checkpoints.push(lengths);
+        Checkpoint { index, lengths }
+    }
+
+    /// Releases this checkpoint and any nested checkpoints, keeping all allocations.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "A checkpoint is consumed on commit."
+    )]
+    pub fn commit(&mut self, checkpoint: Checkpoint) {
+        // Restoring a recorded set of lengths preserves every retained row's
+        // references. Lengths from another arena could drop a name or list
+        // while retaining the row that points to it.
+        assert_eq!(
+            self.checkpoints.get(checkpoint.index),
+            Some(&checkpoint.lengths),
+            "invalid AST checkpoint"
+        );
+        self.checkpoints.truncate(checkpoint.index);
     }
 
     /// Discards allocations since the checkpoint. Handles to those allocations expire here.
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "Rewinding consumes the checkpoint so callers cannot reuse it after rebuilding the tree."
-    )]
     pub fn rewind(&mut self, checkpoint: Checkpoint) {
-        self.ast.nodes.truncate(checkpoint.rows);
-        self.ast.extra.truncate(checkpoint.extra);
-        self.ast.text.truncate(checkpoint.text);
-        for (i, name) in self.ast.names.drain(checkpoint.names..).enumerate() {
-            let index = offset(checkpoint.names + i);
+        let lengths = checkpoint.lengths;
+        self.commit(checkpoint);
+        self.ast.nodes.truncate(lengths.rows);
+        self.ast.extra.truncate(lengths.extra);
+        self.ast.text.truncate(lengths.text);
+        for (i, name) in self.ast.names.drain(lengths.names..).enumerate() {
+            let index = offset(lengths.names + i);
             if let Ok(entry) = self
                 .name_ids
                 .find_entry(FxBuildHasher.hash_one(name.as_str()), |&id| id == index)
@@ -785,9 +897,31 @@ impl Builder {
                 entry.remove();
             }
         }
-        self.ast.bytes.truncate(checkpoint.bytes);
-        self.ast.numbers.truncate(checkpoint.numbers);
-        self.ast.debug_text.truncate(checkpoint.debug_text);
+        self.ast.bytes.truncate(lengths.bytes);
+        self.ast.numbers.truncate(lengths.numbers);
+        self.ast.debug_text.truncate(lengths.debug_text);
+    }
+
+    #[inline]
+    fn validate_child<T: NodeType, const OPTIONAL: bool>(&self, slot: u32) {
+        // A child already exists when its parent is appended. Slot zero is the
+        // sentinel used by an absent optional child.
+        let Some(row) = self.ast.nodes.rows().get(slot as usize) else {
+            invalid_child();
+        };
+        if let Some(kind) = T::KIND
+            && (!OPTIONAL || slot != 0)
+            && row.kind() != kind
+        {
+            invalid_child();
+        }
+    }
+
+    #[inline]
+    fn validate_name(&self, id: u32) {
+        if id as usize >= self.ast.names.len() {
+            invalid_child();
+        }
     }
 
     fn node_count(&self) -> usize {
@@ -803,8 +937,9 @@ impl Builder {
 
     pub fn get<T: NodeType>(&self, id: BuildId<T>) -> T::Borrowed<'_> {
         let syntax = SyntaxNode::from_slot(&self.ast, id.slot());
+        let node = syntax.retype();
         debug_assert!(T::matches(syntax.row.kind()));
-        syntax.retype()
+        node
     }
 
     /// The source range of a node in this builder.
@@ -849,7 +984,8 @@ impl Builder {
         ListId::new(Interval::new(start, len))
     }
 
-    pub fn get_list<E: list::Element>(&self, list: ListId<E>) -> List<'_, E> {
+    #[cfg(test)]
+    fn get_list<E: list::Element>(&self, list: ListId<E>) -> List<'_, E> {
         List::new(&self.ast, list.word())
     }
 
@@ -967,6 +1103,8 @@ impl Builder {
     /// A string expression stores its decoded text range beside its parts list.
     /// Six bytes hold a text offset and a 16-bit length. Longer strings use a full range
     /// in the extra table, with the maximum inline length reserved for that case.
+    ///
+    /// Validates `parts` for the generated getter before caching its joined text.
     fn string_literal_text(&mut self, parts: u64) -> (u32, u16) {
         let [start, len] = split_words(self.join_string_literals(parts).encode());
         if let Ok(len) = u16::try_from(len)
@@ -979,8 +1117,9 @@ impl Builder {
         (index, u16::MAX)
     }
 
-    fn join_string_literals(&mut self, parts: u64) -> Interval {
-        let parts = List::<AstNodeId<crate::kind::StringLiteral>>::new(&self.ast, parts);
+    fn join_string_literals(&mut self, word: u64) -> Interval {
+        // List::new checks the interval and every child slot before the parent stores them.
+        let parts = List::<AstNodeId<crate::kind::StringLiteral>>::new(&self.ast, word);
         let Some(first) = parts.first() else {
             return Interval::new(0, 0);
         };
@@ -1002,8 +1141,8 @@ impl Builder {
             // trees may join parts from disjoint positions in the text column.
             let parts = parts.id();
             let start = self.ast.text.len();
-            for i in 0..parts.len() {
-                let range = self.get_list(parts).at(i).text_range();
+            for index in 0..parts.len() {
+                let range = self.list_item(parts, index).text_range();
                 self.ast.text.extend_from_within(range.indices());
             }
             Interval::new(start, self.ast.text.len() - start)
@@ -1190,7 +1329,10 @@ fn offset(len: usize) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Builder, NodeKind, Row, TextRange, TextSize};
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    use super::{BuildId, Builder, NodeKind, Row, TextRange, TextSize, build};
+    use crate::{ExprContext, ModModule, kind};
 
     #[test]
     fn dense_prefix_bounds_speculative_reservations() {
@@ -1214,5 +1356,176 @@ mod tests {
             (nodes.capacity() - nodes.len()) * (size_of::<Row>() + size_of::<TextRange>());
         assert!(spare_bytes <= 1 << 20);
         assert!((extra.capacity() - extra.len()) * size_of::<u32>() <= 1 << 20);
+    }
+
+    fn none(builder: &mut Builder) -> BuildId<kind::Expr> {
+        builder
+            .add(build::ExprNoneLiteral {
+                range: TextRange::default(),
+            })
+            .into()
+    }
+
+    fn statement(builder: &mut Builder, spelling: &str) -> BuildId<kind::StmtExpr> {
+        let range = TextRange::default();
+        let id = builder.intern_name(spelling);
+        let value = builder
+            .add(build::ExprName {
+                range,
+                ctx: ExprContext::Load,
+                id,
+            })
+            .into();
+        builder.add(build::StmtExpr { range, value })
+    }
+
+    fn module(builder: &mut Builder, spelling: &str) -> BuildId<kind::ModModule> {
+        let item: BuildId<kind::Stmt> = statement(builder, spelling).into();
+        let body = builder.list([item]);
+        builder.add(build::ModModule {
+            range: TextRange::default(),
+            body,
+        })
+    }
+
+    fn spelling(module: ModModule<'_>) -> &str {
+        module
+            .body()
+            .at(0)
+            .as_expr_stmt()
+            .unwrap()
+            .value()
+            .as_name_expr()
+            .unwrap()
+            .id()
+            .as_str()
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid AST child slot")]
+    fn reject_stale_child_before_storing_parent() {
+        let mut builder = Builder::default();
+        let checkpoint = builder.checkpoint();
+        let value = none(&mut builder);
+        builder.rewind(checkpoint);
+        builder.add(build::StmtExpr {
+            range: TextRange::default(),
+            value,
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid AST child slot")]
+    fn reject_foreign_concrete_child_with_different_local_kind() {
+        let range = TextRange::default();
+        let mut other = Builder::default();
+        let id = other.intern_name("other");
+        let name = other.add(build::Identifier { range, id });
+        let mut builder = Builder::default();
+        none(&mut builder);
+        builder.add(build::Alias {
+            range,
+            name,
+            asname: None,
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid AST child slot")]
+    fn reject_name_outside_local_pool() {
+        let id = Builder::default().intern_name("other");
+        Builder::default().add(build::Identifier {
+            range: TextRange::default(),
+            id,
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid AST child slot")]
+    fn reject_list_outside_local_arena() {
+        let mut other = Builder::default();
+        let item: BuildId<kind::Stmt> = statement(&mut other, "other").into();
+        let body = other.list([item]);
+        Builder::default().add(build::ModModule {
+            range: TextRange::default(),
+            body,
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid AST child slot")]
+    fn reject_list_containing_out_of_bounds_slot() {
+        let item: BuildId<kind::Stmt> = statement(&mut Builder::default(), "other").into();
+        let mut builder = Builder::default();
+        let body = builder.list([item]);
+        builder.add(build::ModModule {
+            range: TextRange::default(),
+            body,
+        });
+    }
+
+    #[test]
+    fn reject_reused_slot_at_each_typed_entry_point() {
+        let mut builder = Builder::default();
+        let checkpoint = builder.checkpoint();
+        let stale = statement(&mut builder, "old");
+        builder.rewind(checkpoint);
+        none(&mut builder);
+        none(&mut builder);
+        let list = builder.list([stale]);
+        assert!(catch_unwind(|| builder.get(stale)).is_err());
+        assert!(catch_unwind(|| builder.get_list(list).at(0)).is_err());
+        let tree = builder.finish_tree(stale);
+        assert!(catch_unwind(|| tree.root()).is_err());
+    }
+
+    #[test]
+    fn reject_foreign_checkpoint_with_matching_row_count() {
+        let mut other = Builder::default();
+        for _ in 0..3 {
+            none(&mut other);
+        }
+        let foreign = other.checkpoint();
+        let mut builder = Builder::default();
+        let retained = module(&mut builder, "kept");
+        let local = builder.checkpoint();
+        // The foreign lengths would retain the module but delete its list and name.
+        assert!(catch_unwind(AssertUnwindSafe(|| builder.rewind(foreign))).is_err());
+        builder.rewind(local);
+        assert_eq!(spelling(builder.get(retained)), "kept");
+    }
+
+    #[test]
+    fn discard_invalidates_checkpoints_that_included_the_row() {
+        let mut builder = Builder::default();
+        let value = none(&mut builder);
+        let stale = builder.checkpoint();
+        builder.discard_if_last(value);
+        let retained = module(&mut builder, "replacement");
+        assert!(catch_unwind(AssertUnwindSafe(|| builder.rewind(stale))).is_err());
+        assert_eq!(spelling(builder.get(retained)), "replacement");
+    }
+
+    #[test]
+    fn nested_rewinds_preserve_the_retained_tree() {
+        let mut builder = Builder::default();
+        let root = module(&mut builder, "keep");
+        let first = builder.checkpoint();
+        module(&mut builder, "middle");
+        let second = builder.checkpoint();
+        for _ in 0..32 {
+            module(&mut builder, "late");
+        }
+        builder.rewind(second);
+        let third = builder.checkpoint();
+        module(&mut builder, "committed");
+        builder.commit(third);
+        builder.rewind(first);
+        module(&mut builder, "replacement");
+        let mut tree = builder.finish_tree(root);
+        tree.shrink_to_fit();
+        let cloned = tree.clone();
+        drop(tree);
+        assert_eq!(spelling(cloned.root()), "keep");
     }
 }

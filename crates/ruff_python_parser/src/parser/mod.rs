@@ -903,7 +903,7 @@ impl<'src> Parser<'src> {
     }
 
     /// Creates a checkpoint to which the parser can later return to using [`Self::rewind`].
-    fn checkpoint(&self) -> ParserCheckpoint {
+    fn checkpoint(&mut self) -> ParserCheckpoint {
         ParserCheckpoint {
             storage: self.storage.checkpoint(),
             tokens: self.tokens.checkpoint(),

@@ -3,11 +3,10 @@ use std::ops::Bound;
 use std::ops::Range;
 
 use super::{
-    Any, Ast, AstNode, AstNodeId, BuildId, Builder, NodeList, NodeType, offset, split_words,
+    Any, Ast, AstNode, AstNodeId, BuildId, Builder, NodeList, NodeType, SyntaxNode, offset,
+    split_words,
 };
-use crate::{
-    CmpOp, Expr, FString, Identifier, MappingPatternItem, NodeKind, Pattern, StringLiteral,
-};
+use crate::{CmpOp, Expr, FString, Identifier, MappingPatternItem, Pattern, StringLiteral};
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -43,11 +42,34 @@ impl Interval {
 const _: () = assert!(size_of::<Interval>() == 8);
 
 /// Items stored in an AST list. The field schema determines how each word is read.
-pub trait Element {
+pub trait Element: Sized {
+    const IS_NODE: bool = true;
     type Item<'a>: Copy;
 
-    #[doc(hidden)]
-    fn read(ast: &Ast, word: u32) -> Self::Item<'_>;
+    fn read(word: ListWord<'_, Self>) -> Self::Item<'_>;
+}
+
+/// A word and the arena of the list it came from. For node elements the word
+/// is an in-bounds slot in this arena. Keeping them together prevents element
+/// decoders from pairing a validated slot with a different AST.
+pub struct ListWord<'a, E> {
+    ast: &'a Ast,
+    value: u32,
+    element: PhantomData<fn() -> E>,
+}
+
+impl<'a, E: Element> ListWord<'a, E> {
+    #[inline]
+    fn node(self) -> SyntaxNode<'a> {
+        const { assert!(E::IS_NODE) };
+        // SAFETY: The word was checked in this arena, either individually by
+        // Builder::list_item or as part of a validated List. The shared borrow
+        // keeps the slot valid.
+        #[expect(unsafe_code)]
+        unsafe {
+            SyntaxNode::from_slot_unchecked(self.ast, self.value)
+        }
+    }
 }
 
 /// A list descriptor that can be stored in a node under construction.
@@ -93,6 +115,22 @@ impl<E> ListId<E> {
 
     pub fn is_empty(self) -> bool {
         self.range.len == 0
+    }
+}
+
+impl Builder {
+    /// Reads one list element, checking just its slot. Use this when building
+    /// new nodes between reads, since each write ends the previous list borrow.
+    pub fn list_item<E: Element>(&self, list: ListId<E>, index: usize) -> E::Item<'_> {
+        let value = self.ast.extra[list.range.indices()][index];
+        if E::IS_NODE && value as usize >= self.ast.nodes.len() {
+            super::invalid_child();
+        }
+        E::read(ListWord {
+            ast: &self.ast,
+            value,
+            element: PhantomData,
+        })
     }
 }
 
@@ -155,8 +193,8 @@ impl Element for ArgumentId {
     type Item<'a> = super::ArgOrKeyword<'a>;
 
     #[inline]
-    fn read(ast: &Ast, word: u32) -> Self::Item<'_> {
-        let node: super::SyntaxNode<'_> = ast.child(u64::from(word));
+    fn read(word: ListWord<'_, Self>) -> Self::Item<'_> {
+        let node = word.node();
         if let Some(keyword) = node.cast::<crate::Keyword>() {
             super::ArgOrKeyword::Keyword(keyword)
         } else {
@@ -183,8 +221,9 @@ impl ListItem for PatternArgumentId {
 impl Element for PatternArgumentId {
     type Item<'a> = crate::PatternOrKeyword<crate::Pattern<'a>, crate::PatternKeyword<'a>>;
 
-    fn read(ast: &Ast, word: u32) -> Self::Item<'_> {
-        let node: super::SyntaxNode<'_> = ast.child(u64::from(word));
+    #[inline]
+    fn read(word: ListWord<'_, Self>) -> Self::Item<'_> {
+        let node = word.node();
         if let Some(keyword) = node.cast::<crate::PatternKeyword>() {
             crate::PatternOrKeyword::Keyword(keyword)
         } else {
@@ -195,8 +234,7 @@ impl Element for PatternArgumentId {
 
 /// The children of one type in a heterogeneous, source-ordered AST list.
 pub struct FilteredNodes<'a, T> {
-    ast: &'a Ast,
-    range: Interval,
+    nodes: NodeList<'a, Any>,
     marker: PhantomData<fn() -> T>,
 }
 
@@ -218,9 +256,13 @@ impl<T> Clone for FilteredNodes<'_, T> {
 
 impl<'a, T: NodeType> FilteredNodes<'a, T> {
     pub(super) fn new<E: Element>(items: List<'a, E>) -> Self {
+        const { assert!(E::IS_NODE) };
         Self {
-            ast: items.ast,
-            range: items.range,
+            nodes: List {
+                ast: items.ast,
+                range: items.range,
+                element: PhantomData,
+            },
             marker: PhantomData,
         }
     }
@@ -228,8 +270,7 @@ impl<'a, T: NodeType> FilteredNodes<'a, T> {
     #[inline]
     pub fn iter(self) -> FilteredNodeIter<'a, T> {
         FilteredNodeIter {
-            ast: self.ast,
-            words: &self.ast.extra[self.range.indices()],
+            nodes: self.nodes.iter(),
             marker: PhantomData,
         }
     }
@@ -246,7 +287,7 @@ impl<'a, T: NodeType> FilteredNodes<'a, T> {
     pub fn split_first(self) -> Option<(T::Borrowed<'a>, Self)> {
         let mut iter = self.iter();
         let first = iter.next()?;
-        Some((first, self.suffix(iter.words.len())))
+        Some((first, Self::new(iter.nodes.as_slice())))
     }
 
     #[must_use]
@@ -255,14 +296,7 @@ impl<'a, T: NodeType> FilteredNodes<'a, T> {
         if n > 0 {
             iter.nth(n - 1);
         }
-        self.suffix(iter.words.len())
-    }
-
-    fn suffix(self, remaining: usize) -> Self {
-        Self {
-            range: Interval::new(self.range.indices().end - remaining, remaining),
-            ..self
-        }
+        Self::new(iter.nodes.as_slice())
     }
 
     pub fn first(self) -> Option<T::Borrowed<'a>> {
@@ -273,7 +307,7 @@ impl<'a, T: NodeType> FilteredNodes<'a, T> {
     }
 
     pub fn as_array<const N: usize>(self) -> Option<[T::Borrowed<'a>; N]> {
-        if (self.range.len as usize) < N {
+        if self.nodes.len() < N {
             return None;
         }
         itertools::Itertools::collect_array(self.iter())
@@ -290,33 +324,29 @@ impl<'a, T: NodeType> IntoIterator for FilteredNodes<'a, T> {
 }
 
 pub struct FilteredNodeIter<'a, T> {
-    ast: &'a Ast,
-    words: &'a [u32],
+    nodes: Iter<'a, AstNodeId<Any>>,
     marker: PhantomData<fn() -> T>,
 }
 
 impl<T> Clone for FilteredNodeIter<'_, T> {
     fn clone(&self) -> Self {
-        Self { ..*self }
+        Self {
+            nodes: self.nodes.clone(),
+            marker: PhantomData,
+        }
     }
 }
 
 impl<'a, T: NodeType> Iterator for FilteredNodeIter<'a, T> {
     type Item = T::Borrowed<'a>;
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.words.len()))
+        (0, Some(self.nodes.len()))
     }
     fn last(mut self) -> Option<Self::Item> {
         self.next_back()
     }
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(word) = self.words.split_off_first() {
-            let node: super::SyntaxNode<'_> = self.ast.child(u64::from(*word));
-            if let Some(node) = node.cast::<T::Borrowed<'a>>() {
-                return Some(node);
-            }
-        }
-        None
+        self.nodes.find_map(AstNode::cast::<T::Borrowed<'a>>)
     }
 }
 
@@ -328,13 +358,10 @@ impl<'a, T: NodeType> From<NodeList<'a, T>> for FilteredNodes<'a, T> {
 
 impl<'a, T: NodeType> DoubleEndedIterator for FilteredNodeIter<'a, T> {
     fn next_back(&mut self) -> Option<T::Borrowed<'a>> {
-        while let Some(word) = self.words.split_off_last() {
-            let node: super::SyntaxNode<'_> = self.ast.child(u64::from(*word));
-            if let Some(node) = node.cast::<T::Borrowed<'a>>() {
-                return Some(node);
-            }
-        }
-        None
+        self.nodes
+            .by_ref()
+            .rev()
+            .find_map(AstNode::cast::<T::Borrowed<'a>>)
     }
 }
 
@@ -365,16 +392,18 @@ impl ListItem for FStringPartId {
 impl<T: NodeType + 'static> Element for AstNodeId<T> {
     type Item<'a> = T::Borrowed<'a>;
 
-    fn read(ast: &Ast, word: u32) -> Self::Item<'_> {
-        ast.child(u64::from(word))
+    #[inline]
+    fn read(word: ListWord<'_, Self>) -> Self::Item<'_> {
+        word.node().retype()
     }
 }
 
 impl Element for CmpOp {
+    const IS_NODE: bool = false;
     type Item<'a> = Self;
 
-    fn read(_: &Ast, word: u32) -> Self {
-        super::scalar::Word::decode(u64::from(word))
+    fn read(word: ListWord<'_, Self>) -> Self {
+        super::scalar::Word::decode(u64::from(word.value))
     }
 }
 
@@ -653,18 +682,19 @@ pub enum FStringPartView<'a> {
 impl Element for crate::FStringPart {
     type Item<'a> = FStringPartView<'a>;
 
-    fn read(ast: &Ast, word: u32) -> Self::Item<'_> {
-        if ast.nodes.rows()[word as usize].kind() == NodeKind::FString {
-            FStringPartView::FString(ast.child(u64::from(word)))
+    fn read(word: ListWord<'_, Self>) -> Self::Item<'_> {
+        let node = word.node();
+        if let Some(fstring) = node.cast::<FString>() {
+            FStringPartView::FString(fstring)
         } else {
-            FStringPartView::Literal(ast.child(u64::from(word)))
+            FStringPartView::Literal(node.retype())
         }
     }
 }
 
 /// A borrowed list whose stored descriptor is an eight-byte start and length.
 pub struct List<'a, E> {
-    pub(super) ast: &'a Ast,
+    ast: &'a Ast,
     range: Interval,
     element: PhantomData<fn() -> E>,
 }
@@ -692,7 +722,28 @@ where
 }
 
 impl<'a, E: Element> List<'a, E> {
+    pub(super) fn ast(self) -> &'a Ast {
+        self.ast
+    }
+
     pub(super) fn new(ast: &'a Ast, word: u64) -> Self {
+        if E::IS_NODE {
+            ast.validate_list(word);
+        }
+        // SAFETY: validate_list checked the interval and all node slots against
+        // this AST. Scalar lists use checked indexing in words().
+        #[expect(unsafe_code)]
+        unsafe {
+            Self::from_validated(ast, word)
+        }
+    }
+
+    /// # Safety
+    ///
+    /// If `E::IS_NODE`, the interval must be in bounds for `ast.extra`, and
+    /// every word in the interval must be an in-bounds slot in `ast.nodes`.
+    #[expect(unsafe_code)]
+    pub(super) unsafe fn from_validated(ast: &'a Ast, word: u64) -> Self {
         Self {
             ast,
             range: Interval::decode(word),
@@ -741,7 +792,11 @@ impl<'a, E: Element> List<'a, E> {
     #[inline]
     pub fn at(self, index: usize) -> E::Item<'a> {
         assert!(index < self.len(), "list index out of bounds");
-        E::read(self.ast, self.ast.extra[self.range.start as usize + index])
+        E::read(ListWord {
+            ast: self.ast,
+            value: self.words()[index],
+            element: PhantomData,
+        })
     }
 
     pub fn as_array<const N: usize>(self) -> Option<[E::Item<'a>; N]> {
@@ -754,7 +809,16 @@ impl<'a, E: Element> List<'a, E> {
 
     pub(super) fn words(self) -> &'a [u32] {
         let start = self.range.start as usize;
-        &self.ast.extra[start..start + self.len()]
+        if E::IS_NODE {
+            // SAFETY: The interval belongs to this AST by from_validated's contract.
+            // Slicing and iterator cursors only select subranges of that interval.
+            #[expect(unsafe_code)]
+            unsafe {
+                self.ast.extra.get_unchecked(start..start + self.len())
+            }
+        } else {
+            &self.ast.extra[start..start + self.len()]
+        }
     }
 
     pub fn split_first(self) -> Option<(E::Item<'a>, Self)> {
@@ -830,7 +894,11 @@ impl<E> Clone for Iter<'_, E> {
 impl<'a, E: Element> Iter<'a, E> {
     #[inline]
     fn decode(&self, value: u32) -> E::Item<'a> {
-        E::read(self.ast, value)
+        E::read(ListWord {
+            ast: self.ast,
+            value,
+            element: PhantomData,
+        })
     }
 
     pub fn next_if(&mut self, predicate: impl FnOnce(E::Item<'a>) -> bool) -> Option<E::Item<'a>> {
@@ -935,8 +1003,22 @@ where
 mod tests {
     use ruff_text_size::TextRange;
 
+    use crate::AstNode;
     use crate::flat::{Builder, Emit, build};
     use crate::kind;
+
+    #[test]
+    fn builder_checks_the_selected_list_item() {
+        let range = TextRange::default();
+        let mut builder = Builder::default();
+        let first = builder.add(build::StmtPass { range });
+        let checkpoint = builder.checkpoint();
+        let stale = builder.add(build::StmtPass { range });
+        builder.rewind(checkpoint);
+        let list = builder.list([first, stale]);
+        assert!(builder.list_item(list, 0).is_same_node(builder.get(first)));
+        assert!(std::panic::catch_unwind(|| builder.list_item(list, 1)).is_err());
+    }
 
     #[test]
     fn node_positions_use_ids_from_the_same_tree() {

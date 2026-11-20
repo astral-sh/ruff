@@ -2491,6 +2491,7 @@ impl<'src> Parser<'src> {
         }
 
         let with_items = if with_item_kind.is_parenthesized() {
+            self.storage.commit(checkpoint.storage);
             Some(
                 self.storage
                     .list(parsed_with_items.into_iter().map(|parsed| parsed.item)),
@@ -2647,6 +2648,7 @@ impl<'src> Parser<'src> {
                 // `match [x, y, z]: {dict}` or `match[0]: int`.
                 self.bump(TokenKind::Colon);
 
+                self.storage.commit(checkpoint.storage);
                 let cases = self.parse_match_body();
 
                 Some(
@@ -2672,6 +2674,7 @@ impl<'src> Parser<'src> {
                     self.current_token_range(),
                 );
 
+                self.storage.commit(checkpoint.storage);
                 let cases = self.parse_match_body();
 
                 Some(
