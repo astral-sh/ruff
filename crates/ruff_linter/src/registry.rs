@@ -241,7 +241,8 @@ pub enum LintSource {
     Imports,
     Noqa,
     Filesystem,
-    /// A TOML config file, either `pyproject.toml`, `ruff.toml`, or `.ruff.toml`.
+    /// A TOML config file, either `pyproject.toml`, `ruff.toml`, or `.ruff.toml`, or TOML
+    /// configuration embedded in inline script metadata.
     Toml,
 }
 

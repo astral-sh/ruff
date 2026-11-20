@@ -150,6 +150,12 @@ pub fn check_path(
         doc_lines.extend(doc_lines_from_tokens(tokens));
     }
 
+    if source_type.is_py_file()
+        && context.any_rule_enabled(&[Rule::RuleCodesInSelectors, Rule::RenamedRule])
+    {
+        crate::toml::lint_script_metadata(&context, locator.contents());
+    }
+
     // Run the token-based rules.
     if context.has_rules_for(LintSource::Tokens) {
         check_tokens(
