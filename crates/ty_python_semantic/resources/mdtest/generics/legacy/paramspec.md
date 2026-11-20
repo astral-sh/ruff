@@ -2127,14 +2127,31 @@ reveal_type(render_pair((numbers, numbers)))  # revealed: tuple[list[str], list[
 render_pair((numbers, words))  # error: [invalid-argument-type]
 ```
 
-The list or an expected callable type can specialize a generic mapper within its constraints.
+An expected callable type can narrow the specialization of a generic mapper.
 
 ```py
 from copy import copy
 
-reveal_type(map_items(copy)([1]))  # revealed: list[int]
+reveal_type(map_items(copy)(numbers))  # revealed: list[object]
 copy_ints: Callable[[list[int]], list[int]] = map_items(copy)  # ok
+```
 
+A bound on the mapper's result can also restrict its input. With `copy`, each item must satisfy the
+bound on `S`.
+
+```py
+@curry_flip
+def map_text(items: list[T], mapper: Callable[[T], S]) -> list[S]:
+    return [mapper(item) for item in items]
+
+text = map_text(copy)
+reveal_type(text(words))  # revealed: list[str]
+text(numbers)  # error: [invalid-argument-type]
+```
+
+A constrained mapper can choose a different specialization for each element.
+
+```py
 X = TypeVar("X", int, str)
 
 def wrap(value: X) -> list[X]:

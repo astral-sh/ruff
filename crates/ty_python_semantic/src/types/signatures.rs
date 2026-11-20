@@ -1241,41 +1241,12 @@ impl<'db> Signature<'db> {
             .collect()
     }
 
-    /// In `[T](sink: (T) -> None) -> ((list[T]) -> T)`, every subtype of a
-    /// valid choice for `T` also satisfies the argument constraints. Bind a
-    /// fresh `S <: T` on the returned callable. The sink specializes the bound
-    /// and the list specializes `S`. For a reusable callable, the choice must
-    /// be independent across invocations.
-    pub(super) fn defer_contravariant_variables(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        mut result: Type<'db>,
-        bind: impl Fn(BoundTypeVarInstance<'db>) -> Option<BoundTypeVarInstance<'db>>,
-    ) -> Option<Type<'db>> {
-        let returned = result.single_callable_signature(db)?;
-        let mut deferred = SmallVec::<[_; 1]>::new();
-        for var in self.generic_context?.variables(db) {
-            if self.parameter_variance(db, env, var) == TypeVarVariance::Contravariant
-                && returned.parameter_variance(db, env, var) != TypeVarVariance::Bivariant
-                && let Some(fresh) = bind(var)
-            {
-                result = result.substitute_one_typevar(
-                    db,
-                    env,
-                    var,
-                    Type::TypeVar(fresh),
-                    AliasPolicy::Preserve,
-                );
-                deferred.push(fresh);
-            }
-        }
-        let context = GenericContext::try_from_typevar_instances(db, env, deferred)?;
-        result.bind_callable_variables(db, context)
-    }
-
-    /// Bind variables from a captured parameter list independently on each call
-    /// when their only invariant use comes from an opaque input to the callback.
+    /// Currying `map(list[T], (T) -> U) -> list[U]` captures the mapper parameter
+    /// in a ParamSpec. Its input constrains `T` from above. Bind a fresh `S <: T`
+    /// on the inner callable so each list can supply its own element type.
+    ///
+    /// This assumes the wrapper forwards the list as an opaque argument and
+    /// each partial application can specialize the original function independently.
     pub(super) fn defer_captured_variables(
         &self,
         db: &'db dyn Db,
@@ -1284,7 +1255,9 @@ impl<'db> Signature<'db> {
         result: Type<'db>,
     ) -> Option<Type<'db>> {
         let callable = result.as_callable()?;
-        let signature = result.single_callable_signature(db)?;
+        let factory = result.single_callable_signature(db)?;
+        let mut inner = factory.return_ty;
+        let returned = inner.single_callable_signature(db)?;
         let declared = self.return_ty.single_callable_signature(db)?;
         let (_, pack) = declared.parameters.as_paramspec_with_prefix()?;
         let variance = |ty: Type<'db>, var: BoundTypeVarInstance<'db>| {
@@ -1329,8 +1302,30 @@ impl<'db> Signature<'db> {
                 None
             }
         };
-        let result = signature.defer_contravariant_variables(db, env, signature.return_ty, bind)?;
-        let signature = signature.clone().with_return_type(result);
+        let mut deferred = SmallVec::<[_; 1]>::new();
+        for var in factory.generic_context?.variables(db) {
+            if factory.parameter_variance(db, env, var) == TypeVarVariance::Contravariant
+                && returned.parameter_variance(db, env, var) != TypeVarVariance::Bivariant
+                && let Some(fresh) = bind(var)
+            {
+                inner = inner.substitute_one_typevar(
+                    db,
+                    env,
+                    var,
+                    Type::TypeVar(fresh),
+                    AliasPolicy::Preserve,
+                );
+                deferred.push(fresh);
+            }
+        }
+        let context = GenericContext::try_from_typevar_instances(db, env, deferred)?;
+        let inner = inner.resolve_type_alias(db).as_callable()?;
+        let signatures = inner
+            .signatures(db)
+            .with_inherited_generic_context(db, context);
+        let signature = factory
+            .clone()
+            .with_return_type(Type::Callable(inner.with_signatures(db, signatures)));
         Some(Type::Callable(
             callable.with_signatures(db, CallableSignature::single(signature)),
         ))
@@ -1338,16 +1333,15 @@ impl<'db> Signature<'db> {
 
     /// Infer a generic callback whose input constrains a parameter of a returned callable.
     ///
-    /// Matching `[V](V) -> V` against `(T) -> U` gives `T <: V <: U`. If the
-    /// result is called immediately, its arguments can determine `V`. Otherwise
-    /// the result may retain state between calls and needs a single choice of `U`.
+    /// Matching `[V](V) -> V` against `(T) -> U` gives `T <: V <: U`. The
+    /// returned callable may retain state between calls, so it needs a single
+    /// choice of `U` even if its inputs can vary.
     pub(super) fn instantiate_callback(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         formal: Type<'db>,
         argument: Type<'db>,
-        immediate_result: Option<&mut Type<'db>>,
     ) -> Option<Type<'db>> {
         let factory = self.generic_context?;
         let returned = self.return_ty.single_callable_signature(db)?;
@@ -1366,11 +1360,7 @@ impl<'db> Signature<'db> {
             return None;
         }
 
-        let local_delta = immediate_result
-            .as_deref()
-            .and_then(|ty| ty.single_callable_signature(db))
-            .and_then(|sig| sig.freshening_delta_for(db, locals));
-        let mut open = match self.freshening_delta_for(db, locals).max(local_delta) {
+        let mut open = match self.freshening_delta_for(db, locals) {
             Some(delta) => generic.freshen_bound_typevars(db, env, delta),
             None => generic.clone(),
         };
@@ -1399,18 +1389,6 @@ impl<'db> Signature<'db> {
         }
         let target = target.single_callable_signature(db)?;
         let unrestricted = open.return_ty.is_assignable_to(db, env, target.return_ty);
-        if let Some(result) = immediate_result
-            && locals
-                .variables(db)
-                .all(|v| !v.typevar(db).is_constrained(db))
-            && unrestricted
-        {
-            // If every choice of V meets the callback's declared requirements,
-            // keep it rigid during this call and rebind it on the result.
-            *result = result.bind_callable_variables(db, locals)?;
-            return Some(Type::single_callable(db, open));
-        }
-
         // Include the widest admissible choices of V alongside the generic
         // overload, which can still match a more specific expected type.
         let variable = locals.variables(db).exactly_one().ok()?;

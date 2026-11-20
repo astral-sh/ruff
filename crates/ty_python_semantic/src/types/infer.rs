@@ -824,7 +824,7 @@ impl<'db> InferExpression<'db> {
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> InferExpression<'db> {
-        if tcx.expected_type().is_some() || tcx.immediately_called() {
+        if tcx.expected_type().is_some() {
             InferExpression::WithContext(ExpressionWithContext::new(db, expression, tcx))
         } else {
             InferExpression::Bare(expression)

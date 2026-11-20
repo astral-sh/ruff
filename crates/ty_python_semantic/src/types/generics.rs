@@ -4033,11 +4033,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         outer: &Signature<'db>,
         formal: Type<'db>,
         actual: Type<'db>,
-        immediate_result: Option<&mut Type<'db>>,
     ) -> Result<(), SpecializationError<'db>> {
         let db = self.db;
         let actual = outer
-            .instantiate_callback(db, self.env, formal, actual, immediate_result)
+            .instantiate_callback(db, self.env, formal, actual)
             .unwrap_or(actual);
 
         // Comparing the entire callable preserves its local variables in constraints

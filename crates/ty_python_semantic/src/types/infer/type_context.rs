@@ -44,8 +44,6 @@ impl TypeContextKind {
 pub(crate) struct TypeContext<'db> {
     expected_type: Option<Type<'db>>,
     kind: TypeContextKind,
-    /// The value of this expression is used directly as the callee of a call.
-    immediately_called: bool,
 }
 
 impl Default for TypeContext<'_> {
@@ -55,15 +53,6 @@ impl Default for TypeContext<'_> {
 }
 
 impl<'db> TypeContext<'db> {
-    pub(super) fn with_immediate_call(mut self, immediately_called: bool) -> Self {
-        self.immediately_called = immediately_called;
-        self
-    }
-
-    pub(crate) fn immediately_called(self) -> bool {
-        self.immediately_called
-    }
-
     pub(crate) fn new(expected_type: Option<Type<'db>>, kind: TypeContextKind) -> Self {
         // During generic call argument inference, type variables that cannot yet be specialized are
         // replaced by `UnspecializedTypeVar`. This marker intentionally carries neither type-variable
@@ -78,7 +67,6 @@ impl<'db> TypeContext<'db> {
         Self {
             expected_type,
             kind,
-            immediately_called: false,
         }
     }
 

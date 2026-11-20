@@ -3172,18 +3172,6 @@ impl<'db> Type<'db> {
         Some(signature)
     }
 
-    fn bind_callable_variables(
-        self,
-        db: &'db dyn Db,
-        context: GenericContext<'db>,
-    ) -> Option<Self> {
-        let callable = self.resolve_type_alias(db).as_callable()?;
-        let signatures = callable
-            .signatures(db)
-            .with_inherited_generic_context(db, context);
-        Some(Type::Callable(callable.with_signatures(db, signatures)))
-    }
-
     fn as_paramspec_value(self, db: &'db dyn Db) -> Option<ParamSpecValue<'db>> {
         match self {
             Self::Callable(callable) if callable.kind(db) == CallableTypeKind::ParamSpecValue => {

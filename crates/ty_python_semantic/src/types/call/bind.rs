@@ -6618,13 +6618,11 @@ impl<'db> CallInference<'_, 'db> {
         }) {
             return (specialize_return_ty(merged_specialization), false);
         }
-        // Check variance in the declared return type. Deferring `T` to the next call
-        // moves it into a fresh variable's bound, hiding invariant uses such as `list[T]`.
         let return_variables: SmallVec<[_; 4]> = generic_context
             .variables(db)
             .enumerate()
             .filter(|(_, variable)| {
-                any_over_type_expanding_aliases(db, env, self.signature.return_ty, |ty| {
+                any_over_type_expanding_aliases(db, env, self.return_ty, |ty| {
                     matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
                 })
             })
@@ -6845,8 +6843,7 @@ impl<'db> CallInference<'_, 'db> {
                 return false;
             }
             variance = variance.join(
-                self.signature
-                    .return_ty
+                self.return_ty
                     .variance_of(db, env, variable.identity(db))
                     .evaluate(db),
             );
@@ -6883,7 +6880,7 @@ impl<'db> CallInference<'_, 'db> {
         })
     }
 
-    fn infer(&mut self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
+    fn infer(&self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
         let db = self.db;
         let mut constraint_set_errors = vec![false; self.arguments.len()];
         let Some(generic_context) = self.signature.generic_context else {
@@ -6901,19 +6898,9 @@ impl<'db> CallInference<'_, 'db> {
             return self.infer_legacy(constraints, generic_context, constraint_set_errors);
         }
 
-        if self.call_expression_tcx.immediately_called()
-            && let Some(deferred) =
-                self.signature
-                    .defer_contravariant_variables(db, self.env, self.return_ty, |var| {
-                        var.defer(db)
-                    })
-        {
-            self.return_ty = deferred;
-        }
         let mut specialization_errors = Vec::new();
         let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
 
-        let original_return = self.return_ty;
         self.infer_argument_constraints(
             &mut builder,
             &FxHashMap::default(),
@@ -6955,7 +6942,6 @@ impl<'db> CallInference<'_, 'db> {
             specialization_errors.clear();
             constraint_set_errors.fill(false);
 
-            self.return_ty = original_return;
             self.infer_argument_constraints(
                 &mut builder,
                 &FxHashMap::default(),
@@ -6998,7 +6984,7 @@ impl<'db> CallInference<'_, 'db> {
 
     // TODO: This method should go away once `ParamSpec` and `TypeVarTuple` are migrated to the constraint solver.
     fn infer_legacy(
-        &mut self,
+        &self,
         constraints: &ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
         mut constraint_set_errors: Vec<bool>,
@@ -7708,7 +7694,7 @@ impl<'db> CallInference<'_, 'db> {
     }
 
     fn infer_argument_constraints<'c>(
-        &mut self,
+        &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
@@ -7716,7 +7702,6 @@ impl<'db> CallInference<'_, 'db> {
         constraint_set_errors: &mut [bool],
     ) -> bool {
         let db = self.db;
-        let immediate = self.call_expression_tcx.immediately_called();
         for relation in self.argument_relations() {
             // Fixed elements can infer normally; the complete variadic pack is inferred below.
             if relation.has_starred_annotation
@@ -7740,7 +7725,6 @@ impl<'db> CallInference<'_, 'db> {
                 self.signature,
                 relation.declared_type,
                 relation.argument_type,
-                immediate.then_some(&mut self.return_ty),
             ) {
                 constraint_set_errors[relation.argument_index] = true;
                 specialization_errors.push(BindingError::SpecializationError {
@@ -9240,7 +9224,7 @@ impl<'db> Binding<'db> {
                 }
             }
         }
-        let mut call = CallInference {
+        let call = CallInference {
             argument_matches: restricted.as_deref()?,
             return_ty: self.unspecialized_return_type(db),
             inferable_typevars: self.inferable_typevars,
