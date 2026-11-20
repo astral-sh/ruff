@@ -15,6 +15,7 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
 };
 use ruff_linter::message::{RenderContext, create_panic_diagnostic, render_diagnostics};
+use ruff_linter::preview::is_script_metadata_enabled;
 use ruff_linter::settings::types::OutputFormat;
 use ruff_markdown::{MarkdownResult, format_code_blocks};
 use ruff_notebook::NotebookIndex;
@@ -40,10 +41,10 @@ use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{
     Project, ResolvedFile, Resolver, RootProject, match_exclusion, project_files_in_path,
 };
-use ruff_workspace::script::{ScriptSettingsError, script};
+use ruff_workspace::script::{ScriptSettingsError, script_metadata};
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
-use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
+use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches, is_cacheable};
 use crate::{ExitStatus, resolve_default_files};
 
 #[derive(Debug, Copy, Clone, is_macro::Is)]
@@ -259,14 +260,15 @@ pub(crate) fn format_path(
     source_type: SourceType,
     mode: FormatMode,
     range: Option<FormatRange>,
-    cache: Option<&Cache>,
+    mut cache: Option<&Cache>,
 ) -> Result<FormatResult, FormatCommandError> {
+    let script_metadata_enabled = is_script_metadata_enabled(project.settings.preview, source_type);
     if let Some(cache) = cache {
         let relative_path = cache
             .relative_path(path)
             .expect("wrong package cache for file");
 
-        if let Ok(cache_key) = FileCacheKey::from_path(path) {
+        if let Ok(cache_key) = FileCacheKey::from_path(path, script_metadata_enabled) {
             if cache.is_formatted(relative_path, &cache_key) {
                 return Ok(FormatResult::Unchanged);
             }
@@ -283,15 +285,19 @@ pub(crate) fn format_path(
         }
     };
 
-    let script = script(
-        project,
-        overrides,
-        overrides.script_configuration(),
-        Some(path),
-        source_type,
-        unformatted.source_code(),
-    )
-    .map_err(|error| FormatCommandError::Configuration(path.to_owned(), error))?;
+    let script_configuration = overrides.script_configuration();
+    let config_error = |error| FormatCommandError::Configuration(path.to_owned(), error);
+    let script = if script_metadata_enabled
+        && let Some(metadata) =
+            script_metadata(Some(path), unformatted.source_code()).map_err(config_error)?
+    {
+        cache = cache.filter(|_| is_cacheable(&metadata));
+        metadata
+            .resolve(project, overrides, script_configuration, Some(path))
+            .map_err(config_error)?
+    } else {
+        None
+    };
     let settings = match &script {
         Some(script) => &script.settings.formatter,
         None => &project.settings.formatter,
@@ -312,7 +318,7 @@ pub(crate) fn format_path(
                     .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
 
                 if let Some(cache) = cache {
-                    if let Ok(cache_key) = FileCacheKey::from_path(path) {
+                    if let Ok(cache_key) = FileCacheKey::from_path(path, script_metadata_enabled) {
                         let relative_path = cache
                             .relative_path(path)
                             .expect("wrong package cache for file");
@@ -329,7 +335,7 @@ pub(crate) fn format_path(
         },
         FormattedSource::Unchanged => {
             if let Some(cache) = cache {
-                if let Ok(cache_key) = FileCacheKey::from_path(path) {
+                if let Ok(cache_key) = FileCacheKey::from_path(path, script_metadata_enabled) {
                     let relative_path = cache
                         .relative_path(path)
                         .expect("wrong package cache for file");

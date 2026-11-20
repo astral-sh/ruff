@@ -15,6 +15,7 @@ use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::detect_package_root;
+use ruff_linter::preview::is_script_metadata_enabled;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::{SourceError, SourceKind, SourceKindDiff};
@@ -25,11 +26,11 @@ use ruff_python_ast::{SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::resolver::Project;
-use ruff_workspace::script::script;
+use ruff_workspace::script::script_metadata;
 use rustc_hash::FxHashMap;
 
 use crate::args::ConfigArguments;
-use crate::cache::{Cache, FileCache, FileCacheKey};
+use crate::cache::{Cache, FileCache, FileCacheKey, is_cacheable};
 
 /// A collection of [`Diagnostic`]s and additional information needed to render them.
 ///
@@ -194,14 +195,17 @@ pub(crate) fn lint_path(
     unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     let settings = &project.settings.linter;
+    let source_type = settings.extension.get_source_type(path);
+    let script_metadata_enabled = is_script_metadata_enabled(project.settings.preview, source_type);
     // Check the cache.
-    let caching = match cache {
+    let mut caching = match cache {
         Some(cache) if noqa.is_enabled() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
 
-            let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
+            let cache_key = FileCacheKey::from_path(path, script_metadata_enabled)
+                .context("Failed to create cache key")?;
             let cached_diagnostics = cache
                 .get(relative_path, &cache_key)
                 .is_some_and(FileCache::linted);
@@ -218,7 +222,7 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    let source_type = match settings.extension.get_source_type(path) {
+    let source_type = match source_type {
         SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
             let (diagnostics, fixed) = if settings
                 .rules
@@ -290,14 +294,21 @@ pub(crate) fn lint_path(
         }
     };
 
-    let script = match script(
-        project,
-        overrides,
-        overrides.script_configuration(),
-        Some(path),
-        SourceType::Python(source_type),
-        source_kind.source_code(),
-    ) {
+    let script_configuration = overrides.script_configuration();
+    let metadata = if script_metadata_enabled {
+        script_metadata(Some(path), source_kind.source_code())
+    } else {
+        Ok(None)
+    };
+    let script = match metadata {
+        Ok(Some(metadata)) => {
+            caching = caching.filter(|_| is_cacheable(&metadata));
+            metadata.resolve(project, overrides, script_configuration, Some(path))
+        }
+        Ok(None) => Ok(None),
+        Err(error) => Err(error),
+    };
+    let script = match script {
         Ok(script) => script,
         Err(error) => {
             return Ok(Diagnostics::new(
