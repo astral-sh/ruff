@@ -1,6 +1,5 @@
-use ruff_python_trivia::{
-    BackwardsTokenizer, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
-};
+use ruff_python_ast::token::TokenKind;
+use ruff_python_trivia::{PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -28,7 +27,7 @@ pub(super) fn comment_strings_in_range<'a>(
 fn semicolon_before_and_after(
     checker: &Checker,
     statement: TextRange,
-) -> (Option<SimpleToken>, Option<SimpleToken>) {
+) -> (Option<TextRange>, Option<SimpleToken>) {
     // determine whether there's a semicolon either before or after the binding statement.
     // Since it's a binding statement, we can just check whether there's a semicolon immediately
     // after the whitespace in front of or behind it
@@ -44,14 +43,21 @@ fn semicolon_before_and_after(
         None
     };
 
-    let semicolon_before = BackwardsTokenizer::up_to(
-        statement.start(),
-        checker.locator().contents(),
-        checker.comment_ranges(),
-    )
-    .skip_trivia()
-    .next()
-    .filter(|token| token.kind() == SimpleTokenKind::Semi);
+    let semicolon_before = checker
+        .tokens()
+        .before(statement.start())
+        .iter()
+        .rfind(|token| {
+            let kind = token.kind();
+            // Treat logical newlines and indentation as trivia for this lookup too.
+            !kind.is_trivia()
+                && !matches!(
+                    kind,
+                    TokenKind::Newline | TokenKind::Indent | TokenKind::Dedent
+                )
+        })
+        .filter(|token| token.kind() == TokenKind::Semi)
+        .map(Ranged::range);
 
     (semicolon_before, after_semicolon)
 }
