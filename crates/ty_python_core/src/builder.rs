@@ -5832,32 +5832,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             return;
         }
 
-        if let ast::Pattern::MatchStar(ast::PatternMatchStar {
-            name: Some(name),
-            range: _,
-            node_index: _,
-        }) = pattern
-        {
-            let symbol = self.add_symbol(name.id().clone());
-            let state = self.current_match_case.as_ref().unwrap();
-            self.add_definition(
-                symbol.into(),
-                MatchPatternDefinitionNodeRef {
-                    pattern: state.pattern,
-                    identifier: name,
-                    predicate: state.predicate,
-                },
-            );
-        }
-
         walk_pattern(self, pattern);
 
-        let name = match pattern {
-            ast::Pattern::MatchAs(pattern) => pattern.name.as_ref(),
-            ast::Pattern::MatchMapping(mapping) => mapping.rest(),
-            _ => None,
-        };
-        if let Some(name) = name {
+        if let Some(name) = pattern.capture_name() {
             let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
