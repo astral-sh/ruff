@@ -2379,6 +2379,36 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
             }
 
+            _ => self.check_normalized_type_pair(db, source, target),
+        }
+    }
+
+    // Keep the large dispatch below off the stack while unfolding recursive aliases.
+    fn check_normalized_type_pair(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
+        match (source, target) {
+            (
+                Type::Never
+                | Type::RecursiveVar(_)
+                | Type::Divergent(_)
+                | Type::Recursive(_)
+                | Type::TypeAlias(_),
+                _,
+            )
+            | (
+                _,
+                Type::RecursiveVar(_)
+                | Type::Divergent(_)
+                | Type::Recursive(_)
+                | Type::TypeAlias(_),
+            ) => {
+                unreachable!("handled before checking normalized types")
+            }
             (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
                 .with_recursion_guard(db, source, target, || {
                     self.check_type_pair(
