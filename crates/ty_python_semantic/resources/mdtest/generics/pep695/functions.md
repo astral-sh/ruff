@@ -5530,6 +5530,30 @@ def split_value[U: (int, str)](value: U) -> None:
     reveal_type(remove_int(value))  # revealed: str
 ```
 
+The return annotation on `collect` fixes `T` to the caller's type variable because `list` is
+invariant. With that specialization, `skip_int` accepts either choice as its argument.
+
+```py
+def skip_int[T](value: T | int) -> list[T]:
+    return [] if isinstance(value, int) else [value]
+
+def collect[U: (int, str)](value: U) -> list[U]:
+    reveal_type(skip_int(value))  # revealed: list[str]
+    return reveal_type(skip_int(value))  # revealed: list[U@collect]
+```
+
+The `bool` arm of `T | bool` covers only part of the `int` choice. Both choices still contribute
+values, so the return type preserves the caller's type variable with `bool` excluded.
+
+```py
+def remove_bool[T](value: T | bool) -> T:
+    assert not isinstance(value, bool)
+    return value
+
+def validate[U: (int, str)](value: U) -> U:
+    return reveal_type(remove_bool(value))  # revealed: U@validate & ~bool
+```
+
 If the callee's type variable has a bound or constraints of its own, only the part left over by the
 `int` arm needs to satisfy them.
 
@@ -5566,6 +5590,22 @@ def invalid_bound[U](value: Callable[[], U | str]) -> None:
 
 def invalid_constraints[U: (int, complex)](value: Callable[[], U | str]) -> None:
     constrained(value)  # error: [invalid-argument-type]
+```
+
+### Passing the same constrained argument to `T | None` and `T`
+
+The second argument in `collect(x, x)` supplies `U` as a lower bound on `T`. Choosing `T = U`
+satisfies both parameters for either choice of `U`.
+
+```py
+def collect[T](first: T | None, second: T) -> list[T]:
+    return [second] if first is None else [first, second]
+
+def repeat[U: (None, str)](x: U) -> list[U]:
+    # TODO: Infer list[U] from the arguments alone.
+    result = collect(x, x)
+    reveal_type(result)  # revealed: list[str | U@repeat]
+    return result  # error: [invalid-explicit-return]
 ```
 
 ### Gradual types in union arms

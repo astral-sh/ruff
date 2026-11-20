@@ -3951,6 +3951,30 @@ def split_value(value: ConstrainedToIntOrStr) -> None:
     reveal_type(remove_int(value))  # revealed: str
 ```
 
+The return annotation on `collect` fixes `T` to the caller's type variable because `list` is
+invariant. With that specialization, `skip_int` accepts either choice as its argument.
+
+```py
+def skip_int(value: T | int) -> list[T]:
+    return [] if isinstance(value, int) else [value]
+
+def collect(value: ConstrainedToIntOrStr) -> list[ConstrainedToIntOrStr]:
+    reveal_type(skip_int(value))  # revealed: list[str]
+    return reveal_type(skip_int(value))  # revealed: list[ConstrainedToIntOrStr@collect]
+```
+
+The `bool` arm of `T | bool` covers only part of the `int` choice. Both choices still contribute
+values, so the return type preserves the caller's type variable with `bool` excluded.
+
+```py
+def remove_bool(value: T | bool) -> T:
+    assert not isinstance(value, bool)
+    return value
+
+def validate(value: ConstrainedToIntOrStr) -> ConstrainedToIntOrStr:
+    return reveal_type(remove_bool(value))  # revealed: ConstrainedToIntOrStr@validate & ~bool
+```
+
 If the callee's type variable has a bound or constraints of its own, only the part left over by the
 `int` arm needs to satisfy them.
 
@@ -3995,6 +4019,27 @@ def invalid_bound(value: Callable[[], Unrestricted | str]) -> None:
 
 def invalid_constraints(value: Callable[[], Incompatible | str]) -> None:
     constrained(value)  # error: [invalid-argument-type]
+```
+
+## Passing the same constrained argument to `T | None` and `T`
+
+The second argument in `collect(x, x)` supplies `U` as a lower bound on `T`. Choosing `T = U`
+satisfies both parameters for either choice of `U`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", None, str)
+
+def collect(first: T | None, second: T) -> list[T]:
+    return [second] if first is None else [first, second]
+
+def repeat(x: U) -> list[U]:
+    # TODO: Infer list[U] from the arguments alone.
+    result = collect(x, x)
+    reveal_type(result)  # revealed: list[str | U@repeat]
+    return result  # error: [invalid-explicit-return]
 ```
 
 ## Gradual types in union arms

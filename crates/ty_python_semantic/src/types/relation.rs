@@ -1673,18 +1673,30 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && let Some((variable, remaining)) =
                 union.residual_typevar_lower_bound(db, self.env, fixed, self.inferable)
         {
-            return if remaining.is_never() {
-                self.always()
-            } else if remaining != source
+            if remaining.is_never() {
+                return self.always();
+            }
+            let variable = Type::TypeVar(variable);
+            let constrain_remaining = || self.check_type_pair(db, remaining, variable);
+            if remaining != source
                 && let Some(domain @ TypeVarBoundOrConstraints::Constraints(_)) =
                     fixed.typevar(db).bound_or_constraints(db, self.env)
             {
-                // A constrained variable takes one of its declared types exactly. Check each
-                // choice separately so a covered choice supplies no inference evidence.
-                self.check_source_typevar_bounds(db, domain, target)
-            } else {
-                self.check_type_pair(db, remaining, Type::TypeVar(variable))
-            };
+                let specialized = union.map_leave_aliases(db, self.env, |&arm| {
+                    if arm == variable { remaining } else { arm }
+                });
+                if !source.is_assignable_to(db, self.env, specialized) {
+                    // For `U: (int, str)` matched against `T | int`, checking each choice
+                    // infers `str` when we can't prove `U ≤ (U & str) | int`. Also retain
+                    // `U & str ≤ T` so an invariant `list[U]` context can select `T = U`.
+                    return self.check_source_typevar_bounds(db, domain, target).or(
+                        db,
+                        self.constraints,
+                        constrain_remaining,
+                    );
+                }
+            }
+            return constrain_remaining();
         }
         if let Type::Intersection(intersection) = source
             && let Some(alternatives) = intersection.finite_alternative_union(db, self.env)
