@@ -1200,6 +1200,37 @@ def identity(value: T, /) -> T:
 reveal_type(pipe(1, identity))  # revealed: Literal[1]
 ```
 
+The leading argument contributes `Literal[1]` to the inferred type of `T` even when `P` captures
+another parameter of type `T`.
+
+```py
+def first(x: T, y: T, /) -> T:
+    return x
+
+reveal_type(pipe(1, first, 1))  # revealed: Literal[1]
+```
+
+Matching the `int` prefix determines the result even when the signature only mentions `P` in the
+callback.
+
+```py
+def result_of(f: Callable[Concatenate[int, P], R]) -> R:
+    raise NotImplementedError
+
+reveal_type(result_of(first))  # revealed: int
+```
+
+An invariant return type can require a wider specialization of `T` that accommodates both arguments.
+
+```py
+def both(x: T, y: T, /) -> list[T]:
+    return [x, y]
+
+# TODO: Infer `list[int | str]` from both arguments, as in the direct call `both(1, "a")`.
+reveal_type(pipe(1, both, "a"))  # revealed: Unknown
+values: list[int | str] = pipe(1, both, "a")  # ok
+```
+
 ## Inferring through unions of structural `ParamSpec` protocols
 
 Different protocols with the same parameter list can satisfy a target protocol structurally, even
@@ -2432,6 +2463,9 @@ def invoke(decorator: Callable[Q, Identity], *args: Q.args, **kwargs: Q.kwargs) 
     return decorator(*args, **kwargs)
 
 reveal_type(invoke(decorate, identity)(1))  # revealed: Literal[1]
+
+def decorate_twice(fn: Identity) -> None:
+    reveal_type(decorate(decorate(fn))(1))  # revealed: Literal[1]
 ```
 
 `keep` carries the decorated function's parameter list into its return type through `Q`. The

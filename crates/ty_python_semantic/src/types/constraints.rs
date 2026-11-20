@@ -169,7 +169,7 @@ impl<'db> TypeVarSet<'db> {
     }
 
     /// Returns the variables in this finite set that are absent from `other`.
-    fn difference(self, db: &'db dyn Db, other: Self) -> Self {
+    pub(super) fn difference(self, db: &'db dyn Db, other: Self) -> Self {
         if other == Self::None {
             return self;
         }

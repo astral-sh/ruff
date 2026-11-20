@@ -1647,6 +1647,9 @@ def invoke[**Q](decorator: Callable[Q, Identity], *args: Q.args, **kwargs: Q.kwa
     return decorator(*args, **kwargs)
 
 reveal_type(invoke(decorate, identity)(1))  # revealed: Literal[1]
+
+def decorate_twice(fn: Identity) -> None:
+    reveal_type(decorate(decorate(fn))(1))  # revealed: Literal[1]
 ```
 
 `keep` carries the decorated function's parameter list into its return type through `Q`. The

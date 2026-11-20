@@ -785,6 +785,37 @@ def identity[T](value: T, /) -> T:
 reveal_type(pipe(1, identity))  # revealed: Literal[1]
 ```
 
+The leading argument contributes `Literal[1]` to the inferred type of `T` even when `P` captures
+another parameter of type `T`.
+
+```py
+def first[T](x: T, y: T, /) -> T:
+    return x
+
+reveal_type(pipe(1, first, 1))  # revealed: Literal[1]
+```
+
+Matching the `int` prefix determines the result even when the signature only mentions `P` in the
+callback.
+
+```py
+def result_of[**P, R](f: Callable[Concatenate[int, P], R]) -> R:
+    raise NotImplementedError
+
+reveal_type(result_of(first))  # revealed: int
+```
+
+An invariant return type can require a wider specialization of `T` that accommodates both arguments.
+
+```py
+def both[T](x: T, y: T, /) -> list[T]:
+    return [x, y]
+
+# TODO: Infer `list[int | str]` from both arguments, as in the direct call `both(1, "a")`.
+reveal_type(pipe(1, both, "a"))  # revealed: Unknown
+values: list[int | str] = pipe(1, both, "a")  # ok
+```
+
 ## `Concatenate` with protocol classes
 
 A protocol with `ParamSpec` in its `__call__` can be used where `Callable[Concatenate[...], ...]` is
