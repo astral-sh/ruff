@@ -7047,6 +7047,10 @@ impl<'db> Type<'db> {
 
     /// Infer the value supplied by `**mapping` for a particular key, or for an unknown key.
     /// Matching a call against overloads can request the same key once per overload.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None during cycle recovery"
+    )]
     fn unpacked_value_type(
         self,
         db: &'db dyn Db,
@@ -7054,10 +7058,6 @@ impl<'db> Type<'db> {
         key: Option<&str>,
     ) -> Type<'db> {
         #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-        #[expect(
-            clippy::unnecessary_wraps,
-            reason = "Salsa supplies None during cycle recovery"
-        )]
         fn cached<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Option<Type<'db>> {
             let env = ProgramEnvironment::from_program(types.program(db));
             Some(
