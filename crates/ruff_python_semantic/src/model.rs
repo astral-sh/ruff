@@ -476,7 +476,7 @@ impl<'a> SemanticModel<'a> {
                 range,
                 self.exceptions(),
                 None,
-                UnresolvedReferenceFlags::empty(),
+                self.unresolved_reference_flags(),
             );
         }
     }
@@ -606,7 +606,7 @@ impl<'a> SemanticModel<'a> {
                                 name.range,
                                 self.exceptions(),
                                 Some(binding_id),
-                                UnresolvedReferenceFlags::empty(),
+                                self.unresolved_reference_flags(),
                             );
                             if index == 0 {
                                 return ReadResult::UnboundLocal(binding_id);
@@ -675,7 +675,7 @@ impl<'a> SemanticModel<'a> {
                             name.range,
                             self.exceptions(),
                             None,
-                            UnresolvedReferenceFlags::empty(),
+                            self.unresolved_reference_flags(),
                         );
                         return ReadResult::UnboundLocal(binding_id);
                     }
@@ -685,7 +685,7 @@ impl<'a> SemanticModel<'a> {
                             name.range,
                             self.exceptions(),
                             None,
-                            UnresolvedReferenceFlags::empty(),
+                            self.unresolved_reference_flags(),
                         );
                         return ReadResult::UnboundLocal(binding_id);
                     }
@@ -801,7 +801,7 @@ impl<'a> SemanticModel<'a> {
                 name.range,
                 self.exceptions(),
                 None,
-                UnresolvedReferenceFlags::WILDCARD_IMPORT,
+                UnresolvedReferenceFlags::WILDCARD_IMPORT | self.unresolved_reference_flags(),
             );
             ReadResult::WildcardImport
         } else {
@@ -809,7 +809,7 @@ impl<'a> SemanticModel<'a> {
                 name.range,
                 self.exceptions(),
                 None,
-                UnresolvedReferenceFlags::empty(),
+                self.unresolved_reference_flags(),
             );
             ReadResult::NotFound
         }
@@ -2313,6 +2313,15 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in a `@no_type_check` context.
     pub const fn in_no_type_check(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::NO_TYPE_CHECK)
+    }
+
+    /// [`UnresolvedReference`]: crate::reference::UnresolvedReference
+    fn unresolved_reference_flags(&self) -> UnresolvedReferenceFlags {
+        if self.in_no_type_check() {
+            UnresolvedReferenceFlags::NO_TYPE_CHECK
+        } else {
+            UnresolvedReferenceFlags::empty()
+        }
     }
 
     /// Return `true` if the model has traversed past the "top-of-file" import boundary.
