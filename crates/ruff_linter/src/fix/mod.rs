@@ -149,8 +149,8 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     .then_with(|| {
         let rules = (name1, name2);
         // Apply `D400` fixes before `D209` fixes.
-        let summary_period = Rule::MissingDocstringSummaryPeriod.name().as_str();
-        let newline_after_last_paragraph = Rule::MissingNewLineAfterLastDocstringParagraph
+        let summary_period = Rule::DocstringSummaryWithoutPeriod.name().as_str();
+        let newline_after_last_paragraph = Rule::MissingNewlineAfterLastDocstringParagraph
             .name()
             .as_str();
         let if_else_instead_of_dict_get = Rule::IfElseBlockInsteadOfDictGet.name().as_str();

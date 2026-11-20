@@ -46,9 +46,9 @@ use crate::rules::pydocstyle::helpers::logical_line;
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.69", category = Category::Pedantic)]
-pub(crate) struct MissingDocstringSummaryPunctuation;
+pub(crate) struct DocstringSummaryWithoutTerminalPunctuation;
 
-impl Violation for MissingDocstringSummaryPunctuation {
+impl Violation for DocstringSummaryWithoutTerminalPunctuation {
     /// `None` in the case a fix is never available or otherwise Some
     /// [`FixAvailability`] describing the available fix.
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -107,8 +107,10 @@ pub(crate) fn ends_with_punctuation(checker: &Checker, docstring: &Docstring) {
         }
 
         if !trimmed.ends_with(['.', '!', '?']) {
-            let mut diagnostic =
-                checker.report_diagnostic(MissingDocstringSummaryPunctuation, docstring.range());
+            let mut diagnostic = checker.report_diagnostic(
+                DocstringSummaryWithoutTerminalPunctuation,
+                docstring.range(),
+            );
             // Best-effort fix: avoid adding a period after other punctuation marks.
             if !trimmed.ends_with([':', ';']) {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(

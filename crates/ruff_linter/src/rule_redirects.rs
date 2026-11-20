@@ -43,7 +43,11 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("over-indentation", Rule::OverIndentedDocstringLine),
     (
         "new-line-after-last-paragraph",
-        Rule::MissingNewLineAfterLastDocstringParagraph,
+        Rule::MissingNewlineAfterLastDocstringParagraph,
+    ),
+    (
+        "missing-new-line-after-last-docstring-paragraph",
+        Rule::MissingNewlineAfterLastDocstringParagraph,
     ),
     (
         "surrounding-whitespace",
@@ -69,20 +73,20 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("triple-single-quotes", Rule::UnconventionalDocstringQuotes),
     (
         "missing-trailing-period",
-        Rule::MissingDocstringSummaryPeriod,
+        Rule::DocstringSummaryWithoutPeriod,
     ),
     ("non-imperative-mood", Rule::NonImperativeDocstringSummary),
     (
         "first-word-uncapitalized",
-        Rule::UncapitalizedFirstWordOfDocstring,
+        Rule::DocstringStartsWithLowercaseLetter,
     ),
     (
         "non-capitalized-section-name",
-        Rule::NonCapitalizedDocstringSectionName,
+        Rule::IncorrectlyCapitalizedDocstringSectionName,
     ),
     (
         "missing-new-line-after-section-name",
-        Rule::MissingNewLineAfterDocstringSectionName,
+        Rule::MissingNewlineAfterDocstringSectionName,
     ),
     (
         "missing-dashed-underline-after-section",
@@ -94,7 +98,7 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "mismatched-section-underline-length",
-        Rule::MismatchedDocstringSectionUnderlineLength,
+        Rule::IncorrectDocstringSectionUnderlineLength,
     ),
     (
         "no-blank-line-after-section",
@@ -106,7 +110,7 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "blank-lines-between-header-and-content",
-        Rule::BlankLinesBetweenDocstringSectionHeaderAndContent,
+        Rule::ExtraBlankLineBeforeDocstringSectionContent,
     ),
     (
         "missing-blank-line-after-last-section",
@@ -114,16 +118,44 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "missing-terminal-punctuation",
-        Rule::MissingDocstringSummaryPunctuation,
+        Rule::DocstringSummaryWithoutTerminalPunctuation,
     ),
     (
         "missing-section-name-colon",
-        Rule::MissingDocstringSectionNameColon,
+        Rule::DocstringSectionNameWithoutColon,
     ),
     ("undocumented-param", Rule::UndocumentedParameter),
     (
         "incorrect-section-order",
         Rule::IncorrectDocstringSectionOrder,
+    ),
+    (
+        "docstring-extraneous-parameter",
+        Rule::ExtraneousDocstringParameter,
+    ),
+    (
+        "docstring-missing-returns",
+        Rule::MissingDocstringReturnsSection,
+    ),
+    (
+        "docstring-extraneous-returns",
+        Rule::ExtraneousDocstringReturnsSection,
+    ),
+    (
+        "docstring-missing-yields",
+        Rule::MissingDocstringYieldsSection,
+    ),
+    (
+        "docstring-extraneous-yields",
+        Rule::ExtraneousDocstringYieldsSection,
+    ),
+    (
+        "docstring-missing-exception",
+        Rule::UndocumentedRaisedException,
+    ),
+    (
+        "docstring-extraneous-exception",
+        Rule::ExtraneousDocstringException,
     ),
     ("get-attr-with-constant", Rule::GetattrWithConstant),
     ("set-attr-with-constant", Rule::SetattrWithConstant),
