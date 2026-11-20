@@ -201,7 +201,7 @@ fn fields_from_dict_literal(items: &[ast::DictItem]) -> Option<Suite> {
     } else {
         items
             .iter()
-            .map(|ast::DictItem { key, value }| match key {
+            .map(|ast::DictItem { key, value, .. }| match key {
                 Some(Expr::StringLiteral(ast::ExprStringLiteral { value: field, .. })) => {
                     if !is_identifier(field.to_str()) {
                         return None;

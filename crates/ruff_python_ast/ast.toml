@@ -362,7 +362,6 @@ source_order = ["body", "test", "orelse"]
 [Expr.nodes.ExprDict]
 doc = "See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)"
 fields = [{ name = "items", type = "DictItem*" }]
-custom_source_order = true
 
 [Expr.nodes.ExprSet]
 doc = "See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)"
@@ -655,6 +654,7 @@ Arguments = {}
 Parameters = {}
 Parameter = {}
 ParameterWithDefault = {}
+DictItem = {}
 Keyword = {}
 Alias = {}
 WithItem = {}

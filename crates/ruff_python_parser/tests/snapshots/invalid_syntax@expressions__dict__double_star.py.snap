@@ -20,6 +20,8 @@ Module(
                             range: 125..135,
                             items: [
                                 DictItem {
+                                    range: 126..129,
+                                    node_index: NodeIndex(None),
                                     key: None,
                                     value: Name(
                                         ExprName {
@@ -31,6 +33,8 @@ Module(
                                     ),
                                 },
                                 DictItem {
+                                    range: 133..134,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         NumberLiteral(
                                             ExprNumberLiteral {
@@ -66,6 +70,8 @@ Module(
                             range: 136..162,
                             items: [
                                 DictItem {
+                                    range: 137..141,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         Name(
                                             ExprName {
@@ -87,6 +93,8 @@ Module(
                                     ),
                                 },
                                 DictItem {
+                                    range: 143..161,
+                                    node_index: NodeIndex(None),
                                     key: None,
                                     value: If(
                                         ExprIf {
@@ -133,6 +141,8 @@ Module(
                             range: 163..184,
                             items: [
                                 DictItem {
+                                    range: 164..177,
+                                    node_index: NodeIndex(None),
                                     key: None,
                                     value: Lambda(
                                         ExprLambda {
@@ -177,6 +187,8 @@ Module(
                                     ),
                                 },
                                 DictItem {
+                                    range: 179..183,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         Name(
                                             ExprName {
@@ -212,6 +224,8 @@ Module(
                             range: 185..201,
                             items: [
                                 DictItem {
+                                    range: 186..190,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         Name(
                                             ExprName {
@@ -233,6 +247,8 @@ Module(
                                     ),
                                 },
                                 DictItem {
+                                    range: 192..200,
+                                    node_index: NodeIndex(None),
                                     key: None,
                                     value: BoolOp(
                                         ExprBoolOp {
@@ -275,6 +291,8 @@ Module(
                             range: 202..219,
                             items: [
                                 DictItem {
+                                    range: 203..212,
+                                    node_index: NodeIndex(None),
                                     key: None,
                                     value: BoolOp(
                                         ExprBoolOp {
@@ -303,6 +321,8 @@ Module(
                                     ),
                                 },
                                 DictItem {
+                                    range: 214..218,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         Name(
                                             ExprName {
@@ -338,6 +358,8 @@ Module(
                             range: 220..241,
                             items: [
                                 DictItem {
+                                    range: 221..225,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         Name(
                                             ExprName {
@@ -359,6 +381,8 @@ Module(
                                     ),
                                 },
                                 DictItem {
+                                    range: 227..234,
+                                    node_index: NodeIndex(None),
                                     key: None,
                                     value: UnaryOp(
                                         ExprUnaryOp {
@@ -377,6 +401,8 @@ Module(
                                     ),
                                 },
                                 DictItem {
+                                    range: 236..240,
+                                    node_index: NodeIndex(None),
                                     key: Some(
                                         Name(
                                             ExprName {
@@ -412,6 +438,8 @@ Module(
                             range: 242..252,
                             items: [
                                 DictItem {
+                                    range: 243..251,
+                                    node_index: NodeIndex(None),
                                     key: None,
                                     value: Compare(
                                         ExprCompare {
@@ -456,6 +484,8 @@ Module(
                             range: 253..267,
                             items: [
                                 DictItem {
+                                    range: 254..266,
+                                    node_index: NodeIndex(None),
                                     key: None,
                                     value: Compare(
                                         ExprCompare {
@@ -500,6 +530,8 @@ Module(
                             range: 268..277,
                             items: [
                                 DictItem {
+                                    range: 269..276,
+                                    node_index: NodeIndex(None),
                                     key: None,
                                     value: Compare(
                                         ExprCompare {
