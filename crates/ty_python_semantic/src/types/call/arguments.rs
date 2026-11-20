@@ -248,10 +248,10 @@ impl<'db> VariadicArgument<'db> {
         let ty = match self {
             Self::Sequence { sequence, .. } => suffix(sequence)?,
             Self::Type(types) => {
-                let project = |ty: &Type<'db>| suffix(&ty.iterate(db, env));
+                let suffix_for_type = |ty: &Type<'db>| suffix(&ty.iterate(db, env));
                 match types.get_default()?.expand_top_level_aliases(db, env) {
-                    Type::Union(union) => union.try_map(db, env, project)?,
-                    ty => project(&ty)?,
+                    Type::Union(union) => union.try_map(db, env, suffix_for_type)?,
+                    ty => suffix_for_type(&ty)?,
                 }
             }
         };
