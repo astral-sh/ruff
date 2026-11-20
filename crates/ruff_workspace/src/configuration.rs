@@ -1783,12 +1783,12 @@ mod tests {
         Rule::UnnecessaryEnumerate,
         Rule::MathConstant,
         Rule::PreviewTestRule,
-        Rule::BlankLineBetweenMethods,
-        Rule::BlankLinesTopLevel,
+        Rule::MissingBlankLineBeforeMethod,
+        Rule::MissingBlankLinesBeforeTopLevelDefinition,
         Rule::TooManyBlankLines,
         Rule::BlankLineAfterDecorator,
-        Rule::BlankLinesAfterFunctionOrClass,
-        Rule::BlankLinesBeforeNestedDefinition,
+        Rule::MissingBlankLinesAfterTopLevelDefinition,
+        Rule::MissingBlankLineBeforeNestedDefinition,
     ];
 
     fn resolve_rules(

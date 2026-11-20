@@ -36,9 +36,9 @@ use crate::rules::flake8_executable::helpers::{is_executable, is_wsl};
 /// - [Git documentation: `git update-index --chmod`](https://git-scm.com/docs/git-update-index#Documentation/git-update-index.txt---chmod-x)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.233", category = Category::Correctness)]
-pub(crate) struct ShebangMissingExecutableFile;
+pub(crate) struct ExecutableFileWithoutShebang;
 
-impl Violation for ShebangMissingExecutableFile {
+impl Violation for ExecutableFileWithoutShebang {
     #[derive_message_formats]
     fn message(&self) -> String {
         "The file is executable but no shebang is present".to_string()
@@ -56,7 +56,7 @@ pub(crate) fn shebang_missing_executable_file(filepath: &Path, context: &LintCon
     }
     if let Ok(true) = is_executable(filepath) {
         context.report_diagnostic_if_enabled(
-            ShebangMissingExecutableFile,
+            ExecutableFileWithoutShebang,
             ruff_text_size::TextRange::default(),
         );
     }

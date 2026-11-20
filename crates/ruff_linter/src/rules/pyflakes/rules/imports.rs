@@ -120,14 +120,14 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.18", category = Category::Restriction)]
-pub(crate) struct UndefinedLocalWithImportStar {
+pub(crate) struct StarImport {
     pub(crate) name: String,
 }
 
-impl Violation for UndefinedLocalWithImportStar {
+impl Violation for StarImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithImportStar { name } = self;
+        let StarImport { name } = self;
         format!("`from {name} import *` used; unable to detect undefined names")
     }
 }
@@ -204,14 +204,14 @@ impl Violation for LateFutureImport {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.44", category = Category::Restriction)]
-pub(crate) struct UndefinedLocalWithImportStarUsage {
+pub(crate) struct PossiblyUndefinedNameWithStarImport {
     pub(crate) name: String,
 }
 
-impl Violation for UndefinedLocalWithImportStarUsage {
+impl Violation for PossiblyUndefinedNameWithStarImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithImportStarUsage { name } = self;
+        let PossiblyUndefinedNameWithStarImport { name } = self;
         format!("`{name}` may be undefined, or defined from star imports")
     }
 }
@@ -246,14 +246,14 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.37", category = Category::Correctness)]
-pub(crate) struct UndefinedLocalWithNestedImportStarUsage {
+pub(crate) struct NonModuleLevelStarImport {
     pub(crate) name: String,
 }
 
-impl Violation for UndefinedLocalWithNestedImportStarUsage {
+impl Violation for NonModuleLevelStarImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithNestedImportStarUsage { name } = self;
+        let NonModuleLevelStarImport { name } = self;
         format!("`from {name} import *` only allowed at module level")
     }
 }

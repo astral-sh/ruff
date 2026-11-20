@@ -63,11 +63,11 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_34.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
-    #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
+    #[test_case(Rule::StarImport, Path::new("F403.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404_0.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404_1.py"))]
-    #[test_case(Rule::UndefinedLocalWithImportStarUsage, Path::new("F405.py"))]
-    #[test_case(Rule::UndefinedLocalWithNestedImportStarUsage, Path::new("F406.py"))]
+    #[test_case(Rule::PossiblyUndefinedNameWithStarImport, Path::new("F405.py"))]
+    #[test_case(Rule::NonModuleLevelStarImport, Path::new("F406.py"))]
     #[test_case(Rule::FutureFeatureNotDefined, Path::new("F407.py"))]
     #[test_case(Rule::PercentFormatInvalidFormat, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatExpectedMapping, Path::new("F502.py"))]
@@ -1291,10 +1291,7 @@ mod tests {
         // Can't find undefined names with import *.
         flakes(
             "from fu import *; bar",
-            &[
-                Rule::UndefinedLocalWithImportStar,
-                Rule::UndefinedLocalWithImportStarUsage,
-            ],
+            &[Rule::StarImport, Rule::PossiblyUndefinedNameWithStarImport],
         );
     }
 
@@ -3303,12 +3300,11 @@ lambda: fu
     fn relative_future_import_star() {
         let diagnostics = test_snippet(
             "from .__future__ import *",
-            &LinterSettings::for_rule(Rule::UndefinedLocalWithImportStar)
-                .with_target_version(PythonVersion::PY313),
+            &LinterSettings::for_rule(Rule::StarImport).with_target_version(PythonVersion::PY313),
         );
         assert_eq!(
             diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
-            [Rule::UndefinedLocalWithImportStar.name().as_str()]
+            [Rule::StarImport.name().as_str()]
         );
     }
 
@@ -3526,10 +3522,10 @@ lambda: fu
         csc(1)
         ",
             &[
-                Rule::UndefinedLocalWithImportStar,
-                Rule::UndefinedLocalWithImportStarUsage,
-                Rule::UndefinedLocalWithImportStarUsage,
-                Rule::UndefinedLocalWithImportStarUsage,
+                Rule::StarImport,
+                Rule::PossiblyUndefinedNameWithStarImport,
+                Rule::PossiblyUndefinedNameWithStarImport,
+                Rule::PossiblyUndefinedNameWithStarImport,
             ],
         );
     }
@@ -3544,7 +3540,7 @@ lambda: fu
         a = 1
         __all__ = ['a']
         ",
-            &[Rule::UndefinedLocalWithImportStar, Rule::UnusedImport],
+            &[Rule::StarImport, Rule::UnusedImport],
         );
     }
 

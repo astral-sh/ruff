@@ -273,9 +273,9 @@ impl Rule {
             }
             Rule::BlanketNOQA
             | Rule::NoqaComments
-            | Rule::RedirectedNOQA
+            | Rule::RenamedRuleInSuppressionComment
             | Rule::RuleCodesInSuppressionComments
-            | Rule::UnusedNOQA => LintSource::Noqa,
+            | Rule::UnusedSuppressionComment => LintSource::Noqa,
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
@@ -288,18 +288,18 @@ impl Rule {
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::BlanketTypeIgnore
             | Rule::BlankLineAfterDecorator
-            | Rule::BlankLineBetweenMethods
-            | Rule::BlankLinesAfterFunctionOrClass
-            | Rule::BlankLinesBeforeNestedDefinition
-            | Rule::BlankLinesTopLevel
+            | Rule::MissingBlankLineBeforeMethod
+            | Rule::MissingBlankLinesAfterTopLevelDefinition
+            | Rule::MissingBlankLineBeforeNestedDefinition
+            | Rule::MissingBlankLinesBeforeTopLevelDefinition
             | Rule::CommentedOutCode
             | Rule::EmptyComment
             | Rule::ExtraneousParentheses
-            | Rule::InvalidCharacterBackspace
-            | Rule::InvalidCharacterEsc
-            | Rule::InvalidCharacterNul
-            | Rule::InvalidCharacterSub
-            | Rule::InvalidCharacterZeroWidthSpace
+            | Rule::UnescapedBackspaceCharacter
+            | Rule::UnescapedEscapeCharacter
+            | Rule::UnescapedNullCharacter
+            | Rule::UnescapedSubstituteCharacter
+            | Rule::UnescapedZeroWidthSpaceCharacter
             | Rule::InvalidTodoCapitalization
             | Rule::InvalidTodoTag
             | Rule::LineContainsFixme
@@ -315,11 +315,11 @@ impl Rule {
             | Rule::MultiLineImplicitStringConcatenation
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::MultipleStatementsOnOneLineSemicolon
-            | Rule::ProhibitedTrailingComma
+            | Rule::UnnecessaryTrailingComma
             | Rule::ShebangLeadingWhitespace
-            | Rule::ShebangMissingExecutableFile
+            | Rule::ExecutableFileWithoutShebang
             | Rule::ShebangMissingPython
-            | Rule::ShebangNotExecutable
+            | Rule::NonExecutableFileWithShebang
             | Rule::ShebangNotFirstLine
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TabIndentation

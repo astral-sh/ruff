@@ -192,6 +192,50 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         Rule::FunctionalNamedTuple,
     ),
     ("replace-str-enum", Rule::ManualStrEnum),
+    ("prohibited-trailing-comma", Rule::UnnecessaryTrailingComma),
+    (
+        "blank-line-between-methods",
+        Rule::MissingBlankLineBeforeMethod,
+    ),
+    (
+        "blank-lines-top-level",
+        Rule::MissingBlankLinesBeforeTopLevelDefinition,
+    ),
+    (
+        "blank-lines-after-function-or-class",
+        Rule::MissingBlankLinesAfterTopLevelDefinition,
+    ),
+    (
+        "blank-lines-before-nested-definition",
+        Rule::MissingBlankLineBeforeNestedDefinition,
+    ),
+    ("shebang-not-executable", Rule::NonExecutableFileWithShebang),
+    (
+        "shebang-missing-executable-file",
+        Rule::ExecutableFileWithoutShebang,
+    ),
+    ("undefined-local-with-import-star", Rule::StarImport),
+    (
+        "undefined-local-with-import-star-usage",
+        Rule::PossiblyUndefinedNameWithStarImport,
+    ),
+    (
+        "undefined-local-with-nested-import-star-usage",
+        Rule::NonModuleLevelStarImport,
+    ),
+    (
+        "invalid-character-backspace",
+        Rule::UnescapedBackspaceCharacter,
+    ),
+    ("invalid-character-sub", Rule::UnescapedSubstituteCharacter),
+    ("invalid-character-esc", Rule::UnescapedEscapeCharacter),
+    ("invalid-character-nul", Rule::UnescapedNullCharacter),
+    (
+        "invalid-character-zero-width-space",
+        Rule::UnescapedZeroWidthSpaceCharacter,
+    ),
+    ("unused-noqa", Rule::UnusedSuppressionComment),
+    ("redirected-noqa", Rule::RenamedRuleInSuppressionComment),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
