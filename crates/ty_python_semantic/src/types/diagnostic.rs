@@ -843,7 +843,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/mismatched-dynamic-type-name.md")]
     pub(crate) static MISMATCHED_DYNAMIC_TYPE_NAME = {
         summary: "detects mismatched names in dynamically created classes",
-        status: LintStatus::stable("0.0.102"),
+        status: LintStatus::stable("0.0.108"),
         default_level: Level::Ignore,
     }
 }
