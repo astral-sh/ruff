@@ -56,6 +56,10 @@ struct AssignmentIndex;
 /// constraint that we are currently considering.
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
+    /// The nonce of the innermost open snapshot, or zero at the root.
+    current_snapshot: u64,
+    /// The nonce to issue next. This advances across rollbacks so a stale snapshot cannot match.
+    next_snapshot: u64,
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent<AtomicConstraintId, u16>>,
     /// The sequents that can fire when a particular assignment is added to the path.
@@ -104,6 +108,8 @@ pub(crate) struct PathAssignments {
 
 /// Branch-local state restored after visiting an edge.
 pub(super) struct PathSnapshot {
+    current_snapshot: u64,
+    previous_snapshot: u64,
     assignments: usize,
     substituted_constraints: usize,
     fuel_undo: usize,
@@ -194,6 +200,8 @@ impl Ord for AssignmentFuel {
 impl Default for PathAssignments {
     fn default() -> Self {
         Self {
+            current_snapshot: 0,
+            next_snapshot: 1,
             sequents: Vec::default(),
             sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
@@ -288,22 +296,9 @@ impl PathAssignments {
             .map(|constraint| (constraint, false))
             .collect();
         Self {
-            sequents: Vec::default(),
-            sequent_antecedents: FxHashMap::default(),
-            assignments: FxIndexMap::default(),
-            substituted_constraints: FxIndexSet::default(),
-            pending_substitutions: Vec::default(),
-            positive_assignment_indices: IndexVec::default(),
-            negative_assignment_indices: IndexVec::default(),
-            fuel_undo: Vec::default(),
             discovered,
-            elaborated_pairs: FxHashSet::default(),
-            single_replay_consequents: FxHashMap::default(),
-            pair_replay_consequents: FxHashMap::default(),
             independent_typevars,
-            remaining_overall_fuel: OVERALL_FUEL_BUDGET,
-            assignment_queue: VecDeque::default(),
-            new_assignments: FxIndexMap::default(),
+            ..Self::default()
         }
     }
 
@@ -443,8 +438,13 @@ impl PathAssignments {
         .is_ok()
     }
 
-    pub(super) fn snapshot(&self) -> PathSnapshot {
+    pub(super) fn snapshot(&mut self) -> PathSnapshot {
+        let current_snapshot = self.next_snapshot;
+        self.next_snapshot = current_snapshot.strict_add(1);
+        let previous_snapshot = std::mem::replace(&mut self.current_snapshot, current_snapshot);
         PathSnapshot {
+            current_snapshot,
+            previous_snapshot,
             assignments: self.assignments.len(),
             substituted_constraints: self.substituted_constraints.len(),
             fuel_undo: self.fuel_undo.len(),
@@ -452,7 +452,13 @@ impl PathAssignments {
         }
     }
 
+    /// Restores the most recent outstanding snapshot. The snapshot must come from this path.
     pub(super) fn truncate(&mut self, snapshot: &PathSnapshot) {
+        assert_eq!(
+            self.current_snapshot, snapshot.current_snapshot,
+            "snapshots must be truncated in reverse order of creation"
+        );
+
         self.assignment_queue.clear();
         self.pending_substitutions.clear();
         // A branch can replenish an assignment more than once. Restore in reverse order while
@@ -475,6 +481,7 @@ impl PathAssignments {
         self.substituted_constraints
             .truncate(snapshot.substituted_constraints);
         self.remaining_overall_fuel = snapshot.remaining_overall_fuel;
+        self.current_snapshot = snapshot.previous_snapshot;
     }
 
     /// Walks one of the outgoing edges of an internal BDD node. `assignment` describes the
