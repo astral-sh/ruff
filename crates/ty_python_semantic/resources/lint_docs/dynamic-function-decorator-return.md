@@ -82,6 +82,6 @@ This rule is disabled by default. It is intended for advanced users wanting addi
 checks from their type checker, not for users who have just started to use type checkers on their
 Python code.
 
-[ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
-[ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/
+[ann201]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-public-function/
+[ann202]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-private-function/
 [dynamic type]: https://typing.python.org/en/latest/spec/glossary.html#term-dynamic-type
