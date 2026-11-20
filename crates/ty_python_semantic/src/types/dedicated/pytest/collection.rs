@@ -511,10 +511,7 @@ mod tests {
     use ty_python_core::definition::{Definition, DefinitionKind};
     use ty_python_core::semantic_index;
 
-    use super::{
-        PytestTestKind, is_default_pytest_test_file_name, pytest_test_for_binding,
-        pytest_tests_in_file,
-    };
+    use super::{PytestTestKind, pytest_test_for_binding, pytest_tests_in_file};
     use crate::Db;
     use crate::db::tests::{TestDb, TestDbBuilder};
 
