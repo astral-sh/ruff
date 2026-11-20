@@ -1,10 +1,10 @@
 use std::path::Path;
 
+pub(crate) use executable_file_without_shebang::*;
+pub(crate) use non_executable_file_with_shebang::*;
 use ruff_python_trivia::CommentRanges;
 pub(crate) use shebang_leading_whitespace::*;
-pub(crate) use shebang_missing_executable_file::*;
 pub(crate) use shebang_missing_python::*;
-pub(crate) use shebang_not_executable::*;
 pub(crate) use shebang_not_first_line::*;
 
 use crate::Locator;
@@ -12,10 +12,10 @@ use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::comments::shebang::ShebangDirective;
 
+mod executable_file_without_shebang;
+mod non_executable_file_with_shebang;
 mod shebang_leading_whitespace;
-mod shebang_missing_executable_file;
 mod shebang_missing_python;
-mod shebang_not_executable;
 mod shebang_not_first_line;
 
 pub(crate) fn from_tokens(
