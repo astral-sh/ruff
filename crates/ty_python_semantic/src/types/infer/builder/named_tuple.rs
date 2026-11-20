@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{
     Db,
     types::{
@@ -15,6 +17,7 @@ use crate::{
         extract_fixed_length_iterable_element_types,
         function::KnownFunction,
         infer::TypeInferenceBuilder,
+        unpacker::sequence_elts,
     },
 };
 use char_str::format_char;
@@ -552,153 +555,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         spec
     }
 
+    /// Infer the fields of a `typing.NamedTuple` call. For a list or tuple literal, read each
+    /// declaration directly. For other expressions, recover the fields from the argument type.
     fn infer_typing_namedtuple_spec(&mut self, fields_arg: &ast::Expr) -> NamedTupleSpec<'db> {
-        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-        enum SequenceKind {
-            List,
-            Tuple,
-        }
-
-        let env = self.program_environment();
         let db = self.db();
 
-        // Get the elements from the list or tuple literal.
-        let (elements, field_arg_kind) = match fields_arg {
-            ast::Expr::List(list) => (&list.elts, SequenceKind::List),
-            ast::Expr::Tuple(tuple) => (&tuple.elts, SequenceKind::Tuple),
-            _ => {
-                let ty = self.infer_expression(fields_arg, TypeContext::default());
-                return NamedTupleSpec::from_fields_type(db, self.scope(), ty, |reason| {
-                    if let Some(builder) =
-                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(
-                            "Invalid argument to parameter `fields` of `NamedTuple()`",
-                        );
-                        diagnostic.set_primary_annotation_message(reason);
-                    }
-                });
-            }
+        let Some(elements) = sequence_elts(fields_arg) else {
+            let ty = self.infer_expression(fields_arg, TypeContext::default());
+            return NamedTupleSpec::from_fields_type(db, self.scope(), ty, |reason| {
+                FieldProblem {
+                    expression: fields_arg,
+                    reason,
+                }
+                .report(self);
+            });
         };
 
-        let mut fields = vec![];
-
-        for (i, element) in elements.iter().enumerate() {
-            // Each element should be a tuple or list like ("field_name", type) or ["field_name", type].
-            let (field_spec_elts, field_spec_kind) = match element {
-                ast::Expr::Tuple(tuple) => (&tuple.elts, SequenceKind::Tuple),
-                ast::Expr::List(list) => (&list.elts, SequenceKind::List),
-                _ => {
-                    self.infer_expression(element, TypeContext::default());
-                    for element in &elements[(i + 1)..] {
-                        self.infer_expression(element, TypeContext::default());
-                    }
-                    match field_arg_kind {
-                        SequenceKind::List => {
-                            self.store_expression_type(
-                                fields_arg,
-                                KnownClass::List.to_instance(db, env),
-                            );
-                        }
-                        SequenceKind::Tuple => self.store_expression_type(
-                            fields_arg,
-                            Type::homogeneous_tuple(db, env, Type::unknown()),
-                        ),
-                    }
-                    if let Some(builder) =
-                        self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(
-                            "Invalid argument to parameter `fields` of `NamedTuple()`",
-                        );
-                        diagnostic.set_primary_annotation_message(
-                            "`fields` must be a sequence of literal lists or tuples",
-                        );
-                    }
-                    return NamedTupleSpec::unknown(db, Type::unknown());
-                }
-            };
-
-            let [name_expr, declaration_expr] = &**field_spec_elts else {
-                self.infer_expression(element, TypeContext::default());
-                for element in &elements[(i + 1)..] {
-                    self.infer_expression(element, TypeContext::default());
-                }
-                match field_arg_kind {
-                    SequenceKind::List => {
-                        self.store_expression_type(
-                            fields_arg,
-                            KnownClass::List.to_instance(db, env),
-                        );
-                    }
-                    SequenceKind::Tuple => self.store_expression_type(
-                        fields_arg,
-                        Type::homogeneous_tuple(db, env, Type::unknown()),
-                    ),
-                }
-                if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg) {
-                    let mut diagnostic = builder.into_diagnostic(
-                        "Invalid argument to parameter `fields` of `NamedTuple()`",
-                    );
-                    diagnostic.set_primary_annotation_message(
-                        "Each element in `fields` must be a length-2 tuple or list",
-                    );
-                }
-                return NamedTupleSpec::unknown(db, Type::unknown());
-            };
-
-            let name_type = self.infer_expression(name_expr, TypeContext::default());
-            let declared_type = self.infer_type_expression(declaration_expr);
-
-            let element_type = match field_spec_kind {
-                SequenceKind::Tuple => {
-                    Type::heterogeneous_tuple(db, env, [name_type, declared_type])
-                }
-                SequenceKind::List => KnownClass::List.to_specialized_instance(
-                    db,
-                    env,
-                    &[UnionType::from_two_elements(
-                        db,
-                        env,
-                        name_type,
-                        declared_type,
-                    )],
-                ),
-            };
-
-            self.store_expression_type(element, element_type);
-
-            let Some(name) = name_type.resolve_type_alias(db).as_string_literal() else {
-                for element in &elements[(i + 1)..] {
-                    self.infer_expression(element, TypeContext::default());
-                }
-                match field_arg_kind {
-                    SequenceKind::List => {
-                        self.store_expression_type(
-                            fields_arg,
-                            KnownClass::List.to_instance(db, env),
-                        );
-                    }
-                    SequenceKind::Tuple => self.store_expression_type(
-                        fields_arg,
-                        Type::homogeneous_tuple(db, env, Type::unknown()),
-                    ),
-                }
-                if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, name_expr) {
-                    let mut diagnostic =
-                        builder.into_diagnostic("Invalid `NamedTuple` field name definition");
-                    diagnostic.set_primary_annotation_message(format_args!(
-                        "Expected a string literal for the field name, found `{}`",
-                        name_type.display(db, env)
-                    ));
-                }
-                return NamedTupleSpec::unknown(db, Type::unknown());
-            };
-
-            fields.push(FunctionalNamedTupleField::required(
-                Some(name.value(db)),
-                declared_type,
-            ));
+        let mut fields = Vec::with_capacity(elements.len());
+        let mut problem = None;
+        for element in elements {
+            let current = self.infer_typing_namedtuple_field(element, &mut fields);
+            problem = problem.or(current);
+        }
+        if let Some(problem) = problem {
+            problem.report(self);
         }
 
         let spec = NamedTupleSpec::from_fields(db, fields.into_boxed_slice());
@@ -707,6 +587,110 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)),
         );
         spec
+    }
+
+    /// Model a list literal as a tuple to retain its length after unpacking.
+    /// If `field` is a pair, `[*field, int]` has three items.
+    fn field_value_type(&self, value: &ast::Expr) -> Type<'db> {
+        match value {
+            ast::Expr::List(list) => self.tuple_type_from_literal_elements(&list.elts),
+            _ => self.expression_type(value),
+        }
+    }
+
+    /// Append the fields supplied by a starred expression. Walk nested literals so we can
+    /// recover the name and annotation from individual expressions in a pair like `["x", int]`.
+    fn unpack_namedtuple_fields(
+        &self,
+        value: &ast::Expr,
+        fields: &mut Vec<FunctionalNamedTupleField<'db>>,
+        problem: &mut Option<Cow<'static, str>>,
+    ) {
+        let db = self.db();
+        if let Some(elements) = sequence_elts(value) {
+            for element in elements {
+                if let ast::Expr::Starred(starred) = element {
+                    self.unpack_namedtuple_fields(&starred.value, fields, problem);
+                } else {
+                    fields.push(NamedTupleSpec::field_from_type(
+                        db,
+                        self.scope(),
+                        self.field_value_type(element),
+                        problem,
+                    ));
+                }
+            }
+        } else {
+            let pairs = self
+                .expression_type(value)
+                .iterate(db, self.program_environment());
+            NamedTupleSpec::extend_fields(db, self.scope(), &pairs, fields, problem);
+        }
+    }
+
+    /// Append the fields supplied by one element of a literal `fields` argument, returning
+    /// any problem with that element.
+    fn infer_typing_namedtuple_field<'a>(
+        &mut self,
+        element: &'a ast::Expr,
+        fields: &mut Vec<FunctionalNamedTupleField<'db>>,
+    ) -> Option<FieldProblem<'a>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let Some([name_expr, declaration_expr]) = explicit_field_pair(element) else {
+            self.infer_expression(element, TypeContext::default());
+            let mut problem = None;
+            return if let ast::Expr::Starred(starred) = element {
+                self.unpack_namedtuple_fields(&starred.value, fields, &mut problem);
+                Some(FieldProblem {
+                    expression: element,
+                    reason: problem?,
+                })
+            } else {
+                let pair = self.field_value_type(element);
+                fields.push(NamedTupleSpec::field_from_type(
+                    db,
+                    self.scope(),
+                    pair,
+                    &mut problem,
+                ));
+                Some(FieldProblem {
+                    expression: element,
+                    reason: problem?,
+                })
+            };
+        };
+
+        let name_type = self.infer_expression(name_expr, TypeContext::default());
+        let declared_type = self.infer_type_expression(declaration_expr);
+        let element_type = if element.is_tuple_expr() {
+            Type::heterogeneous_tuple(db, env, [name_type, declared_type])
+        } else {
+            KnownClass::List.to_specialized_instance(
+                db,
+                env,
+                &[UnionType::from_two_elements(
+                    db,
+                    env,
+                    name_type,
+                    declared_type,
+                )],
+            )
+        };
+        self.store_expression_type(element, element_type);
+
+        let name = name_type.resolve_type_alias(db).as_string_literal();
+        fields.push(FunctionalNamedTupleField::required(
+            name.map(|s| s.value(db)),
+            declared_type,
+        ));
+        name.is_none().then(|| FieldProblem {
+            expression: name_expr,
+            reason: Cow::Owned(format!(
+                "Expected a string literal for the field name, found `{}`",
+                name_type.display(db, env)
+            )),
+        })
     }
 
     /// Report diagnostics for invalid field names in a namedtuple definition.
@@ -751,6 +735,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ));
                 diagnostic.set_primary_annotation_message("Will raise `ValueError` at runtime");
             }
+        }
+    }
+}
+
+/// Return the name and annotation expressions from a two-item list or tuple literal with no
+/// starred elements.
+fn explicit_field_pair(element: &ast::Expr) -> Option<&[ast::Expr; 2]> {
+    sequence_elts(element)?
+        .as_array::<2>()
+        .filter(|parts| parts.iter().all(|part| !part.is_starred_expr()))
+}
+
+/// Why ty could not infer the fields of a functional `NamedTuple` definition.
+#[derive(Debug)]
+struct FieldProblem<'a> {
+    expression: &'a ast::Expr,
+    reason: Cow<'static, str>,
+}
+
+impl FieldProblem<'_> {
+    fn report(self, inference: &TypeInferenceBuilder<'_, '_>) {
+        if let Some(builder) = inference
+            .context
+            .report_lint(&INVALID_NAMED_TUPLE, self.expression)
+        {
+            builder
+                .into_diagnostic("Invalid argument to parameter `fields` of `NamedTuple()`")
+                .set_primary_annotation_message(self.reason);
         }
     }
 }
