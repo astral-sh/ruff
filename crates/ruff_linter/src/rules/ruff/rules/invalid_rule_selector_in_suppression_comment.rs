@@ -43,7 +43,7 @@ impl InvalidRuleSelectorKind {
 /// ## Example
 /// ```python
 /// import os  # noqa: XYZ999
-/// import sys # ruff: ignore[unknown-rule]
+/// import sys  # ruff: ignore[unknown-rule]
 /// ```
 ///
 /// Use instead:
@@ -55,7 +55,7 @@ impl InvalidRuleSelectorKind {
 /// Or if there are still valid codes needed:
 /// ```python
 /// import os  # noqa: E402
-/// import sys # ruff: ignore[E402]
+/// import sys  # ruff: ignore[E402]
 /// ```
 ///
 /// ## Fix safety
