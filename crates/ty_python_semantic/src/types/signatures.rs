@@ -1242,7 +1242,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Currying `map(list[T], (T) -> U) -> list[U]` captures the mapper parameter
-    /// in a ParamSpec. Its input constrains `T` from above. Bind a fresh `S <: T`
+    /// in a `ParamSpec`. Its input constrains `T` from above. Bind a fresh `S <: T`
     /// on the inner callable so each list can supply its own element type.
     ///
     /// This assumes the wrapper forwards the list as an opaque argument and
