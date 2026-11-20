@@ -177,6 +177,11 @@ Ruff's linter records a parent and branch for each statement or expression it vi
 Each entry holds a borrowed `SyntaxNode`, which carries its row and owning AST. This lets the
 same table hold a function definition and expressions from a separately parsed string annotation.
 
+For `return value`, the linter records the binding of `value` in a two-byte slot indexed by
+the expression's row. It allocates this table on the first resolved name. Parser recovery
+and reparsed annotations can give the same source occurrence multiple rows. In these cases,
+or when a binding ID exceeds the two-byte slot, the linter uses a map keyed by source offset.
+
 ## Node identity
 
 ty keeps a typed arena handle in each `AstNodeRef<T>`. Parsing the same source with the same
