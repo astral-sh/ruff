@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -69,20 +68,20 @@ pub(crate) fn delattr_with_constant(
     func: &Expr,
     arguments: &ast::Arguments,
 ) {
-    if !checker.semantic().match_builtin_expr(func, "delattr") {
-        return;
-    }
-
     let Some(
         [
             obj,
             Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }),
         ],
-    ) = arguments.args().collect_array()
+    ) = arguments.as_positional_array()
     else {
         return;
     };
     if obj.is_starred_expr() {
+        return;
+    }
+
+    if !checker.semantic().match_builtin_expr(func, "delattr") {
         return;
     }
 

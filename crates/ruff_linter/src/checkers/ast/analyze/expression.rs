@@ -749,16 +749,14 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::StripWithMultiCharacters) {
                 flake8_bugbear::rules::strip_with_multi_characters(checker, expr, func, arguments);
             }
-            if arguments.keywords().next().is_none() {
-                if checker.is_rule_enabled(Rule::GetattrWithConstant) {
-                    flake8_bugbear::rules::getattr_with_constant(checker, expr, func, arguments);
-                }
-                if checker.is_rule_enabled(Rule::DelattrWithConstant) {
-                    flake8_bugbear::rules::delattr_with_constant(checker, expr, func, arguments);
-                }
-                if checker.is_rule_enabled(Rule::SetattrWithConstant) {
-                    flake8_bugbear::rules::setattr_with_constant(checker, expr, func, arguments);
-                }
+            if checker.is_rule_enabled(Rule::GetattrWithConstant) {
+                flake8_bugbear::rules::getattr_with_constant(checker, expr, func, arguments);
+            }
+            if checker.is_rule_enabled(Rule::DelattrWithConstant) {
+                flake8_bugbear::rules::delattr_with_constant(checker, expr, func, arguments);
+            }
+            if checker.is_rule_enabled(Rule::SetattrWithConstant) {
+                flake8_bugbear::rules::setattr_with_constant(checker, expr, func, arguments);
             }
             if checker.is_rule_enabled(Rule::StarArgUnpackingAfterKeywordArg) {
                 flake8_bugbear::rules::star_arg_unpacking_after_keyword_arg(checker, arguments);
