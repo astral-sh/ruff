@@ -41,8 +41,24 @@ def define_types(
     reveal_type(Ts.__name__)  # revealed: Literal["Ts"]
     reveal_type(Number.__name__)  # revealed: Literal["Number"]
 
-    U = TypeVar(type_var)  # error: [mismatched-typevar-name] "Expected "U", got "T""
+    U = TypeVar(type_var)  # snapshot: mismatched-typevar-name
+
     reveal_type(U.__name__)  # revealed: Literal["T"]
+```
+
+```snapshot
+warning[mismatched-typevar-name]: The name passed to `TypeVar` must match the variable it is assigned to
+  --> src/mdtest_snippet.py:30:17
+   |
+30 |     U = TypeVar(type_var)  # snapshot: mismatched-typevar-name
+   |                 ^^^^^^^^ Expected "U", got "T"
+help: Use `"U"` as the name
+   |
+29 |
+   -     U = TypeVar(type_var)  # snapshot: mismatched-typevar-name
+30 +     U = TypeVar("U")  # snapshot: mismatched-typevar-name
+31 |
+   |
 ```
 
 ## Type parameters named at runtime
@@ -56,8 +72,31 @@ from typing_extensions import ParamSpec, TypeVar, TypeVarTuple
 
 def runtime_name(name: str) -> str:
     return name
+```
 
-T = TypeVar(runtime_name("T"))  # error: [mismatched-typevar-name]
+ty marks the fix as unsafe when it replaces a function call, since the call may have side effects.
+
+```py
+T = TypeVar(runtime_name("T"))  # snapshot: mismatched-typevar-name
+```
+
+```snapshot
+warning[mismatched-typevar-name]: The name passed to `TypeVar` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:6:13
+  |
+6 | T = TypeVar(runtime_name("T"))  # snapshot: mismatched-typevar-name
+  |             ^^^^^^^^^^^^^^^^^ Cannot verify that a value of type `str` matches "T"
+help: Use `"T"` as the name
+  |
+5 |     return name
+  - T = TypeVar(runtime_name("T"))  # snapshot: mismatched-typevar-name
+6 + T = TypeVar("T")  # snapshot: mismatched-typevar-name
+7 | P = ParamSpec(name=runtime_name("P"))  # error: [mismatched-paramspec-name]
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+```py
 P = ParamSpec(name=runtime_name("P"))  # error: [mismatched-paramspec-name]
 Ts = TypeVarTuple(runtime_name("Ts"))  # error: [mismatched-typevartuple-name]
 
@@ -88,4 +127,32 @@ Movie = TypedDict(42, {"title": str})  # error: [invalid-argument-type]
 P = ParamSpec(42)  # error: [invalid-paramspec]
 T = TypeVar(42)  # error: [invalid-legacy-type-variable]
 Ts = TypeVarTuple(42)  # error: [invalid-legacy-type-variable]
+```
+
+## Fixing names split across string literals
+
+ty replaces adjacent string literals with a single literal containing the variable name. The
+replacement keeps the first literal's prefix. ty marks the fix as unsafe for all implicitly
+concatenated strings because the replacement can remove comments between the literals.
+
+```py
+from typing import TypeVar
+
+# snapshot: mismatched-typevar-name
+T = TypeVar(name=r"T" "Value")
+```
+
+```snapshot
+warning[mismatched-typevar-name]: The name passed to `TypeVar` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:4:18
+  |
+4 | T = TypeVar(name=r"T" "Value")
+  |                  ^^^^^^^^^^^^ Expected "T", got "TValue"
+help: Use `r"T"` as the name
+  |
+3 | # snapshot: mismatched-typevar-name
+  - T = TypeVar(name=r"T" "Value")
+4 + T = TypeVar(name=r"T")
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```

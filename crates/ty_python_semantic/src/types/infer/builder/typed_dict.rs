@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, NodeIndex, PythonVersion};
 use rustc_hash::FxHashMap;
@@ -335,8 +336,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 name_arg,
                 "TypedDict",
                 &assigned_name,
-                name,
-                name_type,
+                name.ok_or(name_type),
+                Applicability::Safe,
             );
         }
 

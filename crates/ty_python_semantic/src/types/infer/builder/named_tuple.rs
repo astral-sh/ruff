@@ -17,6 +17,7 @@ use crate::{
     },
 };
 use char_str::format_char;
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_python_stdlib::{identifiers::is_identifier, keyword::is_keyword};
 use rustc_hash::FxHashSet;
@@ -357,8 +358,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     name_arg,
                     kind,
                     &assigned_name,
-                    Some(actual_name),
-                    name_type,
+                    Ok(actual_name),
+                    Applicability::Unsafe,
                 );
             }
         } else if !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))

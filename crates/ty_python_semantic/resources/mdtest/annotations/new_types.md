@@ -231,6 +231,13 @@ warning[mismatched-newtype-name]: The name passed to `NewType` must match the va
   |
 5 | UserId = NewType("Id", int)
   |                  ^^^^ Expected "UserId", got "Id"
+help: Use `"UserId"` as the name
+  |
+4 | # snapshot: mismatched-newtype-name
+  - UserId = NewType("Id", int)
+5 + UserId = NewType("UserId", int)
+6 | reveal_type(UserId)  # revealed: <NewType pseudo-class 'Id'>
+  |
 ```
 
 ```py
@@ -246,6 +253,13 @@ warning[mismatched-newtype-name]: The name passed to `NewType` must match the va
    |
 10 | UsesExistingId = NewType("Id", "Id")
    |                          ^^^^ Expected "UsesExistingId", got "Id"
+help: Use `"UsesExistingId"` as the name
+   |
+9  | # snapshot: mismatched-newtype-name
+   - UsesExistingId = NewType("Id", "Id")
+10 + UsesExistingId = NewType("UsesExistingId", "Id")
+11 | UsesExistingId(1)
+   |
 ```
 
 ## The base must be a class type or another newtype
