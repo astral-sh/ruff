@@ -1,5 +1,6 @@
 use crate::ProgramEnvironment;
 use std::borrow::Cow;
+use std::cell::RefCell;
 
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -17,6 +18,7 @@ use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
+use crate::types::typed_dict::TypedDictType;
 use crate::types::typevar::TypeVarDomain;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
@@ -1261,14 +1263,26 @@ impl<'db> Type<'db> {
     }
 }
 
-/// A [`CycleDetector`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
+type TypePairVisitor<'db, 'c> = CycleDetector<
     'db,
     TypeRelation,
     (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation),
     ConstraintSet<'db, 'c>,
     1,
 >;
+
+type TypedDictUnionCache<'db, 'c> = FxHashMap<
+    (TypedDictType<'db>, TypeRelation, TypeVarEvaluation),
+    (UnionType<'db>, ConstraintSet<'db, 'c>),
+>;
+
+/// Results shared within a relation check.
+pub(crate) struct HasRelationToVisitor<'db, 'c> {
+    pairs: TypePairVisitor<'db, 'c>,
+    /// Recursive schemas often compare a source against the same union many times.
+    /// Keep the last reusable union per source and mode to bound memory when targets vary.
+    typed_dict_unions: RefCell<TypedDictUnionCache<'db, 'c>>,
+}
 
 impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation) {
     type Id = (
@@ -1297,7 +1311,10 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        HasRelationToVisitor::new(ConstraintSet::from_bool(constraints, true))
+        Self {
+            pairs: TypePairVisitor::new(ConstraintSet::from_bool(constraints, true)),
+            typed_dict_unions: RefCell::default(),
+        }
     }
 }
 
@@ -1672,26 +1689,30 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
         };
 
-        // Recursive TypedDict schemas can compare the same source against the same union
-        // many times. Once every visited arm has a cached TypedDict comparison, repeating
-        // the traversal would combine the same constraints in the same order. An arm that
-        // returned a provisional result from the recursion stack has no such cache entry.
+        // Reuse the union result only if every arm we visit already has a completed
+        // TypedDict comparison. Repeating the traversal would then combine the same
+        // constraints in the same order. On the first miss, fall back to ordinary
+        // checking for the rest of the union, since a recursive arm can be provisional.
         let context_tree = self.report_context();
-        let key = |ty| (source, ty, self.relation, self.typevar_evaluation);
-        let mut can_memoize = source.is_typed_dict() && context_tree.is_none();
-        if can_memoize && let Some(result) = self.relation_visitor.completed(&key(target)) {
-            return result;
-        }
+        let mut cache_source = source.as_typed_dict().filter(|_| context_tree.is_none());
 
         let mut elements_context = vec![];
         let result = elements
             .iter()
             .when_any(db, self.constraints, |&element| {
-                let result = self.check_type_pair(db, source, element);
-                if can_memoize {
-                    can_memoize = element.is_typed_dict()
-                        && self.relation_visitor.completed(&key(element)).is_some();
+                // Union membership already handled reflexivity, so a TypedDict arm
+                // goes straight to the same guarded comparison as in check_type_pair.
+                if let (Some(source), Type::TypedDict(target)) = (cache_source, element) {
+                    let (result, reused) = self.check_guarded_typeddict_pair(db, source, target);
+                    // Save the slot for a union that needs more than one pair lookup.
+                    if !reused || (result.is_trivially_always_satisfied() && element == elements[0]) {
+                        cache_source = None;
+                    }
+                    return result;
                 }
+                cache_source = None;
+
+                let result = self.check_type_pair(db, source, element);
                 if let Some(context_tree) = context_tree {
                     let context = context_tree.take();
                     if !context.is_empty() {
@@ -1738,9 +1759,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.without_context_collection(|| self.check_type_pair(db, source, materialized))
             });
 
-        if can_memoize {
-            self.relation_visitor
-                .insert_completed_if_absent(key(target), result);
+        if let Some(source) = cache_source {
+            self.relation_visitor.typed_dict_unions.borrow_mut().insert(
+                (source, self.relation, self.typevar_evaluation),
+                (union, result),
+            );
         }
 
         if context_tree.is_some()
@@ -2010,8 +2033,37 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        self.with_recursion_guard_and_status(db, source, target, work)
+            .0
+    }
+
+    fn check_guarded_typeddict_pair(
+        &self,
+        db: &'db dyn Db,
+        source: TypedDictType<'db>,
+        target: TypedDictType<'db>,
+    ) -> (ConstraintSet<'db, 'c>, bool) {
+        self.with_recursion_guard_and_status(
+            db,
+            Type::TypedDict(source),
+            Type::TypedDict(target),
+            || self.check_typeddict_pair(db, source, target),
+        )
+    }
+
+    /// Also reports whether the guard reused a completed result.
+    fn with_recursion_guard_and_status(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> (ConstraintSet<'db, 'c>, bool) {
         let collect_context = self.is_context_collection_enabled();
-        self.relation_visitor
+        let mut reused = false;
+        let result = self
+            .relation_visitor
+            .pairs
             .try_visit(
                 db,
                 (source, target, self.relation, self.typevar_evaluation),
@@ -2020,11 +2072,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // guards. Satisfiable constraints remain reusable, including those that
                 // constrain type variables.
                 |result| {
-                    !collect_context || !result.is_never_satisfied(db, self.env, self.inferable)
+                    reused = !collect_context
+                        || !result.is_never_satisfied(db, self.env, self.inferable);
+                    reused
                 },
                 work,
             )
-            .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
+            .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1));
+        (result, reused)
     }
 
     fn recursive_type_pair_fallback(
@@ -2301,6 +2356,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .with_recursion_guard(db, source, target, || {
                     self.check_type_pair(db, source, intersection.expand_aliases(db, env))
                 }),
+
+            // A cached union already passed the alias check below, which scans every arm.
+            (Type::TypedDict(source), Type::Union(union))
+                if !self.is_context_collection_enabled()
+                    && let Some(&(previous, result)) = self
+                        .relation_visitor
+                        .typed_dict_unions
+                        .borrow()
+                        .get(&(source, self.relation, self.typevar_evaluation))
+                    && previous == union =>
+            {
+                result
+            }
 
             // Annotation unions retain type aliases so recursive aliases can be represented.
             // Normalize direct alias elements together before checking the union so reductions
@@ -3002,9 +3070,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::ProtocolInstance(_), _) => self.never(),
 
             (Type::TypedDict(source_td), Type::TypedDict(target_td)) => {
-                self.with_recursion_guard(db, source, target, || {
-                    self.check_typeddict_pair(db, source_td, target_td)
-                })
+                self.check_guarded_typeddict_pair(db, source_td, target_td)
+                    .0
             }
 
             (Type::TypedDict(typed_dict), _) => {
