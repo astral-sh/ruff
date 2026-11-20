@@ -1556,28 +1556,30 @@ impl<'db> Specialization<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let types = if nested {
-            self.types(db)
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true))
-                .collect::<Option<Box<[_]>>>()?
-        } else {
-            self.types(db)
-                .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div)
-                })
-                .collect::<Box<[_]>>()
-        };
-        let tuple_inner = match self.tuple_inner(db) {
+        let original_types = self.types(db);
+        let mut types = Cow::Borrowed(original_types);
+        for (index, ty) in original_types.iter().enumerate() {
+            let normalized = ty.recursive_type_normalized_impl(db, env, div, true);
+            let normalized = if nested {
+                normalized?
+            } else {
+                normalized.unwrap_or(div)
+            };
+            if normalized != *ty {
+                types.to_mut()[index] = normalized;
+            }
+        }
+        let original_tuple_inner = self.tuple_inner(db);
+        let tuple_inner = match original_tuple_inner {
             Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, env, div, nested)?),
             None => None,
         };
-        let context = self.generic_context(db);
+        if matches!(types, Cow::Borrowed(_)) && tuple_inner == original_tuple_inner {
+            return Some(self);
+        }
         Some(Self::new(
             db,
-            context,
+            self.generic_context(db),
             types,
             self.materialization_kind(db),
             tuple_inner,
