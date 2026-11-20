@@ -1,12 +1,10 @@
-use std::debug_assert_matches;
-
 use anyhow::{Context, Ok, Result};
 
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Binding;
-use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::Edit;
@@ -109,37 +107,50 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
 /// Generate a [`Edit`] to remove the binding from an exception handler.
 pub(crate) fn remove_exception_handler_assignment(
     bound_exception: &Binding,
-    locator: &Locator,
+    tokens: &Tokens,
 ) -> Result<Edit> {
-    // Find the position just after the exception name. This is a late pass so we only have the
-    // binding and can't look its parent in the AST up anymore.
+    // Find the end of the exception type. This is a late pass, so we only have the binding
+    // and can't look up its parent in the AST anymore.
     // ```
     // except ZeroDivisionError as err:
     //                             ^^^ This is the bound_exception range
-    //                         ^^^^ lex this range
+    //                         ^^^^ tokens in this range
     //                         ^ preceding_end (we want to remove from here)
     // ```
     // There can't be any comments in that range.
-    let mut tokenizer =
-        BackwardsTokenizer::up_to(bound_exception.start(), locator.contents(), &[]).skip_trivia();
+    let (before, after) = tokens.split_at(bound_exception.start());
+    let is_trivia = |kind: TokenKind| {
+        kind.is_trivia()
+            || matches!(
+                kind,
+                TokenKind::Newline | TokenKind::Indent | TokenKind::Dedent
+            )
+    };
+    let mut preceding_tokens = before.iter().rev().filter(|token| !is_trivia(token.kind()));
 
     // Eat the `as` token.
-    let preceding = tokenizer
+    let preceding = preceding_tokens
         .next()
         .context("expected the exception name to be preceded by `as`")?;
-    debug_assert_matches!(preceding.kind, SimpleTokenKind::As);
+    debug_assert_eq!(preceding.kind(), TokenKind::As);
 
-    // Lex to the end of the preceding token, which should be the exception value.
-    let preceding = tokenizer
+    // Find the end of the preceding token, which should be the exception value.
+    let preceding = preceding_tokens
         .next()
         .context("expected the exception name to be preceded by a token")?;
 
-    // Lex forwards, to the `:` token.
-    let following = SimpleTokenizer::starts_at(bound_exception.end(), locator.contents())
-        .skip_trivia()
-        .next()
+    debug_assert!(
+        after
+            .first()
+            .is_some_and(|token| token.range() == bound_exception.range())
+    );
+    // Skip the bound name and find the `:` token.
+    let following = after
+        .iter()
+        .skip(1)
+        .find(|token| !is_trivia(token.kind()))
         .context("expected the exception name to be followed by a colon")?;
-    debug_assert_matches!(following.kind, SimpleTokenKind::Colon);
+    debug_assert_eq!(following.kind(), TokenKind::Colon);
 
     Ok(Edit::deletion(preceding.end(), following.start()))
 }
