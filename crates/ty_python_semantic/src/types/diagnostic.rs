@@ -136,6 +136,14 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_ALIAS_TYPE);
     registry.register_lint(&INVALID_NEWTYPE);
     registry.register_lint(&MISMATCHED_TYPE_NAME);
+    registry.register_lint(&MISMATCHED_ENUM_NAME);
+    registry.register_lint(&MISMATCHED_NAMEDTUPLE_NAME);
+    registry.register_lint(&MISMATCHED_NEWTYPE_NAME);
+    registry.register_lint(&MISMATCHED_PARAMSPEC_NAME);
+    registry.register_lint(&MISMATCHED_TYPE_ALIAS_NAME);
+    registry.register_lint(&MISMATCHED_TYPEDDICT_NAME);
+    registry.register_lint(&MISMATCHED_TYPEVAR_NAME);
+    registry.register_lint(&MISMATCHED_TYPEVARTUPLE_NAME);
     registry.register_lint(&MISMATCHED_SENTINEL_NAME);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
@@ -745,10 +753,87 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/mismatched-type-name.md")]
-    pub(crate) static MISMATCHED_TYPE_NAME = {
+    /// Name mismatches now have a separate rule for each kind of type.
+    static MISMATCHED_TYPE_NAME = {
         summary: "detects functional typing definitions whose declared name does not match the assigned variable",
-        status: LintStatus::stable("0.0.30"),
+        status: LintStatus::removed(
+            "0.0.108",
+            "Use `mismatched-enum-name`, `mismatched-namedtuple-name`, `mismatched-newtype-name`, \
+             `mismatched-paramspec-name`, `mismatched-type-alias-name`, `mismatched-typeddict-name`, \
+             `mismatched-typevar-name`, and/or `mismatched-typevartuple-name`.",
+        ),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-enum-name.md")]
+    pub(crate) static MISMATCHED_ENUM_NAME = {
+        summary: "detects mismatched names in enum classes",
+        status: LintStatus::stable("0.0.108"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-namedtuple-name.md")]
+    pub(crate) static MISMATCHED_NAMEDTUPLE_NAME = {
+        summary: "detects mismatched names in named tuples",
+        status: LintStatus::stable("0.0.108"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-newtype-name.md")]
+    pub(crate) static MISMATCHED_NEWTYPE_NAME = {
+        summary: "detects mismatched names in `NewType` definitions",
+        status: LintStatus::stable("0.0.108"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-paramspec-name.md")]
+    pub(crate) static MISMATCHED_PARAMSPEC_NAME = {
+        summary: "detects mismatched names in `ParamSpec` definitions",
+        status: LintStatus::stable("0.0.108"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-type-alias-name.md")]
+    pub(crate) static MISMATCHED_TYPE_ALIAS_NAME = {
+        summary: "detects mismatched names in `TypeAliasType` definitions",
+        status: LintStatus::stable("0.0.108"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-typeddict-name.md")]
+    pub(crate) static MISMATCHED_TYPEDDICT_NAME = {
+        summary: "detects mismatched names in typed dictionaries",
+        status: LintStatus::stable("0.0.108"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-typevar-name.md")]
+    pub(crate) static MISMATCHED_TYPEVAR_NAME = {
+        summary: "detects mismatched names in `TypeVar` definitions",
+        status: LintStatus::stable("0.0.108"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/mismatched-typevartuple-name.md")]
+    pub(crate) static MISMATCHED_TYPEVARTUPLE_NAME = {
+        summary: "detects mismatched names in `TypeVarTuple` definitions",
+        status: LintStatus::stable("0.0.108"),
         default_level: Level::Warn,
     }
 }
@@ -1678,14 +1763,15 @@ pub struct TypeCheckDiagnostics {
 
 pub(crate) fn report_mismatched_type_name<'db>(
     context: &InferContext<'db, '_>,
+    rule: &'static LintMetadata,
     node: impl Ranged,
-    constructor: &str,
+    constructor: impl fmt::Display,
     expected_name: &str,
     actual_name: Option<&str>,
     actual_name_ty: Type<'db>,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&MISMATCHED_TYPE_NAME, node) {
+    if let Some(builder) = context.report_lint(rule, node) {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "The name passed to `{constructor}` must match the variable it is assigned to"
         ));
@@ -1696,7 +1782,7 @@ pub(crate) fn report_mismatched_type_name<'db>(
         } else {
             let env = context.program_environment();
             diagnostic.set_primary_annotation_message(format_args!(
-                "Expected \"{expected_name}\", got variable of type `{}`",
+                "Cannot verify that a value of type `{}` matches \"{expected_name}\"",
                 actual_name_ty.display(db, env)
             ));
         }

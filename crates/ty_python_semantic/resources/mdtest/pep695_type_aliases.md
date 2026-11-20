@@ -944,7 +944,10 @@ Invalid = TypeAliasType("Invalid", int, qualname=1)  # error: [invalid-argument-
 
 ### Error cases
 
-#### Name is not a string literal
+#### Name supplied at runtime
+
+The name comparison needs the value of the first argument. The type alias still resolves to its
+value type when the name argument has type `str`.
 
 ```py
 from typing_extensions import TypeAliasType
@@ -952,8 +955,30 @@ from typing_extensions import TypeAliasType
 def get_name() -> str:
     return "IntOrStr"
 
-# error: [invalid-type-alias-type] "The `name` argument to `TypeAliasType` must be a string literal"
-IntOrStr = TypeAliasType(get_name(), int | str)
+IntOrStr = TypeAliasType(get_name(), int | str)  # error: [mismatched-type-alias-name]
+reveal_type(IntOrStr.__name__)  # revealed: str
+
+def f(value: IntOrStr) -> None:
+    reveal_type(value)  # revealed: int | str
+```
+
+Diagnostics can refer to the alias by its assigned name.
+
+```py
+def as_int_or_str(value: bytes) -> IntOrStr:
+    # snapshot: invalid-explicit-return
+    return value
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+  --> src/mdtest_snippet.py:13:12
+   |
+11 | def as_int_or_str(value: bytes) -> IntOrStr:
+   |                                    -------- Expected `IntOrStr` because of return type
+12 |     # snapshot: invalid-explicit-return
+13 |     return value
+   |            ^^^^^ expected `IntOrStr`, found `bytes`
 ```
 
 #### Name does not match variable
@@ -962,9 +987,17 @@ IntOrStr = TypeAliasType(get_name(), int | str)
 from typing import Union
 from typing_extensions import TypeAliasType
 
-# error: [mismatched-type-name] "The name passed to `TypeAliasType` must match the variable it is assigned to: Expected "IntOrStr", got "WrongName""
+# snapshot: mismatched-type-alias-name
 IntOrStr = TypeAliasType("WrongName", Union[int, str])
 reveal_type(IntOrStr)  # revealed: TypeAliasType
+```
+
+```snapshot
+warning[mismatched-type-alias-name]: The name passed to `TypeAliasType` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:5:26
+  |
+5 | IntOrStr = TypeAliasType("WrongName", Union[int, str])
+  |                          ^^^^^^^^^^^ Expected "IntOrStr", got "WrongName"
 ```
 
 #### Invalid constructor arguments
@@ -980,6 +1013,7 @@ Extra = TypeAliasType("Extra", int, ())
 
 Invalid = TypeAliasType("Invalid", int, bogus=True)  # error: [unknown-argument]
 Duplicate = TypeAliasType("Duplicate", int, name="Other")  # error: [parameter-already-assigned]
+reveal_type(Duplicate.__name__)  # revealed: Literal["Duplicate"]
 DuplicateValue = TypeAliasType("DuplicateValue", int, value=str)  # error: [parameter-already-assigned]
 Unpacked = TypeAliasType("Unpacked", int, **{"bogus": True})  # error: [unknown-argument]
 NonStringKey = TypeAliasType("NonStringKey", int, **{1: 42})  # error: [invalid-argument-type]

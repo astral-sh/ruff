@@ -257,10 +257,61 @@ The assigned variable name should match the `typename` argument:
 from typing import NamedTuple
 from ty_extensions._internal import is_subtype_of
 
-# error: [mismatched-type-name]
+# error: [mismatched-namedtuple-name]
 Mismatch = NamedTuple("WrongName", [("x", int)])
 reveal_type(Mismatch)  # revealed: <class 'WrongName'>
 reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Literal[True]]
+```
+
+### Name comparison through type aliases
+
+The name comparison follows a type alias to a single string literal. The rule is meant to spot
+simple, obvious typos. It allows names of type `str` so callers can still construct named tuples
+dynamically when that's desirable. If the name argument has a union of string literals as its type,
+the caller is likely doing the same thing.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections import namedtuple
+from typing import Literal, NamedTuple
+
+type VectorName = Literal["Vector"]
+type PointNames = Literal["Vector", "Coordinate"]
+
+def fixed_name(name: VectorName) -> None:
+    # error: [mismatched-namedtuple-name] "Expected "Point", got "Vector""
+    Point = NamedTuple(name, [("x", int)])
+    # error: [mismatched-namedtuple-name] "Expected "Point", got "Vector""
+    Point = namedtuple(typename=name, field_names="x")
+
+def choose_name(name: Literal["Vector", "Coordinate"], aliased_name: PointNames) -> None:
+    Point = NamedTuple(name, [("x", int)])  # ok
+    Point = NamedTuple(aliased_name, [("x", int)])  # ok
+    Point = namedtuple(typename=name, field_names="x")  # ok
+    Point = namedtuple(typename=aliased_name, field_names="x")  # ok
+```
+
+### Invalid literal names
+
+Both factories reject names that are keywords or invalid identifiers. An invalid name is reported by
+`invalid-named-tuple` even when the name mismatch rule is enabled.
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+# error: [invalid-named-tuple] "Type name "not valid" in `NamedTuple()` is not a valid Python identifier"
+Spaced = NamedTuple("not valid", [("x", int)])
+
+# error: [invalid-named-tuple] "Type name "class" in `namedtuple()` cannot be a Python keyword"
+Keyword = namedtuple(typename="class", field_names="x", rename=True)
+
+# Soft keywords are valid type names.
+match = namedtuple("match", "x")  # ok
 ```
 
 ### Functional syntax with string annotations
@@ -402,13 +453,18 @@ reveal_type(p.id)  # revealed: int
 reveal_type(p.name)  # revealed: str
 ```
 
-Non-literal `str` names should not be treated as proven mismatches:
+### Class names of type `str`
+
+ty skips the name comparison for both `NamedTuple` and `namedtuple` when the `typename` argument has
+type `str`.
 
 ```py
+from collections import namedtuple
 from typing import NamedTuple
 
 def f(name: str) -> None:
-    Match = NamedTuple(name, [("value", int)])
+    Record = NamedTuple(name, [("value", int)])  # ok
+    Row = namedtuple(name, ["value"])  # ok
 ```
 
 ### Functional syntax with tuple variable fields

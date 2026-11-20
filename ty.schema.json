@@ -1056,7 +1056,7 @@
         },
         "invalid-named-tuple": {
           "title": "detects invalid `NamedTuple` class definitions",
-          "description": "## What it does\n\nChecks for invalidly defined `NamedTuple` classes.\n\n## Why is this bad?\n\nAn invalidly defined `NamedTuple` class may lead to the type checker drawing incorrect conclusions.\nIt may also lead to `TypeError`s or `AttributeError`s at runtime.\n\n## Examples\n\nA class definition cannot combine `NamedTuple` with other base classes in multiple inheritance;\ndoing so raises a `TypeError` at runtime. The sole exception to this rule is `Generic[]`, which can\nbe used alongside `NamedTuple` in a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```\n\nFurther, `NamedTuple` field names cannot start with an underscore:\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     _bar: int\nValueError: Field names cannot start with an underscore: '_bar'\n```\n\n`NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`, `_replace`,\netc.) that cannot be overwritten. Attempting to assign to these attributes without a type annotation\nwill raise an `AttributeError` at runtime.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     x: int\n...     _asdict = 42\nAttributeError: Cannot overwrite NamedTuple attribute _asdict\n```\n\nFinally, `NamedTuple` field annotations cannot use the `ClassVar` or `Final` type qualifiers. These\nqualifiers also cause a runtime error when annotations are evaluated eagerly:\n\n```pycon\n>>> from typing import ClassVar, NamedTuple\n>>> class Foo(NamedTuple):\n...     x: ClassVar[int]\nTypeError: typing.ClassVar[int] is not valid as type argument\n```",
+          "description": "## What it does\n\nChecks for invalid definitions of `typing.NamedTuple` and `collections.namedtuple` classes.\n\n## Why is this bad?\n\nAn invalidly defined `NamedTuple` class may lead to the type checker drawing incorrect conclusions.\nIt may also lead to errors at runtime, such as `ValueError`, `TypeError`, or `AttributeError`.\n\n## Examples\n\nA class definition cannot combine `NamedTuple` with other base classes in multiple inheritance;\ndoing so raises a `TypeError` at runtime. The sole exception to this rule is `Generic[]`, which can\nbe used alongside `NamedTuple` in a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```\n\nFurther, `NamedTuple` field names cannot start with an underscore:\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     _bar: int\nValueError: Field names cannot start with an underscore: '_bar'\n```\n\nNor can they be keywords:\n\n```pycon\n>>> from collections import namedtuple\n>>> X = namedtuple(\"X\", [\"class\"])\nValueError: Type names and field names cannot be a keyword: 'class'\n```\n\nor invalid identifiers:\n\n```pycon\n>>> from collections import namedtuple\n>>> X = namedtuple(\"X\", [\"-\"])\nValueError: Type names and field names must be valid identifiers: '-\n```\n\nSimilar restrictions apply to the `typename` argument:\n\n```pycon\n>>> from typing import NamedTuple\n>>> X = NamedTuple(\"class\", [])\nValueError: Type names and field names cannot be a keyword: 'class'\n>>> X = NamedTuple(\"x-\", [])\nValueError: Type names and field names must be valid identifiers: 'x-'\n```\n\n`NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`, `_replace`,\netc.) that cannot be overwritten. Attempting to assign to these attributes without a type annotation\nwill raise an `AttributeError` at runtime.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     x: int\n...     _asdict = 42\nAttributeError: Cannot overwrite NamedTuple attribute _asdict\n```\n\nFinally, `NamedTuple` field annotations cannot use the `ClassVar` or `Final` type qualifiers. These\nqualifiers also cause a runtime error when annotations are evaluated eagerly:\n\n```pycon\n>>> from typing import ClassVar, NamedTuple\n>>> class Foo(NamedTuple):\n...     x: ClassVar[int]\nTypeError: typing.ClassVar[int] is not valid as type argument\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1076,7 +1076,7 @@
         },
         "invalid-newtype": {
           "title": "detects invalid NewType definitions",
-          "description": "## What it does\n\nChecks for the creation of invalid `NewType`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `NewType`.\n\n## Examples\n\n```python\nfrom typing import NewType\n\n\ndef get_name() -> str:\n    return \"name\"\n\n\nFoo = NewType(\"Foo\", int)  # okay\n# The first argument to `NewType` must be a string literal\nBar = NewType(get_name(), int)  # error\n# invalid base for `typing.NewType`\nBaz = NewType(\"Baz\", int | str)  # error\n```",
+          "description": "## What it does\n\nChecks for the creation of invalid `NewType`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `NewType`.\n\n## Examples\n\n```python\nfrom typing import NewType\n\nFoo = NewType(\"Foo\", int)  # okay\n# The first argument to `NewType` must be a string\nBar = NewType(42, int)  # error\n# invalid base for `typing.NewType`\nBaz = NewType(\"Baz\", int | str)  # error\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1156,7 +1156,7 @@
         },
         "invalid-type-alias-type": {
           "title": "detects invalid TypeAliasType definitions",
-          "description": "## What it does\n\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAliasType, TypeVar\n\n\ndef get_name() -> str:\n    return \"NewAlias\"\n\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\n# TypeAliasType name must be a string literal\nNewAlias = TypeAliasType(get_name(), int)  # error\n\nT = TypeVar(\"T\")\nGenericAlias = TypeAliasType(\"GenericAlias\", list[T], type_params=(T,))  # okay\n# TypeAliasType type parameters must be type variables\nInvalidAlias = TypeAliasType(\"InvalidAlias\", list[T], type_params=(list[T],))  # error\n```",
+          "description": "## What it does\n\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAliasType, TypeVar\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\n# TypeAliasType name must be a string\nNewAlias = TypeAliasType(42, int)  # error\n\nT = TypeVar(\"T\")\nGenericAlias = TypeAliasType(\"GenericAlias\", list[T], type_params=(T,))  # okay\n# TypeAliasType type parameters must be type variables\nInvalidAlias = TypeAliasType(\"InvalidAlias\", list[T], type_params=(list[T],))  # error\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1314,9 +1314,9 @@
             }
           ]
         },
-        "mismatched-sentinel-name": {
-          "title": "detects sentinel definitions whose declared name does not match the assigned variable",
-          "description": "## What it does\n\nChecks for `builtins.sentinel` and `typing_extensions.Sentinel` definitions whose name argument does\nnot match the variable they are assigned to. In class scope, the name can be unqualified or include\nthe full enclosing class path.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a sentinel's runtime representation confusing.\n\n## Default level\n\nThis rule is disabled by default because sentinel names are not required to match their assigned\nvariables, and sometimes the preferred `__repr__` for a sentinel may include non-identifier\ncharacters.\n\nEnable this rule to enforce consistent sentinel naming.\n\nThis rule is similar to `mismatched-type-name`, but is a distinct rule because the default severity\ndiffers.\n\n## Examples\n\n```python\nfrom typing_extensions import Sentinel\n\nMISSING = Sentinel(\"OTHER\")  # error: [mismatched-sentinel-name]\n```\n\nUse a matching name instead:\n\n```python\nfrom typing_extensions import Sentinel\n\nMISSING = Sentinel(\"MISSING\")\n\n\nclass Container:\n    UNSET = Sentinel(\"Container.UNSET\")\n```",
+        "mismatched-enum-name": {
+          "title": "detects mismatched names in enum classes",
+          "description": "## What it does\n\nChecks whether the class name passed to a functional enum constructor, such as `Enum`, `IntEnum`, or\n`Flag`, differs from the assigned variable's name.\n\nThis rule is only applied if ty infers a string literal type for the class name argument.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make an enum's runtime representation confusing.\n\n## Default level\n\nThis rule is disabled by default because enum names are not required to match their assigned\nvariables, and sometimes the preferred `__repr__` for an enum may include non-identifier characters.\n\nEnable this rule to enforce consistent enum naming.\n\n## Examples\n\n```python\nfrom enum import Enum\n\n# error: [mismatched-enum-name] \"Expected \"Color\", got \"Colour\"\"\nColor = Enum(\"Colour\", \"RED BLUE\")\n```\n\n## Rule history\n\n- v0.0.108: Split out from `mismatched-type-name`.",
           "default": "ignore",
           "oneOf": [
             {
@@ -1324,9 +1324,79 @@
             }
           ]
         },
-        "mismatched-type-name": {
-          "title": "detects functional typing definitions whose declared name does not match the assigned variable",
-          "description": "## What it does\n\nChecks for functional typing definitions whose declared name does not match the variable they are\nassigned to.\n\n## Why is this bad?\n\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`, `TypedDict`, and `TypeAliasType`\nall take a name argument that is normally expected to match the assigned variable. A mismatch is\nusually a typo and makes later diagnostics harder to understand.\n\n`mismatched-sentinel-name` is a similar but distinct rule, disabled by default.\n\n## Default level\n\nThis rule is a warning by default because ty can usually recover and continue understanding the\nresulting type.\n\n## Examples\n\n```python\nfrom typing import NewType, ParamSpec, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nP = ParamSpec(\"Q\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
+        "mismatched-namedtuple-name": {
+          "title": "detects mismatched names in named tuples",
+          "description": "## What it does\n\nChecks whether the `typename` passed to `typing.NamedTuple` or `collections.namedtuple` differs from\nthe assigned variable's name.\n\nThis rule is only applied if ty infers a string literal type for the `typename` argument.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a namedtuple's runtime representation confusing.\n\n## Default level\n\nThis rule is disabled by default because namedtuple names are not required to match their assigned\nvariables.\n\nEnable this rule to enforce consistent namedtuple naming.\n\n## Examples\n\n```python\nfrom collections import namedtuple\nfrom typing import NamedTuple\n\n# error: [mismatched-namedtuple-name] \"Expected \"Point\", got \"Vector\"\"\nPoint = NamedTuple(\"Vector\", [(\"x\", int)])\n# error: [mismatched-namedtuple-name] \"Expected \"Pair\", got \"Coordinates\"\"\nPair = namedtuple(\"Coordinates\", \"x y\")\n```\n\n## See also\n\n`invalid-named-tuple` is emitted on namedtuples that will actually lead to exceptions being raised\nat runtime, due to a `typename` that is either an invalid identifier or a keyword.\n\n## Rule history\n\n- v0.0.108: Split out from `mismatched-type-name`.",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "mismatched-newtype-name": {
+          "title": "detects mismatched names in `NewType` definitions",
+          "description": "## What it does\n\nChecks whether the name passed to `NewType` differs from the assigned variable, or if ty cannot\ndetermine the value of a string passed to the `name` argument.\n\n## Why is this bad?\n\nThe name argument sets the newtype's `__name__`. A typo can make the type appear under an unexpected\nname in diagnostics.\n\n## Examples\n\n```python\nfrom typing import NewType\n\n# error: \"Expected \"UserId\", got \"Id\"\"\nUserId = NewType(\"Id\", int)\n\n\ndef f(x: str):\n    # error: \"Cannot verify that a value of type `str` matches \"Id\"\"\n    Id = NewType(x, int)\n```\n\n## Rule history\n\n- v0.0.108: Split out from `mismatched-type-name`.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "mismatched-paramspec-name": {
+          "title": "detects mismatched names in `ParamSpec` definitions",
+          "description": "## What it does\n\nChecks whether the name passed to `ParamSpec` differs from the assigned variable, or if ty cannot\ndetermine the value of a string passed to the `name` argument.\n\n## Why is this bad?\n\nThe name argument identifies the parameter specification in a callable's signature. A mismatch can\nmake it harder to connect that signature to the definition.\n\n## Examples\n\n```python\nfrom typing import ParamSpec\n\n# error: \"Expected \"P\", got \"Q\"\"\nP = ParamSpec(\"Q\")\n\n\ndef f(x: str):\n    # error: \"Cannot verify that a value of type `str` matches \"Q\"\"\n    Q = ParamSpec(x)\n```\n\n## Rule history\n\n- v0.0.108: Split out from `mismatched-type-name`.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "mismatched-sentinel-name": {
+          "title": "detects sentinel definitions whose declared name does not match the assigned variable",
+          "description": "## What it does\n\nChecks for `builtins.sentinel` and `typing_extensions.Sentinel` definitions whose name argument does\nnot match the variable they are assigned to. In class scope, the name can be unqualified or include\nthe full enclosing class path.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a sentinel's runtime representation confusing.\n\n## Default level\n\nThis rule is disabled by default because sentinel names are not required to match their assigned\nvariables, and sometimes the preferred `__repr__` for a sentinel may include non-identifier\ncharacters.\n\nEnable this rule to enforce consistent sentinel naming.\n\n## Examples\n\n```python\nfrom typing_extensions import Sentinel\n\nMISSING = Sentinel(\"OTHER\")  # error: [mismatched-sentinel-name]\n```\n\nUse a matching name instead:\n\n```python\nfrom typing_extensions import Sentinel\n\nMISSING = Sentinel(\"MISSING\")\n\n\nclass Container:\n    UNSET = Sentinel(\"Container.UNSET\")\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "mismatched-type-alias-name": {
+          "title": "detects mismatched names in `TypeAliasType` definitions",
+          "description": "## What it does\n\nChecks whether the name passed to `TypeAliasType` differs from the assigned variable, or if ty\ncannot determine the value of a string passed to the `name` argument.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a type alias's runtime representation confusing.\n\n## Examples\n\n```python\nfrom typing_extensions import TypeAliasType\n\n# error: \"Expected \"UserId\", got \"Id\"\"\nUserId = TypeAliasType(\"Id\", int)\n\n\ndef f(x: str):\n    # error: \"Cannot verify that a value of type `str` matches \"Id\"\"\n    Id = TypeAliasType(x, int)\n```\n\n## Rule history\n\n- v0.0.108: Split out from `mismatched-type-name`.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "mismatched-typeddict-name": {
+          "title": "detects mismatched names in typed dictionaries",
+          "description": "## What it does\n\nChecks whether the name passed to the functional form of `TypedDict` differs from the assigned\nvariable, or if ty cannot determine the value of a string passed to the `typename` argument.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a `TypedDict`'s runtime representation confusing.\n\n## Examples\n\n```python\nfrom typing import TypedDict\n\n# error: \"Expected \"Movie\", got \"Film\"\"\nMovie = TypedDict(\"Film\", {\"title\": str})\n\n\ndef f(x: str):\n    # error: \"Cannot verify that a value of type `str` matches \"Film\"\"\n    Film = TypedDict(x, {\"title\": str})\n```\n\n## Rule history\n\n- v0.0.108: Split out from `mismatched-type-name`.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "mismatched-typevar-name": {
+          "title": "detects mismatched names in `TypeVar` definitions",
+          "description": "## What it does\n\nChecks whether the name passed to `TypeVar` differs from the assigned variable, or if ty cannot\ndetermine the value of a string passed to the `name` argument.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a `TypeVar`'s runtime representation confusing.\n\n## Examples\n\n```python\nfrom typing import TypeVar\n\n# error: \"Expected \"T\", got \"U\"\"\nT = TypeVar(\"U\")\n\n\ndef f(x: str):\n    # error: \"Cannot verify that a value of type `str` matches \"U\"\"\n    U = TypeVar(x)\n```\n\n## Rule history\n\n- v0.0.108: Split out from `mismatched-type-name`.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "mismatched-typevartuple-name": {
+          "title": "detects mismatched names in `TypeVarTuple` definitions",
+          "description": "## What it does\n\nChecks whether the name passed to `TypeVarTuple` differs from the assigned variable, or if ty cannot\ndetermine the value of a string passed to the `name` argument.\n\n## Why is this bad?\n\nA mismatched name can be a typo and can make a `TypeVarTuple`'s runtime representation confusing.\n\n## Examples\n\n```python\nfrom typing_extensions import TypeVarTuple\n\n# error: \"Expected \"Ts\", got \"Us\"\"\nTs = TypeVarTuple(\"Us\")\n\n\ndef f(x: str):\n    # error: \"Cannot verify that a value of type `str` matches \"Us\"\"\n    Us = TypeVarTuple(x)\n```\n\n## Rule history\n\n- v0.0.108: Split out from `mismatched-type-name`.",
           "default": "warn",
           "oneOf": [
             {

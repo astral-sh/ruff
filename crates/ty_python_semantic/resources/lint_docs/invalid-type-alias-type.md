@@ -16,14 +16,9 @@ python-version = "3.12"
 ```python
 from typing import TypeAliasType, TypeVar
 
-
-def get_name() -> str:
-    return "NewAlias"
-
-
 IntOrStr = TypeAliasType("IntOrStr", int | str)  # okay
-# TypeAliasType name must be a string literal
-NewAlias = TypeAliasType(get_name(), int)  # error
+# TypeAliasType name must be a string
+NewAlias = TypeAliasType(42, int)  # error
 
 T = TypeVar("T")
 GenericAlias = TypeAliasType("GenericAlias", list[T], type_params=(T,))  # okay

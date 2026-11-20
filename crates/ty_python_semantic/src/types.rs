@@ -416,6 +416,34 @@ fn definition_expression_type<'db>(
     definition_expression_type_in_scope(db, definition, expression, scope)
 }
 
+/// Find a factory's `name` argument. If it is supplied twice, use the positional
+/// argument for error recovery.
+fn factory_name_argument(arguments: &ast::Arguments) -> Option<&ast::Expr> {
+    arguments
+        .find_positional(0)
+        .or_else(|| arguments.find_keyword("name").map(|keyword| &keyword.value))
+}
+
+/// Infer the literal name argument in a `TypeAliasType`, `TypeVar`, `ParamSpec`, or
+/// `TypeVarTuple` assignment. These factories use `name` for the keyword argument.
+///
+/// Inferring the argument can re-enter the object's `__name__` lookup. Start cycle recovery
+/// with no literal so the lookup can use `str`.
+#[salsa::tracked(
+    cycle_initial=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn factory_name_literal<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<StringLiteralType<'db>> {
+    let assignment = definition.kind(db).as_unannotated_assignment()?;
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let call = assignment.value(&module).as_call_expr()?;
+    let name_arg = factory_name_argument(&call.arguments)?;
+    definition_expression_type(db, definition, name_arg).resolve_string_literal(db)
+}
+
 /// Infer a definition's expression using an explicitly supplied evaluation scope.
 ///
 /// [`definition_expression_type`] can look up the scope of a string literal used as an annotation,
@@ -3317,6 +3345,11 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) => literal.as_string(),
             _ => None,
         }
+    }
+
+    /// Return the string literal after resolving outermost type aliases.
+    fn resolve_string_literal(self, db: &'db dyn Db) -> Option<StringLiteralType<'db>> {
+        self.resolve_type_alias(db).as_string_literal()
     }
 
     fn is_int_literal(&self) -> bool {

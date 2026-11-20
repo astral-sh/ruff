@@ -13,8 +13,9 @@ use crate::{
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
-            INVALID_ARGUMENT_TYPE, INVALID_BASE, MISSING_ARGUMENT, PARAMETER_ALREADY_ASSIGNED,
-            TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_mismatched_type_name,
+            INVALID_ARGUMENT_TYPE, INVALID_BASE, MISMATCHED_ENUM_NAME, MISSING_ARGUMENT,
+            PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+            report_mismatched_type_name,
         },
         infer::TypeInferenceBuilder,
         infer::builder::dynamic_class::report_mro_error_kind,
@@ -361,15 +362,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name_arg = name_arg?;
         let env = self.program_environment();
 
-        let Some(names_arg) = names_arg else {
-            for arg in args {
-                self.infer_expression(arg, TypeContext::default());
-            }
-            for kw in keywords {
-                self.infer_expression(&kw.value, TypeContext::default());
-            }
+        for arg in args {
+            self.infer_expression(arg, TypeContext::default());
+        }
+        for kw in keywords {
+            self.infer_expression(&kw.value, TypeContext::default());
+        }
 
-            self.infer_enum_name_argument(name_arg, base_class);
+        let name_type = self.expression_type(name_arg);
+        let name = self.infer_enum_name_argument(name_arg, name_type, base_class);
+
+        let Some(names_arg) = names_arg else {
             if let Some(keyword) = start_kw {
                 self.infer_enum_start_argument(&keyword.value);
             }
@@ -387,13 +390,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             return Some(base_class.to_instance(db, env));
         };
-
-        for arg in args {
-            self.infer_expression(arg, TypeContext::default());
-        }
-        for kw in keywords {
-            self.infer_expression(&kw.value, TypeContext::default());
-        }
 
         let start = start_kw.map_or(EnumStart::Literal(1), |kw| {
             self.infer_enum_start_argument(&kw.value)
@@ -417,24 +413,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        let name_ty = self.expression_type(name_arg);
-        let name = name_ty
-            .as_string_literal()
-            .map(|name_literal| name_literal.value(db));
-
-        if (name.is_some()
-            || name_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env)))
+        if let Some(actual_name) = name
             && let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
-            && Some(assigned_name.as_str()) != name
+            && assigned_name.as_str() != actual_name
         {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_ENUM_NAME,
                 name_arg,
-                base_class.name(self.program_environment().python_version(db)),
+                base_class.name(env.python_version(db)),
                 &assigned_name,
-                name,
-                name_ty,
+                Some(actual_name),
+                name_type,
             );
         }
 
@@ -448,7 +439,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Non-literal names use the ordinary `type[EnumSubclass]` overload result
         // instead of synthesizing a `DynamicEnumLiteral`.
-        let Some(name) = self.infer_enum_name_argument(name_arg, base_class) else {
+        let Some(name) = name else {
             return SubclassOfType::try_from_type(db, env, base_class.to_class_literal(db, env));
         };
 
@@ -468,14 +459,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     fn infer_enum_name_argument(
-        &mut self,
+        &self,
         name_arg: &ast::Expr,
+        name_type: Type<'db>,
         base_class: KnownClass,
     ) -> Option<&'db str> {
         let db = self.db();
-        let name_type = self.expression_type(name_arg);
 
-        let Some(name_literal) = name_type.as_string_literal() else {
+        let Some(name_literal) = name_type.resolve_string_literal(db) else {
             let env = self.program_environment();
             if !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)

@@ -9,8 +9,8 @@ use crate::TypeQualifiers;
 use crate::types::call::CallError;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
-    UNKNOWN_ARGUMENT, report_mismatched_type_name,
+    INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISMATCHED_TYPEDDICT_NAME, MISSING_ARGUMENT,
+    TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_mismatched_type_name,
 };
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
@@ -266,11 +266,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let name = name_type
-            .as_string_literal()
+            .resolve_string_literal(db)
             .map(|literal| literal.value(db));
 
-        if name.is_none()
-            && !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        let valid_name_type = name.is_some()
+            || name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env));
+
+        if !valid_name_type
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -280,12 +282,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Expected `str`, found `{}`",
                 name_type.display(db, env)
             ));
-        } else if let Some(definition) = definition
+        }
+
+        if valid_name_type
+            && let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
             && Some(assigned_name.as_str()) != name
         {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_TYPEDDICT_NAME,
                 name_arg,
                 "TypedDict",
                 &assigned_name,

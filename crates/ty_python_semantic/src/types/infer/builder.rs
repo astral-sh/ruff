@@ -73,10 +73,11 @@ use crate::types::diagnostic::{
     INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
     INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-    MISMATCHED_SENTINEL_NAME, MISSING_ATTRIBUTE, MISSING_UNION_ATTRIBUTE, NOT_CALLABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind,
-    autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
+    MISMATCHED_NEWTYPE_NAME, MISMATCHED_SENTINEL_NAME, MISMATCHED_TYPE_ALIAS_NAME,
+    MISSING_ATTRIBUTE, MISSING_UNION_ATTRIBUTE, NOT_CALLABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
+    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
+    hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
@@ -3815,6 +3816,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
+        let env = self.program_environment();
         let arguments = &call_expr.arguments;
 
         if !arguments.keywords.is_empty() {
@@ -3846,13 +3848,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
 
-        let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let name = name_param_ty
+            .resolve_string_literal(db)
+            .map(|name| name.value(db));
+
+        if name.is_none()
+            && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        {
             return error(
                 &self.context,
-                "The first argument to `NewType` must be a string literal",
+                "The first argument to `NewType` must be a string",
                 call_expr,
             );
-        };
+        }
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -3865,13 +3873,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        if name != target_name {
+        if name != Some(target_name.as_str()) {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_NEWTYPE_NAME,
                 &arguments.args[0],
                 "NewType",
                 target_name,
-                Some(name),
+                name,
                 name_param_ty,
             );
         }
@@ -3880,7 +3889,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::NewType(NewType::new(
-            db, name, definition, None,
+            db,
+            name.unwrap_or(target_name.as_str()),
+            definition,
+            None,
         )))
     }
 
@@ -4232,6 +4244,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
+        let env = self.program_environment();
         let arguments = &call_expr.arguments;
 
         if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
@@ -4263,13 +4276,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let name_param_ty = self.infer_expression(name_arg, TypeContext::default());
 
-        let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let name = name_param_ty
+            .resolve_string_literal(db)
+            .map(|name| name.value(db));
+
+        if name.is_none()
+            && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        {
             return error(
                 &self.context,
-                "The `name` argument to `TypeAliasType` must be a string literal",
+                "The `name` argument to `TypeAliasType` must be a string",
                 name_arg,
             );
-        };
+        }
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -4282,13 +4301,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        if name != target_name {
+        if name != Some(target_name.as_str()) {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_TYPE_ALIAS_NAME,
                 name_arg,
                 "TypeAliasType",
                 target_name,
-                Some(name),
+                name,
                 name_param_ty,
             );
         }
@@ -4299,7 +4319,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::KnownInstance(KnownInstanceType::TypeAliasType(
             TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
                 db,
-                name,
+                name.unwrap_or(target_name.as_str()),
                 definition,
                 typing_module,
                 None,

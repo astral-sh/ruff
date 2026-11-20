@@ -2815,7 +2815,8 @@ reveal_type(enum_members(Color))
 
 ### Name mismatch diagnostics
 
-The name passed to `Enum` must match the variable it is assigned to:
+When enabled, `mismatched-enum-name` checks whether a class name with a string literal type matches
+the assigned variable:
 
 ```py
 from enum import Enum
@@ -2829,32 +2830,53 @@ GoodMatch2 = Enum(name, "A B")  # also fine
 If there is a mismatch, we emit the following diagnostic:
 
 ```py
-# snapshot: mismatched-type-name
+# snapshot: mismatched-enum-name
 Mismatch = Enum("WrongName", "A B")
 ```
 
 ```snapshot
-warning[mismatched-type-name]: The name passed to `Enum` must match the variable it is assigned to
+info[mismatched-enum-name]: The name passed to `Enum` must match the variable it is assigned to
  --> src/mdtest_snippet.py:8:17
   |
 8 | Mismatch = Enum("WrongName", "A B")
   |                 ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
 ```
 
-If the name is not a string literal, we also emit a diagnostic:
+A name passed through a variable is still checked if its inferred type is a string literal:
 
 ```py
-def f(name: str) -> None:
-    # snapshot: mismatched-type-name
-    DynamicMismatch = Enum(name, "A B")
+# error: [mismatched-enum-name]
+Other = Enum(name, "A B")
 ```
 
-```snapshot
-warning[mismatched-type-name]: The name passed to `Enum` must match the variable it is assigned to
-  --> src/mdtest_snippet.py:11:28
-   |
-11 |     DynamicMismatch = Enum(name, "A B")
-   |                            ^^^^ Expected "DynamicMismatch", got variable of type `str`
+### Names specified by type aliases
+
+When the name argument's type resolves to a single string literal, ty uses that literal as the enum
+class's name and checks it against the assigned variable. The rule is meant to spot simple, obvious
+typos. It allows names of type `str` so callers can still construct enums dynamically when that's
+desirable. If the name argument has a union of string literals as its type, the caller is likely
+doing the same thing, so these cases also do not trigger the rule:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing import Literal
+
+type PaletteName = Literal["Palette"]
+type ColorNames = Literal["Palette", "Swatch"]
+
+def fixed_name(name: PaletteName) -> None:
+    # error: [mismatched-enum-name] "Expected "Color", got "Palette""
+    Color = Enum(name, "RED BLUE")
+    reveal_type(Color.RED)  # revealed: Literal[Palette.RED]
+
+def choose_name(name: Literal["Palette", "Swatch"], aliased_name: ColorNames) -> None:
+    Color = Enum(name, "RED BLUE")  # ok
+    Color = Enum(aliased_name, "RED BLUE")  # ok
 ```
 
 ### List/tuple of tuples
@@ -3119,14 +3141,14 @@ Enum("Color", bad_kwarg=True)
 
 ### Non-literal name
 
-Non-literal names should still be recognized as creating an enum class.
+ty skips the name comparison when the class name has type `str`. It still infers the result as an
+enum class and checks the types of the other arguments.
 
 ```py
 from enum import Enum
 
 def make_enum(name: str) -> type[Enum]:
-    # error: [mismatched-type-name]
-    result = Enum(name.title(), "RED BLUE", module=__name__)
+    result = Enum(name.title(), "RED BLUE", module=__name__)  # ok
     reveal_type(result)  # revealed: type[Enum]
     return result
 

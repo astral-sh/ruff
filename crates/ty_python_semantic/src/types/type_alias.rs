@@ -11,6 +11,7 @@ use crate::{
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
+        factory_name_argument,
         generics::{
             AliasPolicy, ApplySpecialization, Specialization, bind_typevar,
             walk_specialization_types,
@@ -311,9 +312,12 @@ impl<'db> PEP695TypeAliasType<'db> {
 /// Find the `name` and `value` arguments to `TypeAliasType`. If either is supplied
 /// twice, use the positional argument for error recovery.
 pub(super) fn type_alias_arguments(arguments: &ast::Arguments) -> Option<(&ast::Expr, &ast::Expr)> {
-    let keyword = |name| arguments.find_keyword(name).map(|keyword| &keyword.value);
-    let name = arguments.args.first().or_else(|| keyword("name"))?;
-    let value = arguments.args.get(1).or_else(|| keyword("value"))?;
+    let name = factory_name_argument(arguments)?;
+    let value = arguments.args.get(1).or_else(|| {
+        arguments
+            .find_keyword("value")
+            .map(|keyword| &keyword.value)
+    })?;
     Some((name, value))
 }
 
