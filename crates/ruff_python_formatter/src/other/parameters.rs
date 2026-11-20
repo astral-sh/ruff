@@ -1,7 +1,7 @@
 use std::assert_matches;
 
 use ruff_formatter::{FormatRuleWithOptions, format_args, write};
-use ruff_python_ast::{AnyNodeRef, ParameterItem, ParameterRole, Parameters};
+use ruff_python_ast::{ParameterItem, ParameterRole, Parameters, SyntaxNode};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -38,7 +38,7 @@ pub struct FormatParameters {
     parentheses: ParametersParentheses,
 }
 
-impl FormatRuleWithOptions<Parameters, PyFormatContext<'_>> for FormatParameters {
+impl FormatRuleWithOptions<Parameters<'_>, PyFormatContext<'_>> for FormatParameters {
     type Options = ParametersParentheses;
 
     fn with_options(mut self, options: Self::Options) -> Self {
@@ -47,8 +47,8 @@ impl FormatRuleWithOptions<Parameters, PyFormatContext<'_>> for FormatParameters
     }
 }
 
-impl FormatNodeRule<Parameters> for FormatParameters {
-    fn fmt_fields(&self, item: &Parameters, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<ruff_python_ast::kind::Parameters> for FormatParameters {
+    fn fmt_fields(&self, item: Parameters<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
@@ -101,7 +101,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             });
             let source = f.context().source();
             let mut joiner = f.join_with(separator);
-            let mut last_node: Option<AnyNodeRef> = None;
+            let mut last_node: Option<SyntaxNode> = None;
 
             let mut items = item.items_in_binding_order().peekable();
             let mut need_star = true;
@@ -116,8 +116,9 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                         if !matches!(items.peek(), Some(ParameterItem::PositionalOnly(_))) {
                             ends_with_slash = true;
                             if !parameters_dangling.is_empty() {
-                                let following_start =
-                                    items.peek().map_or(item.end(), |p| p.as_ref().start());
+                                let following_start = items
+                                    .peek()
+                                    .map_or(item.end(), |p| p.into_parameter().start());
                                 // A bare star can share this gap, as in `def f(a, /, *, b)`.
                                 let (slash, _) = find_parameter_separators(
                                     source,
@@ -558,7 +559,11 @@ pub(crate) enum ArgumentSeparatorCommentLocation {
     StarTrailing,
 }
 
-fn has_trailing_comma(last_node: Option<AnyNodeRef>, ends_with_slash: bool, source: &str) -> bool {
+fn has_trailing_comma(
+    last_node: Option<SyntaxNode<'_>>,
+    ends_with_slash: bool,
+    source: &str,
+) -> bool {
     let Some(last_node) = last_node else {
         return false;
     };

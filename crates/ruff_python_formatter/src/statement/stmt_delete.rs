@@ -11,18 +11,14 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatStmtDelete;
 
-impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
-    fn fmt_fields(&self, item: &StmtDelete, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtDelete {
-            range: _,
-            node_index: _,
-            targets,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::StmtDelete> for FormatStmtDelete {
+    fn fmt_fields(&self, item: StmtDelete<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let targets = item.targets();
 
         write!(f, [token("del"), space()])?;
 
-        match targets.as_slice() {
-            [] => {
+        match targets {
+            args if args.is_empty() => {
                 write!(
                     f,
                     [
@@ -37,7 +33,7 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
                     ]
                 )
             }
-            [single] => {
+            args if let Some([single]) = args.as_array() => {
                 write!(
                     f,
                     [maybe_parenthesize_expression(

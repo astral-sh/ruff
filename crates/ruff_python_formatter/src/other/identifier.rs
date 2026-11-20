@@ -1,4 +1,4 @@
-use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
+use ruff_formatter::FormatOwnedWithRule;
 use ruff_python_ast::Identifier;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::Ranged;
@@ -7,22 +7,15 @@ use crate::prelude::*;
 
 pub struct FormatIdentifier;
 
-impl FormatRule<Identifier, PyFormatContext<'_>> for FormatIdentifier {
-    fn fmt(&self, item: &Identifier, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatRule<Identifier<'_>, PyFormatContext<'_>> for FormatIdentifier {
+    fn fmt(&self, item: &Identifier<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let item = *item;
         source_text_slice(item.range()).fmt(f)
     }
 }
 
-impl<'ast> AsFormat<PyFormatContext<'ast>> for Identifier {
-    type Format<'a> = FormatRefWithRule<'a, Identifier, FormatIdentifier, PyFormatContext<'ast>>;
-
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(self, FormatIdentifier)
-    }
-}
-
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for Identifier {
-    type Format = FormatOwnedWithRule<Identifier, FormatIdentifier, PyFormatContext<'ast>>;
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for Identifier<'_> {
+    type Format = FormatOwnedWithRule<Self, FormatIdentifier, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatIdentifier)
@@ -46,10 +39,10 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Identifier {
 /// identifiers with newlines must be formatted via `text`. This struct implements both the fast
 /// and slow paths for such identifiers.
 #[derive(Debug)]
-pub(crate) struct DotDelimitedIdentifier<'a>(&'a Identifier);
+pub(crate) struct DotDelimitedIdentifier<'a>(Identifier<'a>);
 
 impl<'a> DotDelimitedIdentifier<'a> {
-    pub(crate) fn new(identifier: &'a Identifier) -> Self {
+    pub(crate) fn new(identifier: Identifier<'a>) -> Self {
         Self(identifier)
     }
 }

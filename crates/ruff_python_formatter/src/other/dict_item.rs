@@ -7,11 +7,11 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatDictItem;
 
-impl FormatNodeRule<DictItem> for FormatDictItem {
-    fn fmt_fields(&self, item: &DictItem, f: &mut PyFormatter) -> FormatResult<()> {
-        let value = &item.value;
+impl FormatNodeRule<ruff_python_ast::kind::DictItem> for FormatDictItem {
+    fn fmt_fields(&self, item: DictItem<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let value = item.value();
         let comments = f.context().comments().clone();
-        if let Some(key) = &item.key {
+        if let Some(key) = item.key() {
             let dangling = comments.dangling(item);
             group(&format_with(|f| {
                 key.format().fmt(f)?;

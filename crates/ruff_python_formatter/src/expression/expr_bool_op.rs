@@ -1,6 +1,5 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{BoolOp, ExprBoolOp};
+use ruff_python_ast::{BoolOp, ExprBoolOp, SyntaxNode};
 
 use crate::expression::binary_like::BinaryLike;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
@@ -9,17 +8,17 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprBoolOp;
 
-impl FormatNodeRule<ExprBoolOp> for FormatExprBoolOp {
+impl FormatNodeRule<ruff_python_ast::kind::ExprBoolOp> for FormatExprBoolOp {
     #[inline]
-    fn fmt_fields(&self, item: &ExprBoolOp, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, item: ExprBoolOp<'_>, f: &mut PyFormatter) -> FormatResult<()> {
         BinaryLike::Bool(item).fmt(f)
     }
 }
 
-impl NeedsParentheses for ExprBoolOp {
+impl NeedsParentheses for ExprBoolOp<'_> {
     fn needs_parentheses(
         &self,
-        parent: AnyNodeRef,
+        parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
