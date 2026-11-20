@@ -538,6 +538,9 @@ impl RowKeys {
 /// Variable-length fields and fields that do not fit inline refer to the extra-data arena.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+// Resolving a child ID loads the row pointer from `nodes`. Keep `nodes` first
+// so x86-64 can encode that load with a short displacement from the AST pointer.
+#[repr(C)]
 pub struct Ast {
     nodes: NodeStorage,
     extra: Vec<u32>,
