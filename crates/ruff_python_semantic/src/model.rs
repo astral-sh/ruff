@@ -224,7 +224,7 @@ impl<'a> SemanticModel<'a> {
             target_version,
             source_type,
             module,
-            nodes: Nodes::default(),
+            nodes: Nodes::for_ast(parsed.ast()),
             node_id: None,
             branches: Branches::default(),
             branch_id: None,
