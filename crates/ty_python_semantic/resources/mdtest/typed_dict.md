@@ -1185,6 +1185,33 @@ x1: IntCallback | StrCallback = {"f": lambda value: reveal_type(value)}
 reveal_type(x1)  # revealed: IntCallback | StrCallback
 ```
 
+## Matching the final value of a tag
+
+When a literal assigns the same key twice, its last value determines which `TypedDict` matches.
+
+```py
+from typing import Literal, TypedDict
+
+class Start(TypedDict):
+    event: Literal["start"]
+
+class Stop(TypedDict):
+    event: Literal["stop"]
+
+event: Start | Stop = {"event": "start", "event": "stop"}
+reveal_type(event)  # revealed: Stop
+```
+
+An unpack or computed key can also replace an earlier tag.
+
+```py
+def _(stop: Stop, key: Literal["event"]):
+    unpacked: Start | Stop = {"event": "start", **stop}
+    reveal_type(unpacked)  # revealed: Stop
+    computed: Start | Stop = {"event": "start", key: "stop"}
+    reveal_type(computed)  # revealed: Stop
+```
+
 ## Union of `TypedDict` behind a type alias
 
 ```toml
