@@ -10062,9 +10062,7 @@ pub struct PatternMatchSequence {
 pub struct PatternMatchMapping {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub keys: thin_vec::ThinVec<Expr>,
-    pub patterns: thin_vec::ThinVec<Pattern>,
-    pub rest: Option<crate::Identifier>,
+    pub items: crate::MappingPatternItems,
 }
 
 /// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
