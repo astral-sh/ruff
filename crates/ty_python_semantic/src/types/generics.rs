@@ -2939,8 +2939,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> TypeVarInference<'db> {
         let db = self.db;
         for (formal, actual) in argument_relations {
-            let when =
-                actual.when_constraint_set_assignable_to(db, self.env, formal, self.constraints);
+            let when = self.constraint_for_relation(formal, actual, TypeVarVariance::Covariant);
             let analysis = self.analyze_constraint_set(when);
             if matches!(&analysis, ConstraintSetAnalysis::Unsatisfiable(failures) if failures.is_empty())
                 && let Type::Union(actual_union) = actual.resolve_type_alias(db)
@@ -4471,14 +4470,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .iter()
                     .map(|formal_element| {
                         let matches = !actual
-                            .when_assignable_to(
-                                db,
-                                self.env,
-                                *formal_element,
-                                self.constraints,
-                                self.inferable,
-                            )
-                            .is_never_satisfied(db, self.env, self.inferable);
+                            .when_assignable_to_owned(db, self.env, *formal_element, self.inferable)
+                            .query(|_, when| when.is_never_satisfied(db, self.env, self.inferable));
 
                         (formal_element, matches)
                     })
