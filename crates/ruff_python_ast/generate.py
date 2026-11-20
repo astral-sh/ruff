@@ -208,6 +208,9 @@ class WireField:
     build_type: str
     encode: str
     read: str
+    # A check emitted before writing the field. Its getter can then use the
+    # validated slot or interval for as long as the parent row exists.
+    validate: str | None
 
 
 def field_codec(field: Field, nodes: set[str]) -> WireField:
@@ -222,27 +225,38 @@ def field_codec(field: Field, nodes: set[str]) -> WireField:
         read: str,
         *,
         build_type: str | None = None,
+        validate: str | None = None,
     ) -> WireField:
-        return WireField(name, width, result, build_type or result, encode, read)
+        return WireField(
+            name, width, result, build_type or result, encode, read, validate
+        )
 
     if inner in {"MappingPatternItems", "ParameterItems"}:
         return codec(
             8,
             f"crate::flat::{inner}<'a>",
             f"{value}.word()",
-            f"super::{inner}(List::new(self.syntax_node().ast, word))",
+            f"super::{inner}(List::from_validated(self.syntax_node().ast, word))",
             build_type=f"super::super::{inner}Id",
+            validate=f"self.ast.validate_list({name});",
         )
     if field.is_list or inner in PARTS:
         item = PARTS.get(inner, inner)
         element = (
             f"AstNodeId<crate::kind::{item}>" if item in nodes else f"crate::{item}"
         )
-        read = "List::new(self.syntax_node().ast, word)"
+        validate = None if item == "CmpOp" else f"self.ast.validate_list({name});"
+        read = (
+            "List::from_validated(self.syntax_node().ast, word)"
+            if validate is not None
+            else "List::new(self.syntax_node().ast, word)"
+        )
         if inner == "StringValue":
+            # Resolving the decoded text validates the entire parts list.
+            validate = f"let (start, len) = self.string_literal_text({name});"
             result = "crate::flat::StringValue<'a>"
             read = (
-                "crate::flat::StringValue::new(List::new(self.syntax_node().ast, word), "
+                f"crate::flat::StringValue::new({read}, "
                 "u64::from(self.syntax_node().row.expr_string_literal_text_offset()) | "
                 "(u64::from(self.syntax_node().row.expr_string_literal_text_len()) << 32))"
             )
@@ -266,32 +280,38 @@ def field_codec(field: Field, nodes: set[str]) -> WireField:
             f"{value}.word()",
             read,
             build_type=f"super::super::ListId<{element}>",
+            validate=validate,
         )
     if inner in nodes:
         view = f"crate::{inner}<'a>"
         handle = f"BuildId<crate::kind::{inner}>"
+        optional = str(field.optional).lower()
+        validate = f"self.validate_child::<crate::kind::{inner}, {optional}>(split_words({name})[0]);"
         if field.optional:
             return codec(
                 4,
                 f"Option<{view}>",
                 f"{value}.map_or(0, |id| u64::from(id.slot))",
-                "self.syntax_node().ast.optional_child(word)",
+                "self.syntax_node().stored_optional_child(split_words(word)[0])",
                 build_type=f"Option<{handle}>",
+                validate=validate,
             )
         return codec(
             4,
             view,
             f"u64::from({value}.slot)",
-            "self.syntax_node().ast.child(word)",
+            "self.syntax_node().stored_child(split_words(word)[0])",
             build_type=handle,
+            validate=validate,
         )
     if inner == "Name":
         return codec(
             4,
             "&'a crate::name::Name",
             f"u64::from({value}.0)",
-            "&self.syntax_node().ast.names[split_words(word)[0] as usize]",
+            "self.syntax_node().stored_name(split_words(word)[0])",
             build_type="super::super::NameId",
+            validate=f"self.validate_name(split_words({name})[0]);",
         )
     if inner == "str":
         return codec(
@@ -477,7 +497,7 @@ def child_sources(
             result.append(
                 (
                     "list",
-                    f"List::<AstNodeId<crate::kind::Any>>::new(self, {raw}).words()",
+                    f"self.list_words({raw})",
                 )
             )
         elif field.optional:
@@ -1076,6 +1096,8 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         mutable = "mut " if fields else ""
         out.append(f"let {mutable}row = Row::new(NodeKind::{n.name});")
         for f in fields:
+            if f.validate is not None:
+                out.append(f.validate)
             if f.name in offsets:
                 value = {
                     1: f"{f.name}.to_le_bytes()[0]",
@@ -1085,7 +1107,6 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                 out.append(f"row.set_{arm}_{f.name}({value});")
         if n.name == "ExprStringLiteral":
             out.append(
-                "let (start, len) = self.string_literal_text(value);"
                 "row.set_expr_string_literal_text_offset(start); row.set_expr_string_literal_text_len(len);"
             )
         if spills:
@@ -1144,9 +1165,16 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                     out.append(
                         '#[expect(clippy::iter_not_returning_iterator, reason = "Python names the iterable expression in a for loop or comprehension `iter`.")]'
                     )
+                read = f.read
+                if f.validate is not None:
+                    out.append("#[expect(unsafe_code)]")
+                    read = (
+                        f"// SAFETY: `{method}` validates `{f.name}` before storing it.\n"
+                        f"unsafe {{ {read} }}"
+                    )
                 out.append(f"""#[inline] pub fn {f.name}(self) -> {f.result} {{
                     let word = {raw};
-                    {f.read}
+                    {read}
                 }}""")
             out.append("}")
     row_code = [generate_row_fields(schemas), "impl super::Ast {"]
@@ -1253,7 +1281,9 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         #[inline] pub(super) fn part_nodes(self) -> NodeList<'a, crate::kind::Any> {{
             let node: SyntaxNode<'a> = self.into();
             let record = node.row;
-            List::new(node.ast, {part_list})
+            // SAFETY: All string-like layouts store their validated parts at this offset.
+            #[expect(unsafe_code)]
+            unsafe {{ List::from_validated(node.ast, {part_list}) }}
         }}
     }}""")
     initializers.append("}")
@@ -1288,7 +1318,7 @@ def generate(ast: Ast) -> list[str]:
         if node.doc is not None:
             write_rustdoc(out, node.doc)
         out.append(
-            f"#[repr(transparent)] #[derive(Copy, Clone, PartialEq)] pub struct {node.name}<'ast> {{ pub(crate) syntax: crate::SyntaxNode<'ast> }}"
+            f"#[repr(transparent)] #[derive(Copy, Clone, PartialEq)] pub struct {node.name}<'ast> {{ syntax: crate::SyntaxNode<'ast> }}"
         )
         out.append(f"crate::flat::impl_ast_node!({node.name});")
     return out

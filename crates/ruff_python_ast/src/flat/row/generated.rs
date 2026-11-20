@@ -392,11 +392,9 @@ impl super::Ast {
             | NodeKind::Parameters
             | NodeKind::TypeParams
             | NodeKind::FString
-            | NodeKind::TString => Children::rows(
-                self,
-                List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                    .words(),
-            ),
+            | NodeKind::TString => {
+                Children::rows(self, self.list_words(record.inline_word::<0, 8>()))
+            }
             NodeKind::ModExpression
             | NodeKind::StmtExpr
             | NodeKind::ExprUnaryOp
@@ -424,8 +422,7 @@ impl super::Ast {
             NodeKind::StmtAssign => Children::sequence(
                 self,
                 None,
-                List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                    .words(),
+                self.list_words(record.inline_word::<0, 8>()),
                 Some(AstNodeId::from_word(
                     split_words(record.inline_word::<8, 4>())[0],
                 )),
@@ -453,8 +450,7 @@ impl super::Ast {
                 Some(AstNodeId::from_word(
                     split_words(record.inline_word::<8, 4>())[0],
                 )),
-                List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                    .words(),
+                self.list_words(record.inline_word::<0, 8>()),
                 None,
             ),
             NodeKind::StmtRaise | NodeKind::PatternMatchAs => {
@@ -475,11 +471,10 @@ impl super::Ast {
                     let word = split_words(record.inline_word::<4, 4>())[0];
                     (word != 0).then(|| AstNodeId::from_word(word))
                 },
-                List::<AstNodeId<crate::kind::Any>>::new(self, {
+                self.list_words({
                     let base = split_words(record.inline_word::<0, 4>())[0] as usize;
                     self.extra_word::<true>(base)
-                })
-                .words(),
+                }),
                 None,
             ),
             NodeKind::StmtPass
@@ -505,11 +500,10 @@ impl super::Ast {
             }
             NodeKind::ExprCompare => Children::rows(
                 self,
-                List::<AstNodeId<crate::kind::Any>>::new(self, {
+                self.list_words({
                     let base = split_words(record.inline_word::<8, 4>())[0] as usize;
                     self.extra_word::<true>(base)
-                })
-                .words(),
+                }),
             ),
             NodeKind::InterpolatedElement => Children::sequence(
                 self,
@@ -527,8 +521,7 @@ impl super::Ast {
                     let word = split_words(record.inline_word::<8, 4>())[0];
                     (word != 0).then(|| AstNodeId::from_word(word))
                 },
-                List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                    .words(),
+                self.list_words(record.inline_word::<0, 8>()),
                 None,
             ),
         }
@@ -537,13 +530,10 @@ impl super::Ast {
         let record = node.row;
         match record.kind() {
             NodeKind::StmtFunctionDef => match field {
-                0 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                ),
+                0 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                })),
                 1 => Field::One(Some(AstNodeId::from_word(
                     split_words(record.inline_word::<4, 4>())[0],
                 ))),
@@ -564,23 +554,17 @@ impl super::Ast {
                     })[0];
                     (word != 0).then(|| AstNodeId::from_word(word))
                 }),
-                5 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 4)
-                    })
-                    .words(),
-                ),
+                5 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 4)
+                })),
                 _ => Field::One(None),
             },
             NodeKind::StmtClassDef => match field {
-                0 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                ),
+                0 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                })),
                 1 => Field::One(Some(AstNodeId::from_word(
                     split_words(record.inline_word::<4, 4>())[0],
                 ))),
@@ -595,13 +579,10 @@ impl super::Ast {
                     })[0];
                     (word != 0).then(|| AstNodeId::from_word(word))
                 }),
-                4 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 3)
-                    })
-                    .words(),
-                ),
+                4 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 3)
+                })),
                 _ => Field::One(None),
             },
             NodeKind::StmtTypeAlias => match field {
@@ -624,82 +605,52 @@ impl super::Ast {
                 1 => Field::One(Some(AstNodeId::from_word(
                     split_words(record.inline_word::<8, 4>())[0],
                 ))),
-                2 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                ),
-                3 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 2)
-                    })
-                    .words(),
-                ),
+                2 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                })),
+                3 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 2)
+                })),
                 _ => Field::One(None),
             },
             NodeKind::StmtWhile | NodeKind::StmtIf => match field {
                 0 => Field::One(Some(AstNodeId::from_word(
                     split_words(record.inline_word::<4, 4>())[0],
                 ))),
-                1 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                ),
-                2 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 2)
-                    })
-                    .words(),
-                ),
+                1 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                })),
+                2 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 2)
+                })),
                 _ => Field::One(None),
             },
             NodeKind::StmtWith => match field {
-                0 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                        .words(),
-                ),
-                1 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                ),
+                0 => Field::Rows(self.list_words(record.inline_word::<0, 8>())),
+                1 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                })),
                 _ => Field::One(None),
             },
             NodeKind::StmtTry => match field {
-                0 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                        .words(),
-                ),
-                1 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                ),
-                2 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 2)
-                    })
-                    .words(),
-                ),
-                3 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 4)
-                    })
-                    .words(),
-                ),
+                0 => Field::Rows(self.list_words(record.inline_word::<0, 8>())),
+                1 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                })),
+                2 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 2)
+                })),
+                3 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 4)
+                })),
                 _ => Field::One(None),
             },
             NodeKind::ExprDictComp => match field {
@@ -710,13 +661,10 @@ impl super::Ast {
                 1 => Field::One(Some(AstNodeId::from_word(
                     split_words(record.inline_word::<8, 4>())[0],
                 ))),
-                2 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                ),
+                2 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                })),
                 _ => Field::One(None),
             },
             NodeKind::ExprSlice => match field {
@@ -743,13 +691,10 @@ impl super::Ast {
                     let word = split_words(record.inline_word::<8, 4>())[0];
                     (word != 0).then(|| AstNodeId::from_word(word))
                 }),
-                2 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                ),
+                2 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                })),
                 _ => Field::One(None),
             },
             NodeKind::TypeParamTypeVar => match field {
@@ -773,13 +718,10 @@ impl super::Ast {
                 1 => Field::One(Some(AstNodeId::from_word(
                     split_words(record.inline_word::<8, 4>())[0],
                 ))),
-                2 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                ),
+                2 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                })),
                 _ => Field::One(None),
             },
             NodeKind::MatchCase => match field {
@@ -790,13 +732,10 @@ impl super::Ast {
                     let word = split_words(record.inline_word::<8, 4>())[0];
                     (word != 0).then(|| AstNodeId::from_word(word))
                 }),
-                2 => Field::Rows(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                ),
+                2 => Field::Rows(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                })),
                 _ => Field::One(None),
             },
             _ => Field::One(None),
@@ -833,10 +772,9 @@ impl super::Ast {
             | NodeKind::Parameters
             | NodeKind::TypeParams
             | NodeKind::FString
-            | NodeKind::TString => stack.descend_list(
-                List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                    .words(),
-            ),
+            | NodeKind::TString => {
+                stack.descend_list(self.list_words(record.inline_word::<0, 8>()))
+            }
             NodeKind::ModExpression
             | NodeKind::StmtExpr
             | NodeKind::ExprUnaryOp
@@ -846,13 +784,10 @@ impl super::Ast {
             | NodeKind::PatternMatchValue
             | NodeKind::Decorator => split_words(record.inline_word::<0, 4>())[0],
             NodeKind::StmtFunctionDef => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 4)
-                    })
-                    .words(),
-                );
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 4)
+                }));
                 let word = split_words({
                     let base = split_words(record.inline_word::<0, 4>())[0] as usize;
                     self.extra_word::<false>(base + 3)
@@ -871,22 +806,16 @@ impl super::Ast {
                     stack.push_node(word);
                 }
                 stack.push_node(split_words(record.inline_word::<4, 4>())[0]);
-                stack.descend_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                )
+                stack.descend_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }))
             }
             NodeKind::StmtClassDef => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 3)
-                    })
-                    .words(),
-                );
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 3)
+                }));
                 let word = split_words({
                     let base = split_words(record.inline_word::<0, 4>())[0] as usize;
                     self.extra_word::<false>(base + 2)
@@ -899,13 +828,10 @@ impl super::Ast {
                     stack.push_node(word);
                 }
                 stack.push_node(split_words(record.inline_word::<4, 4>())[0]);
-                stack.descend_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                )
+                stack.descend_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }))
             }
             NodeKind::StmtReturn | NodeKind::ExprYield | NodeKind::PatternMatchStar => {
                 let word = split_words(record.inline_word::<0, 4>())[0];
@@ -921,10 +847,7 @@ impl super::Ast {
             }
             NodeKind::StmtAssign => {
                 stack.push_node(split_words(record.inline_word::<8, 4>())[0]);
-                stack.descend_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                        .words(),
-                )
+                stack.descend_list(self.list_words(record.inline_word::<0, 8>()))
             }
             NodeKind::StmtAugAssign
             | NodeKind::ExprNamed
@@ -946,61 +869,40 @@ impl super::Ast {
                 split_words(record.inline_word::<0, 4>())[0]
             }
             NodeKind::StmtFor => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 2)
-                    })
-                    .words(),
-                );
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                );
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 2)
+                }));
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }));
                 stack.push_node(split_words(record.inline_word::<8, 4>())[0]);
                 split_words(record.inline_word::<4, 4>())[0]
             }
             NodeKind::StmtWhile | NodeKind::StmtIf => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 2)
-                    })
-                    .words(),
-                );
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                );
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 2)
+                }));
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }));
                 split_words(record.inline_word::<4, 4>())[0]
             }
             NodeKind::StmtWith => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                );
-                stack.descend_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                        .words(),
-                )
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }));
+                stack.descend_list(self.list_words(record.inline_word::<0, 8>()))
             }
             NodeKind::StmtMatch
             | NodeKind::ExprListComp
             | NodeKind::ExprSetComp
             | NodeKind::ExprGenerator => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                        .words(),
-                );
+                stack.push_list(self.list_words(record.inline_word::<0, 8>()));
                 split_words(record.inline_word::<8, 4>())[0]
             }
             NodeKind::StmtRaise | NodeKind::PatternMatchAs => {
@@ -1012,31 +914,19 @@ impl super::Ast {
                 if word == 0 { stack.resume() } else { word }
             }
             NodeKind::StmtTry => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 4)
-                    })
-                    .words(),
-                );
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                        self.extra_word::<true>(base + 2)
-                    })
-                    .words(),
-                );
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                );
-                stack.descend_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                        .words(),
-                )
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 4)
+                }));
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
+                    self.extra_word::<true>(base + 2)
+                }));
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }));
+                stack.descend_list(self.list_words(record.inline_word::<0, 8>()))
             }
             NodeKind::StmtAssert
             | NodeKind::TypeParamTypeVarTuple
@@ -1052,13 +942,10 @@ impl super::Ast {
                 split_words(record.inline_word::<0, 4>())[0]
             }
             NodeKind::StmtImportFrom => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                );
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }));
                 let word = split_words(record.inline_word::<4, 4>())[0];
                 if word == 0 { stack.resume() } else { word }
             }
@@ -1088,24 +975,18 @@ impl super::Ast {
                 split_words(record.inline_word::<0, 4>())[0]
             }
             NodeKind::ExprDictComp => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                );
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }));
                 stack.push_node(split_words(record.inline_word::<8, 4>())[0]);
                 let word = split_words(record.inline_word::<4, 4>())[0];
                 if word == 0 { stack.resume() } else { word }
             }
-            NodeKind::ExprCompare => stack.descend_list(
-                List::<AstNodeId<crate::kind::Any>>::new(self, {
-                    let base = split_words(record.inline_word::<8, 4>())[0] as usize;
-                    self.extra_word::<true>(base)
-                })
-                .words(),
-            ),
+            NodeKind::ExprCompare => stack.descend_list(self.list_words({
+                let base = split_words(record.inline_word::<8, 4>())[0] as usize;
+                self.extra_word::<true>(base)
+            })),
             NodeKind::ExprSlice => {
                 let word = split_words(record.inline_word::<8, 4>())[0];
                 if word != 0 {
@@ -1119,13 +1000,10 @@ impl super::Ast {
                 if word == 0 { stack.resume() } else { word }
             }
             NodeKind::ExceptHandlerExceptHandler => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                );
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }));
                 let word = split_words(record.inline_word::<8, 4>())[0];
                 if word != 0 {
                     stack.push_node(word);
@@ -1153,24 +1031,18 @@ impl super::Ast {
                 split_words(record.inline_word::<0, 4>())[0]
             }
             NodeKind::Comprehension => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                );
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }));
                 stack.push_node(split_words(record.inline_word::<8, 4>())[0]);
                 split_words(record.inline_word::<4, 4>())[0]
             }
             NodeKind::MatchCase => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, {
-                        let base = split_words(record.inline_word::<0, 4>())[0] as usize;
-                        self.extra_word::<true>(base)
-                    })
-                    .words(),
-                );
+                stack.push_list(self.list_words({
+                    let base = split_words(record.inline_word::<0, 4>())[0] as usize;
+                    self.extra_word::<true>(base)
+                }));
                 let word = split_words(record.inline_word::<8, 4>())[0];
                 if word != 0 {
                     stack.push_node(word);
@@ -1178,10 +1050,7 @@ impl super::Ast {
                 split_words(record.inline_word::<4, 4>())[0]
             }
             NodeKind::ElifElseClause => {
-                stack.push_list(
-                    List::<AstNodeId<crate::kind::Any>>::new(self, record.inline_word::<0, 8>())
-                        .words(),
-                );
+                stack.push_list(self.list_words(record.inline_word::<0, 8>()));
                 let word = split_words(record.inline_word::<8, 4>())[0];
                 if word == 0 { stack.resume() } else { word }
             }
@@ -1193,6 +1062,10 @@ impl<'a> super::StringLike<'a> {
     pub(super) fn part_nodes(self) -> NodeList<'a, crate::kind::Any> {
         let node: SyntaxNode<'a> = self.into();
         let record = node.row;
-        List::new(node.ast, record.inline_word::<0, 8>())
+        // SAFETY: All string-like layouts store their validated parts at this offset.
+        #[expect(unsafe_code)]
+        unsafe {
+            List::from_validated(node.ast, record.inline_word::<0, 8>())
+        }
     }
 }

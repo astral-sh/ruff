@@ -312,62 +312,62 @@ pub mod kind {
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Mod<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Mod);
 /// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Stmt<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Stmt);
 /// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Expr<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Expr);
 /// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExceptHandler<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExceptHandler);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct InterpolatedStringElement<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(InterpolatedStringElement);
 /// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Pattern<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Pattern);
 /// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct TypeParam<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(TypeParam);
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ModModule<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ModModule);
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ModExpression<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ModExpression);
 /// See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.FunctionDef)
@@ -377,56 +377,56 @@ crate::flat::impl_ast_node!(ModExpression);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtFunctionDef<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtFunctionDef);
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtClassDef<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtClassDef);
 /// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtReturn<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtReturn);
 /// See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtDelete<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtDelete);
 /// See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtTypeAlias<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtTypeAlias);
 /// See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtAssign<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtAssign);
 /// See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtAugAssign<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtAugAssign);
 /// See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtAnnAssign<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtAnnAssign);
 /// See also [For](https://docs.python.org/3/library/ast.html#ast.For)
@@ -436,7 +436,7 @@ crate::flat::impl_ast_node!(StmtAnnAssign);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtFor<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtFor);
 /// See also [While](https://docs.python.org/3/library/ast.html#ast.While)
@@ -444,14 +444,14 @@ crate::flat::impl_ast_node!(StmtFor);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtWhile<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtWhile);
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtIf<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtIf);
 /// See also [With](https://docs.python.org/3/library/ast.html#ast.With)
@@ -461,21 +461,21 @@ crate::flat::impl_ast_node!(StmtIf);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtWith<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtWith);
 /// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtMatch<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtMatch);
 /// See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtRaise<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtRaise);
 /// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
@@ -483,70 +483,70 @@ crate::flat::impl_ast_node!(StmtRaise);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtTry<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtTry);
 /// See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtAssert<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtAssert);
 /// See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtImport<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtImport);
 /// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtImportFrom<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtImportFrom);
 /// See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtGlobal<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtGlobal);
 /// See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtNonlocal<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtNonlocal);
 /// See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtExpr<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtExpr);
 /// See also [Pass](https://docs.python.org/3/library/ast.html#ast.Pass)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtPass<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtPass);
 /// See also [Break](https://docs.python.org/3/library/ast.html#ast.Break)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtBreak<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtBreak);
 /// See also [Continue](https://docs.python.org/3/library/ast.html#ast.Continue)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtContinue<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtContinue);
 /// An AST node used to represent a IPython escape command at the statement level.
@@ -606,112 +606,112 @@ crate::flat::impl_ast_node!(StmtContinue);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StmtIpyEscapeCommand<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StmtIpyEscapeCommand);
 /// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprBoolOp<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprBoolOp);
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprNamed<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprNamed);
 /// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprBinOp<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprBinOp);
 /// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprUnaryOp<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprUnaryOp);
 /// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprLambda<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprLambda);
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprIf<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprIf);
 /// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprDict<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprDict);
 /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprSet<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprSet);
 /// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprListComp<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprListComp);
 /// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprSetComp<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprSetComp);
 /// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprDictComp<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprDictComp);
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprGenerator<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprGenerator);
 /// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprAwait<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprAwait);
 /// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprYield<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprYield);
 /// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprYieldFrom<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprYieldFrom);
 /// A comparison or chain of comparisons.
@@ -724,7 +724,7 @@ crate::flat::impl_ast_node!(ExprYieldFrom);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprCompare<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprCompare);
 /// A call expression whose end offset is derived from its arguments.
@@ -736,7 +736,7 @@ crate::flat::impl_ast_node!(ExprCompare);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprCall<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprCall);
 /// An AST node that represents either a single-part f-string literal
@@ -750,7 +750,7 @@ crate::flat::impl_ast_node!(ExprCall);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprFString<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprFString);
 /// An AST node that represents either a single-part t-string literal
@@ -764,7 +764,7 @@ crate::flat::impl_ast_node!(ExprFString);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprTString<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprTString);
 /// An AST node that represents either a single-part string literal
@@ -772,7 +772,7 @@ crate::flat::impl_ast_node!(ExprTString);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprStringLiteral<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprStringLiteral);
 /// An AST node that represents either a single-part bytestring literal
@@ -780,80 +780,80 @@ crate::flat::impl_ast_node!(ExprStringLiteral);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprBytesLiteral<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprBytesLiteral);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprNumberLiteral<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprNumberLiteral);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprBooleanLiteral<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprBooleanLiteral);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprNoneLiteral<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprNoneLiteral);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprEllipsisLiteral<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprEllipsisLiteral);
 /// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprAttribute<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprAttribute);
 /// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprSubscript<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprSubscript);
 /// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprStarred<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprStarred);
 /// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprName<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprName);
 /// See also [List](https://docs.python.org/3/library/ast.html#ast.List)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprList<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprList);
 /// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprTuple<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprTuple);
 /// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprSlice<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprSlice);
 /// An AST node used to represent a IPython escape command at the expression level.
@@ -870,118 +870,118 @@ crate::flat::impl_ast_node!(ExprSlice);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExprIpyEscapeCommand<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExprIpyEscapeCommand);
 /// See also [ExceptHandler](https://docs.python.org/3/library/ast.html#ast.ExceptHandler)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ExceptHandlerExceptHandler<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ExceptHandlerExceptHandler);
 /// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct InterpolatedElement<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(InterpolatedElement);
 /// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct InterpolatedStringLiteralElement<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(InterpolatedStringLiteralElement);
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct PatternMatchValue<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(PatternMatchValue);
 /// See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct PatternMatchSingleton<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(PatternMatchSingleton);
 /// See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct PatternMatchSequence<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(PatternMatchSequence);
 /// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct PatternMatchMapping<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(PatternMatchMapping);
 /// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct PatternMatchClass<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(PatternMatchClass);
 /// See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct PatternMatchStar<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(PatternMatchStar);
 /// See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct PatternMatchAs<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(PatternMatchAs);
 /// See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct PatternMatchOr<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(PatternMatchOr);
 /// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct TypeParamTypeVar<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(TypeParamTypeVar);
 /// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct TypeParamTypeVarTuple<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(TypeParamTypeVarTuple);
 /// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct TypeParamParamSpec<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(TypeParamParamSpec);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct InterpolatedStringFormatSpec<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(InterpolatedStringFormatSpec);
 /// The parenthesized arguments of a class pattern, as in `case Point(1, x=0, y=0)`.
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct PatternArguments<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(PatternArguments);
 /// An AST node to represent the keyword arguments to a [`crate::PatternMatchClass`], i.e., the
@@ -992,108 +992,108 @@ crate::flat::impl_ast_node!(PatternArguments);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct PatternKeyword<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(PatternKeyword);
 /// See also [comprehension](https://docs.python.org/3/library/ast.html#ast.comprehension)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Comprehension<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Comprehension);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Arguments<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Arguments);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Parameters<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Parameters);
 /// See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Parameter<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Parameter);
 /// A positional or keyword-only parameter and its optional default value. Variadic parameters use [`Parameter`] directly.
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ParameterWithDefault<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ParameterWithDefault);
 /// A dictionary display entry. A missing key represents `**mapping`.
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct DictItem<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(DictItem);
 /// See also [keyword](https://docs.python.org/3/library/ast.html#ast.keyword)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Keyword<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Keyword);
 /// See also [alias](https://docs.python.org/3/library/ast.html#ast.alias)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Alias<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Alias);
 /// See also [withitem](https://docs.python.org/3/library/ast.html#ast.withitem)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct WithItem<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(WithItem);
 /// See also [match_case](https://docs.python.org/3/library/ast.html#ast.match_case)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct MatchCase<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(MatchCase);
 /// See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Decorator<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Decorator);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct ElifElseClause<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(ElifElseClause);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct TypeParams<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(TypeParams);
 /// An AST node that represents a single f-string which is part of an [`ExprFString`].
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct FString<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(FString);
 /// An AST node that represents a single t-string which is part of an [`ExprTString`].
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct TString<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(TString);
 /// An AST node that represents a single string literal which is part of an
@@ -1102,7 +1102,7 @@ crate::flat::impl_ast_node!(TString);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct StringLiteral<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(StringLiteral);
 /// An AST node that represents a single bytes literal which is part of an
@@ -1111,7 +1111,7 @@ crate::flat::impl_ast_node!(StringLiteral);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct BytesLiteral<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(BytesLiteral);
 /// Parser recovery represents an invalid name with an empty `id`. For example,
@@ -1125,6 +1125,6 @@ crate::flat::impl_ast_node!(BytesLiteral);
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq)]
 pub struct Identifier<'ast> {
-    pub(crate) syntax: crate::SyntaxNode<'ast>,
+    syntax: crate::SyntaxNode<'ast>,
 }
 crate::flat::impl_ast_node!(Identifier);

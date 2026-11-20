@@ -107,7 +107,7 @@ impl Parser<'_> {
                 let items = arguments.items().id();
                 let converted = self.argument_scratch.snapshot();
                 for index in 0..items.len() {
-                    let argument = match self.storage.get_list(items).at(index) {
+                    let argument = match self.storage.list_item(items, index) {
                         ast::PatternOrKeyword::Pattern(pattern) => {
                             ast::ArgumentId::Positional(self.pattern_to_expr(pattern.build_id()))
                         }
@@ -185,7 +185,7 @@ impl Parser<'_> {
                 let patterns = patterns.id();
                 let mut left = self.pattern_to_expr(first.build_id());
                 for index in 1..patterns.len() {
-                    let pattern = self.storage.get_list(patterns).at(index);
+                    let pattern = self.storage.list_item(patterns, index);
                     let range = TextRange::new(start, pattern.end());
                     let right = self.pattern_to_expr(pattern.build_id());
                     left = build::ExprBinOp {
@@ -208,7 +208,7 @@ impl Parser<'_> {
     ) -> ListId<AstNodeId<ast::kind::Expr>> {
         let snapshot = self.expr_scratch.snapshot();
         for index in 0..patterns.len() {
-            let pattern = self.storage.get_list(patterns).at(index).build_id();
+            let pattern = self.storage.list_item(patterns, index).build_id();
             let expr = self.pattern_to_expr(pattern);
             self.expr_scratch.push(expr);
         }

@@ -209,14 +209,14 @@ impl<'a> StringValue<'a> {
     fn text_range(self) -> u64 {
         let [start, len] = super::split_words(self.text);
         if len == u32::from(u16::MAX) {
-            self.parts.ast.extra_word::<true>(start as usize)
+            self.parts.ast().extra_word::<true>(start as usize)
         } else {
             self.text
         }
     }
     #[inline]
     pub fn to_str(self) -> &'a str {
-        self.parts.ast.string(self.text_range())
+        self.parts.ast().string(self.text_range())
     }
     pub fn len(self) -> usize {
         super::split_words(self.text_range())[1] as usize
@@ -742,7 +742,7 @@ impl<'a> From<BytesValue<'a>> for std::borrow::Cow<'a, [u8]> {
             }
             range.end = next.end;
         }
-        Self::Borrowed(&value.0.ast.bytes[range])
+        Self::Borrowed(&value.0.ast().bytes[range])
     }
 }
 
@@ -840,7 +840,7 @@ impl<'a> crate::ExprTuple<'a> {
 impl crate::Keyword<'_> {
     /// Return whether this keyword is a mapping unpacking (`**expression`).
     pub fn is_variadic(self) -> bool {
-        self.syntax.row.keyword_arg() == 0
+        self.syntax_node().row.keyword_arg() == 0
     }
 }
 
@@ -1119,7 +1119,7 @@ impl ParameterWithDefault<'_> {
 impl crate::DictItem<'_> {
     /// Whether this item unpacks a mapping (`**mapping`).
     pub fn is_unpacking(self) -> bool {
-        self.syntax.row.dict_item_key() == 0
+        self.syntax_node().row.dict_item_key() == 0
     }
 }
 
