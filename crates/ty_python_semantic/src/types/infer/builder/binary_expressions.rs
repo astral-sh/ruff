@@ -1,6 +1,6 @@
 use crate::{Db, Program, ProgramEnvironment};
 use compact_str::CompactString;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, ExprKind, SyntaxNode};
 
 use super::TypeInferenceBuilder;
 use crate::types::call::CallArguments;
@@ -180,23 +180,19 @@ impl<'db> BinaryInferenceState<'db> {
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression(
         &mut self,
-        binary: &ast::ExprBinOp,
+        binary: ast::ExprBinOp<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         if tcx.is_typealias() {
             return self.infer_pep_604_union_type_alias(binary, tcx);
         }
 
-        let ast::ExprBinOp {
-            left,
-            op,
-            right,
-            range: _,
-            node_index: _,
-        } = binary;
+        let left = binary.left();
+        let op = binary.op();
+        let right = binary.right();
 
         let (left_ty, right_ty) =
-            match self.infer_binary_expression_operand_types(left, *op, right, tcx) {
+            match self.infer_binary_expression_operand_types(left, op, right, tcx) {
                 BinaryExpressionOperandTypes::TypedDictResult(ty) => return ty,
                 BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
             };
@@ -207,11 +203,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Evaluate a binary operator whose operands have already been inferred in their type contexts.
     pub(super) fn infer_binary_expression_from_types(
         &mut self,
-        binary: &ast::ExprBinOp,
+        binary: ast::ExprBinOp<'_>,
         left_ty: Type<'db>,
         right_ty: Type<'db>,
     ) -> Type<'db> {
-        let op = binary.op;
+        let op = binary.op();
         let mut state = BinaryInferenceState::default();
         let return_type =
             self.infer_binary_expression_type(binary.into(), left_ty, right_ty, op, &mut state);
@@ -224,19 +220,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn infer_pep_604_union_type_alias(
         &mut self,
-        node: &ast::ExprBinOp,
+        node: ast::ExprBinOp<'_>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
-        let ast::ExprBinOp {
-            left,
-            op,
-            right,
-            range: _,
-            node_index: _,
-        } = node;
+        let left = node.left();
+        let op = node.op();
+        let right = node.right();
 
-        if *op != ast::Operator::BitOr {
+        if op != ast::Operator::BitOr {
             // TODO diagnostic?
             return Type::unknown();
         }
@@ -263,9 +255,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// operand types for ordinary binary inference.
     fn infer_binary_expression_operand_types(
         &mut self,
-        left: &ast::Expr,
+        left: ast::Expr<'_>,
         op: ast::Operator,
-        right: &ast::Expr,
+        right: ast::Expr<'_>,
         tcx: TypeContext<'db>,
     ) -> BinaryExpressionOperandTypes<'db> {
         let db = self.db();
@@ -278,17 +270,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // have any effect in this case, but it could in more complicated cases.
         // TODO: When we support passing `tcx` through generic method calls, we can remove this
         // special case and handle the relevant dunder method instead.
-        let operand_tcx = |expr: &ast::Expr| -> TypeContext<'db> {
-            match expr {
-                ast::Expr::List(_)
-                | ast::Expr::Tuple(_)
-                | ast::Expr::Set(_)
-                | ast::Expr::Dict(_)
-                | ast::Expr::ListComp(_)
-                | ast::Expr::SetComp(_)
-                | ast::Expr::DictComp(_) => tcx,
+        let operand_tcx = |expr: ast::Expr<'_>| -> TypeContext<'db> {
+            match expr.classify() {
+                ExprKind::List(_)
+                | ExprKind::Tuple(_)
+                | ExprKind::Set(_)
+                | ExprKind::Dict(_)
+                | ExprKind::ListComp(_)
+                | ExprKind::SetComp(_)
+                | ExprKind::DictComp(_) => tcx,
                 // Also pass `tcx` to nested binary expressions.
-                ast::Expr::BinOp(_) => tcx,
+                ExprKind::BinOp(_) => tcx,
                 _ => TypeContext::default(),
             }
         };
@@ -296,7 +288,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // When a dict literal is `|`'d with a TypedDict, infer the non-literal side first
         // so we can use bidirectional inference on the literal before calling the synthesized
         // `__or__`/`__ror__` method on the TypedDict side.
-        if op == ast::Operator::BitOr && matches!(left, ast::Expr::Dict(_)) {
+        if op == ast::Operator::BitOr && matches!(left.classify(), ExprKind::Dict(_)) {
             let right_ty = self.infer_expression(right, operand_tcx(right));
             if let Type::TypedDict(typed_dict) = right_ty
                 && let Some(ty) = self.try_typed_dict_pep_584_dunder(
@@ -320,7 +312,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let left_ty = self.infer_expression(left, operand_tcx(left));
         if op == ast::Operator::BitOr
             && let Type::TypedDict(typed_dict) = left_ty
-            && matches!(right, ast::Expr::Dict(_))
+            && matches!(right.classify(), ExprKind::Dict(_))
             && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                 right,
                 typed_dict.to_partial(db),
@@ -339,7 +331,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn try_typed_dict_pep_584_dunder(
         &mut self,
-        update: &ast::Expr,
+        update: ast::Expr<'_>,
         update_context_typed_dict: TypedDictType<'db>,
         result_typed_dict: TypedDictType<'db>,
         dunder_name: &str,
@@ -372,13 +364,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Returns `Some` after handling either a compatible or incompatible operand.
     pub(super) fn try_infer_typed_dict_pep_584_augmented_assignment(
         &mut self,
-        assignment: &ast::StmtAugAssign,
+        assignment: ast::StmtAugAssign<'_>,
         target_type: Type<'db>,
-        value_expr: &ast::Expr,
+        value_expr: ast::Expr<'_>,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        if assignment.op != ast::Operator::BitOr {
+        if assignment.op() != ast::Operator::BitOr {
             return None;
         }
 
@@ -472,7 +464,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// The caller reports them together after expanding union operands and in-place fallbacks.
     pub(super) fn infer_binary_expression_type(
         &mut self,
-        node: AnyNodeRef<'_>,
+        node: SyntaxNode<'_>,
         left_ty: Type<'db>,
         right_ty: Type<'db>,
         op: ast::Operator,
@@ -491,7 +483,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn infer_binary_expression_type_impl(
         &mut self,
-        node: AnyNodeRef<'_>,
+        node: SyntaxNode<'_>,
         left_ty: Type<'db>,
         right_ty: Type<'db>,
         op: ast::Operator,
@@ -1240,7 +1232,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Expects the resolved type of the left side of the binary expression.
     fn check_division_by_zero(
         &mut self,
-        node: AnyNodeRef<'_>,
+        node: SyntaxNode<'_>,
         op: ast::Operator,
         left: Type<'db>,
     ) -> bool {

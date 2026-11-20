@@ -11,6 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use crate::ProgramEnvironment;
+use ruff_python_ast as ast;
 use std::cell::LazyCell;
 use std::fmt;
 use std::num::NonZeroU32;
@@ -49,7 +50,7 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::{Expr, ParameterWithDefault, StmtFunctionDef, name, name::Name};
 use ty_python_core::SemanticIndex;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::scope::NodeWithScopeRef;
@@ -75,11 +76,11 @@ pub(super) enum ReturnCallableTypeVarScope {
 pub(super) fn function_signature_expression_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
+    expression: Expr<'_>,
 ) -> Type<'db> {
     let file = definition.program_file(db);
     let index = semantic_index(db, file);
-    let file_scope = index.expression_scope_id(expression);
+    let file_scope = index.expression_scope_id(&expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
         // expression is in the function definition scope, but always deferred
@@ -95,11 +96,10 @@ pub(super) fn function_signature_expression_type<'db>(
 pub(super) fn lexical_return_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    function: &ast::StmtFunctionDef,
+    function: StmtFunctionDef<'_>,
 ) -> Option<Type<'db>> {
     function
-        .returns
-        .as_deref()
+        .returns()
         .map(|returns| function_signature_expression_type(db, definition, returns))
 }
 
@@ -984,7 +984,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         pep695_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
-        function_node: &ast::StmtFunctionDef,
+        function_node: StmtFunctionDef<'_>,
         has_implicitly_positional_first_parameter: bool,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Self {
@@ -993,7 +993,7 @@ impl<'db> Signature<'db> {
         // All annotations in a signature are inferred together, either in the type-parameter
         // scope or in the function's deferred definition. An unannotated signature needs neither.
         let inference = LazyCell::new(|| {
-            if function_node.type_params.is_some() {
+            if function_node.type_params().is_some() {
                 let scope =
                     index.node_scope(NodeWithScopeRef::FunctionTypeParameters(function_node));
                 Either::Left(infer_complete_scope_types(db, scope.to_scope_id(db, file)))
@@ -1001,7 +1001,7 @@ impl<'db> Signature<'db> {
                 Either::Right(infer_deferred_types(db, definition))
             }
         });
-        let annotation = |expression: &ast::Expr| match *inference {
+        let annotation = |expression: Expr<'_>| match *inference {
             Either::Left(types) => (
                 types.expression_type(expression),
                 types.type_expression_flags(expression),
@@ -1014,13 +1014,12 @@ impl<'db> Signature<'db> {
         let parameters = Parameters::from_parameters(
             db,
             index,
-            function_node.parameters.as_ref(),
+            function_node.parameters(),
             has_implicitly_positional_first_parameter,
             &annotation,
         );
         let return_ty = function_node
-            .returns
-            .as_deref()
+            .returns()
             .map(|returns| annotation(returns).0)
             .unwrap_or_else(Type::unknown);
         let legacy_generic_context =
@@ -5454,13 +5453,13 @@ impl<'db> Parameters<'db> {
     fn from_parameters(
         db: &'db dyn Db,
         index: &SemanticIndex<'db>,
-        parameters: &ast::Parameters,
+        parameters: ast::Parameters<'_>,
         has_implicitly_positional_first_parameter: bool,
-        annotation: &impl Fn(&ast::Expr) -> (Type<'db>, TypeExpressionFlags),
+        annotation: &impl Fn(Expr<'_>) -> (Type<'db>, TypeExpressionFlags),
     ) -> Self {
-        let default_type = |param: &ast::ParameterWithDefault| {
+        let default_type = |param: ParameterWithDefault<'_>| {
             param.default().map(|_| {
-                ParameterDefault::Deferred(index.expect_single_definition(&param.parameter))
+                ParameterDefault::Deferred(index.expect_single_definition(param.parameter()))
             })
         };
 
@@ -5475,9 +5474,9 @@ impl<'db> Parameters<'db> {
                     ast::ParameterItem::PositionalOnly(p) => {
                         legacy_positional_prefix = false;
                         (
-                            &p.parameter,
+                            p.parameter(),
                             ParameterKind::PositionalOnly {
-                                name: Some(p.parameter.name.id.clone()),
+                                name: Some(p.parameter().name().id().clone()),
                                 default_type: default_type(p),
                             },
                         )
@@ -5488,35 +5487,35 @@ impl<'db> Parameters<'db> {
                                 || p.uses_pep_484_positional_only_convention())
                         {
                             ParameterKind::PositionalOnly {
-                                name: Some(p.parameter.name.id.clone()),
+                                name: Some(p.parameter().name().id().clone()),
                                 default_type: default_type(p),
                             }
                         } else {
                             legacy_positional_prefix = false;
                             ParameterKind::PositionalOrKeyword {
-                                name: p.parameter.name.id.clone(),
+                                name: p.parameter().name().id().clone(),
                                 default_type: default_type(p),
                             }
                         };
-                        (&p.parameter, kind)
+                        (p.parameter(), kind)
                     }
                     ast::ParameterItem::KeywordOnly(p) => (
-                        &p.parameter,
+                        p.parameter(),
                         ParameterKind::KeywordOnly {
-                            name: p.parameter.name.id.clone(),
+                            name: p.parameter().name().id().clone(),
                             default_type: default_type(p),
                         },
                     ),
                     ast::ParameterItem::Vararg(p) => (
                         p,
                         ParameterKind::Variadic {
-                            name: p.name.id.clone(),
+                            name: p.name().id().clone(),
                         },
                     ),
                     ast::ParameterItem::Kwarg(p) => (
                         p,
                         ParameterKind::KeywordVariadic {
-                            name: p.name.id.clone(),
+                            name: p.name().id().clone(),
                         },
                     ),
                 };
@@ -6178,8 +6177,8 @@ impl<'db> Parameter<'db> {
     fn from_node_and_kind(
         db: &'db dyn Db,
         index: &SemanticIndex<'db>,
-        infer_annotation: &impl Fn(&ast::Expr) -> (Type<'db>, TypeExpressionFlags),
-        parameter: &ast::Parameter,
+        infer_annotation: &impl Fn(Expr<'_>) -> (Type<'db>, TypeExpressionFlags),
+        parameter: ast::Parameter<'_>,
         kind: ParameterKind<'db>,
     ) -> Self {
         let definition = Some(index.expect_single_definition(parameter));
@@ -6310,7 +6309,7 @@ impl<'db> Parameter<'db> {
     }
 
     /// Name of the parameter (if it has one).
-    pub(crate) fn name(&self) -> Option<&ast::name::Name> {
+    pub(crate) fn name(&self) -> Option<&name::Name> {
         match &self.kind {
             ParameterKind::PositionalOnly { name, .. } => name.as_ref(),
             ParameterKind::PositionalOrKeyword { name, .. } => Some(name),

@@ -93,7 +93,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn invalid_assignment_to_final_attribute(
         &self,
         object_ty: Type<'db>,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         attribute: &str,
         qualifiers: TypeQualifiers,
     ) -> bool {
@@ -211,7 +211,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn invalid_deletion_of_final_attribute(
         &self,
         object_ty: Type<'db>,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         attribute: &str,
         qualifiers: TypeQualifiers,
         emit_diagnostics: bool,
@@ -242,7 +242,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn validate_final_attribute_assignment(
         &mut self,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         object_ty: Type<'db>,
         attribute: &str,
     ) -> bool {
@@ -287,7 +287,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn validate_final_attribute_deletion(
         &self,
-        target: &ast::ExprAttribute,
+        target: ast::ExprAttribute<'_>,
         object_ty: Type<'db>,
         attribute: &str,
         emit_diagnostics: bool,
