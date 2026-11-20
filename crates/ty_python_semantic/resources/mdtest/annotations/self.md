@@ -591,6 +591,12 @@ Child().__replace__(parent=Child())  # ok
 Child().__replace__(parent=Node())  # ok
 ```
 
+`Child` is not itself decorated with `@dataclass`, so it inherits `Node.__init__`. That method's
+`Self` is a method-scoped type variable whose upper bound remains `Node`, allowing `Child(Node())`
+just as a handwritten initializer would. This is unsound for `Child.parent`, but reflects the
+existing unsoundness of mutable `Self` attributes: assigning `node.parent = Node()` through a `Node`
+reference also permits a `Node` parent on a `Child` instance.
+
 Attributes annotated with `Self` can be assigned on instances:
 
 ```py
