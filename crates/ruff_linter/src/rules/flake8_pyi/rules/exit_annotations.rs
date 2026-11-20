@@ -511,11 +511,7 @@ fn is_object_or_unused(expr: &Expr, semantic: &SemanticModel) -> bool {
 
 /// Return `true` if the [`Expr`] is the `types.TracebackType` type.
 fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["types", "TracebackType"])
-        })
+    semantic.matches_qualified_name(expr, &["types", "TracebackType"])
 }
 
 /// Return `true` if the [`Expr`] is, e.g., `Type[BaseException]`.

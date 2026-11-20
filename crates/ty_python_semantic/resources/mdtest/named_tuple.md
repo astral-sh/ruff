@@ -132,6 +132,94 @@ reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
 ```
 
+### Union of recursive named tuples
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, TypeAlias
+
+class Negation(NamedTuple):
+    child: Expression
+
+class Group(NamedTuple):
+    children: tuple[Expression, ...]
+
+Expression: TypeAlias = Negation | Group | str
+
+def _(group: Group):
+    reveal_type(group[0])  # revealed: tuple[Negation | Group | str, ...]
+```
+
+### Union containing a subclass of a recursive named tuple
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, TypeAlias
+
+class Negation(NamedTuple):
+    child: Expression
+
+class Group(NamedTuple):
+    children: tuple[Expression, ...]
+
+class Subgroup(Group): ...
+
+Expression: TypeAlias = Negation | Subgroup | str
+
+def _(group: Subgroup):
+    reveal_type(group[0])  # revealed: tuple[Negation | Subgroup | str, ...]
+```
+
+### Recursive fields with a wide union
+
+Two named tuples can share a field type that refers back to both of them. The repeated `int` members
+exercise normalization of a wide union. Both fields must retain `Leaf`.
+
+```py
+from typing import NamedTuple, Union
+from typing_extensions import assert_type
+
+class Leaf(NamedTuple):
+    value: "Metadata"
+
+class Closure(NamedTuple):
+    entries: Union[int, Leaf, int, int, int, int, int, int]
+
+class Partial(NamedTuple):
+    entries: Union[int, Leaf, int, int, int, int, int, int]
+
+Metadata = Closure | Partial
+
+def check(closure: Closure, partial: Partial) -> None:
+    assert_type(closure.entries, int | Leaf)
+    assert_type(partial.entries, int | Leaf)
+```
+
+### Explicit dataclass-transform metaclass
+
+`models.pyi`:
+
+```pyi
+from typing import dataclass_transform
+
+@dataclass_transform()
+class RecordMeta(type): ...
+```
+
+```py
+from dataclasses import fields
+from typing import NamedTuple
+from models import RecordMeta
+
+# TODO: Report the metaclass conflict that makes this class definition raise TypeError.
+class Point(NamedTuple, metaclass=RecordMeta):
+    x: int
+
+fields(Point)
+```
+
 ### Fields declared in stubs
 
 An annotation-only field in a stub remains a required constructor argument. An explicit ellipsis
@@ -169,10 +257,61 @@ The assigned variable name should match the `typename` argument:
 from typing import NamedTuple
 from ty_extensions._internal import is_subtype_of
 
-# error: [mismatched-type-name]
+# error: [mismatched-namedtuple-name]
 Mismatch = NamedTuple("WrongName", [("x", int)])
 reveal_type(Mismatch)  # revealed: <class 'WrongName'>
 reveal_type(is_subtype_of(Mismatch, tuple[int]))  # revealed: ConstraintSet[Literal[True]]
+```
+
+### Name comparison through type aliases
+
+The name comparison follows a type alias to a single string literal. The rule is meant to spot
+simple, obvious typos. It allows names of type `str` so callers can still construct named tuples
+dynamically when that's desirable. If the name argument has a union of string literals as its type,
+the caller is likely doing the same thing.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections import namedtuple
+from typing import Literal, NamedTuple
+
+type VectorName = Literal["Vector"]
+type PointNames = Literal["Vector", "Coordinate"]
+
+def fixed_name(name: VectorName) -> None:
+    # error: [mismatched-namedtuple-name] "Expected "Point", got "Vector""
+    Point = NamedTuple(name, [("x", int)])
+    # error: [mismatched-namedtuple-name] "Expected "Point", got "Vector""
+    Point = namedtuple(typename=name, field_names="x")
+
+def choose_name(name: Literal["Vector", "Coordinate"], aliased_name: PointNames) -> None:
+    Point = NamedTuple(name, [("x", int)])  # ok
+    Point = NamedTuple(aliased_name, [("x", int)])  # ok
+    Point = namedtuple(typename=name, field_names="x")  # ok
+    Point = namedtuple(typename=aliased_name, field_names="x")  # ok
+```
+
+### Invalid literal names
+
+Both factories reject names that are keywords or invalid identifiers. An invalid name is reported by
+`invalid-named-tuple` even when the name mismatch rule is enabled.
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+# error: [invalid-named-tuple] "Type name "not valid" in `NamedTuple()` is not a valid Python identifier"
+Spaced = NamedTuple("not valid", [("x", int)])
+
+# error: [invalid-named-tuple] "Type name "class" in `namedtuple()` cannot be a Python keyword"
+Keyword = namedtuple(typename="class", field_names="x", rename=True)
+
+# Soft keywords are valid type names.
+match = namedtuple("match", "x")  # ok
 ```
 
 ### Functional syntax with string annotations
@@ -314,13 +453,18 @@ reveal_type(p.id)  # revealed: int
 reveal_type(p.name)  # revealed: str
 ```
 
-Non-literal `str` names should not be treated as proven mismatches:
+### Class names of type `str`
+
+ty skips the name comparison for both `NamedTuple` and `namedtuple` when the `typename` argument has
+type `str`.
 
 ```py
+from collections import namedtuple
 from typing import NamedTuple
 
 def f(name: str) -> None:
-    Match = NamedTuple(name, [("value", int)])
+    Record = NamedTuple(name, [("value", int)])  # ok
+    Row = namedtuple(name, ["value"])  # ok
 ```
 
 ### Functional syntax with tuple variable fields
@@ -1320,7 +1464,7 @@ from typing import NamedTuple
 class Point(NamedTuple):
     x: int
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Point.__match_args__)  # revealed: Unknown
 ```
 
@@ -1386,15 +1530,15 @@ class B(NamedTuple):
     x: int
 
 def choose(flag: bool) -> Callable[..., A]:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return A._replace if flag else B._replace
 
 def reversed_order(flag: bool) -> Callable[..., A]:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return B._replace if flag else A._replace
 
 def either_class(flag: bool) -> Callable[..., A | B]:
-    return A._replace if flag else B._replace  # no diagnostic
+    return A._replace if flag else B._replace  # ok
 ```
 
 The same distinction applies to named tuples created with the functional syntax:
@@ -1404,7 +1548,7 @@ DynamicA = NamedTuple("DynamicA", [("x", int)])
 DynamicB = NamedTuple("DynamicB", [("x", int)])
 
 def choose_dynamic(flag: bool) -> Callable[..., DynamicA]:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return DynamicA._replace if flag else DynamicB._replace
 ```
 
@@ -1529,7 +1673,7 @@ reveal_type(typing.NamedTuple.__name__)  # revealed: str
 reveal_type(typing.NamedTuple.__qualname__)  # revealed: str
 reveal_type(typing.NamedTuple.__kwdefaults__)  # revealed: dict[str, Any] | None
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(typing.NamedTuple.__mro__)  # revealed: Unknown
 ```
 

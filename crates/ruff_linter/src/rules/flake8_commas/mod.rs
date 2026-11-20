@@ -21,7 +21,7 @@ mod tests {
             &settings::LinterSettings::for_rules(vec![
                 Rule::MissingTrailingComma,
                 Rule::TrailingCommaOnBareTuple,
-                Rule::ProhibitedTrailingComma,
+                Rule::UnnecessaryTrailingComma,
             ]),
         )?;
         assert_diagnostics!(snapshot, diagnostics);

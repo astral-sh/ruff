@@ -131,6 +131,13 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 /// operations that require access to the entire session state, such as fetching workspace
 /// diagnostics.
 pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
+    /// Prepares request parameters using the live session before taking a snapshot.
+    fn prepare_params(
+        _session: &Session,
+        _params: &mut <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) {
+    }
+
     /// Processes the request parameters and returns the LSP request result.
     ///
     /// This is the main method that handlers implement. It takes the request parameters

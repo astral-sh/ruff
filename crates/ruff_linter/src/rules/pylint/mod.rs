@@ -26,7 +26,7 @@ mod tests {
         Rule::SingledispatchmethodFunction,
         Path::new("singledispatchmethod_function.py")
     )]
-    #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
+    #[test_case(Rule::AssertStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.ipynb"))]
     #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
@@ -56,7 +56,10 @@ mod tests {
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::IfStmtMinMax, Path::new("if_stmt_min_max.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
-    #[test_case(Rule::StopIterationReturn, Path::new("stop_iteration_return.py"))]
+    #[test_case(
+        Rule::RaiseStopIterationInGenerator,
+        Path::new("stop_iteration_return.py")
+    )]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_1.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_2.py"))]
@@ -104,16 +107,16 @@ mod tests {
     )]
     #[test_case(Rule::InvalidStrReturnType, Path::new("invalid_return_type_str.py"))]
     #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"))]
-    #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::InvalidCharacterEsc, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::InvalidCharacterNul, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::InvalidCharacterSub, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedBackspaceCharacter, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedEscapeCharacter, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedNullCharacter, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedSubstituteCharacter, Path::new("invalid_characters.py"))]
     #[test_case(
-        Rule::InvalidCharacterZeroWidthSpace,
+        Rule::UnescapedZeroWidthSpaceCharacter,
         Path::new("invalid_characters.py")
     )]
     #[test_case(
-        Rule::InvalidCharacterBackspace,
+        Rule::UnescapedBackspaceCharacter,
         Path::new("invalid_characters_syntax_error.py")
     )]
     #[test_case(Rule::ShallowCopyEnviron, Path::new("shallow_copy_environ.py"))]
@@ -141,7 +144,7 @@ mod tests {
         Rule::RedefinedArgumentFromLocal,
         Path::new("redefined_argument_from_local.py")
     )]
-    #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
+    #[test_case(Rule::RedefinedForOrWithTarget, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
     #[test_case(
@@ -203,7 +206,7 @@ mod tests {
     )]
     #[test_case(Rule::UnspecifiedEncoding, Path::new("unspecified_encoding.py"))]
     #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
-    #[test_case(Rule::NoSelfUse, Path::new("no_self_use.py"))]
+    #[test_case(Rule::UnusedSelf, Path::new("no_self_use.py"))]
     #[test_case(Rule::MisplacedBareRaise, Path::new("misplaced_bare_raise.py"))]
     #[test_case(Rule::LiteralMembership, Path::new("literal_membership.py"))]
     #[test_case(Rule::GlobalAtModuleLevel, Path::new("global_at_module_level.py"))]
@@ -218,9 +221,9 @@ mod tests {
         Rule::UnnecessaryListIndexLookup,
         Path::new("unnecessary_list_index_lookup.py")
     )]
-    #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::NonDecoratorClassmethod, Path::new("no_method_decorator.py"))]
     #[test_case(Rule::UnnecessaryDunderCall, Path::new("unnecessary_dunder_call.py"))]
-    #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::NonDecoratorStaticmethod, Path::new("no_method_decorator.py"))]
     #[test_case(Rule::PotentialIndexError, Path::new("potential_index_error.py"))]
     #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
     #[test_case(Rule::SelfOrClsAssignment, Path::new("self_or_cls_assignment.py"))]

@@ -1,4 +1,5 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::ExprCall;
+use ruff_python_ast::name::QualifiedName;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -53,18 +54,12 @@ impl Violation for UselessContextlibSuppress {
 /// B022
 pub(crate) fn useless_contextlib_suppress(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
+    call: &ExprCall,
+    qualified_name: &QualifiedName,
 ) {
-    if args.is_empty()
-        && checker
-            .semantic()
-            .resolve_qualified_name(func)
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["contextlib", "suppress"])
-            })
+    if call.arguments.args.is_empty()
+        && matches!(qualified_name.segments(), ["contextlib", "suppress"])
     {
-        checker.report_diagnostic(UselessContextlibSuppress, expr.range());
+        checker.report_diagnostic(UselessContextlibSuppress, call.range());
     }
 }

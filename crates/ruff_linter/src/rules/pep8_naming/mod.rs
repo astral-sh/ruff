@@ -17,22 +17,22 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
-    #[test_case(Rule::InvalidClassName, Path::new("N801.py"))]
-    #[test_case(Rule::InvalidFunctionName, Path::new("N802.py"))]
-    #[test_case(Rule::InvalidArgumentName, Path::new("N803.py"))]
-    #[test_case(Rule::InvalidArgumentName, Path::new("N804.py"))]
-    #[test_case(Rule::InvalidFirstArgumentNameForClassMethod, Path::new("N804.py"))]
-    #[test_case(Rule::InvalidFirstArgumentNameForMethod, Path::new("N805.py"))]
+    #[test_case(Rule::NonCamelCaseClassName, Path::new("N801.py"))]
+    #[test_case(Rule::NonLowercaseFunctionName, Path::new("N802.py"))]
+    #[test_case(Rule::NonLowercaseParameterName, Path::new("N803.py"))]
+    #[test_case(Rule::NonLowercaseParameterName, Path::new("N804.py"))]
+    #[test_case(Rule::ClassMethodReceiverNotNamedCls, Path::new("N804.py"))]
+    #[test_case(Rule::InstanceMethodReceiverNotNamedSelf, Path::new("N805.py"))]
     #[test_case(Rule::NonLowercaseVariableInFunction, Path::new("N806.py"))]
     #[test_case(Rule::DunderFunctionName, Path::new("N807.py"))]
     #[test_case(Rule::ConstantImportedAsNonConstant, Path::new("N811.py"))]
     #[test_case(Rule::LowercaseImportedAsNonLowercase, Path::new("N812.py"))]
-    #[test_case(Rule::CamelcaseImportedAsLowercase, Path::new("N813.py"))]
-    #[test_case(Rule::CamelcaseImportedAsConstant, Path::new("N814.py"))]
+    #[test_case(Rule::CamelCaseImportedAsLowercase, Path::new("N813.py"))]
+    #[test_case(Rule::CamelCaseImportedAsConstant, Path::new("N814.py"))]
     #[test_case(Rule::MixedCaseVariableInClassScope, Path::new("N815.py"))]
     #[test_case(Rule::MixedCaseVariableInGlobalScope, Path::new("N816.py"))]
-    #[test_case(Rule::CamelcaseImportedAsAcronym, Path::new("N817.py"))]
-    #[test_case(Rule::ErrorSuffixOnExceptionName, Path::new("N818.py"))]
+    #[test_case(Rule::CamelCaseImportedAsAcronym, Path::new("N817.py"))]
+    #[test_case(Rule::ExceptionClassWithoutErrorSuffix, Path::new("N818.py"))]
     #[test_case(
         Rule::InvalidModuleName,
         Path::new("N999/module/mod with spaces/__init__.py")
@@ -101,7 +101,7 @@ mod tests {
                     )]),
                     ..Default::default()
                 },
-                ..settings::LinterSettings::for_rule(Rule::CamelcaseImportedAsAcronym)
+                ..settings::LinterSettings::for_rule(Rule::CamelCaseImportedAsAcronym)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -121,7 +121,7 @@ mod tests {
                     ],
                     ..Default::default()
                 },
-                ..settings::LinterSettings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
+                ..settings::LinterSettings::for_rule(Rule::InstanceMethodReceiverNotNamedSelf)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -140,28 +140,28 @@ mod tests {
                     ],
                     ..Default::default()
                 },
-                ..settings::LinterSettings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
+                ..settings::LinterSettings::for_rule(Rule::InstanceMethodReceiverNotNamedSelf)
             },
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
     }
 
-    #[test_case(Rule::InvalidClassName, "N801.py")]
-    #[test_case(Rule::InvalidFunctionName, "N802.py")]
-    #[test_case(Rule::InvalidArgumentName, "N803.py")]
-    #[test_case(Rule::InvalidFirstArgumentNameForClassMethod, "N804.py")]
-    #[test_case(Rule::InvalidFirstArgumentNameForMethod, "N805.py")]
+    #[test_case(Rule::NonCamelCaseClassName, "N801.py")]
+    #[test_case(Rule::NonLowercaseFunctionName, "N802.py")]
+    #[test_case(Rule::NonLowercaseParameterName, "N803.py")]
+    #[test_case(Rule::ClassMethodReceiverNotNamedCls, "N804.py")]
+    #[test_case(Rule::InstanceMethodReceiverNotNamedSelf, "N805.py")]
     #[test_case(Rule::NonLowercaseVariableInFunction, "N806.py")]
     #[test_case(Rule::DunderFunctionName, "N807.py")]
     #[test_case(Rule::ConstantImportedAsNonConstant, "N811.py")]
     #[test_case(Rule::LowercaseImportedAsNonLowercase, "N812.py")]
-    #[test_case(Rule::CamelcaseImportedAsLowercase, "N813.py")]
-    #[test_case(Rule::CamelcaseImportedAsConstant, "N814.py")]
+    #[test_case(Rule::CamelCaseImportedAsLowercase, "N813.py")]
+    #[test_case(Rule::CamelCaseImportedAsConstant, "N814.py")]
     #[test_case(Rule::MixedCaseVariableInClassScope, "N815.py")]
     #[test_case(Rule::MixedCaseVariableInGlobalScope, "N816.py")]
-    #[test_case(Rule::CamelcaseImportedAsAcronym, "N817.py")]
-    #[test_case(Rule::ErrorSuffixOnExceptionName, "N818.py")]
+    #[test_case(Rule::CamelCaseImportedAsAcronym, "N817.py")]
+    #[test_case(Rule::ExceptionClassWithoutErrorSuffix, "N818.py")]
     #[test_case(Rule::InvalidModuleName, "N999/badAllowed/__init__.py")]
     fn ignore_names(rule_code: Rule, path: &str) -> Result<()> {
         let snapshot = format!("ignore_names_{}_{path}", rule_code.name());

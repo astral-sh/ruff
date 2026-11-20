@@ -11,13 +11,14 @@ use crate::place::global_symbol;
 use crate::types::constraints::{
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
     ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    PathBoundSolution, Solution, SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions,
-    TypeVarSolution,
+    PathBoundSolution, ReportDiagnostics, Solution, SolutionPaths, SolutionValidity,
+    SolutionViolationKind, Solutions, TypeVarSolution, UnspecializedTypeVarPolicy,
 };
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, KnownClass, Type, TypeVarVariance, UnionType,
+    BoundTypeVarInstance, DynamicType, IntersectionType, KnownClass, Type, TypeVarVariance,
+    UnionType,
 };
 
 type Paths<'db> = FxHashSet<Solution<'db>>;
@@ -41,7 +42,7 @@ fn exact<'db, 'c>(
     typevar: BoundTypeVarInstance<'db>,
     ty: Type<'db>,
 ) -> ConstraintSet<'db, 'c> {
-    exact_with_provenance(db, builder, ConstraintProvenance::Evidence, typevar, ty)
+    exact_with_provenance(db, builder, ConstraintProvenance::INFERRED, typevar, ty)
 }
 
 fn exact_with_provenance<'db, 'c>(
@@ -189,7 +190,7 @@ fn invalid_paths_respect_projection_budgets() {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             ty,
         )
@@ -210,6 +211,7 @@ fn invalid_paths_respect_projection_budgets() {
                     paths,
                     ..SolutionBudget::default()
                 },
+                ReportDiagnostics::Yes,
                 choose,
             ),
             Err(ProjectionError::PathBudgetExceeded)
@@ -226,6 +228,7 @@ fn invalid_paths_respect_projection_budgets() {
             type_terms: 1,
             ..SolutionBudget::default()
         },
+        ReportDiagnostics::Yes,
         choose,
     );
     assert_eq!(result, Err(ProjectionError::TypeBudgetExceeded));
@@ -238,6 +241,7 @@ fn invalid_paths_respect_projection_budgets() {
                 type_terms: 2,
                 ..SolutionBudget::default()
             },
+            ReportDiagnostics::Yes,
             choose,
         ),
         Ok(Solutions::Unsatisfiable(_))
@@ -263,7 +267,7 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             ty,
         )
@@ -272,9 +276,14 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
 
     for bounds in [[bool, bytes], [bytes, bool]] {
         let set = upper(bounds[0]).or(db, &builder, || upper(bounds[1]));
-        let result = set.solutions_with(db, &env, inferable, SolutionBudget::default(), |_, _| {
-            PathBoundSolution::Unsolved
-        });
+        let result = set.solutions_with(
+            db,
+            &env,
+            inferable,
+            SolutionBudget::default(),
+            ReportDiagnostics::Yes,
+            |_, _| PathBoundSolution::Unsolved,
+        );
         let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
             panic!("expected invalid paths");
         };
@@ -308,9 +317,14 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
 
     // A failing alternative must not produce a diagnostic when another alternative is valid.
     let set = upper(bool).or(db, &builder, || upper(str));
-    let result = set.solutions_with(db, &env, inferable, SolutionBudget::default(), |_, _| {
-        PathBoundSolution::Unsolved
-    });
+    let result = set.solutions_with(
+        db,
+        &env,
+        inferable,
+        SolutionBudget::default(),
+        ReportDiagnostics::Yes,
+        |_, _| PathBoundSolution::Unsolved,
+    );
     assert!(matches!(result, Ok(Solutions::Constrained(_))));
 }
 
@@ -333,7 +347,7 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
                 db,
                 &env,
                 &builder,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -365,7 +379,7 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
                 db,
                 &env,
                 &builder,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -393,7 +407,7 @@ fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
         db,
         &env,
         &builder,
-        ConstraintProvenance::Evidence,
+        ConstraintProvenance::INFERRED,
         t,
         str,
     )
@@ -402,7 +416,7 @@ fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Validity,
+            ConstraintProvenance::VALIDITY,
             t,
             Type::TypeVar(s),
         )
@@ -449,12 +463,12 @@ fn upper_bound_checks_mixed_evidence_after_substitution() {
         db,
         &env,
         &builder,
-        ConstraintProvenance::Evidence,
+        ConstraintProvenance::INFERRED,
         t,
         Type::TypeVar(u),
     )
     .and(db, &builder, || {
-        exact_with_provenance(db, &builder, ConstraintProvenance::Validity, u, list_s)
+        exact_with_provenance(db, &builder, ConstraintProvenance::VALIDITY, u, list_s)
     });
     let inferable = TypeVarSet::from_typevars(db, [t, u]);
 
@@ -485,12 +499,12 @@ fn mixed_evidence_may_use_a_caller_typevars_declared_bound() {
         db,
         &env,
         &builder,
-        ConstraintProvenance::Evidence,
+        ConstraintProvenance::INFERRED,
         t,
         Type::TypeVar(u),
     )
     .and(db, &builder, || {
-        exact_with_provenance(db, &builder, ConstraintProvenance::Validity, u, list_s)
+        exact_with_provenance(db, &builder, ConstraintProvenance::VALIDITY, u, list_s)
     });
     let inferable = TypeVarSet::from_typevars(db, [t, u]);
 
@@ -527,7 +541,7 @@ fn upper_bound_cannot_narrow_a_callable_receiver() {
         db,
         &env,
         &builder,
-        ConstraintProvenance::Evidence,
+        ConstraintProvenance::INFERRED,
         t,
         callable,
     );
@@ -537,6 +551,77 @@ fn upper_bound_cannot_narrow_a_callable_receiver() {
         set.solutions(db, &env, inferable),
         Ok(Solutions::Unsatisfiable(_))
     ));
+}
+
+#[test]
+fn unspecialized_phantom_argument_respects_the_evidence_policy() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("/src/a.py", "type Phantom[X] = int")?;
+    let db = &db;
+    let env = db.program_environment();
+    let file = system_path_to_file(db, "/src/a.py")?;
+    let file = ProgramFile::new(db, file, env.program(db));
+    let phantom = global_symbol(db, file, "Phantom")
+        .place
+        .expect_type()
+        .as_type_alias()
+        .ok_or_else(|| anyhow::anyhow!("expected Phantom alias"))?;
+    let phantom = phantom.apply_specialization(db, |context| {
+        context.specialize(db, &[Type::Dynamic(DynamicType::UnspecializedTypeVar)])
+    });
+    let list = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeAlias(phantom)]);
+    let t = create_typevar(db, "T");
+    let u = create_typevar(db, "U");
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+    let builder = ConstraintSetBuilder::new();
+    let upper = ConstraintSet::constrain_typevar_upper_bound(
+        db,
+        &env,
+        &builder,
+        ConstraintProvenance::INFERRED,
+        t,
+        list,
+    );
+    let inferable = TypeVarSet::from_typevars(db, [t, u]);
+    let solve = |set: ConstraintSet<'_, '_>, policy| {
+        let candidates = CandidateSolutions::compute(
+            db,
+            &env,
+            &mut builder.storage.borrow_mut(),
+            set.node,
+            inferable,
+            set.source_order,
+            policy,
+        );
+        candidates.solve(db, &env, &builder)
+    };
+
+    // Adding an unrelated choice for U must not change which bounds count as evidence for T.
+    let branched = upper.and(db, &builder, || binary_choice(db, &builder, u, [int, str]));
+    assert_eq!(
+        solve(upper, UnspecializedTypeVarPolicy::Ignore),
+        Solutions::Unconstrained
+    );
+    assert_eq!(
+        solve(branched, UnspecializedTypeVarPolicy::Ignore),
+        Solutions::Constrained(SolutionPaths::Complete(
+            [int, str].map(|ty| solution([binding(u, ty)])).into()
+        ))
+    );
+    assert_eq!(
+        solve(upper, UnspecializedTypeVarPolicy::Retain),
+        Solutions::Constrained(SolutionPaths::Complete(vec![solution([binding(t, list)])]))
+    );
+    assert_eq!(
+        solve(branched, UnspecializedTypeVarPolicy::Retain),
+        Solutions::Constrained(SolutionPaths::Complete(
+            [int, str]
+                .map(|ty| solution([binding(t, list), binding(u, ty)]))
+                .into()
+        ))
+    );
+    Ok(())
 }
 
 #[test]
@@ -704,7 +789,7 @@ fn incomplete_solution_discards_the_projection() {
     for alternatives in [[int, str], [str, int]] {
         let set = binary_choice(db, &builder, t, alternatives);
         let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
-            let lower = candidate.inference_lower(db, &env);
+            let lower = candidate.inference_lower();
             if lower == Some(str) {
                 PathBoundSolution::BudgetExceeded {
                     fallback: Some(str),
@@ -715,7 +800,7 @@ fn incomplete_solution_discards_the_projection() {
         };
 
         assert_eq!(
-            set.solutions_with(db, &env, inferable, budget, choose),
+            set.solutions_with(db, &env, inferable, budget, ReportDiagnostics::Yes, choose),
             Ok(Solutions::Constrained(SolutionPaths::BudgetExceeded(
                 alternatives.map(|ty| solution([binding(t, ty)])).into()
             )))
@@ -771,7 +856,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                 },
             ] {
                 let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
-                    let lower = candidate.inference_lower(db, &env);
+                    let lower = candidate.inference_lower();
                     if candidate.bound_typevar == u {
                         PathBoundSolution::Unsatisfiable
                     } else if lower == Some(str) {
@@ -781,7 +866,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                     }
                 };
                 assert_eq!(
-                    set.solutions_with(db, &env, inferable, budget, choose),
+                    set.solutions_with(db, &env, inferable, budget, ReportDiagnostics::Yes, choose),
                     Ok(Solutions::Constrained(SolutionPaths::Complete(vec![
                         solution([binding(t, int),])
                     ])))
@@ -843,7 +928,14 @@ fn valid_unsolved_path_is_not_unconstrained() {
         ),
     ] {
         assert_eq!(
-            set.solutions_with(db, &env, inferable, budget, |_, _| selected),
+            set.solutions_with(
+                db,
+                &env,
+                inferable,
+                budget,
+                ReportDiagnostics::Yes,
+                |_, _| selected
+            ),
             Ok(collected)
         );
         assert_eq!(
@@ -884,10 +976,17 @@ fn type_budget_is_charged_before_constructing_a_union() {
             ..SolutionBudget::default()
         };
         let mut selected = 0;
-        let collected = set.solutions_with(db, &env, inferable, budget, |_, bound| {
-            selected += 1;
-            CandidateSolutions::default_solve(db, &env, &builder, bound)
-        });
+        let collected = set.solutions_with(
+            db,
+            &env,
+            inferable,
+            budget,
+            ReportDiagnostics::Yes,
+            |_, bound| {
+                selected += 1;
+                CandidateSolutions::default_solve(db, &env, &builder, bound)
+            },
+        );
         // One additional path is selected to discover that it exceeds the budget; later
         // paths are not solved.
         assert_eq!(selected, (max_type_terms + 1).min(3));
@@ -1007,6 +1106,7 @@ class E: ...
     let right =
         UnionType::from_elements(db, &env, [instance("C")?, instance("D")?, instance("E")?]);
     let t = create_typevar(db, "T");
+    let inferable = TypeVarSet::from_typevars(db, [t]);
     let builder = ConstraintSetBuilder::new();
 
     // These classes can overlap, so distributing the intersection requires six DNF terms.
@@ -1016,8 +1116,9 @@ class E: ...
         let paths = CandidateSolutions::Constrained(
             alternatives
                 .map(|ty| CandidateSolution {
-                    typevars: Box::new([CandidateTypeVarSolution::from_equivalence(t, ty)])
-                        as Box<[_]>,
+                    typevars: Box::new([CandidateTypeVarSolution::from_equivalence(
+                        t, ty, inferable,
+                    )]) as Box<[_]>,
                     validity: SolutionValidity::Valid,
                 })
                 .into(),

@@ -224,9 +224,13 @@ pub(crate) fn remove_argument<T: Ranged>(
         .find(|arg| arg.range() == argument.range())
         .context("Unable to find argument")?;
 
-    let parenthesized_range =
-        token::parenthesized_range(arg.value().into(), arguments.into(), tokens)
-            .unwrap_or(arg.range());
+    let parenthesized_range = match arg {
+        ast::ArgOrKeyword::Keyword(keyword) => keyword.range(),
+        ast::ArgOrKeyword::Arg(expr) => {
+            token::parenthesized_range(expr.into(), arguments.into(), tokens)
+                .unwrap_or(expr.range())
+        }
+    };
 
     if !after.is_empty() {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
@@ -272,8 +276,8 @@ pub(crate) fn remove_argument<T: Ranged>(
 /// The new argument will be inserted before the first existing keyword argument in `arguments`, if
 /// there are any present. Otherwise, the new argument is added to the end of the argument list.
 pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Tokens) -> Edit {
-    if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
-        let keyword = parenthesized_range(value.into(), arguments.into(), tokens).unwrap_or(*range);
+    if let Some(keyword) = arguments.keywords.first() {
+        // The keyword's range starts at its name, even if its value is parenthesized.
         Edit::insertion(format!("{argument}, "), keyword.start())
     } else if let Some(last) = arguments.iter_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.
@@ -287,7 +291,16 @@ pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Token
 }
 
 /// Remove the member at the given index from a sequence of expressions.
-pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> Result<Edit> {
+pub(crate) fn remove_member(
+    elts: &[ast::Expr],
+    index: usize,
+    parent: AnyNodeRef,
+    source: &str,
+    tokens: &Tokens,
+) -> Result<Edit> {
+    let range =
+        parenthesized_range((&elts[index]).into(), parent, tokens).unwrap_or(elts[index].range());
+
     if index < elts.len() - 1 {
         // Case 1: the expression is _not_ the last node, so delete from the start of the
         // expression to the end of the subsequent comma.
@@ -306,7 +319,7 @@ pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> R
             })
             .context("Unable to find next token")?;
 
-        Ok(Edit::deletion(elts[index].start(), next.start()))
+        Ok(Edit::deletion(range.start(), next.start()))
     } else if index > 0 {
         // Case 2: the expression is the last node, but not the _only_ node, so delete from the
         // start of the previous comma to the end of the expression.
@@ -318,11 +331,11 @@ pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> R
             .find(|token| token.kind == SimpleTokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
-        Ok(Edit::deletion(comma.start(), elts[index].end()))
+        Ok(Edit::deletion(comma.start(), range.end()))
     } else {
         // Case 3: expression is the only node, so delete it.
         // Ex) Delete `"a"` in `{"a"}`.
-        Ok(Edit::range_deletion(elts[index].range()))
+        Ok(Edit::range_deletion(range))
     }
 }
 

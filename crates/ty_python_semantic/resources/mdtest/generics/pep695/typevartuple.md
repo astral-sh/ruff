@@ -99,6 +99,18 @@ reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Un
 reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
+### Inherited methods on variadic tuple subclasses
+
+A tuple subclass inherits `__reversed__` from `Sequence`. Its type arguments still apply when
+looking up a method on one of the returned elements.
+
+```py
+class Parts[*Ts](tuple[*Ts]): ...
+
+def count_matches(parts: Parts[str, str]) -> int:
+    return next(parts.__reversed__()).count("x")  # no diagnostic
+```
+
 ### Inherited specializations containing `Never`
 
 A `Never` argument in a variadic generic must retain its position when a subclass forwards its type
@@ -134,6 +146,108 @@ reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tup
 reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str, int]
 ```
 
+An empty tuple unpack leaves the preceding arguments in their original slots.
+
+```py
+class WithSuffix[*Ts, **P, T]:
+    fn: Callable[P, tuple[*Ts, T]]
+
+def shifted(x: WithSuffix[int, [str], bytes, *tuple[()]]) -> None:
+    reveal_type(x.fn)  # revealed: (str, /) -> tuple[int, bytes]
+```
+
+### Defaulted `ParamSpec` after a `TypeVarTuple`
+
+Ordinary type arguments go into the pack. An explicit parameter list overrides the `ParamSpec`
+default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Callable, Concatenate
+
+class Callback[*Ts, **P = [bool]]:
+    fn: Callable[P, tuple[*Ts]]
+
+reveal_type(Callback[int, str]().fn)  # revealed: (bool, /) -> tuple[int, str]
+reveal_type(Callback[list[int]]().fn)  # revealed: (bool, /) -> tuple[list[int]]
+reveal_type(Callback[int, [str]]().fn)  # revealed: (str, /) -> tuple[int]
+reveal_type(Callback[int, [str], *tuple[()]]().fn)  # revealed: (str, /) -> tuple[int]
+reveal_type(Callback[...]().fn)  # revealed: (...) -> tuple[()]
+
+def forward[**Q](a: Callback[int, Q], b: Callback[str, Concatenate[int, Q]]) -> None:
+    reveal_type(a.fn)  # revealed: (**Q@forward) -> tuple[int]
+    reveal_type(b.fn)  # revealed: (int, /, *args: Q@forward.args, **kwargs: Q@forward.kwargs) -> tuple[str]
+```
+
+A forwarded `ParamSpec` can specialize `P`, but it cannot be an element of `Ts`.
+
+```py
+def misplaced[**Q](
+    x: Callback[Q, int],  # error: [invalid-type-arguments] "cannot be used as a TypeVarTuple element"
+    y: Callback[Q.args],  # error: [invalid-type-arguments] "cannot be used as a TypeVarTuple element"
+) -> None: ...
+```
+
+### Multiple trailing `ParamSpec` defaults
+
+Explicit parameter lists bind in declaration order. Any remaining `ParamSpec` uses its default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Callable
+
+class Callbacks[*Ts, **P = [bool], **Q = [bytes]]:
+    first: Callable[P, tuple[*Ts]]
+    second: Callable[Q, tuple[*Ts]]
+
+def f(a: Callbacks[int, str], b: Callbacks[int, [str]], c: Callbacks[int, [str], [float]]) -> None:
+    reveal_type(a.first)  # revealed: (bool, /) -> tuple[int, str]
+    reveal_type(a.second)  # revealed: (bytes, /) -> tuple[int, str]
+    reveal_type(b.first)  # revealed: (str, /) -> tuple[int]
+    reveal_type(b.second)  # revealed: (bytes, /) -> tuple[int]
+    reveal_type(c.first)  # revealed: (str, /) -> tuple[int]
+    reveal_type(c.second)  # revealed: (float, /) -> tuple[int]
+
+def gradual(x: Callbacks[[str], Any]) -> None:
+    reveal_type(x.first)  # revealed: (str, /) -> tuple[()]
+    reveal_type(x.second)  # revealed: (...) -> tuple[()]
+```
+
+An unpacked tuple can fill the fixed parameters and contribute the rest of its elements to the pack.
+The next parameter list still binds to the first `ParamSpec`.
+
+```py
+class Prefixed[T, U, *Ts, **P, **Q = [bytes]]:
+    first: Callable[P, tuple[T, U, *Ts]]
+    second: Callable[Q, tuple[T, U, *Ts]]
+
+def unpacked(x: Prefixed[*tuple[int, str, tuple[float], complex], [bool]]) -> None:
+    reveal_type(x.first)  # revealed: (bool, /) -> tuple[int, str, tuple[float], complex]
+    reveal_type(x.second)  # revealed: (bytes, /) -> tuple[int, str, tuple[float], complex]
+```
+
+When the pack is empty, a parameter list before it still binds to the leading `ParamSpec`.
+
+```py
+class BothSides[**Head, *Ts, **P = [bool], **Q = [bytes]]:
+    head: Callable[Head, None]
+    first: Callable[P, tuple[*Ts]]
+    second: Callable[Q, tuple[*Ts]]
+
+def both_sides(x: BothSides[[float], [str]]) -> None:
+    reveal_type(x.head)  # revealed: (float, /) -> None
+    reveal_type(x.first)  # revealed: (str, /) -> tuple[()]
+    reveal_type(x.second)  # revealed: (bytes, /) -> tuple[()]
+```
+
 ### Inferred specialization from construction
 
 Calling a generic class without explicit type arguments infers its specialization from the
@@ -149,10 +263,12 @@ class Variadic[*Ts]:
         self.shape = shape
 
 reveal_type(Positional(()))  # revealed: Positional[()]
-reveal_type(Positional((1, "a")))  # revealed: Positional[int, str]
+# TODO: We should promote to `Positional[int, str]` here.
+reveal_type(Positional((1, "a")))  # revealed: Positional[Literal[1], Literal["a"]]
 
 reveal_type(Variadic())  # revealed: Variadic[()]
-reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
+# TODO: We should promote to `Variadic[int, str]` here.
+reveal_type(Variadic(1, "a"))  # revealed: Variadic[Literal[1], Literal["a"]]
 
 def _(i: int, s: str) -> None:
     reveal_type(Positional((i, s)))  # revealed: Positional[int, str]
@@ -166,7 +282,7 @@ different specialization.
 valid: Variadic[int] = Variadic(1)
 
 inferred = Variadic(1)
-reveal_type(inferred)  # revealed: Variadic[int]
+reveal_type(inferred)  # revealed: Variadic[Literal[1]]
 # error: [invalid-assignment]
 indirect: Variadic[str] = inferred
 # error: [invalid-assignment]
@@ -180,7 +296,8 @@ Concrete contexts do not supply missing arguments or discard extra ones.
 missing_argument: Variadic[int] = reveal_type(Variadic())  # revealed: Variadic[()]
 
 # error: [invalid-assignment]
-extra_argument: Variadic[int] = reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
+# revealed: Variadic[Literal[1], Literal["a"]]
+extra_argument: Variadic[int] = reveal_type(Variadic(1, "a"))
 ```
 
 A contextual specialization cannot supply missing constructor arguments. Empty calls infer an empty
@@ -189,15 +306,15 @@ suffix. This applies with or without a fixed suffix.
 
 ```py
 def empty_with_context[*Us](shape: tuple[*Us]) -> Variadic[*Us, int]:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return reveal_type(Variadic())  # revealed: Variadic[()]
 
 def nonempty_with_context[*Us](shape: tuple[*Us]) -> Variadic[*Us, int]:
-    # error: [invalid-return-type]
-    return reveal_type(Variadic(1))  # revealed: Variadic[int]
+    # error: [invalid-explicit-return]
+    return reveal_type(Variadic(1))  # revealed: Variadic[Literal[1]]
 
 def empty_without_suffix[*Us](shape: tuple[*Us]) -> Variadic[*Us]:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return reveal_type(Variadic())  # revealed: Variadic[()]
 ```
 
@@ -253,17 +370,17 @@ Fixed elements still constrain the pack's length and types, even when other elem
 ```py
 def fixed_any_with_context[*Us](shape: tuple[*Us], values: tuple[Any]) -> Variadic[*Us, int]:
     fixed_length: Variadic[int] = reveal_type(Variadic(*values))  # revealed: Variadic[int]
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return reveal_type(Variadic(*values))  # revealed: Variadic[Any]
 
 def incompatible_gradual_prefix[*Us](shape: tuple[*Us], values: tuple[int, *tuple[Any, ...]]) -> Variadic[*Us, int]:
-    return Variadic(*values)  # error: [invalid-return-type]
+    return Variadic(*values)  # error: [invalid-explicit-return]
 
 def incompatible_gradual_element(values: tuple[bytes, *tuple[Any, ...]]) -> Variadic[int, str]:
-    return Variadic(*values)  # error: [invalid-return-type]
+    return Variadic(*values)  # error: [invalid-explicit-return]
 
 def too_many_gradual_boundaries(values: tuple[int, *tuple[Any, ...], str]) -> Variadic[int]:
-    return Variadic(*values)  # error: [invalid-return-type]
+    return Variadic(*values)  # error: [invalid-explicit-return]
 ```
 
 ### Unspecified type arguments
@@ -318,10 +435,10 @@ class Array[*Ts]:
         return self
 
     def erase_shape_bottom(self) -> "Bottom[Array[*tuple[Any, ...]]]":
-        return self  # error: [invalid-return-type]
+        return self  # error: [invalid-explicit-return]
 
     def fixed_shape(self) -> "Top[Array[Any]]":
-        return self  # error: [invalid-return-type]
+        return self  # error: [invalid-explicit-return]
 ```
 
 ### Constrained inference from synthetic `Self`
@@ -458,10 +575,10 @@ cannot be assigned to a fixed-length tuple, even when its fixed prefix and suffi
 
 ```py
 def arbitrary_pack[*Ts](value: tuple[*Ts]) -> tuple[int, str]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-explicit-return]
 
 def middle_pack[*Ts](value: tuple[int, *Ts, str]) -> tuple[int, str]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-explicit-return]
 ```
 
 ### Assignability involving type variable tuples
@@ -481,14 +598,14 @@ def preserve_pack_with_boundaries[*Ts](values: tuple[int, *Ts, str]) -> tuple[ob
     return values
 
 def reject_object_pack[*Ts](values: tuple[object, ...], witness: tuple[*Ts]) -> tuple[*Ts]:
-    return values  # error: [invalid-return-type]
+    return values  # error: [invalid-explicit-return]
 
 def reject_int_pack[*Ts](values: tuple[int, ...], witness: tuple[*Ts]) -> tuple[*Ts]:
-    return values  # error: [invalid-return-type]
+    return values  # error: [invalid-explicit-return]
 
 class Outer[*Ts]:
     def reject_unrelated_pack[*Us](self, values: tuple[*Ts]) -> tuple[*Us]:
-        return values  # error: [invalid-return-type]
+        return values  # error: [invalid-explicit-return]
 ```
 
 A fixed-length tuple cannot replace an arbitrary type variable tuple either. The caller determines
@@ -497,10 +614,10 @@ The same restriction applies to annotated assignments inside the function.
 
 ```py
 def reject_empty[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
-    return ()  # error: [invalid-return-type]
+    return ()  # error: [invalid-explicit-return]
 
 def reject_fixed[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
-    return (1, "a")  # error: [invalid-return-type]
+    return (1, "a")  # error: [invalid-explicit-return]
 
 def reject_fixed_assignment[*Ts]() -> None:
     fixed: tuple[*Ts] = (1,)  # error: [invalid-assignment]
@@ -511,10 +628,10 @@ remaining elements still cannot replace an arbitrary type variable tuple.
 
 ```py
 def reject_empty_middle[*Ts](values: tuple[*Ts]) -> tuple[int, *Ts, str]:
-    return (1, "a")  # error: [invalid-return-type]
+    return (1, "a")  # error: [invalid-explicit-return]
 
 def reject_fixed_middle[*Ts](values: tuple[*Ts]) -> tuple[int, *Ts, str]:
-    return (1, True, "a")  # error: [invalid-return-type]
+    return (1, True, "a")  # error: [invalid-explicit-return]
 ```
 
 Materializing a type variable tuple can change its default without changing the identity of the
@@ -935,6 +1052,27 @@ info: Type variable defined here
    |                                 ^^^^^^
 ```
 
+### Starred variadic methods on specialized classes
+
+TODO: Specializing a class currently loses fixed suffix boundaries in its methods' starred
+parameters. Both unpacked tuples and direct arguments can then infer the wrong pack.
+
+```py
+class C[T]:
+    def f[*Ts](self, marker: T, *rest: *tuple[*Ts, str]) -> tuple[*Ts]:
+        raise NotImplementedError
+
+def check(c: C[int], suffix: tuple[bool, str]) -> None:
+    # TODO: Should reveal `tuple[bool]`.
+    # revealed: tuple[bool, str]
+    reveal_type(c.f(1, *suffix))
+
+    # TODO: Should reveal `tuple[bool, bool]` without an argument error.
+    # error: [invalid-argument-type]
+    # revealed: tuple[bool, str]
+    reveal_type(c.f(1, suffix[0], suffix[0], suffix[1]))
+```
+
 ### Union splatted arguments
 
 Equal-length tuple unions preserve their length and combine the types at each position. Different
@@ -1006,7 +1144,7 @@ Return statements and arguments to other functions also provide contextual retur
 
 ```py
 def invalid_return() -> tuple[str]:
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return collect(1)
 
 def accept_strings(values: tuple[str]) -> None: ...
@@ -1014,6 +1152,31 @@ def accept_strings(values: tuple[str]) -> None: ...
 accept_strings(collect("valid"))
 # error: [invalid-argument-type]
 accept_strings(collect(1))
+```
+
+### Contextual arguments in recursive variadic calls
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class Item(TypedDict):
+    value: int
+
+class Boundary(TypedDict):
+    key: str
+
+def collect[*Ts](*args: *tuple[*Ts]) -> tuple[*Ts]:
+    items: tuple[Item] = collect({"value": 1})  # ok
+    raise NotImplementedError
+
+def check(flag: bool) -> None:
+    f = partial(collect) if flag else collect
+    items: tuple[Item] = f({"value": 1})  # ok
+
+def bounded[*Ts](*args: *tuple[Boundary, *Ts, Boundary]) -> tuple[int, *Ts, str]:
+    items: tuple[int, Item, str] = bounded({"key": "first"}, {"value": 1}, {"key": "last"})  # ok
+    raise NotImplementedError
 ```
 
 ### Fixed boundaries around variadic type variable tuples
@@ -1026,6 +1189,9 @@ def prefixed[*Ts](*args: *tuple[int, *Ts]) -> tuple[*Ts]:
     raise NotImplementedError
 
 def suffixed[*Ts](*args: *tuple[*Ts, str]) -> tuple[*Ts]:
+    suffix: tuple[bool, str] = (True, "ok")
+    # revealed: tuple[Literal[True]]
+    reveal_type(suffixed(*suffix))
     raise NotImplementedError
 
 def bounded[*Ts](*args: *tuple[int, *Ts, int]) -> tuple[*Ts]:
@@ -1995,11 +2161,11 @@ def trim_boundaries[*Ts](values: tuple[int, *Ts, str]) -> tuple[*Ts]:
     return values[1:-1]
 
 def reverse[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[*Ts@reverse]`, found `tuple[object, ...]`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `tuple[*Ts@reverse]`, found `tuple[object, ...]`"
     return values[::-1]
 
 def stride[*Ts](values: tuple[*Ts]) -> tuple[*Ts]:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[*Ts@stride]`, found `tuple[object, ...]`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `tuple[*Ts@stride]`, found `tuple[object, ...]`"
     return values[::2]
 ```
 

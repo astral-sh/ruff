@@ -3,7 +3,7 @@ use std::fmt::Write;
 use std::str::FromStr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags, whitespace::indentation};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
@@ -488,20 +488,15 @@ pub(crate) fn printf_string_formatting(
     }
 
     if let Some(prev_end) = prev_end {
-        for token in checker.tokens().after(prev_end) {
-            match token.kind() {
-                // If we hit a right paren, we have to preserve it.
-                TokenKind::Rpar => {
-                    contents.push_str(
-                        checker
-                            .locator()
-                            .slice(TextRange::new(prev_end, token.end())),
-                    );
-                }
-                // Break as soon as we find the modulo symbol.
-                TokenKind::Percent => break,
-                _ => {}
-            }
+        // Preserve the parentheses around the format string, along with anything between them.
+        if let Some(parenthesized) =
+            parenthesized_range(bin_op.left.as_ref().into(), bin_op.into(), checker.tokens())
+        {
+            contents.push_str(
+                checker
+                    .locator()
+                    .slice(TextRange::new(prev_end, parenthesized.end())),
+            );
         }
     }
 

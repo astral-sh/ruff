@@ -79,6 +79,22 @@ def overlapping_generic_types(integers: tuple[int, ...], strings: tuple[str, ...
         reveal_type(strings)  # revealed: tuple[str, ...] & tuple[int, ...]
 ```
 
+## `is` with runtime unions
+
+`typing` can reuse the same union object when a nested union repeats its members in a different
+order. The identity branch is reachable in that case.
+
+```py
+from typing import Union
+from typing_extensions import assert_never
+
+Base = Union[int, str, bytes]
+Forward = Base | Union[str, bytes]
+Reverse = Base | Union[bytes, str]
+if Forward is Reverse:
+    assert_never(Forward)  # error: [type-assertion-failure]
+```
+
 ## `is` with `functools.partial`
 
 In the following example, the class body creates `callback` only once, so `C[int].callback` and
@@ -631,6 +647,17 @@ from ty_extensions import Intersection, Not
 def literal_string(value: object, text: LiteralString) -> None:
     if value is text:
         reveal_type(value)  # revealed: LiteralString
+```
+
+An identity check against an inferred union narrows to the shared literals in that union's order.
+Those literals still widen when inferring the element type of a mutable list.
+
+```py
+def overlapping_literals(value: Literal["a", "b", "c"], flag: bool) -> None:
+    other = "b" if flag else "a"
+    if value is other:
+        reveal_type(value)  # revealed: Literal["b", "a"]
+        reveal_type([value])  # revealed: list[str]
 ```
 
 The same string object (same memory address) can be referenced by multiple different expressions

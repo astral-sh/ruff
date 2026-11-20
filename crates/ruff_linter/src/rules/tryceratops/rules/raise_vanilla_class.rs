@@ -55,9 +55,9 @@ use crate::codes::Category;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.236", category = Category::Style)]
-pub(crate) struct RaiseVanillaClass;
+pub(crate) struct RaiseExceptionOrBaseException;
 
-impl Violation for RaiseVanillaClass {
+impl Violation for RaiseExceptionOrBaseException {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Create your own exception".to_string()
@@ -76,6 +76,6 @@ pub(crate) fn raise_vanilla_class(checker: &Checker, expr: &Expr) {
             )
         })
     {
-        checker.report_diagnostic(RaiseVanillaClass, expr.range());
+        checker.report_diagnostic(RaiseExceptionOrBaseException, expr.range());
     }
 }

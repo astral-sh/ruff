@@ -59,21 +59,23 @@ impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
 }
 
 /// Provides Python specific extensions to [`Formatter`].
-pub(crate) trait PyFormatterExtensions<'ast, 'buf> {
+pub(crate) trait PyFormatterExtensions<'ast, 'buf, 'state> {
     /// A builder that separates each element by a `,` and a [`soft_line_break_or_space`].
     /// It emits a trailing `,` that is only shown if the enclosing group expands. It forces the enclosing
     /// group to expand if the last item has a trailing `comma` and the magical comma option is enabled.
     fn join_comma_separated<'fmt>(
         &'fmt mut self,
         sequence_end: TextSize,
-    ) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf>;
+    ) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf, 'state>;
 }
 
-impl<'buf, 'ast> PyFormatterExtensions<'ast, 'buf> for PyFormatter<'ast, 'buf> {
+impl<'buf, 'ast, 'state> PyFormatterExtensions<'ast, 'buf, 'state>
+    for PyFormatter<'ast, 'buf, 'state>
+{
     fn join_comma_separated<'fmt>(
         &'fmt mut self,
         sequence_end: TextSize,
-    ) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
+    ) -> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf, 'state> {
         JoinCommaSeparatedBuilder::new(self, sequence_end)
     }
 }
@@ -123,16 +125,16 @@ pub(crate) enum TrailingComma {
     OneOrMore,
 }
 
-pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
+pub(crate) struct JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf, 'state> {
     result: FormatResult<()>,
-    fmt: &'fmt mut PyFormatter<'ast, 'buf>,
+    fmt: &'fmt mut PyFormatter<'ast, 'buf, 'state>,
     entries: Entries,
     sequence_end: TextSize,
     trailing_comma: TrailingComma,
 }
 
-impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
-    fn new(f: &'fmt mut PyFormatter<'ast, 'buf>, sequence_end: TextSize) -> Self {
+impl<'fmt, 'ast, 'buf, 'state> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf, 'state> {
+    fn new(f: &'fmt mut PyFormatter<'ast, 'buf, 'state>, sequence_end: TextSize) -> Self {
         Self {
             fmt: f,
             result: Ok(()),

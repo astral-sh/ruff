@@ -45,9 +45,9 @@ use crate::{AlwaysFixableViolation, Fix};
 /// lines and includes comments on any of the lines apart from the last one.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.10.0", category = Category::Pedantic)]
-pub(crate) struct RuntimeCastValue;
+pub(crate) struct CastWithUnquotedType;
 
-impl AlwaysFixableViolation for RuntimeCastValue {
+impl AlwaysFixableViolation for CastWithUnquotedType {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Add quotes to type expression in `typing.cast()`".to_string()
@@ -64,7 +64,7 @@ pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(RuntimeCastValue, type_expr.range());
+    let mut diagnostic = checker.report_diagnostic(CastWithUnquotedType, type_expr.range());
     let edit = quote_type_expression(
         type_expr,
         checker.semantic(),

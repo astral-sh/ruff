@@ -405,8 +405,8 @@ class C:
     key: Literal["a", "b"]
 
 c = C()
-[None for c.key in {"a": 1, "b": 2}]  # no diagnostic
-[None for _ in (0,) for c.key in {"a": 1, "b": 2}]  # no diagnostic
+[None for c.key in {"a": 1, "b": 2}]  # ok
+[None for _ in (0,) for c.key in {"a": 1, "b": 2}]  # ok
 
 for number, letter in {(1, "a"): 0, (2, "b"): 0}:
     reveal_type(number)  # revealed: Literal[1, 2]
@@ -418,7 +418,7 @@ Nested mutable containers still permit mutation:
 ```py
 for values in {"a": [1]}.values():
     reveal_type(values)  # revealed: list[int]
-    values.append(2)  # no diagnostic
+    values.append(2)  # ok
 ```
 
 ## With unpacked literal dictionary
@@ -444,7 +444,7 @@ included in the inferred union:
 for value in {**{1: "a"}, 1: "b"}.values():
     reveal_type(value)  # revealed: Literal["a", "b"]
 
-(key,) = {1: "a", 1: "b"}  # no diagnostic
+(key,) = {1: "a", 1: "b"}  # ok
 ```
 
 ## With non-callable iterator
@@ -669,7 +669,7 @@ class C:
     def f(self) -> None:
         for item in self.values:
             reveal_type(item)  # revealed: A | B
-            # error: [unresolved-attribute] "Attribute `do_b_thing` is not defined on `A` in union `U`"
+            # error: [missing-union-attribute] "Attribute `do_b_thing` is not defined on `A` in union `U`"
             item.do_b_thing()
 ```
 
@@ -1611,7 +1611,7 @@ A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, si
 `__iter__` for all instances of the metaclass:
 
 ```py
-from unresolved_module import SomethingUnknown  # error: [unresolved-import]
+from unresolved_module import SomethingUnknown  # error: [import-not-found]
 from typing import Any, Iterable
 from ty_extensions import static_assert
 from ty_extensions._internal import Unknown, TypeOf, is_assignable_to, reveal_mro
@@ -1941,6 +1941,21 @@ for _ in range(1_000_000):
     reveal_type(x)  # revealed: Literal[1]
     if VAL - 1:
         x = 2
+```
+
+The condition can depend on an earlier iteration. Here `y` starts at `2` and only ever receives `1`
+or `2` from `x`, so the loop never decrements `x`.
+
+```py
+def f(n: int):
+    x = 1
+    y = 2
+    for _ in range(n):
+        if not y:
+            x, y = x - 1, x
+        else:
+            x, y = 2, x
+    reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
 ### Large reachability constraint graphs fall back to `Unknown`

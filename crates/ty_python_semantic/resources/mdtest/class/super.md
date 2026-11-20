@@ -44,15 +44,15 @@ reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'objec
 
 super(C, C()).a
 super(C, C()).b
-super(C, C()).c  # error: [unresolved-attribute]
+super(C, C()).c  # error: [missing-attribute]
 
 super(B, C()).a
-super(B, C()).b  # error: [unresolved-attribute]
-super(B, C()).c  # error: [unresolved-attribute]
+super(B, C()).b  # error: [missing-attribute]
+super(B, C()).c  # error: [missing-attribute]
 
-super(A, C()).a  # error: [unresolved-attribute]
-super(A, C()).b  # error: [unresolved-attribute]
-super(A, C()).c  # error: [unresolved-attribute]
+super(A, C()).a  # error: [missing-attribute]
+super(A, C()).b  # error: [missing-attribute]
+super(A, C()).c  # error: [missing-attribute]
 
 reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
 reveal_type(super(C, C()).b)  # revealed: bound method C.b() -> Unknown
@@ -373,7 +373,7 @@ class B(A): ...
 
 reveal_type(super(B))  # revealed: super
 
-# error: [unresolved-attribute] "Object of type `super` has no attribute `a`"
+# error: [missing-attribute] "Object of type `super` has no attribute `a`"
 super(B).a
 ```
 
@@ -512,7 +512,7 @@ def f(x: C | D):
     s = super(A, x)
     reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>
 
-    # error: [unresolved-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
+    # error: [missing-union-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
 def f(x: Literal["", "hello"]):
@@ -550,7 +550,7 @@ def f(flag: bool):
     reveal_type(s.x)  # revealed: int
     reveal_type(s.y)  # revealed: int | str
 
-    # error: [unresolved-attribute] "Attribute `a` is not defined on `<super: <class 'D'>, D>` in union `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"
+    # error: [missing-union-attribute] "Attribute `a` is not defined on `<super: <class 'D'>, D>` in union `<super: <class 'B'>, B> | <super: <class 'D'>, D>`"
     reveal_type(s.a)  # revealed: str
 ```
 
@@ -745,10 +745,10 @@ class A:
 class B(A):
     def __init__(self, a: int):
         super().__init__(a)
-        # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, Self@__init__>` has no attribute `a`"
+        # error: [missing-attribute] "Object of type `<super: <class 'B'>, Self@__init__>` has no attribute `a`"
         super().a
 
-# error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
+# error: [missing-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
 super(B, B(42)).a
 ```
 
@@ -773,9 +773,9 @@ super(B, B())[0]
 
 ### Generic base initializer
 
-A generic base initializer can inherit both its own class's generic context and the subclass's
-generic context. The merged context is not the same as the subclass's enclosing context and should
-not be freshened as a recursive reference.
+Inside `Child[S]`, the base initializer expects a callback that accepts `S`, even though `S`
+defaults to `BaseException`. For example, a `Child[ValueError]` could pass a `ValueError` to the
+callback, so a callback that only accepts `OSError` is too narrow.
 
 ```py
 from collections.abc import Callable
@@ -789,18 +789,21 @@ class Base(Generic[T]):
     def __init__(self, check: Callable[[T], bool] | None) -> None:
         self.check = check
 
+def has_filename(error: OSError) -> bool:
+    return error.filename is not None
+
 class Child(Base[S], Generic[S]):
     def __init__(self, check: Callable[[S], bool] | None) -> None:
-        # Regression test: Freshening the merged context made this expect
-        # `Callable[[BaseException], bool]` instead of `Callable[[S], bool]`.
-        super().__init__(check)
+        super().__init__(check)  # ok
+        # error: [invalid-argument-type] "Expected `((S@Child, /) -> bool) | None`"
+        super().__init__(has_filename)
 ```
 
-## Subclass Using Concrete Type Instead of `Self`
+## Inferring `Self` in `super()` calls
 
-When a parent class uses `Self` in a parameter type and a subclass overrides it with a concrete
-type, passing that parameter to `super().__init__()` is a type error. This is because `Self` in the
-parent could represent a further subclass. The fix is to use `Self` consistently in the subclass.
+A parent method's `Self` is inferred from both the receiver and the other arguments. Inferring it as
+`Child` accepts a `Child`-typed argument even when the receiver could be a further subclass; this
+does not require specializing the caller's own `Self` type variable.
 
 ```toml
 [environment]
@@ -818,18 +821,16 @@ class Parent:
 
 class Child(Parent):
     def __init__(self, children: Mapping[str, Child] | None = None) -> None:
-        # error: [invalid-argument-type] "Argument to `Parent.__init__` is incorrect: Expected `Mapping[str, Self@__init__] | None`, found `Mapping[str, Child] | None`"
-        super().__init__(children)
+        super().__init__(children)  # ok
+```
 
-# The fix is to use `Self` consistently in the subclass:
+The caller's `Self` type variable is also a valid argument for the parent's independently inferred
+`Self`:
 
-class Parent2:
+```py
+class ChildWithSelf(Parent):
     def __init__(self, children: Mapping[str, Self] | None = None) -> None:
-        self.children = children
-
-class Child2(Parent2):
-    def __init__(self, children: Mapping[str, Self] | None = None) -> None:
-        super().__init__(children)  # OK
+        super().__init__(children)  # ok
 ```
 
 ## Super in Protocol Classes

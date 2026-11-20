@@ -10,7 +10,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::render::{FullRenderer, Renderer};
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Span};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DummyFileResolver, Span};
 use ruff_notebook::Notebook;
 #[cfg(test)]
 use ruff_notebook::NotebookError;
@@ -24,7 +24,7 @@ use ruff_source_file::SourceFileBuilder;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::EmitterContext;
+use crate::message::RenderContext;
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
@@ -445,7 +445,10 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
         .chain(parsed.errors().iter().map(|parse_error| {
             Diagnostic::invalid_syntax(source_code.clone(), &parse_error.error, parse_error)
         }))
-        .sorted_by(Diagnostic::ruff_start_ordering)
+        .sorted_by(|a, b| {
+            a.rendering_sort_key(&DummyFileResolver)
+                .cmp(&b.rendering_sort_key(&DummyFileResolver))
+        })
         .collect();
     (messages, transformed)
 }
@@ -490,7 +493,7 @@ pub(crate) fn print_jupyter_messages(
         .with_fix_applicability(Applicability::DisplayOnly);
 
     FullRenderer::new(
-        &EmitterContext::new(&FxHashMap::from_iter([(
+        &RenderContext::new(&FxHashMap::from_iter([(
             path.file_name().unwrap().to_string_lossy().to_string(),
             notebook.index().clone(),
         )])),
@@ -506,7 +509,7 @@ pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
         .with_show_fix_status(true)
         .with_fix_applicability(Applicability::DisplayOnly);
 
-    FullRenderer::new(&EmitterContext::new(&FxHashMap::default()), &config)
+    FullRenderer::new(&RenderContext::new(&FxHashMap::default()), &config)
         .display(diagnostics)
         .to_string()
 }

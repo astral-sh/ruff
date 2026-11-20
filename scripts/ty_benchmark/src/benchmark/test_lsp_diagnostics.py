@@ -9,16 +9,18 @@ import tempfile
 from abc import ABC, abstractmethod
 from collections import Counter
 from collections.abc import Callable, Generator
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Final, override
 
 import pytest
 from lsprotocol import types as lsp
 
+from benchmark import benchmark_environment
 from benchmark.lsp_client import FileDiagnostics, LSPClient
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.projects import IncrementalEdit, Project
-from benchmark.tool import Pyrefly, Pyright, Tool, Ty
+from benchmark.tool import Pyrefly, Pyright, Tool, Ty, Zuban
 from benchmark.venv import Venv
 
 # Tools to benchmark (only those with LSP support).
@@ -26,6 +28,7 @@ TOOLS_TO_BENCHMARK: Final = [
     Ty(),
     Pyright(),
     Pyrefly(),
+    Zuban(),
 ]
 
 SEVERITY_LABELS: Final = {
@@ -44,6 +47,9 @@ def project_setup(
     """Set up a project and its venv once per module (shared across all tests for this project)."""
     project = request.param
     assert isinstance(project, Project)
+
+    if project.edit is None:
+        pytest.skip(f"{project.name} does not have an incremental edit")
 
     with tempfile.TemporaryDirectory() as tempdir:
         cwd = Path(tempdir)
@@ -118,10 +124,8 @@ def run_benchmark(
         edited_file_path.copy(edited_file_backup)
 
     try:
-        tool.write_config(project, venv)
-
         # Use asyncio.Runner to keep the same event loop alive across setup and measure.
-        with asyncio.Runner() as runner:
+        with tool.configure_lsp(project, venv), asyncio.Runner() as runner:
 
             def setup():
                 if edited_file_backup:
@@ -179,9 +183,10 @@ class LspTest(ABC):
         self.client = LSPClient()
         self.edit = edit
 
-    @property
+    @cached_property
     def cwd(self) -> Path:
-        return self.venv.project_path
+        # Use one physical path for process, workspace, and document identities.
+        return self.venv.project_path.resolve()
 
     @property
     def edited_file_path(self) -> Path:
@@ -218,10 +223,15 @@ class LspTest(ABC):
             pytest.skip(f"{self.tool.name()} doesn't support LSP")
             return
 
-        await self.client.start_io(*lsp_cmd, cwd=self.cwd)
+        await self.client.start_io(
+            *lsp_cmd, cwd=self.cwd, env=benchmark_environment(self.cwd)
+        )
 
         await self.client.initialize_async(
             lsp.InitializeParams(
+                initialization_options=self.tool.lsp_initialization_options(
+                    self.project, self.venv
+                ),
                 root_uri=self.cwd.as_uri(),
                 workspace_folders=[
                     lsp.WorkspaceFolder(uri=self.cwd.as_uri(), name=self.cwd.name)
@@ -279,7 +289,7 @@ class FetchDiagnostics(LspTest):
         if verbose:
             for file, diagnostics in self.diagnostics:
                 if diagnostics:
-                    print_diagnostics(file, diagnostics, self.venv.project_path)
+                    print_diagnostics(file, diagnostics, self.cwd)
 
 
 class IncrementalEditTest(LspTest):
@@ -410,7 +420,7 @@ class IncrementalEditTest(LspTest):
                 self.after_edit_diagnostics,
                 self.project.name,
                 self.tool.name(),
-                self.venv.project_path,
+                self.cwd,
             )
 
 

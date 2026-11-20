@@ -1,12 +1,12 @@
 use std::fmt::Write;
 use std::path::PathBuf;
 
+use ruff_benchmark::checkout::get_project_cache_dir;
 use ruff_benchmark::criterion;
-use ruff_benchmark::real_world_projects::{
-    TY_ECOSYSTEM_PIN, get_project_cache_dir, install_dependencies_to_cache,
-};
+use ruff_benchmark::real_world_projects::{TY_ECOSYSTEM_PIN, install_dependencies_to_cache};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use itertools::Itertools;
 use ty_project::metadata::python_version::SupportedPythonVersion;
 
 mod ty_shared;
@@ -140,6 +140,41 @@ fn benchmark_constraint_quantification(criterion: &mut Criterion) {
     }
 }
 
+/// Compare bottom sources and top targets against distinct signatures.
+fn benchmark_bottom_and_top_signature_comparisons(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for name in ["bottom", "top"] {
+        let mut code = String::from(
+            "\
+from typing import Any, Callable, Literal
+from ty_extensions import Bottom, Top
+",
+        );
+        for i in 0..128 {
+            let signature = format!("Callable[[Literal[{i}], str, bytes], int]");
+            let (source, target) = if name == "bottom" {
+                ("Bottom[Callable[..., Any]]", signature.as_str())
+            } else {
+                (signature.as_str(), "Top[Callable[..., object]]")
+            };
+            writeln!(
+                &mut code,
+                "\ndef check_{i}(source: {source}) -> None:\n    target: {target} = source"
+            )
+            .ok();
+        }
+
+        criterion.bench_function(&format!("ty_micro[{name}_signature_comparisons]"), |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |Case { db }| assert_eq!(db.check().len(), 0),
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
 /// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
 ///
 /// Each callable argument places a distinct union upper bound on `T` through callable-parameter
@@ -195,6 +230,143 @@ fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
     });
 }
 
+/// Bokeh's constructor combines a large literal alias with `str` in its receiver (ty#5046).
+fn benchmark_constructor_literal_alias(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for (name, receiver_arg, size) in [
+        ("union_28", "A | B", 28),
+        ("alias_12", "Alternatives[A, B]", 12),
+    ] {
+        let markers = (0..size).map(|i| format!("'marker{i}'")).join(", ");
+        let code = format!(
+            r#"
+            from typing import Literal, assert_type
+
+            type Alternatives[A, B] = A | B
+            type Marker = Literal[{markers}]
+
+            class Property[T]:
+                value: T
+
+            class Either[T](Property[T]):
+                def __init__[A, B](
+                    self: "Either[{receiver_arg}]", first: type[Property[A]], second: type[Property[B]]
+                ) -> None: ...
+
+            assert_type(Either(Property[Marker], Property[str]), Either[str])
+            "#
+        );
+        criterion.bench_function(
+            &format!("ty_micro[constructor_literal_alias/{name}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |Case { db }| assert_eq!(db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
+/// These constructors used to hang because recursive substitution kept reordering union
+/// members in their inferred type arguments (ty#5057).
+fn benchmark_constructor_union_specialization(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for (name, parameters, example) in [
+        (
+            "instances",
+            "first: PropertyArg[A], second: PropertyArg[B], third: PropertyArg[C]",
+            r#"
+            result = Either(
+                Property[Literal["start", "center", "end"]](),
+                Property[Literal["left", "center", "right"]](),
+                Property[float](),
+            )
+            assert_type(result, Either[Literal["start", "center", "end", "left", "right"] | float])
+            "#,
+        ),
+        (
+            "classes",
+            "first: type[Property[A]], second: type[Property[B]], third: type[Property[C]]",
+            "
+            result = Either(Property[float], Property[str | None], Property[bytes])
+            assert_type(result, Either[float | str | None | bytes])
+            ",
+        ),
+    ] {
+        for (suffix, typevars) in [("", "A, B, C"), ("_reversed", "C, B, A")] {
+            let code = format!(
+                r#"
+            from typing import Literal, assert_type
+
+            class Property[T]:
+                value: T
+
+            type PropertyArg[T] = type[Property[T]] | Property[T]
+
+            class Either[T](Property[T]):
+                def __init__[{typevars}](
+                    self: "Either[A | B | C]", {parameters}
+                ) -> None: ...
+            {example}
+            "#
+            );
+            criterion.bench_function(
+                &format!("ty_micro[constructor_union_specialization/{name}{suffix}]"),
+                |b| {
+                    b.iter_batched_ref(
+                        || setup_micro_case(&code),
+                        |Case { db }| assert_eq!(db.check().len(), 0),
+                        BatchSize::SmallInput,
+                    );
+                },
+            );
+        }
+    }
+}
+
+/// Rejecting `T <= int` contradicts `T <= bool`. Trying to disprove the expression on that
+/// branch can exhaust every combination of unrelated choices for `V`.
+fn benchmark_counterexample_behind_implied_bound(criterion: &mut Criterion) {
+    setup_rayon();
+    let choices = (0..22)
+        .map(|i| format!(
+            "(ConstraintSet.lower_bound(Literal[{}], V) | ConstraintSet.lower_bound(Literal[{}], V))",
+            2 * i, 2 * i + 1
+        ))
+        .join(" & ");
+    // Falsifying a long disjunction requires one continuous path through every bound.
+    let alternatives = (1000..1033)
+        .map(|i| format!("ConstraintSet.lower_bound(Literal[{i}], U)"))
+        .join(" | ");
+    let code = format!(
+        "
+        from typing import Literal
+        from ty_extensions import static_assert
+        from ty_extensions._internal import ConstraintSet
+
+        def check[T, U, V]():
+            t_bool = ConstraintSet.upper_bound(T, bool)
+            t_int = ConstraintSet.upper_bound(T, int)
+            u_int = ConstraintSet.upper_bound(U, int)
+            choices = {choices}
+            static_assert(not (~(t_bool & choices) | (u_int & t_int)))
+            alternatives = {alternatives}
+            static_assert(not (((t_int | ~choices) & t_bool) | alternatives))
+        "
+    );
+    criterion.bench_function("ty_micro[counterexample_behind_implied_bound]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Guards against quadratic pruning when contravariant callbacks contribute many upper-only bounds.
 fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
     const NUM_CALLBACKS: usize = 1_200;
@@ -225,6 +397,76 @@ fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Matching a tuple against `T | tuple[T]` makes either the tuple or its element a lower bound
+/// for `T`. Both violate the declared bound, and each union member doubles the number of paths.
+fn benchmark_incompatible_lower_bound_alternatives(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for members in [4, 8, 11, 12] {
+        let union = (0..members)
+            .map(|i| format!("tuple[Literal[{i}]]"))
+            .join(" | ");
+        let code = format!(
+            "from collections.abc import Callable
+from typing import Any, Literal, overload
+
+@overload
+def consume[T: list[Any]](make: Callable[[], T | tuple[T]]) -> None: ...
+@overload
+def consume(make: object) -> None: ...
+def consume(make: object) -> None: ...
+
+def check(make: Callable[[], {union}]) -> None:
+    consume(make)
+",
+        );
+
+        criterion.bench_function(
+            &format!("ty_micro[incompatible_lower_bound_alternatives/{members}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |Case { db }| assert_eq!(db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
+/// A long conjunction with only two solutions fits within the traversal budget.
+fn benchmark_long_valid_bound_prefix(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from(
+        "from typing import Any, Literal
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def check[T: tuple[Any]]() -> None:
+    bounds = (ConstraintSet.lower_bound(tuple[Literal[-1]], T)
+              | ConstraintSet.lower_bound(tuple[Literal[-2]], T))
+",
+    );
+    // Allocate the choice first so traversal reaches it after the 64 shared lower bounds.
+    for i in 0..64 {
+        writeln!(
+            &mut code,
+            "    bounds &= ConstraintSet.lower_bound(tuple[Literal[{i}]], T)"
+        )
+        .ok();
+    }
+    code.push_str("    static_assert(len(bounds.solutions(inferable=tuple[T])) == 2)\n");
+
+    criterion.bench_function("ty_micro[long_valid_bound_prefix]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
             BatchSize::SmallInput,
         );
     });
@@ -719,8 +961,14 @@ criterion_group!(
     benchmark_typevar_mapping_large_accumulation,
     benchmark_typevar_mapping_small_accumulations,
     benchmark_constraint_quantification,
+    benchmark_bottom_and_top_signature_comparisons,
     benchmark_factored_upper_bounds,
+    benchmark_constructor_literal_alias,
+    benchmark_constructor_union_specialization,
+    benchmark_counterexample_behind_implied_bound,
     benchmark_many_upper_bound_callbacks,
+    benchmark_incompatible_lower_bound_alternatives,
+    benchmark_long_valid_bound_prefix,
     benchmark_pandas_tdd,
     benchmark_mixed_typed_dict_union_copy,
     benchmark_missing_key_typed_dict_union_copy,

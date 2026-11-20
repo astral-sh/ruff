@@ -2,6 +2,9 @@ from argparse import Namespace
 
 a = Namespace()
 
+# Preserve the source spelling of identifiers that normalize to ASCII.
+𝓪.𝓫.𝓬
+
 (
     a
     # comment

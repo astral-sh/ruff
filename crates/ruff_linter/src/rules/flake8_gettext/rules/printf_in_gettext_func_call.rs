@@ -47,11 +47,11 @@ use crate::rules::flake8_gettext::is_ngettext_call;
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.260", category = Category::Suspicious)]
-pub(crate) struct PrintfInGetTextFuncCall {
+pub(crate) struct PrintfInGettextCall {
     is_plural: bool,
 }
 
-impl Violation for PrintfInGetTextFuncCall {
+impl Violation for PrintfInGettextCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.is_plural {
@@ -68,7 +68,7 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if is_printf_format(first) {
-            checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: false }, first.range());
+            checker.report_diagnostic(PrintfInGettextCall { is_plural: false }, first.range());
         }
     }
 
@@ -77,7 +77,7 @@ pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
         && let Some(second) = args.get(1)
         && is_printf_format(second)
     {
-        checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: true }, second.range());
+        checker.report_diagnostic(PrintfInGettextCall { is_plural: true }, second.range());
     }
 }
 

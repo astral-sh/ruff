@@ -3,19 +3,21 @@ use ruff_python_ast::name::Name;
 use ty_module_resolver::KnownModule;
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
-    place_table, use_def_map,
+    place_table, semantic_index, use_def_map,
 };
 
-use crate::place::known_module_symbol;
+use crate::place::{known_module_symbol, place_from_bindings};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::member::class_member;
 use crate::types::{
-    ClassBase, KnownClass, Parameter, Parameters, Signature, Specialization, StaticClassLiteral,
-    Type, binding_type, definition_expression_type,
+    BindingContext, BoundTypeVarInstance, ClassBase, GenericContext, KnownClass, Parameter,
+    Parameters, SelfTypeVarOrigin, Signature, Specialization, StaticClassLiteral, Type, UnionType,
+    binding_type, definition_expression_type,
 };
 use crate::{Db, ProgramEnvironment};
 
 /// Returns whether `class` is a subclass of Django's `Model`.
-fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+pub(in crate::types) fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
     class
         .iter_mro(db, None)
         .skip(1)
@@ -25,7 +27,7 @@ fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
 
 /// The type of a Django model field, and metadata extracted from the field construction.
 ///
-/// For example, the `isbn` field has type `CharField[str]` and `metadata.primary_key: true`:
+/// For example, `isbn` is a `CharField` with `metadata.primary_key` set to `true`.
 /// ```py
 /// class Book(models.Model):
 ///     isbn = CharField(max_length=13, primary_key=True)
@@ -87,6 +89,17 @@ impl<'db> Field<'db> {
                 .is_some_and(|choices| {
                     !definition_expression_type(db, definition, &choices.value).is_none(db)
                 });
+        field.metadata.null = call.arguments.find_keyword("null").is_some_and(|null| {
+            definition_expression_type(db, definition, &null.value) == Type::bool_literal(true)
+        });
+        field.metadata.to_field = call
+            .arguments
+            .find_keyword("to_field")
+            .and_then(|to_field| {
+                definition_expression_type(db, definition, &to_field.value)
+                    .as_string_literal()
+                    .map(|name| Name::new(name.value(db)))
+            });
         field
     }
 }
@@ -96,6 +109,8 @@ impl<'db> Field<'db> {
 struct FieldMetadata {
     primary_key: bool,
     has_choices: bool,
+    null: bool,
+    to_field: Option<Name>,
 }
 
 /// All fields defined on this Django model (not including base class fields).
@@ -135,6 +150,71 @@ fn own_model_fields<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Box
         .collect()
 }
 
+/// Metadata extracted from a Django model's `Meta` configuration.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct ModelMetadata {
+    is_abstract: bool,
+}
+
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn model_metadata<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelMetadata {
+    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    // Subclasses do not inherit `abstract = True`, so only inspect this model's own Meta.
+    let Some(meta) = own_meta(db, class) else {
+        return ModelMetadata::default();
+    };
+
+    for meta_base in meta.iter_mro(db, None).filter_map(ClassBase::into_class) {
+        let Some((meta_base, _)) = meta_base.static_class_literal(db) else {
+            return ModelMetadata::default();
+        };
+        // Django resets an abstract model's Meta.abstract to False during model creation.
+        // A child can inherit other options from that Meta, but must set abstract=True itself.
+        let enclosing_scope = meta_base.definition(db).scope(db);
+        if let Some(owner) = nearest_enclosing_class(
+            db,
+            semantic_index(db, enclosing_scope.program_file(db)),
+            enclosing_scope,
+        ) && owner != class
+            && is_model(db, owner)
+            && own_meta(db, owner) == Some(meta_base)
+        {
+            return ModelMetadata::default();
+        }
+
+        let scope = meta_base.body_scope(db);
+        let Some(symbol) = place_table(db, scope).symbol_id("abstract") else {
+            continue;
+        };
+        // The public type is widened to `bool`, so read the bindings' literal values instead.
+        let Some(abstract_flag) = place_from_bindings(
+            db,
+            &env,
+            use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
+        )
+        .place
+        .ignore_possibly_undefined() else {
+            continue;
+        };
+        return ModelMetadata {
+            is_abstract: abstract_flag == Type::bool_literal(true),
+        };
+    }
+    ModelMetadata::default()
+}
+
+fn own_meta<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<StaticClassLiteral<'db>> {
+    let meta = class_member(db, class.body_scope(db), "Meta")
+        .ignore_possibly_undefined()?
+        .as_class_literal()?
+        .as_static()?;
+    (meta.name(db).as_str() == "Meta" && meta.definition(db).scope(db) == class.body_scope(db))
+        .then_some(meta)
+}
+
 /// Provides synthesized attributes and methods for Django models.
 pub(in crate::types) fn synthesized_member<'db>(
     db: &'db dyn Db,
@@ -144,7 +224,12 @@ pub(in crate::types) fn synthesized_member<'db>(
     name: &str,
 ) -> Option<Type<'db>> {
     // A quick filter on the name, so that we can return quickly for almost all attribute names.
-    if !(matches!(name, "id" | "pk") || name.starts_with("get_") && name.ends_with("_display")) {
+    if !(matches!(name, "id" | "pk")
+        || name.ends_with("_id")
+        || name.starts_with("get_") && name.ends_with("_display")
+        || name.starts_with("get_next_by_")
+        || name.starts_with("get_previous_by_"))
+    {
         return None;
     }
     if !is_model(db, class) {
@@ -152,7 +237,9 @@ pub(in crate::types) fn synthesized_member<'db>(
     }
     match name {
         "id" | "pk" => primary_key_member(db, env, class, specialization, name),
-        _ => display_method(db, env, class, specialization, name),
+        _ => display_method(db, env, class, specialization, name)
+            .or_else(|| date_navigation_method(db, env, class, specialization, name))
+            .or_else(|| foreign_key_id_member(db, env, class, specialization, name)),
     }
 }
 
@@ -201,8 +288,16 @@ fn primary_key_member<'db>(
             break;
         }
         if let Some(field) = own_primary_key(db, base) {
-            return (name == "pk").then(|| field.apply_optional_specialization(db, specialization));
+            return (name == "pk").then(|| {
+                foreign_key_id_type(db, env, field, specialization)
+                    .unwrap_or_else(|| field.ty.apply_optional_specialization(db, specialization))
+            });
         }
+    }
+
+    // Abstract models do not have an automatic primary key.
+    if model_metadata(db, class).is_abstract {
+        return None;
     }
 
     known_module_symbol(db, env, KnownModule::DjangoDbModelsFields, "AutoField")
@@ -212,11 +307,76 @@ fn primary_key_member<'db>(
 }
 
 /// Find a field constructed with `primary_key=True` in this class body.
-fn own_primary_key<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<Type<'db>> {
+fn own_primary_key<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<&'db Field<'db>> {
     own_model_fields(db, class)
         .iter()
         .find(|field| field.metadata.primary_key)
-        .map(|field| field.ty)
+}
+
+/// Synthesize `<field>_id` attributes for foreign keys using the referenced field's type.
+///
+/// For example, `Book().author_id` has type `int`, matching `Author`'s automatic primary key:
+/// ```py
+/// class Author(models.Model):
+///     pass
+///
+/// class Book(models.Model):
+///     author = models.ForeignKey(Author, on_delete=models.CASCADE)
+/// ```
+fn foreign_key_id_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+    specialization: Option<Specialization<'db>>,
+    name: &str,
+) -> Option<Type<'db>> {
+    let field_name = name.strip_suffix("_id")?;
+    let field = own_model_fields(db, class)
+        .iter()
+        .find(|field| field.name == field_name)?;
+    foreign_key_id_type(db, env, field, specialization)
+}
+
+/// Return a relation field's stored ID type, used by both `<field>_id` and `pk`.
+fn foreign_key_id_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    field: &Field<'db>,
+    specialization: Option<Specialization<'db>>,
+) -> Option<Type<'db>> {
+    let field_ty = field.ty.apply_optional_specialization(db, specialization);
+    let foreign_key = KnownClass::DjangoForeignKey.try_to_class_literal(db, env)?;
+    if !field_ty
+        .nominal_class(db, env)?
+        .is_subtype_of_class_literal(db, foreign_key.into())
+    {
+        return None;
+    }
+
+    // django-types represents a foreign key declared with `null=True` as
+    // `ForeignKey[Author | None]`, so its `related_model` attribute has type
+    // `type[Author | None]`. Remove `None` from the instance type before looking up `pk`
+    // (or `to_field`) on `Author`. If `null=True`, add `None` to the
+    // resulting ID type: for example, an integer primary key becomes `int | None`.
+    let related_model = field_ty
+        .member(db, env, "related_model")
+        .place
+        .ignore_possibly_undefined()?
+        .to_instance_approximation(db, env)?
+        .filter_union(db, env, |ty| !ty.is_none(db));
+    let target_name = field.metadata.to_field.as_deref().unwrap_or("pk");
+    let id_ty = related_model
+        .member(db, env, target_name)
+        .place
+        .ignore_possibly_undefined()?;
+    Some(if field.metadata.null {
+        UnionType::from_elements(db, env, [id_ty, Type::none(db, env)])
+    } else {
+        id_ty
+    })
 }
 
 /// Synthesize `get_<field>_display()` for fields with `choices` defined.
@@ -227,7 +387,7 @@ fn display_method<'db>(
     specialization: Option<Specialization<'db>>,
     name: &str,
 ) -> Option<Type<'db>> {
-    let field_name = name.strip_prefix("get_")?.strip_suffix("_display")?;
+    let field_name = name.strip_circumfix("get_", "_display")?;
     let field = own_model_fields(db, class)
         .iter()
         .find(|field| field.name == field_name)?;
@@ -246,6 +406,55 @@ fn display_method<'db>(
             Parameter::positional_or_keyword(Name::new_static("self")).with_annotated_type(self_ty)
         ]),
         KnownClass::Str.to_instance(db, env),
+    );
+    Some(Type::function_like_callable(db, signature))
+}
+
+/// Synthesize `get_next_by_<field>()` and `get_previous_by_<field>()` for non-nullable date fields.
+fn date_navigation_method<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+    specialization: Option<Specialization<'db>>,
+    name: &str,
+) -> Option<Type<'db>> {
+    let field_name = name
+        .strip_prefix("get_next_by_")
+        .or_else(|| name.strip_prefix("get_previous_by_"))?;
+    let field = own_model_fields(db, class)
+        .iter()
+        .find(|field| field.name == field_name)?;
+    if field.metadata.null {
+        return None;
+    }
+    // We add these methods for all field types that inherit from `DateField`, like `DateTimeField`.
+    let date_field = KnownClass::DjangoDateField.try_to_class_literal(db, env)?;
+    let field_class = field.ty.nominal_class(db, env)?;
+    if !field_class.is_subtype_of_class_literal(db, date_field.into()) {
+        return None;
+    }
+
+    // Construct `def get_{next,previous}_by_<field>(self: Self, /, **kwargs: Any) -> Self`.
+    let self_typevar = BoundTypeVarInstance::synthetic_self(
+        db,
+        SelfTypeVarOrigin::Class(class.into()),
+        Type::instance(
+            db,
+            env,
+            class.apply_optional_specialization(db, specialization),
+        ),
+        BindingContext::Synthetic(env.program(db)),
+    );
+    let self_ty = Type::TypeVar(self_typevar);
+    let generic_context = GenericContext::from_typevar_instances(db, env, [self_typevar]);
+    let signature = Signature::new_generic(
+        Some(generic_context),
+        Parameters::standard([
+            Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(self_ty),
+            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                .with_annotated_type(Type::any()),
+        ]),
+        self_ty,
     );
     Some(Type::function_like_callable(db, signature))
 }

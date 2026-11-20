@@ -61,11 +61,11 @@ use crate::{Fix, Violation};
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
-pub(crate) struct InvalidFirstArgumentNameForMethod {
+pub(crate) struct InstanceMethodReceiverNotNamedSelf {
     argument_name: String,
 }
 
-impl Violation for InvalidFirstArgumentNameForMethod {
+impl Violation for InstanceMethodReceiverNotNamedSelf {
     const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -132,13 +132,13 @@ impl Violation for InvalidFirstArgumentNameForMethod {
 /// [PLW0211]: https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
-pub(crate) struct InvalidFirstArgumentNameForClassMethod {
+pub(crate) struct ClassMethodReceiverNotNamedCls {
     argument_name: String,
     // Whether the method is `__new__`
     is_new: bool,
 }
 
-impl Violation for InvalidFirstArgumentNameForClassMethod {
+impl Violation for ClassMethodReceiverNotNamedCls {
     const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -175,9 +175,9 @@ impl FunctionType {
     ) -> DiagnosticGuard<'a, 'b> {
         match self {
             Self::Method => checker
-                .report_diagnostic(InvalidFirstArgumentNameForMethod { argument_name }, range),
+                .report_diagnostic(InstanceMethodReceiverNotNamedSelf { argument_name }, range),
             Self::ClassMethod => checker.report_diagnostic(
-                InvalidFirstArgumentNameForClassMethod {
+                ClassMethodReceiverNotNamedCls {
                     argument_name,
                     is_new: false,
                 },
@@ -195,8 +195,8 @@ impl FunctionType {
 
     const fn rule(self) -> Rule {
         match self {
-            Self::Method => Rule::InvalidFirstArgumentNameForMethod,
-            Self::ClassMethod => Rule::InvalidFirstArgumentNameForClassMethod,
+            Self::Method => Rule::InstanceMethodReceiverNotNamedSelf,
+            Self::ClassMethod => Rule::ClassMethodReceiverNotNamedCls,
         }
     }
 }

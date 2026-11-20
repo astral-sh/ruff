@@ -110,8 +110,7 @@ impl FileScopeId {
     }
 
     pub fn to_scope_id<'db>(self, db: &'db dyn Db, file: ProgramFile<'db>) -> ScopeId<'db> {
-        let index = semantic_index(db, file);
-        index.scope_ids_by_scope[self]
+        semantic_index(db, file).scope_id(self)
     }
 
     pub fn is_generator_function(self, index: &SemanticIndex) -> bool {

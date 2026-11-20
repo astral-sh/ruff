@@ -1,7 +1,8 @@
 //! Tests the interaction of the `lint` configuration section
 
 use std::fs;
-use std::process::Command;
+use std::io;
+use std::process::{Command, Stdio};
 use std::str;
 
 use anyhow::Result;
@@ -19,6 +20,27 @@ impl CliTest {
         command.args(STDIN_BASE_OPTIONS);
         command
     }
+}
+
+#[test]
+fn verbose_logging_with_closed_stderr() -> Result<()> {
+    let case = CliTest::with_file("test.py", "import os\n")?;
+    let (reader, writer) = io::pipe()?;
+    drop(reader);
+
+    assert_cmd_snapshot!(case.check_command()
+        .args(["--isolated", "--verbose", "test.py"])
+        .stderr(writer), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
 }
 
 #[test]
@@ -1369,6 +1391,25 @@ fn rule_name_selector_cli_preview_enabled() -> Result<()> {
     ----- stderr -----
     ");
 
+    Ok(())
+}
+
+#[test]
+fn renamed_rule_selector() -> Result<()> {
+    let fixture = CliTest::with_file("test.py", "def f(): pass")?;
+    let old_name = "missing-return-type-undocumented-public-function";
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--select", old_name]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:5: missing-return-type-public-function: Missing return type annotation for public function `f`
+    Found 1 error.
+    1 unsafe fix available with `--fix --unsafe-fixes`.
+
+    ----- stderr -----
+    warning: `missing-return-type-undocumented-public-function` has been remapped to `missing-return-type-public-function`.
+    ");
     Ok(())
 }
 
@@ -3080,7 +3121,10 @@ requires-python = ">= 3.11"
 /// ```
 #[test]
 fn requires_python_no_tool_target_version_override() -> Result<()> {
-    let fixture = CliTest::new()?;
+    let fixture = CliTest::with_settings(|_, mut settings| {
+        settings.add_filter(r"\[\d{4}-\d{2}-\d{2}\]\[\d{2}:\d{2}:\d{2}\]", "[TIMESTAMP]");
+        settings
+    })?;
     fixture.write_file(
         "pyproject.toml",
         r#"[project]
@@ -3102,6 +3146,17 @@ requires-python = ">= 3.11"
             .arg("test.py")
             .arg("-")
     );
+
+    assert_cmd_snapshot!(fixture.check_command()
+        .args(["--verbose", "--no-respect-gitignore", "--show-settings", "--target-version=py310", "test.py"])
+        .stdout(Stdio::null()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    [TIMESTAMP][ruff::resolve][DEBUG] Using Ruff default settings
+    ");
 
     Ok(())
 }
@@ -4753,12 +4808,12 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     success: false
     exit_code: 2
     ----- stdout -----
-    normal.py:1:1: stable-test-rule: Hey this is a stable test rule.
-    normal.py:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
-    normal.py:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
-    normal.py:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
     normal.py:1:1: preview-test-rule: Hey this is a preview test rule.
     normal.py:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
+    normal.py:1:1: stable-test-rule: Hey this is a stable test rule.
+    normal.py:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    normal.py:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    normal.py:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
     panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
     [*] 1 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
@@ -4788,8 +4843,22 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     success: false
     exit_code: 2
     ----- stdout -----
+    preview-test-rule: Hey this is a preview test rule.
+    --> normal.py:1:1
+
+    redirected-to-test-rule: Hey this is a test rule that was redirected from another.
+    --> normal.py:1:1
+
     stable-test-rule: Hey this is a stable test rule.
     --> normal.py:1:1
+
+    stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    --> normal.py:1:1
+      |
+    1 + # fix from stable-test-rule-display-only-fix
+    2 | import os
+      |
+    note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
     stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
     --> normal.py:1:1
@@ -4805,20 +4874,6 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     2 | import os
       |
     note: This is an unsafe fix and may change runtime behavior
-
-    stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
-    --> normal.py:1:1
-      |
-    1 + # fix from stable-test-rule-display-only-fix
-    2 | import os
-      |
-    note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
-
-    preview-test-rule: Hey this is a preview test rule.
-    --> normal.py:1:1
-
-    redirected-to-test-rule: Hey this is a test rule that was redirected from another.
-    --> normal.py:1:1
 
     panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     --> panic.py:1:1
@@ -5034,7 +5089,7 @@ fn default_rules() -> Result<()> {
     	wait-for-process-in-async-function (ASYNC222),
     	blocking-open-call-in-async-function (ASYNC230),
     	blocking-sleep-in-async-function (ASYNC251),
-    	exec-builtin (S102),
+    	exec (S102),
     	try-except-pass (S110),
     	try-except-continue (S112),
     	blind-except (BLE001),
@@ -5044,8 +5099,8 @@ fn default_rules() -> Result<()> {
     	strip-with-multi-characters (B005),
     	mutable-argument-default (B006),
     	function-call-in-default-argument (B008),
-    	get-attr-with-constant (B009),
-    	set-attr-with-constant (B010),
+    	getattr-with-constant (B009),
+    	setattr-with-constant (B010),
     	jump-statement-in-finally (B012),
     	redundant-tuple-in-exception-handler (B013),
     	duplicate-handler-exception (B014),
@@ -5059,7 +5114,7 @@ fn default_rules() -> Result<()> {
     	useless-contextlib-suppress (B022),
     	function-uses-loop-variable (B023),
     	duplicate-try-block-exception (B025),
-    	star-arg-unpacking-after-keyword-arg (B026),
+    	star-arg-after-keyword (B026),
     	except-with-empty-tuple (B029),
     	except-with-non-exception-classes (B030),
     	reuse-of-groupby-generator (B031),
@@ -5088,24 +5143,24 @@ fn default_rules() -> Result<()> {
     	call-datetime-utcnow (DTZ003),
     	call-datetime-utcfromtimestamp (DTZ004),
     	debugger (T100),
-    	shebang-not-executable (EXE001),
-    	shebang-missing-executable-file (EXE002),
+    	non-executable-file-with-shebang (EXE001),
+    	executable-file-without-shebang (EXE002),
     	shebang-leading-whitespace (EXE004),
     	shebang-not-first-line (EXE005),
     	future-rewritable-type-annotation (FA100),
     	future-required-type-annotation (FA102),
-    	f-string-in-get-text-func-call (INT001),
-    	format-in-get-text-func-call (INT002),
-    	printf-in-get-text-func-call (INT003),
+    	f-string-in-gettext-call (INT001),
+    	format-in-gettext-call (INT002),
+    	printf-in-gettext-call (INT003),
     	implicit-string-concatenation-in-collection-literal (ISC004),
     	direct-logger-instantiation (LOG001),
-    	invalid-get-logger-argument (LOG002),
-    	undocumented-warn (LOG009),
-    	exc-info-outside-except-handler (LOG014),
+    	file-path-as-logger-name (LOG002),
+    	logging-warn-constant (LOG009),
+    	logging-exc-info-outside-except-handler (LOG014),
     	root-logger-call (LOG015),
     	logging-warn (G010),
     	logging-extra-attr-clash (G101),
-    	logging-exc-info (G201),
+    	logging-error-with-exc-info (G201),
     	logging-redundant-exc-info (G202),
     	unnecessary-placeholder (PIE790),
     	duplicate-class-field-definition (PIE794),
@@ -5134,7 +5189,7 @@ fn default_rules() -> Result<()> {
     	custom-type-var-for-self (PYI019),
     	quoted-annotation-in-stub (PYI020),
     	unaliased-collections-abc-set-import (PYI025),
-    	type-alias-without-annotation (PYI026),
+    	unannotated-type-alias-in-stub (PYI026),
     	str-or-repr-defined-in-stub (PYI029),
     	unnecessary-literal-union (PYI030),
     	any-eq-ne-annotation (PYI032),
@@ -5151,11 +5206,11 @@ fn default_rules() -> Result<()> {
     	unused-private-type-alias (PYI047),
     	stub-body-multiple-statements (PYI048),
     	unused-private-typed-dict (PYI049),
-    	no-return-argument-annotation-in-stub (PYI050),
+    	parameter-annotated-with-no-return (PYI050),
     	unannotated-assignment-in-stub (PYI052),
     	unnecessary-type-union (PYI055),
-    	byte-string-usage (PYI057),
-    	generator-return-from-iter-method (PYI058),
+    	deprecated-byte-string-type (PYI057),
+    	iter-method-with-generator-return-annotation (PYI058),
     	generic-not-last-base-class (PYI059),
     	redundant-none-literal (PYI061),
     	duplicate-literal-member (PYI062),
@@ -5173,8 +5228,8 @@ fn default_rules() -> Result<()> {
     	collapsible-if (SIM102),
     	needless-bool (SIM103),
     	return-in-try-except-finally (SIM107),
-    	enumerate-for-loop (SIM113),
-    	if-with-same-arms (SIM114),
+    	manual-loop-counter (SIM113),
+    	if-with-identical-branches (SIM114),
     	open-file-with-context-handler (SIM115),
     	multiple-with-statements (SIM117),
     	in-dict-keys (SIM118),
@@ -5209,7 +5264,7 @@ fn default_rules() -> Result<()> {
     	unused-import (F401),
     	import-shadowed-by-loop-var (F402),
     	late-future-import (F404),
-    	undefined-local-with-nested-import-star-usage (F406),
+    	non-module-level-star-import (F406),
     	future-feature-not-defined (F407),
     	percent-format-invalid-format (F501),
     	percent-format-expected-mapping (F502),
@@ -5283,17 +5338,17 @@ fn default_rules() -> Result<()> {
     	singledispatchmethod-function (PLE1520),
     	yield-from-in-async-function (PLE1700),
     	bidirectional-unicode (PLE2502),
-    	invalid-character-backspace (PLE2510),
-    	invalid-character-sub (PLE2512),
-    	invalid-character-esc (PLE2513),
-    	invalid-character-nul (PLE2514),
-    	invalid-character-zero-width-space (PLE2515),
+    	unescaped-backspace-character (PLE2510),
+    	unescaped-substitute-character (PLE2512),
+    	unescaped-escape-character (PLE2513),
+    	unescaped-null-character (PLE2514),
+    	unescaped-zero-width-space-character (PLE2515),
     	comparison-with-itself (PLR0124),
     	comparison-of-constant (PLR0133),
     	property-with-parameters (PLR0206),
     	manual-from-import (PLR0402),
     	redefined-argument-from-local (PLR1704),
-    	stop-iteration-return (PLR1708),
+    	raise-stop-iteration-in-generator (PLR1708),
     	useless-return (PLR1711),
     	boolean-chained-comparison (PLR1716),
     	sys-exit-alias (PLR1722),
@@ -5304,7 +5359,7 @@ fn default_rules() -> Result<()> {
     	useless-else-on-loop (PLW0120),
     	self-assigning-variable (PLW0127),
     	redeclared-assigned-name (PLW0128),
-    	assert-on-string-literal (PLW0129),
+    	assert-string-literal (PLW0129),
     	named-expr-without-context (PLW0131),
     	useless-exception-statement (PLW0133),
     	nan-comparison (PLW0177),
@@ -5332,7 +5387,7 @@ fn default_rules() -> Result<()> {
     	unnecessary-future-import (UP010),
     	lru-cache-without-parameters (UP011),
     	unnecessary-encode-utf8 (UP012),
-    	convert-named-tuple-functional-to-class (UP014),
+    	functional-named-tuple (UP014),
     	datetime-timezone-utc (UP017),
     	native-literals (UP018),
     	typing-text-str-alias (UP019),
@@ -5400,7 +5455,7 @@ fn default_rules() -> Result<()> {
     	assert-with-print-message (RUF030),
     	decimal-from-float-literal (RUF032),
     	post-init-default (RUF033),
-    	useless-if-else (RUF034),
+    	if-expr-with-identical-branches (RUF034),
     	invalid-assert-message-literal-argument (RUF040),
     	unnecessary-nested-literal (RUF041),
     	unnecessary-cast-to-int (RUF046),
@@ -5413,14 +5468,14 @@ fn default_rules() -> Result<()> {
     	unused-unpacked-variable (RUF059),
     	access-annotations-from-class-dict (RUF063),
     	duplicate-entry-in-dunder-all (RUF068),
-    	unused-noqa (RUF100),
-    	redirected-noqa (RUF101),
+    	unused-suppression-comment (RUF100),
+    	renamed-rule-in-suppression-comment (RUF101),
     	invalid-pyproject-toml (RUF200),
-    	raise-vanilla-class (TRY002),
+    	raise-exception-or-base-exception (TRY002),
     	type-check-without-type-error (TRY004),
     	verbose-raise (TRY201),
     	useless-try-except (TRY203),
-    	verbose-log-message (TRY401),
+    	redundant-exception-in-logging-message (TRY401),
     ]
     ",
     );
@@ -5460,6 +5515,32 @@ fn ruff_toml_is_linted() -> Result<()> {
 
     ----- stderr -----
     "#,
+    );
+
+    Ok(())
+}
+
+#[test]
+fn fix_redirected_selectors_with_rule_names() -> Result<()> {
+    let test = CliTest::with_file("ruff.toml", "lint.select = ['TCH002', 'TCH']\n")?;
+
+    assert_cmd_snapshot!(
+        test.check_command()
+            .args(["--preview", "--extend-select", "RUF201,RUF202", "--diff", "ruff.toml"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- ruff.toml
+    +++ ruff.toml
+    @@ -1 +1 @@
+    -lint.select = ['TCH002', 'TCH']
+    +lint.select = ['typing-only-third-party-import', 'TC']
+
+    Would fix 3 errors.
+
+    ----- stderr -----
+    "
     );
 
     Ok(())

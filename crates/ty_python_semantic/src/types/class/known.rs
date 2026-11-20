@@ -165,10 +165,13 @@ pub enum KnownClass {
     // Django
     DjangoModel,
     DjangoField,
+    DjangoDateField,
+    DjangoForeignKey,
     // Pydantic
     PydanticBaseModel,
     PydanticBaseSettings,
     PydanticConfigDict,
+    PydanticSettingsConfigDict,
     PydanticRootModel,
     PydanticStrict,
     // Pytest
@@ -293,9 +296,12 @@ impl KnownClass {
             | Self::UnittestTestCase
             | Self::DjangoModel
             | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => false,
@@ -432,9 +438,12 @@ impl KnownClass {
             | Self::UnittestTestCase
             | Self::DjangoModel
             | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => Some(Truthiness::Ambiguous),
@@ -561,9 +570,12 @@ impl KnownClass {
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
             | KnownClass::DjangoField
+            | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticSettingsConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
@@ -682,13 +694,15 @@ impl KnownClass {
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
             | KnownClass::DjangoField
+            | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
 
-            KnownClass::PydanticConfigDict => true,
+            KnownClass::PydanticConfigDict | KnownClass::PydanticSettingsConfigDict => true,
         }
     }
 
@@ -803,9 +817,12 @@ impl KnownClass {
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
             | KnownClass::DjangoField
+            | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticSettingsConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
@@ -936,9 +953,12 @@ impl KnownClass {
             | Self::UnittestTestCase
             | Self::DjangoModel
             | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => false,
@@ -1058,9 +1078,12 @@ impl KnownClass {
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
             | KnownClass::DjangoField
+            | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticSettingsConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
@@ -1192,9 +1215,12 @@ impl KnownClass {
             Self::UnittestTestCase => "TestCase",
             Self::DjangoModel => "Model",
             Self::DjangoField => "Field",
+            Self::DjangoDateField => "DateField",
+            Self::DjangoForeignKey => "ForeignKey",
             Self::PydanticBaseModel => "BaseModel",
             Self::PydanticBaseSettings => "BaseSettings",
             Self::PydanticConfigDict => "ConfigDict",
+            Self::PydanticSettingsConfigDict => "SettingsConfigDict",
             Self::PydanticRootModel => "RootModel",
             Self::PydanticStrict => "Strict",
             Self::PytestParametrizeMarkDecorator => "_ParametrizeMarkDecorator",
@@ -1616,8 +1642,8 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike => KnownModule::TyExtensions,
-            Self::ConstraintSet
+            Self::NamedTupleLike
+            | Self::ConstraintSet
             | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
@@ -1630,9 +1656,12 @@ impl KnownClass {
             Self::FunctoolsPartial => KnownModule::Functools,
             Self::UnittestTestCase => KnownModule::UnittestCase,
             Self::DjangoModel => KnownModule::DjangoDbModelsBase,
-            Self::DjangoField => KnownModule::DjangoDbModelsFields,
+            Self::DjangoField | Self::DjangoDateField => KnownModule::DjangoDbModelsFields,
+            Self::DjangoForeignKey => KnownModule::DjangoDbModelsFieldsRelated,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
-            Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
+            Self::PydanticBaseSettings | Self::PydanticSettingsConfigDict => {
+                KnownModule::PydanticSettingsMain
+            }
             Self::PydanticConfigDict => KnownModule::PydanticConfig,
             Self::PydanticRootModel => KnownModule::PydanticRootModel,
             Self::PydanticStrict => KnownModule::PydanticTypes,
@@ -1755,9 +1784,12 @@ impl KnownClass {
             | Self::UnittestTestCase
             | Self::DjangoModel
             | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => false,
@@ -1860,6 +1892,8 @@ impl KnownClass {
             "EllipsisType" => &[Self::EllipsisType],
             "NotImplementedType" => &[Self::NotImplementedType],
             "Field" => &[Self::Field, Self::DjangoField],
+            "DateField" => &[Self::DjangoDateField],
+            "ForeignKey" => &[Self::DjangoForeignKey],
             "KW_ONLY" => &[Self::KwOnly],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
@@ -1878,6 +1912,7 @@ impl KnownClass {
             "BaseModel" => &[Self::PydanticBaseModel],
             "BaseSettings" => &[Self::PydanticBaseSettings],
             "ConfigDict" => &[Self::PydanticConfigDict],
+            "SettingsConfigDict" => &[Self::PydanticSettingsConfigDict],
             "RootModel" => &[Self::PydanticRootModel],
             "Strict" => &[Self::PydanticStrict],
             "_ParametrizeMarkDecorator" => &[Self::PytestParametrizeMarkDecorator],
@@ -1987,9 +2022,12 @@ impl KnownClass {
             | Self::UnittestTestCase
             | Self::DjangoModel
             | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => {

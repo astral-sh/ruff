@@ -14,7 +14,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
 };
-use ruff_linter::message::{EmitterContext, create_panic_diagnostic, render_diagnostics};
+use ruff_linter::message::{RenderContext, create_panic_diagnostic, render_diagnostics};
 use ruff_linter::settings::types::OutputFormat;
 use ruff_markdown::{MarkdownResult, format_code_blocks};
 use ruff_notebook::NotebookIndex;
@@ -38,7 +38,7 @@ use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFile, SourceFile
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, Resolver, match_exclusion, project_files_in_path,
+    ResolvedFile, Resolver, RootSettings, match_exclusion, project_files_in_path,
 };
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -71,13 +71,13 @@ impl FormatMode {
 pub(crate) fn format(
     cli: FormatArguments,
     config_arguments: &ConfigArguments,
-    pyproject_config: &PyprojectConfig,
+    root_settings: &RootSettings,
 ) -> Result<ExitStatus> {
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
-    let (paths, resolver) = project_files_in_path(&files, pyproject_config, config_arguments)?;
+    let (paths, resolver) = project_files_in_path(&files, root_settings, config_arguments)?;
 
-    let output_format = pyproject_config.settings.output_format;
+    let output_format = root_settings.resolved.settings.output_format;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -591,14 +591,17 @@ impl<'a> FormatResults<'a> {
                 }
             })
             .collect();
-        let diagnostics: Vec<_> = errors
+        let mut diagnostics: Vec<_> = errors
             .iter()
             .map(Diagnostic::from)
             .chain(self.to_diagnostics(&mut notebook_index))
-            .sorted_unstable_by(Diagnostic::ruff_start_ordering)
             .collect();
 
-        let context = EmitterContext::new(&notebook_index);
+        let context = RenderContext::new(&notebook_index);
+        diagnostics.sort_unstable_by(|a, b| {
+            a.rendering_sort_key(&context)
+                .cmp(&b.rendering_sort_key(&context))
+        });
         let config = DisplayDiagnosticConfig::new("ruff")
             .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
@@ -1092,7 +1095,7 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             // ```
             Rule::MissingTrailingComma,
             // The formatter always removes blank lines before the docstring.
-            Rule::IncorrectBlankLineBeforeClass,
+            Rule::IncorrectBlankLineBeforeClassDocstring,
         ] {
             if setting.linter.rules.enabled(rule) {
                 incompatible_rules.insert(rule);
@@ -1345,19 +1348,19 @@ mod tests {
         let _s = settings.bind_to_scope();
 
         assert_snapshot!(str::from_utf8(&buf)?, @"
-        io: test.py: Permission denied
+        panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
+        --> test.py:1:1
+        info: This indicates a bug in Ruff.
+        info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
+        info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
+
+        io: Cannot write to file
         --> test.py:1:1
 
         io: File not found
         --> test.py:1:1
 
-        internal-error: Expected index or slice expression
-        --> test.py:1:1
-
-        io: Cannot write to file
-        --> test.py:1:1
-
-        invalid-cli-option: Range formatting is only supported for Python files.
+        io: test.py: Permission denied
         --> test.py:1:1
 
         invalid-syntax: Unexpected indentation
@@ -1366,11 +1369,11 @@ mod tests {
         1 | 1
           | ^
 
-        panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
+        invalid-cli-option: Range formatting is only supported for Python files.
         --> test.py:1:1
-        info: This indicates a bug in Ruff.
-        info: If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, we'd be very appreciative!
-        info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
+
+        internal-error: Expected index or slice expression
+        --> test.py:1:1
         ");
 
         Ok(())

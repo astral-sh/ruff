@@ -25,10 +25,10 @@ def _(
     reveal_type(e)  # revealed: Unknown
     reveal_type(f)  # revealed: Unknown
 
-# error: [empty-body] "Function always implicitly returns `None`, which is not assignable to return type `TypeGuard[str]`"
+# error: [invalid-implicit-return-in-function-with-stub-body] "Function always implicitly returns `None`, which is not assignable to return type `TypeGuard[str]`"
 def _(a) -> TypeGuard[str]: ...
 
-# error: [empty-body] "Function always implicitly returns `None`, which is not assignable to return type `TypeIs[str]`"
+# error: [invalid-implicit-return-in-function-with-stub-body] "Function always implicitly returns `None`, which is not assignable to return type `TypeIs[str]`"
 def _(a) -> TypeIs[str]: ...
 def f(a) -> TypeGuard[str]:
     return True
@@ -88,8 +88,7 @@ class _:
     def _(*, a) -> TypeGuard[str]: ...
 ```
 
-For `TypeIs` functions, the narrowed type must be assignable to the declared type of that parameter,
-if any.
+The narrowed type in a `TypeIs` function must be assignable to the declared parameter type.
 
 ```pyi
 from typing import Any
@@ -100,12 +99,78 @@ def _(a: Any) -> TypeIs[str]: ...
 def _(a: tuple[object]) -> TypeIs[tuple[str]]: ...
 def _(a: str | Any) -> TypeIs[str]: ...
 def _(a) -> TypeIs[str]: ...
+```
 
-# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
+If the narrowed type is incompatible and disjoint from the parameter type, ty reports an error:
+
+```pyi
+# snapshot: disjoint-type-is-narrowing
 def _(a: int) -> TypeIs[str]: ...
+```
 
-# error: [invalid-type-guard-definition] "Narrowed type `int` is not assignable to the declared parameter type `bool | str`"
+```snapshot
+error[disjoint-type-is-narrowing]: Narrowed type `str` is disjoint from the declared parameter type `int`
+  --> src/mdtest_snippet.pyi:49:18
+   |
+49 | def _(a: int) -> TypeIs[str]: ...
+   |                  ^^^^^^^^^^^
+info: `int` is disjoint from `str`
+info: `str` and `int` are disjoint due to incompatible instance layouts
+```
+
+```pyi
+# snapshot: disjoint-type-is-narrowing
+def _(a: list[int]) -> TypeIs[list[str]]: ...
+```
+
+```snapshot
+error[disjoint-type-is-narrowing]: Narrowed type `list[str]` is disjoint from the declared parameter type `list[int]`
+  --> src/mdtest_snippet.pyi:51:24
+   |
+51 | def _(a: list[int]) -> TypeIs[list[str]]: ...
+   |                        ^^^^^^^^^^^^^^^^^
+info: `list[int]` is disjoint from `list[str]`
+info: `str` and `int` are not mutual subtypes of each other, but must be due to invariance
+```
+
+An incompatible narrowing to a type that can overlap the parameter type produces a warning. Here,
+`int` overlaps with `bool` but is too broad for the parameter:
+
+```pyi
+# snapshot: suspicious-type-is-narrowing
 def _(a: bool | str) -> TypeIs[int]: ...
+```
+
+```snapshot
+warning[suspicious-type-is-narrowing]: Narrowed type `int` is not assignable to the declared parameter type `bool | str`
+  --> src/mdtest_snippet.pyi:53:25
+   |
+53 | def _(a: bool | str) -> TypeIs[int]: ...
+   |                         ^^^^^^^^^^^
+info: This is not necessarily unsound, but may indicate a mistake in the signature
+```
+
+## `TypeIs` narrowing to or from `Never`
+
+`Never` is a subtype of every type, so `TypeIs[Never]` satisfies the assignability requirement for
+any parameter type. It can describe a predicate that always returns `False`.
+
+```pyi
+from typing_extensions import Never, TypeIs
+
+def always_false(a: int) -> TypeIs[Never]: ...  # ok
+def unreachable(a: Never) -> TypeIs[Never]: ...  # ok
+```
+
+A `Never` parameter follows the same assignability rule. `Any` is assignable to `Never` because it
+can materialize to `Never`.
+
+```pyi
+from typing import Any
+
+# error: [disjoint-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `Never`"
+def narrow_to_str(a: Never) -> TypeIs[str]: ...
+def narrow_to_any(a: Never) -> TypeIs[Any]: ...  # ok
 ```
 
 ## Overloaded definitions
@@ -115,20 +180,20 @@ diagnostic.
 
 ```pyi
 from typing import overload
-from typing_extensions import Never, TypeIs
+from typing_extensions import TypeIs
 
 @overload
-# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
-def one_invalid(value: Never) -> TypeIs[bool]: ...
+# error: [disjoint-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `int`"
+def one_invalid(value: int) -> TypeIs[str]: ...
 @overload
-def one_invalid(value: object) -> TypeIs[str]: ...
+def one_invalid(value: str) -> TypeIs[str]: ...
 
 # Two distinct invalid overloads should each report their own diagnostic.
 @overload
-# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
-def two_invalid(value: Never) -> TypeIs[bool]: ...
+# error: [disjoint-type-is-narrowing] "Narrowed type `int` is disjoint from the declared parameter type `str`"
+def two_invalid(value: str) -> TypeIs[int]: ...
 @overload
-# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
+# error: [disjoint-type-is-narrowing] "Narrowed type `str` is disjoint from the declared parameter type `int`"
 def two_invalid(value: int) -> TypeIs[str]: ...
 ```
 
@@ -239,16 +304,16 @@ from typing_extensions import Literal, TypeGuard, TypeIs, assert_never
 
 def _(a: object, flag: bool) -> TypeGuard[str]:
     if flag:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal[0]`"
+        # error: [invalid-explicit-return] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal[0]`"
         return 0
 
-    # error: [invalid-return-type] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal["foo"]`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `TypeGuard[str]`, found `Literal["foo"]`"
     return "foo"
 
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `TypeIs[str]`"
+# error: [invalid-implicit-return] "Function can implicitly return `None`, which is not assignable to return type `TypeIs[str]`"
 def f(a: object, flag: bool) -> TypeIs[str]:
     if flag:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `TypeIs[str]`, found `float*`"
+        # error: [invalid-explicit-return] "Return type does not match returned value: expected `TypeIs[str]`, found `float*`"
         return 1.2
 
 def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
@@ -260,7 +325,7 @@ def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
 ```
 
 A valid boolean return must also be accepted when the predicate's return annotation is an alias of
-`TypeIs` or `TypeGuard`, rather than incorrectly producing an `invalid-return-type` diagnostic.
+`TypeIs` or `TypeGuard`, rather than incorrectly producing an `invalid-explicit-return` diagnostic.
 
 ```py
 from typing_extensions import TypeAliasType
@@ -571,6 +636,60 @@ def _(arg: Callable[[object], str] | Callable[[object], int]):
 def _(arg: Callable[[str], object] | Callable[[int], object]):
     if is_callable_that_takes_str(arg):
         reveal_type(arg)  # revealed: (str, /) -> object
+```
+
+## Generic union parameters
+
+Guards infer type arguments separately for each union member, so narrowing preserves the selected
+member's specialization. `TypeGuard` narrows only its positive branch; `TypeIs` also narrows its
+negative branch.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypeGuard, TypeIs
+
+T = TypeVar("T", covariant=True)
+E = TypeVar("E", covariant=True)
+
+class Ok(Generic[T]): ...
+class Err(Generic[E]): ...
+
+def guard_error(value: Ok[T] | Err[E]) -> TypeGuard[Err[E]]:
+    return isinstance(value, Err)
+
+def is_error(value: Ok[T] | Err[E]) -> TypeIs[Err[E]]:
+    return isinstance(value, Err)
+
+def check(value: Ok[int] | Err[str]):
+    if reveal_type(guard_error(value)):  # revealed: TypeGuard[Err[str] @ value]
+        reveal_type(value)  # revealed: Err[str]
+    else:
+        reveal_type(value)  # revealed: Ok[int] | Err[str]
+
+def check_is(value: Ok[int] | Err[str]):
+    if reveal_type(is_error(value)):  # revealed: TypeIs[Err[str] @ value]
+        reveal_type(value)  # revealed: Err[str]
+    else:
+        reveal_type(value)  # revealed: Ok[int] & ~Err[str]
+```
+
+PEP 695 functions preserve the specialization when the union members are reversed:
+
+```py
+def guard_error_pep695[T, E](value: Ok[T] | Err[E]) -> TypeGuard[Err[E]]:
+    return isinstance(value, Err)
+
+def is_error_pep695[T, E](value: Ok[T] | Err[E]) -> TypeIs[Err[E]]:
+    return isinstance(value, Err)
+
+def check_pep695(value: Err[str] | Ok[int]):
+    reveal_type(guard_error_pep695(value))  # revealed: TypeGuard[Err[str] @ value]
+    reveal_type(is_error_pep695(value))  # revealed: TypeIs[Err[str] @ value]
 ```
 
 ## `TypeIs` narrowing with generic classes and gradual types
@@ -1296,6 +1415,50 @@ def overwritten_target(value: object):
         reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysFalsy
     else:
         reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysTruthy
+```
+
+## Negative TypeIs narrowing with recursive unions
+
+Excluding a recursive union still exposes its literal exclusions. Removing `True` from `bool` leaves
+a value whose truthiness is known.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, assert_type
+from typing_extensions import TypeIs
+
+type RecursiveBool = Literal[True] | list[RecursiveBool]
+
+def is_recursive_bool(value: object) -> TypeIs[RecursiveBool]:
+    raise NotImplementedError
+
+def f(value: bool):
+    if not is_recursive_bool(value):
+        assert_type(bool(value), Literal[False])
+```
+
+Excluding an enum member also narrows the remaining members' `name` and `value` attributes.
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+type RecursiveColor = Literal[Color.RED] | list[RecursiveColor]
+
+def is_recursive_color(value: object) -> TypeIs[RecursiveColor]:
+    raise NotImplementedError
+
+def f(value: Color):
+    if not is_recursive_color(value):
+        assert_type(value.name, Literal["BLUE"])
+        assert_type(value.value, Literal[2])
 ```
 
 ## Recursive TypeIs targets

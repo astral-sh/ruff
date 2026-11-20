@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
@@ -72,12 +73,12 @@ impl Violation for VerboseDecimalConstructor {
 }
 
 /// FURB157
-pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["decimal", "Decimal"]))
-    {
+pub(crate) fn verbose_decimal_constructor(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if !matches!(qualified_name.segments(), ["decimal", "Decimal"]) {
         return;
     }
 

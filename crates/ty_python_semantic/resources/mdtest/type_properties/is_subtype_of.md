@@ -1743,14 +1743,16 @@ static_assert(is_subtype_of(RegularCallableTypeOf[variadic_keyword], RegularCall
 static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_keyword], RegularCallableTypeOf[standard_variadic_float]))
 ```
 
-The keyword part of the standard parameter can be matched against keyword-only parameter with the
-same name if the keyword-variadic parameter is absent.
+An optional keyword-only parameter with the same name accepts the keyword form of the call. The
+positional form passes its argument to `*args` and leaves that keyword-only parameter unset.
 
 ```py
-def variadic_a(*args: int, a: int) -> None: ...
+def variadic_a(*args: int, a: int = 0) -> None: ...
+def required_a(*args: int, a: int) -> None: ...
 def variadic_b(*args: int, b: int) -> None: ...
 
 static_assert(is_subtype_of(RegularCallableTypeOf[variadic_a], RegularCallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[required_a], RegularCallableTypeOf[standard_int]))
 # The parameter name is different
 static_assert(not is_subtype_of(RegularCallableTypeOf[variadic_b], RegularCallableTypeOf[standard_int]))
 ```
@@ -2016,6 +2018,17 @@ static_assert(not is_subtype_of(Callable[[], object], Callable[..., object]))
 static_assert(not is_subtype_of(Callable[..., object], Callable[[], object]))
 ```
 
+An optional positional-only parameter of type `object` can accept any first argument. A narrower
+type restricts which calls the function accepts.
+
+```py
+def any_first(value: object = None, /, *args: object, **kwargs: object) -> None: ...
+def string_first(value: str = "", /, *args: object, **kwargs: object) -> None: ...
+
+static_assert(is_subtype_of(RegularCallableTypeOf[any_first], Callable[..., None]))
+static_assert(not is_subtype_of(RegularCallableTypeOf[string_first], Callable[..., None]))
+```
+
 According to the spec, `*args: Any, **kwargs: Any` is equivalent to `...`. This is a subtle but
 important distinction. No materialization of the former signature (if taken literally) can have any
 required arguments, but `...` can materialize to a signature with required arguments. The below test
@@ -2061,8 +2074,9 @@ static_assert(is_subtype_of(BottomCallable, RegularCallableTypeOf[gradual_prefix
 
 #### Object-variadic callables with matching gradual prefixes
 
-Object-variadic callables are subtypes of gradual callables when their required positional
-parameters match the gradual callable's prefix.
+An object-variadic callable with a matching positional-only prefix accepts every materialization of
+the gradual tail. A positional-or-keyword source parameter can receive a second value from a target
+call such as `callback(1, value=2)`.
 
 ```py
 from typing import Callable, Concatenate
@@ -2074,7 +2088,7 @@ def positional_only(value: int, /, *args: object, **kwargs: object) -> None: ...
 
 type GradualIntCallable = Callable[Concatenate[int, ...], None]
 
-static_assert(is_subtype_of(RegularCallableTypeOf[positional_or_keyword], GradualIntCallable))
+static_assert(not is_subtype_of(RegularCallableTypeOf[positional_or_keyword], GradualIntCallable))
 static_assert(is_subtype_of(RegularCallableTypeOf[positional_only], GradualIntCallable))
 ```
 

@@ -92,9 +92,6 @@ pub(crate) struct Session {
     /// Initialization options that were provided by the client during server initialization.
     initialization_options: InitializationOptions,
 
-    /// The uv integrations enabled for the lifetime of this server.
-    use_uv: UseUv,
-
     /// Shares one progress indicator while script synchronization requests are outstanding.
     script_progress: ScriptProgress,
 
@@ -184,8 +181,6 @@ impl Session {
             workspaces.register(uri)?;
         }
 
-        let use_uv = initialization_options.use_uv(&*native_system);
-
         Ok(Self {
             native_system,
             position_encoding,
@@ -194,7 +189,6 @@ impl Session {
             deferred_messages: VecDeque::new(),
             index: Some(index),
             initialization_options,
-            use_uv,
             script_progress: ScriptProgress::default(),
             global_settings: Arc::new(GlobalSettings::default()),
             projects: BTreeMap::new(),
@@ -296,13 +290,15 @@ impl Session {
         let db = &mut project.db;
         let environments = db.uv_environments().clone();
         let changes = environments.poll_sync(db);
-        if matches!(
-            changes.project,
-            Some(ProjectReloadResult::Changed {
-                files_changed: true,
-            })
-        ) {
-            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+        if self.global_settings.diagnostic_mode().is_workspace()
+            && matches!(
+                changes.project,
+                Some(ProjectReloadResult::Changed {
+                    files_changed: true,
+                })
+            )
+        {
+            let scripts = db.project().scripts_to_synchronize(db);
             Self::synchronize_closed_scripts(
                 db,
                 &scripts,
@@ -368,6 +364,9 @@ impl Session {
         for &file in scripts {
             // Open and save handle editor documents separately. Their metadata may contain
             // unsaved changes, including overlays that are not in the diagnostic open-file set.
+            // If a project reload selects uv for an open script, we accept that
+            // a user must save or reopen the document to request a sync. This avoids rereading open scripts
+            // on reload to check whether their inline metadata matches what uv will read from disk.
             if db.document(file).is_some() {
                 continue;
             }
@@ -556,13 +555,15 @@ impl Session {
 
         let capabilities = self.resolved_client_capabilities;
         let script_progress = self.script_progress.clone();
+        let workspace_diagnostics = self.global_settings.diagnostic_mode().is_workspace();
         let db = self.project_db_mut(path);
         let result = db.apply_changes(changes);
         if let Some(project_path) = result.project_sync_path() {
             db.uv_environments()
                 .request_project_sync(db, project_path, &|db, project| {
-                    Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
+                    Some(Box::new(LazyWorkDoneProgress::new(
                         client,
+                        None,
                         WorkDoneProgressBegin {
                             title: format!("Refreshing {} metadata", project.name(db)),
                             cancellable: Some(false),
@@ -573,8 +574,10 @@ impl Session {
                     )))
                 });
         }
-        let scripts = result.scripts_to_synchronize(db);
-        Self::synchronize_closed_scripts(db, &scripts, client, capabilities, &script_progress);
+        if workspace_diagnostics {
+            let scripts = result.scripts_to_synchronize(db);
+            Self::synchronize_closed_scripts(db, &scripts, client, capabilities, &script_progress);
+        }
         self.update_file_watcher(client);
         result
     }
@@ -675,9 +678,22 @@ impl Session {
             let global_settings = global_options.into_settings();
             self.global_settings = Arc::new(global_settings);
         }
-        if let Some(check_mode) = self.global_settings.diagnostic_mode().to_check_mode() {
+        let diagnostic_mode = self.global_settings.diagnostic_mode();
+        if let Some(check_mode) = diagnostic_mode.to_check_mode() {
             for project in self.projects.values_mut() {
-                project.db.set_check_mode(check_mode);
+                let db = &mut project.db;
+                db.set_check_mode(check_mode);
+                // A new folder's settings can enable workspace diagnostics for existing projects.
+                if diagnostic_mode.is_workspace() {
+                    let scripts = db.project().scripts_to_synchronize(db);
+                    Self::synchronize_closed_scripts(
+                        db,
+                        &scripts,
+                        client,
+                        self.resolved_client_capabilities,
+                        &self.script_progress,
+                    );
+                }
             }
         }
 
@@ -779,8 +795,7 @@ impl Session {
             )
         } else {
             ProjectMetadata::discover(workspace_directory, &system)
-        }
-        .map(|metadata| metadata.with_use_uv(self.use_uv));
+        };
 
         let (mut metadata, discovery_result) =
             match metadata.context("Failed to discover project configuration") {
@@ -792,7 +807,7 @@ impl Session {
                         None,
                         &UseDefaultStrategy,
                     );
-                    (metadata.with_use_uv(self.use_uv), Err(err))
+                    (metadata, Err(err))
                 }
             };
 
@@ -800,8 +815,29 @@ impl Session {
             metadata.set_fallback_options(fallback_options.clone());
         }
 
-        if let Some(override_options) = workspace.settings.override_options() {
-            metadata.set_override_options(override_options.clone());
+        // Untrusted workspaces disable uv. In trusted workspaces, `TY_UV` takes precedence
+        // for both workspace discovery and scripts. When it is unset, discovery uses
+        // `experimental.useUv`. For scripts, `project-manager.script` in `ty.configuration` wins
+        // over `experimental.useUv`, and either editor setting overrides script or project configuration.
+        let uv_override = self.initialization_options.uv_override(&system);
+        let legacy_uv = self.initialization_options.experimental_use_uv();
+        let uv_workspace_discovery = uv_override
+            .as_deref()
+            .or(legacy_uv.as_deref())
+            .copied()
+            .is_some_and(UseUv::workspace_discovery_enabled);
+        metadata = metadata.with_uv_workspace_discovery(uv_workspace_discovery);
+
+        let editor_options = workspace
+            .settings
+            .override_options()
+            .cloned()
+            .unwrap_or_default();
+        let overrides = Options::from_uv_mode(uv_override)
+            .combine(editor_options)
+            .combine(Options::from_uv_mode(legacy_uv));
+        if overrides != Options::default() {
+            metadata.set_override_options(overrides);
         }
 
         // Load user configuration even if project discovery failed.
@@ -812,7 +848,7 @@ impl Session {
                     .context("Failed to apply configuration files"),
             )
             .and_then(|()| {
-                if metadata.use_uv().workspace_discovery_enabled() {
+                if metadata.uv_workspace_discovery_enabled() {
                     let workspace = UvWorkspace::discover(workspace_directory, &system);
                     metadata
                         .apply_uv_workspace(&system, workspace)
@@ -821,7 +857,7 @@ impl Session {
                 ProjectDatabase::fallible(metadata.clone(), system.clone())
             });
 
-        let mut db = project.unwrap_or_else(|err| {
+        let db = project.unwrap_or_else(|err| {
             tracing::error!(
                 "Failed to load project for workspace `{uri}`: {err:#}. \
                  Continuing with valid settings"
@@ -835,17 +871,8 @@ impl Session {
 
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);
-        let untracked = previous
-            .map(|state| state.untracked_files_with_pushed_diagnostics)
-            .unwrap_or_default();
-        let scripts: Vec<_> = db.project().script_files(&db).iter().collect();
-        Self::synchronize_closed_scripts(
-            &mut db,
-            &scripts,
-            client,
-            self.resolved_client_capabilities,
-            &self.script_progress,
-        );
+        let untracked =
+            previous.map_or_default(|state| state.untracked_files_with_pushed_diagnostics);
         self.projects.insert(
             root.clone(),
             ProjectState {
@@ -1238,6 +1265,19 @@ impl Session {
         })
     }
 
+    /// Returns whether client settings permit import updates for a rename of `path`.
+    pub(crate) fn allows_file_rename_edits(&self, path: &SystemPath) -> bool {
+        match self.workspaces.for_path(path) {
+            Some(workspace) => !workspace.settings().is_language_services_disabled(),
+            None => !self
+                .initialization_options
+                .options
+                .workspace
+                .disable_language_services
+                .unwrap_or_default(),
+        }
+    }
+
     /// Selects an open document or a supported closed document for a request.
     fn document_target(&self, uri: &Uri) -> Result<DocumentRequestTarget, DocumentError> {
         match self.index().open_document_handle(uri) {
@@ -1345,8 +1385,7 @@ impl Session {
         // Request synchronization before installing the editor contents because uv reads the
         // script from disk. This ensures both use the saved metadata, so saving changed metadata
         // requests another synchronization.
-        if self.use_uv != UseUv::Off
-            && language_id == LanguageId::Python
+        if language_id == LanguageId::Python
             && document.notebook().is_none()
             && let DocumentKey::File(system_path) = DocumentKey::from_uri(document.uri())
         {
@@ -1354,19 +1393,21 @@ impl Session {
             let script_progress = self.script_progress.clone();
             let db = self.project_db_mut(&AnySystemPath::System(system_path.clone()));
 
-            // Refresh any cached disk revision before reading the script tag. A filesystem
-            // change may not have reached the watcher yet, and the later open event will
-            // refresh the file from the editor contents instead.
-            File::sync_path(db, &system_path);
-            if let Ok(file) = system_path_to_file(db, &system_path) {
-                Self::request_script_sync(
-                    db,
-                    file,
-                    client,
-                    capabilities,
-                    ScriptEnvironmentAvailability::Pending,
-                    &script_progress,
-                );
+            if db.project().metadata(db).script_uv_override() != Some(false) {
+                // Refresh any cached disk revision before reading the script tag. A filesystem
+                // change may not have reached the watcher yet, and the later open event will
+                // refresh the file from the editor contents instead.
+                File::sync_path(db, &system_path);
+                if let Ok(file) = system_path_to_file(db, &system_path) {
+                    Self::request_script_sync(
+                        db,
+                        file,
+                        client,
+                        capabilities,
+                        ScriptEnvironmentAvailability::Pending,
+                        &script_progress,
+                    );
+                }
             }
         }
         let handle = self.index_mut().open_text_document(document);
@@ -2232,8 +2273,8 @@ impl OpenDocumentHandle {
             } else {
                 // Restore file and script membership from the saved contents. Discarding
                 // unsaved script metadata can bring a file back into the project when
-                // `exclude-scripts` is enabled. Also request synchronization for saved
-                // metadata changes that were skipped while the editor overlay was present.
+                // `exclude-scripts` is enabled. In workspace mode, this also synchronizes
+                // saved metadata changes skipped while the editor overlay was present.
                 self.update_in_databases(session, client);
             }
         } else {

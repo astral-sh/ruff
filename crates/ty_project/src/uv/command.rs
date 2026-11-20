@@ -1,6 +1,7 @@
 //! Constructs and executes uv metadata commands.
 
 use std::process::Output;
+use std::sync::Arc;
 
 use pep440_rs::Version;
 use ruff_db::system::{Command, CommandExecutor, System, SystemPath, WhichError};
@@ -13,16 +14,20 @@ pub(super) const MINIMUM_UV_VERSION: [u64; 3] = [0, 12, 3];
 #[derive(Clone)]
 pub(crate) struct Uv {
     executable: String,
+    from_env: bool,
 }
 
 impl Uv {
     pub(crate) fn new(system: &dyn System) -> Result<Self, WhichError> {
-        let executable = match system.env_var(EnvVars::UV) {
-            Ok(executable) => executable,
-            Err(_) => system.which("uv")?.into_string(),
+        let (executable, from_env) = match system.env_var(EnvVars::UV) {
+            Ok(executable) => (executable, true),
+            Err(_) => (system.which("uv")?.into_string(), false),
         };
 
-        Ok(Self { executable })
+        Ok(Self {
+            executable,
+            from_env,
+        })
     }
 
     /// Executes `uv workspace metadata` and parses and validates its output.
@@ -31,12 +36,10 @@ impl Uv {
         system: &dyn System,
         target: &MetadataTarget<'_>,
     ) -> Result<UvMetadata, UvMetadataError> {
-        let output = system
+        let executor = system
             .command_executor()
-            .ok_or_else(unsupported_command_execution)
-            .map_err(UvMetadataError::Invocation)
-            .and_then(|executor| self.execute(executor, target));
-        Self::parse_metadata_output(system, output)
+            .ok_or_else(unsupported_command_execution)?;
+        Self::parse_metadata_output(system, self.execute(executor, target))
     }
 
     /// Executes `uv workspace metadata` without interpreting its output.
@@ -85,7 +88,11 @@ impl Uv {
             start.elapsed().as_secs_f64()
         );
 
-        let output = output.map_err(UvMetadataError::Invocation)?;
+        let output = output.map_err(|error| UvMetadataError::Invocation {
+            executable: self.executable.clone(),
+            from_env: self.from_env,
+            error: Arc::new(error),
+        })?;
 
         // Before uv 0.12.3, `--quiet` suppresses the metadata JSON even on success.
         if (!output.status.success() || output.stdout.is_empty())
@@ -155,13 +162,6 @@ pub(crate) enum MetadataTarget<'path> {
         /// The optional `--python` argument.
         python: Option<&'path SystemPath>,
     },
-}
-
-pub(crate) fn uv_executable_error(error: WhichError) -> std::io::Error {
-    std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        format!("failed to resolve uv executable: {error}"),
-    )
 }
 
 pub(super) fn unsupported_command_execution() -> std::io::Error {

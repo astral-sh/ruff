@@ -172,14 +172,6 @@ pub(super) fn validate_paramspec_components<'db>(
                 builder.into_diagnostic(format_args!(
                     "`**{kwarg}: {name}.kwargs` must be accompanied by `*{vararg}: {name}.args`",
                 ));
-            } else {
-                // No *args at all
-                if let Some(builder) = context.report_lint(&INVALID_PARAMSPEC, kwargs_annotation) {
-                    builder.into_diagnostic(format_args!(
-                        "`**{kwarg}: {name}.kwargs` must be accompanied by \
-                             `*{kwarg}: {name}.args`",
-                    ));
-                }
             }
         }
 

@@ -38,9 +38,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.246", category = Category::Suspicious)]
-pub(crate) struct IfWithSameArms;
+pub(crate) struct IfWithIdenticalBranches;
 
-impl Violation for IfWithSameArms {
+impl Violation for IfWithIdenticalBranches {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -90,7 +90,7 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
         }
 
         let mut diagnostic = checker.report_diagnostic(
-            IfWithSameArms,
+            IfWithIdenticalBranches,
             TextRange::new(current_branch.start(), following_branch.end()),
         );
 

@@ -8,15 +8,15 @@ import bar  # error: "Cannot resolve imported module `bar`"
 reveal_type(bar)  # revealed: Unknown
 ```
 
-## Unresolved import from statement
+## Missing module in `from ... import ...`
 
 ```py
-from bar import baz  # error: "Cannot resolve imported module `bar`"
+from bar import baz  # error: [import-not-found] "Cannot resolve imported module `bar`"
 
 reveal_type(baz)  # revealed: Unknown
 ```
 
-## Unresolved import from resolved module
+## Missing name in a resolved module
 
 `a.py`:
 
@@ -24,9 +24,46 @@ reveal_type(baz)  # revealed: Unknown
 ```
 
 ```py
-from a import thing  # error: "Module `a` has no member `thing`"
+from a import thing  # error: [missing-module-member] "Module `a` has no member `thing`"
 
 reveal_type(thing)  # revealed: Unknown
+```
+
+## Suppressing `import-not-found` with the previous rule name
+
+`unresolved-import` is an alias for `import-not-found`. Existing ignore comments that use the old
+name still suppress errors for missing modules.
+
+```toml
+[rules]
+renamed-rule-in-ignore-comment = "ignore"
+```
+
+```py
+import missing_module  # ty: ignore[unresolved-import]
+from missing_package import name  # type: ignore[ty:unresolved-import]
+```
+
+## Reporting an unused `unresolved-import` suppression
+
+In the following example, only `ty: ignore[unresolved-reference]` is required to suppress the
+diagnostic for the unresolved name on `print(missing)`. The `unresolved-import` suppression is
+unused. But `unresolved-import` is actually a legacy alias for `import-not-found` -- a naive
+implementation of `unused-ignore-comment` could result in us, confusingly, complaining that an
+"`import-not-found`" suppression comment was unused, even though none exists!
+
+This test enforces that we use the name of the rule which was actually used in the source code when
+we complain about unused ignore comments, even if the name used in the source code is merely a
+legacy alias to the rule's canonical name.
+
+```py
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-import'"
+# error: [renamed-rule-in-ignore-comment]
+print(missing)  # ty: ignore[unresolved-reference, unresolved-import]
+
+# error: [unused-type-ignore-comment] "'ty:division-by-zero', 'ty:unresolved-import'"
+# error: [renamed-rule-in-ignore-comment]
+print(missing)  # type: ignore[ty:unresolved-reference, ty:division-by-zero, ty:unresolved-import]
 ```
 
 ## Resolved import of symbol from unresolved import

@@ -265,15 +265,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                             )
                             .iter()
                             .flat_map(|module| {
-                                module
-                                    .file(db)
-                                    .map(|file| {
-                                        exported_names(
-                                            db,
-                                            ProgramFile::new(db, file, program_file.program(db)),
-                                        )
-                                    })
-                                    .unwrap_or_default()
+                                module.file(db).map_or_default(|file| {
+                                    exported_names(
+                                        db,
+                                        ProgramFile::new(db, file, program_file.program(db)),
+                                    )
+                                })
                             }) {
                                 self.possibly_add_export(export, PossibleExportKind::Normal);
                             }

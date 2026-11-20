@@ -17,7 +17,7 @@ def _(flag: bool):
 ## Calling with an unknown union
 
 ```py
-from nonexistent import f  # error: [unresolved-import] "Cannot resolve imported module `nonexistent`"
+from nonexistent import f  # error: [import-not-found] "Cannot resolve imported module `nonexistent`"
 
 def coinflip() -> bool:
     return True
@@ -40,7 +40,7 @@ def _(flag: bool):
     else:
         def f() -> int:
             return 1
-    x = f()  # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+    x = f()  # error: [not-callable] "Object of type `Literal[1]` is not callable"
     reveal_type(x)  # revealed: Unknown | int
 ```
 
@@ -57,8 +57,8 @@ def _(flag: bool, flag2: bool):
     else:
         def f() -> int:
             return 1
-    # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
-    # error: [call-non-callable] "Object of type `Literal["foo"]` is not callable"
+    # error: [not-callable] "Object of type `Literal[1]` is not callable"
+    # error: [not-callable] "Object of type `Literal["foo"]` is not callable"
     # revealed: Unknown | int
     reveal_type(f())
 ```
@@ -74,7 +74,7 @@ def _(flag: bool):
     else:
         f = "foo"
 
-    x = f()  # error: [call-non-callable] "Object of type `Literal[1, "foo"]` is not callable"
+    x = f()  # error: [not-callable] "Object of type `Literal[1, "foo"]` is not callable"
     reveal_type(x)  # revealed: Unknown
 ```
 
@@ -98,6 +98,82 @@ def _(flag: bool):
     # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `str`, found `Literal[3]`"
     x = f(3)
     reveal_type(x)  # revealed: int | str
+```
+
+## Gradual callables with different positional prefixes
+
+A call must satisfy the fixed parameters of every union member. Here the longer prefix requires a
+second argument of type `str`.
+
+```py
+from typing import Callable, Concatenate
+
+Short = Callable[Concatenate[int, ...], int]
+Long = Callable[Concatenate[int, str, ...], int]
+
+def call_both(f: Long | Short, g: Short | Long) -> None:
+    f(1, "two")  # ok
+    f(1, 2)  # error: [invalid-argument-type]
+    f(1)  # error: [missing-argument]
+    g(1, "two")  # ok
+    g(1, 2)  # error: [invalid-argument-type]
+    g(1)  # error: [missing-argument]
+```
+
+A function that takes just one `int` is assignable to `Short`, so either union accepts it. The `...`
+in `Short` allows `f(1, "two")` to type-check even though `takes_one(1, "two")` would raise
+`TypeError`. Conversely, `takes_one(1)` succeeds, but `f(1)` is rejected because `f` could be
+`Long`, which requires two arguments.
+
+```py
+def takes_one(value: int) -> int:
+    return value
+
+long_or_short: Long | Short = takes_one  # ok
+short_or_long: Short | Long = takes_one  # ok
+```
+
+When one member has no fixed parameters, a zero-argument implementation is valid in either union
+order. A call through the union still requires the other member's string argument.
+
+```py
+AnyParameters = Callable[..., None]
+WithString = Callable[Concatenate[str, ...], None]
+
+def call(f: AnyParameters | WithString, g: WithString | AnyParameters) -> None:
+    f("value")  # ok
+    g("value")  # ok
+    f()  # error: [missing-argument]
+    g()  # error: [missing-argument]
+    f(1)  # error: [invalid-argument-type]
+    g(1)  # error: [invalid-argument-type]
+
+def no_arguments() -> None: ...
+
+any_or_string: AnyParameters | WithString = no_arguments  # ok
+string_or_any: WithString | AnyParameters = no_arguments  # ok
+```
+
+## Gradual callables with different keyword parameters
+
+Each protocol guarantees support for a different keyword. A function that accepts just one of those
+keywords satisfies the corresponding union member.
+
+```py
+from typing import Any, Protocol
+
+class ByName(Protocol):
+    def __call__(self, *args: Any, name: object = ..., **kwargs: Any) -> None: ...
+
+class ByIndex(Protocol):
+    def __call__(self, *args: Any, index: object = ..., **kwargs: Any) -> None: ...
+
+def by_name(*, name: object = None) -> None: ...
+def by_index(*, index: object = None) -> None: ...
+def accept(callback: ByName | ByIndex) -> None: ...
+
+accept(by_name)  # ok
+accept(by_index)  # ok
 ```
 
 ## Assigning function-literal unions to callables
@@ -211,7 +287,7 @@ def _(flag: bool):
     else:
         f = "This is a string literal"
 
-    # error: [call-non-callable] "Object of type `Literal["This is a string literal"]` is not callable"
+    # error: [not-callable] "Object of type `Literal["This is a string literal"]` is not callable"
     x = f(3)
     reveal_type(x)  # revealed: Any
 ```
@@ -250,7 +326,7 @@ def _(flag: bool):
         f = C()
 
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
-    # error: [call-non-callable] "Object of type `C` is not callable"
+    # error: [not-callable] "Object of type `C` is not callable"
     x = f(3)
     reveal_type(x)  # revealed: Any
 ```

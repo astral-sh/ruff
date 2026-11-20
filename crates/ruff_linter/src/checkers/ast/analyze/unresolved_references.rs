@@ -7,7 +7,10 @@ use crate::rules::pyflakes;
 
 /// Run lint rules over all [`UnresolvedReference`] entities in the [`SemanticModel`].
 pub(crate) fn unresolved_references(checker: &Checker) {
-    if !checker.any_rule_enabled(&[Rule::UndefinedLocalWithImportStarUsage, Rule::UndefinedName]) {
+    if !checker.any_rule_enabled(&[
+        Rule::PossiblyUndefinedNameWithStarImport,
+        Rule::UndefinedName,
+    ]) {
         return;
     }
 
@@ -15,7 +18,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
         if reference.is_wildcard_import() {
             // F405
             checker.report_diagnostic_if_enabled(
-                pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                pyflakes::rules::PossiblyUndefinedNameWithStarImport {
                     name: reference.name(checker.source()).to_string(),
                 },
                 reference.range(),

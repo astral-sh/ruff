@@ -1,7 +1,6 @@
 //! Tracks the support of each constraint and interior node in a BDD.
 //!
-//! The support of a constraint is the set of typevars mentioned anywhere in the constraint
-//! (either the subject, or anywhere in the lower or upper bound).
+//! The support of a constraint is its subject typevars and the free typevars in its bound.
 //!
 //! The support of a node is the union of the supports of every constraint reachable from that
 //! node.

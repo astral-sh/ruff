@@ -17,7 +17,7 @@ use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
     TypedDictOpenness, UnpackedTypedDictKey, extract_unpacked_typed_dict_from_value_type,
 };
-use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
+use crate::types::{Parameter, Type, TypeContext, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArgumentExpansions::iter`].
@@ -135,16 +135,29 @@ impl<'a, 'db> CallArgument<'a, 'db> {
         declared: impl Into<Option<Type<'db>>>,
         matched: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        let declared = declared.into();
-        matched.or_else(|| match self {
+        matched.or_else(|| {
+            self.ordinary_types()?
+                .try_get_for_declared_type(declared.into())
+        })
+    }
+
+    /// A splatted argument supplies the type of its matched element. For an ordinary argument,
+    /// if inference with one or more expected types gave the same result each time, use that
+    /// result. Otherwise, use the type inferred without an expected type, if available.
+    pub(super) fn default_matched_type(&self, matched: Option<Type<'db>>) -> Option<Type<'db>> {
+        matched.or_else(|| self.ordinary_types()?.get_default())
+    }
+
+    /// Returns the inferred types of a positional argument, a named keyword argument, or a
+    /// synthetic receiver. Returns `None` for `*args` and `**kwargs` because their stored types
+    /// describe the whole iterable or mapping. Matching supplies the type of each unpacked value.
+    fn ordinary_types(&self) -> Option<&CallArgumentTypes<'db>> {
+        match self {
             Self::Synthetic(types) | Self::Positional(types) | Self::Keyword { types, .. } => {
-                declared.map_or_else(
-                    || types.get_default(),
-                    |declared| types.try_get_for_declared_type(declared),
-                )
+                Some(types)
             }
             Self::Variadic(_) | Self::Keywords(_) => None,
-        })
+        }
     }
 
     fn expand(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ArgumentExpansion<'a, 'db> {
@@ -206,6 +219,43 @@ impl<'db> VariadicArgument<'db> {
             Self::Type(_) => self.source_type()?.iterate(db, env),
             Self::Sequence { sequence, .. } => Cow::Borrowed(sequence),
         })
+    }
+
+    /// Return the suffix of this positional unpack that a wrapper function forwards to its callback.
+    ///
+    /// `consumed` counts the leading elements of this unpack that bind to the wrapper's
+    /// prefix parameters. In `invoke(*(callback, x), y)`, `invoke` takes `callback`
+    /// (`consumed` is 1), leaving `*(x,)` for the forwarded call.
+    ///
+    /// Slice union members independently so overload resolution can distinguish their suffixes.
+    /// Returns `None` if any member has fewer than `consumed` fixed leading elements.
+    pub(super) fn without_prefix(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        consumed: usize,
+    ) -> Option<Self> {
+        let start = i32::try_from(consumed).ok()?;
+        let suffix = |sequence: &TupleSpec<'db>| match sequence.len() {
+            // Slicing into a variable segment can lose the types and positions of trailing elements.
+            TupleLength::Fixed(prefix) | TupleLength::Variable(prefix, _) if consumed <= prefix => {
+                sequence
+                    .py_slice_type(db, env, Some(start), None, None)
+                    .ok()
+            }
+            _ => None,
+        };
+        let ty = match self {
+            Self::Sequence { sequence, .. } => suffix(sequence)?,
+            Self::Type(types) => {
+                let suffix_for_type = |ty: &Type<'db>| suffix(&ty.iterate(db, env));
+                match types.get_default()?.expand_top_level_aliases(db, env) {
+                    Type::Union(union) => union.try_map(db, env, suffix_for_type)?,
+                    ty => suffix_for_type(&ty)?,
+                }
+            }
+        };
+        Some(Self::Type(CallArgumentTypes::new(Some(ty))))
     }
 
     fn is_fixed_sequence(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
@@ -473,24 +523,26 @@ impl<'db> CallArgumentTypes<'db> {
 
     /// Returns the type of this argument when inferred against the provided declared type.
     ///
-    /// If the type was not inferred against the declared type directly, this method will fall back to
-    /// [`Self::get_default`].
-    fn try_get_for_declared_type(&self, tcx: Type<'db>) -> Option<Type<'db>> {
-        self.types.get(&tcx).copied().or_else(|| self.get_default())
+    /// An unannotated parameter supplies no expected type. Use the result inferred without
+    /// context for that overload, even if another overload provided an expected type.
+    fn try_get_for_declared_type(&self, declared: Option<Type<'db>>) -> Option<Type<'db>> {
+        match declared {
+            Some(ty) => self.types.get(&ty).copied(),
+            None => self.fallback_type,
+        }
+        .or_else(|| self.get_default())
     }
 
-    /// Returns the type of this argument when inferred against the provided declared type.
-    ///
-    /// If the type was not inferred against the declared type directly, this method will fall back to
-    /// [`Self::get_default`], or to `Unknown` if no fallback type exists.
-    pub(crate) fn get_for_declared_type(&self, tcx: Type<'db>) -> Type<'db> {
-        self.try_get_for_declared_type(tcx)
+    /// Returns the argument type inferred for this parameter, falling back to
+    /// [`Self::get_default`] or `Unknown` if that inference is unavailable.
+    pub(super) fn get_for_parameter(&self, parameter: &Parameter<'db>) -> Type<'db> {
+        self.try_get_for_declared_type(parameter.argument_context_type())
             .unwrap_or(Type::unknown())
     }
 
     /// Insert the type of this argument when inferred with the provided type context.
     fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
-        match tcx.into().annotation {
+        match tcx.into().expected_type() {
             None => self.fallback_type = Some(ty),
             Some(tcx) => {
                 self.types.insert(tcx, ty);
@@ -501,7 +553,7 @@ impl<'db> CallArgumentTypes<'db> {
     fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
         self.types
             .iter()
-            .map(|(tcx, ty)| (TypeContext::declared(Some(*tcx)), *ty))
+            .map(|(tcx, ty)| (TypeContext::preference(Some(*tcx)), *ty))
             .chain(self.fallback_type.map(|ty| (TypeContext::default(), ty)))
     }
 }
@@ -686,8 +738,16 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .collect()
     }
 
+    pub(super) fn push(&mut self, argument: CallArgument<'a, 'db>) {
+        self.items.push(argument);
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.items.len()
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.items.is_empty()
     }
 
     pub(crate) fn is_variadic(&self, index: usize) -> bool {
@@ -761,47 +821,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
     }
 
-    /// Select the arguments forwarded to a `ParamSpec` sub-call.
-    ///
-    /// The resulting argument list preserves the order of `indices`. Unlike [`Self::start_from`],
-    /// this can project a non-contiguous subset of the original call arguments. Known keyword
-    /// arguments retain only keys that were not consumed by the wrapper's prefix:
-    ///
-    /// ```py
-    /// def wrapper[**P, R](func: Callable[P, R], **kwargs: P.kwargs) -> R: ...
-    /// wrapper(TagSet=[...], func=f)  # select `TagSet=[...]`, but not the later `func=f`
-    /// ```
-    pub(crate) fn select_for_paramspec(
-        &self,
-        indices: &[usize],
-        parameters: &Parameters<'db>,
-        prefix_len: usize,
-    ) -> Self {
-        Self {
-            items: indices
-                .iter()
-                .map(|index| {
-                    let mut argument = self.items[*index].clone();
-                    if let CallArgument::Keywords(KeywordArgument::Known { keywords, .. }) =
-                        &mut argument
-                    {
-                        keywords.keys = keywords
-                            .keys
-                            .iter()
-                            .filter(|(name, _)| {
-                                parameters
-                                    .keyword_by_name(name.as_str())
-                                    .is_none_or(|(index, _)| index >= prefix_len)
-                            })
-                            .cloned()
-                            .collect();
-                    }
-                    argument
-                })
-                .collect(),
-        }
-    }
-
     /// Returns the `functools.partial(...)` bound-argument slice and whether it is concrete enough
     /// to synthesize a precise partial signature.
     pub(crate) fn functools_partial_bound_arguments(
@@ -866,7 +885,9 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 f.debug_map()
                     .entries(self.types.iter().map(|(tcx, ty)| {
                         (
-                            tcx.annotation.as_ref().map(|ty| ty.display(db, self.env)),
+                            tcx.expected_type()
+                                .as_ref()
+                                .map(|ty| ty.display(db, self.env)),
                             ty.display(db, self.env),
                         )
                     }))

@@ -54,11 +54,11 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |
 5 |     """F403""",  # snapshot: rule-codes-in-selectors
   |        ^^^^
-help: Replace rule code with `undefined-local-with-import-star`
+help: Replace rule code with `star-import`
   |
 4 |     'F402',  # snapshot: rule-codes-in-selectors
   -     """F403""",  # snapshot: rule-codes-in-selectors
-5 +     """undefined-local-with-import-star""",  # snapshot: rule-codes-in-selectors
+5 +     """star-import""",  # snapshot: rule-codes-in-selectors
 6 |     '''F404''',  # snapshot: rule-codes-in-selectors
   |
 

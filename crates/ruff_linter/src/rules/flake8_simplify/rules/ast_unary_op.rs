@@ -3,11 +3,11 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_semantic::ScopeKind;
+use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for negated `==` operators.
@@ -112,6 +112,12 @@ impl AlwaysFixableViolation for NegateNotEqualOp {
 /// a
 /// ```
 ///
+/// ## Fix availability
+/// Outside of a boolean context (such as an `if` test), the fix wraps the operand in
+/// `bool(...)` unless the operand is already known to be a `bool`. This rule will emit a
+/// diagnostic but not suggest a fix if that wrapper is needed and `bool` has been shadowed
+/// from its builtin binding.
+///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
@@ -120,16 +126,18 @@ pub(crate) struct DoubleNegation {
     expr: String,
 }
 
-impl AlwaysFixableViolation for DoubleNegation {
+impl Violation for DoubleNegation {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let DoubleNegation { expr } = self;
         format!("Use `{expr}` instead of `not (not {expr})`")
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let DoubleNegation { expr } = self;
-        format!("Replace with `{expr}`")
+        Some(format!("Replace with `{expr}`"))
     }
 }
 
@@ -238,6 +246,21 @@ pub(crate) fn negation_with_not_equal_op(
     )));
 }
 
+/// Returns `true` if `expr` always evaluates to a `bool`, so that `not not expr` is
+/// equivalent to `expr` without a `bool(...)` wrapper.
+fn is_always_bool(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        // Membership and identity tests always produce a `bool`. Other comparison
+        // operators can be overloaded to return arbitrary objects, so every operator in
+        // a chain has to qualify: `x == y in z` evaluates to `x == y` if that is falsy.
+        Expr::Compare(ast::ExprCompare { ops, .. }) => ops
+            .iter()
+            .all(|op| matches!(op, CmpOp::In | CmpOp::NotIn | CmpOp::Is | CmpOp::IsNot)),
+        Expr::Call(ast::ExprCall { func, .. }) => semantic.match_builtin_expr(func, "bool"),
+        _ => false,
+    }
+}
+
 /// SIM208
 pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, operand: &Expr) {
     if !matches!(op, UnaryOp::Not) {
@@ -262,7 +285,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
         },
         expr.range(),
     );
-    if checker.semantic().in_boolean_test() {
+    if checker.semantic().in_boolean_test() || is_always_bool(operand, checker.semantic()) {
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             checker.locator().slice(operand.as_ref()).to_string(),
             expr.range(),

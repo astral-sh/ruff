@@ -60,14 +60,14 @@ use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_v
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.0.286", category = Category::Pedantic)]
-pub(crate) struct NoSelfUse {
+pub(crate) struct UnusedSelf {
     method_name: String,
 }
 
-impl Violation for NoSelfUse {
+impl Violation for UnusedSelf {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoSelfUse { method_name } = self;
+        let UnusedSelf { method_name } = self;
         format!("Method `{method_name}` could be a function, class method, or static method")
     }
 }
@@ -148,7 +148,7 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
         .is_some_and(|binding| binding.kind.is_argument() && binding.is_unused())
     {
         let mut diagnostic = checker.report_diagnostic(
-            NoSelfUse {
+            UnusedSelf {
                 method_name: name.to_string(),
             },
             func.identifier(),

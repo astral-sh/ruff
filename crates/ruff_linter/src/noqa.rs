@@ -1011,8 +1011,7 @@ fn find_suppression_comments<'a>(
 
         let noqa_offset = message
             .range()
-            .map(|range| noqa_line_for.resolve(range.start()))
-            .unwrap_or_default();
+            .map_or_default(|range| noqa_line_for.resolve(range.start()));
 
         // Or ignored by a `noqa` directive on the diagnostic's line itself?
         let existing_noqa =
@@ -3094,7 +3093,7 @@ mod tests {
                 SuppressionKind::Noqa,
                 &LinterSettings::for_rules([
                     Rule::MissingTypeFunctionArgument,
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::UnusedFunctionArgument,
                     Rule::UndocumentedPublicFunction,
                 ]),
@@ -3124,7 +3123,7 @@ mod tests {
                 SuppressionKind::Noqa,
                 &LinterSettings::for_rules([
                     Rule::MissingTypeFunctionArgument,
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::UnusedFunctionArgument,
                     Rule::UndocumentedPublicFunction,
                 ])
@@ -3155,7 +3154,7 @@ mod tests {
                 SuppressionKind::Ignore,
                 &LinterSettings::for_rules([
                     Rule::MissingTypeFunctionArgument,
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::UnusedFunctionArgument,
                     Rule::UndocumentedPublicFunction,
                 ])
@@ -3167,7 +3166,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # noqa: ANN001, ARG001, D103  # ruff: ignore[missing-return-type-undocumented-public-function]
+        def unused(x):  # noqa: ANN001, ARG001, D103  # ruff: ignore[missing-return-type-public-function]
             pass
         ```
         "
@@ -3236,7 +3235,7 @@ mod tests {
                 SuppressionKind::Ignore,
                 &LinterSettings::for_rules([
                     Rule::MissingTypeFunctionArgument,
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::UnusedFunctionArgument,
                     Rule::UndocumentedPublicFunction,
                 ])
@@ -3248,7 +3247,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff: ignore[ANN001, ARG001, D103, missing-return-type-undocumented-public-function]
+        def unused(x):  # ruff: ignore[ANN001, ARG001, D103, missing-return-type-public-function]
             pass
         ```
         "
@@ -3267,7 +3266,7 @@ mod tests {
                 SuppressionKind::Ignore,
                 &LinterSettings::for_rules([
                     Rule::MissingTypeFunctionArgument,
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                     Rule::UndocumentedPublicFunction,
                 ])
                 .with_preview_mode(),
@@ -3278,7 +3277,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff: ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
+        def unused(x):  # ruff: ignore[missing-return-type-public-function, missing-type-function-argument, undocumented-public-function]
             pass
         ```
         "
@@ -3326,7 +3325,7 @@ mod tests {
                 SuppressionKind::Ignore,
                 &LinterSettings::for_rules([
                     Rule::MissingTypeFunctionArgument,
-                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePublicFunction,
                 ])
                 .with_preview_mode(),
             )?,
@@ -3336,7 +3335,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        # ruff: ignore[ANN001, missing-return-type-undocumented-public-function]
+        # ruff: ignore[ANN001, missing-return-type-public-function]
         def public(x):
             """Return x."""
             return x

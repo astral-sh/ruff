@@ -40,9 +40,9 @@ use crate::rules::flake8_executable::helpers::{is_executable, is_wsl};
 /// - [Git documentation: `git update-index --chmod`](https://git-scm.com/docs/git-update-index#Documentation/git-update-index.txt---chmod-x)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.233", category = Category::Suspicious)]
-pub(crate) struct ShebangNotExecutable;
+pub(crate) struct NonExecutableFileWithShebang;
 
-impl Violation for ShebangNotExecutable {
+impl Violation for NonExecutableFileWithShebang {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Shebang is present but file is not executable".to_string()
@@ -60,7 +60,7 @@ pub(crate) fn shebang_not_executable(filepath: &Path, range: TextRange, context:
     }
 
     if let Ok(false) = is_executable(filepath) {
-        context.report_diagnostic_if_enabled(ShebangNotExecutable, range);
+        context.report_diagnostic_if_enabled(NonExecutableFileWithShebang, range);
     }
 }
 

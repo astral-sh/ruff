@@ -13,10 +13,10 @@ pub(crate) fn parameters(parameters: &Parameters, checker: &Checker) {
         ruff::rules::implicit_optional(checker, parameters);
     }
     if checker.source_type.is_stub() {
-        if checker.is_rule_enabled(Rule::TypedArgumentDefaultInStub) {
+        if checker.is_rule_enabled(Rule::ComplexDefaultForAnnotatedParameterInStub) {
             flake8_pyi::rules::typed_argument_simple_defaults(checker, parameters);
         }
-        if checker.is_rule_enabled(Rule::ArgumentDefaultInStub) {
+        if checker.is_rule_enabled(Rule::ComplexDefaultForUnannotatedParameterInStub) {
             flake8_pyi::rules::argument_simple_defaults(checker, parameters);
         }
     }

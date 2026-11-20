@@ -88,9 +88,9 @@ class _:
         reveal_type(a.z)  # revealed: None | Unknown
 
 a = A()
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 a.dynamically_added = 0
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(a.dynamically_added)  # revealed: Literal[0]
 
 # error: [unresolved-reference]
@@ -135,9 +135,9 @@ a.b = B()
 reveal_type(a.b)  # revealed: B
 reveal_type(a.b.c1)  # revealed: C | None
 reveal_type(a.b.c2)  # revealed: C | None
-# error: [unresolved-attribute]
+# error: [missing-union-attribute]
 reveal_type(a.b.c1.d)  # revealed: D | None
-# error: [unresolved-attribute]
+# error: [missing-union-attribute]
 reveal_type(a.b.c2.d)  # revealed: D | None
 ```
 
@@ -255,7 +255,7 @@ class GetterOnly:
         return "hello"
 
 def update(obj: GetterOnly) -> None:
-    obj.value = "goodbye"  # error: [unresolved-attribute]
+    obj.value = "goodbye"  # error: [missing-attribute]
     reveal_type(obj.value)  # revealed: str
 ```
 
@@ -323,10 +323,10 @@ still track the assigned type and report an incompatible use later:
 ```py
 import module
 
-module.value = 1  # error: [unresolved-attribute]
+module.value = 1  # error: [missing-attribute]
 
 # error: [invalid-assignment]
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 value: str = module.value
 ```
 
@@ -466,9 +466,9 @@ class C:
     reveal_type(b.a.x[0])  # revealed: Literal[0]
 
 def _():
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(b.a.x[0])  # revealed: int | None
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     reveal_type(b.a.x)  # revealed: list[int | None]
     reveal_type(b.a)  # revealed: A | None
 

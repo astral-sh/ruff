@@ -492,6 +492,88 @@ def _(x: int | None):
             reveal_type(x)  # revealed: int
 ```
 
+## Narrowed target reassigned on a loop backedge
+
+A saved condition describes the value that was checked before the loop. A write at the end of the
+body can change that value before the next iteration.
+
+```py
+def _(x: int | None):
+    is_none = x is None
+    for _ in range(2):
+        if not is_none:
+            reveal_type(x)  # revealed: int | None
+            x + 1  # error: [unsupported-operator]
+        x = None
+```
+
+Replacing an object also invalidates a saved check of its attribute, including in the loop
+condition.
+
+```py
+class Box:
+    value: int | None
+
+def _(box: Box):
+    has_value = box.value is not None
+    while has_value:
+        reveal_type(box.value)  # revealed: int | None
+        box = Box()
+```
+
+A write can reach the next outer iteration even if it exits the inner loop.
+
+```py
+def _(x: int | None):
+    is_none = x is None
+    for _ in range(2):
+        for _ in range(2):
+            if not is_none:
+                reveal_type(x)  # revealed: int | None
+            x = None
+            break
+```
+
+## Writes that cannot reach another iteration
+
+A write followed by an unconditional `break` cannot affect the next iteration.
+
+```py
+def _(x: int | None):
+    is_none = x is None
+    for _ in range(2):
+        if not is_none:
+            reveal_type(x)  # revealed: int
+        x = None
+        break
+```
+
+An unreachable write in a nested loop also leaves the alias valid.
+
+```py
+def _(x: int | None):
+    is_none = x is None
+    for _ in range(2):
+        if not is_none:
+            reveal_type(x)  # revealed: int
+        for _ in range(2):
+            if False:
+                x = None
+```
+
+## Alias refreshed each iteration
+
+Recomputing the condition on each iteration makes it describe the current value.
+
+```py
+def _(x: int | None):
+    for _ in range(2):
+        is_none = x is None
+        if not is_none:
+            reveal_type(x)  # revealed: int
+        x = None
+```
+
 ## Alias reassigned on a loop backedge
 
 A different assignment can reach the condition from an earlier iteration. That assignment does not

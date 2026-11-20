@@ -37,9 +37,9 @@ use crate::codes::Category;
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.2.0", category = Category::Pedantic)]
-pub(crate) struct ExceptionWithoutExcInfo;
+pub(crate) struct LoggingExceptionWithFalsyExcInfo;
 
-impl Violation for ExceptionWithoutExcInfo {
+impl Violation for LoggingExceptionWithFalsyExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Use of `logging.exception` with falsy `exc_info`".to_string()
@@ -68,10 +68,7 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
         Expr::Name(_) => {
             if !checker
                 .semantic()
-                .resolve_qualified_name(call.func.as_ref())
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["logging", "exception"])
-                })
+                .matches_qualified_name(call.func.as_ref(), &["logging", "exception"])
             {
                 return;
             }
@@ -80,7 +77,7 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
     }
 
     if exc_info_arg_is_falsey(call, checker) {
-        checker.report_diagnostic(ExceptionWithoutExcInfo, call.range());
+        checker.report_diagnostic(LoggingExceptionWithFalsyExcInfo, call.range());
     }
 }
 

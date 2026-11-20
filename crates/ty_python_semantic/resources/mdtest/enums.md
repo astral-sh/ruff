@@ -2163,6 +2163,21 @@ for color in Color:
 reveal_type(list(Color))  # revealed: list[Color]
 ```
 
+## Combining flag members
+
+Flag operators accept other members of the same enum. A member's literal type does not restrict the
+other operand to that same member.
+
+```py
+from enum import Flag
+
+class Flags(Flag):
+    A = 1
+    B = 2
+
+Flags.A | Flags.B  # ok
+```
+
 ## Methods / non-member attributes
 
 Methods and non-member attributes defined in the enum class can be accessed on enum members:
@@ -2227,12 +2242,13 @@ def _(answer: type[Answer]) -> None:
     reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
 ```
 
-## Reassigning enum members
+## Reassigning and deleting enum members
 
 ### Class attributes
 
-Enum members cannot be reassigned on the class, even to their original value or to the member
-itself. This also applies to aliases, including aliases declared with the same value.
+Enum members cannot be deleted or reassigned on the class, even if the assignment uses the original
+value or the member itself. This also applies to aliases, including aliases declared with the same
+value.
 
 ```py
 from enum import Enum
@@ -2248,6 +2264,7 @@ Answer.NO = 0  # error: [invalid-assignment]
 Answer.NO = Answer.NO  # error: [invalid-assignment]
 Answer.ALIAS = 0  # error: [invalid-assignment]
 Answer.SAME_VALUE = 0  # error: [invalid-assignment]
+del Answer.NO  # error: [invalid-assignment] "Cannot delete read-only attribute `NO`"
 ```
 
 The assigned expression is still checked when the target is read-only:
@@ -2427,7 +2444,7 @@ bound. Their `Self` type preserves the particular member at call sites.
 python-version = "3.11"
 
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -2460,13 +2477,29 @@ class Answer(Enum):
 reveal_type(Answer.YES.identity())  # revealed: Literal[Answer.YES]
 ```
 
+### Contextual element types when listing enum members
+
+The fresh list can use the annotated enum element type even when the classmethod receiver has a more
+specific `Self` type.
+
+```py
+from enum import Enum
+
+class Mode(Enum):
+    A = 1
+
+    @classmethod
+    def all(cls) -> list["Mode"]:
+        return reveal_type(list(cls))  # revealed: list[Mode]
+```
+
 ### Special attributes on bounded type variables
 
 An ordinary type variable bounded by an enum has the same special attributes as the enum itself.
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -2494,7 +2527,7 @@ from every possible enum.
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -2656,9 +2689,9 @@ reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWit
 
 # Attributes `.value` and `.name` can *not* be accessed on members of these enums:
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.value
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.name
 
 # But the internal underscore attributes are available:
@@ -2667,9 +2700,9 @@ reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._value_)  # revealed: Any
 reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._name_)  # revealed: Literal["NO"]
 
 def _(x: EnumWithSubclassOfEnumMetaMetaclass):
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     x.value
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     x.name
     reveal_type(x._value_)  # revealed: Any
     reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
@@ -2730,9 +2763,9 @@ reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWit
 
 # Attributes `.value` and `.name` can *not* be accessed on members of these enums:
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.value
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.name
 
 # But the internal underscore attributes are available:
@@ -2741,9 +2774,9 @@ reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._value_)  # revealed: Any
 reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO._name_)  # revealed: Literal["NO"]
 
 def _(x: EnumWithSubclassOfEnumMetaMetaclass):
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     x.value
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     x.name
     reveal_type(x._value_)  # revealed: Any
     reveal_type(x._name_)  # revealed: Literal["NO", "YES"]
@@ -2782,7 +2815,8 @@ reveal_type(enum_members(Color))
 
 ### Name mismatch diagnostics
 
-The name passed to `Enum` must match the variable it is assigned to:
+When enabled, `mismatched-enum-name` checks whether a class name with a string literal type matches
+the assigned variable:
 
 ```py
 from enum import Enum
@@ -2796,32 +2830,53 @@ GoodMatch2 = Enum(name, "A B")  # also fine
 If there is a mismatch, we emit the following diagnostic:
 
 ```py
-# snapshot: mismatched-type-name
+# snapshot: mismatched-enum-name
 Mismatch = Enum("WrongName", "A B")
 ```
 
 ```snapshot
-warning[mismatched-type-name]: The name passed to `Enum` must match the variable it is assigned to
+info[mismatched-enum-name]: The name passed to `Enum` must match the variable it is assigned to
  --> src/mdtest_snippet.py:8:17
   |
 8 | Mismatch = Enum("WrongName", "A B")
   |                 ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
 ```
 
-If the name is not a string literal, we also emit a diagnostic:
+A name passed through a variable is still checked if its inferred type is a string literal:
 
 ```py
-def f(name: str) -> None:
-    # snapshot: mismatched-type-name
-    DynamicMismatch = Enum(name, "A B")
+# error: [mismatched-enum-name]
+Other = Enum(name, "A B")
 ```
 
-```snapshot
-warning[mismatched-type-name]: The name passed to `Enum` must match the variable it is assigned to
-  --> src/mdtest_snippet.py:11:28
-   |
-11 |     DynamicMismatch = Enum(name, "A B")
-   |                            ^^^^ Expected "DynamicMismatch", got variable of type `str`
+### Names specified by type aliases
+
+When the name argument's type resolves to a single string literal, ty uses that literal as the enum
+class's name and checks it against the assigned variable. The rule is meant to spot simple, obvious
+typos. It allows names of type `str` so callers can still construct enums dynamically when that's
+desirable. If the name argument has a union of string literals as its type, the caller is likely
+doing the same thing, so these cases also do not trigger the rule:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing import Literal
+
+type PaletteName = Literal["Palette"]
+type ColorNames = Literal["Palette", "Swatch"]
+
+def fixed_name(name: PaletteName) -> None:
+    # error: [mismatched-enum-name] "Expected "Color", got "Palette""
+    Color = Enum(name, "RED BLUE")
+    reveal_type(Color.RED)  # revealed: Literal[Palette.RED]
+
+def choose_name(name: Literal["Palette", "Swatch"], aliased_name: ColorNames) -> None:
+    Color = Enum(name, "RED BLUE")  # ok
+    Color = Enum(aliased_name, "RED BLUE")  # ok
 ```
 
 ### List/tuple of tuples
@@ -3086,14 +3141,14 @@ Enum("Color", bad_kwarg=True)
 
 ### Non-literal name
 
-Non-literal names should still be recognized as creating an enum class.
+ty skips the name comparison when the class name has type `str`. It still infers the result as an
+enum class and checks the types of the other arguments.
 
 ```py
 from enum import Enum
 
 def make_enum(name: str) -> type[Enum]:
-    # error: [mismatched-type-name]
-    result = Enum(name.title(), "RED BLUE", module=__name__)
+    result = Enum(name.title(), "RED BLUE", module=__name__)  # ok
     reveal_type(result)  # revealed: type[Enum]
     return result
 
@@ -3554,7 +3609,7 @@ def color_name(color: Color) -> str:
     else:
         assert_never(color)
 
-# No `invalid-return-type` error here because the implicit `else` branch is detected as unreachable:
+# The implicit `else` branch is unreachable, so ty accepts this function's return type.
 def color_name_without_assertion(color: Color) -> str:
     if color is Color.RED:
         return "Red"

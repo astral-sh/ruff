@@ -118,13 +118,13 @@ Sentinels declared in class scope can also be used in type expressions:
 ```py
 class C:
     MARKER = Sentinel("C.MARKER")
-    UNQUALIFIED = Sentinel("UNQUALIFIED")  # no diagnostic
+    UNQUALIFIED = Sentinel("UNQUALIFIED")  # ok
     WRONG_CLASS = Sentinel("Other.WRONG_CLASS")  # error: [mismatched-sentinel-name]
     WRONG_NAME = Sentinel("C.OTHER")  # error: [mismatched-sentinel-name]
 
     class Nested:
-        MARKER = Sentinel("C.Nested.MARKER")  # no diagnostic
-        UNQUALIFIED = Sentinel("UNQUALIFIED")  # no diagnostic
+        MARKER = Sentinel("C.Nested.MARKER")  # ok
+        UNQUALIFIED = Sentinel("UNQUALIFIED")  # ok
         PARTIALLY_QUALIFIED = Sentinel("Nested.PARTIALLY_QUALIFIED")  # error: [mismatched-sentinel-name]
         WRONG_CLASS = Sentinel("Other.Nested.WRONG_CLASS")  # error: [mismatched-sentinel-name]
         WRONG_NAME = Sentinel("C.Nested.OTHER")  # error: [mismatched-sentinel-name]
@@ -288,13 +288,13 @@ Sentinels declared in class scope can also be used in type expressions:
 ```py
 class C:
     MARKER = sentinel("C.MARKER")
-    UNQUALIFIED = sentinel("UNQUALIFIED")  # no diagnostic
+    UNQUALIFIED = sentinel("UNQUALIFIED")  # ok
     WRONG_CLASS = sentinel("Other.WRONG_CLASS")  # error: [mismatched-sentinel-name]
     WRONG_NAME = sentinel("C.OTHER")  # error: [mismatched-sentinel-name]
 
     class Nested:
-        MARKER = sentinel("C.Nested.MARKER")  # no diagnostic
-        UNQUALIFIED = sentinel("UNQUALIFIED")  # no diagnostic
+        MARKER = sentinel("C.Nested.MARKER")  # ok
+        UNQUALIFIED = sentinel("UNQUALIFIED")  # ok
         PARTIALLY_QUALIFIED = sentinel("Nested.PARTIALLY_QUALIFIED")  # error: [mismatched-sentinel-name]
         WRONG_CLASS = sentinel("Other.Nested.WRONG_CLASS")  # error: [mismatched-sentinel-name]
         WRONG_NAME = sentinel("C.Nested.OTHER")  # error: [mismatched-sentinel-name]

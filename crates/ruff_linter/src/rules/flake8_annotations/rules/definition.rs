@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::Definition;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType};
@@ -243,12 +243,12 @@ impl Violation for MissingTypeCls {
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
-pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
+pub(crate) struct MissingReturnTypePublicFunction {
     name: String,
     annotation: Option<String>,
 }
 
-impl Violation for MissingReturnTypeUndocumentedPublicFunction {
+impl Violation for MissingReturnTypePublicFunction {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -884,7 +884,7 @@ pub(crate) fn definition(
         } else {
             match visibility {
                 visibility::Visibility::Public => {
-                    if checker.is_rule_enabled(Rule::MissingReturnTypeUndocumentedPublicFunction) {
+                    if checker.is_rule_enabled(Rule::MissingReturnTypePublicFunction) {
                         let return_type = if is_stub_function(function, checker) {
                             None
                         } else {
@@ -898,7 +898,7 @@ pub(crate) fn definition(
                                 })
                         };
                         let mut diagnostic = checker.report_diagnostic(
-                            MissingReturnTypeUndocumentedPublicFunction {
+                            MissingReturnTypePublicFunction {
                                 name: name.to_string(),
                                 annotation: return_type
                                     .clone()

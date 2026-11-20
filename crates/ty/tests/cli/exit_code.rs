@@ -3,6 +3,21 @@ use insta_cmd::assert_cmd_snapshot;
 use crate::CliTest;
 
 #[test]
+fn shell_completion_broken_pipe() -> anyhow::Result<()> {
+    let case = CliTest::new()?;
+    let (reader, writer) = std::io::pipe()?;
+    drop(reader);
+
+    let status = case
+        .command_with_subcommand("generate-shell-completion")
+        .arg("fish")
+        .stdout(writer)
+        .status()?;
+    assert!(status.success(), "{status}");
+    Ok(())
+}
+
+#[test]
 fn only_warnings() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 

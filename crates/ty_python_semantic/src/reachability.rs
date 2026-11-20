@@ -201,15 +201,15 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
-        NarrowingConstraint, SpecialFormType, TruthinessAnalyzer, Type, TypeContext, UnionType,
-        definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
-        expand_type, infer_expression_types, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
+        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, IntersectionType,
+        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        class_pattern_coverage_target, definite_match_pattern_type,
+        definite_match_pattern_type_for_subject, equality_truthiness, expand_type,
+        infer_narrowing_constraints, infer_predicate_truthiness, infer_same_file_expression_type,
+        mapping_pattern_type, pattern_binding_fallthrough_type, same_enum_or_pattern_type,
         sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
-use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexSlice};
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
@@ -220,7 +220,7 @@ use ty_python_core::{
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
     definition::{DefinitionKind, DefinitionState},
-    expression::{Expression, ExpressionContext},
+    expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
@@ -228,7 +228,9 @@ use ty_python_core::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
         ScopedPredicateId,
     },
-    reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    reachability_constraints::{
+        InteriorNode, ReachabilityConstraints, ScopedReachabilityConstraintId,
+    },
     scope::ScopeId,
     use_def_map,
 };
@@ -313,7 +315,7 @@ fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>
     // Condition analysis recovers cycles as ambiguous, so an unresolved guard cannot exclude values.
     predicate
         .guard(db)
-        .is_none_or(|guard| condition_truthiness(db, guard).is_always_true())
+        .is_none_or(|guard| infer_predicate_truthiness(db, guard).is_always_true())
 }
 
 /// Narrow `subject_ty` by a match pattern.
@@ -590,13 +592,14 @@ fn accumulate_constraint<'db>(
 }
 
 const NON_TERMINAL_CALL_CHUNK_SIZE: usize = 16;
-const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
-const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
+const REACHABILITY_CHECKPOINT_INTERVAL: u32 = 8;
+const INITIAL_CHECKPOINT_MASK: u32 = !(REACHABILITY_CHECKPOINT_INTERVAL - 1);
+const CHECKPOINT_MASK_SHIFT: u32 = 3;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
+
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
-        PredicateNode::Expression { expression, .. }
-        | PredicateNode::Condition(expression)
+        PredicateNode::Expression(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
@@ -626,15 +629,27 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// Reentrant analysis is handled by Salsa cycle recovery on the cached-range queries. The final
 /// incomplete block is left for the reachability walk: it can add at most 15 nested call queries,
 /// and analyzing it eagerly would bypass the range query's cycle recovery and could introduce a
-/// divergent inference cycle. For large scopes, keeping the complete-block pass unconditional
-/// ensures that tracked callers record the same dependencies on every thread. Small scopes do not
-/// need to precompute calls to bound the Salsa stack, so their calls are evaluated entirely on
-/// demand.
+/// divergent inference cycle. For large scopes, the decision to warm calls depends only on the
+/// structure of the constraint, so every thread takes the same path. A condition whose branches
+/// are all terminals has no call prefix to warm unless it is itself a statement call. Small
+/// scopes evaluate calls on demand because their reverse call chains are already bounded.
 fn analyze_non_terminal_calls_up_to_predicate<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    root_predicate: ScopedPredicateId,
-) -> bool {
+    root: InteriorNode,
+) {
+    let root_predicate = root.atom();
+    if !matches!(
+        predicates[root_predicate].node,
+        PredicateNode::IsNonTerminalCall(_)
+    ) && [root.if_true(), root.if_false(), root.if_ambiguous()]
+        .into_iter()
+        .all(|id| terminal_reachability(id).is_some())
+    {
+        // No branch of this constraint can visit a statement-call predicate. If inferring
+        // the condition itself needs earlier calls, their own reachability walks warm them.
+        return;
+    }
     let scope = predicate_scope(db, &predicates[root_predicate]);
     let has_many_calls = predicates
         .iter()
@@ -643,7 +658,7 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
         .is_some();
 
     if !has_many_calls {
-        return false;
+        return;
     }
 
     let call_predicates = non_terminal_call_predicates(db, scope);
@@ -659,8 +674,6 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
         start += length;
         remaining -= length;
     }
-
-    true
 }
 
 /// Returns the statement-call predicates for `scope` in source order.
@@ -737,6 +750,7 @@ fn evaluate_reachability_constraint<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
+    predicate_cache: Option<&TruthinessCache>,
 ) -> Truthiness {
     if let Some(reachability) = terminal_reachability(id) {
         return reachability;
@@ -745,19 +759,21 @@ fn evaluate_reachability_constraint<'db>(
     let use_def = use_def_map(db, scope);
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
-    let root_predicate = constraints.get_interior_node(id).atom();
-    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
-    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
+    let root = constraints.get_interior_node(id);
+    analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
 
     evaluate_reachability_path(
         db,
         scope,
         constraints,
-        predicates,
-        call_predicates,
+        PredicateEvaluator {
+            entries: predicates,
+            cache: predicate_cache,
+        },
         id,
-        true,
+        INITIAL_CHECKPOINT_MASK,
     )
+    .resolve(db, scope)
 }
 
 /// Evaluates the normal continuation captured by a deferred `finally` predicate.
@@ -781,7 +797,7 @@ fn evaluate_finally_continuation<'db>(
     scope: ScopeId<'db>,
     continuation: ScopedReachabilityConstraintId,
 ) -> Truthiness {
-    evaluate_reachability_constraint(db, scope, continuation)
+    evaluate_reachability_constraint(db, scope, continuation, None)
 }
 
 fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
@@ -793,54 +809,100 @@ fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthines
     }
 }
 
-/// Selects sparse, stable checkpoints without adding a second scope-wide predicate index.
-///
-/// Statement calls retain their existing checkpoint spacing. Other control-flow predicates become
-/// checkpoints only after a sufficiently long path has demonstrated that reuse is worthwhile.
-fn is_reachability_checkpoint(
-    call_predicates: Option<&[ScopedPredicateId]>,
-    predicate: ScopedPredicateId,
-    visited: usize,
-) -> bool {
-    if let Some(call_index) = call_predicates.and_then(|calls| calls.binary_search(&predicate).ok())
-    {
-        return (call_index + 1).is_multiple_of(REACHABILITY_EVALUATION_CHUNK_SIZE);
-    }
-
-    // Folding the adjacent bucket prevents regularly interleaved predicate kinds from always
-    // missing the same checkpoint positions.
-    let index = predicate.index();
-    let checkpoint_position = index ^ (index / CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL);
-    visited >= CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL
-        && (checkpoint_position + 1).is_multiple_of(CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
+#[derive(Default, Clone, Copy)]
+struct CheckpointBoundary {
+    visited: u32,
+    lower_bound: u32,
 }
 
-/// Evaluate a reachability decision diagram, reusing checkpoints for previously evaluated suffixes.
+impl CheckpointBoundary {
+    /// Selects the first predicate below an aligned boundary. Predicate IDs decrease along
+    /// every path, so nearby walks can share a checkpoint even when simplification leaves
+    /// gaps in the IDs. Choose the boundary after a short prefix to avoid caching short paths.
+    fn crossed(&mut self, predicate: ScopedPredicateId, mask: u32) -> bool {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "ScopedPredicateId stores a u32"
+        )]
+        let index = predicate.index() as u32;
+        self.visited += 1;
+        if self.visited == REACHABILITY_CHECKPOINT_INTERVAL {
+            self.lower_bound = index & mask;
+        }
+        index < self.lower_bound
+    }
+}
+
+/// A segment can finish the evaluation or leave a single suffix for its caller to resolve.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+enum ReachabilitySegment {
+    Complete(Truthiness),
+    Continue {
+        id: ScopedReachabilityConstraintId,
+        mask: u32,
+    },
+}
+
+impl ReachabilitySegment {
+    fn resolve<'db>(mut self, db: &'db dyn Db, scope: ScopeId<'db>) -> Truthiness {
+        loop {
+            match self {
+                Self::Complete(result) => return result,
+                Self::Continue { id, mask } => {
+                    self = evaluate_reachability_checkpoint(db, scope, id, mask);
+                }
+            }
+        }
+    }
+}
+
+/// Predicates from one use-def map. An inference region can share their outcomes between
+/// reachability checks and narrowing projections that consult the same map.
+#[derive(Clone, Copy)]
+struct PredicateEvaluator<'a, 'db> {
+    entries: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    cache: Option<&'a TruthinessCache>,
+}
+
+impl<'a, 'db> PredicateEvaluator<'a, 'db> {
+    fn uncached(entries: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>) -> Self {
+        Self {
+            entries,
+            cache: None,
+        }
+    }
+
+    fn evaluate(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        id: ScopedPredicateId,
+    ) -> Truthiness {
+        let evaluate = || analyze_single(db, env, &self.entries[id]);
+        self.cache.map_or_else(evaluate, |cache| {
+            cache.get_or_evaluate(id.index(), evaluate)
+        })
+    }
+}
+
+/// Walk a segment of a reachability decision diagram.
 ///
 /// An inhabited predicate selects its true, false, or ambiguous branch. An uninhabited predicate
 /// cannot select either boolean branch, so only paths that bypass it remain reachable. Such paths
 /// occur in both its true and false branches: evaluate both and take the conjunction of their
 /// reachability. A stack holds pending branches, and a set avoids evaluating shared suffixes twice.
 /// Stop as soon as any required branch is unreachable.
-///
-/// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the first
-/// node is evaluated directly to prevent the query from immediately calling itself again.
-///
-/// General checkpoints are created only after traversing a genuinely long path. Their positions
-/// depend on stable predicate IDs, so adjacent roots reuse the same suffix without requiring an
-/// additional retained scope-wide index or allocating tracked queries for short, ordinary paths.
 fn evaluate_reachability_path<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     constraints: &ReachabilityConstraints,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    call_predicates: Option<&[ScopedPredicateId]>,
+    predicates: PredicateEvaluator<'_, 'db>,
     mut id: ScopedReachabilityConstraintId,
-    mut use_checkpoint: bool,
-) -> Truthiness {
+    mask: u32,
+) -> ReachabilitySegment {
     let env = ProgramEnvironment::from_scope(scope);
-    let mut visited = 0;
-    let mut pending = SmallVec::<[ScopedReachabilityConstraintId; 2]>::new();
+    let mut boundary = CheckpointBoundary::default();
+    let mut pending = SmallVec::<[(_, _); 2]>::new();
     let mut seen: Option<FxHashSet<ScopedReachabilityConstraintId>> = None;
     let mut result = Truthiness::AlwaysTrue;
 
@@ -852,72 +914,70 @@ fn evaluate_reachability_path<'db>(
             reachability
         } else {
             let node = constraints.get_interior_node(id);
-            if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
-                evaluate_reachability_checkpoint(db, scope, id)
+            if boundary.crossed(node.atom(), mask) {
+                // Widen the alignment eightfold at each checkpoint to keep the number of
+                // lookups logarithmic. After ten shifts the mask is zero and the walk finishes
+                // locally. This also bounds nested queries while combining uninhabited branches.
+                let next = ReachabilitySegment::Continue {
+                    id,
+                    mask: mask << CHECKPOINT_MASK_SHIFT,
+                };
+                if pending.is_empty() && result.is_always_true() {
+                    return next;
+                }
+                next.resolve(db, scope)
             } else {
-                id = match analyze_single(db, &env, &predicates[node.atom()]) {
+                id = match predicates.evaluate(db, &env, node.atom()) {
                     Truthiness::AlwaysTrue => node.if_true(),
                     Truthiness::Ambiguous => node.if_ambiguous(),
                     Truthiness::AlwaysFalse => node.if_false(),
                     Truthiness::Uninhabited => {
                         // An uninhabited condition cannot take either branch. Retain only paths
                         // that bypass the condition, which are represented in both branches.
-                        pending.push(node.if_false());
+                        pending.push((node.if_false(), boundary));
                         seen.get_or_insert_with(FxHashSet::default);
                         node.if_true()
                     }
                 };
-                use_checkpoint = true;
-                visited += 1;
                 continue;
             }
         };
 
         result = result.and(reachability);
         if result.is_always_false() {
-            return result;
+            return ReachabilitySegment::Complete(result);
         }
         let Some(next) = pending.pop() else {
-            return result;
+            return ReachabilitySegment::Complete(result);
         };
-        id = next;
-        use_checkpoint = true;
-        visited = 0;
+        (id, boundary) = next;
     }
 }
 
-/// Evaluates a canonical suffix of a reachability decision diagram.
+/// Caches a segment of a reachability decision diagram.
 ///
-/// Statement calls retain their existing sparse checkpoints; other predicates become checkpoints
-/// only after a long path demonstrates that reuse is worthwhile. This lets later statements reuse
-/// constraints accumulated by earlier statements without retaining an additional scope-wide index
-/// or a Salsa query key and memo for every constraint.
+/// Returning a continuation keeps consecutive segments of a linear path independent during
+/// both cold evaluation and Salsa validation after an edit.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
+    cycle_initial = |_, _, _, _, _| ReachabilitySegment::Complete(Truthiness::Ambiguous),
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn evaluate_reachability_checkpoint<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
-) -> Truthiness {
+    mask: u32,
+) -> ReachabilitySegment {
     let use_def = use_def_map(db, scope);
     let predicates = use_def.predicates();
-    let has_many_calls = predicates
-        .iter()
-        .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
-        .nth(NON_TERMINAL_CALL_CHUNK_SIZE)
-        .is_some();
-    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
     evaluate_reachability_path(
         db,
         scope,
         use_def.reachability_constraints(),
-        predicates,
-        call_predicates,
+        PredicateEvaluator::uncached(predicates),
         id,
-        false,
+        mask,
     )
 }
 
@@ -943,17 +1003,18 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             return reachability;
         }
 
-        let root_predicate = self.get_interior_node(id).atom();
-        analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
+        let root = self.get_interior_node(id);
+        analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
+        let scope = predicate_scope(db, &predicates[root.atom()]);
         evaluate_reachability_path(
             db,
-            predicate_scope(db, &predicates[root_predicate]),
+            scope,
             self,
-            predicates,
-            None,
+            PredicateEvaluator::uncached(predicates),
             id,
-            true,
+            INITIAL_CHECKPOINT_MASK,
         )
+        .resolve(db, scope)
     }
 }
 
@@ -1135,7 +1196,7 @@ pub(crate) struct NarrowingProjector<'a, 'db> {
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
     constraints: &'a NarrowingConstraints,
-    predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    predicates: PredicateEvaluator<'a, 'db>,
     predicate_narrowing_targets: &'a PredicateNarrowingTargets,
     place: ScopedPlaceId,
     base_ty: Type<'db>,
@@ -1160,7 +1221,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             db,
             env,
             constraints,
-            predicates,
+            predicates: PredicateEvaluator::uncached(predicates),
             predicate_narrowing_targets,
             place,
             base_ty,
@@ -1168,6 +1229,17 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             graph: ProjectedNarrowingGraph::default(),
             narrowed_cache: FxHashMap::default(),
         }
+    }
+
+    pub(crate) fn with_reachability_cache(
+        mut self,
+        cache: Option<&'a ReachabilityEvaluationCache<'db>>,
+        constraints: &ReachabilityConstraints,
+    ) -> Self {
+        self.predicates.cache = cache
+            .filter(|cache| cache.primary_constraints == std::ptr::from_ref(constraints).addr())
+            .map(|cache| &cache.primary_predicates);
+        self
     }
 
     /// Narrows a binding while reusing projections and shared suffixes from earlier bindings.
@@ -1247,7 +1319,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         }
 
         let constraints =
-            infer_narrowing_constraints(db, self.predicates[predicate_id], self.place);
+            infer_narrowing_constraints(db, self.predicates.entries[predicate_id], self.place);
         self.graph
             .predicate_constraints_cache
             .insert(predicate_id, constraints.clone());
@@ -1421,7 +1493,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         type Id = ScopedNarrowingConstraint;
         enum Action {
             Visit(Id),
-            AnalyzeNonTerminal(Id),
+            VisitBranches(Id),
             FinishNonTerminal { id: Id, branch: Id },
             FinishPredicate(Id),
         }
@@ -1438,7 +1510,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     }
 
                     let node = self.constraints.get_interior_node(id);
-                    let predicate = self.predicates[node.atom];
+                    let predicate = self.predicates.entries[node.atom];
                     let index = node.atom.index();
                     let checkpoint_position =
                         index ^ (index / NARROWING_EVALUATION_CHECKPOINT_INTERVAL);
@@ -1482,27 +1554,33 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         self.project_cache.insert((id, self.base_ty), projected);
                         continue;
                     }
-                    let is_control_flow_gate = matches!(
+                    actions.push(Action::VisitBranches(id));
+                    actions.push(Action::Visit(node.if_uncertain));
+                }
+                Action::VisitBranches(id) => {
+                    let node = self.constraints.get_interior_node(id);
+                    // This path bypasses the predicate. If it admits every value, the
+                    // conditional paths cannot narrow this place.
+                    if self.projected_node(node.if_uncertain)
+                        == ProjectedNarrowingNodeId::ALWAYS_TRUE
+                    {
+                        self.project_cache
+                            .insert((id, self.base_ty), ProjectedNarrowingNodeId::ALWAYS_TRUE);
+                        continue;
+                    }
+                    let predicate = self.predicates.entries[node.atom];
+                    if !matches!(
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
-                    );
-
-                    if is_control_flow_gate {
-                        actions.push(Action::AnalyzeNonTerminal(id));
-                        actions.push(Action::Visit(node.if_uncertain));
-                    } else {
+                    ) {
                         actions.push(Action::FinishPredicate(id));
                         actions.push(Action::Visit(node.if_false));
-                        actions.push(Action::Visit(node.if_uncertain));
                         actions.push(Action::Visit(node.if_true));
+                        continue;
                     }
-                }
-                Action::AnalyzeNonTerminal(id) => {
-                    let node = self.constraints.get_interior_node(id);
-                    let predicate = self.predicates[node.atom];
-                    let branch = match analyze_single(db, self.env, &predicate) {
+                    let branch = match self.predicates.evaluate(self.db, self.env, node.atom) {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Uninhabited => ScopedNarrowingConstraint::ALWAYS_FALSE,
@@ -1528,13 +1606,21 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let if_true = self.projected_node(node.if_true);
                     let if_uncertain = self.projected_node(node.if_uncertain);
                     let if_false = self.projected_node(node.if_false);
+                    // If the bypass already covers both conditional branches, their
+                    // predicate cannot affect the projection.
+                    if [if_true, if_false].into_iter().all(|branch| {
+                        branch == ProjectedNarrowingNodeId::ALWAYS_FALSE || branch == if_uncertain
+                    }) {
+                        self.project_cache.insert((id, self.base_ty), if_uncertain);
+                        continue;
+                    }
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
                     let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
                         // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
                         // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
                         // Including a statically unreachable branch could erase narrowing from the reachable branch.
-                        match analyze_single(self.db, self.env, &self.predicates[node.atom]) {
+                        match self.predicates.evaluate(self.db, self.env, node.atom) {
                             Truthiness::AlwaysTrue => self.or(if_true, if_uncertain),
                             Truthiness::AlwaysFalse => self.or(if_false, if_uncertain),
                             Truthiness::Ambiguous => {
@@ -1694,6 +1780,19 @@ fn analyze_single_pattern_predicate_kind<'db>(
                 Truthiness::Ambiguous
             }
         }
+        PatternPredicateKind::Or(predicates)
+            if let Some(matched) = same_enum_or_pattern_type(db, env, predicates, subject_ty) =>
+        {
+            if subject_ty.is_disjoint_from(db, env, matched) {
+                Truthiness::AlwaysFalse
+            } else if IntersectionType::from_positive_and_negative(db, env, subject_ty, matched)
+                .is_never()
+            {
+                Truthiness::AlwaysTrue
+            } else {
+                Truthiness::Ambiguous
+            }
+        }
         PatternPredicateKind::Or(predicates) => {
             use std::ops::ControlFlow;
 
@@ -1740,16 +1839,13 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(kind) => {
-            let class_ty =
-                match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                    Type::ClassLiteral(class) => {
-                        Type::instance(db, env, class.top_materialization(db))
-                    }
-                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        Type::Callable(CallableType::top(db))
-                    }
-                    _ => return Truthiness::Ambiguous,
-                };
+            let class_ty = match class_pattern_coverage_target(db, kind) {
+                Type::ClassLiteral(class) => Type::instance(db, env, class.top_materialization(db)),
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                    Type::Callable(CallableType::top(db))
+                }
+                _ => return Truthiness::Ambiguous,
+            };
             let definitely_matched = precomputed_definite_match_ty.unwrap_or_else(|| {
                 definite_match_pattern_type_for_subject(db, env, predicate_kind, subject_ty)
             });
@@ -1779,8 +1875,15 @@ fn analyze_single_pattern_predicate_kind<'db>(
             }
         }
         PatternPredicateKind::Sequence(kind) => {
+            // Exact tuples are always eligible for sequence patterns. Avoid projecting their
+            // element types into a generic tuple specialization just to establish this fact.
+            let is_exact_tuple = |ty: Type<'db>| ty.exact_tuple_instance_spec(db).is_some();
+            let is_tuple_subject = match subject_ty {
+                Type::Union(union) => union.elements(db).iter().copied().all(is_exact_tuple),
+                _ => is_exact_tuple(subject_ty),
+            };
             let sequence_ty = sequence_pattern_type_builder(db, env).build();
-            if subject_ty.is_subtype_of(db, env, sequence_ty) {
+            if is_tuple_subject || subject_ty.is_subtype_of(db, env, sequence_ty) {
                 if kind.is_irrefutable() {
                     Truthiness::AlwaysTrue
                 } else {
@@ -1932,62 +2035,6 @@ fn context_manager_suppresses<'db>(
     )
 }
 
-/// Test an expression's result object, accounting for operands that cannot complete.
-/// Separate value and condition queries use the expression directly as their Salsa key, avoiding
-/// an additional interner for pairs of expressions and evaluation contexts.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, _, _| Truthiness::Ambiguous,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
-    heap_size = get_size2::GetSize::get_heap_size
-)]
-fn value_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
-    expression_truthiness(db, expression, ExpressionContext::Value)
-}
-
-/// Follow short-circuit conditions without testing their result objects again.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, _, _| Truthiness::Ambiguous,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
-    heap_size = get_size2::GetSize::get_heap_size
-)]
-fn condition_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
-    expression_truthiness(db, expression, ExpressionContext::Condition)
-}
-
-fn widen_truthiness(cycle: &salsa::Cycle, previous: Truthiness, result: Truthiness) -> Truthiness {
-    // A condition can control whether one of its own inputs is reachable. Expression inference
-    // can lose its previous result when it ceases to be a cycle head, so its type widening alone
-    // does not ensure that the condition's truthiness converges. Delay widening here to avoid
-    // retaining imprecise results from the first few iterations.
-    if cycle.iteration() > crate::TAINTED_CYCLES {
-        previous.union(result)
-    } else {
-        result
-    }
-}
-
-/// Keep this separate from type inference: `bool(never)` has type `bool`, but cannot produce a
-/// boolean outcome. The calling query caches that distinction and widens it during inference cycles.
-fn expression_truthiness<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-    context: ExpressionContext,
-) -> Truthiness {
-    let env = ProgramEnvironment::from_scope(expression.scope(db));
-    let module = parsed_module(db, expression.python_file(db)).load(db);
-    let inference = infer_expression_types(db, expression, TypeContext::default());
-    let node = expression.node_ref(db).node(&module);
-    TruthinessAnalyzer::new(
-        db,
-        &env,
-        |node| inference.expression_type(node),
-        |node| inference.comparison_truthiness(node),
-    )
-    .truthiness(node, context)
-}
-
 /// Evaluate a predicate, returning `Uninhabited` when it cannot produce a boolean outcome.
 ///
 /// Unlike ambiguous truthiness, an uninhabited condition does not make either branch reachable.
@@ -1997,24 +2044,8 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {
-        PredicateNode::Expression {
-            expression: test_expr,
-            truthiness_from_type: true,
-        } => {
-            let inference = infer_expression_types(db, test_expr, TypeContext::default());
-            let ty = inference.expression_type(test_expr.node_ref(db));
-            if ty.is_equivalent_to(db, env, Type::Never) {
-                Truthiness::Uninhabited
-            } else {
-                ty.bool(db, env).negate_if(!predicate.is_positive)
-            }
-        }
-        PredicateNode::Expression {
-            expression: test_expr,
-            truthiness_from_type: false,
-        } => value_truthiness(db, test_expr).negate_if(!predicate.is_positive),
-        PredicateNode::Condition(test_expr) => {
-            condition_truthiness(db, test_expr).negate_if(!predicate.is_positive)
+        PredicateNode::Expression(expression) => {
+            infer_predicate_truthiness(db, expression).negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
             expression,
@@ -2138,6 +2169,24 @@ pub(crate) fn evaluate_reachability(
         .evaluate(db, use_def.predicates(), reachability)
 }
 
+#[derive(Default)]
+struct TruthinessCache(RefCell<Vec<Option<Truthiness>>>);
+
+impl TruthinessCache {
+    fn get_or_evaluate(&self, index: usize, evaluate: impl FnOnce() -> Truthiness) -> Truthiness {
+        if let Some(value) = self.0.borrow().get(index).copied().flatten() {
+            return value;
+        }
+        let value = evaluate();
+        let mut entries = self.0.borrow_mut();
+        if entries.len() <= index {
+            entries.resize(index + 1, None);
+        }
+        entries[index] = Some(value);
+        value
+    }
+}
+
 /// Inference-local cache for static reachability evaluations.
 ///
 /// Place lookup may evaluate the same reachability constraint many times while inferring a single
@@ -2146,14 +2195,17 @@ pub(crate) fn evaluate_reachability(
 /// avoids repeating non-trivial work.
 ///
 /// The common case is evaluating constraints from the inferred region's own use-def map. Those
-/// entries are stored in a dense vector indexed by [`ScopedReachabilityConstraintId`]. Constraints
+/// entries are stored in a dense vector indexed by [`ScopedReachabilityConstraintId`]. Distinct
+/// paths through that graph can test the same predicate, so cache its truthiness for the lifetime
+/// of this inference, including when the surrounding query is iterating a cycle. Constraints
 /// from other use-def maps are less common and are stored separately, keyed by the address of their
 /// [`ReachabilityConstraints`] graph plus the local constraint id. The graph address is part of the
 /// key because scoped constraint ids are only unique within one graph.
 pub(crate) struct ReachabilityEvaluationCache<'db> {
     primary_scope: ScopeId<'db>,
     primary_constraints: usize,
-    primary_entries: RefCell<Vec<Option<Truthiness>>>,
+    primary_entries: TruthinessCache,
+    primary_predicates: TruthinessCache,
     other_entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
 }
 
@@ -2170,7 +2222,8 @@ impl<'db> ReachabilityEvaluationCache<'db> {
         Self {
             primary_scope,
             primary_constraints: std::ptr::from_ref(primary_constraints).addr(),
-            primary_entries: RefCell::new(Vec::new()),
+            primary_entries: TruthinessCache::default(),
+            primary_predicates: TruthinessCache::default(),
             other_entries: RefCell::new(FxHashMap::default()),
         }
     }
@@ -2205,23 +2258,19 @@ impl<'db> ReachabilityEvaluationCache<'db> {
                 return result;
             }
 
-            let result = evaluate_reachability_constraint(db, scope, id);
+            let result = evaluate_reachability_constraint(db, scope, id, None);
             self.other_entries.borrow_mut().insert(key, result);
             return result;
         }
 
-        let index = id.index();
-        if let Some(result) = self.primary_entries.borrow().get(index).copied().flatten() {
-            return result;
-        }
-
-        let result = evaluate_reachability_constraint(db, self.primary_scope, id);
-        let mut entries = self.primary_entries.borrow_mut();
-        if entries.len() <= index {
-            entries.resize(index + 1, None);
-        }
-        entries[index] = Some(result);
-        result
+        self.primary_entries.get_or_evaluate(id.index(), || {
+            evaluate_reachability_constraint(
+                db,
+                self.primary_scope,
+                id,
+                Some(&self.primary_predicates),
+            )
+        })
     }
 }
 
@@ -2328,6 +2377,42 @@ mod tests {
     use ty_python_core::semantic_index;
 
     #[test]
+    fn sparse_paths_reuse_checkpoint_segments() {
+        const LENGTH: usize = 1024;
+        const STRIDE: usize = 256;
+        let levels = (LENGTH * STRIDE).ilog2() as usize;
+        let mut cached = FxHashSet::default();
+        let mut visits = 0;
+
+        // Evaluate every prefix, starting with the full path and an empty checkpoint cache.
+        // Simplifying no-op branches can leave gaps of arbitrary size between predicate IDs.
+        for length in (1..=LENGTH).rev() {
+            let mut boundary = CheckpointBoundary::default();
+            let mut mask = INITIAL_CHECKPOINT_MASK;
+            let mut lookups = 0;
+            let mut cold = true;
+            for index in (0..length).rev() {
+                let predicate = ScopedPredicateId::new(STRIDE * index + 1);
+                if boundary.crossed(predicate, mask) {
+                    lookups += 1;
+                    mask <<= CHECKPOINT_MASK_SHIFT;
+                    cold = cached.insert((predicate, mask));
+                    boundary = CheckpointBoundary::default();
+                    // The next segment starts at the predicate that crossed the boundary.
+                    assert!(!boundary.crossed(predicate, mask));
+                }
+                // Only the first lookup of a segment evaluates its predicates.
+                visits += usize::from(cold);
+            }
+            assert!(lookups <= levels);
+        }
+
+        // Sharing aligned segments should keep the average work to a short walk per level.
+        let interval = REACHABILITY_CHECKPOINT_INTERVAL as usize;
+        assert!(visits <= LENGTH * interval * levels);
+    }
+
+    #[test]
     fn non_terminal_call_range_recovers_cross_file_cycle() -> anyhow::Result<()> {
         let mut db = setup_db();
         let calls = "        other.target.ping()\n".repeat(NON_TERMINAL_CALL_CHUNK_SIZE + 1);
@@ -2379,9 +2464,11 @@ class TargetB:
     #[test]
     fn non_terminal_call_range_invalidates_when_callable_changes() -> anyhow::Result<()> {
         let mut db = setup_db();
+        // Only the first call depends on the edited module. Place it in a complete call
+        // range and a cached reachability segment when evaluating the end of the scope.
         let source = format!(
-            "from dependency import callback\n\ndef f() -> None:\n{}",
-            "    callback()\n".repeat(NON_TERMINAL_CALL_CHUNK_SIZE + 1)
+            "from dependency import callback\n\ndef f() -> None:\n    callback()\n{}",
+            "    print()\n".repeat(4 * NON_TERMINAL_CALL_CHUNK_SIZE)
         );
         db.write_files([
             ("/src/dependency.py", "def callback() -> None: ..."),
@@ -2399,8 +2486,13 @@ class TargetB:
             let scope = function_scope.to_scope_id(&db, program_file);
             let use_def = use_def_map(&db, scope);
             assert!(
-                evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
-                    .may_be_true()
+                evaluate_reachability_constraint(
+                    &db,
+                    scope,
+                    use_def.end_of_scope_reachability(),
+                    None
+                )
+                .may_be_true()
             );
         }
 
@@ -2413,7 +2505,7 @@ class TargetB:
         let scope = function_scope.to_scope_id(&db, program_file);
         let use_def = use_def_map(&db, scope);
         assert!(
-            evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
+            evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(), None)
                 .is_always_false()
         );
         Ok(())
@@ -2446,15 +2538,7 @@ class TargetB:
                 let predicate = use_def
                     .predicates()
                     .iter()
-                    .find(|predicate| {
-                        matches!(
-                            predicate.node,
-                            PredicateNode::Expression {
-                                truthiness_from_type: true,
-                                ..
-                            }
-                        )
-                    })
+                    .find(|predicate| matches!(predicate.node, PredicateNode::Expression(_)))
                     .unwrap();
                 let predicates: Predicates = std::iter::repeat_n(*predicate, DEPTH).collect();
 
