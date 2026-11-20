@@ -19,3 +19,7 @@ P2 = ParamSpec()  # error
 ## References
 
 - [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)
+
+## Rule history
+
+- v0.0.108: Checks on the use of `P.args` and `P.kwargs` moved to `invalid-paramspec-components`.
