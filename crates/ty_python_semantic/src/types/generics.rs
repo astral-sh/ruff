@@ -4054,14 +4054,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             && let Ok(signature) = callables.signatures(db).exactly_one()
             && let Some(locals) = signature.generic_context
             && locals.variables(db).all(|local| {
-                signature.parameters().iter().skip(prefix.len()).any(|p| {
-                    any_over_type_expanding_aliases(
-                        db,
-                        self.env,
-                        p.annotated_type(),
-                        |ty| matches!(ty, Type::TypeVar(var) if var.is_same_typevar_as(db, local)),
-                    )
-                })
+                // Validation currently rejects a tuple pack shared by the
+                // specialized prefix and P (astral-sh/ty#4029).
+                !local.is_typevartuple(db)
+                    && signature.parameters().iter().skip(prefix.len()).any(|p| {
+                        any_over_type_expanding_aliases(
+                            db,
+                            self.env,
+                            p.annotated_type(),
+                            |ty| matches!(ty, Type::TypeVar(var) if var.is_same_typevar_as(db, local)),
+                        )
+                    })
             })
         {
             let when = self.constraint_for_relation(formal, actual, TypeVarVariance::Covariant);

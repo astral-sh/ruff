@@ -1542,6 +1542,14 @@ def box[*Ts](items: tuple[*Ts]) -> list[tuple[*Ts]]:
 map_items(box)([(1, "word")])  # ok
 ```
 
+A curried function can share a variadic tuple between its input and the mapper's parameter list.
+
+```py
+@curry_flip  # ok
+def starmap[*Ts](items: tuple[*Ts], mapper: Callable[[*Ts], int]) -> int:
+    return mapper(*items)
+```
+
 ### Captured and fixed variables in a return type
 
 Capturing a callable's type variable does not permit a second, enclosing variable in its return type
