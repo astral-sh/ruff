@@ -47,7 +47,11 @@ impl Violation for UnnecessaryListCall {
 }
 
 /// C411
-pub(crate) fn unnecessary_list_call(checker: &Checker, &expr: &Expr<'_>, call: ast::ExprCall<'_>) {
+pub(crate) fn unnecessary_list_call(
+    checker: &Checker,
+    &expr: &Expr<'_>,
+    call: &ast::ExprCallFields<'_>,
+) {
     let Some(argument) = helpers::exactly_one_argument_with_matching_function("list", call) else {
         return;
     };

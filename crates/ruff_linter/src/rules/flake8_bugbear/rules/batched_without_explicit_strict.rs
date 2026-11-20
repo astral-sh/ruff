@@ -67,13 +67,13 @@ impl Violation for BatchedWithoutExplicitStrict {
 }
 
 /// B911
-pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     if checker.target_version() < PythonVersion::PY313 {
         return;
     }
 
     let semantic = checker.semantic();
-    let (func, arguments) = (call.func(), call.arguments());
+    let (func, arguments) = (call.func, call.arguments);
 
     if !semantic.matches_qualified_name(func, &["itertools", "batched"]) {
         return;

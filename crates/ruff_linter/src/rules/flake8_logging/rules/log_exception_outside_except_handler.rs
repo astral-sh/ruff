@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::ExprKind;
 use ruff_python_semantic::analyze::logging;
 use ruff_text_size::Ranged;
@@ -88,14 +88,14 @@ impl Violation for LoggingExceptionOutsideExceptHandler {
 }
 
 /// LOG004
-pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &ExprCallFields<'_>) {
     let semantic = checker.semantic();
 
     if !outside_handlers(call.range().start(), semantic) {
         return;
     }
 
-    let func = call.func();
+    let func = call.func;
     let fix = match func.classify() {
         ExprKind::Attribute(attribute) => {
             let attr = attribute.attr();

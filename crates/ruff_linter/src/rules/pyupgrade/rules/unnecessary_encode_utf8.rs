@@ -152,8 +152,8 @@ fn replace_with_bytes_literal(locator: &Locator, call: ast::ExprCall<'_>, tokens
 }
 
 /// UP012
-pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: ast::ExprCall<'_>) {
-    let Some(variable) = match_encoded_variable(call.func()) else {
+pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let Some(variable) = match_encoded_variable(call.func) else {
         return;
     };
     match variable.classify() {
@@ -165,7 +165,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: ast::ExprCall<'_>
             }
 
             // Ex) `"str".encode()`, `"str".encode("utf-8")`
-            if let Some(encoding_arg) = match_encoding_arg(call.arguments()) {
+            if let Some(encoding_arg) = match_encoding_arg(call.arguments) {
                 if literal.to_str().is_ascii() {
                     // Ex) Convert `"foo".encode()` to `b"foo"`.
                     let mut diagnostic = checker.report_diagnostic(
@@ -176,7 +176,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: ast::ExprCall<'_>
                     );
                     diagnostic.set_fix(replace_with_bytes_literal(
                         checker.locator(),
-                        call,
+                        call.node,
                         checker.tokens(),
                     ));
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
@@ -191,7 +191,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: ast::ExprCall<'_>
                     diagnostic.try_set_fix(|| {
                         remove_argument(
                             &kwarg,
-                            call.arguments(),
+                            call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
                             checker.tokens(),
@@ -209,7 +209,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: ast::ExprCall<'_>
                     diagnostic.try_set_fix(|| {
                         remove_argument(
                             &arg,
-                            call.arguments(),
+                            call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
                             checker.tokens(),
@@ -221,7 +221,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: ast::ExprCall<'_>
         }
         // Ex) `f"foo{bar}".encode("utf-8")`
         ExprKind::FString(_) => {
-            if let Some(encoding_arg) = match_encoding_arg(call.arguments()) {
+            if let Some(encoding_arg) = match_encoding_arg(call.arguments) {
                 if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode(encoding="utf-8")` to
                     // `f"unicode text©".encode()`.
@@ -234,7 +234,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: ast::ExprCall<'_>
                     diagnostic.try_set_fix(|| {
                         remove_argument(
                             &kwarg,
-                            call.arguments(),
+                            call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
                             checker.tokens(),
@@ -252,7 +252,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: ast::ExprCall<'_>
                     diagnostic.try_set_fix(|| {
                         remove_argument(
                             &arg,
-                            call.arguments(),
+                            call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
                             checker.tokens(),

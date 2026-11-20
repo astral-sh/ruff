@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -61,17 +61,17 @@ impl AlwaysFixableViolation for MapWithoutExplicitStrict {
 }
 
 /// B912
-pub(crate) fn map_without_explicit_strict(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn map_without_explicit_strict(checker: &Checker, call: &ExprCallFields<'_>) {
     let semantic = checker.semantic();
 
-    if semantic.match_builtin_expr(call.func(), "map")
-        && needs_strict_argument(call.arguments(), 3)
-        && !any_infinite_iterables(call.arguments().args().iter().skip(1), semantic)
+    if semantic.match_builtin_expr(call.func, "map")
+        && needs_strict_argument(call.arguments, 3)
+        && !any_infinite_iterables(call.arguments.args().iter().skip(1), semantic)
     {
         checker
             .report_diagnostic(MapWithoutExplicitStrict, call.range())
             .set_fix(Fix::applicable_edit(
-                add_argument("strict=False", call.arguments(), checker.tokens()),
+                add_argument("strict=False", call.arguments, checker.tokens()),
                 Applicability::Unsafe,
             ));
     }

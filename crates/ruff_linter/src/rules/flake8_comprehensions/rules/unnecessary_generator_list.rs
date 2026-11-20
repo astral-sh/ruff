@@ -65,7 +65,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorList {
 }
 
 /// C400 (`list(generator)`)
-pub(crate) fn unnecessary_generator_list(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     let Some(argument) = exactly_one_argument_with_matching_function("list", call) else {
         return;
     };
@@ -114,7 +114,7 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: ast::ExprCall<
         let call_start = Edit::replacement(
             "[".to_string(),
             call.range().start(),
-            call.arguments().start() + TextSize::from(1),
+            call.arguments.start() + TextSize::from(1),
         );
 
         // Replace `)` with `]`.
@@ -125,7 +125,7 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: ast::ExprCall<
         let right_bracket_loc = after_arg_tokens
             .iter()
             .find(|token| token.kind() == TokenKind::Comma)
-            .map_or(call.arguments().end(), Ranged::end)
+            .map_or(call.arguments.end(), Ranged::end)
             - TextSize::from(1);
         let call_end = Edit::replacement("]".to_string(), right_bracket_loc, call.range().end());
 
@@ -134,7 +134,7 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: ast::ExprCall<
         if parenthesized {
             // The generator's range will include the innermost parentheses, but it could be
             // surrounded by additional parentheses.
-            let range = parenthesized_range(argument, (call.arguments()).into(), checker.tokens())
+            let range = parenthesized_range(argument, (call.arguments).into(), checker.tokens())
                 .unwrap_or(argument.range());
 
             // The generator always parenthesizes the expression; trim the parentheses.

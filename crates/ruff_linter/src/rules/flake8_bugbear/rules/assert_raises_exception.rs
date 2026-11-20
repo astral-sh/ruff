@@ -127,9 +127,9 @@ pub(crate) fn assert_raises_exception(
 }
 
 /// B017 (call form)
-pub(crate) fn assert_raises_exception_call(checker: &Checker, call: ast::ExprCall<'_>) {
-    let func = call.func();
-    let arguments = call.arguments();
+pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let func = call.func;
+    let arguments = call.arguments;
     let semantic = checker.semantic();
 
     if arguments.len() < 2 {

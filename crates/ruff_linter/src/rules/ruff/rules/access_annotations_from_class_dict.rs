@@ -98,7 +98,7 @@ impl Violation for AccessAnnotationsFromClassDict {
 /// RUF063
 pub(crate) fn access_annotations_from_class_dict_with_get(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
 ) {
     let python_version = checker.target_version();
     let typing_extensions = checker.settings().typing_extensions;
@@ -111,8 +111,8 @@ pub(crate) fn access_annotations_from_class_dict_with_get(
     // Expected pattern: foo.__dict__.get("__annotations__" [, <default>])
     // Here, `call` is the `.get(...)` part.
 
-    // 1. Check that the `call.func()` is `get`
-    let get_attribute = match call.func().classify() {
+    // 1. Check that the `call.func` is `get`
+    let get_attribute = match call.func.classify() {
         ExprKind::Attribute(attr) if attr.attr().as_str() == "get" => attr,
         _ => return,
     };
@@ -130,11 +130,11 @@ pub(crate) fn access_annotations_from_class_dict_with_get(
     //    - One or two positional arguments.
     //    - First positional argument must be the string literal "__annotations__".
     //    - The value of the second positional argument (if present) does not affect the match.
-    if !call.arguments().keywords().is_empty() || call.arguments().len() > 2 {
+    if !call.arguments.keywords().is_empty() || call.arguments.len() > 2 {
         return;
     }
 
-    let Some(first_arg) = call.arguments().find_positional(0) else {
+    let Some(first_arg) = call.arguments.find_positional(0) else {
         return;
     };
 

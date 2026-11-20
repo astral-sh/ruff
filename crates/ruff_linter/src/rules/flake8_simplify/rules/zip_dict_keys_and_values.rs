@@ -66,9 +66,9 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 }
 
 /// SIM911
-pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: ast::ExprCall<'_>) {
-    let func = expr.func();
-    let arguments = expr.arguments();
+pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCallFields<'_>) {
+    let func = expr.func;
+    let arguments = expr.arguments;
     let [arg1, arg2] = if let Some(pair) = arguments.as_positional_array::<2>() {
         pair
     } else {
@@ -119,7 +119,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: ast::ExprCall<'_
         expr.range(),
         checker.locator(),
     );
-    let actual = checker.locator().slice(expr);
+    let actual = checker.locator().slice(expr.node);
 
     let mut diagnostic = checker.report_diagnostic(
         ZipDictKeysAndValues {

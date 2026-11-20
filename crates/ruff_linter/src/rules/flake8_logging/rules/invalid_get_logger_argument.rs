@@ -64,13 +64,13 @@ impl Violation for FilePathAsLoggerName {
 }
 
 /// LOG002
-pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
 
     let Some(expr) = call
-        .arguments()
+        .arguments
         .find_argument_value("name", 0)
         .and_then(Expr::as_name_expr)
     else {
@@ -88,7 +88,7 @@ pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: ast::ExprCall
 
     if !checker
         .semantic()
-        .matches_qualified_name(call.func(), &["logging", "getLogger"])
+        .matches_qualified_name(call.func, &["logging", "getLogger"])
     {
         return;
     }

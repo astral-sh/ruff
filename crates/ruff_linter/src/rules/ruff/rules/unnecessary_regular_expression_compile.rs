@@ -53,18 +53,21 @@ impl Violation for UnnecessaryRegularExpressionCompile {
 }
 
 /// `unnecessary-regular-expression-compile`
-pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn unnecessary_regular_expression_compile(
+    checker: &Checker,
+    call: &ast::ExprCallFields<'_>,
+) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::RE) {
         return;
     }
 
-    let ExprKind::Attribute(attribute) = call.func().classify() else {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
     let attr = attribute.attr();
     let value = attribute.value();
-    let Some(re_func) = reducible_re_method(attr.as_str(), call.arguments()) else {
+    let Some(re_func) = reducible_re_method(attr.as_str(), call.arguments) else {
         return;
     };
 

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::ExprKind;
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
@@ -88,8 +88,8 @@ impl Violation for LoggingExcInfoOutsideExceptHandler {
 }
 
 /// LOG014
-pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: ExprCall<'_>) {
-    let Some(exc_info) = call.arguments().find_keyword("exc_info") else {
+pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCallFields<'_>) {
+    let Some(exc_info) = call.arguments.find_keyword("exc_info") else {
         return;
     };
 
@@ -103,7 +103,7 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: ExprCall<
         return;
     }
 
-    let func = call.func();
+    let func = call.func;
     match func.classify() {
         ExprKind::Attribute(attribute) => {
             if LoggingLevel::from_attribute(&attribute.attr()).is_none() {
@@ -137,7 +137,7 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: ExprCall<
         return;
     }
 
-    let arguments = call.arguments();
+    let arguments = call.arguments;
 
     let mut diagnostic =
         checker.report_diagnostic(LoggingExcInfoOutsideExceptHandler, exc_info.range());

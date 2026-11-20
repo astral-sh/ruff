@@ -61,20 +61,24 @@ impl AlwaysFixableViolation for UnnecessaryCollectionCall {
 /// C408
 pub(crate) fn unnecessary_collection_call(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call_fields: &ast::ExprCallFields<'_>,
     settings: &Settings,
 ) {
-    let empty = call.arguments().is_empty();
+    let call = call_fields.node;
+    let empty = call_fields.arguments.is_empty();
     if !empty
         && (settings.allow_dict_calls_with_keyword_arguments
-            || call.arguments().iter_source_order().any(|item| match item {
-                ast::ArgOrKeyword::Arg(_) => true,
-                ast::ArgOrKeyword::Keyword(keyword) => keyword.is_variadic(),
-            }))
+            || call_fields
+                .arguments
+                .iter_source_order()
+                .any(|item| match item {
+                    ast::ArgOrKeyword::Arg(_) => true,
+                    ast::ArgOrKeyword::Keyword(keyword) => keyword.is_variadic(),
+                }))
     {
         return;
     }
-    let Some(builtin) = checker.semantic().resolve_builtin_symbol(call.func()) else {
+    let Some(builtin) = checker.semantic().resolve_builtin_symbol(call_fields.func) else {
         return;
     };
     let collection = match builtin {
@@ -84,8 +88,10 @@ pub(crate) fn unnecessary_collection_call(
         _ => return,
     };
 
-    let mut diagnostic =
-        checker.report_diagnostic(UnnecessaryCollectionCall { kind: collection }, call.range());
+    let mut diagnostic = checker.report_diagnostic(
+        UnnecessaryCollectionCall { kind: collection },
+        call_fields.range(),
+    );
 
     // Convert `dict()` to `{}`.
     if empty {
@@ -93,26 +99,32 @@ pub(crate) fn unnecessary_collection_call(
             // Replace from the start of the call to the start of the argument.
             let call_start = Edit::replacement(
                 match collection {
-                    Collection::Dict => {
-                        pad_start("{", call.range(), checker.locator(), checker.semantic())
-                    }
+                    Collection::Dict => pad_start(
+                        "{",
+                        call_fields.range(),
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     Collection::List => "[".to_string(),
                     Collection::Tuple => "(".to_string(),
                 },
                 call.start(),
-                call.arguments().start() + TextSize::from(1),
+                call_fields.arguments.start() + TextSize::from(1),
             );
 
             // Replace from the end of the inner list or tuple to the end of the call with `}`.
             let call_end = Edit::replacement(
                 match collection {
-                    Collection::Dict => {
-                        pad_end("}", call.range(), checker.locator(), checker.semantic())
-                    }
+                    Collection::Dict => pad_end(
+                        "}",
+                        call_fields.range(),
+                        checker.locator(),
+                        checker.semantic(),
+                    ),
                     Collection::List => "]".to_string(),
                     Collection::Tuple => ")".to_string(),
                 },
-                call.arguments().end() - TextSize::from(1),
+                call_fields.arguments.end() - TextSize::from(1),
                 call.end(),
             );
 
