@@ -25,27 +25,37 @@ impl InvalidRuleCodeKind {
             InvalidRuleCodeKind::Suppression => "suppression",
         }
     }
+
+    fn selector(&self) -> &str {
+        match self {
+            InvalidRuleCodeKind::Noqa => "code",
+            InvalidRuleCodeKind::Suppression => "selector",
+        }
+    }
 }
 
 /// ## What it does
-/// Checks for `noqa` codes that are invalid.
+/// Checks for invalid rule names and codes in suppression comments.
 ///
 /// ## Why is this bad?
-/// Invalid rule codes serve no purpose and may indicate outdated code suppressions.
+/// Invalid rule selectors serve no purpose and may indicate outdated code suppressions.
 ///
 /// ## Example
 /// ```python
 /// import os  # noqa: XYZ999
+/// import sys # ruff: ignore[unknown-rule]
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import os
+/// import sys
 /// ```
 ///
 /// Or if there are still valid codes needed:
 /// ```python
 /// import os  # noqa: E402
+/// import sys # ruff: ignore[E402]
 /// ```
 ///
 /// ## Fix safety
@@ -63,19 +73,20 @@ impl InvalidRuleCodeKind {
 /// - `lint.external`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
-pub(crate) struct InvalidRuleCode {
-    pub(crate) rule_code: String,
+pub(crate) struct InvalidRuleSelectorInSuppressionComment {
+    pub(crate) rule: String,
     pub(crate) kind: InvalidRuleCodeKind,
     pub(crate) whole_comment: bool,
 }
 
-impl AlwaysFixableViolation for InvalidRuleCode {
+impl AlwaysFixableViolation for InvalidRuleSelectorInSuppressionComment {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Invalid rule code in {}: {}",
-            self.kind.as_str(),
-            self.rule_code
+            "Invalid rule {selector} in {comment}: {rule}",
+            selector = self.kind.selector(),
+            comment = self.kind.as_str(),
+            rule = self.rule,
         )
     }
 
@@ -83,7 +94,11 @@ impl AlwaysFixableViolation for InvalidRuleCode {
         if self.whole_comment {
             format!("Remove the {} comment", self.kind.as_str())
         } else {
-            format!("Remove the rule code `{}`", self.rule_code)
+            format!(
+                "Remove the rule {selector} `{rule}`",
+                selector = self.kind.selector(),
+                rule = self.rule,
+            )
         }
     }
 }
@@ -144,8 +159,8 @@ fn all_codes_invalid_diagnostic(
     context: &LintContext,
 ) {
     let mut diagnostic = context.report_custom_diagnostic(
-        InvalidRuleCode {
-            rule_code: invalid_codes
+        InvalidRuleSelectorInSuppressionComment {
+            rule: invalid_codes
                 .into_iter()
                 .map(Code::as_str)
                 .collect::<Vec<_>>()
@@ -166,8 +181,8 @@ fn some_codes_are_invalid_diagnostic(
     context: &LintContext,
 ) {
     let mut diagnostic = context.report_custom_diagnostic(
-        InvalidRuleCode {
-            rule_code: invalid_code.to_string(),
+        InvalidRuleSelectorInSuppressionComment {
+            rule: invalid_code.to_string(),
             kind: InvalidRuleCodeKind::Noqa,
             whole_comment: false,
         },

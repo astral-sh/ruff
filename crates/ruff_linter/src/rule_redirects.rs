@@ -310,6 +310,10 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("unused-noqa", Rule::UnusedSuppressionComment),
     ("redirected-noqa", Rule::RenamedRuleInSuppressionComment),
     (
+        "invalid-rule-code",
+        Rule::InvalidRuleSelectorInSuppressionComment,
+    ),
+    (
         "star-arg-unpacking-after-keyword-arg",
         Rule::StarArgAfterKeyword,
     ),
