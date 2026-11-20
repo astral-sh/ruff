@@ -6,23 +6,23 @@ use crate::AlwaysFixableViolation;
 use crate::codes::Category;
 
 #[derive(Debug, PartialEq, Eq, Default)]
-pub(crate) struct UnusedCodes<'a> {
+pub(crate) struct UnusedRuleSelectors<'a> {
     pub(crate) disabled: &'a [&'a str],
     pub(crate) duplicated: &'a [&'a str],
     pub(crate) unmatched: &'a [&'a str],
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum UnusedNOQAKind {
+pub(crate) enum UnusedSuppressionKind {
     Noqa,
     Suppression,
 }
 
-impl UnusedNOQAKind {
+impl UnusedSuppressionKind {
     fn as_str(&self) -> &str {
         match self {
-            UnusedNOQAKind::Noqa => "`noqa` directive",
-            UnusedNOQAKind::Suppression => "suppression",
+            UnusedSuppressionKind::Noqa => "`noqa` directive",
+            UnusedSuppressionKind::Suppression => "suppression",
         }
     }
 }
@@ -90,53 +90,53 @@ impl UnusedNOQAKind {
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155", category = Category::Suspicious)]
 pub(crate) struct UnusedSuppressionComment<'a> {
-    pub codes: Option<UnusedCodes<'a>>,
-    pub kind: UnusedNOQAKind,
+    pub selectors: Option<UnusedRuleSelectors<'a>>,
+    pub kind: UnusedSuppressionKind,
 }
 
 impl AlwaysFixableViolation for UnusedSuppressionComment<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
-        match &self.codes {
-            Some(codes) => {
-                let mut codes_by_reason = vec![];
-                if !codes.unmatched.is_empty() {
-                    codes_by_reason.push(format!(
+        match &self.selectors {
+            Some(selectors) => {
+                let mut selectors_by_reason = vec![];
+                if !selectors.unmatched.is_empty() {
+                    selectors_by_reason.push(format!(
                         "unused: {}",
-                        codes
+                        selectors
                             .unmatched
                             .iter()
-                            .map(|code| format!("`{code}`"))
+                            .map(|selector| format!("`{selector}`"))
                             .join(", ")
                     ));
                 }
-                if !codes.disabled.is_empty() {
-                    codes_by_reason.push(format!(
+                if !selectors.disabled.is_empty() {
+                    selectors_by_reason.push(format!(
                         "non-enabled: {}",
-                        codes
+                        selectors
                             .disabled
                             .iter()
-                            .map(|code| format!("`{code}`"))
+                            .map(|selector| format!("`{selector}`"))
                             .join(", ")
                     ));
                 }
-                if !codes.duplicated.is_empty() {
-                    codes_by_reason.push(format!(
+                if !selectors.duplicated.is_empty() {
+                    selectors_by_reason.push(format!(
                         "duplicated: {}",
-                        codes
+                        selectors
                             .duplicated
                             .iter()
-                            .map(|code| format!("`{code}`"))
+                            .map(|selector| format!("`{selector}`"))
                             .join(", ")
                     ));
                 }
-                if codes_by_reason.is_empty() {
+                if selectors_by_reason.is_empty() {
                     format!("Unused {}", self.kind.as_str())
                 } else {
                     format!(
                         "Unused {} ({})",
                         self.kind.as_str(),
-                        codes_by_reason.join("; ")
+                        selectors_by_reason.join("; ")
                     )
                 }
             }
