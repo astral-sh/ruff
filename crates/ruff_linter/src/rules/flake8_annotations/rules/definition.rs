@@ -17,10 +17,10 @@ use crate::rules::ruff::typing::type_hint_resolves_to_any;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks that function arguments have type annotations.
+/// Checks that function parameters have type annotations.
 ///
 /// ## Why is this bad?
-/// Type annotations are a good way to document the types of function arguments. They also
+/// Type annotations are a good way to document the types of function parameters. They also
 /// help catch bugs, when used alongside a type checker, by ensuring that the types of
 /// any provided arguments match expectation.
 ///
@@ -53,10 +53,10 @@ impl Violation for UnannotatedParameter {
 }
 
 /// ## What it does
-/// Checks that function `*args` arguments have type annotations.
+/// Checks that variadic positional parameters (`*args`) have type annotations.
 ///
 /// ## Why is this bad?
-/// Type annotations are a good way to document the types of function arguments. They also
+/// Type annotations are a good way to document the types of function parameters. They also
 /// help catch bugs, when used alongside a type checker, by ensuring that the types of
 /// any provided arguments match expectation.
 ///
@@ -89,10 +89,10 @@ impl Violation for UnannotatedVariadicPositionalParameter {
 }
 
 /// ## What it does
-/// Checks that function `**kwargs` arguments have type annotations.
+/// Checks that variadic keyword parameters (`**kwargs`) have type annotations.
 ///
 /// ## Why is this bad?
-/// Type annotations are a good way to document the types of function arguments. They also
+/// Type annotations are a good way to document the types of function parameters. They also
 /// help catch bugs, when used alongside a type checker, by ensuring that the types of
 /// any provided arguments match expectation.
 ///

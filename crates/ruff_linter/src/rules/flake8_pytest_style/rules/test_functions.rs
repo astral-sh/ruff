@@ -7,7 +7,7 @@ use ruff_python_ast::StmtFunctionDef;
 use ruff_text_size::Ranged;
 
 /// ## What it does
-/// Checks for parameters of test functions with default arguments.
+/// Checks for parameters of test functions with default values.
 ///
 /// ## Why is this bad?
 /// Such a parameter will always have the default value during the test

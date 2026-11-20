@@ -15,7 +15,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Why is this bad?
 /// In Python 3, `super` can be invoked without any arguments when: (1) the
 /// first argument is `__class__`, and (2) the second argument is equivalent to
-/// the first argument of the enclosing method.
+/// the first parameter of the enclosing method.
 ///
 /// When possible, omit the arguments to `super` to make the code more concise
 /// and maintainable.

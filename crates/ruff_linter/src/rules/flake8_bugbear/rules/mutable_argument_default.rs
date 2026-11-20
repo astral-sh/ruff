@@ -21,7 +21,7 @@ use crate::preview::{
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for uses of mutable objects as function argument defaults.
+/// Checks for uses of mutable objects as function parameter defaults.
 ///
 /// ## Why is this bad?
 /// Function defaults are evaluated once, when the function is defined.
@@ -34,12 +34,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// default, and initialize a new mutable object inside the function body
 /// for each call.
 ///
-/// Arguments with immutable type annotations will be ignored by this rule.
+/// Parameters with immutable type annotations will be ignored by this rule.
 /// Types outside of the standard library can be marked as immutable with the
 /// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
 /// ## Known problems
-/// Mutable argument defaults can be used intentionally to cache computation
+/// Mutable parameter defaults can be used intentionally to cache computation
 /// results. Replacing the default with `None` or an immutable data structure
 /// does not work for such usages. Instead, prefer the `@functools.lru_cache`
 /// decorator from the standard library.

@@ -9,7 +9,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for numeric literals with a string representation longer than ten
-/// characters.
+/// characters in stubs.
 ///
 /// ## Why is this bad?
 /// If a function has a default value where the literal representation is

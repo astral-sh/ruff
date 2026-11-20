@@ -12,10 +12,10 @@ use crate::codes::Category;
 use crate::registry::Rule;
 
 /// ## What it does
-/// Checks for the presence of unused arguments in function definitions.
+/// Checks for the presence of unused parameters in function definitions.
 ///
 /// ## Why is this bad?
-/// An argument that is defined but not used is likely a mistake, and should
+/// A parameter that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
@@ -51,10 +51,10 @@ impl Violation for UnusedFunctionParameter {
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in instance method definitions.
+/// Checks for the presence of unused parameters in instance method definitions.
 ///
 /// ## Why is this bad?
-/// An argument that is defined but not used is likely a mistake, and should
+/// A parameter that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
@@ -69,7 +69,7 @@ impl Violation for UnusedFunctionParameter {
 /// overriding method with `@override` signals to Ruff that the method is
 /// intended to override a superclass method and that a type checker will
 /// enforce that it does so; Ruff therefore knows that it should not enforce
-/// rules about unused arguments on such methods.
+/// rules about unused parameters on such methods.
 ///
 /// ## Example
 /// ```python
@@ -104,10 +104,10 @@ impl Violation for UnusedMethodParameter {
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in class method definitions.
+/// Checks for the presence of unused parameters in class method definitions.
 ///
 /// ## Why is this bad?
-/// An argument that is defined but not used is likely a mistake, and should
+/// A parameter that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
@@ -122,7 +122,7 @@ impl Violation for UnusedMethodParameter {
 /// overriding method with `@override` signals to Ruff that the method is
 /// intended to override a superclass method and that a type checker will
 /// enforce that it does so; Ruff therefore knows that it should not enforce
-/// rules about unused arguments on such methods.
+/// rules about unused parameters on such methods.
 ///
 /// ## Example
 /// ```python
@@ -159,10 +159,10 @@ impl Violation for UnusedClassMethodParameter {
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in static method definitions.
+/// Checks for the presence of unused parameters in static method definitions.
 ///
 /// ## Why is this bad?
-/// An argument that is defined but not used is likely a mistake, and should
+/// A parameter that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
@@ -177,7 +177,7 @@ impl Violation for UnusedClassMethodParameter {
 /// overriding method with `@override` signals to Ruff that the method is
 /// intended to override a superclass method, and that a type checker will
 /// enforce that it does so; Ruff therefore knows that it should not enforce
-/// rules about unused arguments on such methods.
+/// rules about unused parameters on such methods.
 ///
 /// ## Example
 /// ```python
@@ -214,11 +214,11 @@ impl Violation for UnusedStaticMethodParameter {
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in lambda expression
+/// Checks for the presence of unused parameters in lambda expression
 /// definitions.
 ///
 /// ## Why is this bad?
-/// An argument that is defined but not used is likely a mistake, and should
+/// A parameter that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be

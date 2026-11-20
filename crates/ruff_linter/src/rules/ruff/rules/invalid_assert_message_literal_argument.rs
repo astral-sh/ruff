@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for invalid use of literals in assert message arguments.
+/// Checks for non-string literals used as the message of an `assert` statement.
 ///
 /// ## Why is this bad?
 /// An assert message which is a non-string literal was likely intended

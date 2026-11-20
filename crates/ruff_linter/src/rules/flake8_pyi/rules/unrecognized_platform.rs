@@ -9,10 +9,8 @@ use crate::codes::Category;
 use crate::registry::Rule;
 
 /// ## What it does
-/// Check for unrecognized `sys.platform` checks. Platform checks should be
+/// Checks for unrecognized `sys.platform` checks in stubs. Platform checks should be
 /// simple string comparisons.
-///
-/// **Note**: this rule is only enabled in `.pyi` stub files.
 ///
 /// ## Why is this bad?
 /// Some `sys.platform` checks are too complex for type checkers to
@@ -58,9 +56,7 @@ impl Violation for UnrecognizedPlatformCheckInStub {
 }
 
 /// ## What it does
-/// Check for unrecognized platform names in `sys.platform` checks.
-///
-/// **Note**: this rule is only enabled in `.pyi` stub files.
+/// Checks for unrecognized platform names in `sys.platform` checks in stubs.
 ///
 /// ## Why is this bad?
 /// If a `sys.platform` check compares to a platform name outside of a

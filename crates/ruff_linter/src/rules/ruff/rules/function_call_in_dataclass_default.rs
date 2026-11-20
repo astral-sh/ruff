@@ -28,7 +28,7 @@ use crate::rules::ruff::helpers::{
 /// If a field needs to be initialized with a mutable object, use the
 /// `field(default_factory=...)` pattern.
 ///
-/// Attributes whose default arguments are `NewType` calls
+/// Attributes whose default values are `NewType` calls
 /// where the original type is immutable are ignored.
 ///
 /// ## Example

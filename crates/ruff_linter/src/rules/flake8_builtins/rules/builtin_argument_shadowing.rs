@@ -10,12 +10,12 @@ use crate::codes::Category;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
-/// Checks for function arguments that use the same names as builtins.
+/// Checks for function parameters that use the same names as builtins.
 ///
 /// ## Why is this bad?
-/// Reusing a builtin name for the name of an argument increases the
+/// Reusing a builtin name for the name of a parameter increases the
 /// difficulty of reading and maintaining the code, and can cause
-/// non-obvious errors, as readers may mistake the argument for the
+/// non-obvious errors, as readers may mistake the parameter for the
 /// builtin and vice versa.
 ///
 /// Function definitions decorated with [`@override`][override] or

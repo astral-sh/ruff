@@ -11,12 +11,12 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for static methods that use `self` or `cls` as their first argument.
+/// Checks for static methods that use `self` or `cls` as their first parameter.
 /// This rule also applies to `__new__` methods, which are implicitly static.
 ///
 /// ## Why is this bad?
-/// [PEP 8] recommends the use of `self` and `cls` as the first arguments for
-/// instance methods and class methods, respectively. Naming the first argument
+/// [PEP 8] recommends the use of `self` and `cls` as the first parameters for
+/// instance methods and class methods, respectively. Naming the first parameter
 /// of a static method as `self` or `cls` can be misleading, as static methods
 /// do not receive an instance or class reference as their first argument.
 ///

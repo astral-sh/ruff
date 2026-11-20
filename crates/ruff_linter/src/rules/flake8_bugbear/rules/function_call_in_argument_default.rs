@@ -14,15 +14,15 @@ use crate::codes::Category;
 use crate::rules::ruff::rules::is_frozen_dataclass_instantiation;
 
 /// ## What it does
-/// Checks for function calls in default function arguments.
+/// Checks for function calls in parameter defaults.
 ///
 /// ## Why is this bad?
-/// Any function call that's used in a default argument will only be performed
+/// Any function call that's used as a parameter default will only be performed
 /// once, at definition time. The returned value will then be reused by all
 /// calls to the function, which can lead to unexpected behaviour.
 ///
 /// Parameters with immutable type annotations will be ignored by this rule.
-/// Those whose default arguments are `NewType` calls where the original type
+/// Those whose default values are `NewType` calls where the original type
 /// is immutable are also ignored, as are instantiations of frozen dataclasses.
 ///
 /// Calls and types outside of the standard library can be marked as an exception
@@ -52,7 +52,7 @@ use crate::rules::ruff::rules::is_frozen_dataclass_instantiation;
 /// ```
 ///
 /// If the use of a singleton is intentional, assign the result call to a
-/// module-level variable, and use that variable in the default argument:
+/// module-level variable, and use that variable as the parameter default:
 ///
 /// ```python
 /// ERROR = ValueError("Hosts weren't successfully added")
