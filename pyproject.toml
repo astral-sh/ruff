@@ -413,6 +413,8 @@ unsound-assignment = "warn"
 redundant-condition-strict = "warn"
 disjoint-cast = "warn"
 missing-direct-dependency = "warn"
+mismatched-enum-name = "warn"
+mismatched-namedtuple-name = "warn"
 
 [tool.black]
 force-exclude = '''
