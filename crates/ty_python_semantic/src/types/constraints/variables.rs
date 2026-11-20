@@ -451,6 +451,13 @@ impl<'db> AtomicConstraint<'db> {
         bound: Type<'db>,
     ) -> Type<'db> {
         match bound {
+            // For `type Id[T] = T`, the bound `S <= Id[R]` relates two type variables.
+            // Storing the alias as a concrete bound would hide that relationship from the solver.
+            Type::TypeAlias(_)
+                if let resolved @ Type::TypeVar(_) = bound.resolve_type_alias(db) =>
+            {
+                resolved
+            }
             Type::Callable(callable) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
                 if let [signature] = callable.signatures(db).overloads.as_slice()
                     && signature.generic_context.is_none()
