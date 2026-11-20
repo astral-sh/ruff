@@ -210,7 +210,8 @@ impl<'db> ConstraintSet<'db, '_> {
             self,
             inferable,
             budget,
-            ReportDiagnostics::Yes,
+            // Only valid solutions reach the fold, so we can reject conflicting bounds directly.
+            ReportDiagnostics::No,
         )?;
 
         path_bounds.try_fold_with(
