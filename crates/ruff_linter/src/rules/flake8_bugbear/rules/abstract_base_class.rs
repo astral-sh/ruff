@@ -117,12 +117,14 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
 }
 
 fn is_abc_class(arguments: &Arguments, semantic: &SemanticModel) -> bool {
-    arguments.keywords().any(|keyword| {
-        keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
-            && semantic.matches_qualified_name(&keyword.value, &["abc", "ABCMeta"])
-    }) || arguments
-        .args()
-        .any(|base| semantic.matches_qualified_name(base, &["abc", "ABC"]))
+    match arguments.items.as_slice() {
+        [ast::Argument::Positional(base)] => semantic.matches_qualified_name(base, &["abc", "ABC"]),
+        [ast::Argument::Keyword(keyword)] => {
+            keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
+                && semantic.matches_qualified_name(&keyword.value, &["abc", "ABCMeta"])
+        }
+        _ => false,
+    }
 }
 
 fn is_empty_body(body: &[Stmt]) -> bool {
@@ -155,9 +157,6 @@ pub(crate) fn abstract_base_class(
         return;
     };
 
-    if arguments.len() != 1 {
-        return;
-    }
     if !is_abc_class(arguments, checker.semantic()) {
         return;
     }

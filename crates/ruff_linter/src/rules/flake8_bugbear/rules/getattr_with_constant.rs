@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
@@ -76,7 +75,7 @@ pub(crate) fn getattr_with_constant(
     func: &Expr,
     arguments: &ast::Arguments,
 ) {
-    let Some([obj, arg]) = arguments.args().collect_array() else {
+    let Some([obj, arg]) = arguments.as_positional_array() else {
         return;
     };
     if obj.is_starred_expr() {

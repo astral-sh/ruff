@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -99,7 +98,7 @@ pub(crate) fn setattr_with_constant(
     func: &Expr,
     arguments: &ast::Arguments,
 ) {
-    let Some([obj, name, value]) = arguments.args().collect_array() else {
+    let Some([obj, name, value]) = arguments.as_positional_array() else {
         return;
     };
     if obj.is_starred_expr() {
