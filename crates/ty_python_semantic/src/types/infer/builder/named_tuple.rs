@@ -11,12 +11,14 @@ use crate::{
         },
         diagnostic::{
             INVALID_ARGUMENT_TYPE, INVALID_NAMED_TUPLE, MISSING_ARGUMENT,
-            PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
-            report_mismatched_type_name,
+            NON_LITERAL_NAMED_TUPLE_FIELDS, PARAMETER_ALREADY_ASSIGNED,
+            TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_mismatched_type_name,
         },
         extract_fixed_length_iterable_element_types,
         function::KnownFunction,
         infer::TypeInferenceBuilder,
+        object_type_form,
+        tuple::{TupleLength, TupleSpec},
         unpacker::sequence_elts,
     },
 };
@@ -566,16 +568,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 FieldProblem {
                     expression: fields_arg,
                     reason,
+                    compatible: self.can_supply_namedtuple_fields(ty),
                 }
                 .report(self);
             });
         };
 
         let mut fields = Vec::with_capacity(elements.len());
-        let mut problem = None;
+        let mut problem: Option<FieldProblem<'_>> = None;
         for element in elements {
-            let current = self.infer_typing_namedtuple_field(element, &mut fields);
-            problem = problem.or(current);
+            // An unknown field name should not hide a later malformed pair.
+            if let Some(current) = self.infer_typing_namedtuple_field(element, &mut fields)
+                && problem
+                    .as_ref()
+                    .is_none_or(|previous| previous.compatible && !current.compatible)
+            {
+                problem = Some(current);
+            }
         }
         if let Some(problem) = problem {
             problem.report(self);
@@ -645,6 +654,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(FieldProblem {
                     expression: element,
                     reason: problem?,
+                    compatible: self
+                        .can_supply_namedtuple_fields(self.field_value_type(&starred.value)),
                 })
             } else {
                 let pair = self.field_value_type(element);
@@ -657,6 +668,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(FieldProblem {
                     expression: element,
                     reason: problem?,
+                    compatible: self.can_supply_field_pair(pair),
                 })
             };
         };
@@ -690,7 +702,67 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Expected a string literal for the field name, found `{}`",
                 name_type.display(db, env)
             )),
+            compatible: name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env)),
         })
+    }
+
+    /// Check whether the type of `fields` in `NamedTuple("Url", fields)` is compatible with
+    /// an iterable of field pairs.
+    fn can_supply_namedtuple_fields(&self, ty: Type<'db>) -> bool {
+        self.all_iterable_shapes_match(ty, |fields| {
+            fields
+                .iter_element_types(self.db())
+                .all(|pair| self.can_supply_field_pair(pair))
+        })
+    }
+
+    /// Check whether the type of `field` in `NamedTuple("Url", [field])` is compatible with
+    /// a `(name, annotation)` pair.
+    fn can_supply_field_pair(&self, ty: Type<'db>) -> bool {
+        let db = self.db();
+        let env = self.program_environment();
+        let str_ty = KnownClass::Str.to_instance(db, env);
+        // A string could be a forward reference, and `None` stands for `NoneType`.
+        let annotation_ty =
+            UnionType::from_elements(db, env, [object_type_form(db), str_ty, Type::none(db, env)]);
+
+        self.all_iterable_shapes_match(ty, |items| {
+            if let Some(fixed) = items.as_fixed_length() {
+                let [name, annotation] = fixed.all_elements() else {
+                    return false;
+                };
+                return name.is_assignable_to(db, env, str_ty)
+                    && annotation.is_assignable_to(db, env, annotation_ty);
+            }
+
+            // A `list[str | type]` can contain `["host", str]`. Check whether the iterable
+            // can have exactly two items and whether each item's type at that length overlaps
+            // the expected type for its position.
+            items
+                .resize(db, env, TupleLength::Fixed(2))
+                .is_ok_and(|pair| {
+                    pair.iter_element_types(db)
+                        .zip([str_ty, annotation_ty])
+                        .all(|(actual, expected)| !actual.is_disjoint_from(db, env, expected))
+                })
+        })
+    }
+
+    /// Check that every alternative of `ty` is iterable and its yielded items satisfy `check`.
+    /// Calling `try_iterate` on `tuple[str, type] | tuple[str]` produces a single variable-length
+    /// tuple spec that admits two items, hiding the one-item alternative.
+    fn all_iterable_shapes_match(
+        &self,
+        ty: Type<'db>,
+        check: impl Fn(&TupleSpec<'db>) -> bool,
+    ) -> bool {
+        let db = self.db();
+        let env = self.program_environment();
+        let matches = |ty: Type<'db>| ty.try_iterate(db, env).is_ok_and(|items| check(&items));
+        match ty.expand_top_level_aliases(db, env) {
+            Type::Union(union) => union.elements(db).iter().copied().all(matches),
+            ty => matches(ty),
+        }
     }
 
     /// Report diagnostics for invalid field names in a namedtuple definition.
@@ -752,16 +824,27 @@ fn explicit_field_pair(element: &ast::Expr) -> Option<&[ast::Expr; 2]> {
 struct FieldProblem<'a> {
     expression: &'a ast::Expr,
     reason: Cow<'static, str>,
+    /// Whether the inferred type is compatible with the expected field definitions. If so,
+    /// report `non-literal-named-tuple-fields`. Otherwise, report `invalid-named-tuple`.
+    compatible: bool,
 }
 
 impl FieldProblem<'_> {
     fn report(self, inference: &TypeInferenceBuilder<'_, '_>) {
-        if let Some(builder) = inference
-            .context
-            .report_lint(&INVALID_NAMED_TUPLE, self.expression)
-        {
+        let (lint, message) = if self.compatible {
+            (
+                &NON_LITERAL_NAMED_TUPLE_FIELDS,
+                "Cannot determine the fields of `NamedTuple()` statically",
+            )
+        } else {
+            (
+                &INVALID_NAMED_TUPLE,
+                "Invalid argument to parameter `fields` of `NamedTuple()`",
+            )
+        };
+        if let Some(builder) = inference.context.report_lint(lint, self.expression) {
             builder
-                .into_diagnostic("Invalid argument to parameter `fields` of `NamedTuple()`")
+                .into_diagnostic(message)
                 .set_primary_annotation_message(self.reason);
         }
     }
