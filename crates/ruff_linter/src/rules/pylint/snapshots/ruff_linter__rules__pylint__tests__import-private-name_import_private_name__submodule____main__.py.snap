@@ -63,6 +63,7 @@ PLC2701 Private name import `_aaa`
 7 | import _aaa
   |        ^^^^
 8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
+9 | import _pytest.outcomes
   |
 
 PLC2701 Private name import `_ddd` from external module `bbb.ccc`
@@ -72,46 +73,67 @@ PLC2701 Private name import `_ddd` from external module `bbb.ccc`
  7 | import _aaa
  8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
    |                        ^^^
- 9 |
-10 | # Non-errors.
+ 9 | import _pytest.outcomes
+10 | import foo._bar
+   |
+
+PLC2701 Private name import `_pytest`
+  --> __main__.py:9:8
+   |
+ 7 | import _aaa
+ 8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
+ 9 | import _pytest.outcomes
+   |        ^^^^^^^^^^^^^^^^
+10 | import foo._bar
    |
 
 PLC2701 Private name import `_bar` from external module `foo`
-  --> __main__.py:52:14
+  --> __main__.py:10:8
    |
-50 |     return arg
-51 |
-52 | from foo.    _bar import baz
-   |              ^^^^
+ 8 | import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
+ 9 | import _pytest.outcomes
+10 | import foo._bar
+   |        ^^^^^^^^
+11 |
+12 | # Non-errors.
+   |
+
+PLC2701 Private name import `_bar` from external module `foo`
+  --> __main__.py:54:14
+   |
+52 |     return arg
 53 |
-54 | # PLC2701 exceptions: `os._exit` is considered public despite leading underscore.
+54 | from foo.    _bar import baz
+   |              ^^^^
+55 |
+56 | # PLC2701 exceptions: `os._exit` is considered public despite leading underscore.
    |
 
 PLC2701 Private name import `_exit` from external module `another_module`
-  --> __main__.py:57:28
+  --> __main__.py:59:28
    |
-55 | from os import _exit
-56 | from os import _exit as process_exit
-57 | from another_module import _exit as another_exit
+57 | from os import _exit
+58 | from os import _exit as process_exit
+59 | from another_module import _exit as another_exit
    |                            ^^^^^
-58 | from os import _private_member
-59 | from os import _exit as os_exit, _other_private_member
+60 | from os import _private_member
+61 | from os import _exit as os_exit, _other_private_member
    |
 
 PLC2701 Private name import `_private_member` from external module `os`
-  --> __main__.py:58:16
+  --> __main__.py:60:16
    |
-56 | from os import _exit as process_exit
-57 | from another_module import _exit as another_exit
-58 | from os import _private_member
+58 | from os import _exit as process_exit
+59 | from another_module import _exit as another_exit
+60 | from os import _private_member
    |                ^^^^^^^^^^^^^^^
-59 | from os import _exit as os_exit, _other_private_member
+61 | from os import _exit as os_exit, _other_private_member
    |
 
 PLC2701 Private name import `_other_private_member` from external module `os`
-  --> __main__.py:59:34
+  --> __main__.py:61:34
    |
-57 | from another_module import _exit as another_exit
-58 | from os import _private_member
-59 | from os import _exit as os_exit, _other_private_member
+59 | from another_module import _exit as another_exit
+60 | from os import _private_member
+61 | from os import _exit as os_exit, _other_private_member
    |                                  ^^^^^^^^^^^^^^^^^^^^^

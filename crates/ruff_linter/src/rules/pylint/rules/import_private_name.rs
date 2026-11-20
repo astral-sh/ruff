@@ -4,7 +4,9 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, helpers::is_dunder, name::QualifiedName};
-use ruff_python_semantic::{AnyImport, FromImport, Import, Imported, ResolvedReference, Scope};
+use ruff_python_semantic::{
+    AnyImport, FromImport, Import, Imported, ResolvedReference, Scope, SubmoduleImport,
+};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
@@ -83,7 +85,7 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         let import_info = match import {
             AnyImport::Import(import) => ImportInfo::from(import),
             AnyImport::FromImport(import) => ImportInfo::from(import),
-            AnyImport::SubmoduleImport(_) => continue,
+            AnyImport::SubmoduleImport(import) => ImportInfo::from(import),
         };
 
         let Some(root_module) = import_info.module_name.first() else {
@@ -203,6 +205,18 @@ impl<'a> From<&'a Import<'_>> for ImportInfo<'a> {
         Self {
             module_name,
             member_name,
+            qualified_name,
+        }
+    }
+}
+
+impl<'a> From<&'a SubmoduleImport<'_>> for ImportInfo<'a> {
+    fn from(import: &'a SubmoduleImport) -> Self {
+        let qualified_name = &import.qualified_name;
+        let segments = qualified_name.segments();
+        Self {
+            module_name: segments,
+            member_name: Cow::Borrowed(segments.last().copied().unwrap_or_default()),
             qualified_name,
         }
     }

@@ -6,6 +6,8 @@ from i import _j
 from k import _l as m
 import _aaa
 import bbb.ccc._ddd as eee  # Panicked in https://github.com/astral-sh/ruff/pull/5920
+import _pytest.outcomes
+import foo._bar
 
 # Non-errors.
 import n
