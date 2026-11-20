@@ -1,7 +1,189 @@
 use anyhow::Result;
+use indoc::indoc;
 use insta::assert_json_snapshot;
+use lsp_types::{
+    DocumentDiagnosticReport, TextDocumentContentChangeEvent,
+    TextDocumentContentChangeWholeDocument,
+};
 
-use crate::TestServerBuilder;
+use crate::{TestServer, TestServerBuilder};
+
+#[test]
+fn invalid_script_configuration_blocks_edits() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "ruff.toml",
+            indoc! {r#"
+                preview = true
+                lint.ignore = ['F401']
+            "#},
+        )?
+        .build();
+    server.open_text_document(
+        "script.py",
+        indoc! {r#"
+            #!/usr/bin/env python
+
+            # /// script
+            # tool.ruff.line-length = 'wide'
+            # ///
+            import os
+            x= 1
+        "#},
+        1,
+    );
+    let items = document_diagnostics(&mut server, "script.py")?;
+    assert_eq!(items.len(), 1);
+    assert_eq!(
+        items[0].code,
+        Some(lsp_types::Code::String(
+            "invalid-script-metadata".to_owned()
+        ))
+    );
+    assert_eq!(
+        items[0].range,
+        lsp_types::Range::new(
+            lsp_types::Position::new(3, 26),
+            lsp_types::Position::new(3, 32),
+        )
+    );
+    assert!(
+        server
+            .code_action_request("script.py", items)
+            .unwrap_or_default()
+            .is_empty()
+    );
+    assert!(
+        server
+            .format_request("script.py")
+            .is_none_or(|edits| edits.is_empty())
+    );
+    Ok(())
+}
+
+#[test]
+fn inline_script_preserves_project_exclusions() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "ruff.toml",
+            indoc! {r#"
+                preview = true
+                exclude = ['script.py']
+            "#},
+        )?
+        .build();
+    server.open_text_document(
+        "script.py",
+        indoc! {r#"
+            # /// script
+            # [tool.ruff]
+            # ///
+            import os
+        "#},
+        1,
+    );
+    let items = document_diagnostics(&mut server, "script.py")?;
+    assert!(items.is_empty());
+    Ok(())
+}
+
+#[test]
+fn inline_script_configuration_in_open_document() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file("ruff.toml", "lint.ignore = ['F401']")?
+        .with_server_preview(true)
+        .build();
+    server.open_text_document(
+        "script.py",
+        indoc! {r#"
+            # /// script
+            # [tool.ruff]
+            # ///
+            import os
+        "#},
+        1,
+    );
+    let items = document_diagnostics(&mut server, "script.py")?;
+    assert_eq!(items.len(), 1);
+    assert_eq!(
+        items[0].code,
+        Some(lsp_types::Code::String("unused-import".to_owned()))
+    );
+
+    server.change_text_document(
+        "script.py",
+        vec![
+            TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: indoc! {r#"
+                        import os
+                    "#}
+                    .into(),
+                },
+            ),
+        ],
+        2,
+    );
+    let items = document_diagnostics(&mut server, "script.py")?;
+    assert!(items.is_empty());
+    Ok(())
+}
+
+#[test]
+fn script_requires_python_in_open_document() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "ruff.toml",
+            indoc! {r#"
+                preview = true
+                per-file-target-version = { 'script.py' = 'py39' }
+                lint.select = ['UP045']
+            "#},
+        )?
+        .build();
+    let code = indoc! {r#"
+        from typing import Optional
+        x: Optional[int]
+    "#};
+    server.open_text_document(
+        "script.py",
+        indoc! {r#"
+            # /// script
+            # requires-python = '>=3.10'
+            # ///
+            from typing import Optional
+            x: Optional[int]
+        "#},
+        1,
+    );
+    let items = document_diagnostics(&mut server, "script.py")?;
+    assert_eq!(items.len(), 1);
+    server.change_text_document(
+        "script.py",
+        vec![
+            TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument { text: code.into() },
+            ),
+        ],
+        2,
+    );
+    let items = document_diagnostics(&mut server, "script.py")?;
+    assert!(items.is_empty());
+    Ok(())
+}
+
+fn document_diagnostics(server: &mut TestServer, path: &str) -> Result<Vec<lsp_types::Diagnostic>> {
+    let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+        server.document_diagnostic_request(path, None)
+    else {
+        anyhow::bail!("expected a full diagnostic report for {path}");
+    };
+    Ok(report.full_document_diagnostic_report.items)
+}
 
 #[test]
 fn uses_human_readable_names_in_preview() -> Result<()> {

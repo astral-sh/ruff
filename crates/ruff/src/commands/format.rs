@@ -289,7 +289,8 @@ pub(crate) fn format_path(
     let config_error = |error| FormatCommandError::Configuration(path.to_owned(), error);
     let script = if script_metadata_enabled
         && let Some(metadata) =
-            script_metadata(Some(path), unformatted.source_code()).map_err(config_error)?
+            script_metadata(Some(path), unformatted.source_code(), script_configuration)
+                .map_err(config_error)?
     {
         cache = cache.filter(|_| is_cacheable(&metadata));
         metadata

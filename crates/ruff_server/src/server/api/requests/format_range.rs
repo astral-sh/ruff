@@ -60,6 +60,9 @@ fn format_text_document_range(
     backend: crate::format::FormatBackend,
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
+    if settings.script_error().is_some() {
+        return Ok(None);
+    }
     let file_path = query.virtual_file_path();
     let source_type = query.source_type_for_format();
 

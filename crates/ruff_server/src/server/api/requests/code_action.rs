@@ -50,6 +50,10 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         let document_path = query.virtual_file_path();
         let settings = query.settings();
 
+        if settings.script_error().is_some() {
+            return Ok(Some(response));
+        }
+
         if is_document_excluded_for_linting(
             &document_path,
             &settings.file_resolver,

@@ -29,6 +29,9 @@ pub(crate) fn fix_all(
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
     let settings = query.settings();
+    if settings.script_error().is_some() {
+        return Ok(Fixes::default());
+    }
     let document_path = query.virtual_file_path();
 
     // If the document is excluded, return an empty list of fixes.

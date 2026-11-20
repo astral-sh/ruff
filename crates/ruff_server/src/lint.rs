@@ -173,6 +173,16 @@ fn check_python(
     let settings = query.settings();
     let document_path = query.virtual_file_path();
     let source_kind = query.make_python_source_kind(source_type);
+    if let Some(error) = settings.script_error() {
+        return CheckResult {
+            diagnostics: vec![error.clone()],
+            suppression_edits: Vec::new(),
+            document: CheckedDocument::Python {
+                index: LineIndex::from_source_text(source_kind.source_code()),
+                source: source_kind,
+            },
+        };
+    }
 
     let file_path = query.file_path();
     let package = if let Some(file_path) = &file_path {
