@@ -262,7 +262,7 @@ PROTOCOL_TLS_SERVER: Final = _SSLMethod.PROTOCOL_TLS_SERVER
 class Options(enum.IntFlag):
     """An enumeration."""
 
-    OP_ALL: int
+    OP_ALL = ...
     OP_NO_SSLv2 = 0
     OP_NO_SSLv3 = 33554432
     OP_NO_TLSv1 = 67108864

@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::{Checker, LintContext};
+use crate::codes::Category;
 use crate::preview::is_unicode_to_unicode_confusables_enabled;
 use crate::rules::ruff::rules::Context;
 use crate::rules::ruff::rules::confusables::confusable;
@@ -46,7 +47,7 @@ use crate::rules::ruff::rules::confusables::confusable;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.102")]
+#[violation_metadata(stable_since = "v0.0.102", category = Category::Security)]
 pub(crate) struct AmbiguousUnicodeCharacterString {
     confusable: char,
     representant: char,
@@ -100,7 +101,7 @@ impl Violation for AmbiguousUnicodeCharacterString {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.102")]
+#[violation_metadata(stable_since = "v0.0.102", category = Category::Security)]
 pub(crate) struct AmbiguousUnicodeCharacterDocstring {
     confusable: char,
     representant: char,
@@ -154,7 +155,7 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.108")]
+#[violation_metadata(stable_since = "v0.0.108", category = Category::Security)]
 pub(crate) struct AmbiguousUnicodeCharacterComment {
     confusable: char,
     representant: char,

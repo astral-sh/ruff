@@ -1,11 +1,9 @@
 # Settings
 
-The Ruff Language Server provides a set of configuration options to customize its behavior
-along with the ability to use an existing `pyproject.toml` or `ruff.toml` file to configure the
-linter and formatter. This is done by providing these settings while initializing the server.
-VS Code provides a UI to configure these settings, while other editors may require manual
-configuration. The [setup](./setup.md) section provides instructions on where to place these settings
-as per the editor.
+The Ruff Language Server accepts settings to customize its behavior and can use an existing
+`pyproject.toml` or `ruff.toml` file to configure the linter and formatter. Provide these settings
+when initializing the server. VS Code provides a UI for them, while other editors may require manual
+configuration. The [setup](./setup.md) section explains where to place the settings for each editor.
 
 ## Top-level
 
@@ -31,8 +29,8 @@ editor-provided configuration (`configuration`) and a project level configuratio
 
 #### Resolution order {: #configuration_resolution_order }
 
-In an editor, Ruff supports three sources of configuration, prioritized as follows (from highest to
-lowest):
+With the default `"editorFirst"` configuration preference, Ruff prioritizes the three sources of
+configuration as follows (from highest to lowest):
 
 1. **Specific settings:** Individual settings like [`lineLength`](#linelength) or
     [`lint.select`](#select) defined in the editor
@@ -47,7 +45,7 @@ For example, if the line length is specified in all three sources, Ruff will use
 
 **Default value**: `null`
 
-**Type**: `string`
+**Type**: `string` (path to a configuration file) or `object` (inline configuration)
 
 **Example usage**:
 
@@ -102,7 +100,7 @@ _Using inline configuration:_
                 "flake8-tidy-imports": {
                     "banned-api": {
                         "typing.TypedDict": {
-                            "msg": "Use `typing_extensions.TypedDict` instead",
+                            "msg": "Use `typing_extensions.TypedDict` instead"
                         }
                     }
                 }
@@ -178,7 +176,7 @@ The strategy to use when resolving settings across VS Code and the filesystem. B
 configuration is prioritized over `ruff.toml` and `pyproject.toml` files.
 
 - `"editorFirst"`: Editor settings take priority over configuration files present in the workspace.
-- `"filesystemFirst"`: Configuration files present in the workspace takes priority over editor
+- `"filesystemFirst"`: Configuration files present in the workspace take priority over editor
     settings.
 - `"editorOnly"`: Ignore configuration files entirely i.e., only use editor settings.
 
@@ -249,7 +247,7 @@ documentation](https://docs.astral.sh/ruff/settings/#exclude) for more details.
     vim.lsp.config('ruff', {
       init_options = {
         settings = {
-          exclude = ["**/tests/**"]
+          exclude = { "**/tests/**" }
         }
       }
     })
@@ -973,13 +971,17 @@ Whether to enable Ruff's preview mode when formatting.
 
 ### `backend` {: #format_backend }
 
-The backend to use for formatting files. Following options are available:
+The backend to use for formatting files. The following options are available:
 
 - `"internal"`: Use the built-in Ruff formatter
 - `"uv"`: Use uv for formatting (requires uv >= 0.8.13)
 
 For `internal`, the formatter version will match the selected Ruff version while for `uv`, the
 formatter version may differ.
+
+Starting the server with `ruff server --untrusted-workspace` disables the uv backend. With this flag,
+the server always uses the internal formatter, regardless of this setting. This prevents workspace
+configuration from causing uv to execute untrusted code.
 
 **Default value**: `"internal"`
 
@@ -1048,54 +1050,6 @@ Whether to enable the Ruff extension. Modifying this setting requires restarting
 }
 ```
 
-### `format.args`
-
-!!! warning "Deprecated"
-
-    This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
-    deprecated in favor of the native language server. Refer to the [migration
-    guide](migration.md) for more information.
-
-_**This setting is not used by the native language server.**_
-
-Additional arguments to pass to the Ruff formatter.
-
-**Default value**: `[]`
-
-**Type**: `string[]`
-
-**Example usage**:
-
-```json
-{
-    "ruff.format.args": ["--line-length", "100"]
-}
-```
-
-### `ignoreStandardLibrary`
-
-!!! warning "Deprecated"
-
-    This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
-    deprecated in favor of the native language server. Refer to the [migration
-    guide](migration.md) for more information.
-
-_**This setting is not used by the native language server.**_
-
-Whether to ignore files that are inferred to be part of the Python standard library.
-
-**Default value**: `true`
-
-**Type**: `bool`
-
-**Example usage**:
-
-```json
-{
-    "ruff.ignoreStandardLibrary": false
-}
-```
-
 ### `importStrategy`
 
 Strategy for loading the `ruff` executable.
@@ -1120,11 +1074,8 @@ Strategy for loading the `ruff` executable.
 A list of paths to Python interpreters. Even though this is a list, only the first interpreter is
 used.
 
-This setting depends on the [`ruff.nativeServer`](#nativeserver) setting:
-
-- If using the native server, the interpreter is used to find the `ruff` executable when
-    [`ruff.importStrategy`](#importstrategy) is set to `fromEnvironment`.
-- Otherwise, the interpreter is used to run the `ruff-lsp` server.
+The interpreter is used to find the `ruff` executable when
+[`ruff.importStrategy`](#importstrategy) is set to `fromEnvironment`.
 
 **Default value**: `[]`
 
@@ -1138,72 +1089,14 @@ This setting depends on the [`ruff.nativeServer`](#nativeserver) setting:
 }
 ```
 
-### `lint.args`
-
-!!! warning "Deprecated"
-
-    This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
-    deprecated in favor of the native language server. Refer to the [migration
-    guide](migration.md) for more information.
-
-_**This setting is not used by the native language server.**_
-
-Additional arguments to pass to the Ruff linter.
-
-**Default value**: `[]`
-
-**Type**: `string[]`
-
-**Example usage**:
-
-```json
-{
-    "ruff.lint.args": ["--config", "/path/to/pyproject.toml"]
-}
-```
-
-### `lint.run`
-
-!!! warning "Deprecated"
-
-    This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
-    deprecated in favor of the native language server. Refer to the [migration
-    guide](migration.md) for more information.
-
-_**This setting is not used by the native language server.**_
-
-Run Ruff on every keystroke (`onType`) or on save (`onSave`).
-
-**Default value**: `"onType"`
-
-**Type**: `"onType" | "onSave"`
-
-**Example usage**:
-
-```json
-{
-    "ruff.lint.run": "onSave"
-}
-```
-
 ### `nativeServer`
+
+!!! warning "Deprecated"
+
+    This setting is deprecated as of Ruff 0.17. The Ruff extension will always use the native language server.
 
 Whether to use the native language server, [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) or
 automatically decide between the two based on the Ruff version and extension settings.
-
-- `"on"`: Use the native language server. A warning will be displayed if deprecated settings are
-    detected.
-- `"off"`: Use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A warning will be displayed if
-    settings specific to the native server are detected.
-- `"auto"`: Automatically select between the native language server and
-    [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) based on the following conditions:
-    1. If the Ruff version is >= `0.5.3`, use the native language server unless any deprecated
-        settings are detected. In that case, show a warning and use
-        [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) instead.
-    1. If the Ruff version is < `0.5.3`, use [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp). A
-        warning will be displayed if settings specific to the native server are detected.
-- `true`: Same as `on`
-- `false`: Same as `off`
 
 **Default value**: `"auto"`
 
@@ -1219,9 +1112,9 @@ automatically decide between the two based on the Ruff version and extension set
 
 ### `path`
 
-A list of path to `ruff` executables.
+A list of paths to `ruff` executables.
 
-The first executable in the list which is exists is used. This setting takes precedence over the
+The first executable in the list that exists is used. This setting takes precedence over the
 [`ruff.importStrategy`](#importstrategy) setting.
 
 **Default value**: `[]`
@@ -1233,28 +1126,6 @@ The first executable in the list which is exists is used. This setting takes pre
 ```json
 {
     "ruff.path": ["/home/user/.local/bin/ruff"]
-}
-```
-
-### `showNotifications`
-
-!!! warning "Deprecated"
-
-    This setting is only used by [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) which is
-    deprecated in favor of the native language server. Refer to the [migration
-    guide](migration.md) for more information.
-
-Setting to control when a notification is shown.
-
-**Default value**: `"off"`
-
-**Type**: `"off" | "onError" | "onWarning" | "always"`
-
-**Example usage**:
-
-```json
-{
-    "ruff.showNotifications": "onWarning"
 }
 ```
 

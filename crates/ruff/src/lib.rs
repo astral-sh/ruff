@@ -1,6 +1,5 @@
 #![allow(clippy::print_stdout)]
 
-use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, BufWriter, Write, stdout};
 use std::path::{Path, PathBuf};
@@ -14,6 +13,7 @@ use log::error;
 use notify::{RecursiveMode, Watcher, recommended_watcher};
 
 use args::{GlobalConfigArgs, ServerCommand};
+use ruff_command_line::TerminalColor;
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_linter::logging::{LogLevel, set_up_logging};
 use ruff_linter::settings::flags::FixMode;
@@ -21,7 +21,7 @@ use ruff_linter::{SuppressionKind, fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
 use crate::args::{
-    AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand, TerminalColor,
+    AnalyzeCommand, AnalyzeGraphCommand, Args, CheckCommand, Command, FormatCommand,
 };
 use crate::printer::{Flags as PrinterFlags, Printer};
 
@@ -125,48 +125,48 @@ fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     }
 }
 
-pub fn run(
-    Args {
-        command,
-        global_options,
-    }: Args,
-) -> Result<ExitStatus> {
+pub fn run(args: Args) -> Result<ExitStatus> {
     // Set color before so all outputs are properly colored
-    if let Some(color_override) =
-        colored_override(global_options.color, std::env::var_os("FORCE_COLOR"))
-    {
-        colored::control::set_override(color_override);
-    }
+    let color = TerminalColor::resolve(args.global_options.color);
+    colored::control::set_override(color.should_colorize(&io::stdout()));
 
     {
         ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            #[expect(clippy::print_stderr)]
-            {
-                eprintln!(
-                    r#"
+            writeln!(
+                io::stderr().lock(),
+                r#"
 {}{} {} If you could open an issue at:
 
     https://github.com/astral-sh/ruff/issues/new?title=%5BPanic%5D
 
 ...quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
 "#,
-                    "error".red().bold(),
-                    ":".bold(),
-                    "Ruff crashed.".bold(),
-                );
-            }
+                "error".red().bold(),
+                ":".bold(),
+                "Ruff crashed.".bold(),
+            ).ok();
             default_panic_hook(info);
         }));
     }
 
     // Don't set up logging for the server command, as it has its own logging setup
     // and setting the global logger can only be done once.
-    if !matches!(command, Command::Server { .. }) {
-        set_up_logging(global_options.log_level())?;
+    if !matches!(args.command, Command::Server { .. }) {
+        set_up_logging(args.global_options.log_level())?;
     }
 
+    run_command(args)
+}
+
+/// Run a CLI command without reinstalling the process-wide logger and panic hook.
+pub fn run_command(
+    Args {
+        command,
+        global_options,
+    }: Args,
+) -> Result<ExitStatus> {
     match command {
         Command::Version { output_format } => {
             commands::version::version(output_format)?;
@@ -213,11 +213,11 @@ pub fn run(
 
 fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
     let (cli, config_arguments) = args.partition(global_options)?;
-    let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+    let root_settings = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        commands::format_stdin::format_stdin(&cli, &config_arguments, &pyproject_config)
+        commands::format_stdin::format_stdin(&cli, &config_arguments, &root_settings)
     } else {
-        commands::format::format(cli, &config_arguments, &pyproject_config)
+        commands::format::format(cli, &config_arguments, &root_settings)
     }
 }
 
@@ -231,7 +231,7 @@ fn analyze_graph(
 }
 
 fn server(args: ServerCommand) -> Result<ExitStatus> {
-    commands::server::run_server(args.resolve_preview())
+    commands::server::run_server(args.resolve_preview(), args.resolve_workspace_trust())
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
@@ -239,7 +239,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+    let root_settings = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
 
     let mut writer: Box<dyn Write> = match cli.output_file {
         Some(path) if !cli.watch => {
@@ -260,19 +260,14 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     if cli.show_settings {
         commands::show_settings::show_settings(
             &files,
-            &pyproject_config,
+            &root_settings,
             &config_arguments,
             &mut writer,
         )?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(
-            &files,
-            &pyproject_config,
-            &config_arguments,
-            &mut writer,
-        )?;
+        commands::show_files::show_files(&files, &root_settings, &config_arguments, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
 
@@ -285,7 +280,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         output_format,
         show_fixes,
         ..
-    } = pyproject_config.settings;
+    } = root_settings.resolved.settings;
 
     // Fix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
@@ -344,7 +339,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
         let modifications = commands::add_noqa::add_noqa(
             &files,
-            &pyproject_config,
+            &root_settings,
             &config_arguments,
             reason_opt,
             suppression_kind,
@@ -374,8 +369,8 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // the settings should already be combined with the CLI overrides at this point
     // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
     //   is resolved.
-    let preview = pyproject_config.settings.linter.preview;
-    let prefer_rule_codes = pyproject_config.settings.output_prefer_rule_codes;
+    let preview = root_settings.resolved.settings.linter.preview;
+    let prefer_rule_codes = root_settings.resolved.settings.output_prefer_rule_codes;
 
     if cli.watch {
         // Configure the file watcher.
@@ -384,7 +379,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         for file in &files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
-        if let Some(file) = pyproject_config.path.as_ref() {
+        if let Some(file) = root_settings.resolved.config_path() {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
 
@@ -394,7 +389,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
         let diagnostics = commands::check::check(
             &files,
-            &pyproject_config,
+            &root_settings,
             &config_arguments,
             cache.into(),
             noqa.into(),
@@ -405,7 +400,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
-        let mut pyproject_config = pyproject_config;
+        let mut root_settings = root_settings;
 
         loop {
             let Some(change_kind) = change_detected(&rx.recv()??) else {
@@ -413,15 +408,14 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             };
 
             if matches!(change_kind, ChangeKind::Configuration) {
-                pyproject_config =
-                    resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+                root_settings = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
             }
             Printer::clear_screen()?;
             printer.write_to_user("File change detected...\n");
 
             let diagnostics = commands::check::check(
                 &files,
-                &pyproject_config,
+                &root_settings,
                 &config_arguments,
                 cache.into(),
                 noqa.into(),
@@ -430,117 +424,99 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             )?;
             printer.write_continuously(&mut writer, &diagnostics, preview, prefer_rule_codes)?;
         }
+    }
+    // Generate lint violations.
+    let diagnostics = if is_stdin {
+        commands::check_stdin::check_stdin(
+            cli.stdin_filename.map(fs::normalize_path).as_deref(),
+            &root_settings,
+            &config_arguments,
+            noqa.into(),
+            fix_mode,
+        )?
     } else {
-        // Generate lint violations.
-        let diagnostics = if is_stdin {
-            commands::check_stdin::check_stdin(
-                cli.stdin_filename.map(fs::normalize_path).as_deref(),
-                &pyproject_config,
-                &config_arguments,
-                noqa.into(),
-                fix_mode,
-            )?
-        } else {
-            commands::check::check(
-                &files,
-                &pyproject_config,
-                &config_arguments,
-                cache.into(),
-                noqa.into(),
-                fix_mode,
-                unsafe_fixes,
-            )?
-        };
+        commands::check::check(
+            &files,
+            &root_settings,
+            &config_arguments,
+            cache.into(),
+            noqa.into(),
+            fix_mode,
+            unsafe_fixes,
+        )?
+    };
 
-        // Always try to print violations (though the printer itself may suppress output)
-        // If we're writing fixes via stdin, the transformed source code goes to the writer
-        // so send the summary to stderr instead
-        let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
-            stderr_writer
-        } else {
-            writer
-        };
-        if cli.statistics {
-            printer.write_statistics(&diagnostics, &mut summary_writer)?;
-        } else {
-            printer.write_once(
-                &diagnostics,
-                &mut summary_writer,
-                preview,
-                prefer_rule_codes,
-            )?;
-        }
+    // Always try to print violations (though the printer itself may suppress output)
+    // If we're writing fixes via stdin, the transformed source code goes to the writer
+    // so send the summary to stderr instead
+    let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
+        stderr_writer
+    } else {
+        writer
+    };
+    if cli.statistics {
+        printer.write_statistics(&diagnostics, &mut summary_writer)?;
+    } else {
+        printer.write_once(
+            &diagnostics,
+            &mut summary_writer,
+            preview,
+            prefer_rule_codes,
+        )?;
+    }
 
-        if !cli.exit_zero {
-            let max_severity = diagnostics
-                .inner
-                .iter()
-                .map(Diagnostic::severity)
-                .max()
-                .unwrap_or(Severity::Info);
-            if max_severity.is_fatal() {
-                // When a panic/fatal error is reported, prompt the user to open an issue on github.
-                // Diagnostics with severity `fatal` will be sorted to the bottom, and printing the
-                // message here instead of attaching it to the diagnostic ensures that we only print
-                // it once instead of repeating it for each diagnostic. Prints to stderr to prevent
-                // the message from being captured by tools parsing the normal output.
-                let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
+    if !cli.exit_zero {
+        let max_severity = diagnostics
+            .inner
+            .iter()
+            .map(Diagnostic::severity)
+            .max()
+            .unwrap_or(Severity::Info);
+        if max_severity.is_fatal() {
+            // When a panic/fatal error is reported, prompt the user to open an issue on github.
+            // Printing the message here instead of attaching it to the diagnostic ensures that we
+            // only print it once instead of repeating it for each diagnostic. Prints to stderr to
+            // prevent the message from being captured by tools parsing the normal output.
+            let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
 
 https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
 ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
 ";
-                error!("{message}");
-                return Ok(ExitStatus::Error);
+            error!("{message}");
+            return Ok(ExitStatus::Error);
+        }
+        if cli.diff {
+            // If we're printing a diff, we always want to exit non-zero if there are
+            // any fixable violations (since we've printed the diff, but not applied the
+            // fixes).
+            if !diagnostics.fixed.is_empty() {
+                return Ok(ExitStatus::Failure);
             }
-            if cli.diff {
-                // If we're printing a diff, we always want to exit non-zero if there are
-                // any fixable violations (since we've printed the diff, but not applied the
-                // fixes).
+        } else if fix_only {
+            // If we're only fixing, we want to exit zero (since we've fixed all fixable
+            // violations), unless we're explicitly asked to exit non-zero on fix.
+            if cli.exit_non_zero_on_fix {
                 if !diagnostics.fixed.is_empty() {
                     return Ok(ExitStatus::Failure);
                 }
-            } else if fix_only {
-                // If we're only fixing, we want to exit zero (since we've fixed all fixable
-                // violations), unless we're explicitly asked to exit non-zero on fix.
-                if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
+            }
+        } else {
+            // If we're running the linter (not just fixing), we want to exit non-zero if
+            // there are any violations, unless we're explicitly asked to exit zero on
+            // fix.
+            if cli.exit_non_zero_on_fix {
+                if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
+                    return Ok(ExitStatus::Failure);
                 }
             } else {
-                // If we're running the linter (not just fixing), we want to exit non-zero if
-                // there are any violations, unless we're explicitly asked to exit zero on
-                // fix.
-                if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
-                } else {
-                    if !diagnostics.inner.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
+                if !diagnostics.inner.is_empty() {
+                    return Ok(ExitStatus::Failure);
                 }
             }
         }
     }
     Ok(ExitStatus::Success)
-}
-
-fn colored_override(
-    color: Option<TerminalColor>,
-    env_force_color: Option<OsString>,
-) -> Option<bool> {
-    match color {
-        // Cli arguments should take precedence over env vars.
-        Some(TerminalColor::Always) => Some(true),
-        Some(TerminalColor::Never) => Some(false),
-        // Default to no override, but respect FORCE_COLOR.
-        Some(TerminalColor::Auto) | None => {
-            // support FORCE_COLOR env var
-            env_force_color.map(|force_color: OsString| !force_color.is_empty())
-        }
-    }
 }
 
 #[cfg(test)]
@@ -660,29 +636,6 @@ mod test_file_change_detector {
                 ],
                 attrs: notify::event::EventAttributes::default(),
             }),
-        );
-    }
-}
-
-#[cfg(test)]
-mod test_set_colored_override {
-    use crate::{args::TerminalColor, colored_override};
-
-    #[test]
-    fn force_color_env_is_respected() {
-        assert_eq!(colored_override(None, Some("1".into())), Some(true));
-    }
-
-    #[test]
-    fn cli_args_takes_precedences_over_force_color_env() {
-        assert_eq!(
-            colored_override(Some(TerminalColor::Never), Some("1".into())),
-            Some(false)
-        );
-
-        assert_eq!(
-            colored_override(Some(TerminalColor::Always), None),
-            Some(true)
         );
     }
 }

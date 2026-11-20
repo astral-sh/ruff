@@ -12,6 +12,23 @@ def _(x: int | None):
     reveal_type(x)  # revealed: int | None
 ```
 
+Calls in both branches must not prevent complementary narrowing paths from recombining into the
+original type.
+
+```py
+class Base: ...
+class Child(Base): ...
+
+def consume(value: object) -> None: ...
+def _(value: Base):
+    if isinstance(value, Child):
+        consume(value)
+    else:
+        consume(value)
+
+    reveal_type(value)  # revealed: Base
+```
+
 ## Narrowing can have a persistent effect if the variable is mutated in one branch
 
 ```py
@@ -487,8 +504,22 @@ async def main(val: int | None):
 data: dict[str, str] = {}
 api_key = data.get("api_key")
 
-if not api_key:
+if api_key is None:
     exit(1)
 
-reveal_type(api_key)  # revealed: str & ~AlwaysFalsy
+reveal_type(api_key)  # revealed: str
+```
+
+## Reading two places in both branches preserves their individual types
+
+```py
+def _(condition: bool, number: int, text: str):
+    if condition:
+        pair = (number, text)
+    else:
+        pair = (text, number)
+
+    reveal_type(number)  # revealed: int
+    reveal_type(text)  # revealed: str
+    return pair
 ```

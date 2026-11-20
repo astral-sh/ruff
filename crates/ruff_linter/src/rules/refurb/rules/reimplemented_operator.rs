@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::{ImportRequest, Importer};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -69,7 +70,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [descriptors]: https://docs.python.org/3/howto/descriptor.html
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.9")]
+#[violation_metadata(preview_since = "v0.1.9", category = Category::Pedantic)]
 pub(crate) struct ReimplementedOperator {
     operator: Operator,
     target: FunctionLikeKind,
@@ -429,27 +430,22 @@ fn cmp_op(expr: &ast::ExprCompare, params: &Parameters) -> Option<&'static str> 
     let [arg1, arg2] = params.args.as_slice() else {
         return None;
     };
-    let [op] = &*expr.ops else {
-        return None;
-    };
-    let [right] = &*expr.comparators else {
-        return None;
-    };
+    let (left, op, right) = expr.as_single()?;
 
     match op {
-        ast::CmpOp::Eq => match_arguments(arg1, arg2, &expr.left, right).then_some("eq"),
-        ast::CmpOp::NotEq => match_arguments(arg1, arg2, &expr.left, right).then_some("ne"),
-        ast::CmpOp::Lt => match_arguments(arg1, arg2, &expr.left, right).then_some("lt"),
-        ast::CmpOp::LtE => match_arguments(arg1, arg2, &expr.left, right).then_some("le"),
-        ast::CmpOp::Gt => match_arguments(arg1, arg2, &expr.left, right).then_some("gt"),
-        ast::CmpOp::GtE => match_arguments(arg1, arg2, &expr.left, right).then_some("ge"),
-        ast::CmpOp::Is => match_arguments(arg1, arg2, &expr.left, right).then_some("is_"),
-        ast::CmpOp::IsNot => match_arguments(arg1, arg2, &expr.left, right).then_some("is_not"),
+        ast::CmpOp::Eq => match_arguments(arg1, arg2, left, right).then_some("eq"),
+        ast::CmpOp::NotEq => match_arguments(arg1, arg2, left, right).then_some("ne"),
+        ast::CmpOp::Lt => match_arguments(arg1, arg2, left, right).then_some("lt"),
+        ast::CmpOp::LtE => match_arguments(arg1, arg2, left, right).then_some("le"),
+        ast::CmpOp::Gt => match_arguments(arg1, arg2, left, right).then_some("gt"),
+        ast::CmpOp::GtE => match_arguments(arg1, arg2, left, right).then_some("ge"),
+        ast::CmpOp::Is => match_arguments(arg1, arg2, left, right).then_some("is_"),
+        ast::CmpOp::IsNot => match_arguments(arg1, arg2, left, right).then_some("is_not"),
         ast::CmpOp::In => {
             // Note: `operator.contains` reverses the order of arguments. That is:
             // `operator.contains` is equivalent to `lambda x, y: y in x`, rather than
             // `lambda x, y: x in y`.
-            match_arguments(arg1, arg2, right, &expr.left).then_some("contains")
+            match_arguments(arg1, arg2, right, left).then_some("contains")
         }
         ast::CmpOp::NotIn => None,
     }

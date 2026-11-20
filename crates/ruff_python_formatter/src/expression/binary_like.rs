@@ -44,11 +44,11 @@ impl<'a> BinaryLike<'a> {
             trivia: &TriviaRanges,
             parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
         ) {
-            parts.reserve(compare.comparators.len() * 2 + 1);
+            parts.reserve(compare.ops.len() * 2 + 1);
 
             rec(
                 Operand::Left {
-                    expression: &compare.left,
+                    expression: compare.first_operand(),
                     leading_comments,
                 },
                 comments,
@@ -57,15 +57,14 @@ impl<'a> BinaryLike<'a> {
             );
 
             assert_eq!(
-                compare.comparators.len(),
-                compare.ops.len(),
+                compare.operands.len(),
+                compare.ops.len() + 1,
                 "Compare expression with an unbalanced number of comparators and operations."
             );
 
-            if let Some((last_expression, middle_expressions)) = compare.comparators.split_last() {
-                let (last_operator, middle_operators) = compare.ops.split_last().unwrap();
-
-                for (operator, expression) in middle_operators.iter().zip(middle_expressions) {
+            let mut comparisons = compare.iter();
+            if let Some((_, last_operator, last_expression)) = comparisons.next_back() {
+                for (_, operator, expression) in comparisons {
                     parts.push(OperandOrOperator::Operator(Operator {
                         symbol: OperatorSymbol::Comparator(*operator),
                         trailing_comments: &[],

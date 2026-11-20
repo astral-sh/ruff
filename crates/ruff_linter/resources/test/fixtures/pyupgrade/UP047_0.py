@@ -63,3 +63,12 @@ def multi_param(t: list[T], c: Callable[[T], None]) -> T:
 def outer():
     def inner(t: T) -> T:
         return t
+
+
+# A sole starred constraint needs a trailing comma in the PEP 695 constraint tuple.
+constraints = (int, str)
+U = TypeVar("U", *constraints)
+
+
+def starred_constraints(var: U) -> U:
+    return var

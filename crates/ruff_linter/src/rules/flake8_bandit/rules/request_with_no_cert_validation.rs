@@ -1,10 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::is_const_false;
+use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for HTTPS requests that disable SSL certificate checks.
@@ -31,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Common Weakness Enumeration: CWE-295](https://cwe.mitre.org/data/definitions/295.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.213")]
+#[violation_metadata(stable_since = "v0.0.213", category = Category::Security)]
 pub(crate) struct RequestWithNoCertValidation {
     string: String,
 }
@@ -47,32 +49,32 @@ impl Violation for RequestWithNoCertValidation {
 }
 
 /// S501
-pub(crate) fn request_with_no_cert_validation(checker: &Checker, call: &ast::ExprCall) {
-    if let Some(target) = checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .and_then(|qualified_name| match qualified_name.segments() {
-            [
-                "requests",
-                "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request",
-            ] => Some("requests"),
-            [
-                "httpx",
-                "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request"
-                | "stream" | "Client" | "AsyncClient",
-            ] => Some("httpx"),
-            _ => None,
-        })
+pub(crate) fn request_with_no_cert_validation(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    let target = match qualified_name.segments() {
+        [
+            "requests",
+            "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request",
+        ] => "requests",
+        [
+            "httpx",
+            "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request" | "stream"
+            | "Client" | "AsyncClient",
+        ] => "httpx",
+        _ => return,
+    };
+
+    if let Some(keyword) = call.arguments.find_keyword("verify")
+        && is_const_false(&keyword.value)
     {
-        if let Some(keyword) = call.arguments.find_keyword("verify") {
-            if is_const_false(&keyword.value) {
-                checker.report_diagnostic(
-                    RequestWithNoCertValidation {
-                        string: target.to_string(),
-                    },
-                    keyword.range(),
-                );
-            }
-        }
+        checker.report_diagnostic(
+            RequestWithNoCertValidation {
+                string: target.to_string(),
+            },
+            keyword.range(),
+        );
     }
 }

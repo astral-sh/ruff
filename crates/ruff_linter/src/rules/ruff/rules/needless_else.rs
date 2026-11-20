@@ -9,6 +9,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -31,7 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     bar()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.3")]
+#[violation_metadata(preview_since = "0.9.3", category = Category::Style)]
 pub(crate) struct NeedlessElse;
 
 impl AlwaysFixableViolation for NeedlessElse {
@@ -274,8 +275,7 @@ impl<'a> AnyNodeWithOrElse<'a> {
             }) => elif_else_clauses
                 .last()
                 .filter(|clause| clause.test.is_none())
-                .map(|clause| &*clause.body)
-                .unwrap_or_default(),
+                .map_or_default(|clause| &*clause.body),
         }
     }
 }

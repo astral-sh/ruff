@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for exception handlers that catch non-exception classes.
@@ -35,7 +36,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.255")]
+#[violation_metadata(stable_since = "v0.0.255", category = Category::Correctness)]
 pub(crate) struct ExceptWithNonExceptionClasses {
     is_star: bool,
 }

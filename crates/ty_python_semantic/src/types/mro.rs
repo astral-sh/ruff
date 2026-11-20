@@ -1,10 +1,9 @@
 use crate::Db;
+use crate::FxIndexMap;
 use crate::ProgramEnvironment;
-use std::collections::VecDeque;
 use std::ops::Deref;
 
-use indexmap::IndexMap;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use crate::types::class::{DynamicClassLiteral, DynamicEnumLiteral};
 use crate::types::class_base::ClassBase;
@@ -13,7 +12,7 @@ use crate::types::{
     ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, StaticClassLiteral, Type,
 };
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 /// The inferred method resolution order of a given class.
 ///
@@ -38,7 +37,8 @@ use itertools::Itertools;
 pub(crate) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
-    /// Attempt to resolve the MRO of a given class. Because we derive the MRO from the list of
+    /// Resolve a static class's ancestors in MRO order from the supplied base types. The iterator supplies the
+    /// class itself before requesting these entries. Because we derive the MRO from the list of
     /// base classes in the class definition, this operation is performed on a [class
     /// literal][StaticClassLiteral], not a [class type][ClassType]. (You can _also_ get the MRO of a
     /// class type, but this is done by first getting the MRO of the underlying class literal, and
@@ -52,11 +52,12 @@ impl<'db> Mro<'db> {
     ///
     /// (We emit a diagnostic warning about the runtime `TypeError` in
     /// [`super::infer::infer_scope_types`].)
-    pub(super) fn of_static_class(
+    pub(super) fn ancestors_of_static_class(
         db: &'db dyn Db,
         class_literal: StaticClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
-    ) -> Result<Self, StaticMroError<'db>> {
+        original_bases: &[Type<'db>],
+    ) -> Result<Box<[ClassBase<'db>]>, StaticMroError<'db>> {
         /// Possibly add `Generic` to the resolved bases list.
         ///
         /// This function is called in two cases:
@@ -91,15 +92,10 @@ impl<'db> Mro<'db> {
         let env = &ProgramEnvironment::from_scope(class_literal.body_scope(db));
         let class = class_literal.apply_optional_specialization(db, specialization);
 
-        let original_bases = class_literal.explicit_bases(db);
-
         match original_bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
-            [] if class.is_object(db) => Ok(Self::from([
-                // object is not generic, so the default specialization should be a no-op
-                ClassBase::Class(class),
-            ])),
+            [] if class.is_object(db) => Ok(Box::new([])),
 
             // All other classes in Python have an MRO with length >=2.
             // Even if a class has no explicit base classes,
@@ -117,16 +113,9 @@ impl<'db> Mro<'db> {
             [] => {
                 // e.g. `class Foo[T]: ...` implicitly has `Generic` inserted into its bases
                 if class.has_pep_695_type_params(db) {
-                    Ok(Self::from([
-                        ClassBase::Class(class),
-                        ClassBase::Generic,
-                        ClassBase::object(db, env),
-                    ]))
+                    Ok(Box::new([ClassBase::Generic, ClassBase::object(db, env)]))
                 } else {
-                    Ok(Self::from([
-                        ClassBase::Class(class),
-                        ClassBase::object(db, env),
-                    ]))
+                    Ok(Box::new([ClassBase::object(db, env)]))
                 }
             }
 
@@ -163,9 +152,7 @@ impl<'db> Mro<'db> {
                         if single_base.has_cyclic_mro(db) {
                             Err(StaticMroErrorKind::InheritanceCycle)
                         } else {
-                            Ok(std::iter::once(ClassBase::Class(class))
-                                .chain(single_base.mro(db, env, specialization))
-                                .collect())
+                            Ok(single_base.mro(db, env, specialization).collect())
                         }
                     },
                 )
@@ -218,7 +205,7 @@ impl<'db> Mro<'db> {
                     maybe_add_generic(&mut resolved_bases, original_bases, &[]);
                 }
 
-                let mut seqs = vec![VecDeque::from([ClassBase::Class(class)])];
+                let mut seqs = vec![vec![ClassBase::Class(class)]];
                 for base in &resolved_bases {
                     if base.has_cyclic_mro(db) {
                         return Err(
@@ -227,15 +214,31 @@ impl<'db> Mro<'db> {
                     }
                     seqs.push(base.mro(db, env, specialization).collect());
                 }
-                seqs.push(
-                    resolved_bases
+                // A single parent's MRO can also supply the implicit Generic and object
+                // at its end. In either case all C3 constraints already hold in that MRO.
+                let one_parent_order = match resolved_bases.as_slice() {
+                    [_] => true,
+                    [base, ClassBase::Generic] if *base != ClassBase::Generic => {
+                        seqs[1].ends_with(&seqs[2])
+                    }
+                    _ => false,
+                };
+                if one_parent_order {
+                    let mut seen = FxHashSet::default();
+                    seen.insert(ClassBase::Class(class).mro_identity(db));
+                    if seqs[1]
                         .iter()
-                        .map(|base| base.apply_optional_specialization(db, specialization))
-                        .collect(),
-                );
+                        .all(|base| seen.insert(base.mro_identity(db)))
+                    {
+                        return Ok(std::mem::take(&mut seqs[1]).into_boxed_slice());
+                    }
+                }
+                // The direct bases constrain their order. The preceding MROs already
+                // supply each base with the specialization used for member lookup.
+                seqs.push(resolved_bases.clone());
 
-                if let Some(mro) = c3_merge(seqs) {
-                    return Ok(mro);
+                if let Some(mro) = c3_merge(db, seqs) {
+                    return Ok(mro.0.into_vec().into_iter().skip(1).collect());
                 }
 
                 // We now know that the MRO is unresolvable through the C3-merge algorithm.
@@ -258,14 +261,14 @@ impl<'db> Mro<'db> {
                 let mut duplicate_dynamic_bases = false;
 
                 let duplicate_bases: Vec<DuplicateBaseError<'db>> = {
-                    let mut base_to_indices: IndexMap<ClassBase<'db>, Vec<usize>, FxBuildHasher> =
-                        IndexMap::default();
+                    let mut base_to_indices =
+                        FxIndexMap::<Type<'db>, (ClassBase<'db>, Vec<usize>)>::default();
 
                     // We need to iterate over `original_bases` here rather than `resolved_bases`
                     // so that we get the correct index of the duplicate bases if there were any
                     // (`resolved_bases` may be a longer list than `original_bases`!). However, we
-                    // need to use a `ClassBase` rather than a `Type` as the key type for the
-                    // `base_to_indices` map so that a class such as
+                    // need to use the base's MRO identity rather than its inferred type as the key
+                    // for the `base_to_indices` map so that a class such as
                     // `class Foo(Protocol[T], Protocol): ...` correctly causes us to emit a
                     // `duplicate-base` diagnostic (matching the runtime behaviour) rather than an
                     // `inconsistent-mro` diagnostic (which would be accurate -- but not nearly as
@@ -279,15 +282,15 @@ impl<'db> Mro<'db> {
                         ) else {
                             continue;
                         };
-                        base_to_indices
-                            .entry(base.mro_identity())
-                            .or_default()
-                            .push(index);
+                        let (_, indices) = base_to_indices
+                            .entry(base.mro_identity(db))
+                            .or_insert_with(|| (base, Vec::new()));
+                        indices.push(index);
                     }
 
                     let mut errors = vec![];
 
-                    for (base, indices) in base_to_indices {
+                    for (base, indices) in base_to_indices.into_values() {
                         let Some((first_index, later_indices)) = indices.split_first() else {
                             continue;
                         };
@@ -316,7 +319,7 @@ impl<'db> Mro<'db> {
 
                 if duplicate_bases.is_empty() {
                     if duplicate_dynamic_bases {
-                        Ok(Mro::from_error(db, env, class))
+                        Ok(Box::new([ClassBase::unknown(), ClassBase::object(db, env)]))
                     } else {
                         Err(StaticMroErrorKind::UnresolvableMro {
                             bases_list: original_bases.iter().copied().collect(),
@@ -393,17 +396,17 @@ impl<'db> Mro<'db> {
         }
 
         // Build MRO sequences and check for inheritance cycles.
-        let mut seqs = vec![VecDeque::from([self_base])];
+        let mut seqs = vec![vec![self_base]];
         for base in &resolved_bases {
             if base.has_cyclic_mro(db) {
                 return Err(DynamicMroErrorKind::InheritanceCycle.into_error(db, env, dynamic));
             }
             seqs.push(base.mro(db, env, None).collect());
         }
-        seqs.push(resolved_bases.iter().copied().collect());
+        seqs.push(resolved_bases.clone());
 
         // Try C3 merge.
-        if let Some(mro) = c3_merge(seqs) {
+        if let Some(mro) = c3_merge(db, seqs) {
             return Ok(mro);
         }
 
@@ -414,14 +417,12 @@ impl<'db> Mro<'db> {
         let mut duplicates = Vec::new();
         let mut has_duplicate_dynamic_bases = false;
         for base in &resolved_bases {
-            if matches!(base, ClassBase::Any | ClassBase::Dynamic(_)) {
-                if !seen.insert(*base) {
+            if !seen.insert(base.mro_identity(db)) {
+                if matches!(base, ClassBase::Any | ClassBase::Dynamic(_)) {
                     has_duplicate_dynamic_bases = true;
+                } else {
+                    duplicates.push(*base);
                 }
-                continue;
-            }
-            if !seen.insert(base.mro_identity()) {
-                duplicates.push(*base);
             }
         }
 
@@ -477,23 +478,18 @@ impl<'db> Mro<'db> {
         //
         // This matches the `dynamic_fallback` approach used by `of_dynamic_class`.
         let fallback_mro = || {
-            let mut result = vec![self_base];
-            let mut seen = FxHashSet::default();
-            seen.insert(self_base);
-            for base in &resolved_bases {
-                for item in base.mro(db, env, None) {
-                    if seen.insert(item) {
-                        result.push(item);
-                    }
-                }
-            }
-            Self::from(result)
+            Self::fallback_from_bases(
+                db,
+                env,
+                ClassType::NonGeneric(dynamic_enum.into()),
+                resolved_bases.iter().copied(),
+            )
         };
 
         // Standard C3 linearization: build sequences from each base's MRO, plus the
         // bases list itself, then merge. See `of_static_class` and `of_dynamic_class`
         // for the same pattern.
-        let mut seqs = vec![VecDeque::from([self_base])];
+        let mut seqs = vec![vec![self_base]];
         for base in &resolved_bases {
             if base.has_cyclic_mro(db) {
                 return Err(DynamicMroError {
@@ -503,9 +499,9 @@ impl<'db> Mro<'db> {
             }
             seqs.push(base.mro(db, env, None).collect());
         }
-        seqs.push(resolved_bases.iter().copied().collect());
+        seqs.push(resolved_bases.clone());
 
-        c3_merge(seqs).ok_or_else(|| DynamicMroError {
+        c3_merge(db, seqs).ok_or_else(|| DynamicMroError {
             kind: DynamicMroErrorKind::UnresolvableMro,
             fallback_mro: fallback_mro(),
         })
@@ -513,29 +509,47 @@ impl<'db> Mro<'db> {
 
     /// Compute a fallback MRO for a dynamic class when `of_dynamic_class` fails.
     ///
-    /// Iterates over base MROs sequentially with deduplication.
+    /// Preserves known bases even when an invalid base must be replaced with `Unknown`.
     fn dynamic_fallback(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         dynamic: DynamicClassLiteral<'db>,
     ) -> Self {
-        let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic.into()));
+        Self::fallback_from_bases(
+            db,
+            env,
+            ClassType::NonGeneric(dynamic.into()),
+            dynamic.explicit_bases(db).iter().map(|base_type| {
+                ClassBase::try_from_explicit_base(db, env, *base_type, None)
+                    .unwrap_or_else(ClassBase::unknown)
+            }),
+        )
+    }
+
+    /// Retain the first specialization of each class when C3 cannot determine a valid MRO.
+    ///
+    /// Visit the bases' MROs in order, but defer `object` until every other base has been added.
+    /// This preserves known members while keeping class identities unique and `object` last,
+    /// including when subclasses inherit this fallback MRO.
+    fn fallback_from_bases(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: ClassType<'db>,
+        bases: impl IntoIterator<Item = ClassBase<'db>>,
+    ) -> Self {
+        let self_base = ClassBase::Class(class);
+        let object_base = ClassBase::object(db, env);
         let mut result = vec![self_base];
-        let mut seen = FxHashSet::default();
-        seen.insert(self_base);
-
-        for base_type in dynamic.explicit_bases(db) {
-            // Convert `Type` to `ClassBase`, falling back to `Unknown` if conversion fails.
-            let base = ClassBase::try_from_explicit_base(db, env, *base_type, None)
-                .unwrap_or_else(ClassBase::unknown);
-
+        let mut seen =
+            FxHashSet::from_iter([self_base.mro_identity(db), object_base.mro_identity(db)]);
+        for base in bases {
             for item in base.mro(db, env, None) {
-                if seen.insert(item) {
+                if seen.insert(item.mro_identity(db)) {
                     result.push(item);
                 }
             }
         }
-
+        result.push(object_base);
         Self::from(result)
     }
 }
@@ -583,7 +597,7 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 ///
 /// Even for first-party code, where we will have to resolve the MRO for every class we encounter,
 /// loading the cached MRO comes with a certain amount of overhead, so it's best to avoid calling the
-/// Salsa-tracked [`StaticClassLiteral::try_mro`] method unless it's absolutely necessary.
+/// Salsa-tracked [`StaticClassLiteral::try_mro_ancestors`] method unless it's absolutely necessary.
 #[derive(Clone)]
 pub(crate) struct MroIterator<'db> {
     db: &'db dyn Db,
@@ -651,12 +665,10 @@ impl<'db> MroIterator<'db> {
                     let specialization = self.specialization.map(|specialization| {
                         specialization.tuple_runtime_element_specialization(db)
                     });
-                    let mut full_mro_iter = match literal.try_mro(db, specialization) {
-                        Ok(mro) => mro.iter(),
-                        Err(error) => error.fallback_mro().iter(),
-                    };
-                    full_mro_iter.next();
-                    full_mro_iter
+                    literal
+                        .try_mro_ancestors(db, specialization)
+                        .unwrap_or_else(StaticMroError::fallback_ancestors)
+                        .iter()
                 }
                 ClassLiteral::Dynamic(literal) => {
                     let mut full_mro_iter = match literal.try_mro(db) {
@@ -718,6 +730,44 @@ impl DoubleEndedIterator for MroIterator<'_> {
     }
 }
 
+impl<'db> ClassType<'db> {
+    /// Walk the bases that can match a nominal relation to `target`. The lazy first
+    /// entry always has the source's origin, even when a bare class is specialized.
+    pub(super) fn relation_bases(
+        self,
+        db: &'db dyn Db,
+        target: ClassLiteral<'db>,
+    ) -> impl Iterator<Item = ClassBase<'db>> {
+        if self.class_literal(db) == target {
+            return Either::Left(self.iter_mro(db));
+        }
+        let tail = match self {
+            ClassType::NonGeneric(literal) => {
+                literal.iter_mro(db).full_mro_except_first_element().clone()
+            }
+            ClassType::Generic(alias) => {
+                let specialization = alias.specialization(db);
+                // Only an unpacked TypeVarTuple needs a different specialization for its
+                // bases. Otherwise the alias itself already keys the required MRO.
+                let runtime = specialization.tuple_runtime_element_specialization(db);
+                let ancestors = if runtime == specialization {
+                    alias
+                        .try_mro_ancestors(db)
+                        .map(Box::as_ref)
+                        .map_err(Box::as_ref)
+                } else {
+                    alias.origin(db).try_mro_ancestors(db, Some(runtime))
+                };
+                ancestors
+                    .unwrap_or_else(StaticMroError::fallback_ancestors)
+                    .iter()
+            }
+        };
+        Either::Right(tail.copied())
+    }
+}
+
+/// Boxed in cached MRO results so successful MROs do not reserve space for failure details.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct StaticMroError<'db> {
     kind: StaticMroErrorKind<'db>,
@@ -743,10 +793,9 @@ impl<'db> StaticMroError<'db> {
         &self.kind
     }
 
-    /// Return the fallback MRO we should infer for this class during type inference
-    /// (since accurate resolution of its "true" MRO was impossible)
-    fn fallback_mro(&self) -> &Mro<'db> {
-        &self.fallback_mro
+    /// Return the ancestors used for lookup when this class has an invalid MRO.
+    pub(super) fn fallback_ancestors(&self) -> &[ClassBase<'db>] {
+        &self.fallback_mro[1..]
     }
 }
 
@@ -819,44 +868,60 @@ pub(super) struct DuplicateBaseError<'db> {
 ///
 /// [C3-merge algorithm]: https://docs.python.org/3/howto/mro.html#python-2-3-mro
 /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
-    // Most MROs aren't that long...
-    let mut mro = Vec::with_capacity(8);
+fn c3_merge<'db>(db: &'db dyn Db, sequences: Vec<Vec<ClassBase<'db>>>) -> Option<Mro<'db>> {
+    // A class can be emitted once it is at the head of every sequence that contains it.
+    // Count the occurrences that are still behind a head, using the runtime identity so
+    // that different specializations of the same class share a count.
+    struct Candidate<'db> {
+        base: ClassBase<'db>,
+        in_tails: usize,
+    }
 
-    loop {
-        sequences.retain(|sequence| !sequence.is_empty());
-
-        if sequences.is_empty() {
-            return Some(Mro::from(mro));
-        }
-
-        // If the candidate exists "deeper down" in the inheritance hierarchy,
-        // we should refrain from adding it to the MRO for now. Add the first candidate
-        // for which this does not hold true. If this holds true for all candidates,
-        // return `None`; it will be impossible to find a consistent MRO for the class
-        // with the given bases.
-        let mro_entry = sequences.iter().find_map(|outer_sequence| {
-            let candidate = outer_sequence[0];
-            let candidate_identity = candidate.mro_identity();
-
-            let not_head = sequences.iter().all(|sequence| {
-                sequence
-                    .iter()
-                    .skip(1)
-                    .all(|base| base.mro_identity() != candidate_identity)
-            });
-
-            not_head.then_some(candidate)
+    let mut entries = FxIndexMap::default();
+    let mut in_order = true;
+    let mut sequences: Vec<_> = sequences
+        .into_iter()
+        .map(|sequence| {
+            let mut next_index = 0;
+            sequence
+                .into_iter()
+                .enumerate()
+                .map(|(position, base)| {
+                    let entry = entries.entry(base.mro_identity(db));
+                    let index = entry.index();
+                    in_order &= index >= next_index;
+                    next_index = index + 1;
+                    let entry = entry.or_insert(Candidate { base, in_tails: 0 });
+                    entry.in_tails += usize::from(position != 0);
+                    index
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+        })
+        .collect();
+    // If the order of first occurrence already respects every parent, each of its
+    // entries is C3's leftmost eligible head when its turn comes.
+    if in_order {
+        return Some(entries.into_values().map(|entry| entry.base).collect());
+    }
+    let mut mro = Vec::with_capacity(entries.len());
+    while mro.len() < entries.len() {
+        let index = sequences.iter().find_map(|sequence| {
+            let &head = sequence.as_slice().first()?;
+            (entries[head].in_tails == 0).then_some(head)
         })?;
-
-        mro.push(mro_entry);
-
-        // Make sure we don't try to add the candidate to the MRO twice:
-        let mro_entry_identity = mro_entry.mro_identity();
+        // If two parents contribute the same class, the leftmost parent's specialization wins.
+        mro.push(entries[index].base);
         for sequence in &mut sequences {
-            sequence.pop_front_if(|base| base.mro_identity() == mro_entry_identity);
+            if sequence.as_slice().first() == Some(&index) {
+                sequence.next();
+                if let Some(&next) = sequence.as_slice().first() {
+                    entries[next].in_tails -= 1;
+                }
+            }
         }
     }
+    Some(Mro::from(mro))
 }
 
 /// Determine if an `inconsistent-mro` error could be resolved by moving
@@ -890,10 +955,10 @@ fn check_generic_reorder_fixes_mro<'db>(
         return None;
     }
 
-    let mut reordered: VecDeque<ClassBase<'db>> = resolved_bases.iter().copied().collect();
-    let generic = reordered.remove(single_index)?;
-    reordered.push_back(generic);
-    let mut seqs: Vec<VecDeque<ClassBase<'db>>> = Vec::with_capacity(reordered.len() + 1);
+    let mut reordered = resolved_bases.to_vec();
+    let generic = reordered.remove(single_index);
+    reordered.push(generic);
+    let mut seqs: Vec<Vec<ClassBase<'db>>> = Vec::with_capacity(reordered.len() + 1);
     for base in &reordered {
         if base.has_cyclic_mro(db) {
             return None;
@@ -901,7 +966,7 @@ fn check_generic_reorder_fixes_mro<'db>(
         seqs.push(base.mro(db, env, None).collect());
     }
     seqs.push(reordered);
-    c3_merge(seqs)?;
+    c3_merge(db, seqs)?;
     Some(single_index)
 }
 

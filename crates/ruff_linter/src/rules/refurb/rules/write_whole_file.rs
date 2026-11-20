@@ -7,6 +7,7 @@ use ruff_python_ast::{
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
 use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
@@ -41,7 +42,7 @@ use crate::{FixAvailability, Locator, Violation};
 /// - [Python documentation: `Path.write_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_bytes)
 /// - [Python documentation: `Path.write_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_text)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.6")]
+#[violation_metadata(preview_since = "v0.3.6", category = Category::Pedantic)]
 pub(crate) struct WriteWholeFile<'a> {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
@@ -153,7 +154,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                     );
 
                     if let Some(fix) =
-                        generate_fix(self.checker, &open, self.with_stmt, &suggestion)
+                        generate_fix(self.checker, &open, self.with_stmt, expr, &suggestion)
                     {
                         diagnostic.set_fix(fix);
                     }
@@ -204,9 +205,18 @@ fn generate_fix(
     checker: &Checker,
     open: &FileOpen,
     with_stmt: &ast::StmtWith,
+    call_expr: &Expr,
     suggestion: &str,
 ) -> Option<Fix> {
-    if !(with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)])) {
+    if with_stmt.items.len() != 1 {
+        return None;
+    }
+
+    let [Stmt::Expr(ast::StmtExpr { value, .. })] = with_stmt.body.as_slice() else {
+        return None;
+    };
+
+    if value.range() != call_expr.range() {
         return None;
     }
 

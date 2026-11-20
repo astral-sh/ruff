@@ -1,9 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of the `mako` templates.
@@ -33,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// - [OpenStack security: Cross site scripting XSS](https://security.openstack.org/guidelines/dg_cross-site-scripting-xss.html)
 /// - [Common Weakness Enumeration: CWE-80](https://cwe.mitre.org/data/definitions/80.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Security)]
 pub(crate) struct MakoTemplates;
 
 impl Violation for MakoTemplates {
@@ -46,14 +48,12 @@ impl Violation for MakoTemplates {
 }
 
 /// S702
-pub(crate) fn mako_templates(checker: &Checker, call: &ast::ExprCall) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["mako", "template", "Template"])
-        })
-    {
+pub(crate) fn mako_templates(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if matches!(qualified_name.segments(), ["mako", "template", "Template"]) {
         checker.report_diagnostic(MakoTemplates, call.func.range());
     }
 }

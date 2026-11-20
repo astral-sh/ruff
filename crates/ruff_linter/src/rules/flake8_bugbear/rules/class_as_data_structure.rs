@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -34,7 +35,7 @@ use ruff_python_ast::PythonVersion;
 ///     y: float
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.0")]
+#[violation_metadata(preview_since = "0.9.0", category = Category::Pedantic)]
 pub(crate) struct ClassAsDataStructure;
 
 impl Violation for ClassAsDataStructure {

@@ -45,8 +45,10 @@ reveal_type(f(*("a", "b")))  # revealed: Unknown
 
 ## Type checking
 
-The second step is to perform type checking. This is done for all the overloads that passed the
-arity check.
+The second step checks argument types against the overloads that passed the arity check. If a
+literal argument rules out an overload, ty can check the other candidates first. If any of them
+matches, ty skips type checking the deferred overloads. If none matches, ty checks them too so it
+can use their errors to choose the closest overload for diagnostics.
 
 ### Single match
 
@@ -112,6 +114,51 @@ reveal_type(f(*("a",)))  # revealed: Unknown
 
 More examples of this diagnostic can be found in the
 [single_matching_overload.md](../diagnostics/single_matching_overload.md) document.
+
+### Overloads distinguished by a string literal
+
+A literal-valued variable can select an overload by keyword.
+
+```py
+from functools import partial
+from typing import Literal, overload
+
+@overload
+def select(key: Literal["number"], value: int) -> int: ...
+@overload
+def select(key: Literal["text"], value: str) -> str: ...
+def select(key: str, value: int | str) -> int | str:
+    return value
+
+def use(key: Literal["text"]):
+    reveal_type(select(key=key, value="hello"))  # revealed: str
+```
+
+Binding the literal with `functools.partial` selects the same overload for later calls.
+
+```py
+select_text = partial(select, "text")
+reveal_type(select_text)  # revealed: partial[(value: str) -> str]
+select_text(1)  # error: [invalid-argument-type]
+```
+
+### Type context when no overload matches
+
+Both overloads reject the value, but only the first also rejects the key. The second overload
+therefore supplies the type of the lambda parameter.
+
+```py
+from typing import Callable, Literal, overload
+
+@overload
+def visit(value: int, callback: Callable[[int], object], *, key: Literal["number"]) -> None: ...
+@overload
+def visit(value: str, callback: Callable[[str], object], *, key: Literal["text"]) -> None: ...
+def visit(value, callback, *, key): ...
+
+# error: [no-matching-overload]
+visit(b"bad", lambda x: reveal_type(x), key="text")  # revealed: str
+```
 
 ### Multiple matches
 
@@ -183,6 +230,26 @@ def _(ab: A | B, ac: A | C, bc: B | C):
 
     reveal_type(f(ac))  # revealed: A | C
     reveal_type(f(*(ac,)))  # revealed: A | C
+```
+
+### Expanding immediate list and dictionary arguments
+
+Unpacking an immediate list or dictionary preserves each element's union type for overload
+expansion.
+
+```py
+from typing import overload
+
+@overload
+def choose(x: int) -> int: ...
+@overload
+def choose(x: str) -> str: ...
+def choose(x: int | str) -> int | str:
+    return x
+
+def _(value: int | str) -> None:
+    reveal_type(choose(*[value]))  # revealed: int | str
+    reveal_type(choose(**{"x": value}))  # revealed: int | str
 ```
 
 ### Expanding first argument
@@ -488,6 +555,39 @@ def _(x: tuple[A | B, int], y: tuple[int, bool]):
     reveal_type(f(*(x, y)))  # revealed: A | B | C | D
 ```
 
+### Expanding tuple subclasses
+
+Expanding a tuple subclass preserves its class identity while specializing its element types.
+Overloads accepting either the subclass or its tuple base remain applicable after expansion.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Literal, NamedTuple, overload
+
+class Point(NamedTuple):
+    x: bool
+
+@overload
+def by_class(value: Point, flag: Literal[True]) -> int: ...
+@overload
+def by_class(value: Point, flag: Literal[False]) -> str: ...
+@overload
+def by_element(value: tuple[Literal[True]]) -> int: ...
+@overload
+def by_element(value: tuple[Literal[False]]) -> str: ...
+```
+
+```py
+from overloaded import Point, by_class, by_element
+
+def _(value: Point, flag: bool):
+    reveal_type(by_class(value, flag))  # revealed: int | str
+    reveal_type(by_class(*(value, flag)))  # revealed: int | str
+    reveal_type(by_element(value))  # revealed: int | str
+    reveal_type(by_element(*(value,)))  # revealed: int | str
+```
+
 ### Expanding `type`
 
 There's no special handling for expanding `type[A | B]` type because ty stores this type in it's
@@ -772,6 +872,49 @@ def _(x: Alias) -> None:
     # The type alias `Alias` should be expanded to `A | B` during overload resolution
     reveal_type(f(x))  # revealed: A | B
     reveal_type(f(*(x,)))  # revealed: A | B
+```
+
+### Expanding recursive aliases
+
+A recursive alias whose outermost type is a union can match several overloads. Its recursive members
+retain their types while each union alternative is checked.
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+Tree = T | tuple["Tree[T]"]
+
+@overload
+def choose(value: int) -> str: ...
+@overload
+def choose(value: tuple[object]) -> bytes: ...
+def choose(value):
+    raise NotImplementedError
+
+def inspect(value: Tree[int]):
+    reveal_type(choose(value))  # revealed: str | bytes
+```
+
+### Expanding recursive tuple elements
+
+The boolean element of a recursive tuple expands to its two literal alternatives. Expanding the
+recursive element stops at the reference to the same tuple type.
+
+```py
+from typing import Literal, overload
+
+Recursive = tuple["Recursive", bool]
+
+@overload
+def choose(value: tuple[object, Literal[True]]) -> str: ...
+@overload
+def choose(value: tuple[object, Literal[False]]) -> bytes: ...
+def choose(value):
+    raise NotImplementedError
+
+def inspect(value: Recursive):
+    reveal_type(choose(value))  # revealed: str | bytes
 ```
 
 ### No matching overloads
@@ -1366,6 +1509,7 @@ from overloaded import f
 def _(x1: int, x2: int, args1: list[int], args2: tuple[int, *tuple[int, ...]]):
     reveal_type(f(x1, x2))  # revealed: tuple[int, int]
     reveal_type(f(*(x1, x2)))  # revealed: tuple[int, int]
+    reveal_type(f(*[x1, x2]))  # revealed: tuple[int, int]
 
     # Step 4 should filter out all but the last overload.
     reveal_type(f(x1, *args1))  # revealed: tuple[int, ...]
@@ -1394,8 +1538,10 @@ def _(x1: int, x2: int, kwargs: dict[str, int]):
     reveal_type(f(x1=x1))  # revealed: int
     reveal_type(f(x1=x1, x2=x2))  # revealed: tuple[int, int]
 
-    # Step 4 should filter out all but the last overload.
-    reveal_type(f(**{"x1": x1, "x2": x2}))  # revealed: int
+    # The literal dictionary has exactly the two keys required by the second overload.
+    reveal_type(f(**{"x1": x1, "x2": x2}))  # revealed: tuple[int, int]
+
+    # Step 4 should filter out all but the last overload for unknown dictionary contents.
     reveal_type(f(**kwargs))  # revealed: int
 ```
 
@@ -1549,6 +1695,203 @@ def _(list_int: list[int], list_any: list[Any]):
     # is ambiguous.
     reveal_type(f(list_any))  # revealed: Unknown
     reveal_type(f(*(list_any,)))  # revealed: Unknown
+```
+
+### Shared structure in ambiguous return types
+
+When multiple overloads remain ambiguous, their return types can still share useful structure. We
+preserve matching generic classes and recursively replace differing type arguments with `Unknown`.
+Overloads eliminated by argument checking do not contribute to the result.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def nested(x: int) -> dict[str, list[int]]: ...
+@overload
+def nested(x: str) -> dict[str, list[str]]: ...
+@overload
+def nested(x: bytes) -> dict[int, list[bytes]]: ...
+@overload
+def different_classes(x: int) -> list[int]: ...
+@overload
+def different_classes(x: str) -> set[int]: ...
+```
+
+```py
+from typing import Any
+from overloaded import nested, different_classes
+
+def _(value: Any):
+    reveal_type(nested(value))  # revealed: dict[Unknown, list[Unknown]]
+    reveal_type(different_classes(value))  # revealed: Unknown
+
+reveal_type(nested(1))  # revealed: dict[str, list[int]]
+```
+
+### Ambiguous tuple return types
+
+Tuples with matching shapes retain their length, fixed elements, and variable-length segment.
+Different tuple shapes fall back to `Unknown`.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def fixed(x: int) -> tuple[int | str, list[int]]: ...
+@overload
+def fixed(x: str) -> tuple[str | int, list[str]]: ...
+@overload
+def variable(x: int) -> tuple[str, *tuple[int, ...], bytes]: ...
+@overload
+def variable(x: str) -> tuple[str, *tuple[float, ...], bytes]: ...
+@overload
+def different_lengths(x: int) -> tuple[int]: ...
+@overload
+def different_lengths(x: str) -> tuple[int, int]: ...
+```
+
+```py
+from typing import Any
+from overloaded import fixed, variable, different_lengths
+
+def _(value: Any):
+    reveal_type(fixed(value))  # revealed: tuple[int | str, list[Unknown]]
+    reveal_type(variable(value))  # revealed: tuple[str, *tuple[Unknown, ...], bytes]
+    reveal_type(different_lengths(value))  # revealed: Unknown
+```
+
+### Equivalent tuple shapes with a differing return type
+
+The first two return types below describe the same nonempty tuples of integers. Nevertheless, when a
+third return type differs, all original tuple shapes must agree before we merge their elements.
+Choosing one equivalent return type first would make the result depend on overload order.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def prefix_first(x: int) -> tuple[int, *tuple[int, ...]]: ...
+@overload
+def prefix_first(x: str) -> tuple[*tuple[int, ...], int]: ...
+@overload
+def prefix_first(x: bytes) -> tuple[str, *tuple[int, ...]]: ...
+@overload
+def suffix_first(x: str) -> tuple[*tuple[int, ...], int]: ...
+@overload
+def suffix_first(x: int) -> tuple[int, *tuple[int, ...]]: ...
+@overload
+def suffix_first(x: bytes) -> tuple[str, *tuple[int, ...]]: ...
+```
+
+```py
+from typing import Any
+from overloaded import prefix_first, suffix_first
+
+def _(value: Any):
+    reveal_type(prefix_first(value))  # revealed: Unknown
+    reveal_type(suffix_first(value))  # revealed: Unknown
+```
+
+### Ambiguous class object return types
+
+When every remaining overload returns a class object, the result retains `type[...]`, including any
+shared generic structure within it. This also applies to final classes, which normalize to exact
+class objects.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import final, overload
+
+@final
+class Final: ...
+
+@overload
+def classes(x: int) -> type[int]: ...
+@overload
+def classes(x: str) -> type[str]: ...
+@overload
+def generic_classes(x: int) -> type[list[int]]: ...
+@overload
+def generic_classes(x: str) -> type[list[str]]: ...
+@overload
+def final_classes(x: int) -> type[Final]: ...
+@overload
+def final_classes(x: str) -> type[str]: ...
+```
+
+```py
+from typing import Any
+from overloaded import classes, generic_classes, final_classes
+
+def _(value: Any):
+    reveal_type(classes(value))  # revealed: type[Unknown]
+    reveal_type(generic_classes(value))  # revealed: type[list[Unknown]]
+    reveal_type(final_classes(value))  # revealed: type[Unknown]
+```
+
+### Differing unions in ambiguous return types
+
+Equivalent unions are preserved, but differing unions fall back to `Unknown` without trying to pair
+up their elements. Shared structure outside the union is still preserved.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def union_arguments(x: int) -> list[int | str]: ...
+@overload
+def union_arguments(x: str) -> list[int | bytes]: ...
+@overload
+def optional(x: int) -> list[int] | None: ...
+@overload
+def optional(x: str) -> list[str] | None: ...
+```
+
+```py
+from typing import Any
+from overloaded import union_arguments, optional
+
+def _(value: Any):
+    # A union-aware merge could infer list[int | Unknown], but we currently don't attempt to
+    # find the common structure of two unions.
+    reveal_type(union_arguments(value))  # revealed: list[Unknown]
+    reveal_type(optional(value))  # revealed: Unknown
+```
+
+### Argument expansion with shared return structure
+
+Ambiguity is resolved separately for each expanded argument list. The final result is a union of
+those results, so a precise return from another expansion is preserved.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int, y: int) -> list[int]: ...
+@overload
+def f(x: int, y: str) -> list[str]: ...
+@overload
+def f(x: str, y: object) -> bytes: ...
+```
+
+```py
+from typing import Any
+from overloaded import f
+
+def _(x: int | str, y: Any):
+    reveal_type(f(x, y))  # revealed: list[Unknown] | bytes
 ```
 
 ### Single tuple argument
@@ -1880,6 +2223,52 @@ def _(arg: list[Any]):
     reveal_type(f4(*arg))  # revealed: Unknown
 ```
 
+### Variable-length arguments matched to different arities
+
+A variable-length argument can match different numbers of parameters in each overload. Here, the
+later keyword argument does not cause an otherwise viable overload to be discarded.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int, y: int, /, *, flag: str) -> int: ...
+@overload
+def f(x: int, /, *, flag: str) -> str: ...
+```
+
+```py
+from overloaded import f
+
+def _(args: tuple[int, ...]):
+    reveal_type(f(*args, flag=""))  # revealed: Unknown
+```
+
+### Required tuple elements before a later positional argument
+
+The tuple's required final `bytes` element selects the second overload. Its variable-length part
+must be empty to leave room for `1.0`:
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(a: str, b: float) -> str: ...
+@overload
+def f(a: bytes, b: float) -> bytes: ...
+```
+
+```py
+from overloaded import f
+
+def _(args: tuple[*tuple[str, ...], bytes]) -> None:
+    reveal_type(f(*args, 1.0))  # revealed: bytes
+```
+
 ### Variadic argument with generics
 
 `overloaded.pyi`:
@@ -2137,6 +2526,10 @@ from overloaded import A, B, C, f
 def _(arg: tuple[A | B, Any]):
     reveal_type(f(arg))  # revealed: A | Unknown
     reveal_type(f(*(arg,)))  # revealed: A | Unknown
+
+# Ambiguity from the first expansion must not affect the second expansion's return type.
+def _(arg: tuple[B | A, Any]):
+    reveal_type(f(arg))  # revealed: Unknown | A
 ```
 
 #### Both argument lists ambiguous
@@ -2196,7 +2589,7 @@ def f(components: Iterable[T | None]) -> T: ...
 
 ```py
 from overloaded import f
-from nonexistent_module import something_unknown  # error: [unresolved-import]
+from nonexistent_module import something_unknown  # error: [import-not-found]
 
 reveal_type(something_unknown)  # revealed: Unknown
 
@@ -2210,6 +2603,35 @@ def _(s: str):
     reveal_type(f((s, s, None)))  # revealed: str
 
 reveal_type(f((None, None, None)))  # revealed: Literal[b""]
+```
+
+### An unannotated parameter with a context-dependent argument
+
+Both overloads initially match when `index` is `1`. The first leaves `value` unannotated, so
+`first()` uses its type variable's default of `int`. Filtering with that argument type selects the
+first overload. When `index` is a string, only the second overload matches and it supplies `Never`
+as the expected type for `first()`.
+
+```py
+from typing import overload
+from typing_extensions import Never, TypeVar
+
+T = TypeVar("T", default=int)
+
+def first(*values: T) -> T:
+    return values[0]
+
+@overload
+def choose(value, index: int) -> int: ...
+@overload
+def choose(value: Never, index: object) -> object: ...
+def choose(value, index):
+    return index
+
+result = choose(reveal_type(first()), 1)  # revealed: int
+reveal_type(result)  # revealed: int
+
+choose(reveal_type(first()), "x")  # revealed: Never
 ```
 
 ## Bidirectional Type Inference
@@ -2321,7 +2743,7 @@ select_payload({"name": "missing count"}, 1)
 # error: [no-matching-overload]
 select_payload({"name": "bad count", "count": "not an int"}, 1)
 
-# error: [invalid-key]
+# error: [unknown-typed-dict-constructor-key]
 # error: [no-matching-overload]
 select_payload({"name": "extra key", "count": 1, "extra": None}, 1)
 

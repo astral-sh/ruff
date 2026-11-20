@@ -4,6 +4,7 @@ use ruff_python_ast::{ExprSubscript, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
@@ -131,7 +132,7 @@ use super::{
 /// [source of confusion]: https://peps.python.org/pep-0695/#points-of-confusion
 /// [type alias]: https://docs.python.org/3/reference/simple_stmts.html#type-aliases
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct NonPEP695GenericClass {
     name: String,
 }

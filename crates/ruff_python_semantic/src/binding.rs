@@ -66,6 +66,11 @@ impl<'a> Binding<'a> {
         self.flags.intersects(BindingFlags::EXTERNAL)
     }
 
+    /// Return `true` if this binding was imported lazily, including through `__lazy_modules__`.
+    pub const fn is_lazy(&self) -> bool {
+        self.flags.intersects(BindingFlags::LAZY)
+    }
+
     /// Return `true` if this [`Binding`] represents an aliased symbol
     /// (e.g., `app` in `from fastapi import FastAPI as app`).
     pub const fn is_alias(&self) -> bool {
@@ -430,6 +435,9 @@ bitflags! {
         /// assert (x := y**2) > 42, x
         /// ```
         const IN_ASSERT_STATEMENT = 1 << 13;
+
+        /// The import was lazy when its binding was created.
+        const LAZY = 1 << 14;
 
         /// The binding represents any type alias.
         const TYPE_ALIAS = Self::ANNOTATED_TYPE_ALIAS.bits() | Self::DEFERRED_TYPE_ALIAS.bits();

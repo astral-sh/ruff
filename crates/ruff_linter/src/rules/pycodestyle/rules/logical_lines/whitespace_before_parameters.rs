@@ -3,6 +3,7 @@ use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -26,7 +27,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct WhitespaceBeforeParameters {
     bracket: TokenKind,
 }
@@ -68,7 +69,7 @@ pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &LintCon
         if matches!(kind, TokenKind::Lpar | TokenKind::Lsqb)
             && matches!(
                 prev_token,
-                TokenKind::Name | TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
+                TokenKind::Identifier | TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
             )
             && (pre_pre_kind != Some(TokenKind::Class))
             && token.start() != prev_end

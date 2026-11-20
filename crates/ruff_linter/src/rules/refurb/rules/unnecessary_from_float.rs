@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
@@ -61,7 +62,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 /// - [Python documentation: `fractions`](https://docs.python.org/3/library/fractions.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
 pub(crate) struct UnnecessaryFromFloat {
     method_name: MethodName,
     constructor: Constructor,
@@ -220,12 +221,9 @@ fn is_valid_argument_type(
         // Fraction.from_decimal accepts int, bool, Decimal
         (MethodName::FromDecimal, Constructor::Fraction) => {
             // First check if it's a Decimal constructor call
-            let is_decimal_call = arg_expr
-                .as_call_expr()
-                .and_then(|call| semantic.resolve_qualified_name(&call.func))
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["decimal", "Decimal"])
-                });
+            let is_decimal_call = arg_expr.as_call_expr().is_some_and(|call| {
+                semantic.matches_qualified_name(&call.func, &["decimal", "Decimal"])
+            });
 
             if is_decimal_call {
                 return true;

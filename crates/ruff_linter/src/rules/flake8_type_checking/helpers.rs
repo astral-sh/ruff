@@ -3,8 +3,11 @@ use std::cmp::Reverse;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
-use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
+use ruff_python_ast::{
+    self as ast, Decorator, Expr, ExprContext, Operator, PythonVersion, StringLiteralFlags,
+};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
@@ -14,6 +17,8 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Edit;
 use crate::Locator;
+use crate::checkers::ast::Checker;
+use crate::rules::flake8_type_checking::settings::RuntimeSemantics;
 use crate::settings::LinterSettings;
 
 /// Represents the kind of an existing or potential typing-only annotation.
@@ -25,6 +30,8 @@ use crate::settings::LinterSettings;
 pub(crate) enum TypingReference {
     /// The reference is in a runtime-evaluated context.
     Runtime,
+    /// The reference is in a runtime-ambiguous context.
+    RuntimeAmbiguous,
     /// The reference is in a runtime-evaluated context, but the
     /// `lint.future-annotations` setting is enabled.
     ///
@@ -58,6 +65,11 @@ impl TypingReference {
             // type definition to be considered a typing reference
             if !reference.in_type_definition() {
                 return Self::Runtime;
+            }
+
+            if reference.in_runtime_ambiguous_annotation() {
+                kind = kind.combine(Self::RuntimeAmbiguous);
+                continue;
             }
 
             if reference.in_typing_only_annotation() || reference.in_string_type_definition() {
@@ -117,59 +129,77 @@ pub(crate) fn is_valid_runtime_import(
     }
 }
 
-/// Returns `true` if a function's parameters should be treated as runtime-required.
-pub(crate) fn runtime_required_function(
+/// Returns the desired `RuntimeSemantics` for a function's annotations
+pub(crate) fn function_annotation_runtime_semantics(
     function_def: &ast::StmtFunctionDef,
-    decorators: &[String],
     semantic: &SemanticModel,
-) -> bool {
-    if runtime_required_decorators(&function_def.decorator_list, decorators, semantic) {
-        return true;
-    }
-    false
+    settings: &LinterSettings,
+) -> RuntimeSemantics {
+    decorator_runtime_semantics(&function_def.decorator_list, semantic, settings)
 }
 
-/// Returns `true` if a class's assignments should be treated as runtime-required.
-pub(crate) fn runtime_required_class(
+/// Returns the desired `RuntimeSemantics` for a class's annotations
+pub(crate) fn class_annotation_runtime_semantics(
     class_def: &ast::StmtClassDef,
-    base_classes: &[String],
-    decorators: &[String],
     semantic: &SemanticModel,
-) -> bool {
-    if runtime_required_base_class(class_def, base_classes, semantic) {
-        return true;
+    settings: &LinterSettings,
+) -> RuntimeSemantics {
+    let semantics = base_class_runtime_semantics(class_def, semantic, settings);
+    if matches!(semantics, RuntimeSemantics::Required) {
+        return semantics;
     }
-    if runtime_required_decorators(&class_def.decorator_list, decorators, semantic) {
-        return true;
-    }
-    false
+    semantics.combine(decorator_runtime_semantics(
+        &class_def.decorator_list,
+        semantic,
+        settings,
+    ))
 }
 
-/// Return `true` if a class is a subclass of a runtime-required base class.
-fn runtime_required_base_class(
+/// Returns `RuntimeSemantics` based on a class's base class.
+fn base_class_runtime_semantics(
     class_def: &ast::StmtClassDef,
-    base_classes: &[String],
     semantic: &SemanticModel,
-) -> bool {
+    settings: &LinterSettings,
+) -> RuntimeSemantics {
+    let base_classes = &settings.flake8_type_checking.runtime_evaluated_base_classes;
+    if base_classes.is_empty() {
+        return RuntimeSemantics::Default;
+    }
+    let mut result = RuntimeSemantics::Default;
     analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
-        base_classes
+        match base_classes
             .iter()
-            .any(|base_class| QualifiedName::from_dotted_name(base_class) == qualified_name)
-    })
+            .find(|(base_class, ..)| QualifiedName::from_dotted_name(base_class) == qualified_name)
+        {
+            Some((_, RuntimeSemantics::Required)) => {
+                // Once we encounter a runtime required name we can stop looking
+                // at the rest of the names by returning `true`
+                result = RuntimeSemantics::Required;
+                true
+            }
+            Some((_, semantics)) => {
+                result = semantics.combine(result);
+                false
+            }
+            _ => false,
+        }
+    });
+    result
 }
 
-fn runtime_required_decorators(
+fn decorator_runtime_semantics(
     decorator_list: &[Decorator],
-    decorators: &[String],
     semantic: &SemanticModel,
-) -> bool {
+    settings: &LinterSettings,
+) -> RuntimeSemantics {
+    let decorators = &settings.flake8_type_checking.runtime_evaluated_decorators;
     if decorators.is_empty() {
-        return false;
+        return RuntimeSemantics::Default;
     }
-
-    decorator_list.iter().any(|decorator| {
+    let mut result = RuntimeSemantics::Default;
+    for decorator in decorator_list {
         let expression = map_callable(&decorator.expression);
-        semantic
+        match semantic
             // First try to resolve the qualified name normally for cases like:
             // ```python
             // from mymodule import app
@@ -189,12 +219,21 @@ fn runtime_required_decorators(
             // def test(): ...
             // ```
             .or_else(|| analyze::typing::resolve_assignment(expression, semantic))
-            .is_some_and(|qualified_name| {
-                decorators
-                    .iter()
-                    .any(|decorator| QualifiedName::from_dotted_name(decorator) == qualified_name)
-            })
-    })
+            .and_then(|qualified_name| {
+                decorators.iter().find(|(decorator, ..)| {
+                    QualifiedName::from_dotted_name(decorator) == qualified_name
+                })
+            }) {
+            Some((_, RuntimeSemantics::Required)) => {
+                return RuntimeSemantics::Required;
+            }
+            Some((_, semantics)) => {
+                result = semantics.combine(result);
+            }
+            _ => {}
+        }
+    }
+    result
 }
 
 /// Returns `true` if an annotation will be inspected at runtime by the `dataclasses` module.
@@ -211,11 +250,10 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
     // Determine whether the assignment is in a `@dataclass` class definition.
     if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
         if class_def.decorator_list.iter().any(|decorator| {
-            semantic
-                .resolve_qualified_name(map_callable(&decorator.expression))
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["dataclasses", "dataclass"])
-                })
+            semantic.matches_qualified_name(
+                map_callable(&decorator.expression),
+                &["dataclasses", "dataclass"],
+            )
         }) {
             // Determine whether the annotation is `typing.ClassVar`, `dataclasses.InitVar`, or `dataclasses.KW_ONLY`.
             return semantic
@@ -376,6 +414,40 @@ pub(crate) fn quote_type_expression(
     Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
 }
 
+/// Safely remove quotes from a type expression.
+///
+/// This function handles edge cases like multiline strings correctly
+/// by checking for and potentially adding missing parentheses.
+pub(crate) fn unquote_annotation_string(
+    expr: &Expr,
+    annotation_expr: &ast::ExprStringLiteral,
+    checker: &Checker,
+) -> Edit {
+    let fix_string = annotation_expr.value.to_string();
+
+    let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
+        && parenthesized_range(
+            // Check for parentheses outside the string ("""...""")
+            annotation_expr.into(),
+            checker.semantic().current_statement().into(),
+            checker.source_tokens(),
+        )
+        .is_none()
+        && parenthesized_range(
+            // Check for parentheses inside the string """(...)"""
+            expr.into(),
+            annotation_expr.into(),
+            checker.tokens(),
+        )
+        .is_none()
+    {
+        format!("({fix_string})")
+    } else {
+        fix_string
+    };
+    Edit::range_replacement(fix_string, annotation_expr.range())
+}
+
 /// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].
 pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
     let mut edits = edits;
@@ -511,5 +583,84 @@ impl QuoteRewriter {
 impl Transformer for QuoteRewriter {
     fn visit_string_literal(&self, literal: &mut ast::StringLiteral) {
         literal.flags = literal.flags.with_quote_style(self.preferred_inner_quote);
+    }
+}
+
+/// Traverses the type expression and checks if the expression can safely
+/// be unquoted
+pub(crate) fn quotes_are_unremovable(
+    semantic: &SemanticModel,
+    expr: &Expr,
+    target_version: PythonVersion,
+) -> bool {
+    match expr {
+        Expr::BinOp(ast::ExprBinOp {
+            left, right, op, ..
+        }) => {
+            match op {
+                Operator::BitOr => {
+                    if target_version < PythonVersion::PY310 {
+                        return true;
+                    }
+                    quotes_are_unremovable(semantic, left, target_version)
+                        || quotes_are_unremovable(semantic, right, target_version)
+                }
+                // for now we'll treat uses of other operators as unremovable quotes
+                // since that would make it an invalid type expression anyways. We skip
+                // walking the nested non-type expressions from `typing.Annotated`, so
+                // we don't produce false negatives in this branch.
+                _ => true,
+            }
+        }
+        Expr::Starred(ast::ExprStarred {
+            value,
+            ctx: ExprContext::Load,
+            ..
+        }) => quotes_are_unremovable(semantic, value, target_version),
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            // for subscripts we don't know whether it's safe to do at runtime
+            // since the operation may only be available at type checking time.
+            // E.g. stubs only generics.
+            if !semantic.in_type_checking_block() {
+                return true;
+            }
+            if quotes_are_unremovable(semantic, value, target_version) {
+                return true;
+            }
+            // for `typing.Annotated`, only analyze the first argument, since the rest may
+            // contain arbitrary expressions.
+            if let Some(qualified_name) = semantic.resolve_qualified_name(value) {
+                if semantic.match_typing_qualified_name(&qualified_name, "Annotated") {
+                    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                        return !elts.is_empty()
+                            && quotes_are_unremovable(semantic, &elts[0], target_version);
+                    }
+                    return false;
+                }
+            }
+            quotes_are_unremovable(semantic, slice, target_version)
+        }
+        Expr::Attribute(ast::ExprAttribute { value, .. }) => {
+            // for attributes we also don't know whether it's safe
+            if !semantic.in_type_checking_block() {
+                return true;
+            }
+            quotes_are_unremovable(semantic, value, target_version)
+        }
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            for elt in elts {
+                if quotes_are_unremovable(semantic, elt, target_version) {
+                    return true;
+                }
+            }
+            false
+        }
+        Expr::Name(name) => {
+            semantic.resolve_name(name).is_some()
+                && semantic
+                    .simulate_runtime_load(name, semantic.in_type_checking_block().into())
+                    .is_none()
+        }
+        _ => false,
     }
 }

@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::add_argument;
 use crate::{Fix, FixAvailability, Violation};
 
@@ -49,7 +50,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", category = Category::Suspicious)]
 pub(crate) struct SubprocessRunWithoutCheck;
 
 impl Violation for SubprocessRunWithoutCheck {
@@ -75,8 +76,7 @@ pub(crate) fn subprocess_run_without_check(checker: &Checker, call: &ast::ExprCa
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
+        .matches_qualified_name(&call.func, &["subprocess", "run"])
     {
         if call.arguments.find_keyword("check").is_none() {
             let mut diagnostic =

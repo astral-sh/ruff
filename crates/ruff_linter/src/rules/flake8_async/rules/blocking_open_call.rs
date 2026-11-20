@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks that async functions do not open files with blocking methods like `open`.
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 ///         contents = await f.read()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
 pub(crate) struct BlockingOpenCallInAsyncFunction;
 
 impl Violation for BlockingOpenCallInAsyncFunction {
@@ -64,7 +65,7 @@ fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["" | "io", "open"] | ["io", "open_code"]
+                ["" | "builtins" | "io", "open"] | ["io", "open_code"]
             )
         })
 }
@@ -85,12 +86,7 @@ pub(crate) fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -
     // Path("foo").open()
     // ```
     if let Expr::Call(call) = value.as_ref() {
-        let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) else {
-            return false;
-        };
-        if qualified_name.segments() == ["pathlib", "Path"] {
-            return true;
-        }
+        return semantic.matches_qualified_name(&call.func, &["pathlib", "Path"]);
     }
 
     // Second, is this a call to `pathlib.Path.open` via a variable?
@@ -113,7 +109,5 @@ pub(crate) fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -
         return false;
     };
 
-    semantic
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|qualified_name| qualified_name.segments() == ["pathlib", "Path"])
+    semantic.matches_qualified_name(call.func.as_ref(), &["pathlib", "Path"])
 }

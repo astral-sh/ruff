@@ -4,6 +4,7 @@ use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_mkdir_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
@@ -51,7 +52,7 @@ use crate::{FixAvailability, Violation};
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231")]
+#[violation_metadata(stable_since = "v0.0.231", category = Category::Pedantic)]
 pub(crate) struct OsMkdir;
 
 impl Violation for OsMkdir {
@@ -119,8 +120,7 @@ pub(crate) fn os_mkdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         let mkdir_args = call
             .arguments
             .find_argument_value("mode", 1)
-            .map(|expr| format!("mode={}", checker.locator().slice(expr.range())))
-            .unwrap_or_default();
+            .map_or_default(|expr| format!("mode={}", checker.locator().slice(expr.range())));
 
         let replacement = if is_pathlib_path_call(checker, path) {
             format!("{path_code}.mkdir({mkdir_args})")

@@ -132,6 +132,94 @@ reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
 ```
 
+### Union of recursive named tuples
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, TypeAlias
+
+class Negation(NamedTuple):
+    child: Expression
+
+class Group(NamedTuple):
+    children: tuple[Expression, ...]
+
+Expression: TypeAlias = Negation | Group | str
+
+def _(group: Group):
+    reveal_type(group[0])  # revealed: tuple[Negation | Group | str, ...]
+```
+
+### Union containing a subclass of a recursive named tuple
+
+```py
+from __future__ import annotations
+
+from typing import NamedTuple, TypeAlias
+
+class Negation(NamedTuple):
+    child: Expression
+
+class Group(NamedTuple):
+    children: tuple[Expression, ...]
+
+class Subgroup(Group): ...
+
+Expression: TypeAlias = Negation | Subgroup | str
+
+def _(group: Subgroup):
+    reveal_type(group[0])  # revealed: tuple[Negation | Subgroup | str, ...]
+```
+
+### Recursive fields with a wide union
+
+Two named tuples can share a field type that refers back to both of them. The repeated `int` members
+exercise normalization of a wide union. Both fields must retain `Leaf`.
+
+```py
+from typing import NamedTuple, Union
+from typing_extensions import assert_type
+
+class Leaf(NamedTuple):
+    value: "Metadata"
+
+class Closure(NamedTuple):
+    entries: Union[int, Leaf, int, int, int, int, int, int]
+
+class Partial(NamedTuple):
+    entries: Union[int, Leaf, int, int, int, int, int, int]
+
+Metadata = Closure | Partial
+
+def check(closure: Closure, partial: Partial) -> None:
+    assert_type(closure.entries, int | Leaf)
+    assert_type(partial.entries, int | Leaf)
+```
+
+### Explicit dataclass-transform metaclass
+
+`models.pyi`:
+
+```pyi
+from typing import dataclass_transform
+
+@dataclass_transform()
+class RecordMeta(type): ...
+```
+
+```py
+from dataclasses import fields
+from typing import NamedTuple
+from models import RecordMeta
+
+# TODO: Report the metaclass conflict that makes this class definition raise TypeError.
+class Point(NamedTuple, metaclass=RecordMeta):
+    x: int
+
+fields(Point)
+```
+
 ### Fields declared in stubs
 
 An annotation-only field in a stub remains a required constructor argument. An explicit ellipsis
@@ -209,9 +297,9 @@ a = A(x=B(x=C(x=A(x=None))))
 reveal_type(a.x)  # revealed: B | None
 
 if a.x:
-    reveal_type(a.x and a.x.x)  # revealed: C
-    reveal_type(a.x and a.x.x.x)  # revealed: A
-    reveal_type(a.x and a.x.x.x.x)  # revealed: B | None
+    reveal_type(a.x.x)  # revealed: C
+    reveal_type(a.x.x.x)  # revealed: A
+    reveal_type(a.x.x.x.x)  # revealed: B | None
 
 A(x=42)  # error: [invalid-argument-type]
 
@@ -1243,6 +1331,36 @@ reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
 reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
 ```
 
+### Methods with default type parameters
+
+Methods on generic named tuples honor explicit type arguments that override their defaults,
+including when accessed through a subclass. The `_make` class method returns the specialized
+receiver type.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import NamedTuple
+
+class Box[T = int](NamedTuple):
+    value: T
+
+class Child[T = int](Box[T]):
+    pass
+
+def methods(box: Box[str], child: Child[str]) -> None:
+    reveal_type(box._asdict())  # revealed: dict[str, Any]
+    reveal_type(child._asdict())  # revealed: dict[str, Any]
+    reveal_type(Box[str]._make(("value",)))  # revealed: Box[str]
+    reveal_type(Child[str]._make(("value",)))  # revealed: Child[str]
+
+reveal_type(Box._make((1,)))  # revealed: Box[int]
+reveal_type(Child._make((1,)))  # revealed: Child[int]
+```
+
 ### Functional syntax with generics
 
 Generic namedtuples can also be defined using the functional syntax with type variables in the field
@@ -1290,7 +1408,7 @@ from typing import NamedTuple
 class Point(NamedTuple):
     x: int
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Point.__match_args__)  # revealed: Unknown
 ```
 
@@ -1338,6 +1456,44 @@ class IntBox(Box[int]):
     pass
 
 reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
+```
+
+### `_replace` methods from different classes
+
+The `_replace` methods of different named tuples retain different return types even when their
+fields match. A union of these methods cannot promise to return only one of the classes, regardless
+of branch order:
+
+```py
+from typing import Callable, NamedTuple
+
+class A(NamedTuple):
+    x: int
+
+class B(NamedTuple):
+    x: int
+
+def choose(flag: bool) -> Callable[..., A]:
+    # error: [invalid-explicit-return]
+    return A._replace if flag else B._replace
+
+def reversed_order(flag: bool) -> Callable[..., A]:
+    # error: [invalid-explicit-return]
+    return B._replace if flag else A._replace
+
+def either_class(flag: bool) -> Callable[..., A | B]:
+    return A._replace if flag else B._replace  # ok
+```
+
+The same distinction applies to named tuples created with the functional syntax:
+
+```py
+DynamicA = NamedTuple("DynamicA", [("x", int)])
+DynamicB = NamedTuple("DynamicB", [("x", int)])
+
+def choose_dynamic(flag: bool) -> Callable[..., DynamicA]:
+    # error: [invalid-explicit-return]
+    return DynamicA._replace if flag else DynamicB._replace
 ```
 
 ## `collections.namedtuple`
@@ -1461,7 +1617,7 @@ reveal_type(typing.NamedTuple.__name__)  # revealed: str
 reveal_type(typing.NamedTuple.__qualname__)  # revealed: str
 reveal_type(typing.NamedTuple.__kwdefaults__)  # revealed: dict[str, Any] | None
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(typing.NamedTuple.__mro__)  # revealed: Unknown
 ```
 
@@ -1485,7 +1641,7 @@ def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x.__iter__)
 
 def _(y: type[typing.NamedTuple]):
-    reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+    reveal_type(y)  # revealed: type[tuple[object, ...]] & type[NamedTupleLike]
 
 # error: [invalid-type-form] "Special form `typing.NamedTuple` expected no type parameter"
 def _(z: typing.NamedTuple[int]): ...

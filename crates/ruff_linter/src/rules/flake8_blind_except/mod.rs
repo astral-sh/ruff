@@ -14,7 +14,7 @@ mod tests {
 
     #[test_case(Rule::BlindExcept, Path::new("BLE.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_blind_except").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),

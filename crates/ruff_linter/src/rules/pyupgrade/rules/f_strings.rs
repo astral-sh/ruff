@@ -11,11 +11,13 @@ use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::{curly_escape, curly_unescape};
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -40,7 +42,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.224")]
+#[violation_metadata(stable_since = "v0.0.224", category = Category::Complexity)]
 pub(crate) struct FString;
 
 impl Violation for FString {
@@ -347,6 +349,9 @@ impl FStringConversion {
                     for part in field.parts {
                         match part {
                             FieldNamePart::Attribute(name) => {
+                                if !is_identifier(&name) {
+                                    return Err(anyhow::anyhow!("non-identifier attribute"));
+                                }
                                 converted.push('.');
                                 converted.push_str(&name);
                             }
@@ -361,6 +366,18 @@ impl FStringConversion {
                                     "\"" => '\'',
                                     _ => unreachable!("invalid trailing quote"),
                                 };
+                                if index.contains(quote) {
+                                    return Err(anyhow::anyhow!(
+                                        "string index contains the f-string quote"
+                                    ));
+                                }
+                                // `str.format` takes the backslash literally, but inside the
+                                // quoted key it would start an escape sequence.
+                                if index.contains('\\') {
+                                    return Err(anyhow::anyhow!(
+                                        "string index contains a backslash"
+                                    ));
+                                }
                                 converted.push('[');
                                 converted.push(quote);
                                 converted.push_str(&index);
@@ -371,6 +388,9 @@ impl FStringConversion {
                     }
 
                     if let Some(conversion_spec) = conversion_spec {
+                        if !matches!(conversion_spec, 's' | 'r' | 'a') {
+                            return Err(anyhow::anyhow!("unknown conversion specifier"));
+                        }
                         converted.push('!');
                         converted.push(conversion_spec);
                     }
@@ -404,6 +424,11 @@ impl FStringConversion {
 /// UP032
 pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
     if summary.has_nested_parts {
+        return;
+    }
+
+    // `"{} {1}".format(a, b)` raises `ValueError`, but the equivalent f-string would succeed.
+    if !summary.autos.is_empty() && !summary.indices.is_empty() {
         return;
     }
 

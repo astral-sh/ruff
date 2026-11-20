@@ -19,15 +19,21 @@ use crate::{
 struct Rule {
     /// The actual name of the rule, e.g., `NoIndentedBlock`.
     name: Ident,
-    /// The linter associated with the rule, e.g., `Pycodestyle`.
-    linter: Ident,
-    /// The code associated with the rule, e.g., `"E112"`.
-    code: LitStr,
+    /// The linter and code associated with the rule, if any.
+    code: Option<LinterCode>,
     /// The path to the struct implementing the rule, e.g.
     /// `rules::pycodestyle::rules::logical_lines::NoIndentedBlock`
     path: Path,
     /// The rule attributes, e.g. for feature gates
     attrs: Vec<Attribute>,
+}
+
+#[derive(Clone)]
+struct LinterCode {
+    /// The linter associated with the rule, e.g., `Pycodestyle`.
+    linter: Ident,
+    /// The code associated with the rule, e.g., `"E112"`.
+    code: LitStr,
 }
 
 pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
@@ -58,25 +64,38 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         ));
     };
 
-    // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data.
-    let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
-
+    let mut rules = Vec::new();
     for arm in arms {
         if matches!(arm.pat, Pat::Wild(..)) {
             break;
         }
 
-        let rule = syn::parse::<Rule>(arm.into_token_stream().into())?;
-        linter_to_rules
-            .entry(rule.linter.clone())
-            .or_default()
-            .insert(rule.code.value(), rule);
+        rules.push(syn::parse::<Rule>(arm.into_token_stream().into())?);
+    }
+
+    rules.sort_by_cached_key(|rule| {
+        (
+            rule.code.is_none(),
+            rule.code
+                .as_ref()
+                .map(|code| (code.linter.clone(), code.code.value())),
+        )
+    });
+
+    // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data.
+    let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, &Rule>> = BTreeMap::new();
+    for rule in &rules {
+        if let Some(LinterCode { linter, code }) = &rule.code {
+            linter_to_rules
+                .entry(linter.clone())
+                .or_default()
+                .insert(code.value(), rule);
+        }
     }
 
     let linter_idents: Vec<_> = linter_to_rules.keys().collect();
 
-    let all_rules = linter_to_rules.values().flat_map(BTreeMap::values);
-    let mut output = register_rules(all_rules);
+    let mut output = register_rules(rules.iter());
 
     output.extend(quote! {
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -120,15 +139,9 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 fn from(linter: #linter) -> Self {
                     let prefix = RuleCodePrefix::#linter(linter);
                     if let Some(rule) = prefix.as_rule() {
-                        Self::Rule {
-                            rule,
-                            redirected_from: None,
-                        }
+                        Self::Rule { rule }
                     } else {
-                        Self::Prefix {
-                            prefix,
-                            redirected_from: None,
-                        }
+                        Self::Prefix { prefix }
                     }
                 }
             }
@@ -168,13 +181,13 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 quote!(#(#attrs)*)
             };
             prefix_into_iter_match_arms.extend(quote! {
-                #attrs #linter::#prefix_ident => vec![#(#rule_paths,)*].into_iter(),
+                #attrs #linter::#prefix_ident => [#(#rule_paths,)*].iter().copied(),
             });
         }
 
         output.extend(quote! {
             impl #linter {
-                pub(crate) fn rules(&self) -> ::std::vec::IntoIter<Rule> {
+                pub(crate) fn rules(&self) -> ::std::iter::Copied<::std::slice::Iter<'static, Rule>> {
                     match self { #prefix_into_iter_match_arms }
                 }
             }
@@ -190,15 +203,15 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 })
             }
 
-            pub(crate) fn rules(&self) -> ::std::vec::IntoIter<Rule> {
+            pub(crate) fn rules(&self) -> ::std::iter::Copied<::std::slice::Iter<'static, Rule>> {
                 match self {
-                    #(RuleCodePrefix::#linter_idents(prefix) => prefix.clone().rules(),)*
+                    #(RuleCodePrefix::#linter_idents(prefix) => prefix.rules(),)*
                 }
             }
         }
     });
 
-    let rule_to_code = generate_rule_to_code(&linter_to_rules);
+    let rule_to_code = generate_rule_to_code(&rules);
     output.extend(rule_to_code);
 
     output.extend(generate_iter_impl(&linter_to_rules, &linter_idents));
@@ -208,7 +221,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
 
 /// Group the rules by their common prefixes.
 fn rules_by_prefix(
-    rules: &BTreeMap<String, Rule>,
+    rules: &BTreeMap<String, &Rule>,
 ) -> BTreeMap<String, Vec<(Path, Vec<Attribute>)>> {
     // TODO(charlie): Why do we do this here _and_ in `rule_code_prefix::expand`?
     let mut rules_by_prefix = BTreeMap::new();
@@ -237,16 +250,20 @@ fn rules_by_prefix(
 /// to multiple codes (e.g., if it existed in multiple linters, like Pylint and Flake8, under
 /// different codes). We haven't actually activated this functionality yet, but some work was
 /// done to support it, so the logic exists here.
-fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>) -> TokenStream {
+fn generate_rule_to_code(rules: &[Rule]) -> TokenStream {
     let mut rule_to_codes: HashMap<&Path, Vec<&Rule>> = HashMap::new();
     let mut linter_code_for_rule_match_arms = quote!();
 
-    for (linter, map) in linter_to_rules {
-        for (code, rule) in map {
-            let Rule {
-                path, attrs, name, ..
-            } = rule;
-            rule_to_codes.entry(path).or_default().push(rule);
+    for rule in rules {
+        let Rule {
+            path,
+            attrs,
+            name,
+            code,
+        } = rule;
+        rule_to_codes.entry(path).or_default().push(rule);
+
+        if let Some(LinterCode { linter, code }) = code {
             linter_code_for_rule_match_arms.extend(quote! {
                 #(#attrs)* (Self::#linter, Rule::#name) => Some(#code),
             });
@@ -279,25 +296,31 @@ See also https://github.com/astral-sh/ruff/issues/2186.
             rule_name.ident
         );
 
-        let Rule {
-            linter,
-            code,
-            attrs,
-            ..
-        } = codes
+        let Rule { code, attrs, .. } = codes
             .iter()
-            .sorted_by_key(|data| data.linter == "Pylint")
+            .sorted_by_key(|rule| {
+                rule.code
+                    .as_ref()
+                    .is_some_and(|code| code.linter == "Pylint")
+            })
             .next()
             .unwrap();
 
+        let noqa_code = match code {
+            Some(LinterCode { linter, code }) => {
+                quote!(Some(NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code)))
+            }
+            None => quote!(None),
+        };
+
         rule_noqa_code_match_arms.extend(quote! {
-            #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
+            #(#attrs)* Rule::#rule_name => #noqa_code,
         });
     }
 
     let rule_to_code = quote! {
         impl Rule {
-            pub fn noqa_code(&self) -> NoqaCode {
+            pub fn noqa_code(&self) -> Option<NoqaCode> {
                 use crate::registry::RuleNamespace;
 
                 match self {
@@ -336,7 +359,7 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 
 /// Implement `impl IntoIterator for &Linter` and `RuleCodePrefix::iter()`
 fn generate_iter_impl(
-    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>,
+    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, &Rule>>,
     linter_idents: &[&Ident],
 ) -> TokenStream {
     let mut linter_rules_match_arms = quote!();
@@ -347,7 +370,7 @@ fn generate_iter_impl(
             quote!(#(#attrs)* Rule::#rule_name)
         });
         linter_rules_match_arms.extend(quote! {
-            Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
+            Linter::#linter => [#(#rule_paths,)*].iter().copied(),
         });
         let rule_paths = map.values().map(|Rule { attrs, path, .. }| {
             let rule_name = path.segments.last().unwrap();
@@ -361,7 +384,7 @@ fn generate_iter_impl(
     quote! {
         impl Linter {
             /// Rules not in the preview.
-            pub(crate) fn rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
+            pub(crate) fn rules(self: &Linter) -> ::std::iter::Copied<::std::slice::Iter<'static, Rule>> {
                 match self {
                     #linter_rules_match_arms
                 }
@@ -394,6 +417,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
     let mut rule_status_match_arms = quote!();
+    let mut rule_category_match_arms = quote!();
     let mut rule_file_match_arms = quote!();
     let mut rule_line_match_arms = quote!();
     let mut rule_parse_match_arms = quote!();
@@ -418,6 +442,9 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         rule_status_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::status(),},
         );
+        rule_category_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::category(),},
+        );
         rule_file_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::file(),},
         );
@@ -432,6 +459,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
         #[derive(
             EnumIter,
+            ::strum_macros::VariantArray,
             Debug,
             PartialEq,
             Eq,
@@ -451,7 +479,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             }
 
             /// Returns the documentation for this rule.
-            pub fn explanation(&self) -> Option<&'static str> {
+            pub fn explanation(&self) -> &'static str {
                 use crate::ViolationMetadata;
                 match self { #rule_explanation_match_arms }
             }
@@ -463,6 +491,10 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
             pub fn status(&self) -> crate::codes::RuleStatus {
                 match self { #rule_status_match_arms }
+            }
+
+            pub fn category(&self) -> crate::codes::Category {
+                match self { #rule_category_match_arms }
             }
 
             pub fn file(&self) -> &'static str {
@@ -490,16 +522,20 @@ impl Parse for Rule {
         let attrs = Attribute::parse_outer(input)?;
         let pat_tuple;
         parenthesized!(pat_tuple in input);
-        let linter: Ident = pat_tuple.parse()?;
-        let _: Token!(,) = pat_tuple.parse()?;
-        let code: LitStr = pat_tuple.parse()?;
+        let code = if pat_tuple.is_empty() {
+            None
+        } else {
+            let linter: Ident = pat_tuple.parse()?;
+            let _: Token!(,) = pat_tuple.parse()?;
+            let code: LitStr = pat_tuple.parse()?;
+            Some(LinterCode { linter, code })
+        };
         let _: Token!(=>) = input.parse()?;
         let rule_path: Path = input.parse()?;
         let _: Token!(,) = input.parse()?;
         let rule_name = rule_path.segments.last().unwrap().ident.clone();
         Ok(Rule {
             name: rule_name,
-            linter,
             code,
             path: rule_path,
             attrs,

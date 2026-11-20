@@ -46,7 +46,7 @@ class DummyProcess(threading.Thread):
     @property
     def exitcode(self) -> Literal[0] | None: ...
     if sys.version_info >= (3, 14):
-        # Default changed in Python 3.14.1
+        # kwargs default changed in Python 3.14.1
         def __init__(
             self,
             group: Any = None,

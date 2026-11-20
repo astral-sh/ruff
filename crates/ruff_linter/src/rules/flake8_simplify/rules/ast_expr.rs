@@ -7,6 +7,7 @@ use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
@@ -46,7 +47,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.218")]
+#[violation_metadata(stable_since = "v0.0.218", category = Category::Pedantic)]
 pub(crate) struct UncapitalizedEnvironmentVariables {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -100,7 +101,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.261")]
+#[violation_metadata(stable_since = "v0.0.261", category = Category::Pedantic)]
 pub(crate) struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,

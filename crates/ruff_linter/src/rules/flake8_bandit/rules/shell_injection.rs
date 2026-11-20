@@ -7,6 +7,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
+use crate::codes::Category;
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
 };
@@ -37,7 +38,7 @@ use crate::{
 /// - [Python documentation: `subprocess` — Subprocess management](https://docs.python.org/3/library/subprocess.html)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct SubprocessPopenWithShellEqualsTrue {
     safety: Safety,
     is_exact: bool,
@@ -88,7 +89,7 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
 ///
 /// [#4045]: https://github.com/astral-sh/ruff/issues/4045
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct SubprocessWithoutShellEqualsTrue;
 
 impl Violation for SubprocessWithoutShellEqualsTrue {
@@ -127,7 +128,7 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 /// ## References
 /// - [Python documentation: Security Considerations](https://docs.python.org/3/library/subprocess.html#security-considerations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct CallWithShellEqualsTrue {
     is_exact: bool,
 }
@@ -180,7 +181,7 @@ impl Violation for CallWithShellEqualsTrue {
 /// ## References
 /// - [Python documentation: `subprocess`](https://docs.python.org/3/library/subprocess.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct StartProcessWithAShell {
     safety: Safety,
 }
@@ -226,7 +227,7 @@ impl Violation for StartProcessWithAShell {
 ///
 /// [S605]: https://docs.astral.sh/ruff/rules/start-process-with-a-shell
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct StartProcessWithNoShell;
 
 impl Violation for StartProcessWithNoShell {
@@ -262,7 +263,7 @@ impl Violation for StartProcessWithNoShell {
 /// - [Python documentation: `subprocess.Popen()`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
 /// - [Common Weakness Enumeration: CWE-426](https://cwe.mitre.org/data/definitions/426.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Security)]
 pub(crate) struct StartProcessWithPartialPath;
 
 impl Violation for StartProcessWithPartialPath {
@@ -296,7 +297,7 @@ impl Violation for StartProcessWithPartialPath {
 /// ## References
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Security)]
 pub(crate) struct UnixCommandWildcardInjection;
 
 impl Violation for UnixCommandWildcardInjection {
@@ -311,9 +312,7 @@ impl Violation for UnixCommandWildcardInjection {
 fn is_trusted_element(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::StringLiteral(_) => true,
-        _ => semantic
-            .resolve_qualified_name(expr)
-            .is_some_and(|name| matches!(name.segments(), ["sys", "executable"])),
+        _ => semantic.matches_qualified_name(expr, &["sys", "executable"]),
     }
 }
 

@@ -1,0 +1,89 @@
+---
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+---
+SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+ --> SIM109.py:2:4
+  |
+1 | # SIM109
+2 | if a == b or a == c:
+  |    ^^^^^^^^^^^^^^^^
+3 |     d
+  |
+help: Replace with `a in (b, c)`
+  |
+1 | # SIM109
+  - if a == b or a == c:
+2 + if a in (b, c):
+3 |     d
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+ --> SIM109.py:6:5
+  |
+5 | # SIM109
+6 | if (a == b or a == c) and None:
+  |     ^^^^^^^^^^^^^^^^
+7 |     d
+  |
+help: Replace with `a in (b, c)`
+  |
+5 | # SIM109
+  - if (a == b or a == c) and None:
+6 + if (a in (b, c)) and None:
+7 |     d
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+  --> SIM109.py:10:4
+   |
+ 9 | # SIM109
+10 | if a == b or a == c or None:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+11 |     d
+   |
+help: Replace with `a in (b, c)`
+   |
+9  | # SIM109
+   - if a == b or a == c or None:
+10 + if a in (b, c) or None:
+11 |     d
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+  --> SIM109.py:17:4
+   |
+15 | # two merged comparisons, so it's moved after the merged `in` comparison
+16 | # instead of staying in its original position.
+17 | if a == b or None or a == c:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+18 |     d
+   |
+help: Replace with `a in (b, c)`
+   |
+16 | # instead of staying in its original position.
+   - if a == b or None or a == c:
+17 + if a in (b, c) or None:
+18 |     d
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+  --> SIM109.py:24:4
+   |
+22 | # comparisons, so it must stay first in the fix instead of being moved
+23 | # after the merged `in` comparison.
+24 | if None or a == b or a == c:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+25 |     d
+   |
+help: Replace with `a in (b, c)`
+   |
+23 | # after the merged `in` comparison.
+   - if None or a == b or a == c:
+24 + if None or a in (b, c):
+25 |     d
+   |
+note: This is an unsafe fix and may change runtime behavior

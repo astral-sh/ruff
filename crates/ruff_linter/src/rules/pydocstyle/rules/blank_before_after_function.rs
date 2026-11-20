@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -42,17 +43,17 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
-pub(crate) struct BlankLineBeforeFunction {
+#[violation_metadata(stable_since = "v0.0.70", category = Category::Formatting)]
+pub(crate) struct BlankLineBeforeFunctionDocstring {
     num_lines: usize,
 }
 
-impl Violation for BlankLineBeforeFunction {
+impl Violation for BlankLineBeforeFunctionDocstring {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineBeforeFunction { num_lines } = self;
+        let BlankLineBeforeFunctionDocstring { num_lines } = self;
         format!("No blank lines allowed before function docstring (found {num_lines})")
     }
 
@@ -93,17 +94,17 @@ impl Violation for BlankLineBeforeFunction {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
-pub(crate) struct BlankLineAfterFunction {
+#[violation_metadata(stable_since = "v0.0.70", category = Category::Formatting)]
+pub(crate) struct BlankLineAfterFunctionDocstring {
     num_lines: usize,
 }
 
-impl Violation for BlankLineAfterFunction {
+impl Violation for BlankLineAfterFunctionDocstring {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineAfterFunction { num_lines } = self;
+        let BlankLineAfterFunctionDocstring { num_lines } = self;
         format!("No blank lines allowed after function docstring (found {num_lines})")
     }
 
@@ -121,14 +122,14 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
         return;
     };
 
-    if checker.is_rule_enabled(Rule::BlankLineBeforeFunction) {
+    if checker.is_rule_enabled(Rule::BlankLineBeforeFunctionDocstring) {
         let before = checker
             .locator()
             .slice(TextRange::new(function.start(), docstring.start()));
 
         let mut lines = UniversalNewlineIterator::with_offset(before, function.start()).rev();
         let mut blank_lines_before = 0usize;
-        let mut blank_lines_start = lines.next().map(|l| l.end()).unwrap_or_default();
+        let mut blank_lines_start = lines.next().map_or_default(|l| l.end());
         let mut start_is_line_continuation = false;
 
         for line in lines {
@@ -143,7 +144,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
 
         if blank_lines_before != 0 {
             let mut diagnostic = checker.report_diagnostic(
-                BlankLineBeforeFunction {
+                BlankLineBeforeFunctionDocstring {
                     num_lines: blank_lines_before,
                 },
                 docstring.range(),
@@ -159,7 +160,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
         }
     }
 
-    if checker.is_rule_enabled(Rule::BlankLineAfterFunction) {
+    if checker.is_rule_enabled(Rule::BlankLineAfterFunctionDocstring) {
         let after = checker
             .locator()
             .slice(TextRange::new(docstring.end(), function.end()));
@@ -177,7 +178,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
         let mut lines = UniversalNewlineIterator::with_offset(after, docstring.end()).peekable();
         let first_line = lines.next();
         let first_line_line_continuation = first_line.as_ref().is_some_and(|l| l.ends_with('\\'));
-        let first_line_end = first_line.map(|l| l.end()).unwrap_or_default();
+        let first_line_end = first_line.map_or_default(|l| l.end());
         let mut blank_lines_end = first_line_end;
 
         while let Some(line) = lines.peek() {
@@ -201,7 +202,7 @@ pub(crate) fn blank_before_after_function(checker: &Checker, docstring: &Docstri
 
         if blank_lines_after != 0 {
             let mut diagnostic = checker.report_diagnostic(
-                BlankLineAfterFunction {
+                BlankLineAfterFunctionDocstring {
                     num_lines: blank_lines_after,
                 },
                 docstring.range(),

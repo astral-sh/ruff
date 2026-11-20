@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -41,15 +42,15 @@ use ruff_python_ast::PythonVersion;
 ///
 /// [bottom type]: https://en.wikipedia.org/wiki/Bottom_type
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.272")]
-pub(crate) struct NoReturnArgumentAnnotationInStub {
+#[violation_metadata(stable_since = "v0.0.272", category = Category::Style)]
+pub(crate) struct ParameterAnnotatedWithNoReturn {
     module: TypingModule,
 }
 
-impl Violation for NoReturnArgumentAnnotationInStub {
+impl Violation for ParameterAnnotatedWithNoReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoReturnArgumentAnnotationInStub { module } = self;
+        let ParameterAnnotatedWithNoReturn { module } = self;
         format!("Prefer `{module}.Never` over `NoReturn` for argument annotations")
     }
 }
@@ -67,7 +68,7 @@ pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast:
     {
         if is_no_return(annotation, checker) {
             checker.report_diagnostic(
-                NoReturnArgumentAnnotationInStub {
+                ParameterAnnotatedWithNoReturn {
                     module: if checker.target_version() >= PythonVersion::PY311 {
                         TypingModule::Typing
                     } else {

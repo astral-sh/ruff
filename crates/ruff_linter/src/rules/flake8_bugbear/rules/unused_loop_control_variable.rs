@@ -7,6 +7,7 @@ use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -39,7 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.84")]
+#[violation_metadata(stable_since = "v0.0.84", category = Category::Pedantic)]
 pub(crate) struct UnusedLoopControlVariable {
     /// The name of the loop control variable.
     name: String,

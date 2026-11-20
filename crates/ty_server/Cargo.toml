@@ -33,6 +33,8 @@ ty_python_semantic = { workspace = true }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 crossbeam = { workspace = true }
+indexmap = { workspace = true }
+jiff = { workspace = true }
 jod-thread = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
@@ -44,17 +46,22 @@ shellexpand = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["chrono"] }
+tracing-subscriber = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 libc = { workspace = true }
 
 [dev-dependencies]
+ruff_python_trivia = { workspace = true }
+
 dunce = { workspace = true }
 insta = { workspace = true, features = ["filters", "json"] }
 regex = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
+
+[features]
+test-uv = ["ty_project/test-uv"]
 
 [lints]
 workspace = true

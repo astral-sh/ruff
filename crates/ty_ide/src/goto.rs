@@ -26,6 +26,7 @@ use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, ProgramEnvironment, SemanticModel,
     TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
+    fixture_bindings_for_parameter,
 };
 
 #[derive(Clone, Debug)]
@@ -344,8 +345,27 @@ impl<'db> Definitions<'db> {
         model: &SemanticModel<'db>,
         goto_target: &GotoTarget<'_>,
     ) -> Option<Definitions<'db>> {
-        let definitions = self.goto_declaration(model, goto_target)?;
-        Some(definitions.map_stubs(model.db()))
+        let mut definitions = self;
+
+        if let GotoTarget::Parameter(parameter) = goto_target {
+            let fixture_bindings =
+                fixture_bindings_for_parameter(model.db(), parameter.definition(model));
+
+            if !fixture_bindings.is_empty() {
+                definitions = Self::new(
+                    fixture_bindings
+                        .iter()
+                        .map(|binding| ResolvedDefinition::Definition(binding.fixture()))
+                        .collect(),
+                );
+            }
+        }
+
+        Some(
+            definitions
+                .goto_declaration(model, goto_target)?
+                .map_stubs(model.db()),
+        )
     }
 
     /// Map definitions from stub files to corresponding source implementations.
@@ -483,6 +503,21 @@ pub(crate) fn docstring_for_call_definition<'db>(
     Definitions::new(vec![resolved.clone()])
         .docstring(db)
         .or_else(|| resolved.implementation_docstring(db).map(Docstring::new))
+}
+
+/// A parameter written in a `def` gets its documentation from the function docstring.
+/// A generated dataclass constructor has no `def __init__` to read. In `Foo(bar=True)`,
+/// `bar` points back to the field in the class body, where a string literal immediately
+/// following the field can document it.
+pub(crate) fn docstring_for_parameter_field<'db>(
+    db: &'db dyn Db,
+    definition: Option<Definition<'db>>,
+) -> Option<Docstring> {
+    let definition = definition?;
+    if definition.kind(db).is_parameter_def() {
+        return None;
+    }
+    Definitions::new(vec![ResolvedDefinition::Definition(definition)]).docstring(db)
 }
 
 impl GotoTarget<'_> {
@@ -1403,7 +1438,7 @@ pub(crate) fn find_goto_target<'a>(
     find_goto_target_impl(model, parsed.tokens(), parsed.syntax().into(), offset)
 }
 
-fn find_goto_target_impl<'a>(
+pub(crate) fn find_goto_target_impl<'a>(
     model: &'a SemanticModel,
     tokens: &'a Tokens,
     syntax: AnyNodeRef<'a>,
@@ -1413,7 +1448,7 @@ fn find_goto_target_impl<'a>(
         tokens
             .at_offset(offset)
             .max_by_key(|token| match token.kind() {
-                TokenKind::Name
+                TokenKind::Identifier
                 | TokenKind::String
                 | TokenKind::Complex
                 | TokenKind::Float

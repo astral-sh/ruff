@@ -37,6 +37,31 @@ reveal_type(add(1))  # revealed: int
 reveal_type(add(1, 2))  # revealed: int
 ```
 
+## Local functions in a loop
+
+A previous iteration can bind the same local function. An overloaded local function still sees the
+overloads defined earlier in the loop body.
+
+```py
+from typing import overload
+
+def outer(values: list[int]):
+    for value in values:
+        def plain() -> int:
+            return value
+
+        reveal_type(plain)  # revealed: def plain() -> int
+
+        @overload
+        def convert(x: int) -> int: ...
+        @overload
+        def convert(x: str) -> str: ...
+        def convert(x: int | str) -> int | str:
+            return x
+
+        reveal_type(convert)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+```
+
 ## Overriding
 
 These scenarios are to verify that the overloaded and non-overloaded definitions are correctly
@@ -140,6 +165,31 @@ reveal_type(foo3.takes_self_or_int(foo3))  # revealed: Foo3
 reveal_type(foo3.takes_self_or_int(1))  # revealed: int
 ```
 
+## Cached classmethod implementations
+
+An overloaded classmethod can cache its implementation with `lru_cache`. Each call uses the return
+type of its matching overload.
+
+```py
+from functools import lru_cache
+from typing import overload
+
+class Cached:
+    @overload
+    @classmethod
+    def identity(cls, value: int) -> int: ...
+    @overload
+    @classmethod
+    def identity(cls, value: str) -> str: ...
+    @classmethod
+    @lru_cache
+    def identity(cls, value: int | str) -> int | str:
+        return value
+
+reveal_type(Cached.identity(1))  # revealed: int
+reveal_type(Cached.identity("value"))  # revealed: str
+```
+
 ## Explicit receiver annotations
 
 Binding a method filters overloads that explicitly annotate `self` with a type that cannot accept
@@ -220,6 +270,28 @@ def takes_base_any(base: BaseForAny[Any]) -> None:
     reveal_type(base.g)  # revealed: bound method BaseForAny[Any].g() -> int
     reveal_type(base.g())  # revealed: int
     accepts_bytes_callback(base.g)  # error: [invalid-argument-type]
+```
+
+## Overloads without a positional receiver
+
+An overload without a positional receiver cannot be called as a bound method:
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+class Mixed:
+    @overload
+    def method() -> str: ...
+    @overload
+    def method(self) -> int: ...
+    def method(self: object = None) -> int | str:
+        return 1
+
+reveal_type(Mixed().method())  # revealed: int
+
+valid: Callable[[], int] = Mixed().method
+invalid: Callable[[], str] = Mixed().method  # error: [invalid-assignment]
 ```
 
 ## No matching explicit receiver
@@ -753,7 +825,7 @@ At least two `@overload`-decorated definitions must be present.
 from typing import overload
 
 @overload
-# error: [invalid-overload]
+# error: [single-overload]
 def func(x: int) -> int: ...
 def func(x: int | str) -> int | str:
     return x
@@ -763,7 +835,7 @@ def func(x: int | str) -> int | str:
 from typing import overload
 
 @overload
-# error: [invalid-overload]
+# error: [single-overload]
 def func(x: int) -> int: ...
 ```
 
@@ -780,14 +852,14 @@ non-`@overload`-decorated definition (for the same function/method).
 from typing import overload
 
 @overload
-# error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
+# error: [missing-overload-implementation] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: int) -> int: ...
 @overload
 def func(x: str) -> str: ...
 
 class Foo:
     @overload
-    # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
+    # error: [missing-overload-implementation] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
@@ -856,7 +928,7 @@ class Fine(metaclass=CustomAbstractMetaclass):
 class Foo:
     @overload
     @abstractmethod
-    # error: [invalid-overload]
+    # error: [missing-overload-implementation]
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
@@ -869,14 +941,14 @@ And, the `@abstractmethod` decorator must be present on all the `@overload`-ed m
 class PartialFoo1(ABC):
     @overload
     @abstractmethod
-    # error: [invalid-overload]
+    # error: [missing-overload-implementation]
     def f(self, x: int) -> int: ...
     @overload
     def f(self, x: str) -> str: ...
 
 class PartialFoo(ABC):
     @overload
-    # error: [invalid-overload]
+    # error: [missing-overload-implementation]
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
@@ -933,7 +1005,7 @@ if TYPE_CHECKING:
 if TYPE_CHECKING:
     @overload
     # not all overloads are in a `TYPE_CHECKING` block, so this is an error
-    def c() -> None: ...  # error: [invalid-overload]
+    def c() -> None: ...  # error: [missing-overload-implementation]
 
 @overload
 def c(x: int) -> int: ...
@@ -1000,7 +1072,7 @@ from typing import overload
 @overload
 def return_type(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Overload return type is not assignable to implementation return type"
+# error: [inconsistent-overload-implementation] "Overload return type is not assignable to implementation return type"
 def return_type(x: str) -> str: ...
 def return_type(x: int | str) -> int:
     return 1
@@ -1008,10 +1080,29 @@ def return_type(x: int | str) -> int:
 @overload
 def parameter_type(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+# error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
 def parameter_type(x: str) -> str: ...
 def parameter_type(x: int) -> int | str:
     return 1
+```
+
+An inconsistent implementation does not disable a consistently applied method decorator. Calls still
+use the overload signatures.
+
+```py
+class StaticMethod:
+    @overload
+    @staticmethod
+    # error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
+    def method(x: int) -> int: ...
+    @overload
+    @staticmethod
+    def method(x: str) -> int: ...
+    @staticmethod
+    def method(x: str) -> int:
+        return 0
+
+reveal_type(StaticMethod().method(1))  # revealed: int
 ```
 
 Generic overloads are left to the full implementation-consistency check.
@@ -1040,7 +1131,7 @@ P = ParamSpec("P")
 
 class Task(Generic[P]):
     @overload
-    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    # error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
     def submit(self: "Task[P]", *args: P.args, **kwargs: P.kwargs) -> int: ...
     @overload
     def submit(self: "Task[P]", value: int) -> int: ...
@@ -1082,7 +1173,7 @@ def narrow_parameter(func: Callable[[int | str], int | str]) -> Callable[[int], 
 @overload
 def narrowed(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+# error: [inconsistent-overload-implementation] "Implementation does not accept all arguments of this overload"
 def narrowed(x: str, /) -> str: ...
 @narrow_parameter
 def narrowed(x: int | str) -> int | str:
@@ -1179,7 +1270,7 @@ def replace_with(value: R) -> Callable[[Callable[..., Any]], R]:
 @overload
 def replaced(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Overload signature is not consistent with implementation"
+# error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
 def replaced(x: str, /) -> str: ...
 @deprecated("use replacement directly")
 @replace_with(replacement)
@@ -1243,7 +1334,7 @@ def callback_valid(x: int | str) -> int | str:
 @overload
 def callback_narrowed(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Overload signature is not consistent with implementation"
+# error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
 def callback_narrowed(x: str, /) -> str: ...
 @narrow_callback
 def callback_narrowed(x: int | str) -> int | str:
@@ -1260,7 +1351,7 @@ def union_valid(x: int | str) -> int | str:
 @overload
 def union_narrowed(x: int, /) -> int: ...
 @overload
-# error: [invalid-overload] "Overload signature is not consistent with implementation"
+# error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
 def union_narrowed(x: str, /) -> str: ...
 @narrow_union
 def union_narrowed(x: int | str) -> int | str:
@@ -1271,7 +1362,7 @@ def not_callable(x: int, /) -> int: ...
 @overload
 def not_callable(x: str, /) -> str: ...
 @noncallable
-# error: [invalid-overload] "Overload implementation is not callable after applying decorators"
+# error: [inconsistent-overload-implementation] "Overload implementation is not callable after applying decorators"
 def not_callable(x: int | str) -> int | str:
     return x
 
@@ -1280,6 +1371,68 @@ reveal_type(callback_narrowed)  # revealed: Overload[(x: int, /) -> int, (x: str
 reveal_type(union_valid)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
 reveal_type(union_narrowed)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
 reveal_type(not_callable)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+```
+
+### Classmethod implementations returning unions of wrappers
+
+A decorator can replace an overloaded classmethod's implementation with one of several callable
+objects. Each alternative is checked before binding the class argument.
+
+```py
+from typing import TypeAlias, overload
+
+class A:
+    def __call__(self, cls: type, value: int | str) -> int | str:
+        return value
+
+class B:
+    def __call__(self, cls: type, value: int | str) -> int | str:
+        return value
+
+Choice: TypeAlias = A | B
+
+def wrap(function: object) -> Choice:
+    return A()
+
+class C:
+    @overload
+    @classmethod
+    def identity(cls, value: int) -> int: ...
+    @overload
+    @classmethod
+    def identity(cls, value: str) -> str: ...
+    @classmethod
+    @wrap
+    def identity(cls, value: int | str) -> int | str:
+        return value
+
+reveal_type(C.identity(1))  # revealed: int
+reveal_type(C.identity("x"))  # revealed: str
+```
+
+Every possible wrapper must support every overload. An alternative that only accepts `int` cannot
+implement the `str` overload, even when another alternative accepts both.
+
+```py
+class Narrow:
+    def __call__(self, cls: type, value: int) -> int:
+        return value
+
+def narrow_wrap(function: object) -> A | Narrow:
+    return Narrow()
+
+class Invalid:
+    @overload
+    @classmethod
+    def identity(cls, value: int) -> int: ...
+    @overload
+    @classmethod
+    # error: [inconsistent-overload-implementation] "Overload signature is not consistent with implementation"
+    def identity(cls, value: str) -> str: ...
+    @classmethod
+    @narrow_wrap
+    def identity(cls, value: int | str) -> int | str:
+        return value
 ```
 
 ### Implementation consistency parameter mismatch diagnostics
@@ -1300,7 +1453,7 @@ class ColumnSelector:
     @overload
     def _extract(self, row_key: int) -> object: ...
     @overload
-    # snapshot: invalid-overload
+    # snapshot: inconsistent-overload-implementation
     def _extract(self, column_key: int) -> object: ...
     def _extract(self, row_key: int | None = None, column_key: int | None = None) -> object:
         return object()
@@ -1309,14 +1462,14 @@ class PositionalOnlyWithKwargs:
     @overload
     def update(self, params: Iterable[tuple[str, str | Iterable[str]]], /, **kwds: str) -> None: ...
     @overload
-    # snapshot: invalid-overload
+    # snapshot: inconsistent-overload-implementation
     def update(self, **kwds: str | Iterable[str]) -> None: ...
     def update(self, params=(), /, **kwds) -> None:
         pass
 ```
 
 ```snapshot
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:9:9
    |
  9 |     def _extract(self, column_key: int) -> object: ...
@@ -1327,7 +1480,7 @@ info: Implementation signature `(self, row_key: int | None = None, column_key: i
 info: the parameter named `row_key` does not match `column_key` (and can be used as a keyword parameter)
 
 
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:18:9
    |
 18 |     def update(self, **kwds: str | Iterable[str]) -> None: ...
@@ -1352,7 +1505,7 @@ python-version = "3.12"
 from typing import overload
 
 @overload
-# snapshot: invalid-overload
+# snapshot: inconsistent-overload-implementation
 def return_tuple(x: int) -> tuple[str]: ...
 @overload
 def return_tuple(x: str) -> tuple[int]: ...
@@ -1361,7 +1514,7 @@ def return_tuple(x: int | str) -> tuple[int]:
 ```
 
 ```snapshot
-error[invalid-overload]: Overload return type is not assignable to implementation return type
+error[inconsistent-overload-implementation]: Overload return type is not assignable to implementation return type
  --> src/mdtest_snippet.py:5:5
   |
 5 | def return_tuple(x: int) -> tuple[str]: ...
@@ -1388,32 +1541,32 @@ from typing import Callable, overload
 
 class CheckStaticMethod:
     @overload
-    def method1(x: int) -> int: ...
+    def method1(self, x: int) -> int: ...
     @overload
-    def method1(x: str) -> str: ...
+    def method1(self, x: str) -> str: ...
     @staticmethod
-    # error: [invalid-overload] "Overloaded function `method1` does not use the `@staticmethod` decorator consistently"
-    def method1(x: int | str) -> int | str:
+    # error: [inconsistent-overload-decorator] "Overloaded function `method1` does not use the `@staticmethod` decorator consistently"
+    def method1(self, x: int | str) -> int | str:
         return x
 
     @overload
-    def method2(x: int) -> int: ...
+    def method2(self, x: int) -> int: ...
     @overload
     @staticmethod
-    def method2(x: str) -> str: ...
+    def method2(self, x: str) -> str: ...
     @staticmethod
-    # error: [invalid-overload]
-    def method2(x: int | str) -> int | str:
+    # error: [inconsistent-overload-decorator]
+    def method2(self, x: int | str) -> int | str:
         return x
 
     @overload
     @staticmethod
-    def method3(x: int) -> int: ...
+    def method3(self, x: int) -> int: ...
     @overload
     @staticmethod
-    def method3(x: str) -> str: ...
-    # error: [invalid-overload]
-    def method3(x: int | str) -> int | str:
+    def method3(self, x: str) -> str: ...
+    # error: [inconsistent-overload-decorator]
+    def method3(self, x: int | str) -> int | str:
         return x
 
     @overload
@@ -1425,6 +1578,61 @@ class CheckStaticMethod:
     @staticmethod
     def method4(x: int | str) -> int | str:
         return x
+```
+
+An inconsistently applied `@staticmethod` decorator has no effect on method binding, including when
+it decorates the implementation. The consistent overload set remains a static method.
+
+```py
+instance = CheckStaticMethod()
+reveal_type(instance.method1(1))  # revealed: int
+reveal_type(instance.method2("a"))  # revealed: str
+reveal_type(instance.method3(1))  # revealed: int
+reveal_type(instance.method4("a"))  # revealed: str
+
+reveal_type(CheckStaticMethod.method1(instance, 1))  # revealed: int
+CheckStaticMethod.method1(1)  # error: [no-matching-overload]
+```
+
+#### Inconsistent `@staticmethod` decorators in stubs
+
+When a stub mixes static and instance overloads, calls bind the instance as the first argument.
+Overloads whose first parameter cannot accept that instance are filtered out. The order of the
+overloads does not affect this recovery.
+
+`widget.pyi`:
+
+```pyi
+from typing import overload
+
+class Widget:
+    @overload
+    @staticmethod
+    def method(source: str, index: int) -> int: ...
+    @overload
+    # error: [inconsistent-overload-decorator] "Overloaded function `method` does not use the `@staticmethod` decorator consistently"
+    def method(self, index: int) -> str: ...
+    @overload
+    def reversed(self, index: int) -> str: ...
+    @overload
+    @staticmethod
+    # error: [inconsistent-overload-decorator]
+    def reversed(source: str, index: int) -> int: ...
+```
+
+Accessing the method on the class leaves the receiver unbound, so its first parameter must be passed
+explicitly.
+
+`main.py`:
+
+```py
+from widget import Widget
+
+widget = Widget()
+reveal_type(widget.method(5))  # revealed: str
+reveal_type(widget.reversed(5))  # revealed: str
+reveal_type(Widget.method(widget, 5))  # revealed: str
+reveal_type(Widget.method("a", 5))  # revealed: int
 ```
 
 #### `@classmethod`
@@ -1448,7 +1656,7 @@ class CheckClassMethod:
     @overload
     def try_from1(cls, x: str) -> None: ...
     @classmethod
-    # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
+    # error: [inconsistent-overload-decorator] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
@@ -1460,7 +1668,7 @@ class CheckClassMethod:
     @classmethod
     def try_from2(cls, x: str) -> None: ...
     @classmethod
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
@@ -1472,10 +1680,10 @@ class CheckClassMethod:
     @overload
     @classmethod
     def try_from3(cls, x: str) -> None: ...
-    # error: [invalid-overload]
+    # error: [inconsistent-overload-decorator]
     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
-            # error: [call-non-callable]
+            # error: [not-callable]
             return cls(x)
         return None
 
@@ -1490,7 +1698,26 @@ class CheckClassMethod:
         if isinstance(x, int):
             return cls(x)
         return None
+```
 
+Inconsistent `@classmethod` decorators likewise do not bind the class. Calls on an instance bind
+that instance, and calls on the class require an explicit receiver.
+
+```py
+instance = CheckClassMethod(1)
+reveal_type(instance.try_from1("a"))  # revealed: None
+reveal_type(instance.try_from2(1))  # revealed: CheckClassMethod
+reveal_type(CheckClassMethod.try_from3(CheckClassMethod, 1))  # revealed: CheckClassMethod
+reveal_type(CheckClassMethod.try_from1(instance, "a"))  # revealed: None
+CheckClassMethod.try_from1(1)  # error: [no-matching-overload]
+
+reveal_type(CheckClassMethod.try_from4(1))  # revealed: CheckClassMethod
+```
+
+Consistent classmethod overloads can restrict which subclasses accept each overload by annotating
+the receiver.
+
+```py
 class Base:
     @overload
     @classmethod
@@ -1510,6 +1737,43 @@ reveal_type(Child.from_value)  # revealed: Overload[(x: int) -> int, (x: str) ->
 good: Callable[[int], int] = Base.from_value
 # error: [invalid-assignment]
 bad: Callable[[str], str] = Base.from_value
+```
+
+#### Inconsistent `@classmethod` decorators in stubs
+
+An explicit class receiver annotation cannot accept an instance. Ignoring an inconsistent
+`@classmethod` decorator therefore filters out that overload when the method binds an instance,
+regardless of overload order.
+
+`factory.pyi`:
+
+```pyi
+from typing import overload
+
+class Factory:
+    @overload
+    @classmethod
+    def method(cls: type[Factory], value: int) -> int: ...
+    @overload
+    # error: [inconsistent-overload-decorator] "Overloaded function `method` does not use the `@classmethod` decorator consistently"
+    def method(self, value: int) -> str: ...
+    @overload
+    def reversed(self, value: int) -> str: ...
+    @overload
+    @classmethod
+    # error: [inconsistent-overload-decorator]
+    def reversed(cls: type[Factory], value: int) -> int: ...
+```
+
+`main.py`:
+
+```py
+from factory import Factory
+
+factory = Factory()
+reveal_type(factory.method(1))  # revealed: str
+reveal_type(factory.reversed(1))  # revealed: str
+reveal_type(Factory.method(factory, 1))  # revealed: str
 ```
 
 #### `@final`
@@ -1533,7 +1797,7 @@ class Foo:
 
     @overload
     @final
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method2(self, x: int) -> int: ...
     @overload
     def method2(self, x: str) -> str: ...
@@ -1544,7 +1808,7 @@ class Foo:
     def method3(self, x: int) -> int: ...
     @overload
     @final
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method3(self, x: str) -> str: ...
     def method3(self, x: int | str) -> int | str:
         return x
@@ -1566,16 +1830,16 @@ class Foo:
     def method2(self, x: int) -> int: ...
     @final
     @overload
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method2(self, x: str) -> str: ...
     @overload
     def method3(self, x: int) -> int: ...
     @final
     @overload
-    def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+    def method3(self, x: str) -> int: ...  # error: [misplaced-overload-decorator]
     @overload
     @final
-    def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+    def method3(self, x: bytes) -> bytes: ...  # error: [misplaced-overload-decorator]
     @overload
     def method3(self, x: bytearray) -> bytearray: ...
 ```
@@ -1611,7 +1875,7 @@ class Sub2(Base):
     def method(self, x: int) -> int: ...
     @overload
     @override
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method(self, x: str) -> str: ...
     def method(self, x: int | str) -> int | str:
         return x
@@ -1619,7 +1883,7 @@ class Sub2(Base):
 class Sub3(Base):
     @overload
     @override
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
@@ -1650,7 +1914,7 @@ class Sub2(Base):
     def method(self, x: int) -> int: ...
     @overload
     @override
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def method(self, x: str) -> str: ...
 ```
 
@@ -1783,7 +2047,7 @@ if flag():
     def a(x: str) -> str: ...
 
 @overload
-# error: [invalid-overload] "Overloads for function `a` must be followed by a non-`@overload`-decorated implementation function"
+# error: [missing-overload-implementation] "Overloads for function `a` must be followed by a non-`@overload`-decorated implementation function"
 def a(x: bytes) -> bytes: ...
 @overload
 def a(x: bool) -> bool: ...

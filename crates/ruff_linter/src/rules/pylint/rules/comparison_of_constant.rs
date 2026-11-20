@@ -1,11 +1,11 @@
-use itertools::Itertools;
-use ruff_python_ast::{CmpOp, Expr};
+use ruff_python_ast::{CmpOp, ExprCompare};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for comparisons between constants.
@@ -28,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.221")]
+#[violation_metadata(stable_since = "v0.0.221", category = Category::Complexity)]
 pub(crate) struct ComparisonOfConstant {
     left_constant: String,
     op: CmpOp,
@@ -51,17 +51,8 @@ impl Violation for ComparisonOfConstant {
 }
 
 /// PLR0133
-pub(crate) fn comparison_of_constant(
-    checker: &Checker,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    for ((left, right), op) in std::iter::once(left)
-        .chain(comparators)
-        .tuple_windows()
-        .zip(ops)
-    {
+pub(crate) fn comparison_of_constant(checker: &Checker, compare: &ExprCompare) {
+    for (left, op, right) in compare.iter() {
         if left.is_literal_expr() && right.is_literal_expr() {
             checker.report_diagnostic(
                 ComparisonOfConstant {

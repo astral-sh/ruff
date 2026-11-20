@@ -27,32 +27,6 @@ DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
 help: Add `FasterThanLightError` to the docstring
 
-DOC501 Raised exception `ValueError` missing from docstring
-  --> DOC501_numpy.py:58:5
-   |
-56 |   # DOC501
-57 |   def calculate_speed(distance: float, time: float) -> float:
-58 | /     """
-59 | |     Calculate speed as distance divided by time.
-60 | |
-61 | |     Parameters
-62 | |     ----------
-63 | |     distance : float
-64 | |         Distance traveled.
-65 | |     time : float
-66 | |         Time spent traveling.
-67 | |
-68 | |     Returns
-69 | |     -------
-70 | |     float
-71 | |         Speed as distance divided by time.
-72 | |     """
-   | |_______^
-73 |       try:
-74 |           return distance / time
-   |
-help: Add `ValueError` to the docstring
-
 DOC501 Raised exception `FasterThanLightError` missing from docstring
   --> DOC501_numpy.py:58:5
    |
@@ -78,6 +52,32 @@ DOC501 Raised exception `FasterThanLightError` missing from docstring
 74 |           return distance / time
    |
 help: Add `FasterThanLightError` to the docstring
+
+DOC501 Raised exception `ValueError` missing from docstring
+  --> DOC501_numpy.py:58:5
+   |
+56 |   # DOC501
+57 |   def calculate_speed(distance: float, time: float) -> float:
+58 | /     """
+59 | |     Calculate speed as distance divided by time.
+60 | |
+61 | |     Parameters
+62 | |     ----------
+63 | |     distance : float
+64 | |         Distance traveled.
+65 | |     time : float
+66 | |         Time spent traveling.
+67 | |
+68 | |     Returns
+69 | |     -------
+70 | |     float
+71 | |         Speed as distance divided by time.
+72 | |     """
+   | |_______^
+73 |       try:
+74 |           return distance / time
+   |
+help: Add `ValueError` to the docstring
 
 DOC501 Raised exception `TypeError` missing from docstring
    --> DOC501_numpy.py:83:5

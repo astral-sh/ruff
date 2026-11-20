@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for cases where files are opened (e.g., using the builtin `open()` function)
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.219")]
+#[violation_metadata(stable_since = "v0.0.219", category = Category::Suspicious)]
 pub(crate) struct OpenFileWithContextHandler;
 
 impl Violation for OpenFileWithContextHandler {
@@ -71,12 +72,7 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if semantic
-                        .resolve_qualified_name(func)
-                        .is_some_and(|qualified_name| {
-                            matches!(qualified_name.segments(), ["contextlib", "AsyncExitStack"])
-                        })
-                    {
+                    if semantic.matches_qualified_name(func, &["contextlib", "AsyncExitStack"]) {
                         return true;
                     }
                 }
@@ -105,12 +101,7 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
         if let Stmt::With(ast::StmtWith { items, .. }) = parent {
             for item in items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
-                    if semantic
-                        .resolve_qualified_name(func)
-                        .is_some_and(|qualified_name| {
-                            matches!(qualified_name.segments(), ["contextlib", "ExitStack"])
-                        })
-                    {
+                    if semantic.matches_qualified_name(func, &["contextlib", "ExitStack"]) {
                         return true;
                     }
                 }

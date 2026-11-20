@@ -7,13 +7,15 @@ any scope. Final names declared in class scopes cannot be overridden in subclass
 
 ### `Final` with type
 
-Declared symbols that are additionally qualified with `Final` use the declared type when accessed
-from another scope. Local uses of the symbol will use the inferred type, which may be more specific:
+A symbol annotated with `Final[T]` uses its declared type when accessed from another scope. A local
+read can narrow to the assigned value. An explicit `Final[Unknown]` keeps the declared `Unknown` on
+the annotated assignment, while a bare `Final` takes its type from the value.
 
 `mod.py`:
 
 ```py
 from typing import Final, Annotated
+from ty_extensions._internal import Unknown
 
 FINAL_A: Final[int] = 1
 FINAL_B: Annotated[Final[int], "the annotation for FINAL_B"] = 1
@@ -21,12 +23,14 @@ FINAL_C: Final[Annotated[int, "the annotation for FINAL_C"]] = 1
 FINAL_D: "Final[int]" = 1
 FINAL_F: Final[int]
 FINAL_F = 1
+FINAL_G: Final[Unknown] = b""
 
 reveal_type(FINAL_A)  # revealed: Literal[1]
 reveal_type(FINAL_B)  # revealed: Literal[1]
 reveal_type(FINAL_C)  # revealed: Literal[1]
 reveal_type(FINAL_D)  # revealed: Literal[1]
-reveal_type(FINAL_D)  # revealed: Literal[1]
+reveal_type(FINAL_F)  # revealed: Literal[1]
+reveal_type(FINAL_G)  # revealed: Unknown
 
 def nonlocal_uses():
     reveal_type(FINAL_A)  # revealed: int
@@ -34,18 +38,20 @@ def nonlocal_uses():
     reveal_type(FINAL_C)  # revealed: int
     reveal_type(FINAL_D)  # revealed: int
     reveal_type(FINAL_F)  # revealed: int
+    reveal_type(FINAL_G)  # revealed: Unknown
 ```
 
 Imported types:
 
 ```py
-from mod import FINAL_A, FINAL_B, FINAL_C, FINAL_D, FINAL_F
+from mod import FINAL_A, FINAL_B, FINAL_C, FINAL_D, FINAL_F, FINAL_G
 
 reveal_type(FINAL_A)  # revealed: int
 reveal_type(FINAL_B)  # revealed: int
 reveal_type(FINAL_C)  # revealed: int
 reveal_type(FINAL_D)  # revealed: int
 reveal_type(FINAL_F)  # revealed: int
+reveal_type(FINAL_G)  # revealed: Unknown
 ```
 
 ### Bare `Final` without a type
@@ -60,8 +66,10 @@ symbol cannot be modified:
 from typing import Final
 
 FINAL_A: Final = 1
+IMAGE: Final = bytes.fromhex("fd")
 
 reveal_type(FINAL_A)  # revealed: Literal[1]
+reveal_type(IMAGE)  # revealed: bytes
 
 def nonlocal_uses():
     reveal_type(FINAL_A)  # revealed: Literal[1]
@@ -73,6 +81,46 @@ def nonlocal_uses():
 from mod import FINAL_A
 
 reveal_type(FINAL_A)  # revealed: Literal[1]
+```
+
+The contents of a final list remain mutable. A bare `Final` infers the same element type as an
+unannotated list.
+
+```py
+from typing import Final
+
+items: Final = [None]
+reveal_type(items)  # revealed: list[None | Unknown]
+items.append(1)  # ok
+```
+
+### Conditional type argument
+
+A public read combines the inferred value on a bare `Final` branch with the declared type on the
+other branch. Unreachable declarations do not contribute.
+
+```py
+from typing import Final
+
+def flag() -> bool:
+    return True
+
+if flag():
+    value: Final = "a"
+    possibly_unbound: Final
+else:
+    value: Final[int] = 0
+    possibly_unbound: Final[int] = 0
+
+if False:
+    always_typed: Final = "a"
+else:
+    always_typed: Final[int] = 0
+
+def read():
+    reveal_type(value)  # revealed: Literal["a"] | int
+    reveal_type(possibly_unbound)  # revealed: int
+    reveal_type(always_typed)  # revealed: int
 ```
 
 ### In class definitions
@@ -89,6 +137,7 @@ class C:
         self.FINAL_D: Final = 1
         self.FINAL_E: Final
         self.FINAL_E = 1
+        self.FINAL_F: Final = reveal_type(bytes.fromhex("fd"))  # revealed: bytes
 
 reveal_type(C.FINAL_A)  # revealed: int
 reveal_type(C.FINAL_B)  # revealed: Literal[1]
@@ -98,6 +147,56 @@ reveal_type(C().FINAL_B)  # revealed: Literal[1]
 reveal_type(C().FINAL_C)  # revealed: int
 reveal_type(C().FINAL_D)  # revealed: Literal[1]
 reveal_type(C().FINAL_E)  # revealed: int
+```
+
+### Inferring a final attribute from its initializer
+
+A bare `Final` uses the type inferred in `__init__`. An explicit `Final[Unknown]` narrows inside
+`__init__` and exposes `Unknown` to callers.
+
+```py
+from typing import Final
+from ty_extensions._internal import Unknown
+
+class C:
+    inferred: Final
+    declared: Final[Unknown]
+
+    def __init__(self):
+        self.inferred = bytes.fromhex("fd")
+        reveal_type(self.inferred)  # revealed: bytes
+        self.declared = "data".encode()
+        reveal_type(self.declared)  # revealed: bytes
+
+    def reset(self):
+        self.inferred = 1  # error: [invalid-assignment]
+
+reveal_type(C().inferred)  # revealed: bytes
+reveal_type(C().declared)  # revealed: Unknown
+
+class Child(C):
+    def __init__(self):
+        self.inferred = b""  # error: [invalid-assignment]
+
+reveal_type(Child().inferred)  # revealed: bytes
+```
+
+Each branch infers its initializer independently. Copying an `Any` preserves its type even when
+another branch assigns an integer to the same attribute.
+
+```py
+from copy import copy
+from typing import Any
+
+class D:
+    value: Final
+
+    def __init__(self, flag: bool, dynamic: Any):
+        if flag:
+            self.value = copy(dynamic)
+            reveal_type(self.value)  # revealed: Any
+        else:
+            self.value = 1
 ```
 
 ### Recursive bare `Final` instance attribute
@@ -110,6 +209,31 @@ from typing import Final
 class ScopeChain:
     def __init__(self, parent: ScopeChain | None = None) -> None:
         self.depth: Final = 1 if parent is None else parent.depth + 1
+```
+
+### Recursive bare `Final` class attributes
+
+A class defined in a loop can compute final attributes from the previous class. The number of
+iterations is unknown, so these growing values have types `int`, `str`, and `bytes`.
+
+```py
+from typing import Final
+
+def build_classes(n: int):
+    class C:
+        count: Final = 0
+        label: Final = ""
+        data: Final = b""
+
+    for _ in range(n):
+        class C:
+            count: Final = C.count + 1
+            label: Final = C.label + "a"
+            data: Final = C.data + b"a"
+
+    reveal_type(C.count)  # revealed: int
+    reveal_type(C.label)  # revealed: str
+    reveal_type(C.data)  # revealed: bytes
 ```
 
 ## Not modifiable
@@ -175,6 +299,412 @@ FINAL_C = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINA
 FINAL_D = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_D` is not allowed"
 FINAL_E = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_E` is not allowed"
 FINAL_F = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_F` is not allowed"
+```
+
+### Imported `Final` qualifiers survive re-exports
+
+An import does not declare the imported type, but a `Final` qualifier still prevents reassignment
+after direct or wildcard re-exports. An incompatible reassignment also reports the source type
+without treating that type as a local declaration. Repeated reassignment errors do not label the
+previous invalid assignment as a `Final` declaration.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`forwarded.py`:
+
+```py
+from source import VALUE as VALUE
+```
+
+`wildcard.py`:
+
+```py
+from source import *
+```
+
+`main.py`:
+
+```py
+from forwarded import VALUE as forwarded_value
+from wildcard import VALUE as wildcard_value
+from source import VALUE as imported_twice
+from source import VALUE as wrong_type
+
+from source import VALUE as imported_twice
+
+forwarded_value = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `forwarded_value` is not allowed"
+# snapshot: invalid-assignment
+forwarded_value = 3
+wildcard_value = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
+imported_twice = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `imported_twice` is not allowed"
+
+# error: [invalid-assignment] "Reassignment of `Final` symbol `wrong_type` is not allowed"
+# error: [invalid-assignment] "Object of type `Literal["wrong"]` is not assignable to `int`"
+wrong_type = "wrong"
+
+def overwrite_wildcard() -> None:
+    global wildcard_value
+    wildcard_value = 3  # error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
+```
+
+```snapshot
+error[invalid-assignment]: Reassignment of `Final` symbol `forwarded_value` is not allowed
+  --> src/main.py:10:1
+   |
+10 | forwarded_value = 3
+   | ^^^^^^^^^^^^^^^^^^^ Reassignment of `Final` symbol
+```
+
+### Imported `Final` qualifiers survive loop bindings
+
+An imported `Final` value remains protected when a loop introduces synthetic bindings for its name.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+```py
+from source import VALUE
+
+for _ in range(2):
+    VALUE = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `VALUE` is not allowed"
+```
+
+### Imported `Final` qualifiers do not replace earlier declared types
+
+An incompatible imported value is checked against the existing declaration, which remains the
+authoritative declared type. A later incompatible reassignment reports both the type mismatch and
+the imported `Final` restriction.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+value: str
+from source import VALUE as value  # error: [invalid-assignment]
+
+reveal_type(value)  # revealed: str
+
+# error: [invalid-assignment] "Reassignment of `Final` symbol `value` is not allowed"
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to `str`"
+value = 2
+```
+
+### Imported `Final` qualifiers apply across nested scopes
+
+An imported final value in an enclosing scope prevents `nonlocal` assignments, including when the
+imported name already has a separate type annotation.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+def enclosing() -> None:
+    local_value: int
+    from source import VALUE as local_value
+
+    def replace_nonlocal() -> None:
+        nonlocal local_value
+        local_value = 2  # error: [invalid-assignment]
+```
+
+### Imported `Final` qualifiers apply inside `global` scopes
+
+Importing a final value into a name declared `global` preserves the qualifier for subsequent
+assignments in the same forwarding scope.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+value: int = 0
+
+def replace_global() -> None:
+    global value
+    from source import VALUE as value
+
+    value = 2  # error: [invalid-assignment]
+```
+
+### Non-final imports replace forwarded imported `Final` qualifiers
+
+Importing a non-final value into a `global` name should replace the owner's earlier imported `Final`
+qualifier.
+
+TODO: Subsequent assignments are incorrectly rejected because ty retains the owner's earlier `Final`
+qualifier. Pyrefly correctly permits these assignments.
+
+`constant.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`mutable.py`:
+
+```py
+VALUE: int = 0
+```
+
+`main.py`:
+
+```py
+from constant import VALUE as global_value
+
+def replace_global() -> None:
+    global global_value
+    from mutable import VALUE as global_value
+
+    global_value = 2  # error: [invalid-assignment]
+```
+
+### Imported `Final` qualifiers apply to class members
+
+An imported `Final` qualifier prevents subclass overrides and assignments through the class object
+or its instances. An earlier class-member annotation retains its declared type.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+class Base:
+    VALUE: int
+    from source import VALUE
+
+reveal_type(Base.VALUE)  # revealed: int
+
+class Derived(Base):
+    VALUE = 2  # error: [override-of-final-variable]
+
+Base.VALUE = 3  # error: [invalid-assignment]
+Base().VALUE = 4  # error: [invalid-assignment]
+```
+
+### Conditional imports preserve `Final` qualifiers
+
+A conditionally re-exported name remains final if a reachable import supplies a `Final` qualifier,
+even when an earlier import in another branch is not final.
+
+`constant.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`mutable.py`:
+
+```py
+VALUE: int = 0
+```
+
+`mutable_first.py`:
+
+```py
+def choose() -> bool:
+    return True
+
+if choose():
+    from mutable import VALUE as VALUE
+else:
+    from constant import VALUE as VALUE
+```
+
+`main.py`:
+
+```py
+from mutable_first import VALUE as mutable_first
+
+mutable_first = 2  # error: [invalid-assignment]
+```
+
+### Conditional imports combine `Final` source types
+
+Without a local annotation, reassignment is checked against the union of the reachable final
+imports' source types, in addition to the restriction on reassigning a final name.
+
+`source.py`:
+
+```py
+from typing import Final
+
+NUMBER: Final[int] = 1
+TEXT: Final[str] = "text"
+```
+
+`main.py`:
+
+```py
+def reassign(flag: bool) -> None:
+    if flag:
+        from source import NUMBER as value
+    else:
+        from source import TEXT as value
+
+    # error: [invalid-assignment] "Reassignment of `Final` symbol `value` is not allowed"
+    # error: [invalid-assignment] "Object of type `None` is not assignable to `int | str`"
+    value = None
+```
+
+### Stub annotations preserve `Final` qualifiers from private imports
+
+A genuine stub annotation exports its name even when a subsequent import omits the redundant alias
+used for explicit re-exports. The imported `Final` qualifier still applies to that exported name.
+
+`source.pyi`:
+
+```pyi
+from typing import Final
+
+VALUE: Final[int]
+```
+
+`forwarded.pyi`:
+
+```pyi
+VALUE: int
+from source import VALUE
+```
+
+`main.py`:
+
+```py
+from forwarded import VALUE
+
+VALUE = 2  # error: [invalid-assignment]
+```
+
+### Statically unreachable imports do not introduce `Final` qualifiers
+
+An imported `Final` qualifier has the same reachability constraints as its import. An import
+excluded by the configured Python version cannot affect later assignments.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+import sys
+
+version_value = 0
+
+if sys.version_info >= (3, 12):
+    from source import VALUE as version_value
+
+version_value = 2
+```
+
+### Imported `Final` qualifiers are replaced by later imports
+
+A subsequent direct import, wildcard import, or module import replaces an earlier imported value. If
+the replacement is not final, later ordinary assignments remain valid.
+
+`constant.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`mutable.py`:
+
+```py
+VALUE: int = 0
+```
+
+`main.py`:
+
+```py
+from constant import VALUE as direct_value
+from mutable import VALUE as direct_value
+
+direct_value = 2
+
+from constant import VALUE
+from mutable import *
+
+VALUE = 2
+
+from constant import VALUE as module_value
+import os as module_value
+
+module_value = 2
+```
+
+### Imported `Final` qualifiers are replaced by later annotations
+
+An explicit annotation after an import establishes a new declaration and replaces qualifiers
+inherited solely from the imported value.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+from source import VALUE as value
+
+value: int | None
+value = None
+value = 2
 ```
 
 ### Reassignment after conditional assignment
@@ -387,6 +917,112 @@ def intersection_one_final(arg: Intersection[HasFinal, NotFinal]):
 def intersection_augmented(arg: Intersection[HasFinal, NotFinal]):
     # error: [invalid-assignment]
     arg.x += 1
+```
+
+### Instance attributes on unions and protocol intersections
+
+An instance attribute remains `Final` when another union member allows assignment. Narrowing the
+receiver through a protocol also preserves the nominal class's `Final` restriction.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Final, Protocol
+from typing_extensions import TypeIs
+
+class Fixed:
+    def __init__(self) -> None:
+        self.value: Final[int] = 1
+
+class AlsoFixed:
+    def __init__(self) -> None:
+        self.value: Final[int] = 1
+
+class Mutable:
+    value: int = 1
+
+class Marker(Protocol):
+    @property
+    def marker(self) -> bool: ...
+
+def has_marker(value: object) -> TypeIs[Marker]:
+    return True
+
+def assign(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutable: Mutable) -> None:
+    either.value = 2  # error: [invalid-assignment]
+    either.value += 1  # error: [invalid-assignment]
+    both.value = 2  # error: [invalid-assignment]
+    if has_marker(fixed):
+        fixed.value = 2  # error: [invalid-assignment]
+    if has_marker(either):
+        either.value = 2  # error: [invalid-assignment]
+    if has_marker(mutable):
+        mutable.value = 2  # ok
+```
+
+The same restriction applies to deletion, even when a protocol component permits it:
+
+```py
+def delete(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutable: Mutable) -> None:
+    del either.value  # error: [invalid-assignment]
+    if has_marker(fixed):
+        del fixed.value  # error: [invalid-assignment]
+    if has_marker(either):
+        del either.value  # error: [invalid-assignment]
+    if has_marker(both):
+        del both.value  # error: [invalid-assignment]
+    if has_marker(mutable):
+        del mutable.value  # ok
+```
+
+Narrowing `self` still allows initialization. That exemption does not apply to another parameter:
+
+```py
+class Initialized:
+    def __init__(self, other: "Initialized | Mutable") -> None:
+        self.value: Final[int] = 1
+        if has_marker(self):
+            self.value = 2  # ok
+        if has_marker(other):
+            other.value = 2  # error: [invalid-assignment]
+```
+
+Diagnostics point to the nominal class that declares the attribute:
+
+```py
+class Declared:
+    value: Final[int]
+
+    def __init__(self) -> None:
+        self.value = 1
+
+def assign_declared(value: Declared | Mutable) -> None:
+    value.value = 2  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign to final attribute `value` on type `Declared`
+  --> src/mdtest_snippet.py:56:5
+   |
+56 |     value.value = 2  # snapshot: invalid-assignment
+   |     ^^^^^^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
+   |
+  ::: src/mdtest_snippet.py:50:12
+   |
+50 |     value: Final[int]
+   |            ---------- Attribute declared as `Final` here
+```
+
+A type alias in a union preserves the `Final` restriction on the aliased class's instance attribute.
+
+```py
+type FixedAlias = Fixed
+
+def assign_aliased(value: FixedAlias | Mutable) -> None:
+    value.value = 2  # error: [invalid-assignment]
 ```
 
 ## Mutability
@@ -650,7 +1286,7 @@ class Derived(Base):
 
 ### Instance `Final` declared in `__init__`
 
-Instance attributes declared as `Final` in `__init__` should also prevent overrides in subclasses:
+The subclass initializer cannot reassign a final attribute declared in the base class initializer.
 
 ```py
 from typing import Final
@@ -660,9 +1296,21 @@ class Base:
         self.x: Final[int] = 1
 
 class Derived(Base):
-    # TODO: This should be an error, but instance attribute override checking is not yet supported
     def __init__(self):
-        self.x = 2
+        self.x = 2  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign to inherited final attribute `x`
+ --> src/mdtest_snippet.py:9:9
+  |
+5 |         self.x: Final[int] = 1
+  |                 ---------- Attribute declared as `Final` here
+6 |
+7 | class Derived(Base):
+8 |     def __init__(self):
+9 |         self.x = 2  # snapshot: invalid-assignment
+  |         ^^^^^^ Only the class that declares a final attribute can initialize it
 ```
 
 ### Private (name-mangled) members are not checked
@@ -675,8 +1323,15 @@ from typing import Final
 class Base:
     __X: Final[int] = 1
 
+    def __init__(self):
+        self.__value: Final[int] = 1
+
 class Derived(Base):
     __X = 2  # No error: name mangling means these are different attributes
+
+    def __init__(self):
+        super().__init__()
+        self.__value = 2  # ok
 ```
 
 ## Syntax and usage
@@ -763,8 +1418,7 @@ class C:
 
 ### `__post_init__`
 
-`__post_init__` is a dunder that runs as part of instance initialization, so `Final` instance
-attributes may be declared and assigned in it, regardless of whether the class is a dataclass:
+A dataclass can declare and assign a `Final` instance attribute in `__post_init__`.
 
 ```py
 from dataclasses import dataclass
@@ -782,12 +1436,42 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
-```py
-from typing import Final
+Classes with a dataclass transform can also initialize a bare `Final` in `__post_init__`. Its public
+type comes from that assignment.
 
-class NonDataclass:
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class Model: ...
+
+class Record(Model):
+    value: Final
+
+    def __init__(self):
+        self.__post_init__()
+
     def __post_init__(self):
-        self.x: Final[int] = 1
+        self.value = b""
+
+reveal_type(Record().value)  # revealed: bytes
+```
+
+In an ordinary class, `__post_init__` is a regular method. Assignments there cannot initialize a
+final attribute or change its inferred type.
+
+```py
+class NonDataclass:
+    value: Final
+
+    def __init__(self):
+        self.value = b""
+
+    def __post_init__(self):
+        self.x: Final[int] = 1  # error: [invalid-assignment]
+        self.value = 1  # error: [invalid-assignment]
+
+reveal_type(NonDataclass().value)  # revealed: bytes
 ```
 
 Assigning to a `Final` attribute via the class literal on a dataclass-like class mentions
@@ -853,7 +1537,7 @@ from __future__ import annotations
 
 from typing import Final, Protocol, TypeVar
 
-T = TypeVar("T", covariant=True)
+T = TypeVar("T")
 
 class Owned(Protocol[T]):
     owner: Final[T]
@@ -968,6 +1652,10 @@ from typing import Final
 
 DECLARED_THEN_BOUND: Final[int]
 DECLARED_THEN_BOUND = 1
+
+HEADER: Final
+HEADER = bytes.fromhex("fd")
+reveal_type(HEADER)  # revealed: bytes
 ```
 
 ### No assignment
@@ -1049,7 +1737,8 @@ del MODULE_FINAL
 
 ### Stub file `Final` without value
 
-In stub files, `Final` declarations without a value are permitted, at both module and class scope.
+In stubs, a `Final` declaration binds the name even when it omits the value. A bare `Final` with no
+initializer or with an ellipsis placeholder has type `Unknown`.
 
 `stub.pyi`:
 
@@ -1057,9 +1746,25 @@ In stub files, `Final` declarations without a value are permitted, at both modul
 from typing import Final
 
 STUB_FINAL: Final[int]
+UNTYPED: Final
 
 class StubClass:
     STUB_ATTR: Final[str]
+    placeholder: Final = ...
+```
+
+`main.py`:
+
+```py
+from stub import STUB_FINAL, UNTYPED, StubClass
+
+reveal_type(STUB_FINAL)  # revealed: int
+reveal_type(UNTYPED)  # revealed: Unknown
+reveal_type(StubClass().STUB_ATTR)  # revealed: str
+reveal_type(StubClass().placeholder)  # revealed: Unknown
+
+UNTYPED = 1  # error: [invalid-assignment]
+StubClass().placeholder = 1  # error: [invalid-assignment]
 ```
 
 ### Conditional assignment in `__init__`
@@ -1086,6 +1791,38 @@ class D:
         if flag:
             self.y = 1
         # No else: y may be unbound at runtime, but there is still an assignment path
+```
+
+### Assignment in a loop in `__init__`
+
+An assignment in a loop body provides a value for a `Final` attribute declared in the class body.
+
+```py
+from typing import Final
+
+class C:
+    value: Final[int]
+
+    def __init__(self) -> None:
+        for _ in range(2):
+            self.value = 1
+```
+
+### Rebinding `self` does not initialize `Final` attributes
+
+Reading a `Final` attribute before a loop and then rebinding `self` does not assign a value to the
+attribute.
+
+```py
+from typing import Final
+
+class C:
+    value: Final[int]  # error: [final-without-value] "`Final` symbol `value` is not assigned a value"
+
+    def __init__(self, repeat: bool, replacement: "C") -> None:
+        self.value
+        while repeat:
+            self = replacement
 ```
 
 ### Reachable `Final` declaration wins for diagnostics

@@ -6,7 +6,7 @@ XXX references to utf-8 need further investigation.
 
 import io
 import sys
-from _typeshed import SizedBuffer, StrOrBytesPath, StrPath
+from _typeshed import FileDescriptorOrPath, SizedBuffer, StrPath
 from collections.abc import Callable, Iterable, Iterator
 from io import TextIOWrapper
 from os import PathLike
@@ -667,7 +667,7 @@ else:
         def joinpath(self, *other: StrPath) -> Path: ...
         def __truediv__(self, add: StrPath) -> Path: ...
 
-def is_zipfile(filename: StrOrBytesPath | _SupportsReadSeekTell) -> bool:
+def is_zipfile(filename: FileDescriptorOrPath | _SupportsReadSeekTell) -> bool:
     """Quickly see if a file is a ZIP file by checking the magic number.
 
     The filename argument may be a file or file-like object too.

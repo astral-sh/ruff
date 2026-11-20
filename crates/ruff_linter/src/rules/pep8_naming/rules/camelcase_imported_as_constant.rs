@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pep8_naming::helpers;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
@@ -51,16 +52,16 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.82")]
-pub(crate) struct CamelcaseImportedAsConstant {
+#[violation_metadata(stable_since = "v0.0.82", category = Category::Pedantic)]
+pub(crate) struct CamelCaseImportedAsConstant {
     name: String,
     asname: String,
 }
 
-impl Violation for CamelcaseImportedAsConstant {
+impl Violation for CamelCaseImportedAsConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CamelcaseImportedAsConstant { name, asname } = self;
+        let CamelCaseImportedAsConstant { name, asname } = self;
         format!("Camelcase `{name}` imported as constant `{asname}`")
     }
 }
@@ -89,7 +90,7 @@ pub(crate) fn camelcase_imported_as_constant(
             return;
         }
         let mut diagnostic = checker.report_diagnostic(
-            CamelcaseImportedAsConstant {
+            CamelCaseImportedAsConstant {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },

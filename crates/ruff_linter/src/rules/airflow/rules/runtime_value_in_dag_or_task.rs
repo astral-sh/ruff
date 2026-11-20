@@ -5,6 +5,7 @@ use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::is_airflow_builtin_or_provider;
 use crate::{FixAvailability, Violation};
 
@@ -37,7 +38,7 @@ use crate::{FixAvailability, Violation};
 /// dag = DAG(dag_id="my_dag", start_date=datetime(2024, 1, 1))
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.6")]
+#[violation_metadata(preview_since = "0.15.6", category = Category::Correctness)]
 pub(crate) struct Airflow3DagDynamicValue {
     function_name: String,
 }
@@ -229,13 +230,9 @@ fn find_runtime_varying_call<'a>(
         Expr::Yield(ast::ExprYield { value, .. }) => value
             .as_ref()
             .and_then(|v| find_runtime_varying_call(v, semantic)),
-        Expr::Compare(ast::ExprCompare {
-            left, comparators, ..
-        }) => find_runtime_varying_call(left, semantic).or_else(|| {
-            comparators
-                .iter()
-                .find_map(|c| find_runtime_varying_call(c, semantic))
-        }),
+        Expr::Compare(ast::ExprCompare { operands, .. }) => operands
+            .iter()
+            .find_map(|operand| find_runtime_varying_call(operand, semantic)),
         Expr::FString(ast::ExprFString { value, .. }) => value
             .elements()
             .find_map(|element| find_runtime_in_interpolated_element(element, semantic)),

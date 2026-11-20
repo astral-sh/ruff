@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -27,7 +28,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// x = "\b"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterBackspace;
 
 impl Violation for InvalidCharacterBackspace {
@@ -63,7 +64,7 @@ impl Violation for InvalidCharacterBackspace {
 /// x = "\x1a"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterSub;
 
 impl Violation for InvalidCharacterSub {
@@ -99,7 +100,7 @@ impl Violation for InvalidCharacterSub {
 /// x = "\x1b"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterEsc;
 
 impl Violation for InvalidCharacterEsc {
@@ -135,7 +136,7 @@ impl Violation for InvalidCharacterEsc {
 /// x = "\0"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterNul;
 
 impl Violation for InvalidCharacterNul {
@@ -170,7 +171,7 @@ impl Violation for InvalidCharacterNul {
 /// x = "Dear Sir\u200b/\u200bMadam"  # zero width space
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterZeroWidthSpace;
 
 impl Violation for InvalidCharacterZeroWidthSpace {
@@ -184,6 +185,20 @@ impl Violation for InvalidCharacterZeroWidthSpace {
     fn fix_title(&self) -> Option<String> {
         Some("Replace with escape sequence".to_string())
     }
+}
+
+/// Helper that allows us to exit early before embarking on expensive walks
+/// of all tokens for various pylint rules.
+///
+/// Interpolation depth matters for fixes, so we avoid walking every token
+/// unless the source contains a character one of these rules could report.
+pub(crate) fn contains_invalid_string_character(source: &str) -> bool {
+    let bytes = source.as_bytes();
+    // Search for NUL (0), backspace (0x08), substitute (0x1a), escape (0x1b),
+    // and the UTF-8 encoding of zero-width space (U+200B).
+    memchr::memchr3(0, 0x08, 0x1a, bytes).is_some()
+        || memchr::memchr(0x1b, bytes).is_some()
+        || memchr::memmem::find(bytes, "\u{200b}".as_bytes()).is_some()
 }
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515

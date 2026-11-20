@@ -28,10 +28,13 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod call_hierarchy;
+mod closed_documents;
 mod code_actions;
 mod commands;
 mod completions;
 mod configuration;
+mod diagnostic_snapshots;
+mod file_watching;
 mod folding_range;
 mod goto_definition;
 mod hover;
@@ -42,9 +45,11 @@ mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;
+mod script_preparation;
 mod semantic_tokens;
 mod signature_help;
 mod type_hierarchy;
+mod will_rename_files;
 mod workspace_folders;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -64,25 +69,34 @@ use lsp_types::{
     DefinitionRequest, DefinitionResponse, DiagnosticClientCapabilities,
     DidChangeTextDocumentNotification, DidChangeTextDocumentParams,
     DidChangeWatchedFilesClientCapabilities, DidChangeWatchedFilesNotification,
-    DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersNotification,
-    DidChangeWorkspaceFoldersParams, DidCloseTextDocumentNotification, DidCloseTextDocumentParams,
-    DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification,
-    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticRequest, ExitNotification, FileEvent, FoldingRange, FoldingRangeParams,
-    Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest, InitializeResult,
-    InitializedNotification, InitializedParams, InlayHint, InlayHintClientCapabilities,
-    InlayHintParams, InlayHintRequest, LanguageKind, Notification, PartialResultParams, Position,
-    PrepareRenameRequest, PreviousResultId, PublishDiagnosticsClientCapabilities, Range, Request,
-    SemanticTokens, ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
+    DidChangeWatchedFilesParams, DidChangeWatchedFilesRegistrationOptions,
+    DidChangeWorkspaceFoldersNotification, DidChangeWorkspaceFoldersParams,
+    DidCloseTextDocumentNotification, DidCloseTextDocumentParams, DidOpenTextDocumentNotification,
+    DidOpenTextDocumentParams, DidSaveTextDocumentNotification, DidSaveTextDocumentParams,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticRequest,
+    ExitNotification, FileChangeType, FileEvent, FileSystemWatcher, FoldingRange,
+    FoldingRangeParams, Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest,
+    InitializeResult, InitializedNotification, InitializedParams, InlayHint,
+    InlayHintClientCapabilities, InlayHintParams, InlayHintRequest, LanguageKind, Notification,
+    PartialResultParams, Position, PrepareRenameRequest, PreviousResultId,
+    PublishDiagnosticsClientCapabilities, Range, RegistrationRequest, Request, SemanticTokens,
+    ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
     SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
-    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, UnregistrationRequest,
+    Uri, VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
     WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
+use lsp_types::{FileRename, WillRenameFilesRequest};
+#[cfg(feature = "test-uv")]
+use ruff_db::system::System as _;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, SystemVirtualPath, TestSystem};
 use rustc_hash::FxHashMap;
+use serde_json::{Value, json};
 use tempfile::TempDir;
+use ty_project::UseUv;
+#[cfg(feature = "test-uv")]
+use ty_project::uv_test_env_vars;
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
@@ -213,7 +227,7 @@ impl TestServer {
         workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
         test_context: TestContext,
         capabilities: ClientCapabilities,
-        initialization_options: Option<ClientOptions>,
+        initialization_options: Option<Value>,
         env_vars: Vec<(String, Option<String>)>,
     ) -> Self {
         setup_tracing();
@@ -227,6 +241,7 @@ impl TestServer {
 
         // Create test system and set environment variable overrides
         let test_system = Arc::new(TestSystem::new(os_system));
+        test_system.clear_env_vars();
         for (name, value) in env_vars {
             match value {
                 Some(value) => {
@@ -279,26 +294,18 @@ impl TestServer {
     }
 
     /// Perform LSP initialization handshake
-    ///
-    /// # Panics
-    ///
-    /// If the `initialization_options` cannot be serialized to JSON
     fn initialize(
         mut self,
         workspace_folders: Vec<WorkspaceFolder>,
         capabilities: ClientCapabilities,
-        initialization_options: Option<ClientOptions>,
+        initialization_options: Option<Value>,
     ) -> Self {
         let init_params = InitializeParams {
             capabilities,
             workspace_folders_initialize_params: WorkspaceFoldersInitializeParams {
                 workspace_folders: Some(workspace_folders.into()),
             },
-            initialization_options: initialization_options.map(|options| {
-                serde_json::to_value(options)
-                    .context("Failed to serialize initialization options to `ClientOptions`")
-                    .unwrap()
-            }),
+            initialization_options,
             ..Default::default()
         };
 
@@ -601,6 +608,78 @@ impl TestServer {
         }
     }
 
+    /// Wait for and acknowledge a server-requested diagnostic refresh.
+    pub(crate) fn await_diagnostic_refresh(&mut self) {
+        let (id, ()) = self.await_request::<lsp_types::DiagnosticRefreshRequest>();
+        self.send(Message::Response(Response::new_ok(id, ())));
+    }
+
+    /// Acknowledge a successful server-to-client request.
+    pub(crate) fn acknowledge_request(&mut self, id: RequestId) {
+        self.send(Message::Response(Response::new_ok(id, ())));
+    }
+
+    pub(crate) fn watcher_registration_request(
+        &mut self,
+    ) -> Result<(RequestId, String, Vec<FileSystemWatcher>)> {
+        let (request_id, params) = self.await_request::<RegistrationRequest>();
+        let [registration] = params.registrations.as_slice() else {
+            anyhow::bail!("expected exactly one file watcher registration");
+        };
+        anyhow::ensure!(
+            registration.method == "workspace/didChangeWatchedFiles",
+            "unexpected registration method: {}",
+            registration.method
+        );
+        let options: DidChangeWatchedFilesRegistrationOptions = serde_json::from_value(
+            registration
+                .register_options
+                .clone()
+                .context("expected file watcher options")?,
+        )?;
+        Ok((request_id, registration.id.clone(), options.watchers))
+    }
+
+    pub(crate) fn acknowledge_unregistration(&mut self) -> Result<String> {
+        let (request_id, params) = self.await_request::<UnregistrationRequest>();
+        let [unregistration] = params.unregisterations.as_slice() else {
+            anyhow::bail!("expected exactly one unregistration");
+        };
+        let registration_id = unregistration.id.clone();
+        self.acknowledge_request(request_id);
+        Ok(registration_id)
+    }
+
+    /// Checks server-created progress with matching begin, report, and end notifications.
+    #[cfg(feature = "test-uv")]
+    #[track_caller]
+    pub(crate) fn assert_work_done_progress(
+        &mut self,
+        expected_title: &str,
+    ) -> Result<lsp_types::WorkDoneProgressEnd> {
+        let (request_id, progress) =
+            self.await_request::<lsp_types::WorkDoneProgressCreateRequest>();
+        self.send(Message::Response(Response::new_ok(request_id, ())));
+
+        let begin = self.await_notification::<lsp_types::ProgressNotification>();
+        assert_eq!(begin.token, progress.token);
+        assert_eq!(begin.value["kind"], "begin");
+        let begin: lsp_types::WorkDoneProgressBegin = serde_json::from_value(begin.value)?;
+        assert_eq!(begin.title, expected_title);
+
+        loop {
+            let notification = self.await_notification::<lsp_types::ProgressNotification>();
+            assert_eq!(notification.token, progress.token);
+            if notification.value["kind"] == "report" {
+                let _: lsp_types::WorkDoneProgressReport =
+                    serde_json::from_value(notification.value)?;
+            } else {
+                assert_eq!(notification.value["kind"], "end");
+                return Ok(serde_json::from_value(notification.value)?);
+            }
+        }
+    }
+
     /// Wait for a request of the specified type from the server and return the request ID and
     /// parameters.
     ///
@@ -778,7 +857,6 @@ impl TestServer {
         self.test_context.root().join(path)
     }
 
-    #[expect(dead_code)]
     pub(crate) fn write_file(
         &self,
         path: impl AsRef<SystemPath>,
@@ -873,6 +951,18 @@ impl TestServer {
         self.send_notification::<DidChangeWatchedFilesNotification>(params);
     }
 
+    /// Sends a `workspace/didChangeWatchedFiles` notification for one path.
+    pub(crate) fn did_change_watched_file(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        kind: FileChangeType,
+    ) {
+        self.did_change_watched_files(vec![FileEvent {
+            uri: self.file_uri(path),
+            kind,
+        }]);
+    }
+
     /// Send a `workspace/didChangeWorkspaceFolders` notification with the given added/removed
     /// workspace folders. The paths provided should be paths to the root of the workspace folder.
     pub(crate) fn change_workspace_folders<P: AsRef<SystemPath>>(
@@ -935,6 +1025,10 @@ impl TestServer {
                 work_done_progress_params: WorkDoneProgressParams::default(),
             }),
         )
+    }
+
+    pub(crate) fn will_rename_files(&mut self, files: Vec<FileRename>) -> Option<WorkspaceEdit> {
+        self.send_request_await::<WillRenameFilesRequest>(lsp_types::RenameFilesParams { files })
     }
 
     /// Send a `textDocument/diagnostic` request for the document at the given path.
@@ -1138,6 +1232,12 @@ impl fmt::Debug for TestServer {
 
 impl Drop for TestServer {
     fn drop(&mut self) {
+        // If initialization panicked, there is no running session to shut down. Trying to send
+        // another request could panic again while the test is already unwinding.
+        if self.initialize_response.is_none() {
+            return;
+        }
+
         self.drain_messages();
 
         // Follow the LSP protocol to shutdown the server gracefully.
@@ -1206,7 +1306,7 @@ impl Drop for TestServer {
 pub(crate) struct TestServerBuilder {
     test_context: TestContext,
     workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
-    initialization_options: Option<ClientOptions>,
+    initialization_options: Option<Value>,
     client_capabilities: ClientCapabilities,
     env_vars: Vec<(String, Option<String>)>,
 }
@@ -1241,17 +1341,41 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
-            env_vars: vec![
-                ("HOME".into(), None),
-                ("PATH".into(), None),
-                ("VIRTUAL_ENV".into(), None),
-            ],
+            env_vars: Vec::new(),
         })
     }
 
-    /// Set the initial client options for the test server
-    pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
+    /// Set the initial client options for the test server.
+    pub(crate) fn with_initialization_options(self, options: &ClientOptions) -> Self {
+        self.with_raw_initialization_options(json!(options))
+    }
+
+    /// Set raw initialization JSON for malformed or startup-only settings.
+    pub(crate) fn with_raw_initialization_options(mut self, options: Value) -> Self {
         self.initialization_options = Some(options);
+        self
+    }
+
+    /// Use the uv executable on the test process's PATH.
+    #[cfg(feature = "test-uv")]
+    pub(crate) fn with_real_uv(mut self) -> Result<Self> {
+        let uv = OsSystem::default().which("uv")?;
+        self.env_vars
+            .extend(uv_test_env_vars().map(|(name, value)| (name.to_owned(), Some(value))));
+        Ok(self.with_env_var("UV", uv.as_str()))
+    }
+
+    /// Select uv as the script project manager in the editor configuration.
+    pub(crate) fn with_uv_script_manager(mut self) -> Self {
+        let options = self.initialization_options.get_or_insert_with(|| json!({}));
+        options["configuration"]["project-manager"]["script"] = json!("uv");
+        self
+    }
+
+    /// Set the legacy `experimental.useUv` editor option.
+    pub(crate) fn with_use_uv(mut self, use_uv: UseUv) -> Self {
+        self.initialization_options.get_or_insert_with(|| json!({}))["experimental"]["useUv"] =
+            json!(use_uv);
         self
     }
 
@@ -1309,6 +1433,27 @@ impl TestServerBuilder {
         self
     }
 
+    /// Enable server-requested refreshes for pull diagnostics.
+    pub(crate) fn enable_workspace_diagnostic_refresh(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .workspace
+            .get_or_insert_default()
+            .diagnostics
+            .get_or_insert_default()
+            .refresh_support = Some(enabled);
+        self
+    }
+
+    /// Enable server-created work-done progress.
+    #[cfg(feature = "test-uv")]
+    pub(crate) fn enable_work_done_progress(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .window
+            .get_or_insert_default()
+            .work_done_progress = Some(enabled);
+        self
+    }
+
     /// Enable or disable dynamic registration of diagnostics capability
     pub(crate) fn enable_diagnostic_dynamic_registration(mut self, enabled: bool) -> Self {
         self.client_capabilities
@@ -1342,6 +1487,17 @@ impl TestServerBuilder {
         self
     }
 
+    /// Enable server-requested refreshes for inlay hints.
+    pub(crate) fn enable_inlay_hint_refresh(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .workspace
+            .get_or_insert_default()
+            .inlay_hint
+            .get_or_insert_default()
+            .refresh_support = Some(enabled);
+        self
+    }
+
     /// Enable or disable the completion snippet capability.
     pub(crate) fn enable_completion_snippets(mut self, enabled: bool) -> Self {
         self.client_capabilities
@@ -1355,17 +1511,15 @@ impl TestServerBuilder {
         self
     }
 
-    /// Enable or disable file watching capability
-    #[expect(dead_code)]
-    pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
+    /// Enable dynamic file watching, optionally with relative patterns.
+    pub(crate) fn with_watched_file_support(mut self, relative_pattern_support: bool) -> Self {
         self.client_capabilities
             .workspace
             .get_or_insert_default()
-            .did_change_watched_files = if enabled {
-            Some(DidChangeWatchedFilesClientCapabilities::default())
-        } else {
-            None
-        };
+            .did_change_watched_files = Some(DidChangeWatchedFilesClientCapabilities {
+            dynamic_registration: Some(true),
+            relative_pattern_support: Some(relative_pattern_support),
+        });
         self
     }
 
@@ -1488,7 +1642,6 @@ impl TestServerBuilder {
     }
 
     /// Write multiple files to the test directory
-    #[expect(dead_code)]
     pub(crate) fn with_files<P, C, I>(mut self, files: I) -> Result<Self>
     where
         I: IntoIterator<Item = (P, C)>,
@@ -1554,6 +1707,11 @@ impl TestContext {
             .map_err(|()| anyhow!("Failed to convert root directory to uri"))?;
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
         settings.add_filter(&tempdir_filter(project_dir_uri.path()), "<temp_dir>/");
+        // Absolute globs use forward slashes on every platform.
+        settings.add_filter(
+            &tempdir_filter(project_dir.as_str().replace('\\', "/")),
+            "<temp_dir>/",
+        );
         settings.add_filter(r#"\\\\"#, "/");
         settings.add_filter(
             r#"The system cannot find the file specified."#,

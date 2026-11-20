@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TC003 [*] Move standard library import `uuid.UUID` into a type-checking block
+TC003 [*] Make standard library import `uuid.UUID` lazy
  --> runtime_evaluated_decorators_3.py:6:18
   |
 4 | from array import array
@@ -11,17 +11,11 @@ TC003 [*] Move standard library import `uuid.UUID` into a type-checking block
 7 | from collections.abc import Sequence
 8 | from pydantic import validate_call
   |
-help: Move into type-checking block
-   |
-5  | from dataclasses import dataclass
-   - from uuid import UUID  # TC003
-6  | from collections.abc import Sequence
---------------------------------------------------------------------------------
-10 | from attrs import frozen
-11 + from typing import TYPE_CHECKING
-12 +
-13 + if TYPE_CHECKING:
-14 +     from uuid import UUID
-15 |
-   |
+help: Convert to a lazy import (or move into a type-checking block)
+  |
+5 | from dataclasses import dataclass
+  - from uuid import UUID  # TC003
+6 + lazy from uuid import UUID  # TC003
+7 | from collections.abc import Sequence
+  |
 note: This is an unsafe fix and may change runtime behavior

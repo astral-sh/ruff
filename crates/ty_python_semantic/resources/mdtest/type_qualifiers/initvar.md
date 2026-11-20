@@ -36,13 +36,13 @@ However, when we create an instance of this dataclass, the `db` attribute is not
 db = Database()
 alice = Person(db, "Alice", 30)
 
-alice.db  # error: [unresolved-attribute]
+alice.db  # error: [missing-attribute]
 ```
 
 The `db` attribute is also not accessible on the class itself:
 
 ```py
-Person.db  # error: [unresolved-attribute]
+Person.db  # error: [missing-attribute]
 ```
 
 Other fields can still be accessed normally:
@@ -95,7 +95,8 @@ C()  # error: [missing-argument] "No argument provided for required parameter `a
 
 ## Deferred annotations
 
-The same case must not fail when annotations are deferred, as they are by default on Python 3.14:
+With deferred annotations, the default value of `int` shadows the built-in type in both annotations.
+Field synthesis still reports the missing argument even though the annotations are invalid.
 
 ```toml
 [environment]
@@ -108,8 +109,8 @@ from ty_extensions import Top
 
 @dataclass
 class C:
-    a: Top[int]
-    int: InitVar[int] = 0
+    a: Top[int]  # error: [invalid-type-form]
+    int: InitVar[int] = 0  # error: [invalid-type-form]
 
 def fn():
     C()  # error: [missing-argument] "No argument provided for required parameter `a`"
@@ -165,7 +166,7 @@ class AlsoWrong:
 # revealed: (self: AlsoWrong, x: Unknown) -> None
 reveal_type(AlsoWrong.__init__)
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(AlsoWrong(42).x)  # revealed: Unknown
 ```
 

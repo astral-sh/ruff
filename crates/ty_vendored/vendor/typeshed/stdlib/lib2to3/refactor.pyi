@@ -210,7 +210,7 @@ class RefactoringTool:
 class MultiprocessingUnsupported(Exception): ...
 
 class MultiprocessRefactoringTool(RefactoringTool):
-    queue: JoinableQueue[None | tuple[Iterable[str], bool | int]] | None
+    queue: JoinableQueue[tuple[Iterable[str], bool | int] | None] | None
     output_lock: Lock | None
     def refactor(
         self, items: Iterable[str], write: bool = False, doctests_only: bool = False, num_processes: int = 1

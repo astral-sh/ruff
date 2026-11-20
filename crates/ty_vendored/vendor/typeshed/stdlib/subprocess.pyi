@@ -93,7 +93,7 @@ if sys.platform == "win32":
 #    reveal_type(x)  # bytes, based on the overloads
 # except TimeoutError as e:
 #    reveal_type(e.cmd)  # Any, but morally is _CMD
-_FILE: TypeAlias = None | int | IO[Any]
+_FILE: TypeAlias = int | IO[Any] | None
 _InputString: TypeAlias = ReadableBuffer | str
 _CMD: TypeAlias = StrOrBytesPath | Sequence[StrOrBytesPath]
 if sys.platform == "win32":
@@ -626,6 +626,7 @@ if sys.version_info >= (3, 11):
         pass_fds: Collection[int] = (),
         *,
         encoding: str | None = None,
+        errors: str | None = None,
         timeout: float | None = None,
         text: bool | None = None,
         user: str | int | None = None,
@@ -665,6 +666,7 @@ else:
         pass_fds: Collection[int] = (),
         *,
         encoding: str | None = None,
+        errors: str | None = None,
         timeout: float | None = None,
         text: bool | None = None,
         user: str | int | None = None,
@@ -705,6 +707,7 @@ if sys.version_info >= (3, 11):
         timeout: float | None = None,
         *,
         encoding: str | None = None,
+        errors: str | None = None,
         text: bool | None = None,
         user: str | int | None = None,
         group: str | int | None = None,
@@ -746,6 +749,7 @@ else:
         timeout: float | None = None,
         *,
         encoding: str | None = None,
+        errors: str | None = None,
         text: bool | None = None,
         user: str | int | None = None,
         group: str | int | None = None,

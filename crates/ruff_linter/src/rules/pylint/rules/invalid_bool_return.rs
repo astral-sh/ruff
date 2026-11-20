@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::terminal::Terminal;
@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `__bool__` implementations that return a type other than `bool`.
@@ -35,7 +36,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__bool__` method](https://docs.python.org/3/reference/datamodel.html#object.__bool__)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Suspicious)]
 pub(crate) struct InvalidBoolReturnType;
 
 impl Violation for InvalidBoolReturnType {

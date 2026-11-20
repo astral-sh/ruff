@@ -13,7 +13,7 @@ use ruff_python_parser::{
 };
 
 use crate::files::File;
-use crate::source::source_text;
+use crate::source::{read_source_text, source_text};
 use crate::{Db, PythonFile};
 
 /// Returns the parsed AST of `file`, including its token stream.
@@ -47,7 +47,13 @@ pub(super) fn disable_lru(db: &mut dyn Db) {
 }
 
 fn parsed_module_impl(db: &dyn Db, file: File, target_version: PythonVersion) -> Parsed<ModModule> {
-    let source = source_text(db, file);
+    // A bundled stub's AST is often enough for type inference. Only cache its decompressed
+    // source if a caller asks for the text itself.
+    let source = if file.path(db).is_vendored_path() {
+        read_source_text(db, file)
+    } else {
+        source_text(db, file)
+    };
     let ty = file.source_type(db);
 
     let options = ParseOptions::from(ty).with_target_version(target_version);
@@ -117,7 +123,7 @@ pub struct ParsedModule {
 }
 
 impl ParsedModule {
-    pub fn new(file: File, python_version: PythonVersion, parsed: Parsed<ModModule>) -> Self {
+    fn new(file: File, python_version: PythonVersion, parsed: Parsed<ModModule>) -> Self {
         Self {
             file,
             python_version,
@@ -153,6 +159,23 @@ impl ParsedModule {
         ParsedModuleRef {
             module: self.clone(),
             indexed: parsed,
+        }
+    }
+
+    /// Loads the parsed module and simultaneously notes whether the underlying
+    /// file is closed. If so, we proactively clear its AST from the Salsa cache
+    /// when the returned guard is dropped.
+    ///
+    /// This is intended for use in language server operations that scan all of
+    /// the files in a workspace, thereby often exceeding the LRU cache for parsed
+    /// modules. Clearing ASTs proactively helps mitigate unpredictable pauses
+    /// that would otherwise occur on the next database update, but it can also
+    /// reduce the efficiency of our cache, so we should replace this with a more
+    /// robust solution eventually: <https://github.com/astral-sh/ty/issues/3909>.
+    pub fn load_then_clear_on_drop(&self, db: &dyn Db) -> ParsedModuleGuard {
+        ParsedModuleGuard {
+            module: self.load(db),
+            clear_on_drop: !db.system().is_file_open(self.file.path(db)),
         }
     }
 
@@ -199,6 +222,11 @@ impl ParsedModuleRef {
         &self.module
     }
 
+    /// Number of indexed nodes in the root AST.
+    pub fn node_count(&self) -> usize {
+        self.indexed.node_count()
+    }
+
     /// Returns a reference to the AST node at the given index.
     pub fn get_by_index<'ast>(&'ast self, index: NodeIndex) -> AnyRootNodeRef<'ast> {
         self.indexed.get_by_index(index)
@@ -210,6 +238,28 @@ impl std::ops::Deref for ParsedModuleRef {
 
     fn deref(&self) -> &Self::Target {
         &self.indexed.parsed
+    }
+}
+
+/// A parsed module reference that clears the cached AST on drop if the file was closed when loaded.
+pub struct ParsedModuleGuard {
+    module: ParsedModuleRef,
+    clear_on_drop: bool,
+}
+
+impl std::ops::Deref for ParsedModuleGuard {
+    type Target = ParsedModuleRef;
+
+    fn deref(&self) -> &Self::Target {
+        &self.module
+    }
+}
+
+impl Drop for ParsedModuleGuard {
+    fn drop(&mut self) {
+        if self.clear_on_drop {
+            self.module.module().clear();
+        }
     }
 }
 
@@ -396,7 +446,7 @@ mod indexed {
                                 aligned && address.is_multiple_of(Self::ALIGNMENT),
                             )
                         });
-                let offset_bits = usize::BITS - ((max - base) / Self::ALIGNMENT).leading_zeros();
+                let offset_bits = ((max - base) / Self::ALIGNMENT).bit_width();
                 let relative_bits = u8::try_from(offset_bits)
                     .expect("an address offset cannot require more than u8::MAX bits")
                     + Self::KIND_BITS;
@@ -413,6 +463,8 @@ mod indexed {
                         entry_count,
                         layout: IndexChunkLayout::Relative,
                     });
+                    let chunk_words = (node_chunk.len() * usize::from(relative_bits)).div_ceil(64);
+                    words.resize(words.len() + chunk_words, 0);
                     for (entry, node) in node_chunk.iter().enumerate() {
                         let (kind, pointer) = node.into_raw_parts();
                         let address = pointer.as_ptr().expose_provenance();
@@ -442,6 +494,8 @@ mod indexed {
                         u64::try_from(pointer.as_ptr().expose_provenance())
                             .expect("AST node addresses should fit in a bitstream word")
                     }));
+                    let kind_words = (node_chunk.len() * usize::from(Self::KIND_BITS)).div_ceil(64);
+                    words.resize(words.len() + kind_words, 0);
                     for (entry, node) in node_chunk.iter().enumerate() {
                         let (kind, _) = node.into_raw_parts();
                         Self::write_bits(
@@ -456,12 +510,11 @@ mod indexed {
             }
         }
 
-        fn write_bits(words: &mut Vec<u64>, bit: usize, value: u64, bits: u8) {
+        fn write_bits(words: &mut [u64], bit: usize, value: u64, bits: u8) {
             debug_assert!((1..=64).contains(&bits));
             let word = bit / 64;
             let shift = bit % 64;
             let end = bit + usize::from(bits);
-            words.resize(words.len().max(end.div_ceil(64)), 0);
             words[word] |= value << shift;
             if end > (word + 1) * 64 {
                 words[word + 1] |= value >> (64 - shift);
@@ -485,12 +538,10 @@ mod indexed {
             }
         }
 
-        #[cfg(test)]
         fn len(&self) -> usize {
-            self.chunks
-                .iter()
-                .map(|chunk| usize::from(chunk.entry_count))
-                .sum()
+            self.chunks.split_last().map_or(0, |(last, full)| {
+                full.len() * Self::CHUNK_LEN + usize::from(last.entry_count)
+            })
         }
 
         fn get(&self, index: usize) -> (usize, RootNodeKind) {
@@ -592,6 +643,10 @@ mod indexed {
                 .index = index;
 
             inner
+        }
+
+        pub(super) fn node_count(&self) -> usize {
+            self.index.len()
         }
 
         /// Returns the node at the given index.
@@ -937,12 +992,14 @@ mod tests {
     use crate::PythonFile;
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
+    use crate::source::source_text;
     use crate::system::{
         DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemVirtualPath,
     };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
     use ruff_python_ast::PythonVersion;
+    use salsa::EventKind;
     use zip::CompressionMethod;
 
     #[test]
@@ -1037,10 +1094,19 @@ else:
 
         let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();
 
-        let file = PythonFile::new(&db, file, PythonVersion::latest_ty());
-        let parsed = parsed_module(&db, file).load(&db);
+        let python_file = PythonFile::new(&db, file, PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, python_file).load(&db);
 
         assert!(parsed.has_valid_syntax());
+
+        // Parsing alone leaves the source-text query unevaluated.
+        db.clear_salsa_events();
+        let _ = source_text(&db, file);
+        assert!(
+            db.take_salsa_events()
+                .iter()
+                .any(|event| matches!(event.kind, EventKind::WillExecute { .. }))
+        );
     }
 
     #[test]

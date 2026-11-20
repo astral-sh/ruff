@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::name::QualifiedName;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
@@ -6,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for the use of legacy `np.random` function calls.
@@ -46,7 +48,7 @@ use crate::checkers::ast::Checker;
 /// [Random Sampling]: https://numpy.org/doc/stable/reference/random/index.html#random-quick-start
 /// [NEP 19]: https://numpy.org/neps/nep-0019-rng-policy.html
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.248")]
+#[violation_metadata(stable_since = "v0.0.248", category = Category::Suspicious)]
 pub(crate) struct NumpyLegacyRandom {
     method_name: String,
 }
@@ -60,16 +62,12 @@ impl Violation for NumpyLegacyRandom {
 }
 
 /// NPY002
-pub(crate) fn legacy_random(checker: &Checker, expr: &Expr) {
+pub(crate) fn legacy_random(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
 
-    let Some(method_name) = checker.semantic().resolve_qualified_name(expr) else {
-        return;
-    };
-
-    let ["numpy", "random", method_name] = method_name.segments() else {
+    let ["numpy", "random", method_name] = qualified_name.segments() else {
         return;
     };
 

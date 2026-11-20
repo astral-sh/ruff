@@ -280,7 +280,7 @@ impl Task {
         let system = OsSystem::new(project_path);
         let mut project_metadata = ProjectMetadata::discover(project_path, &system)?;
         // Explicitly point ty to the .venv to avoid any set VIRTUAL_ENV variable to take precedence.
-        project_metadata.apply_override_options(Options {
+        project_metadata.set_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python: Some(RelativePathBuf::cli(".venv")),
                 ..EnvironmentOptions::default()

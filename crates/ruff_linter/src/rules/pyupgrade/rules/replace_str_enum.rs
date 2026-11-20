@@ -4,6 +4,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -81,17 +82,17 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [breaking change]: https://blog.pecar.me/python-enum
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
-pub(crate) struct ReplaceStrEnum {
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
+pub(crate) struct ManualStrEnum {
     name: String,
 }
 
-impl Violation for ReplaceStrEnum {
+impl Violation for ManualStrEnum {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ReplaceStrEnum { name } = self;
+        let ManualStrEnum { name } = self;
         format!("Class {name} inherits from both `str` and `enum.Enum`")
     }
 
@@ -131,7 +132,7 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef)
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        ReplaceStrEnum {
+        ManualStrEnum {
             name: class_def.name.to_string(),
         },
         class_def.identifier(),

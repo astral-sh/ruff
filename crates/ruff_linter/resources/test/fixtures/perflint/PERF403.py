@@ -231,3 +231,47 @@ def f():
         k  # comment
     ) in ["a", "b", "c"]:
         result[k] = k
+
+def f(values):
+    # ternary iterable must be parenthesized (https://github.com/astral-sh/ruff/issues/29365)
+    result = {}
+    for key, value in [values] if isinstance(values, tuple) else values:
+        result[key] = value
+    return result
+
+def f(values):
+    # parenthesized ternary iterable
+    result = {0: 0}
+    for key, value in ([values] if isinstance(values, tuple) else values):
+        result[key] = value
+    return result
+
+def f(values):
+    # lambda iterable
+    result = {}
+    for key, value in lambda: values:
+        result[key] = value
+    return result
+
+def f(values):
+    # assignment expressions are not allowed in a comprehension's iterable, so there is no diagnostic
+    result = {}
+    for key, value in (items := values):
+        result[key] = value
+    return result
+
+def f(values):
+    # assignment expressions are not allowed in a comprehension's iterable, so there is no diagnostic
+    result = {}
+    for key, value in dict(items := values):
+        result[key] = value
+    return result
+
+def f(values):
+    # comment inside the iterable's parentheses is kept with the iterable, not duplicated
+    result = {}
+    for key, value in (  # comment
+        values if values else ()
+    ):
+        result[key] = value
+    return result

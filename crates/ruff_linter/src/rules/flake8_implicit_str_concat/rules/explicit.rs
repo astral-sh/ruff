@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::{TokenKind, parenthesized_range};
 use ruff_python_ast::{self as ast, Expr, Operator};
@@ -6,6 +7,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -33,6 +35,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// )
 /// ```
 ///
+/// ## Fix safety
+///
+/// The fix is marked as unsafe when it would create a docstring.
+///
 /// ## Options
 ///
 /// Setting `lint.flake8-implicit-str-concat.allow-multiline = false` will disable this rule because
@@ -40,7 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// - `lint.flake8-implicit-str-concat.allow-multiline`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201")]
+#[violation_metadata(stable_since = "v0.0.201", category = Category::Restriction)]
 pub(crate) struct ExplicitStringConcatenation;
 
 impl Violation for ExplicitStringConcatenation {
@@ -113,6 +119,23 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
     }
 }
 
+/// Returns `true` if removing the `+` operator would turn the enclosing
+/// expression statement into a docstring, which would change the program's
+/// behavior (e.g., by setting `__doc__`). See #27979.
+fn fix_creates_docstring(checker: &Checker, expr: &ast::ExprBinOp) -> bool {
+    // Only concatenations of plain string literals can produce a docstring
+    // after the fix; f-strings, byte strings, and template strings are not
+    // recognized as docstrings by Python.
+    if !matches!(
+        (expr.left.as_ref(), expr.right.as_ref()),
+        (Expr::StringLiteral(_), Expr::StringLiteral(_))
+    ) {
+        return false;
+    }
+
+    checker.in_docstring_position(expr.range())
+}
+
 fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> {
     let ast::ExprBinOp { left, right, .. } = expr_bin_op;
 
@@ -141,8 +164,14 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> 
         before_plus.trim_end_matches(is_python_whitespace)
     };
 
-    Some(Fix::safe_edit(Edit::range_replacement(
-        format!("{before_plus}{after_plus}"),
-        between_operands_range,
-    )))
+    let applicability = if fix_creates_docstring(checker, expr_bin_op) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Some(Fix::applicable_edit(
+        Edit::range_replacement(format!("{before_plus}{after_plus}"), between_operands_range),
+        applicability,
+    ))
 }

@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::{
     is_dunder_operator_method, is_underscore_prefixed_public_member,
 };
@@ -58,7 +59,7 @@ use crate::rules::pylint::helpers::{
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.240")]
+#[violation_metadata(stable_since = "v0.0.240", category = Category::Pedantic)]
 pub(crate) struct PrivateMemberAccess {
     access: String,
 }
@@ -172,12 +173,13 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 ///         def f(self, other: Annotated[C, ...]): ...
 ///     ```
 ///
-/// * `super().__new__`/`cls` call:
+/// * `super().__new__`/`object.__new__`/`cls` call:
 ///
 ///     ```python
 ///     class C:
 ///         def __new__(cls): ...
 ///             instance = super().__new__(cls)
+///             instance = object.__new__(cls)
 ///         @classmethod
 ///         def m(cls):
 ///             instance = cls()
@@ -293,7 +295,7 @@ impl TypeChecker for SameClassInstanceChecker {
         Self::is_current_class_name(class_name, semantic)
     }
 
-    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `self`
+    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `object.__new__()`, `self`
     fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
         // `this = self` — a direct assignment from `self`, but only when
         // `self` is actually a function parameter (not a local rebinding).
@@ -318,15 +320,21 @@ impl TypeChecker for SameClassInstanceChecker {
             }
 
             Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                let Expr::Call(ast::ExprCall { func, .. }) = &**value else {
+                if attr != "__new__" {
                     return false;
-                };
+                }
 
-                let Expr::Name(ast::ExprName { id: func, .. }) = &**func else {
-                    return false;
-                };
-
-                func == "super" && attr == "__new__"
+                match &**value {
+                    // `super().__new__()`, `object().__new__()`
+                    Expr::Call(ast::ExprCall {
+                        func, arguments, ..
+                    }) => {
+                        matches!(&**func, Expr::Name(ast::ExprName { id, .. }) if id == "super")
+                            || (arguments.is_empty() && semantic.match_builtin_expr(func, "object"))
+                    }
+                    // `object.__new__()`
+                    value => semantic.match_builtin_expr(value, "object"),
+                }
             }
 
             _ => false,

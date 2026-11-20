@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::logging;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_logging::helpers::outside_handlers;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -69,10 +70,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [The documentation]: https://docs.python.org/3/library/logging.html#logging.exception
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
-pub(crate) struct LogExceptionOutsideExceptHandler;
+#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
+pub(crate) struct LoggingExceptionOutsideExceptHandler;
 
-impl Violation for LogExceptionOutsideExceptHandler {
+impl Violation for LoggingExceptionOutsideExceptHandler {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -111,11 +112,7 @@ pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &Exp
         }
 
         func @ Expr::Name(_) => {
-            let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
-                return;
-            };
-
-            if !matches!(qualified_name.segments(), ["logging", "exception"]) {
+            if !semantic.matches_qualified_name(func, &["logging", "exception"]) {
                 return;
             }
 
@@ -125,7 +122,8 @@ pub(crate) fn log_exception_outside_except_handler(checker: &Checker, call: &Exp
         _ => return,
     };
 
-    let mut diagnostic = checker.report_diagnostic(LogExceptionOutsideExceptHandler, call.range());
+    let mut diagnostic =
+        checker.report_diagnostic(LoggingExceptionOutsideExceptHandler, call.range());
 
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);

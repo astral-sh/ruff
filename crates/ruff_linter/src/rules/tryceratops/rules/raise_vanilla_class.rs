@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for code that raises `Exception` or `BaseException` directly.
@@ -53,10 +54,10 @@ use crate::checkers::ast::Checker;
 ///         logger.error("Oops")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
-pub(crate) struct RaiseVanillaClass;
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Style)]
+pub(crate) struct RaiseExceptionOrBaseException;
 
-impl Violation for RaiseVanillaClass {
+impl Violation for RaiseExceptionOrBaseException {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Create your own exception".to_string()
@@ -75,6 +76,6 @@ pub(crate) fn raise_vanilla_class(checker: &Checker, expr: &Expr) {
             )
         })
     {
-        checker.report_diagnostic(RaiseVanillaClass, expr.range());
+        checker.report_diagnostic(RaiseExceptionOrBaseException, expr.range());
     }
 }

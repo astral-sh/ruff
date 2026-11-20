@@ -60,7 +60,7 @@ impl<'db> ScopeId<'db> {
     }
 
     /// Returns the class definition for the enclosing class if this scope is a method body.
-    pub fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+    fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         semantic_index(db, self.program_file(db)).class_definition_of_method(self.file_scope_id(db))
     }
 
@@ -110,8 +110,7 @@ impl FileScopeId {
     }
 
     pub fn to_scope_id<'db>(self, db: &'db dyn Db, file: ProgramFile<'db>) -> ScopeId<'db> {
-        let index = semantic_index(db, file);
-        index.scope_ids_by_scope[self]
+        semantic_index(db, file).scope_id(self)
     }
 
     pub fn is_generator_function(self, index: &SemanticIndex) -> bool {

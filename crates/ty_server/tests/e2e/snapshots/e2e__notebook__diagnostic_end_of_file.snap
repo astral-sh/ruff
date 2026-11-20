@@ -17,9 +17,9 @@ expression: diagnostics
         }
       },
       "severity": 1,
-      "code": "invalid-return-type",
+      "code": "invalid-implicit-return",
       "codeDescription": {
-        "href": "https://ty.dev/rules#invalid-return-type"
+        "href": "https://ty.dev/rules#invalid-implicit-return"
       },
       "source": "ty",
       "message": "Function can implicitly return `None`, which is not assignable to return type `str`"
@@ -40,7 +40,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name"
+      "message": "Expected `,`, found identifier"
     },
     {
       "range": {
@@ -110,7 +110,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name"
+      "message": "Expected `,`, found identifier"
     },
     {
       "range": {
@@ -180,7 +180,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name"
+      "message": "Expected `,`, found identifier"
     },
     {
       "range": {

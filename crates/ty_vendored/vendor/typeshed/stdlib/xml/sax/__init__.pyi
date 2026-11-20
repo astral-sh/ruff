@@ -50,8 +50,21 @@ def make_parser(parser_list: Iterable[str] = ()) -> XMLReader:
     modules containing both a SAX parser and a create_parser function.
     """
 
-def parse(source: _Source, handler: ContentHandler, errorHandler: ErrorHandler = ...) -> None: ...
-def parseString(string: ReadableBuffer | str, handler: ContentHandler, errorHandler: ErrorHandler | None = ...) -> None: ...
+def parse(source: _Source, handler: ContentHandler, errorHandler: ErrorHandler = ...) -> None:
+    """Parse an XML document with the default parser.
+
+    source is a system identifier, a path-like object or a file object,
+    handler is a ContentHandler instance, and errorHandler is an
+    ErrorHandler instance.  All work is done by the handler.
+    """
+
+def parseString(string: ReadableBuffer | str, handler: ContentHandler, errorHandler: ErrorHandler | None = ...) -> None:
+    """Parse an XML document from a string with the default parser.
+
+    string is a str or a bytes-like object, the other arguments are the
+    same as for parse().
+    """
+
 def _create_parser(parser_name: str) -> XMLReader: ...
 
 if sys.version_info >= (3, 14):

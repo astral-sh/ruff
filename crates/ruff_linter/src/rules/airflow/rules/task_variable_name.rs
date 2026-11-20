@@ -1,4 +1,5 @@
 use crate::Violation;
+use crate::codes::Category;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
@@ -32,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// my_task = PythonOperator(task_id="my_task")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Style)]
 pub(crate) struct AirflowVariableNameTaskIdMismatch {
     task_id: String,
 }

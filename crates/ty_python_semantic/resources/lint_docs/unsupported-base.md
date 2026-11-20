@@ -4,10 +4,9 @@ Checks for class definitions that have bases which are unsupported by ty.
 
 ## Why is this bad?
 
-If a class has a base that is an instance of a complex type such as a union type,
-ty will not be able to resolve the [method resolution order] (MRO) for the class.
-This will lead to an inferior understanding of your codebase and unpredictable
-type-checking behavior.
+If a class has a base that is an instance of a complex type such as a union type, ty will not be
+able to resolve the [method resolution order] (MRO) for the class. This will lead to an inferior
+understanding of your codebase and unpredictable type-checking behavior.
 
 ## Examples
 

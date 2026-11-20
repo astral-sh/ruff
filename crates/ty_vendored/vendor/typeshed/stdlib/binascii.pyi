@@ -2,7 +2,7 @@
 
 import sys
 from _typeshed import ReadableBuffer
-from typing import TypeAlias
+from typing import SupportsIndex, TypeAlias
 from typing_extensions import deprecated
 
 # Many functions in binascii accept buffer objects
@@ -186,10 +186,10 @@ if sys.version_info < (3, 11):
     def b2a_hqx(data: ReadableBuffer, /) -> bytes:
         """Encode .hqx data."""
 
-def crc_hqx(data: ReadableBuffer, crc: int, /) -> int:
+def crc_hqx(data: ReadableBuffer, crc: SupportsIndex, /) -> int:
     """Compute CRC-CCITT incrementally."""
 
-def crc32(data: ReadableBuffer, crc: int = 0, /) -> int:
+def crc32(data: ReadableBuffer, crc: SupportsIndex = 0, /) -> int:
     """Compute CRC-32 incrementally."""
 
 def b2a_hex(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = 1) -> bytes:

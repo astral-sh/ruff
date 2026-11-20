@@ -10,7 +10,7 @@ expression: lex_source(source)
     Lbrace 21..22,
     Comment 23..34,
     NonLogicalNewline 34..35,
-    Name 39..40,
+    Identifier 39..40,
     NonLogicalNewline 40..41,
     Rbrace 41..42,
     FStringMiddle 42..59 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING | F_STRING),

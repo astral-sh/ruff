@@ -7,7 +7,7 @@ use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Expr, ExprAttribute, ExprName, StmtFunctionDef, StmtTry};
+use ruff_python_ast::{Expr, ExprAttribute, ExprName, Stmt, StmtFunctionDef, StmtTry};
 use ruff_python_semantic::Exceptions;
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::SemanticModel;
@@ -259,12 +259,18 @@ pub(crate) fn generate_remove_and_runtime_import_edit(
         checker.indexer(),
     )
     .ok()?;
+    let is_lazy = match stmt {
+        Stmt::Import(import) => import.is_lazy,
+        Stmt::ImportFrom(import) => import.is_lazy,
+        _ => false,
+    };
     let import_edit = checker.importer().add_import(
         &NameImport::ImportFrom(MemberNameImport::member(
-            (*module).to_string(),
+            module.to_string(),
             name.to_string(),
         )),
         expr.start(),
+        is_lazy,
     );
 
     Some(Fix::unsafe_edits(remove_edit, [import_edit]))

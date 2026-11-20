@@ -1,3 +1,4 @@
+pub(crate) use context_manager_iterator::*;
 pub(crate) use convert_named_tuple_functional_to_class::*;
 pub(crate) use convert_typed_dict_functional_to_class::*;
 pub(crate) use datetime_utc_alias::*;
@@ -44,6 +45,7 @@ pub(crate) use useless_object_inheritance::*;
 pub(crate) use while_one::*;
 pub(crate) use yield_in_for_loop::*;
 
+mod context_manager_iterator;
 mod convert_named_tuple_functional_to_class;
 mod convert_typed_dict_functional_to_class;
 mod datetime_utc_alias;

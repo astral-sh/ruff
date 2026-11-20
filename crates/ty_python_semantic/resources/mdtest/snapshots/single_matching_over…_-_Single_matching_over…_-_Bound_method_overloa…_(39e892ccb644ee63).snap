@@ -20,7 +20,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/single_match
  5 | 
  6 | class Base:
  7 |     @overload
- 8 |     def f(self: Other, x: bytes) -> bytes: ...  # error: [invalid-overload]
+ 8 |     def f(self: Other, x: bytes) -> bytes: ...  # error: [inconsistent-overload-implementation]
  9 |     @overload
 10 |     def f(self, x: int) -> int: ...
 11 |     @overload
@@ -38,10 +38,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/single_match
 # Diagnostics
 
 ```
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:8:9
    |
- 8 |     def f(self: Other, x: bytes) -> bytes: ...  # error: [invalid-overload]
+ 8 |     def f(self: Other, x: bytes) -> bytes: ...  # error: [inconsistent-overload-implementation]
    |         ^
  9 |     @overload
 10 |     def f(self, x: int) -> int: ...

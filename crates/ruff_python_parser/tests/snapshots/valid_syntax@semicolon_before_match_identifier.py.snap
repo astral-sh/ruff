@@ -1,0 +1,256 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/semicolon_before_match_identifier.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..109,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 0..7,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 0..7,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 0..5,
+                                    id: Name("first"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 5..7,
+                                node_index: NodeIndex(None),
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 9..22,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 9..14,
+                                id: Name("match"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 17..22,
+                            id: Name("value"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 23..30,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 23..30,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 23..28,
+                                    id: Name("first"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 28..30,
+                                node_index: NodeIndex(None),
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 32..44,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 32..44,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 32..37,
+                                    id: Name("match"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 37..44,
+                                node_index: NodeIndex(None),
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 38..43,
+                                            id: Name("value"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 45..52,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 45..52,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 45..50,
+                                    id: Name("first"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 50..52,
+                                node_index: NodeIndex(None),
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            AnnAssign(
+                StmtAnnAssign {
+                    node_index: NodeIndex(None),
+                    range: 54..67,
+                    target: Subscript(
+                        ExprSubscript {
+                            node_index: NodeIndex(None),
+                            range: 54..62,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 54..59,
+                                    id: Name("match"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: NumberLiteral(
+                                ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 60..61,
+                                    value: Int(
+                                        0,
+                                    ),
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 64..67,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 68..75,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 68..75,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 68..73,
+                                    id: Name("first"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 73..75,
+                                node_index: NodeIndex(None),
+                                args: [],
+                                keywords: [],
+                            },
+                        },
+                    ),
+                },
+            ),
+            Match(
+                StmtMatch {
+                    node_index: NodeIndex(None),
+                    range: 77..108,
+                    subject: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 84..89,
+                            id: Name("value"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 96..108,
+                            node_index: NodeIndex(None),
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    node_index: NodeIndex(None),
+                                    range: 101..102,
+                                    pattern: None,
+                                    name: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 104..108,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

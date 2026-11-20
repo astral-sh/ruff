@@ -122,3 +122,19 @@ help: Use type parameters
 57 |     c(t[0])
    |
 note: This is an unsafe fix and may change runtime behavior
+
+UP047 [*] Generic function `starred_constraints` should use type parameters
+  --> UP047_0.py:73:5
+   |
+73 | def starred_constraints(var: U) -> U:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+74 |     return var
+   |
+help: Use type parameters
+   |
+72 |
+   - def starred_constraints(var: U) -> U:
+73 + def starred_constraints[U: (*constraints,)](var: U) -> U:
+74 |     return var
+   |
+note: This is an unsafe fix and may change runtime behavior

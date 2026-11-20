@@ -2,6 +2,7 @@
 The 'interpreters' module provides a more convenient interface.
 """
 
+import sys
 import types
 from collections.abc import Callable
 from typing import Any, Final, Literal, SupportsIndex, TypeAlias, TypeVar, overload
@@ -18,7 +19,11 @@ class InterpreterError(Exception):
 class InterpreterNotFoundError(InterpreterError):
     """An interpreter was not found"""
 
-class NotShareableError(ValueError): ...
+if sys.version_info >= (3, 14):
+    class NotShareableError(TypeError): ...
+
+else:
+    class NotShareableError(ValueError): ...
 
 @disjoint_base
 class CrossInterpreterBufferView:
@@ -75,7 +80,7 @@ def whence(id: SupportsIndex) -> _Whence:
 
 def exec(
     id: SupportsIndex, code: str | types.CodeType | Callable[[], object], shared: _SharedDict = {}, *, restrict: bool = False
-) -> None | types.SimpleNamespace:
+) -> types.SimpleNamespace | None:
     """Execute the provided code in the identified interpreter.
 
     This is equivalent to running the builtin exec() under the target

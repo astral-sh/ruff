@@ -34,7 +34,7 @@ pub fn goto_definition(
 #[cfg(test)]
 pub(super) mod test {
 
-    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
+    use crate::tests::{CursorTest, IntoDiagnostic, SitePackagesCursorTestBuilder, cursor_test};
     use crate::{NavigationTargets, RangedValue, goto_definition};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
@@ -130,6 +130,125 @@ def f(items):
           |
         3 |     [[(last := item) for item in items] for _ in [1]]
           |        ----
+        ");
+    }
+
+    fn pytest_cursor_test_builder() -> SitePackagesCursorTestBuilder {
+        let mut builder = CursorTest::builder().with_site_packages();
+        builder
+            .site_packages(
+                "_pytest/__init__.pyi",
+                r#"
+                "#,
+            )
+            .site_packages(
+                "_pytest/fixtures.pyi",
+                r#"
+                from typing import Any, Callable
+
+                def fixture(
+                    function: Callable[..., Any] | None = ...,
+                    *,
+                    name: str | None = ...,
+                ) -> Any: ...
+                "#,
+            )
+            .site_packages(
+                "pytest/__init__.pyi",
+                r#"
+                from _pytest.fixtures import fixture as fixture
+                "#,
+            );
+        builder
+    }
+
+    #[test]
+    fn goto_definition_uses_pytest_fixture_binding() {
+        let test = pytest_cursor_test_builder()
+            .source(
+                "test_example.py",
+                r#"
+                import pytest
+
+                @pytest.fixture(name="resource")
+                def implementation(): ...
+
+                def test_use(resource<CURSOR>): ...
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> src/test_example.py:7:14
+          |
+        7 | def test_use(resource): ...
+          |              ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> src/test_example.py:5:5
+          |
+        5 | def implementation(): ...
+          |     --------------
+        ");
+    }
+
+    #[test]
+    fn goto_definition_uses_pytest_plugins() {
+        let test = pytest_cursor_test_builder()
+            .source(
+                "conftest.py",
+                r#"
+                pytest_plugins = ["tests.fixtures"]
+                "#,
+            )
+            .source(
+                "tests/fixtures.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource(): ...
+                "#,
+            )
+            .source(
+                "tests/test_example.py",
+                "def test_use(resource<CURSOR>): ...",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> src/tests/test_example.py:1:14
+          |
+        1 | def test_use(resource): ...
+          |              ^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> src/tests/fixtures.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+        ");
+    }
+
+    #[test]
+    fn goto_definition_parameter_declaration() {
+        let test = cursor_test(
+            r#"
+            def function(parameter<CURSOR>): ...
+            "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:2:14
+          |
+        2 | def function(parameter): ...
+          |              ^^^^^^^^^ Clicking here
+        info: Found 1 definition
+         --> main.py:2:14
+          |
+        2 | def function(parameter): ...
+          |              ---------
         ");
     }
 
@@ -2321,6 +2440,73 @@ while True:
           |
         3 |     variable = 1
           |     --------
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_union() {
+        let test = cursor_test(
+            "
+def first(value: int) -> int:
+    return value
+
+def second(value: int) -> str:
+    return str(value)
+
+def run(flag: bool):
+    callback = first if flag else second
+    callback(value<CURSOR>=1)
+",
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:10:14
+           |
+        10 |     callback(value=1)
+           |              ^^^^^ Clicking here
+        info: Found 2 definitions
+         --> main.py:2:11
+          |
+        2 | def first(value: int) -> int:
+          |           -----
+        3 |     return value
+        4 |
+        5 | def second(value: int) -> str:
+          |            -----
+        ");
+    }
+
+    #[test]
+    fn goto_definition_keyword_argument_constructor_new_and_init() {
+        let test = cursor_test(
+            "
+class Product:
+    def __new__(cls, value: int):
+        return object.__new__(cls)
+
+    def __init__(self, value: int):
+        self.value = value
+
+Product(value<CURSOR>=1)
+",
+        );
+
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:9:9
+          |
+        9 | Product(value=1)
+          |         ^^^^^ Clicking here
+        info: Found 2 definitions
+         --> main.py:3:22
+          |
+        3 |     def __new__(cls, value: int):
+          |                      -----
+        4 |         return object.__new__(cls)
+        5 |
+        6 |     def __init__(self, value: int):
+          |                        -----
         ");
     }
 

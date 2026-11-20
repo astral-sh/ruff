@@ -7,6 +7,7 @@ use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
@@ -44,10 +45,10 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation: `delattr`](https://docs.python.org/3/library/functions.html#delattr)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.6")]
-pub(crate) struct DelAttrWithConstant;
+#[violation_metadata(preview_since = "0.15.6", category = Category::Complexity)]
+pub(crate) struct DelattrWithConstant;
 
-impl AlwaysFixableViolation for DelAttrWithConstant {
+impl AlwaysFixableViolation for DelattrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Do not call `delattr` with a constant attribute value. It is not any safer than \
@@ -102,7 +103,7 @@ pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     }) = checker.semantic().current_statement()
     {
         if expr == child.as_ref() {
-            let mut diagnostic = checker.report_diagnostic(DelAttrWithConstant, expr.range());
+            let mut diagnostic = checker.report_diagnostic(DelattrWithConstant, expr.range());
             let edit = Edit::range_replacement(
                 generate_del_statement(obj, attr_name, checker.generator()),
                 expr.range(),

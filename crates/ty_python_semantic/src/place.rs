@@ -1,20 +1,23 @@
+pub(crate) mod definitions;
+
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
+use rustc_hash::FxHashMap;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
 };
 
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
-    ReachabilityEvaluationCache, evaluate_reachability, evaluate_reachability_with_cache,
+    NarrowingProjector, ReachabilityEvaluationCache, evaluate_reachability,
+    evaluate_reachability_with_cache,
 };
-use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, exists_at_runtime, inferred_declaration,
-    is_discarded_dict_key_assignment,
+    DeclaredType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
+    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    may_exist_at_runtime,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -27,8 +30,8 @@ use ty_python_core::reachability_constraints::{
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    DeclarationWithConstraint, DeclarationsIterator, ProgramFile, Truthiness, global_scope,
-    place_table, use_def_map,
+    DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidatesIterator, ProgramFile,
+    Truthiness, global_scope, place_table, use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -87,21 +90,6 @@ pub(crate) enum PublicTypePolicy {
     Promote,
 }
 
-impl PublicTypePolicy {
-    /// Apply the public-type policy to the raw type.
-    fn apply_if_needed<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-    ) -> Type<'db> {
-        match self {
-            Self::Raw => ty,
-            Self::Promote => ty.promote(db, env).promote_singletons(db, env),
-        }
-    }
-}
-
 /// The source definition provenance for a place.
 #[derive(
     Debug, Clone, Copy, Default, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue,
@@ -145,16 +133,16 @@ impl<'db> Provenance<'db> {
 
 /// A defined place with its raw type, origin, definedness, public-type policy, and provenance.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct DefinedPlace<'db> {
-    pub(crate) ty: Type<'db>,
+pub(crate) struct DefinedPlace<'db, T = Type<'db>> {
+    pub(crate) ty: T,
     pub(crate) origin: TypeOrigin,
     pub(crate) definedness: Definedness,
     pub(crate) public_type_policy: PublicTypePolicy,
     pub(crate) provenance: Provenance<'db>,
 }
 
-impl<'db> DefinedPlace<'db> {
-    fn new(ty: Type<'db>) -> Self {
+impl<'db, T> DefinedPlace<'db, T> {
+    fn new(ty: T) -> Self {
         Self {
             ty,
             origin: TypeOrigin::Inferred,
@@ -167,6 +155,16 @@ impl<'db> DefinedPlace<'db> {
     fn with_origin(mut self, origin: TypeOrigin) -> Self {
         self.origin = origin;
         self
+    }
+
+    fn with_type<U>(self, ty: U) -> DefinedPlace<'db, U> {
+        DefinedPlace {
+            ty,
+            origin: self.origin,
+            definedness: self.definedness,
+            public_type_policy: self.public_type_policy,
+            provenance: self.provenance,
+        }
     }
 
     pub(crate) fn with_definedness(mut self, definedness: Definedness) -> Self {
@@ -191,6 +189,15 @@ impl<'db> DefinedPlace<'db> {
 
     pub(crate) const fn is_definitely_defined(&self) -> bool {
         matches!(self.definedness, Definedness::AlwaysDefined)
+    }
+}
+
+impl<'db> DefinedPlace<'db> {
+    pub(crate) fn public_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self.public_type_policy {
+            PublicTypePolicy::Raw => self.ty,
+            PublicTypePolicy::Promote => self.ty.promote(db, env).promote_singletons(db, env),
+        }
     }
 }
 
@@ -307,7 +314,7 @@ impl<'db> Place<'db> {
     }
 
     #[must_use]
-    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
+    fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
         match self {
             Place::Defined(defined) => Place::Defined(DefinedPlace {
                 ty: f(defined.ty),
@@ -555,7 +562,7 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    file.map(|file| {
+    file.map_or_default(|file| {
         let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
             if file.file(db).is_stub(db) {
                 RequiresExplicitReExport::Yes
@@ -572,7 +579,6 @@ pub(crate) fn imported_symbol<'db>(
             ConsideredDefinitions::EndOfScope,
         )
     })
-    .unwrap_or_default()
     .or_fall_back_to(db, env, || {
         match name {
             "__file__" => {
@@ -615,8 +621,7 @@ pub(crate) fn builtins_symbol<'db>(
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     builtins_symbol_impl(db, env, symbol, BuiltinVisibility::All)
-        .map(|(_, symbol)| symbol)
-        .unwrap_or_default()
+        .map_or_default(|(_, symbol)| symbol)
 }
 
 /// Looks up `symbol` for implicit builtin fallback.
@@ -637,8 +642,7 @@ pub(crate) fn implicit_builtins_symbol<'db>(
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly)
-        .map(|(_, symbol)| symbol)
-        .unwrap_or_default()
+        .map_or_default(|(_, symbol)| symbol)
 }
 
 /// Returns the module scope that supplies `symbol` through implicit builtin fallback.
@@ -692,7 +696,7 @@ fn builtins_symbol_impl<'db>(
         if matches!(visibility, BuiltinVisibility::RuntimeOnly)
             && let Place::Defined(defined) = found_symbol.place
             && let Some(definition) = defined.provenance.definition()
-            && !exists_at_runtime(db, definition)
+            && !may_exist_at_runtime(db, definition)
         {
             return None;
         }
@@ -705,7 +709,7 @@ fn builtins_symbol_impl<'db>(
         resolver_environment,
         &ModuleName::new_static("__builtins__").unwrap(),
     )
-    .and_then(&resolver)
+    .and_then(resolver)
     .or_else(|| {
         resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
             .and_then(resolver)
@@ -813,6 +817,35 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     )
 }
 
+/// Check whether a member prefix has a binding without inferring its value when possible.
+pub(crate) fn has_bound_prefix<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bindings: BindingWithConstraintsIterator<'_, 'db>,
+    cache: Option<&ReachabilityEvaluationCache<'db>>,
+) -> bool {
+    let mut rows = bindings.clone();
+    if let Some(row) = rows.next()
+        && rows.next().is_none()
+    {
+        match row.binding {
+            DefinitionState::Undefined => return false,
+            DefinitionState::Defined(definition) => {
+                let kind = definition.kind(db);
+                if kind.is_user_visible() && !matches!(kind, DefinitionKind::DictKeyAssignment(_)) {
+                    // With no unbound or deleted alternative, even an unreachable binding gives
+                    // a defined place of type Never. Either way the outer prefix is shadowed.
+                    return true;
+                }
+            }
+            DefinitionState::Deleted => {}
+        }
+    }
+    !place_from_bindings_impl(db, env, bindings, RequiresExplicitReExport::No, cache)
+        .place
+        .is_undefined()
+}
+
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
 /// If there is only one declaration, or all declarations declare the same type, returns
@@ -845,35 +878,178 @@ pub(crate) fn place_from_declarations_with_reachability_cache<'db>(
 }
 
 type DeclaredTypeAndConflictingTypes<'db> = (
-    TypeAndQualifiers<'db>,
+    DeclaredType<'db>,
     Option<Box<indexmap::set::Slice<Type<'db>>>>,
 );
 
 /// The result of looking up a declared type from declarations; see [`place_from_declarations`].
 #[derive(Debug, Default)]
 pub(crate) struct PlaceFromDeclarationsResult<'db> {
-    place_and_quals: PlaceAndQualifiers<'db>,
+    /// A reachable declaration can supply qualifiers without specifying a type.
+    place: Option<DefinedPlace<'db, Option<Type<'db>>>>,
+    qualifiers: TypeQualifiers,
     conflicting_types: Option<Box<indexmap::set::Slice<Type<'db>>>>,
+    /// At least one reachable declaration supplies qualifiers without a type, even if other
+    /// declarations of the same place specify a type.
+    pub(crate) has_qualifier_only_declaration: bool,
     /// Contains the first reachable declaration for this place, if any.
     /// This field is used for backreferences in diagnostics.
     pub(crate) first_declaration: Option<Definition<'db>>,
 }
 
 impl<'db> PlaceFromDeclarationsResult<'db> {
-    fn conflict(
-        place_and_quals: PlaceAndQualifiers<'db>,
-        conflicting_types: Box<indexmap::set::Slice<Type<'db>>>,
-        first_declaration: Option<Definition<'db>>,
-    ) -> Self {
-        PlaceFromDeclarationsResult {
-            place_and_quals,
-            conflicting_types: Some(conflicting_types),
-            first_declaration,
-        }
+    pub(crate) fn qualifiers(&self) -> TypeQualifiers {
+        self.qualifiers
     }
 
-    pub(crate) fn ignore_conflicting_declarations(self) -> PlaceAndQualifiers<'db> {
-        self.place_and_quals
+    pub(crate) fn is_qualifier_only(&self) -> bool {
+        self.place.is_some_and(|place| place.ty.is_none())
+    }
+
+    /// Add any reachable imported `Final` qualifier without establishing a declared type.
+    #[must_use]
+    pub(crate) fn with_imported_final(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidates: ImportedFinalCandidatesIterator<'_, 'db>,
+    ) -> Self {
+        self.with_imported_final_impl(
+            db,
+            env,
+            candidates,
+            RequiresExplicitReExport::No,
+            None,
+            false,
+        )
+    }
+
+    /// Also use an imported `Final`'s source type to constrain an assignment when the target has
+    /// no declared type. An existing annotation always takes precedence over that source type.
+    #[must_use]
+    pub(crate) fn with_imported_final_for_assignment(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidates: ImportedFinalCandidatesIterator<'_, 'db>,
+        reachability_cache: &ReachabilityEvaluationCache<'db>,
+    ) -> Self {
+        self.with_imported_final_impl(
+            db,
+            env,
+            candidates,
+            RequiresExplicitReExport::No,
+            Some(reachability_cache),
+            true,
+        )
+    }
+
+    /// This can be called cross-module, so resolve imports through semantic queries without
+    /// reading AST nodes from the file containing the candidate definitions.
+    fn with_imported_final_impl(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidates: ImportedFinalCandidatesIterator<'_, 'db>,
+        requires_explicit_reexport: RequiresExplicitReExport,
+        reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
+        fallback_to_imported_type: bool,
+    ) -> Self {
+        let predicates = candidates.predicates();
+        let reachability_constraints = candidates.reachability_constraints();
+        let fallback_to_imported_type = fallback_to_imported_type && self.place.is_none();
+
+        let mut first_imported_type = None;
+        let mut imported_type_builder: Option<PublicTypeBuilder<'db>> = None;
+        let mut imported_provenance = Provenance::Unknown;
+        let mut imported_reachability = Truthiness::AlwaysFalse;
+
+        for candidate in candidates {
+            let definition = candidate.definition;
+
+            // A genuine stub annotation can export its symbol even when an import omits the
+            // redundant alias normally required for re-export. The import itself remains private.
+            // TODO: Preserve `Final` when a later public assignment re-exports a private import,
+            // without leaking qualifiers from a private branch.
+            if self.first_declaration.is_none()
+                && is_non_exported(db, definition, requires_explicit_reexport)
+            {
+                continue;
+            }
+
+            let static_reachability = evaluate_reachability_with_cache(
+                db,
+                reachability_cache,
+                reachability_constraints,
+                predicates,
+                candidate.reachability_constraint,
+            );
+            if static_reachability.is_always_false() {
+                continue;
+            }
+
+            let Some(declared_type) = inferred_declaration(db, definition).declared() else {
+                continue;
+            };
+            if !declared_type.qualifiers().contains(TypeQualifiers::FINAL) {
+                continue;
+            }
+
+            self.qualifiers.insert(TypeQualifiers::FINAL);
+
+            // Public lookup must still regard this symbol as undeclared. Only assignment
+            // inference without an annotation needs the imported source type as a constraint.
+            if !fallback_to_imported_type {
+                return self;
+            }
+
+            let Some(imported_type) = declared_type.inner_type() else {
+                continue;
+            };
+            imported_reachability = imported_reachability.or(static_reachability);
+            let source_provenance = match declared_type.provenance() {
+                Provenance::Unknown => Provenance::SingleDefinition(definition),
+                provenance => provenance,
+            };
+            imported_provenance = imported_provenance.or(source_provenance);
+
+            if let Some(builder) = &mut imported_type_builder {
+                builder.add(imported_type, static_reachability);
+            } else if let Some((first, first_reachability)) = first_imported_type {
+                let mut builder = PublicTypeBuilder::new(db, env);
+                builder.add(first, first_reachability);
+                builder.add(imported_type, static_reachability);
+                imported_type_builder = Some(builder);
+            } else {
+                first_imported_type = Some((imported_type, static_reachability));
+            }
+        }
+
+        if let Some((first, _)) = first_imported_type {
+            let imported_type = imported_type_builder
+                .map(PublicTypeBuilder::build)
+                .unwrap_or(first);
+            let definedness = if imported_reachability.is_always_true() {
+                Definedness::AlwaysDefined
+            } else {
+                Definedness::PossiblyUndefined
+            };
+            self.place = Some(
+                DefinedPlace::new(Some(imported_type))
+                    .with_definedness(definedness)
+                    .with_provenance(imported_provenance),
+            );
+        }
+
+        self
+    }
+
+    pub(crate) fn ignore_conflicting_declarations(&self) -> PlaceAndQualifiers<'db> {
+        self.place
+            .map_or(Place::Undefined, |place| {
+                Place::Defined(place.with_type(place.ty.unwrap_or_else(Type::unknown)))
+            })
+            .with_qualifiers(self.qualifiers)
     }
 
     pub(crate) fn into_place_and_conflicting_declarations(
@@ -882,7 +1058,10 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
         PlaceAndQualifiers<'db>,
         Option<Box<indexmap::set::Slice<Type<'db>>>>,
     ) {
-        (self.place_and_quals, self.conflicting_types)
+        (
+            self.ignore_conflicting_declarations(),
+            self.conflicting_types,
+        )
     }
 }
 
@@ -941,24 +1120,10 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::NOT_REQUIRED)
     }
 
-    /// Returns `true` if the place has a `ReadOnly` type qualifier.
+    /// Returns `true` if the place has a `ReadOnly` qualifier or is a nested class.
     pub(crate) fn is_read_only(&self) -> bool {
-        self.qualifiers.contains(TypeQualifiers::READ_ONLY)
-    }
-
-    /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
-    pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
-        match self {
-            PlaceAndQualifiers { place, qualifiers }
-                if (qualifiers.contains(TypeQualifiers::FINAL)
-                    && place
-                        .ignore_possibly_undefined()
-                        .is_some_and(|ty| ty.is_unknown())) =>
-            {
-                Some(*qualifiers)
-            }
-            _ => None,
-        }
+        self.qualifiers
+            .intersects(TypeQualifiers::READ_ONLY | TypeQualifiers::NESTED_CLASS)
     }
 
     #[must_use]
@@ -988,7 +1153,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                 place: Place::Defined(place),
                 qualifiers,
             } => {
-                let ty = place.public_type_policy.apply_if_needed(db, env, place.ty);
+                let ty = place.public_type(db, env);
                 let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
                     .with_provenance(place.provenance);
                 match place.definedness {
@@ -1137,92 +1302,50 @@ pub(crate) fn place_by_id<'db>(
     // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
 
-    let declarations = match considered_definitions {
-        ConsideredDefinitions::EndOfScope => use_def.end_of_scope_declarations(place_id),
-        ConsideredDefinitions::AllReachable => use_def.reachable_declarations(place_id),
+    let (declarations, imported_final) = match considered_definitions {
+        ConsideredDefinitions::EndOfScope => (
+            use_def.end_of_scope_declarations(place_id),
+            use_def.end_of_scope_imported_final_candidates(place_id),
+        ),
+        ConsideredDefinitions::AllReachable => (
+            use_def.reachable_declarations(place_id),
+            use_def.reachable_imported_final_candidates(place_id),
+        ),
     };
 
     let declared =
         place_from_declarations_impl(db, &env, declarations, requires_explicit_reexport, None)
-            .ignore_conflicting_declarations();
+            .with_imported_final_impl(
+                db,
+                &env,
+                imported_final,
+                requires_explicit_reexport,
+                None,
+                false,
+            );
 
     let all_considered_bindings = || match considered_definitions {
         ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(place_id),
         ConsideredDefinitions::AllReachable => use_def.reachable_bindings(place_id),
     };
 
-    // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
-    // inferred type, without unioning with `Unknown`, because it cannot be modified.
-    if let Some(qualifiers) = declared.is_bare_final() {
-        let bindings = all_considered_bindings();
-        return place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
-            .place
-            .with_qualifiers(qualifiers);
-    }
-
-    match declared {
-        // Handle bare `ClassVar` annotations by falling back to the union of `Unknown` and the
-        // inferred type.
-        PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    ty: Type::Dynamic(DynamicType::Unknown),
-                    origin,
-                    definedness,
-                    provenance: declared_provenance,
-                    ..
-                }),
-            qualifiers,
-        } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
-            let bindings = all_considered_bindings();
-            match place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
-                .place
-            {
-                Place::Defined(DefinedPlace {
-                    ty: inferred,
-                    origin,
-                    definedness: boundness,
-                    provenance: inferred_provenance,
-                    ..
-                }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_two_elements(db, &env, Type::unknown(), inferred),
-                    origin,
-                    definedness: boundness,
-                    public_type_policy: PublicTypePolicy::Raw,
-                    provenance: inferred_provenance.or(declared_provenance),
-                })
-                .with_qualifiers(qualifiers),
-                Place::Undefined => Place::Defined(DefinedPlace {
-                    ty: Type::unknown(),
-                    origin,
-                    definedness,
-                    public_type_policy: PublicTypePolicy::Raw,
-                    provenance: declared_provenance,
-                })
-                .with_qualifiers(qualifiers),
-            }
-        }
-        // Place is declared, trust the declared type
-        place_and_quals @ PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }),
-            qualifiers: _,
-        } => place_and_quals,
+    let qualifiers = declared.qualifiers();
+    match declared.place {
+        Some(
+            declaration @ DefinedPlace {
+                ty: Some(ty),
+                definedness: Definedness::AlwaysDefined,
+                ..
+            },
+        ) => Place::Defined(declaration.with_type(ty)).with_qualifiers(qualifiers),
         // Place is possibly declared
-        PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    ty: declared_ty,
-                    origin,
-                    definedness: Definedness::PossiblyUndefined,
-                    provenance: declared_provenance,
-                    ..
-                }),
-            qualifiers,
-        } => {
+        Some(DefinedPlace {
+            ty: Some(declared_ty),
+            origin,
+            definedness: Definedness::PossiblyUndefined,
+            provenance: declared_provenance,
+            ..
+        }) => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let inferred =
@@ -1264,16 +1387,26 @@ pub(crate) fn place_by_id<'db>(
 
             PlaceAndQualifiers { place, qualifiers }
         }
-        // Place is undeclared, infer the type from bindings
-        PlaceAndQualifiers {
-            place: Place::Undefined,
-            qualifiers: _,
-        } => {
+        // Without a declared type, infer the public type from bindings.
+        declaration => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let mut inferred =
                 place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
                     .place;
+
+            if let Some(declaration) = declaration {
+                if qualifiers.contains(TypeQualifiers::FINAL) {
+                    // A bare `Final` keeps its inferred literal type.
+                    return inferred.with_qualifiers(qualifiers);
+                }
+                // A bare `ClassVar` can declare a member before any value is available.
+                let Place::Defined(binding) = &mut inferred else {
+                    return Place::Defined(declaration.with_type(Type::unknown()))
+                        .with_qualifiers(qualifiers);
+                };
+                binding.provenance = binding.provenance.or(declaration.provenance);
+            }
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1315,20 +1448,18 @@ pub(crate) fn place_by_id<'db>(
             // We generally trust undeclared places in stubs and expose the raw type.
             let in_stub_file = scope.file(db).is_stub(db);
 
-            if is_considered_non_modifiable
+            if !(is_considered_non_modifiable
                 || is_module_global
                 || scope_has_private_visibility
-                || in_stub_file
+                || in_stub_file)
             {
-                inferred.into()
-            } else {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
                 // `LookupResult` via `into_lookup_result`.
-                inferred
-                    .with_public_type_policy(PublicTypePolicy::Promote)
-                    .into()
+                inferred = inferred.with_public_type_policy(PublicTypePolicy::Promote);
             }
+
+            inferred.with_qualifiers(qualifiers)
         }
     }
 
@@ -1405,7 +1536,7 @@ impl<'db> DeclarationsBoundnessEvaluator<'_, 'db> {
                             "If we have at least one declaration, the implicit `unbound` binding should not be definitely visible"
                         )
                     }
-                    Truthiness::AlwaysFalse => Definedness::AlwaysDefined,
+                    Truthiness::AlwaysFalse | Truthiness::Uninhabited => Definedness::AlwaysDefined,
                     Truthiness::Ambiguous => Definedness::PossiblyUndefined,
                 }
             }
@@ -1461,7 +1592,7 @@ fn symbol_impl<'db>(
 
     place_table(db, scope)
         .symbol_id(name)
-        .map(|symbol| {
+        .map_or_default(|symbol| {
             place_by_id(
                 db,
                 scope,
@@ -1470,14 +1601,13 @@ fn symbol_impl<'db>(
                 considered_definitions,
             )
         })
-        .unwrap_or_default()
 }
 
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
 #[salsa::tracked(
     returns(clone),
     cycle_initial=|db, _, definition: Definition<'db>| {
-        loop_header_reachability_impl(db, definition, true)
+        loop_header_reachability_impl(db, definition, Some(&mut FxHashMap::default()))
     },
     cycle_fn=loop_header_reachability_cycle_recover,
     heap_size = ruff_memory_usage::heap_size,
@@ -1486,7 +1616,7 @@ pub(crate) fn loop_header_reachability<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> LoopHeaderReachability<'db> {
-    loop_header_reachability_impl(db, definition, false)
+    loop_header_reachability_impl(db, definition, None)
 }
 
 fn loop_header_reachability_cycle_recover<'db>(
@@ -1502,7 +1632,7 @@ fn loop_header_reachability_cycle_recover<'db>(
 fn loop_header_reachability_impl<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    is_cycle_initial: bool,
+    mut cycle_initial_cache: Option<&mut FxHashMap<Definition<'db>, Truthiness>>,
 ) -> LoopHeaderReachability<'db> {
     // This cutoff was chosen by benchmarking real isort to keep loop analysis
     // overhead minimal while preserving diagnostics.
@@ -1518,12 +1648,13 @@ fn loop_header_reachability_impl<'db>(
     let place = loop_header_definition.place();
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
+    let mut deleted_narrowing_constraints = FxIndexSet::default();
     let mut reachable_bindings = FxIndexSet::default();
     let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
     let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
         <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
     for live_binding in live_bindings {
-        let reachability = if is_cycle_initial {
+        let reachability = if cycle_initial_cache.is_some() {
             Truthiness::Ambiguous
         } else if use_exact_reachability {
             evaluate_reachability(db, use_def, live_binding.reachability_constraint())
@@ -1540,11 +1671,42 @@ fn loop_header_reachability_impl<'db>(
         }
 
         match use_def.definition(live_binding.binding()) {
-            DefinitionState::Defined(def) => {
+            // Assignment validity can depend on this header, so avoid inferring it while
+            // initializing a cycle.
+            DefinitionState::Defined(def)
+                if cycle_initial_cache.is_some() || !is_discarded_dict_key_assignment(db, def) =>
+            {
                 debug_assert_ne!(
                     def, definition,
                     "loop headers only include bindings from within the loop"
                 );
+                if def.kind(db).is_loop_header() {
+                    // An inner loop can reach a `break` with a header binding that carries a
+                    // deletion from an earlier iteration. That deletion also affects boundness
+                    // in the enclosing loop.
+                    let nested_deleted_reachability =
+                        if let Some(cache) = cycle_initial_cache.as_deref_mut() {
+                            // Cycle initialization cannot evaluate predicates that could re-enter
+                            // the cycle. Memoize this structural walk because a descendant header
+                            // can be reached through several containing headers.
+                            cache.get(&def).copied().unwrap_or_else(|| {
+                                let deleted_reachability =
+                                    loop_header_reachability_impl(db, def, Some(cache))
+                                        .deleted_reachability;
+                                cache.insert(def, deleted_reachability);
+                                deleted_reachability
+                            })
+                        } else {
+                            loop_header_reachability(db, def).deleted_reachability
+                        };
+                    // This binding is reachable, but a conditional loop-back path can make a
+                    // definitely reachable nested deletion only possibly reachable here.
+                    deleted_reachability =
+                        deleted_reachability.or(match nested_deleted_reachability {
+                            Truthiness::AlwaysTrue => reachability,
+                            other => other,
+                        });
+                }
                 reachable_bindings.insert(ReachableLoopBinding {
                     definition: def,
                     narrowing_constraint: live_binding.narrowing_constraint(),
@@ -1553,8 +1715,11 @@ fn loop_header_reachability_impl<'db>(
             // `del` in the loop body is always visible to code after the loop via the
             // normal control flow merge. Updating `deleted_reachability` here is
             // necessary for prior uses in the loop to see it.
-            DefinitionState::Deleted => {
+            // Discarded dictionary-key bindings also require a fallback to the receiver's
+            // value type instead of contributing their assigned value.
+            DefinitionState::Defined(_) | DefinitionState::Deleted => {
                 deleted_reachability = deleted_reachability.or(reachability);
+                deleted_narrowing_constraints.insert(live_binding.narrowing_constraint());
             }
             DefinitionState::Undefined => {
                 unreachable!("loop headers only include bindings from within the loop")
@@ -1564,6 +1729,7 @@ fn loop_header_reachability_impl<'db>(
 
     LoopHeaderReachability {
         deleted_reachability,
+        deleted_narrowing_constraints: deleted_narrowing_constraints.into_iter().collect(),
         reachable_bindings,
     }
 }
@@ -1571,8 +1737,12 @@ fn loop_header_reachability_impl<'db>(
 /// Result of [`loop_header_reachability`]: pre-computed reachability info for loop-back bindings.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct LoopHeaderReachability<'db> {
+    /// Reachability of deletions, including those carried by nested loop headers.
     pub(crate) deleted_reachability: Truthiness,
-    /// Reachable loop-back bindings that are not `del`s.
+    /// Constraints established after a deletion, member invalidation, or discarded key assignment.
+    /// These still narrow the fallback type of the member on the next iteration.
+    pub(crate) deleted_narrowing_constraints: Box<[ScopedNarrowingConstraint]>,
+    /// Reachable loop-back bindings whose values contribute to inferred types.
     pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
 }
 
@@ -1584,15 +1754,27 @@ impl<'db> LoopHeaderReachability<'db> {
     ) -> LoopHeaderReachability<'db> {
         // Avoid losing precision for cycles that are soon to converge.
         // See [`Type::cycle_normalized`] for more details.
-        let reachable_bindings = if cycle.iteration() <= crate::TAINTED_CYCLES {
-            self.reachable_bindings
-        } else {
-            let previous_bindings = previous.reachable_bindings.iter().copied();
-            previous_bindings.chain(self.reachable_bindings).collect()
-        };
+        if cycle.iteration() <= crate::TAINTED_CYCLES {
+            return self;
+        }
+
+        let mut reachable_bindings: FxIndexSet<_> = previous
+            .reachable_bindings
+            .iter()
+            .copied()
+            .chain(self.reachable_bindings)
+            .collect();
+        reachable_bindings.shrink_to_fit();
+        let deleted_narrowing_constraints: FxIndexSet<_> = previous
+            .deleted_narrowing_constraints
+            .iter()
+            .copied()
+            .chain(self.deleted_narrowing_constraints)
+            .collect();
 
         LoopHeaderReachability {
             deleted_reachability: self.deleted_reachability,
+            deleted_narrowing_constraints: deleted_narrowing_constraints.into_iter().collect(),
             reachable_bindings,
         }
     }
@@ -1655,6 +1837,7 @@ fn place_from_bindings_impl<'db>(
     let mut provenance = Provenance::Unknown;
     // special handling for synthetic loop header definitions and nested bindings definitions
     let mut only_non_shadowing_bindings = true;
+    let mut narrowing_projector = None;
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1780,10 +1963,25 @@ fn place_from_bindings_impl<'db>(
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
             let binding_ty = binding_type(db, binding);
-            Some((
-                narrowing_constraint.narrow(db, env, binding_ty, binding.place(db)),
-                static_reachability,
-            ))
+            let narrowed = match narrowing_constraint.constraint() {
+                ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
+                ScopedNarrowingConstraint::ALWAYS_FALSE => Type::Never,
+                constraint => narrowing_projector
+                    .get_or_insert_with(|| {
+                        NarrowingProjector::new(
+                            db,
+                            env,
+                            narrowing_constraint.narrowing_constraints(),
+                            predicates,
+                            narrowing_constraint.predicate_narrowing_targets(),
+                            binding.place(db),
+                            binding_ty,
+                        )
+                        .with_reachability_cache(reachability_cache, reachability_constraints)
+                    })
+                    .narrow(constraint, binding_ty),
+            };
+            Some((narrowed, static_reachability))
         },
     );
 
@@ -1816,13 +2014,15 @@ fn place_from_bindings_impl<'db>(
                         "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
                     )
                 }
-                Some(Truthiness::AlwaysFalse) | None => Definedness::AlwaysDefined,
+                Some(Truthiness::AlwaysFalse | Truthiness::Uninhabited) | None => {
+                    Definedness::AlwaysDefined
+                }
                 Some(Truthiness::Ambiguous) => Definedness::PossiblyUndefined,
             },
         };
 
         match deleted_reachability {
-            Truthiness::AlwaysFalse => Place::Defined(
+            Truthiness::AlwaysFalse | Truthiness::Uninhabited => Place::Defined(
                 DefinedPlace::new(ty)
                     .with_definedness(boundness)
                     .with_provenance(provenance),
@@ -1937,35 +2137,31 @@ impl<'db> PublicTypeBuilder<'db> {
 
 /// Accumulates multiple (potentially conflicting) declared types and type qualifiers,
 /// and eventually builds a union from them.
+#[derive(Default)]
 struct DeclaredTypeBuilder<'db> {
-    inner: PublicTypeBuilder<'db>,
+    inner: Option<PublicTypeBuilder<'db>>,
     qualifiers: TypeQualifiers,
     first_type: Option<Type<'db>>,
     conflicting_types: FxOrderSet<Type<'db>>,
 }
 
 impl<'db> DeclaredTypeBuilder<'db> {
-    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
-        DeclaredTypeBuilder {
-            inner: PublicTypeBuilder::new(db, env),
-            qualifiers: TypeQualifiers::empty(),
-            first_type: None,
-            conflicting_types: FxOrderSet::default(),
-        }
-    }
-
     fn add(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        element: TypeAndQualifiers<'db>,
+        element: DeclaredType<'db>,
         reachability: Truthiness,
     ) {
-        debug_assert!(std::ptr::eq(db, self.inner.db));
-
-        let element_ty = element.inner_type();
-
-        if self.inner.add(element_ty, reachability) {
+        self.qualifiers |= element.qualifiers();
+        let Some(element_ty) = element.inner_type() else {
+            return;
+        };
+        let inner = self
+            .inner
+            .get_or_insert_with(|| PublicTypeBuilder::new(db, env));
+        debug_assert!(std::ptr::eq(db, inner.db));
+        if inner.add(element_ty, reachability) {
             if let Some(first_ty) = self.first_type {
                 if !first_ty.is_equivalent_to(db, env, element_ty) {
                     self.conflicting_types.insert(element_ty);
@@ -1974,25 +2170,20 @@ impl<'db> DeclaredTypeBuilder<'db> {
                 self.first_type = Some(element_ty);
             }
         }
-
-        self.qualifiers = self.qualifiers.union(element.qualifiers());
     }
 
     fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
-        let type_and_quals =
-            TypeAndQualifiers::new(self.inner.build(), TypeOrigin::Declared, self.qualifiers);
+        let ty = self.inner.map(PublicTypeBuilder::build);
+        let ty = DeclaredType::new(ty, TypeOrigin::Declared, self.qualifiers);
         if self.conflicting_types.is_empty() {
-            (type_and_quals, None)
+            (ty, None)
         } else {
             self.conflicting_types.insert_before(
                 0,
                 self.first_type
                     .expect("there must be a first type if there are conflicting types"),
             );
-            (
-                type_and_quals,
-                Some(self.conflicting_types.into_boxed_slice()),
-            )
+            (ty, Some(self.conflicting_types.into_boxed_slice()))
         }
     }
 }
@@ -2037,6 +2228,7 @@ fn place_from_declarations_impl<'db>(
     let mut first_declaration = None;
     let mut provenance = Provenance::Unknown;
     let mut all_declarations_definitely_reachable = true;
+    let mut has_qualifier_only_declaration = false;
 
     let mut types = declarations.filter_map(|declaration_with_constraint| {
         let DeclarationWithConstraint {
@@ -2065,6 +2257,7 @@ fn place_from_declarations_impl<'db>(
             None
         } else {
             let declared_type = inferred_declaration(db, declaration).declared()?;
+            has_qualifier_only_declaration |= declared_type.inner_type().is_none();
             first_declaration.get_or_insert(declaration);
             provenance = provenance.or(Provenance::SingleDefinition(declaration));
             all_declarations_definitely_reachable =
@@ -2076,7 +2269,7 @@ fn place_from_declarations_impl<'db>(
 
     if let Some((first, first_reachability)) = types.next() {
         let (declared, conflicting) = if let Some((second, second_reachability)) = types.next() {
-            let mut builder = DeclaredTypeBuilder::new(db, env);
+            let mut builder = DeclaredTypeBuilder::default();
             builder.add(db, env, first, first_reachability);
             builder.add(db, env, second, second_reachability);
             for (element, reachability) in types {
@@ -2087,24 +2280,25 @@ fn place_from_declarations_impl<'db>(
             (first, None)
         };
 
-        let boundness = boundness_evaluator.evaluate(db, all_declarations_definitely_reachable);
-
-        let place_and_quals = Place::Defined(
-            DefinedPlace::new(declared.inner_type())
-                .with_origin(TypeOrigin::Declared)
-                .with_definedness(boundness)
-                .with_provenance(provenance),
-        )
-        .with_qualifiers(declared.qualifiers());
-
-        if let Some(conflicting) = conflicting {
-            PlaceFromDeclarationsResult::conflict(place_and_quals, conflicting, first_declaration)
+        // When only some paths declare a type, public lookup also considers the inferred
+        // type of the bindings, just as it would for paths with no annotation at all.
+        let boundness = if has_qualifier_only_declaration && declared.inner_type().is_some() {
+            Definedness::PossiblyUndefined
         } else {
-            PlaceFromDeclarationsResult {
-                place_and_quals,
-                conflicting_types: None,
-                first_declaration,
-            }
+            boundness_evaluator.evaluate(db, all_declarations_definitely_reachable)
+        };
+
+        PlaceFromDeclarationsResult {
+            place: Some(
+                DefinedPlace::new(declared.inner_type())
+                    .with_origin(TypeOrigin::Declared)
+                    .with_definedness(boundness)
+                    .with_provenance(provenance),
+            ),
+            qualifiers: declared.qualifiers(),
+            conflicting_types: conflicting,
+            has_qualifier_only_declaration,
+            first_declaration,
         }
     } else {
         PlaceFromDeclarationsResult::default()

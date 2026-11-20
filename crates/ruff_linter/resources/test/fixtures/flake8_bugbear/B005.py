@@ -22,6 +22,7 @@ s.strip("あ")  # no warning
 s.strip("ああ")  # warning
 s.strip("\ufeff")  # no warning
 s.strip("\u0074\u0065\u0073\u0074")  # warning
+s.strip("--").lstrip("--")  # two warnings
 
 from somewhere import other_type, strip
 

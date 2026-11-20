@@ -7,6 +7,7 @@ use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -33,10 +34,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     def bar(cls): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.7")]
-pub(crate) struct NoClassmethodDecorator;
+#[violation_metadata(preview_since = "v0.1.7", category = Category::Style)]
+pub(crate) struct NonDecoratorClassmethod;
 
-impl AlwaysFixableViolation for NoClassmethodDecorator {
+impl AlwaysFixableViolation for NonDecoratorClassmethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Class method defined without decorator".to_string()
@@ -70,10 +71,10 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 ///     def bar(arg1, arg2): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.7")]
-pub(crate) struct NoStaticmethodDecorator;
+#[violation_metadata(preview_since = "v0.1.7", category = Category::Style)]
+pub(crate) struct NonDecoratorStaticmethod;
 
-impl AlwaysFixableViolation for NoStaticmethodDecorator {
+impl AlwaysFixableViolation for NonDecoratorStaticmethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Static method defined without decorator".to_string()
@@ -174,9 +175,11 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
 
             let range = TextRange::new(stmt.range().start(), stmt.range().start());
             let mut diagnostic = match method_type {
-                MethodType::Classmethod => checker.report_diagnostic(NoClassmethodDecorator, range),
+                MethodType::Classmethod => {
+                    checker.report_diagnostic(NonDecoratorClassmethod, range)
+                }
                 MethodType::Staticmethod => {
-                    checker.report_diagnostic(NoStaticmethodDecorator, range)
+                    checker.report_diagnostic(NonDecoratorStaticmethod, range)
                 }
             };
 

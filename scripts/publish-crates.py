@@ -2,18 +2,11 @@
 # requires-python = ">=3.12"
 # dependencies = []
 #
-# [tool.ty.rules]
-# blanket-ignore-comment = "warn"
-# missing-type-argument = "warn"
-# possibly-unresolved-reference = "warn"
-# unsound-return-statement = "warn"
-# unsound-yield = "warn"
-# unsupported-dynamic-base = "warn"
-# division-by-zero = "warn"
-#
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 # Publish workspace crates to crates.io idempotently.
@@ -151,7 +144,7 @@ def publish_workspace(
         print(f"  {crate.pretty()}")
 
     command = build_cargo_publish_command(cargo, existing, cargo_publish_args)
-    return subprocess.run(command, cwd=REPO_ROOT).returncode
+    return subprocess.run(command, cwd=REPO_ROOT, check=False).returncode
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

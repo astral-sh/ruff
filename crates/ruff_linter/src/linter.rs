@@ -1,13 +1,14 @@
 use std::borrow::Cow;
+use std::collections::hash_map::Entry;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use rustc_hash::FxBuildHasher;
+use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, SecondaryCode};
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
@@ -25,15 +26,14 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
 use crate::noqa::add_suppression;
 use crate::package::PackageRoot;
-use crate::preview::is_py315_support_enabled;
-use crate::registry::Rule;
+use crate::registry::{LintSource, Rule};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
 use crate::suppression::Suppressions;
-use crate::{Locator, SuppressionKind, directives, fs, warn_user_once};
+use crate::{Locator, SuppressionKind, directives, fs};
 
 pub(crate) mod float;
 
@@ -57,31 +57,35 @@ impl LinterResult {
 
 #[derive(Debug, Default, PartialEq)]
 struct FixCount {
-    rule_name: &'static str,
+    code: Option<SecondaryCode>,
     count: usize,
 }
 
-/// A mapping from a noqa code to the corresponding lint name and a count of applied fixes.
+/// A mapping from a diagnostic's identifier to its optional noqa code and fix count.
 #[derive(Debug, Default, PartialEq)]
-pub struct FixTable(hashbrown::HashMap<SecondaryCode, FixCount, rustc_hash::FxBuildHasher>);
+pub struct FixTable(FxHashMap<DiagnosticId, FixCount>);
 
 impl FixTable {
     pub fn counts(&self) -> impl Iterator<Item = usize> {
         self.0.values().map(|fc| fc.count)
     }
 
-    pub fn entry<'a>(&'a mut self, code: &'a SecondaryCode) -> FixTableEntry<'a> {
-        FixTableEntry(self.0.entry_ref(code))
+    pub fn entry(&mut self, id: DiagnosticId) -> FixTableEntry<'_> {
+        FixTableEntry(self.0.entry(id))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&SecondaryCode, &'static str, usize)> {
+    pub fn iter(&self) -> impl Iterator<Item = (DiagnosticId, Option<&SecondaryCode>, usize)> {
         self.0
             .iter()
-            .map(|(code, FixCount { rule_name, count })| (code, *rule_name, *count))
+            .map(|(id, FixCount { code, count })| (*id, code.as_ref(), *count))
     }
 
-    fn keys(&self) -> impl Iterator<Item = &SecondaryCode> {
-        self.0.keys()
+    /// Iterate over secondary codes, falling back to rule names for rules without codes.
+    fn identifiers(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().map(|(id, FixCount { code, .. })| {
+            code.as_ref()
+                .map_or_else(|| id.as_str(), SecondaryCode::as_str)
+        })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -89,16 +93,14 @@ impl FixTable {
     }
 }
 
-pub struct FixTableEntry<'a>(
-    hashbrown::hash_map::EntryRef<'a, 'a, SecondaryCode, SecondaryCode, FixCount, FxBuildHasher>,
-);
+pub struct FixTableEntry<'a>(Entry<'a, DiagnosticId, FixCount>);
 
 impl<'a> FixTableEntry<'a> {
-    pub fn or_default(self, rule_name: &'static str) -> &'a mut usize {
+    pub fn or_default(self, code: Option<&SecondaryCode>) -> &'a mut usize {
         &mut (self
             .0
-            .or_insert(FixCount {
-                rule_name,
+            .or_insert_with(|| FixCount {
+                code: code.cloned(),
                 count: 0,
             })
             .count)
@@ -149,10 +151,7 @@ pub fn check_path(
     }
 
     // Run the token-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_tokens())
-    {
+    if context.has_rules_for(LintSource::Tokens) {
         check_tokens(
             tokens,
             path,
@@ -166,10 +165,7 @@ pub fn check_path(
     }
 
     // Run the filesystem-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_filesystem())
-    {
+    if context.has_rules_for(LintSource::Filesystem) {
         check_file_path(
             path,
             package,
@@ -182,10 +178,7 @@ pub fn check_path(
     }
 
     // Run the logical line-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_logical_lines())
-    {
+    if context.has_rules_for(LintSource::LogicalLines) {
         crate::checkers::logical_lines::check_logical_lines(
             tokens, locator, indexer, stylist, settings, &context,
         );
@@ -213,10 +206,7 @@ pub fn check_path(
             &context,
         ));
 
-        let use_imports = !directives.isort.skip_file
-            && context
-                .iter_enabled_rules()
-                .any(|rule_code| rule_code.lint_source().is_imports());
+        let use_imports = !directives.isort.skip_file && context.has_rules_for(LintSource::Imports);
         if use_imports || use_doc_lines {
             if use_imports {
                 check_imports(
@@ -229,7 +219,7 @@ pub fn check_path(
                     package,
                     source_type,
                     cell_offsets,
-                    target_version.linter_version(),
+                    target_version,
                     &context,
                 );
             }
@@ -246,10 +236,7 @@ pub fn check_path(
     }
 
     // Run the lines-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_physical_lines())
-    {
+    if context.has_rules_for(LintSource::PhysicalLines) {
         check_physical_lines(locator, stylist, indexer, &doc_lines, settings, &context);
     }
 
@@ -328,11 +315,7 @@ pub fn check_path(
     }
 
     // Enforce `noqa` directives.
-    if noqa.is_enabled()
-        || context
-            .iter_enabled_rules()
-            .any(|rule_code| rule_code.lint_source().is_noqa())
-    {
+    if noqa.is_enabled() || context.has_rules_for(LintSource::Noqa) {
         let ignored = check_noqa(
             &mut context,
             path,
@@ -452,14 +435,6 @@ pub fn lint_only(
 ) -> LinterResult {
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version.linter_version(), PythonVersion::PY315)
-        && !is_py315_support_enabled(settings)
-    {
-        warn_user_once!(
-            "Support for Python 3.15 is under development and may be unstable. Enable `preview` to remove this warning."
-        );
-    }
-
     let parsed = source.into_parsed(source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
@@ -566,14 +541,6 @@ pub fn lint_fix<'a>(
 
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version.linter_version(), PythonVersion::PY315)
-        && !is_py315_support_enabled(settings)
-    {
-        warn_user_once!(
-            "Support for Python 3.15 is under development and may be unstable. Enable `preview` to remove this warning."
-        );
-    }
-
     // Continuously fix until the source code stabilizes.
     loop {
         // Parse once.
@@ -627,7 +594,12 @@ pub fn lint_fix<'a>(
             // syntax error. Return the original code.
             if has_valid_syntax && has_no_syntax_errors {
                 if let Some(error) = parsed.errors().first() {
-                    report_fix_syntax_error(path, transformed.source_code(), error, fixed.keys());
+                    report_fix_syntax_error(
+                        path,
+                        transformed.source_code(),
+                        error,
+                        fixed.identifiers(),
+                    );
                     return Err(anyhow!("Fix introduced a syntax error"));
                 }
             }
@@ -642,8 +614,8 @@ pub fn lint_fix<'a>(
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
-                for (rule, name, count) in applied.iter() {
-                    *fixed.entry(rule).or_default(name) += count;
+                for (id, code, count) in applied.iter() {
+                    *fixed.entry(id).or_default(code) += count;
                 }
 
                 transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
@@ -682,7 +654,7 @@ pub(crate) fn report_failed_to_converge_error(
     transformed: &str,
     diagnostics: &[Diagnostic],
 ) {
-    let codes = collect_rule_codes(diagnostics.iter().filter_map(Diagnostic::secondary_code));
+    let codes = collect_rule_codes(diagnostics.iter().map(Diagnostic::secondary_code_or_id));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
@@ -718,7 +690,7 @@ fn report_fix_syntax_error<'a>(
     path: &Path,
     transformed: &str,
     error: &ParseError,
-    rules: impl IntoIterator<Item = &'a SecondaryCode>,
+    rules: impl IntoIterator<Item = &'a str>,
 ) {
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {
@@ -810,7 +782,7 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use test_case::test_case;
 
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::{Diagnostic, DummyFileResolver};
     use ruff_notebook::{Notebook, NotebookError};
 
     use crate::linter::{check_path, parse_unchecked_source};
@@ -1008,7 +980,10 @@ mod tests {
             target_version,
             &suppressions,
         );
-        diagnostics.sort_by(Diagnostic::ruff_start_ordering);
+        diagnostics.sort_by(|a, b| {
+            a.rendering_sort_key(&DummyFileResolver)
+                .cmp(&b.rendering_sort_key(&DummyFileResolver))
+        });
         diagnostics
     }
 
@@ -1222,7 +1197,7 @@ mod tests {
 		&LinterSettings {
 			unresolved_target_version: PythonVersion { major: 3, minor: 9 }.into(),
 			typing_extensions: false,
-			..LinterSettings::for_rule(Rule::TypeAliasWithoutAnnotation)
+			..LinterSettings::for_rule(Rule::UnannotatedTypeAliasInStub)
 		}
 	)]
     fn test_disabled_typing_extensions_pyi(name: &str, contents: &str, settings: &LinterSettings) {

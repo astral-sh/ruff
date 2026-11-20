@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `for` loops that append every item of an iterable to a list,
@@ -37,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// filtered = list(original)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276")]
+#[violation_metadata(stable_since = "v0.0.276", category = Category::Complexity)]
 pub(crate) struct ManualListCopy;
 
 impl Violation for ManualListCopy {

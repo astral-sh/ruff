@@ -6,9 +6,10 @@ use lsp_server::RequestId;
 use lsp_types::WorkspaceDiagnosticRequest;
 use lsp_types::{
     FullDocumentDiagnosticReport, PreviousResultId, ProgressToken,
-    UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
-    WorkspaceDiagnosticReportPartialResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
+    UnchangedDocumentDiagnosticReport, Uri, WorkDoneProgressBegin, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceUnchangedDocumentDiagnosticReport,
 };
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
@@ -17,7 +18,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use ty_ide::{Hint, hints};
-use ty_project::{ProgressReporter, ProjectDatabase, SemanticDb as _};
+use ty_project::{ProgressReporter, ProjectDatabase};
 
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
@@ -98,6 +99,9 @@ use crate::system::file_to_uri;
 /// suspended workspace diagnostic request (if any) after every notification if the notification
 /// changed the [`Session`]'s state.
 ///
+/// A script contributes no diagnostics while its first uv sync is pending. Applying the
+/// result wakes a long-polling request so it can check the script.
+///
 /// [workspace-diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic)
 pub(crate) struct WorkspaceDiagnosticRequestHandler;
 
@@ -105,15 +109,15 @@ impl RequestHandler for WorkspaceDiagnosticRequestHandler {
     type RequestType = WorkspaceDiagnosticRequest;
 }
 
-impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
-    fn run(
+impl WorkspaceDiagnosticRequestHandler {
+    fn workspace_diagnostics(
         snapshot: &SessionSnapshot,
         client: &Client,
         params: WorkspaceDiagnosticParams,
-    ) -> Result<WorkspaceDiagnosticReport> {
+    ) -> WorkspaceDiagnosticReportResult {
         if !snapshot.global_settings().diagnostic_mode().is_workspace() {
             tracing::debug!("Workspace diagnostics is disabled; returning empty report");
-            return Ok(WorkspaceDiagnosticReport { items: vec![] });
+            return WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport::default());
         }
 
         let writer = ResponseWriter::new(
@@ -130,7 +134,12 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         let work_done_progress = LazyWorkDoneProgress::new(
             client,
             params.work_done_progress_params.work_done_token,
-            "Checking",
+            WorkDoneProgressBegin {
+                title: "Checking".into(),
+                cancellable: Some(false),
+                message: None,
+                percentage: Some(0),
+            },
             snapshot.resolved_client_capabilities(),
         );
         let mut reporter = WorkspaceDiagnosticsProgressReporter::new(work_done_progress, writer);
@@ -139,7 +148,17 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
             db.check_with_reporter(&mut reporter);
         }
 
-        Ok(reporter.into_final_report())
+        reporter.into_final_report()
+    }
+}
+
+impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
+    fn run(
+        snapshot: &SessionSnapshot,
+        client: &Client,
+        params: WorkspaceDiagnosticParams,
+    ) -> Result<WorkspaceDiagnosticReport> {
+        Ok(Self::workspace_diagnostics(snapshot, client, params).into_report())
     }
 
     fn handle_request(
@@ -148,7 +167,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         client: &Client,
         params: WorkspaceDiagnosticParams,
     ) {
-        let result = Self::run(&snapshot, client, params.clone());
+        let result = Self::workspace_diagnostics(&snapshot, client, params.clone());
 
         // Test if this is a no-op result, in which case we should long-poll the request and
         // only respond once some diagnostics have changed to get the latest result ids.
@@ -159,7 +178,9 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         //   case we shouldn't do any long polling because some diagnostics changed).
         // * If this is a full report, then check if all items are unchanged (or empty), the same as for
         //   the non-streaming case.
-        if let Ok(WorkspaceDiagnosticReport { items }) = &result {
+        if let WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items }) =
+            &result
+        {
             let all_unchanged = items.iter().all(|item| {
                 matches!(
                     item,
@@ -187,7 +208,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
             }
         }
 
-        client.respond(id, result);
+        client.respond(id, Ok(result.into_report()));
     }
 }
 
@@ -225,7 +246,7 @@ impl<'a> WorkspaceDiagnosticsProgressReporter<'a> {
         }
     }
 
-    fn into_final_report(self) -> WorkspaceDiagnosticReport {
+    fn into_final_report(self) -> WorkspaceDiagnosticReportResult {
         let state = self.state.into_inner().unwrap();
         state.response.into_final_report()
     }
@@ -239,7 +260,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
-        let unnecessary_hints = hints(db, db.program_file(file));
+        let unnecessary_hints = hints(db, file);
 
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
@@ -258,9 +279,8 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
             state.report_progress(&self.work_done);
         }
 
-        // Don't report empty diagnostics. We clear previous diagnostics in `into_response`
-        // which also handles the case where a file no longer has diagnostics because
-        // it's no longer part of the project.
+        // `into_final_report` clears any previous diagnostics for files with empty results
+        // and for files that are no longer part of the project.
         if !diagnostics.is_empty() || !unnecessary_hints.is_empty() {
             state
                 .response
@@ -287,7 +307,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
-            let unnecessary_hints = hints(db, db.program_file(file));
+            let unnecessary_hints = hints(db, file);
             response.write_diagnostics_for_file(db, file, &diagnostics, &unnecessary_hints);
         }
         response.maybe_flush();
@@ -394,45 +414,48 @@ impl<'a> ResponseWriter<'a> {
         let key = DocumentKey::from_uri(&uri);
         let version = self
             .index
-            .document_handle(&uri)
+            .open_document_handle(&uri)
             .map(|doc| doc.version())
             .ok();
 
-        let result_id = Diagnostics::result_id_from_hash(
+        let diagnostics = diagnostics
+            .iter()
+            .filter(|diagnostic| self.global_settings.should_show_diagnostic(diagnostic));
+        let Some(result_id) = Diagnostics::result_id_from_hash(
             db,
-            diagnostics,
+            diagnostics.clone(),
             unnecessary_hints,
             self.client_capabilities,
-        );
+        ) else {
+            // Leave any previous result ID for `into_final_report` to clear. Without a previous
+            // result, there is nothing to report and the request can continue long polling.
+            return;
+        };
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_uri, id)| id);
 
-        let report = match result_id {
-            Some(new_id) if Some(&new_id) == previous_result_id.as_ref() => {
+        let report = match previous_result_id {
+            Some(previous_id) if result_id == previous_id => {
                 WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
                     WorkspaceUnchangedDocumentDiagnosticReport {
                         uri,
                         version,
                         unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
-                            result_id: new_id,
+                            result_id,
                         },
                     },
                 )
             }
-            new_id => {
+            _ => {
                 let mut lsp_diagnostics = diagnostics
-                    .iter()
-                    .filter_map(|diagnostic| {
-                        Some(
-                            to_lsp_diagnostic(
-                                db,
-                                diagnostic,
-                                self.position_encoding,
-                                self.client_capabilities,
-                                self.global_settings,
-                            )?
-                            .1,
+                    .map(|diagnostic| {
+                        to_lsp_diagnostic(
+                            db,
+                            diagnostic,
+                            self.position_encoding,
+                            self.client_capabilities,
                         )
+                        .1
                     })
                     .collect::<Vec<_>>();
                 lsp_diagnostics.extend(unnecessary_hints_to_lsp_diagnostics(
@@ -447,7 +470,7 @@ impl<'a> ResponseWriter<'a> {
                         uri,
                         version,
                         full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                            result_id: new_id,
+                            result_id: Some(result_id),
                             items: lsp_diagnostics,
                         },
                     },
@@ -483,7 +506,7 @@ impl<'a> ResponseWriter<'a> {
     ///
     /// The result can be a partial or full report depending on whether the server's streaming
     /// diagnostics and if it already sent some diagnostics.
-    fn into_final_report(mut self) -> WorkspaceDiagnosticReport {
+    fn into_final_report(mut self) -> WorkspaceDiagnosticReportResult {
         let mut items = Vec::new();
 
         // Handle files that had diagnostics in previous request but no longer have any
@@ -549,15 +572,12 @@ impl ReportingMode {
     fn create_result(
         &mut self,
         items: Vec<WorkspaceDocumentDiagnosticReport>,
-    ) -> WorkspaceDiagnosticReport {
+    ) -> WorkspaceDiagnosticReportResult {
         match self {
-            ReportingMode::Streaming(streaming) => match streaming.create_result(items) {
-                WorkspaceDiagnosticReportResult::Report(report) => report,
-                WorkspaceDiagnosticReportResult::PartialReport(
-                    WorkspaceDiagnosticReportPartialResult { items },
-                ) => WorkspaceDiagnosticReport { items },
-            },
-            ReportingMode::Bulk(..) => WorkspaceDiagnosticReport { items },
+            ReportingMode::Streaming(streaming) => streaming.create_result(items),
+            ReportingMode::Bulk(..) => {
+                WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items })
+            }
         }
     }
 }
@@ -586,6 +606,17 @@ struct Streaming {
 enum WorkspaceDiagnosticReportResult {
     Report(WorkspaceDiagnosticReport),
     PartialReport(WorkspaceDiagnosticReportPartialResult),
+}
+
+impl WorkspaceDiagnosticReportResult {
+    fn into_report(self) -> WorkspaceDiagnosticReport {
+        match self {
+            Self::Report(report) => report,
+            Self::PartialReport(WorkspaceDiagnosticReportPartialResult { items }) => {
+                WorkspaceDiagnosticReport { items }
+            }
+        }
+    }
 }
 
 impl Streaming {

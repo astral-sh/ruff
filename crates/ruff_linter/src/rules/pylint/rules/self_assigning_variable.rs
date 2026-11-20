@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for self-assignment of variables.
@@ -24,7 +25,7 @@ use crate::checkers::ast::Checker;
 /// country = "Poland"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Suspicious)]
 pub(crate) struct SelfAssigningVariable {
     name: String,
 }
@@ -42,6 +43,12 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
     // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
     // is not a self-assignment).
     if checker.semantic().current_scope().kind.is_class() {
+        return;
+    }
+
+    // For `x = value`, `array_combinations` would allocate a buffer just to yield one pair.
+    if let [target] = assign.targets.as_slice() {
+        visit_assignments(checker, target, assign.value.as_ref());
         return;
     }
 

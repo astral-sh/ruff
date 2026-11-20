@@ -25,7 +25,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Fast-path dict(...) in TypedDict context: infer keyword values against fields,
         // then validate and return the TypedDict type. This also covers `dict(**src)` when `src`
         // is `TypedDict`-shaped.
-        if let Some(tcx) = call_expression_tcx.annotation
+        if let Some(tcx) = call_expression_tcx.expected_type()
             && let Some(typed_dict) = tcx
                 .filter_union(db, self.program_environment(), Type::is_typed_dict)
                 .as_typed_dict()
@@ -56,7 +56,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             if supports_typed_dict_context {
-                self.infer_typed_dict_constructor_keyword_values(typed_dict, arguments);
+                self.infer_typed_dict_constructor_keyword_values(
+                    typed_dict,
+                    arguments,
+                    call_expression_tcx,
+                );
                 validate_typed_dict_constructor(
                     &self.context,
                     typed_dict,
@@ -113,5 +117,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             &mut infer_elt_ty,
             call_expression_tcx,
         )
+        .or_else(|| {
+            // Empty calls still need constructor validation and have no inferred values to preserve.
+            if arguments.is_empty() {
+                return None;
+            }
+
+            // Without generic definitions, collection inference still checks all values. Return
+            // `Unknown` in that case to avoid inferring them again. Specialization failures need
+            // ordinary call checking to report argument errors.
+            KnownClass::Dict
+                .try_to_class_literal(db, self.program_environment())
+                .and_then(|class| class.generic_context(db))
+                .is_none()
+                .then(Type::unknown)
+        })
     }
 }

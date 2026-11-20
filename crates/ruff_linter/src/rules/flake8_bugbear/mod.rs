@@ -36,7 +36,7 @@ mod tests {
     #[test_case(Rule::FStringDocstring, Path::new("B021.py"))]
     #[test_case(Rule::FunctionCallInDefaultArgument, Path::new("B006_B008.py"))]
     #[test_case(Rule::FunctionUsesLoopVariable, Path::new("B023.py"))]
-    #[test_case(Rule::GetAttrWithConstant, Path::new("B009_B010.py"))]
+    #[test_case(Rule::GetattrWithConstant, Path::new("B009_B010.py"))]
     #[test_case(Rule::JumpStatementInFinally, Path::new("B012.py"))]
     #[test_case(Rule::LoopVariableOverridesIterator, Path::new("B020.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.py"))]
@@ -56,8 +56,8 @@ mod tests {
     #[test_case(Rule::ReSubPositionalArgs, Path::new("B034.py"))]
     #[test_case(Rule::RedundantTupleInExceptionHandler, Path::new("B013.py"))]
     #[test_case(Rule::ReuseOfGroupbyGenerator, Path::new("B031.py"))]
-    #[test_case(Rule::DelAttrWithConstant, Path::new("B043.py"))]
-    #[test_case(Rule::SetAttrWithConstant, Path::new("B009_B010.py"))]
+    #[test_case(Rule::DelattrWithConstant, Path::new("B043.py"))]
+    #[test_case(Rule::SetattrWithConstant, Path::new("B009_B010.py"))]
     #[test_case(Rule::StarArgUnpackingAfterKeywordArg, Path::new("B026.py"))]
     #[test_case(Rule::StaticKeyDictComprehension, Path::new("B035.py"))]
     #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"))]
@@ -76,7 +76,7 @@ mod tests {
     #[test_case(Rule::BatchedWithoutExplicitStrict, Path::new("B911.py"))]
     #[test_case(Rule::MapWithoutExplicitStrict, Path::new("B912.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -96,12 +96,9 @@ mod tests {
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
+    #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &LinterSettings::for_rule(rule_code)
@@ -134,7 +131,7 @@ mod tests {
     ) -> Result<()> {
         let snapshot = format!(
             "{}_py{}{}_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             target_version.major,
             target_version.minor,
             path.to_string_lossy(),

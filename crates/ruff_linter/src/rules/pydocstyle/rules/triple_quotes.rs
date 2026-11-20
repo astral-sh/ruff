@@ -3,6 +3,7 @@ use ruff_python_ast::str::Quote;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -47,12 +48,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.69")]
-pub(crate) struct TripleSingleQuotes {
+#[violation_metadata(stable_since = "v0.0.69", category = Category::Formatting)]
+pub(crate) struct UnconventionalDocstringQuotes {
     expected_quote: Quote,
 }
 
-impl Violation for TripleSingleQuotes {
+impl Violation for UnconventionalDocstringQuotes {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -89,8 +90,10 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
     match expected_quote {
         Quote::Single => {
             if !opener.ends_with("'''") {
-                let mut diagnostic = checker
-                    .report_diagnostic(TripleSingleQuotes { expected_quote }, docstring.range());
+                let mut diagnostic = checker.report_diagnostic(
+                    UnconventionalDocstringQuotes { expected_quote },
+                    docstring.range(),
+                );
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('\'') {
@@ -103,8 +106,10 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
         }
         Quote::Double => {
             if !opener.ends_with("\"\"\"") {
-                let mut diagnostic = checker
-                    .report_diagnostic(TripleSingleQuotes { expected_quote }, docstring.range());
+                let mut diagnostic = checker.report_diagnostic(
+                    UnconventionalDocstringQuotes { expected_quote },
+                    docstring.range(),
+                );
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('"') {

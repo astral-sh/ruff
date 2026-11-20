@@ -24,9 +24,11 @@ concurrency:
   group: build-binaries-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-permissions: {}
+permissions:
+  contents: read
 
 env:
+  UV_LOCKED: 1
   ACTIONS_CACHE_MODE: none
   PACKAGE_NAME: ruff
   MODULE_NAME: ruff
@@ -55,24 +57,33 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           command: sdist
           args: --out dist
       - name: "Test sdist"
-        run: |
-          pip install dist/"${PACKAGE_NAME}"-*.tar.gz --force-reinstall
-          "${MODULE_NAME}" --help
-          python -m "${MODULE_NAME}" --help
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
+        with:
+          image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
+          artifacts: dist
+          rust-toolchain: rust-toolchain.toml
+          run: |
+            # pip builds outside /test, where the toolchain file no longer applies.
+            rustup default "$(rustup show active-toolchain | cut -d ' ' -f1)"
+            pip install /dist/"${PACKAGE_NAME}"-*.tar.gz --force-reinstall
+            "${MODULE_NAME}" --help
+            python -m "${MODULE_NAME}" --help
       - name: "Upload sdist"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-sdist
+          compression-level: 0
           path: dist
 
   macos-x86_64:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'namespace-profile-macos-15' || 'macos-15' }}
     steps:
+      - uses: astral-sh/github-actions/demudhra@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
@@ -88,7 +99,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: x86_64
           args: --release --locked --out dist --compatibility pypi
         env:
@@ -96,9 +107,10 @@ jobs:
           # ICF reduces the macOS x86_64 ruff binary size by ~1.5%.
           RUSTFLAGS: "-C linker=rust-lld -C linker-flavor=ld64.lld -C link-arg=--icf=safe"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-macos-x86_64
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         run: |
@@ -111,9 +123,10 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: artifacts-macos-x86_64
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -126,6 +139,7 @@ jobs:
       # ICF reduces the macOS aarch64 ruff binary size by ~0.8%.
       RUSTFLAGS: "-C linker=rust-lld -C linker-flavor=ld64.lld -C link-arg=--icf=safe"
     steps:
+      - uses: astral-sh/github-actions/demudhra@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
@@ -149,7 +163,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: aarch64
           args: --release --locked --out dist --compatibility pypi
         env:
@@ -163,9 +177,10 @@ jobs:
           ruff --help
           python -m ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-aarch64-apple-darwin
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         run: |
@@ -178,9 +193,10 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: artifacts-aarch64-apple-darwin
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -228,7 +244,7 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist --compatibility pypi
         env:
@@ -254,9 +270,10 @@ jobs:
           "${MODULE_NAME}" --help
           python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-${{ matrix.platform.target }}
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -265,9 +282,10 @@ jobs:
           7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/ruff.exe
           sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: artifacts-${{ matrix.platform.target }}
+          compression-level: 0
           path: |
             *.zip
             *.sha256
@@ -308,20 +326,25 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: ${{ matrix.target }}
           manylinux: 2_17
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
-        run: |
-          pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
-          "${MODULE_NAME}" --help
-          python -m "${MODULE_NAME}" --help
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
+        with:
+          image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
+          artifacts: dist
+          run: |
+            pip install /dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
+            "${MODULE_NAME}" --help
+            python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-${{ matrix.target }}
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -337,9 +360,10 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: artifacts-${{ matrix.target }}
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -376,20 +400,26 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: aarch64-unknown-linux-gnu
           manylinux: 2_17
           docker-options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
-        run: |
-          pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
-          "${MODULE_NAME}" --help
-          python -m "${MODULE_NAME}" --help
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
+        with:
+          image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
+          platform: linux/arm64
+          artifacts: dist
+          run: |
+            pip install /dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
+            "${MODULE_NAME}" --help
+            python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-aarch64-unknown-linux-gnu
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -405,9 +435,10 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: artifacts-aarch64-unknown-linux-gnu
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -419,23 +450,26 @@ jobs:
       matrix:
         platform:
           - target: armv7-unknown-linux-gnueabihf
-            arch: armv7
+            test_image: arm32v7/ubuntu:20.04@sha256:d9a6ab6baaf86907ea1d46f0cbc87547920077c9c6017721faed6eeb51e9aa7e
+            test_platform: linux/arm/v7
             manylinux: 2_17
           - target: s390x-unknown-linux-gnu
-            arch: s390x
+            test_image: s390x/ubuntu:20.04@sha256:221f5f8e28d896556d0e55605cd6936450e6231544e9d83d687beae2d0e71afd
+            test_platform: linux/s390x
             manylinux: 2_17
             maturin_docker_options: -e CFLAGS_s390x_unknown_linux_gnu=-march=z10
           - target: powerpc64le-unknown-linux-gnu
-            arch: ppc64le
             manylinux: 2_17
             # see https://github.com/astral-sh/ruff/issues/10073
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: arm-unknown-linux-musleabihf
             # Use the cross container, but tag as `linux_armv6l`
             manylinux: auto
-            arch: arm
+            test_image: balenalib/rpi-raspbian:bullseye@sha256:851cfc48b26f6413a72a7f6873a7624ba2a427048976f6ab4483f72fe165d4f1
+            test_platform: linux/arm/v6
           - target: riscv64gc-unknown-linux-gnu
-            arch: riscv64
+            test_image: riscv64/ubuntu:20.04@sha256:610bedb0c5d9aeae4b45e9064e820c4e0b0f6c1d2843116b0a1ae754890951ac
+            test_platform: linux/riscv64
             # Minimum manylinux target for riscv64
             manylinux: 2_31
 
@@ -454,29 +488,29 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: ${{ matrix.platform.target }}
           manylinux: ${{ matrix.platform.manylinux }}
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist --compatibility pypi
-      - uses: uraimo/run-on-arch-action@f9b26e3a1a408d5fd530d20c17b9f3f4428ff8d9 # v3.1.0
-        if: ${{ matrix.platform.arch != 'ppc64le'}}
-        name: Test wheel
+      - name: "Test wheel"
+        if: ${{ matrix.platform.target != 'powerpc64le-unknown-linux-gnu' }}
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
-          arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
-          distro: ${{ matrix.platform.arch == 'arm' && 'bullseye' || 'ubuntu20.04' }}
-          githubToken: ${{ github.token }}
-          install: |
+          image: ${{ matrix.platform.test_image }}
+          platform: ${{ matrix.platform.test_platform }}
+          artifacts: dist
+          run: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip libatomic1
-            pip3 install -U pip
-          run: |
-            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
+            python3 -m pip install --upgrade --require-hashes -r /pip-requirements.txt
+            python3 -m pip install "${PACKAGE_NAME}" --no-index --find-links /dist --force-reinstall
             ruff --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-${{ matrix.platform.target }}
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -492,9 +526,10 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: artifacts-${{ matrix.platform.target }}
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -523,23 +558,26 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/io -w /io --env MODULE_NAME --env PACKAGE_NAME alpine:latest sh -c "
-            apk add python3;
-            python -m venv .venv;
-            .venv/bin/pip3 install ${PACKAGE_NAME} --no-index --find-links dist/ --force-reinstall;
-            .venv/bin/${MODULE_NAME} --help;
-            "
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
+        with:
+          image: alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+          artifacts: dist
+          run: |
+            apk add python3
+            python -m venv .venv
+            .venv/bin/pip3 install "${PACKAGE_NAME}" --no-index --find-links /dist --force-reinstall
+            .venv/bin/"${MODULE_NAME}" --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-${{ matrix.target }}
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -555,9 +593,10 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: artifacts-${{ matrix.target }}
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256
@@ -569,10 +608,10 @@ jobs:
       matrix:
         platform:
           - target: aarch64-unknown-linux-musl
-            arch: aarch64
+            test_platform: linux/arm64
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-musleabihf
-            arch: armv7
+            test_platform: linux/arm/v7
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -589,27 +628,27 @@ jobs:
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           sccache: false
-          maturin-version: v1.14.1
+          maturin-version: v1.15.0
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist --compatibility pypi
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-      - uses: uraimo/run-on-arch-action@f9b26e3a1a408d5fd530d20c17b9f3f4428ff8d9 # v3.1.0
-        name: Test wheel
+      - name: "Test wheel"
+        uses: astral-sh/github-actions/release-smoke-test@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
-          arch: ${{ matrix.platform.arch }}
-          distro: alpine_latest
-          githubToken: ${{ github.token }}
-          install: |
-            apk add python3
+          image: alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+          platform: ${{ matrix.platform.test_platform }}
+          artifacts: dist
           run: |
+            apk add python3
             python -m venv .venv
-            .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            .venv/bin/${{ env.MODULE_NAME }} --help
+            .venv/bin/pip3 install "${PACKAGE_NAME}" --no-index --find-links /dist --force-reinstall
+            .venv/bin/"${MODULE_NAME}" --help
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-${{ matrix.platform.target }}
+          compression-level: 0
           path: dist
       - name: "Archive binary"
         shell: bash
@@ -625,9 +664,10 @@ jobs:
           tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: artifacts-${{ matrix.platform.target }}
+          compression-level: 0
           path: |
             *.tar.gz
             *.sha256

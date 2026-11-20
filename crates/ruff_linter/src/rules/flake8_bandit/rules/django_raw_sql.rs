@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of Django's `RawSQL` function.
@@ -25,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// - [Django documentation: SQL injection protection](https://docs.djangoproject.com/en/dev/topics/security/#sql-injection-protection)
 /// - [Common Weakness Enumeration: CWE-89](https://cwe.mitre.org/data/definitions/89.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Security)]
 pub(crate) struct DjangoRawSql;
 
 impl Violation for DjangoRawSql {
@@ -41,16 +42,10 @@ pub(crate) fn django_raw_sql(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["django", "db", "models", "expressions", "RawSQL"]
-            )
-        })
-    {
+    if checker.semantic().matches_qualified_name(
+        &call.func,
+        &["django", "db", "models", "expressions", "RawSQL"],
+    ) {
         if !call
             .arguments
             .find_argument_value("sql", 0)

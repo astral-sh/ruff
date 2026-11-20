@@ -1,8 +1,7 @@
 ## What it does
 
-Checks for class definitions where the metaclass of the class
-being created would not be a subclass of the metaclasses of
-all the class's bases.
+Checks for class definitions where the metaclass of the class being created would not be a subclass
+of the metaclasses of all the class's bases.
 
 ## Why is it bad?
 

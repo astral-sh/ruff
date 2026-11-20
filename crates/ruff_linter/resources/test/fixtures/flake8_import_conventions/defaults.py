@@ -4,6 +4,7 @@ def not_checked():
 
 def unconventional():
     import altair
+    import datetime
     import matplotlib.pyplot
     import numpy
     import pandas
@@ -14,6 +15,7 @@ def unconventional():
 
 def unconventional_aliases():
     import altair as altr
+    import datetime as date_time
     import matplotlib.pyplot as plot
     import numpy as nmp
     import pandas as pdas
@@ -24,6 +26,7 @@ def unconventional_aliases():
 
 def conventional_aliases():
     import altair as alt
+    import datetime as dt
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd

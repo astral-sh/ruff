@@ -1,5 +1,5 @@
-//! Tests for [`ruff_python_ast::tokens::parentheses_iterator`] and
-//! [`ruff_python_ast::tokens::parenthesized_range`].
+//! Tests for [`ruff_python_ast::token::parentheses_iterator`] and
+//! [`ruff_python_ast::token::parenthesized_range`].
 
 use ruff_python_ast::{
     self as ast, Expr,

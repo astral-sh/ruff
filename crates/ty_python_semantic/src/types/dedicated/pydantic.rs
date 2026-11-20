@@ -1,32 +1,38 @@
 use crate::ProgramEnvironment;
 use char_str::CharStr;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{parsed_module, parsed_string_annotation};
+use ruff_db::source::source_text;
 use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, Keyword, name::Name};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
-    place_table, use_def_map,
+    place_table,
+    scope::ScopeId,
+    semantic_index, use_def_map,
 };
 
+use crate::Db;
 use crate::diagnostic::format_enumeration;
 use crate::place::{DefinedPlace, Definedness, Place, Provenance, known_module_symbol};
 use crate::reachability::DeclarationsIteratorExtension;
 use crate::types::call::Bindings;
-use crate::types::class::CodeGeneratorKind;
+use crate::types::class::{CodeGeneratorKind, FieldKind};
 use crate::types::context::InferContext;
+use crate::types::definition_resolution::{ImportAliasResolution, definitions_for_name};
 use crate::types::diagnostic::PYDANTIC_DISCARDED_EXTRA_ARGUMENT;
-use crate::types::ide_support::{ImportAliasResolution, definitions_for_name};
-use crate::types::infer::function_known_decorators;
+use crate::types::infer::{
+    function_known_decorators, infer_complete_scope_types, infer_definition_types,
+};
 use crate::types::known_instance::FieldInstance;
 use crate::types::member::class_member;
 use crate::types::special_form::SpecialFormType;
 use crate::types::{
     ClassBase, ClassType, DataclassTransformerParams, FunctionType, KnownClass, KnownFunction,
-    KnownInstanceType, KnownUnion, Parameter, Specialization, StaticClassLiteral, Type, UnionType,
-    definition_expression_type,
+    KnownInstanceType, KnownUnion, MemberLookupPolicy, Parameter, Parameters, Signature,
+    Specialization, StaticClassLiteral, Type, TypeAliasType, UnionType, definition_expression_type,
+    definition_expression_type_in_scope,
 };
-use crate::{Db, SemanticModel};
 
 /// Pydantic treats underscore-prefixed annotations as private instance attributes.
 pub(in crate::types) fn is_private_attribute(name: &str) -> bool {
@@ -44,6 +50,7 @@ pub(crate) struct ModelMetadata<'db> {
 
 impl get_size2::GetSize for ModelMetadata<'_> {}
 
+#[salsa::tracked]
 impl<'db> ModelMetadata<'db> {
     pub(in crate::types) fn from_class(
         db: &'db dyn Db,
@@ -75,8 +82,53 @@ impl<'db> ModelMetadata<'db> {
         validate_by_name.enabled_or(false)
     }
 
+    pub(in crate::types) fn field_is_strict(self, db: &'db dyn Db, field: ConfigBoolean) -> bool {
+        field.or(self.config(db).strict).is_enabled()
+    }
+
     pub(in crate::types) fn is_frozen(self, db: &'db dyn Db) -> bool {
         self.config(db).frozen.is_enabled()
+    }
+
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    pub(in crate::types) fn generated_hash(
+        self,
+        db: &'db dyn Db,
+        class: StaticClassLiteral<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> Option<Type<'db>> {
+        if !self.is_frozen(db) {
+            return None;
+        }
+        let env = &ProgramEnvironment::from_scope(class.body_scope(db));
+        let inherited = class
+            .class_member_from_mro(
+                db,
+                env,
+                "__hash__",
+                MemberLookupPolicy::default(),
+                class.iter_mro(db, specialization).skip(1),
+            )
+            .place
+            .ignore_possibly_undefined()?;
+        let generated = Type::function_like_callable(
+            db,
+            Signature::new(
+                Parameters::standard([Parameter::positional_or_keyword(Name::new_static("self"))
+                    .with_annotated_type(KnownClass::PydanticBaseModel.to_instance(db, env))]),
+                KnownClass::Int.to_instance(db, env),
+            ),
+        );
+        // Pydantic replaces a disabled, default, or previously generated hash. It leaves
+        // a user-defined hash alone, even if the subclass disables it by defining __eq__.
+        (inherited.is_none(db)
+            || inherited == generated
+            || Some(inherited)
+                == Type::object()
+                    .class_member(db, env, "__hash__")
+                    .place
+                    .ignore_possibly_undefined())
+        .then_some(generated)
     }
 }
 
@@ -93,6 +145,7 @@ pub(in crate::types) struct FieldMetadata<'db> {
     pub(in crate::types) init: bool,
     pub(in crate::types) alias: Option<Box<str>>,
     pub(in crate::types) strict: ConfigBoolean,
+    pub(in crate::types) frozen: ConfigBoolean,
 }
 
 impl Default for FieldMetadata<'_> {
@@ -102,6 +155,7 @@ impl Default for FieldMetadata<'_> {
             init: true,
             alias: None,
             strict: ConfigBoolean::Unspecified,
+            frozen: ConfigBoolean::Unspecified,
         }
     }
 }
@@ -113,15 +167,12 @@ impl<'db> FieldMetadata<'db> {
     /// ```py
     /// field: int = Field(default=0, alias="field_alias")
     /// ```
-    fn collect_from_rhs_type(
-        &mut self,
-        db: &'db dyn Db,
-        rhs_type: Option<Type<'db>>,
-        specialization: Option<Specialization<'db>>,
-    ) {
+    fn collect_from_rhs_type(&mut self, db: &'db dyn Db, rhs_type: Option<Type<'db>>) {
         match rhs_type {
             Some(Type::KnownInstance(KnownInstanceType::Field(field))) => {
-                self.merge_field(db, field, specialization);
+                // `own_fields_inner` has already specialized the right-hand side, including
+                // the default value inside a field specifier.
+                self.merge_field(db, field, None);
             }
             Some(rhs_type) => self.default_ty = Some(rhs_type),
             None => {}
@@ -147,12 +198,44 @@ impl<'db> FieldMetadata<'db> {
         specialization: Option<Specialization<'db>>,
     ) {
         let module = parsed_module(db, definition.python_file(db)).load(db);
-        let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
-            return;
+        let kind = definition.kind(db);
+        let mut annotation = match &kind {
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.annotation(&module),
+            DefinitionKind::TypeAlias(alias) => &alias.node(&module).value,
+            _ => return,
         };
-        let annotation = assignment.annotation(&module);
+        // Capture the scope before unwrapping quotes. A `type` alias evaluates its value
+        // in its own scope, which also applies to names inside a quoted annotation.
+        let file = definition.program_file(db);
+        let scope = semantic_index(db, file)
+            .expression_scope_id(annotation)
+            .to_scope_id(db, file);
+        let mut parsed;
+        while let Expr::StringLiteral(string) = annotation {
+            let is_string_annotation = if scope == definition.scope(db) {
+                infer_definition_types(db, definition).is_string_annotation(annotation)
+            } else {
+                infer_complete_scope_types(db, scope).is_string_annotation(annotation)
+            };
+            if !is_string_annotation {
+                return;
+            }
+            let Some(literal) = string.as_single_part_string() else {
+                return;
+            };
+            let source = source_text(db, definition.file(db));
+            let Ok(inner) = parsed_string_annotation(&source, literal) else {
+                return;
+            };
+            parsed = inner;
+            annotation = parsed.expr();
+        }
 
-        if self.collect_from_annotated(db, definition, annotation, specialization) {
+        let origin = ScopedDefinition {
+            id: definition,
+            scope,
+        };
+        if self.collect_from_annotated(db, origin, annotation, specialization) {
             return;
         }
 
@@ -171,11 +254,10 @@ impl<'db> FieldMetadata<'db> {
         // using `StrictInt = Annotated[int, Strict()]`. Since we don't retain the `Annotated`
         // metadata, we need to follow the alias back to its definition and parse the metadata
         // from there.
-        let model = SemanticModel::new(db, definition.program_file(db));
         let Some(alias_definition) = definitions_for_name(
-            &model,
+            db,
+            scope,
             name.id.as_str(),
-            name.into(),
             ImportAliasResolution::ResolveAliases,
         )
         .into_iter()
@@ -196,21 +278,25 @@ impl<'db> FieldMetadata<'db> {
             _ => return,
         };
 
-        self.collect_from_annotated(db, alias_definition, value, specialization);
+        let origin = ScopedDefinition {
+            id: alias_definition,
+            scope: alias_definition.scope(db),
+        };
+        self.collect_from_annotated(db, origin, value, specialization);
     }
 
     /// Collect Pydantic field metadata from the `Annotated` part of a field's annotation.
     fn collect_from_annotated(
         &mut self,
         db: &'db dyn Db,
-        definition: Definition<'db>,
+        definition: ScopedDefinition<'db>,
         annotation: &Expr,
         specialization: Option<Specialization<'db>>,
     ) -> bool {
         let Some(subscript) = annotation.as_subscript_expr() else {
             return false;
         };
-        if definition_expression_type(db, definition, &subscript.value)
+        if field_expression_type(db, definition, &subscript.value)
             != Type::SpecialForm(SpecialFormType::Annotated)
         {
             return false;
@@ -227,7 +313,7 @@ impl<'db> FieldMetadata<'db> {
             let Some(call) = metadata.as_call_expr() else {
                 continue;
             };
-            let callee = definition_expression_type(db, definition, &call.func);
+            let callee = field_expression_type(db, definition, &call.func);
 
             if callee
                 .as_class_literal()
@@ -236,7 +322,7 @@ impl<'db> FieldMetadata<'db> {
                 let strict = call.arguments.find_argument_value("strict", 0).map_or(
                     ConfigBoolean::Enabled,
                     |strict| {
-                        ConfigBoolean::from_type(definition_expression_type(db, definition, strict))
+                        ConfigBoolean::from_type(field_expression_type(db, definition, strict))
                     },
                 );
                 self.merge_strict(strict);
@@ -245,7 +331,7 @@ impl<'db> FieldMetadata<'db> {
                 Type::FunctionLiteral(function)
                     if function.is_known(db, KnownFunction::PydanticField)
             ) {
-                let field_type = definition_expression_type(db, definition, metadata);
+                let field_type = field_expression_type(db, definition, metadata);
                 if let Type::KnownInstance(KnownInstanceType::Field(field)) = field_type {
                     self.merge_field(db, field, specialization);
                 } else {
@@ -277,18 +363,21 @@ impl<'db> FieldMetadata<'db> {
         if !field.strict(db).is_unspecified() {
             self.strict = field.strict(db);
         }
+        if !field.frozen(db).is_unspecified() {
+            self.frozen = field.frozen(db);
+        }
     }
 
     fn merge_field_call(
         &mut self,
         db: &'db dyn Db,
-        definition: Definition<'db>,
+        definition: ScopedDefinition<'db>,
         call: &ExprCall,
         call_type: Type<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
         if let Some(default) = call.arguments.find_argument_value("default", 0) {
-            let default_type = definition_expression_type(db, definition, default);
+            let default_type = field_expression_type(db, definition, default);
             if !default_type.is_instance_of(db, KnownClass::EllipsisType) {
                 self.default_ty =
                     Some(default_type.apply_optional_specialization(db, specialization));
@@ -298,8 +387,8 @@ impl<'db> FieldMetadata<'db> {
         }
 
         if let Some(init) = call.arguments.find_keyword("init") {
-            let init = definition_expression_type(db, definition, &init.value);
-            let env = ProgramEnvironment::from_definition(definition);
+            let init = field_expression_type(db, definition, &init.value);
+            let env = ProgramEnvironment::from_scope(definition.scope);
             self.init &= !init.bool(db, &env).is_always_false();
         }
 
@@ -308,24 +397,57 @@ impl<'db> FieldMetadata<'db> {
             .find_keyword("validation_alias")
             .or_else(|| call.arguments.find_keyword("alias"))
         {
-            self.alias = definition_expression_type(db, definition, &alias.value)
+            self.alias = field_expression_type(db, definition, &alias.value)
                 .as_string_literal()
                 .map(|literal| Box::from(literal.value(db)));
         }
 
         if let Some(strict) = call.arguments.find_keyword("strict") {
-            let strict = definition_expression_type(db, definition, &strict.value);
+            let strict = field_expression_type(db, definition, &strict.value);
             if !strict.is_none(db) {
                 self.merge_strict(ConfigBoolean::from_type(strict));
             }
         }
+
+        if let Some(frozen) = call.arguments.find_keyword("frozen") {
+            let frozen = field_expression_type(db, definition, &frozen.value);
+            self.frozen = if frozen.is_none(db) {
+                ConfigBoolean::Disabled
+            } else {
+                ConfigBoolean::from_type(frozen)
+            };
+        }
     }
+}
+
+#[derive(Clone, Copy)]
+struct ScopedDefinition<'db> {
+    id: Definition<'db>,
+    scope: ScopeId<'db>,
+}
+
+/// Look up an `Annotated` argument in the scope of the field or type alias that defines it.
+/// Expressions parsed from a quoted annotation have no scope in the semantic index.
+fn field_expression_type<'db>(
+    db: &'db dyn Db,
+    definition: ScopedDefinition<'db>,
+    expression: &Expr,
+) -> Type<'db> {
+    definition_expression_type_in_scope(db, definition.id, expression, definition.scope)
+}
+
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn type_alias_strictness<'db>(db: &'db dyn Db, definition: Definition<'db>) -> ConfigBoolean {
+    let mut metadata = FieldMetadata::default();
+    metadata.collect_from_annotation(db, definition, None);
+    metadata.strict
 }
 
 /// Resolve a Pydantic field's metadata from its annotation and right-hand side.
 pub(in crate::types) fn field_metadata<'db>(
     db: &'db dyn Db,
     definition: Option<Definition<'db>>,
+    declared_ty: Type<'db>,
     rhs_type: Option<Type<'db>>,
     specialization: Option<Specialization<'db>>,
 ) -> FieldMetadata<'db> {
@@ -333,7 +455,12 @@ pub(in crate::types) fn field_metadata<'db>(
     if let Some(definition) = definition {
         metadata.collect_from_annotation(db, definition, specialization);
     }
-    metadata.collect_from_rhs_type(db, rhs_type, specialization);
+    metadata.collect_from_rhs_type(db, rhs_type);
+    if metadata.strict.is_unspecified()
+        && let Type::TypeAlias(alias @ TypeAliasType::PEP695(_)) = declared_ty
+    {
+        metadata.strict = type_alias_strictness(db, alias.definition(db));
+    }
     metadata
 }
 
@@ -448,7 +575,7 @@ impl ConfigBoolean {
         matches!(self, Self::Disabled)
     }
 
-    const fn is_enabled(self) -> bool {
+    pub(in crate::types) const fn is_enabled(self) -> bool {
         matches!(self, Self::Enabled)
     }
 
@@ -496,15 +623,75 @@ pub(in crate::types) fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral
         .any(|base| base.is_known(db, KnownClass::PydanticBaseModel))
 }
 
-/// Return whether `ty` is an instance of a Pydantic model.
-pub(in crate::types) fn is_model_instance(
+/// How a Pydantic model handles attribute assignments.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::types) enum SetAttrBehavior {
+    Frozen,
+    NonFrozen,
+    CustomSetAttr,
+}
+
+/// Return the model's assignment behavior for `attribute`, or `None` if it cannot be determined.
+pub(in crate::types) fn setattr_behavior(
     db: &dyn Db,
     env: &ProgramEnvironment<'_>,
     ty: Type<'_>,
-) -> bool {
-    ty.nominal_class(db, env)
-        .and_then(|class| class.static_class_literal(db))
-        .is_some_and(|(class, _)| is_model(db, class))
+    attribute: &str,
+) -> Option<SetAttrBehavior> {
+    let (class, _) = ty
+        .nominal_class(db, env)
+        .and_then(|class| class.static_class_literal(db))?;
+    let field_policy = CodeGeneratorKind::from_class(db, class.into())?;
+    let metadata = field_policy.pydantic_metadata()?;
+
+    if !uses_base_model_setattr(db, env, class)? {
+        return Some(SetAttrBehavior::CustomSetAttr);
+    }
+
+    // Pydantic only checks the field's own `frozen` setting if the model is not frozen,
+    // so `Field(frozen=False)` cannot make a field of a frozen model mutable. Private
+    // attributes are not model fields, so their assignments are never checked.
+    let is_frozen = metadata.is_frozen(db)
+        || !is_private_attribute(attribute)
+            && class
+                .fields(db, None, field_policy)
+                .get(attribute)
+                .is_some_and(|field| {
+                    matches!(field.kind, FieldKind::Pydantic { frozen: true, .. })
+                });
+    Some(if is_frozen {
+        SetAttrBehavior::Frozen
+    } else {
+        SetAttrBehavior::NonFrozen
+    })
+}
+
+/// Check whether attribute assignments use Pydantic's setter. Return `None` if the MRO does not
+/// resolve to a known setter.
+pub(in crate::types) fn uses_base_model_setattr<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+) -> Option<bool> {
+    // Pydantic checks the receiver's effective config in `BaseModel.__setattr__` rather than
+    // generating a setter on each frozen model. A custom setter can replace that behavior.
+    for base in class.iter_mro(db, None) {
+        if matches!(base, ClassBase::Generic | ClassBase::Protocol) {
+            continue;
+        }
+        let base_class = base.into_class()?;
+        let (base, _) = base_class.static_class_literal(db)?;
+        if base.is_known(db, KnownClass::PydanticBaseModel) {
+            return Some(true);
+        }
+        if !base_class
+            .own_class_member(db, env, None, "__setattr__")
+            .is_undefined()
+        {
+            return Some(false);
+        }
+    }
+    None
 }
 
 /// Return whether a field specifier's `default` argument provides a default value.
@@ -607,6 +794,13 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
     // Pydantic merges the effective config from each direct base from left to right. A later base
     // therefore takes precedence over an earlier base.
     for base in class.explicit_bases(db) {
+        if matches!(
+            base,
+            Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+        ) {
+            continue;
+        }
+
         let Some(base) = base.to_class_type(db) else {
             config = ModelConfig::unknown();
             continue;
@@ -684,7 +878,14 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
     };
     let callee = definition_expression_type(db, definition, &call.func);
     if !callee.as_class_literal().is_some_and(|class| {
-        class.is_known(db, KnownClass::PydanticConfigDict) || class.is_known(db, KnownClass::Dict)
+        class.is_known(db, KnownClass::Dict)
+            || class
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|base| {
+                    base.is_known(db, KnownClass::PydanticConfigDict)
+                        || base.is_known(db, KnownClass::PydanticSettingsConfigDict)
+                })
     }) {
         return Some(ModelConfig::unknown());
     }
@@ -829,15 +1030,17 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
     class: StaticClassLiteral<'db>,
     field_name: &Name,
     field_type: Type<'db>,
-    field_strict: ConfigBoolean,
-    metadata: ModelMetadata<'db>,
+    strict: bool,
 ) -> Type<'db> {
     if has_before_or_plain_field_validator(db, class, field_name.clone()) {
         return Type::any();
     }
 
-    if field_strict.or(metadata.config(db).strict).is_enabled() {
-        return field_type;
+    if strict {
+        return match field_type {
+            Type::TypeAlias(alias @ TypeAliasType::PEP695(_)) => alias.value_type(db),
+            _ => field_type,
+        };
     }
 
     let env = ProgramEnvironment::from_scope(class.body_scope(db));
@@ -968,6 +1171,20 @@ fn lax_input_type_impl<'db>(
         }
         let result = lax_input_type_impl(db, env, alias.value_type(db), expanding_types);
         expanding_types.remove(&field_type);
+        return result;
+    }
+
+    if let Type::Recursive(recursive) = field_type {
+        // Guard the constructor: recursive arguments can grow without repeating a specialization.
+        let constructor = Type::Recursive(recursive.constructor(db));
+        if !expanding_types.insert(constructor) {
+            return Type::any();
+        }
+        let result = recursive
+            .unfold(db, env)
+            .map(|unfolded| lax_input_type_impl(db, env, unfolded, expanding_types))
+            .unwrap_or(Type::any());
+        expanding_types.remove(&constructor);
         return result;
     }
 
@@ -1210,6 +1427,10 @@ fn lax_alias<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &str) ->
 enum ModelInitBehavior {
     /// The model inherits Pydantic's ordinary `BaseModel` initializer.
     BaseModel,
+    /// The model inherits `BaseSettings.__init__`, which accepts settings control parameters
+    /// such as `_env_file` as well as model fields. The model's `extra` configuration determines
+    /// whether other keyword arguments are stored, discarded, or rejected.
+    BaseSettings,
     /// The first custom initializer in the MRO accepts arbitrary keyword arguments.
     CustomVariadic,
     /// The first custom initializer in the MRO has a fixed parameter list.
@@ -1229,10 +1450,12 @@ fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitB
             return ModelInitBehavior::BaseModel;
         }
 
-        // These constructors use variadic keywords for specialized inputs, not arbitrary extras.
-        if base.is_known(db, KnownClass::PydanticRootModel)
-            || base.is_known(db, KnownClass::PydanticBaseSettings)
-        {
+        if base.is_known(db, KnownClass::PydanticBaseSettings) {
+            return ModelInitBehavior::BaseSettings;
+        }
+
+        // Root models use variadic keywords for specialized inputs, not arbitrary extras.
+        if base.is_known(db, KnownClass::PydanticRootModel) {
             return ModelInitBehavior::Other;
         }
 
@@ -1277,7 +1500,9 @@ pub(in crate::types) fn model_init_accepts_extra(
     metadata.accepts_extra(db)
         && matches!(
             model_init_behavior(db, class),
-            ModelInitBehavior::BaseModel | ModelInitBehavior::CustomVariadic
+            ModelInitBehavior::BaseModel
+                | ModelInitBehavior::BaseSettings
+                | ModelInitBehavior::CustomVariadic
         )
 }
 
@@ -1287,7 +1512,11 @@ fn model_init_discards_extra(
     class: StaticClassLiteral<'_>,
     metadata: ModelMetadata<'_>,
 ) -> bool {
-    metadata.discards_extra(db) && model_init_behavior(db, class) == ModelInitBehavior::BaseModel
+    metadata.discards_extra(db)
+        && matches!(
+            model_init_behavior(db, class),
+            ModelInitBehavior::BaseModel | ModelInitBehavior::BaseSettings
+        )
 }
 
 /// Report keyword arguments that the Pydantic model constructor silently discards.

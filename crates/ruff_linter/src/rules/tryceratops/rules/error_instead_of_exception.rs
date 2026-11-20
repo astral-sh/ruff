@@ -6,6 +6,7 @@ use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
@@ -56,10 +57,10 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
-pub(crate) struct ErrorInsteadOfException;
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
+pub(crate) struct LoggingErrorInsteadOfException;
 
-impl Violation for ErrorInsteadOfException {
+impl Violation for LoggingErrorInsteadOfException {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -86,7 +87,7 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
             if matches!(logging_level, LoggingLevel::Error) {
                 if exc_info(&expr.arguments, checker.semantic()).is_none() {
                     let mut diagnostic =
-                        checker.report_diagnostic(ErrorInsteadOfException, expr.range());
+                        checker.report_diagnostic(LoggingErrorInsteadOfException, expr.range());
 
                     match expr.func.as_ref() {
                         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
@@ -94,13 +95,10 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
                                 Edit::range_replacement("exception".to_string(), attr.range()),
                                 // When run against `logging.error`, the fix is safe; otherwise,
                                 // the object _may_ not be a logger.
-                                if checker
-                                    .semantic()
-                                    .resolve_qualified_name(expr.func.as_ref())
-                                    .is_some_and(|qualified_name| {
-                                        matches!(qualified_name.segments(), ["logging", "error"])
-                                    })
-                                {
+                                if checker.semantic().matches_qualified_name(
+                                    expr.func.as_ref(),
+                                    &["logging", "error"],
+                                ) {
                                     Applicability::Safe
                                 } else {
                                     Applicability::Unsafe
@@ -121,16 +119,10 @@ pub(crate) fn error_instead_of_exception(checker: &Checker, handlers: &[ExceptHa
                                     [name_edit],
                                     // When run against `logging.error`, the fix is safe; otherwise,
                                     // the object _may_ not be a logger.
-                                    if checker
-                                        .semantic()
-                                        .resolve_qualified_name(expr.func.as_ref())
-                                        .is_some_and(|qualified_name| {
-                                            matches!(
-                                                qualified_name.segments(),
-                                                ["logging", "error"]
-                                            )
-                                        })
-                                    {
+                                    if checker.semantic().matches_qualified_name(
+                                        expr.func.as_ref(),
+                                        &["logging", "error"],
+                                    ) {
                                         Applicability::Safe
                                     } else {
                                         Applicability::Unsafe

@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 use super::{LogicalLine, Whitespace};
@@ -22,7 +23,7 @@ use super::{LogicalLine, Whitespace};
 /// True and False
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct MultipleSpacesAfterKeyword;
 
 impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
@@ -52,7 +53,7 @@ impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
 /// x and y
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct MultipleSpacesBeforeKeyword;
 
 impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
@@ -82,7 +83,7 @@ impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
 /// True and False
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct TabAfterKeyword;
 
 impl AlwaysFixableViolation for TabAfterKeyword {
@@ -112,7 +113,7 @@ impl AlwaysFixableViolation for TabAfterKeyword {
 /// True and False
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct TabBeforeKeyword;
 
 impl AlwaysFixableViolation for TabBeforeKeyword {
@@ -131,7 +132,8 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &LintConte
     let mut after_keyword = false;
 
     for token in line.tokens() {
-        let is_keyword = token.kind().is_keyword();
+        // Like pycodestyle, don't treat `True`, `False`, and `None` as keywords.
+        let is_keyword = token.kind().is_keyword() && !token.kind().is_singleton();
         if is_keyword {
             if !after_keyword {
                 match line.leading_whitespace(token) {

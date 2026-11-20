@@ -6,6 +6,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
@@ -59,18 +60,18 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// unsafe for any `__iter__` or `__aiter__` method in a `.py` file that has
 /// more than two statements (including docstrings) in its body.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
-pub(crate) struct GeneratorReturnFromIterMethod {
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Style)]
+pub(crate) struct IterMethodWithGeneratorReturnAnnotation {
     return_type: Iterator,
     method: Method,
 }
 
-impl Violation for GeneratorReturnFromIterMethod {
+impl Violation for IterMethodWithGeneratorReturnAnnotation {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let GeneratorReturnFromIterMethod {
+        let IterMethodWithGeneratorReturnAnnotation {
             return_type,
             method,
         } = self;
@@ -78,7 +79,7 @@ impl Violation for GeneratorReturnFromIterMethod {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let GeneratorReturnFromIterMethod {
+        let IterMethodWithGeneratorReturnAnnotation {
             return_type,
             method,
         } = self;
@@ -212,7 +213,7 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
         }
     }
     let mut diagnostic = checker.report_diagnostic(
-        GeneratorReturnFromIterMethod {
+        IterMethodWithGeneratorReturnAnnotation {
             return_type: member.to_iter(),
             method,
         },

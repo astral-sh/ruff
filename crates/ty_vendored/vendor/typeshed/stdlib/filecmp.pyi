@@ -117,8 +117,8 @@ class dircmp(Generic[AnyStr]):
             ignore: Sequence[AnyStr] | None = None,
             hide: Sequence[AnyStr] | None = None,
         ) -> None: ...
-    left: AnyStr
-    right: AnyStr
+    left: GenericPath[AnyStr]
+    right: GenericPath[AnyStr]
     hide: Sequence[AnyStr]
     ignore: Sequence[AnyStr]
     # These properties are created at runtime by __getattr__

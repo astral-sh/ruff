@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_gettext::is_ngettext_call;
 
 /// ## What it does
@@ -46,12 +47,12 @@ use crate::rules::flake8_gettext::is_ngettext_call;
 /// ## References
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260")]
-pub(crate) struct FormatInGetTextFuncCall {
+#[violation_metadata(stable_since = "v0.0.260", category = Category::Suspicious)]
+pub(crate) struct FormatInGettextCall {
     is_plural: bool,
 }
 
-impl Violation for FormatInGetTextFuncCall {
+impl Violation for FormatInGettextCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.is_plural {
@@ -69,7 +70,7 @@ pub(crate) fn format_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if is_format_call(first) {
-            checker.report_diagnostic(FormatInGetTextFuncCall { is_plural: false }, first.range());
+            checker.report_diagnostic(FormatInGettextCall { is_plural: false }, first.range());
         }
     }
 
@@ -78,7 +79,7 @@ pub(crate) fn format_in_gettext_func_call(checker: &Checker, func: &Expr, args: 
         && let Some(second) = args.get(1)
         && is_format_call(second)
     {
-        checker.report_diagnostic(FormatInGetTextFuncCall { is_plural: true }, second.range());
+        checker.report_diagnostic(FormatInGettextCall { is_plural: true }, second.range());
     }
 }
 

@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks that async functions do not use blocking httpx clients.
@@ -37,7 +38,7 @@ use crate::checkers::ast::Checker;
 ///         response = await client.get(...)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct BlockingHttpCallHttpxInAsyncFunction {
     name: String,
     call: String,
@@ -62,10 +63,7 @@ impl TypeChecker for HttpxClientChecker {
         semantic: &ruff_python_semantic::SemanticModel,
     ) -> bool {
         // match base annotation directly
-        if semantic
-            .resolve_qualified_name(annotation)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["httpx", "Client"]))
-        {
+        if semantic.matches_qualified_name(annotation, &["httpx", "Client"]) {
             return true;
         }
 
@@ -73,12 +71,7 @@ impl TypeChecker for HttpxClientChecker {
         let mut found = false;
         traverse_union_and_optional(
             &mut |inner_expr, _| {
-                if semantic
-                    .resolve_qualified_name(inner_expr)
-                    .is_some_and(|qualified_name| {
-                        matches!(qualified_name.segments(), ["httpx", "Client"])
-                    })
-                {
+                if semantic.matches_qualified_name(inner_expr, &["httpx", "Client"]) {
                     found = true;
                 }
             },
@@ -96,9 +89,7 @@ impl TypeChecker for HttpxClientChecker {
             return false;
         };
 
-        semantic
-            .resolve_qualified_name(func)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["httpx", "Client"]))
+        semantic.matches_qualified_name(func, &["httpx", "Client"])
     }
 }
 

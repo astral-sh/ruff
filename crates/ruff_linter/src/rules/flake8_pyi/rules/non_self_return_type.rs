@@ -1,4 +1,5 @@
 use crate::checkers::ast::{Checker, TypingImporter};
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
@@ -114,7 +115,7 @@ use ruff_text_size::Ranged;
 ///
 /// [PEP 673]: https://peps.python.org/pep-0673/#valid-locations-for-self
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Suspicious)]
 pub(crate) struct NonSelfReturnType {
     class_name: String,
     method_name: String,
@@ -167,14 +168,6 @@ pub(crate) fn non_self_return_type(
     let Some(returns) = returns else {
         return;
     };
-
-    // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
-    if !matches!(
-        analyze::class::is_metaclass(class_def, semantic),
-        analyze::class::IsMetaclass::No
-    ) {
-        return;
-    }
 
     // Skip any abstract or overloaded methods.
     if is_abstract(decorator_list, semantic) || is_overload(decorator_list, semantic) {
@@ -232,6 +225,14 @@ fn add_diagnostic(
     class_def: &ast::StmtClassDef,
     method_name: &str,
 ) {
+    // PEP 673 forbids the use of `typing(_extensions).Self` in metaclasses.
+    if !matches!(
+        analyze::class::is_metaclass(class_def, checker.semantic()),
+        analyze::class::IsMetaclass::No
+    ) {
+        return;
+    }
+
     let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
         return;
     };
@@ -265,8 +266,9 @@ fn replace_with_self_fix(
         let first = parameters.iter().next()?;
         let annotation = first.annotation()?;
 
+        // The parameter's range includes any parentheses around the annotation, e.g. `self: (Foo)`.
         is_class_reference(semantic, annotation, &class_def.name)
-            .then(|| Edit::deletion(first.name().end(), annotation.end()))
+            .then(|| Edit::deletion(first.name().end(), first.as_parameter().end()))
     };
 
     others.extend(remove_first_argument_type_hint());

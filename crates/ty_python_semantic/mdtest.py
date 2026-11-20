@@ -8,6 +8,8 @@
 #
 # [tool.uv]
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 from __future__ import annotations
@@ -132,7 +134,7 @@ class MDTestRunner:
 
     def _run_mdtest(
         self, arguments: list[str] | None = None, *, capture_output: bool = False
-    ) -> subprocess.CompletedProcess:
+    ) -> subprocess.CompletedProcess[str]:
         assert self.mdtest_executable is not None
 
         arguments = arguments or []

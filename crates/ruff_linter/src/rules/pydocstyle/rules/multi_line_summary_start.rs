@@ -7,6 +7,7 @@ use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlineI
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -58,13 +59,13 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
-/// [D213]: https://docs.astral.sh/ruff/rules/multi-line-summary-second-line
+/// [D213]: https://docs.astral.sh/ruff/rules/multiline-docstring-summary-on-first-line
 /// [PEP 257]: https://peps.python.org/pep-0257
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.69")]
-pub(crate) struct MultiLineSummaryFirstLine;
+#[violation_metadata(stable_since = "v0.0.69", category = Category::Pedantic)]
+pub(crate) struct MultilineDocstringSummaryOnSeparateLine;
 
-impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
+impl AlwaysFixableViolation for MultilineDocstringSummaryOnSeparateLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Multi-line docstring summary should start at the first line".to_string()
@@ -122,13 +123,13 @@ impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 ///
-/// [D212]: https://docs.astral.sh/ruff/rules/multi-line-summary-first-line
+/// [D212]: https://docs.astral.sh/ruff/rules/multiline-docstring-summary-on-separate-line
 /// [PEP 257]: https://peps.python.org/pep-0257
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.69")]
-pub(crate) struct MultiLineSummarySecondLine;
+#[violation_metadata(stable_since = "v0.0.69", category = Category::Pedantic)]
+pub(crate) struct MultilineDocstringSummaryOnFirstLine;
 
-impl AlwaysFixableViolation for MultiLineSummarySecondLine {
+impl AlwaysFixableViolation for MultilineDocstringSummaryOnFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Multi-line docstring summary should start at the second line".to_string()
@@ -157,9 +158,9 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
     };
 
     if is_triple_quote(&first_line) {
-        if checker.is_rule_enabled(Rule::MultiLineSummaryFirstLine) {
-            let mut diagnostic =
-                checker.report_diagnostic(MultiLineSummaryFirstLine, docstring.range());
+        if checker.is_rule_enabled(Rule::MultilineDocstringSummaryOnSeparateLine) {
+            let mut diagnostic = checker
+                .report_diagnostic(MultilineDocstringSummaryOnSeparateLine, docstring.range());
             // Delete until first non-whitespace char.
             for line in content_lines {
                 if let Some(end_column) = line.find(|c: char| !c.is_whitespace()) {
@@ -180,9 +181,9 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
         // "
         // ```
     } else {
-        if checker.is_rule_enabled(Rule::MultiLineSummarySecondLine) {
+        if checker.is_rule_enabled(Rule::MultilineDocstringSummaryOnFirstLine) {
             let mut diagnostic =
-                checker.report_diagnostic(MultiLineSummarySecondLine, docstring.range());
+                checker.report_diagnostic(MultilineDocstringSummaryOnFirstLine, docstring.range());
             let mut indentation = Cow::Borrowed(docstring.compute_indentation());
             let mut fixable = true;
             if !indentation.chars().all(char::is_whitespace) {

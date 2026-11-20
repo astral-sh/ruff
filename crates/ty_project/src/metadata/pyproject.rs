@@ -43,13 +43,10 @@ impl PyProject {
 
     fn deserialize_toml(content: &str) -> Result<Self, PyProjectError> {
         let mut pyproject: Self = toml::from_str(content).map_err(PyProjectError::TomlSyntax)?;
-        // TOML tables are unordered and the `toml` crate sorts keys
-        // lexicographically. Normalize rule order so that the `all` selector
-        // is applied before per-rule selectors.
-        if let Some(tool) = &mut pyproject.tool {
-            if let Some(ty) = &mut tool.ty {
-                ty.prioritize_all_selectors();
-            }
+        if let Some(tool) = &mut pyproject.tool
+            && let Some(ty) = &mut tool.ty
+        {
+            ty.order_rule_selectors(ty_python_semantic::default_lint_registry());
         }
         Ok(pyproject)
     }
@@ -141,7 +138,7 @@ pub enum ResolveRequiresPythonError {
 
 impl ResolveRequiresPythonError {
     /// Returns the error without its optional recovery guidance.
-    pub fn message(&self) -> String {
+    pub(crate) fn message(&self) -> String {
         match self {
             Self::TooLargeMajor(version) => {
                 format!(
@@ -163,7 +160,7 @@ impl ResolveRequiresPythonError {
     }
 
     /// Returns guidance for fixing the invalid Python requirement, when available.
-    pub fn hint(&self) -> Option<&'static str> {
+    pub(crate) fn hint(&self) -> Option<&'static str> {
         match self {
             Self::NoLowerBound(_) => Some(
                 "Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
@@ -188,7 +185,7 @@ impl fmt::Display for ResolveRequiresPythonError {
 
 impl std::error::Error for ResolveRequiresPythonError {}
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Tool {
     pub ty: Option<Options>,

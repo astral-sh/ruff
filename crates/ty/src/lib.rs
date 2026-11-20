@@ -6,9 +6,11 @@ mod rule;
 mod server;
 mod version;
 
-use std::io::{BufWriter, Write};
+use std::fmt::Display;
+use std::io::{self, BufWriter, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use anyhow::Result;
 use anyhow::{Context, anyhow};
@@ -16,24 +18,30 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
+use ruff_command_line::TerminalColor;
 use ruff_db::cancellation::{Canceled, CancellationToken, CancellationTokenSource};
-use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
-};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity};
 use ruff_db::files::File;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::script::ScriptTag;
+use ruff_ranged_value::RangedValue;
 use salsa::Database;
+use ty_combine::Combine;
+use ty_project::metadata::Options;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{CollectReporter, Db, ScriptEnvironmentAvailability, ScriptSyncProgress, watch};
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{
+    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UseUv,
+    UvSyncProgress, UvWorkspace, watch,
+};
+use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
-use crate::logging::{VerbosityLevel, setup_tracing};
+use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat};
+use crate::logging::{IndicatifWriter, VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
 
@@ -42,8 +50,8 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
-    let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
-        .context("Failed to read CLI arguments from file")?;
+    let args =
+        ruff_command_line::expand_args(args).context("Failed to read CLI arguments from file")?;
     let args = Cli::parse_from(args);
 
     match args.command {
@@ -51,9 +59,10 @@ pub fn run() -> anyhow::Result<ExitStatus> {
         Command::Server(server_args) => server::run(&server_args),
         Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
-            use std::io::stdout;
-
-            shell.generate(&mut Cli::command(), &mut stdout());
+            // The generator panics on write errors. Handle stdout errors in the CLI instead.
+            let mut completions = Vec::new();
+            shell.generate(&mut Cli::command(), &mut completions);
+            io::stdout().lock().write_all(&completions)?;
             Ok(ExitStatus::Success)
         }
         Command::Explain { command } => match command {
@@ -92,12 +101,23 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
-    set_colored_override(args.color);
+    let color = TerminalColor::resolve(args.color);
+    colored::control::set_override(color.should_colorize(&io::stdout()));
+
+    if let Some(color_override) = color.as_override() {
+        // indicatif bars styled while hidden use the stdout setting (`set_colors_enabled`)
+        // even when later drawn on stderr. Bars styled after attachment to stderr use its setting.
+        console::set_colors_enabled(color_override);
+        console::set_colors_enabled_stderr(color_override);
+    }
 
     let verbosity = args.verbosity.level();
-    let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
-
     let printer = Printer::new(verbosity, args.no_progress);
+    let progress = indicatif::MultiProgress::with_draw_target(printer.progress_target());
+    let tracing_progress = progress.clone();
+    let _guard = setup_tracing(verbosity, color, move || {
+        IndicatifWriter::stderr(tracing_progress.clone())
+    })?;
 
     tracing::debug!("Version: {}", version::version());
 
@@ -129,6 +149,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         MainLoopMode::Fix(FixMode::ApplyFixes)
     } else if args.add_ignore {
         MainLoopMode::Fix(FixMode::AddIgnore)
+    } else if args.update_baseline {
+        MainLoopMode::UpdateBaseline
     } else {
         MainLoopMode::Check
     };
@@ -143,30 +165,44 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
 
+    let use_uv = UseUv::from_system(&system);
     let mut project_metadata = match &config_file {
         Some(config_file) => {
             ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
         }
-        None if check_paths.iter().any(|path| system.is_file(path)) => {
-            // `uv check --script` passes a file as its check path. Standalone scripts must not
-            // inherit the enclosing workspace; their environments are synchronized lazily.
-            ProjectMetadata::discover_without_uv(&project_path, &system)?
-        }
         None => ProjectMetadata::discover(&project_path, &system)?,
-    };
-
-    if watch && project_metadata.has_uv_workspace() {
-        return Err(anyhow!(
-            "`--watch` is not supported with uv workspace integration"
-        ));
     }
+    .with_uv_workspace_discovery(use_uv.is_some_and(UseUv::workspace_discovery_enabled));
 
     project_metadata.apply_configuration_files(&system)?;
 
-    project_metadata.apply_override_options(args.into_options());
+    let env_options = Options::from_uv_mode(use_uv.map(RangedValue::cli));
+    project_metadata.set_override_options(env_options.combine(args.into_options()));
+    if project_metadata.uv_workspace_discovery_enabled()
+        && let [path] = check_paths.as_slice()
+        && system.is_file(path)
+        && system
+            .read_to_string(path)
+            .is_ok_and(|source| ScriptTag::parse(&source).is_some())
+    {
+        // A single PEP 723 script uses its own uv environment, even with an explicit ty
+        // configuration file. The other explicit paths still discover workspace metadata.
+        project_metadata = project_metadata.with_uv_workspace_discovery(false);
+    }
+
+    if project_metadata.uv_workspace_discovery_enabled() {
+        let workspace = UvWorkspace::discover(&project_path, &system);
+        project_metadata.apply_uv_workspace(&system, workspace)?;
+    }
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();
+
+    if matches!(mode, MainLoopMode::UpdateBaseline) && project.settings(&db).baseline().is_none() {
+        return Err(anyhow!(
+            "`--update-baseline` requires a baseline path from `--baseline` or configuration"
+        ));
+    }
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     project.set_force_exclude(&mut db, force_exclude);
@@ -192,7 +228,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.freeze();
     }
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer, progress);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -204,11 +240,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         }
     })?;
 
-    let exit_status = if watch {
-        main_loop.watch(&mut db)?
-    } else {
-        main_loop.run(&mut db)?
-    };
+    let exit_status = main_loop.run(&mut db, watch)?;
+    tracing::debug!("Exiting main loop");
 
     let mut stdout = printer.stream_for_requested_summary().lock();
     match memory_report.as_deref() {
@@ -224,7 +257,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         None => {}
     }
 
-    std::mem::forget(db);
+    db.forget_storage_on_exit();
 
     if matches!(exit_status, ExitStatus::Interrupted) {
         return Ok(ExitStatus::Interrupted);
@@ -280,8 +313,11 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
-    /// Progress bars shared by project checks and background script synchronization.
-    progress: ProgressDisplay,
+    /// Progress for the current synchronization batch, cleared before checking starts.
+    sync_progress: Option<SyncProgress>,
+
+    /// Shared with tracing so warnings can be printed above active progress bars.
+    progress: indicatif::MultiProgress,
 
     /// Interface for displaying information to the user.
     printer: Printer,
@@ -293,13 +329,15 @@ struct MainLoop {
 }
 
 impl MainLoop {
-    fn new(mode: MainLoopMode, printer: Printer) -> (Self, MainLoopCancellationToken) {
+    fn new(
+        mode: MainLoopMode,
+        printer: Printer,
+        progress: indicatif::MultiProgress,
+    ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         let cancellation_token_source = CancellationTokenSource::new();
         let cancellation_token = cancellation_token_source.token();
-        let progress = ProgressDisplay::new();
-        progress.bars.set_draw_target(printer.progress_target());
 
         (
             Self {
@@ -307,6 +345,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
+                sync_progress: None,
                 progress,
                 printer,
                 cancellation_token,
@@ -318,7 +357,7 @@ impl MainLoop {
         )
     }
 
-    fn watch(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
+    fn start_watching(&mut self, db: &mut ProjectDatabase) -> Result<()> {
         tracing::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
@@ -326,41 +365,43 @@ impl MainLoop {
         })?;
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
-        self.run(db)
+        Ok(())
     }
 
-    fn run(self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        let result = self.main_loop(db);
-
-        tracing::debug!("Exiting main loop");
-
-        result
-    }
-
-    fn main_loop(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
+    fn run(mut self, db: &mut ProjectDatabase, watch: bool) -> Result<ExitStatus> {
         tracing::debug!("Starting main loop");
 
         let mut revision = 0u64;
-        let script_sync_wakeups = db.script_environments().sync_wakeups();
+        let uv_sync_wakeups = db.uv_environments().sync_wakeups();
         let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
-        request_check(db, &check_sender);
+
+        self.spawn_indexing_task(db);
 
         // Apply all queued changes before starting a pending check because every applied change
         // cancels the running check.
         while let Ok(message) = crossbeam_channel::select_biased! {
-            recv(script_sync_wakeups) -> wakeup => {
-                wakeup.map(|()| MainLoopMessage::PollScriptEnvironments)
+            recv(uv_sync_wakeups) -> wakeup => {
+                wakeup.map(|()| MainLoopMessage::PollUvEnvironments)
             }
             recv(self.receiver) -> message => message,
             recv(check_receiver) -> request => request.map(|()| MainLoopMessage::CheckWorkspace),
         } {
             match message {
+                MainLoopMessage::ProjectIndexed => {
+                    if watch {
+                        self.start_watching(db)?;
+                    }
+                    let scripts = db.project().scripts_to_synchronize(db);
+                    self.synchronize_scripts(db, &scripts);
+                    request_check(&check_sender);
+                }
                 MainLoopMessage::CheckWorkspace => {
                     // Synchronization may have started after this request was queued.
-                    if db.script_environments().has_pending_synchronizations() {
-                        tracing::debug!("Deferring check until script synchronization completes");
+                    if db.uv_environments().has_pending_synchronizations() {
+                        tracing::debug!("Deferring check until uv synchronization completes");
                         continue;
                     }
+                    self.sync_progress = None;
                     let db = db.clone();
                     let sender = self.sender.clone();
                     let progress = self.progress.clone();
@@ -403,6 +444,11 @@ impl MainLoop {
                         tracing::warn!("No python files found under the given path(s)");
                     }
 
+                    let mut result = result;
+                    if !matches!(self.mode, MainLoopMode::UpdateBaseline) {
+                        retain_visible_diagnostics(&mut result);
+                    }
+
                     let result = match self.mode {
                         MainLoopMode::Check => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
@@ -431,7 +477,8 @@ impl MainLoop {
                                 ),
                             };
 
-                            if let Ok(result) = result {
+                            if let Ok(mut result) = result {
+                                retain_visible_diagnostics(&mut result.diagnostics);
                                 let fixed_diagnostics = match mode {
                                     FixMode::AddIgnore => None,
                                     FixMode::ApplyFixes => Some(result.count),
@@ -461,6 +508,28 @@ impl MainLoop {
                                 Err(Canceled)
                             }
                         }
+                        MainLoopMode::UpdateBaseline => {
+                            let settings = db.project().settings(db);
+                            let Some(baseline_path) = settings.baseline() else {
+                                return Err(anyhow!(
+                                    "`--update-baseline` requires a baseline path from `--baseline` or configuration"
+                                ));
+                            };
+                            let result = ty_project::baseline::write(db, baseline_path, result)?;
+                            if !result.diagnostics.is_empty() {
+                                self.write_diagnostics(db, &result.diagnostics, None)?;
+                            }
+
+                            if settings.terminal().output_format.is_human_readable() {
+                                let count = result.count;
+                                writeln!(
+                                    self.printer.stream_for_requested_summary(),
+                                    "Updated baseline `{baseline_path}` with {count} diagnostic{}.",
+                                    if count == 1 { "" } else { "s" }
+                                )?;
+                            }
+                            Ok(result.diagnostics)
+                        }
                     };
 
                     let exit_status = match result.as_deref() {
@@ -487,43 +556,46 @@ impl MainLoop {
                     return Ok(exit_status);
                 }
 
-                MainLoopMessage::PollScriptEnvironments => {
-                    let environments = db.script_environments().clone();
-                    if !environments.poll_sync(db).is_empty() {
+                MainLoopMessage::PollUvEnvironments => {
+                    let environments = db.uv_environments().clone();
+                    let changes = environments.poll_sync(db);
+                    if !changes.is_empty() {
                         revision += 1;
                     }
-                    request_check(db, &check_sender);
+                    if let Some(project_change) = changes.project {
+                        if matches!(
+                            project_change,
+                            ProjectReloadResult::Changed {
+                                files_changed: true,
+                            }
+                        ) {
+                            let scripts = db.project().scripts_to_synchronize(db);
+                            self.synchronize_scripts(db, &scripts);
+                        }
+                    }
+                    if !changes.is_empty()
+                        && let Some(watcher) = self.watcher.as_mut()
+                    {
+                        watcher.update(db);
+                    }
+                    request_check(&check_sender);
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
-                    // Another filesystem event can arrive while a script is still synchronizing.
-                    // Keep its progress visible after clearing the previous check's output.
-                    self.progress.bars.suspend(Printer::clear_screen)?;
-
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(&changes);
-
-                    let environments = db.script_environments().clone();
-                    for file in environments.files() {
-                        environments.request_sync(
-                            db,
-                            file,
-                            ScriptEnvironmentAvailability::Pending,
-                            &|db, file| self.progress.for_script(db, file),
-                        );
-                    }
+                    let result = db.apply_changes(&changes);
+                    self.synchronize_environments(db, &result)?;
 
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
 
-                    request_check(db, &check_sender);
+                    request_check(&check_sender);
                 }
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
                     db.trigger_cancellation();
-                    self.progress.clear();
                     return Ok(ExitStatus::Interrupted);
                 }
             }
@@ -532,6 +604,76 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+
+    /// Every CLI check needs the file index. Build it in the background so the main loop
+    /// can handle Ctrl-C while walking the check paths.
+    fn spawn_indexing_task(&self, db: &ProjectDatabase) {
+        let db = db.clone();
+        let sender = self.sender.clone();
+        let progress = self.progress.clone();
+        rayon::spawn(move || {
+            let reporter = IndicatifReporter::new(progress);
+            reporter.start_indexing();
+            let indexed = salsa::Cancelled::catch(|| db.project().files(&db));
+            // Indicatif skips terminal cleanup while unwinding.
+            drop(reporter);
+            if indexed.is_err() {
+                // On Ctrl-C, the main loop is already handling `Exit` and waiting
+                // for this worker to release its database handle.
+                return;
+            }
+            let _ = sender.send(MainLoopMessage::ProjectIndexed);
+        });
+    }
+
+    fn synchronize_environments(
+        &mut self,
+        db: &mut ProjectDatabase,
+        changes: &ChangeResult,
+    ) -> Result<()> {
+        // Keep active progress visible after clearing the previous check's output.
+        self.progress.suspend(Printer::clear_screen)?;
+
+        let project_path = changes.project_sync_path();
+        let scripts = changes.scripts_to_synchronize(db);
+        if project_path.is_none() && scripts.is_empty() {
+            return Ok(());
+        }
+
+        let progress = self
+            .sync_progress
+            .get_or_insert_with(|| SyncProgress::new(self.progress.clone()));
+
+        if let Some(project_path) = project_path {
+            db.uv_environments()
+                .request_project_sync(db, project_path, &|db, project| {
+                    progress.for_project(db, project)
+                });
+        }
+        self.synchronize_scripts(db, &scripts);
+        Ok(())
+    }
+
+    fn synchronize_scripts(&mut self, db: &mut ProjectDatabase, scripts: &[File]) {
+        let environments = db.uv_environments().clone();
+
+        if scripts.is_empty() {
+            return;
+        }
+
+        let progress = self
+            .sync_progress
+            .get_or_insert_with(|| SyncProgress::new(self.progress.clone()));
+
+        for &file in scripts {
+            environments.request_sync(
+                db,
+                file,
+                ScriptEnvironmentAvailability::Pending,
+                &|db, file| progress.for_script(db, file),
+            );
+        }
     }
 
     fn write_diagnostics(
@@ -561,7 +703,6 @@ impl MainLoop {
                 if stdout.is_enabled() {
                     let mut stdout = BufWriter::new(stdout);
                     let display_config = DisplayDiagnosticConfig::new("ty")
-                        .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
                         .with_cancellation_token(Some(self.cancellation_token.clone()))
                         .context(0);
@@ -569,7 +710,9 @@ impl MainLoop {
                     write!(
                         stdout,
                         "{}",
-                        DisplayDiagnostics::new(db, &display_config, diagnostics)
+                        terminal_settings
+                            .output_format
+                            .display(db, &display_config, diagnostics)
                     )?;
                     stdout.flush()?;
                 }
@@ -603,12 +746,19 @@ impl MainLoop {
 enum MainLoopMode {
     Check,
     Fix(FixMode),
+    UpdateBaseline,
 }
 
 #[derive(Copy, Clone, Debug)]
 enum FixMode {
     AddIgnore,
     ApplyFixes,
+}
+
+fn retain_visible_diagnostics(diagnostics: &mut Vec<Diagnostic>) {
+    diagnostics.retain(|diagnostic| {
+        !(diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint())
+    });
 }
 
 fn exit_status_from_diagnostics(
@@ -632,7 +782,7 @@ fn exit_status_from_diagnostics(
     }
 
     match max_severity {
-        Severity::Info => ExitStatus::Success,
+        Severity::Hint | Severity::Info => ExitStatus::Success,
         Severity::Warning => {
             if terminal_settings.error_on_warning {
                 ExitStatus::Failure
@@ -649,25 +799,29 @@ fn exit_status_from_diagnostics(
 struct IndicatifReporter {
     collector: CollectReporter,
 
-    progress: ProgressDisplay,
-
-    /// A reporter that is ready, containing a progress bar to report to.
-    ///
-    /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
-    /// do not initialize the bar too early as it may take a while to collect the number of files to
-    /// process and we don't want to display an empty "0/0" bar.
-    checking_bar: indicatif::ProgressBar,
+    /// Show a spinner during indexing and a file count once the number of files to check is known.
+    bar: indicatif::ProgressBar,
+    multi_progress: indicatif::MultiProgress,
 }
 
 impl IndicatifReporter {
-    fn new(progress: ProgressDisplay) -> Self {
-        let checking_bar = progress.bars.add(indicatif::ProgressBar::hidden());
-
+    fn new(multi_progress: indicatif::MultiProgress) -> Self {
         Self {
-            progress,
-            checking_bar,
+            bar: multi_progress.add(indicatif::ProgressBar::hidden()),
+            multi_progress,
             collector: CollectReporter::default(),
         }
+    }
+
+    fn start_indexing(&self) {
+        if self.bar.is_hidden() {
+            return;
+        }
+
+        self.bar
+            .set_style(indicatif::ProgressStyle::default_spinner());
+        self.bar.set_message("Indexing files");
+        self.bar.enable_steady_tick(Duration::from_millis(100));
     }
 
     fn into_sorted_diagnostics(mut self, db: &dyn Db) -> Vec<Diagnostic> {
@@ -679,25 +833,21 @@ impl ty_project::ProgressReporter for IndicatifReporter {
     fn set_files(&mut self, files: usize) {
         self.collector.set_files(files);
 
-        self.checking_bar.set_length(files as u64);
-        self.checking_bar.set_message("Checking");
-        self.checking_bar.set_style(
+        self.bar.set_length(files as u64);
+        self.bar.set_message("Checking");
+        self.bar.set_style(
             indicatif::ProgressStyle::with_template(
-                "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
+                "{msg:8.dim} {wide_bar:.green/dim} {pos}/{len} files",
             )
             .unwrap()
             .progress_chars("--"),
         );
-        self.checking_bar.tick();
-    }
-
-    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn ScriptSyncProgress>> {
-        self.progress.for_script(db, file)
+        self.bar.force_draw();
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         self.collector.report_checked_file(db, file, diagnostics);
-        self.checking_bar.inc(1);
+        self.bar.inc(1);
     }
 
     fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
@@ -707,59 +857,106 @@ impl ty_project::ProgressReporter for IndicatifReporter {
 
 impl Drop for IndicatifReporter {
     fn drop(&mut self) {
-        self.progress.finish_checking(&self.checking_bar);
+        self.bar.finish_and_clear();
+        self.multi_progress.remove(&self.bar);
     }
 }
 
-/// Coordinates the file-checking bar and per-script synchronization messages.
-#[derive(Clone)]
-struct ProgressDisplay {
+/// Shows the script count and individual uv status lines for one synchronization batch.
+struct SyncProgress {
     bars: indicatif::MultiProgress,
+
+    /// Hidden until the first script synchronization is requested.
+    script_bar: indicatif::ProgressBar,
 }
 
-impl ProgressDisplay {
-    fn new() -> Self {
-        Self {
-            bars: indicatif::MultiProgress::with_draw_target(
-                indicatif::ProgressDrawTarget::hidden(),
-            ),
-        }
+impl SyncProgress {
+    fn new(bars: indicatif::MultiProgress) -> Self {
+        let script_bar = indicatif::ProgressBar::hidden();
+        script_bar.set_length(0);
+        script_bar.set_message("Syncing");
+        script_bar.set_style(
+            indicatif::ProgressStyle::with_template(
+                "{msg:8.dim} {wide_bar:.green/dim} {pos}/{len} scripts",
+            )
+            .unwrap()
+            .progress_chars("--"),
+        );
+        let script_bar = bars.add(script_bar);
+        Self { bars, script_bar }
     }
 
-    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn ScriptSyncProgress>> {
+    fn for_project(&self, db: &dyn Db, project: Project) -> Option<Box<dyn UvSyncProgress>> {
+        Some(self.start("Refreshing", format_args!("{} metadata", project.name(db)))?)
+    }
+
+    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn UvSyncProgress>> {
+        let path = file.path(db).as_system_path()?;
+        let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
+        let mut progress = self.start("Syncing", path)?;
+        self.script_bar.inc_length(1);
+        self.script_bar.force_draw();
+        progress.completion_bar = Some(self.script_bar.clone());
+        Some(progress)
+    }
+
+    fn start(&self, action: &str, target: impl Display) -> Option<Box<UvSyncProgressBar>> {
         if self.bars.is_hidden() {
             return None;
         }
 
-        let path = file.path(db).as_system_path()?;
-        let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
-
-        let bar = self.bars.insert(0, indicatif::ProgressBar::hidden());
+        let bar = indicatif::ProgressBar::hidden();
         bar.set_style(indicatif::ProgressStyle::with_template("{wide_msg}").unwrap());
-        bar.set_message(format!("   {} {path}", "Syncing".bold().cyan()));
-
-        Some(Box::new(ScriptSyncProgressBar { bar }))
-    }
-
-    fn finish_checking(&self, bar: &indicatif::ProgressBar) {
-        self.bars.remove(bar);
-        self.clear();
-    }
-
-    fn clear(&self) {
-        let _ = self.bars.clear();
+        bar.set_message(format!("   {} {target}", action.bold().cyan()));
+        Some(Box::new(UvSyncProgressBar {
+            bars: self.bars.clone(),
+            bar,
+            completion_bar: None,
+        }))
     }
 }
 
-struct ScriptSyncProgressBar {
-    bar: indicatif::ProgressBar,
-}
-
-impl ScriptSyncProgress for ScriptSyncProgressBar {}
-
-impl Drop for ScriptSyncProgressBar {
+impl Drop for SyncProgress {
     fn drop(&mut self) {
+        self.script_bar.finish_and_clear();
+        self.bars.remove(&self.script_bar);
+    }
+}
+
+struct UvSyncProgressBar {
+    bars: indicatif::MultiProgress,
+    bar: indicatif::ProgressBar,
+    /// The shared script synchronization bar, advanced when this request completes.
+    ///
+    /// This reporter handles both script synchronization (`Some`) and project metadata
+    /// refreshes (`None`), which do not contribute to the script count.
+    completion_bar: Option<indicatif::ProgressBar>,
+}
+
+impl UvSyncProgress for UvSyncProgressBar {
+    fn started(&mut self) {
+        self.bar.reset();
+        self.bars.insert(0, self.bar.clone());
+        // There are no periodic ticks to redraw this status line if drawing is rate-limited.
+        self.bar.force_draw();
+    }
+
+    fn finished(&mut self) {
         self.bar.finish_and_clear();
+        self.bars.remove(&self.bar);
+    }
+
+    fn completed(self: Box<Self>) {
+        if let Some(bar) = &self.completion_bar {
+            bar.inc(1);
+            bar.force_draw();
+        }
+    }
+}
+
+impl Drop for UvSyncProgressBar {
+    fn drop(&mut self) {
+        self.finished();
     }
 }
 
@@ -779,22 +976,19 @@ impl MainLoopCancellationToken {
 /// Message sent from the orchestrator to the main loop.
 #[derive(Debug)]
 enum MainLoopMessage {
+    ProjectIndexed,
     CheckWorkspace,
     CheckCompleted {
         /// The diagnostics that were found during the check.
         result: Vec<Diagnostic>,
         revision: u64,
     },
-    PollScriptEnvironments,
+    PollUvEnvironments,
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
 }
 
-fn request_check(db: &dyn Db, sender: &crossbeam_channel::Sender<()>) {
-    if db.script_environments().has_pending_synchronizations() {
-        return;
-    }
-
+fn request_check(sender: &crossbeam_channel::Sender<()>) {
     // A full channel means that a check has already been requested. Keeping one pending request
     // coalesces bursts of file changes while the main loop drains higher-priority work.
     let _ = sender.try_send(());
@@ -811,26 +1005,15 @@ fn current_directory() -> Result<SystemPathBuf> {
     })
 }
 
-fn set_colored_override(color: Option<TerminalColor>) {
-    let Some(color) = color else {
-        return;
-    };
-
-    match color {
-        TerminalColor::Auto => {
-            colored::control::unset_override();
-        }
-        TerminalColor::Always => {
-            colored::control::set_override(true);
-        }
-        TerminalColor::Never => {
-            colored::control::set_override(false);
-        }
-    }
-}
-
-/// Initializes the global rayon thread pool to never use more than `TY_MAX_PARALLELISM` threads.
+/// Initializes the global Rayon thread pool. A positive `TY_MAX_PARALLELISM` takes
+/// precedence over `RAYON_NUM_THREADS` for both file discovery and type checking.
 fn setup_rayon() {
+    if let Ok(value) = std::env::var(EnvVars::TY_MAX_PARALLELISM)
+        && let Ok(limit) = value.parse()
+    {
+        ruff_db::set_max_parallelism(limit).expect("parallelism already initialized");
+    }
+
     ThreadPoolBuilder::default()
         .num_threads(max_parallelism().get())
         .stack_size(STACK_SIZE)

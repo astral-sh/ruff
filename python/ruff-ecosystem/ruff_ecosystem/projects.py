@@ -30,9 +30,12 @@ class Project(Serializable):
     """
 
     repo: Repository
+    # ruff: disable[unnecessary-lambda] False positive on types defined later in the file
+    # See https://github.com/astral-sh/ruff/issues/24704
     check_options: CheckOptions = field(default_factory=lambda: CheckOptions())
     format_options: FormatOptions = field(default_factory=lambda: FormatOptions())
     config_overrides: ConfigOverrides = field(default_factory=lambda: ConfigOverrides())
+    # ruff: enable[unnecessary-lambda]
 
     def with_preview_enabled(self: Self) -> Self:
         return type(self)(
@@ -72,7 +75,7 @@ RULE_SELECTOR_OPTIONS = (
 
 
 @cache
-def rule_name_to_code(executable: Path) -> dict[str, str]:
+def rule_name_to_code(executable: Path) -> dict[str, str | None]:
     rules = json.loads(
         check_output(
             [executable, "rule", "--all", "--output-format", "json"],
@@ -82,9 +85,8 @@ def rule_name_to_code(executable: Path) -> dict[str, str]:
     return {rule["name"]: rule["code"] for rule in rules}
 
 
-def normalize_rule_selectors(
-    config: dict[str, Any], rule_names: dict[str, str]
-) -> None:
+def normalize_rule_selectors(config: dict[str, Any], executable: Path) -> None:
+    rule_names = rule_name_to_code(executable)
     selector_lists: list[list[Any]] = []
 
     for section in (config, config.get("lint")):
@@ -103,13 +105,52 @@ def normalize_rule_selectors(
                     if isinstance(selectors, list)
                 )
 
-    for selectors in selector_lists:
-        selectors[:] = [
-            rule_names.get(selector, selector)
-            if isinstance(selector, str)
-            else selector
+    unknown_names = sorted(
+        {
+            selector
+            for selectors in selector_lists
             for selector in selectors
-        ]
+            if isinstance(selector, str)
+            and selector.islower()
+            and selector not in rule_names
+        }
+    )
+    if unknown_names:
+        # Resolve only unrecognized rule names so code and prefix redirects in
+        # the project's configuration still exercise both Ruff versions.
+        fixed = check_output(
+            [
+                executable,
+                "check",
+                "--isolated",
+                "--no-cache",
+                "--preview",
+                "--select",
+                "RUF202",
+                "--fix-only",
+                "--silent",
+                "--stdin-filename",
+                "ruff.toml",
+                "-",
+            ],
+            input=tomli_w.dumps({"lint": {"select": unknown_names}}),
+            encoding="utf8",
+        )
+        replacements = tomli.loads(fixed)["lint"]["select"]
+        rule_names = rule_names | {
+            old: rule_names.get(new, old)
+            for old, new in zip(unknown_names, replacements, strict=True)
+        }
+
+    for selectors in selector_lists:
+        normalized = []
+        for selector in selectors:
+            if not isinstance(selector, str):
+                normalized.append(selector)
+            # Rules without codes have no selector that works outside preview mode.
+            elif (code := rule_names.get(selector, selector)) is not None:
+                normalized.append(code)
+        selectors[:] = normalized
 
 
 @dataclass(frozen=True)
@@ -147,7 +188,7 @@ class ConfigOverrides(Serializable):
         self,
         dirpath: Path,
         preview: bool,
-        rule_names: dict[str, str],
+        ruff_executable: Path,
     ) -> None:
         """
         Temporarily patch the Ruff configuration file in the given directory.
@@ -214,7 +255,7 @@ class ConfigOverrides(Serializable):
             ruff_config = toml
             for name in base:
                 ruff_config = ruff_config[name]
-            normalize_rule_selectors(ruff_config, rule_names)
+            normalize_rule_selectors(ruff_config, ruff_executable)
 
         tomli_w.dump(toml, path.open("wb"))
 

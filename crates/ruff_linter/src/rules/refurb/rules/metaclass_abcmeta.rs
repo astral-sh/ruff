@@ -6,6 +6,7 @@ use ruff_python_semantic::analyze;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::importer::ImportRequest;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -51,7 +52,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
 /// - [Python documentation: `abc.ABCMeta`](https://docs.python.org/3/library/abc.html#abc.ABCMeta)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.0")]
+#[violation_metadata(preview_since = "v0.2.0", category = Category::Complexity)]
 pub(crate) struct MetaClassABCMeta;
 
 impl AlwaysFixableViolation for MetaClassABCMeta {
@@ -85,8 +86,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
     // Determine whether it's assigned to `abc.ABCMeta`.
     if !checker
         .semantic()
-        .resolve_qualified_name(&keyword.value)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["abc", "ABCMeta"]))
+        .matches_qualified_name(&keyword.value, &["abc", "ABCMeta"])
     {
         return;
     }

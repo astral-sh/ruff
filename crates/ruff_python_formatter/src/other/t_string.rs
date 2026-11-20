@@ -1,4 +1,5 @@
 use super::interpolated_string_element::FormatInterpolatedStringElement;
+use crate::context::WithInterpolatedStringState;
 use crate::other::interpolated_string::{InterpolatedStringContext, InterpolatedStringLayout};
 use crate::prelude::*;
 use crate::string::{StringNormalizer, StringQuotes};
@@ -30,8 +31,15 @@ impl FormatNodeRule<TString> for FormatTString {
         let quotes = StringQuotes::from(string_kind);
         write!(f, [string_kind.prefix(), quotes])?;
 
-        for element in &item.elements {
-            FormatInterpolatedStringElement::new(element, context).fmt(f)?;
+        {
+            let state = f
+                .context()
+                .interpolated_string_state()
+                .enter_string(context);
+            let f = &mut WithInterpolatedStringState::new(state, &mut *f);
+            for element in &item.elements {
+                FormatInterpolatedStringElement::new(element, context).fmt(f)?;
+            }
         }
 
         // Ending quote

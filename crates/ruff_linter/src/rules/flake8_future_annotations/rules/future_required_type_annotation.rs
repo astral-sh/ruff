@@ -5,6 +5,7 @@ use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
@@ -49,7 +50,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## Options
 /// - `target-version`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
 pub(crate) struct FutureRequiredTypeAnnotation {
     reason: Reason,
 }

@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 
 /// ## What it does
@@ -38,10 +39,10 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 ///
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.250")]
-pub(crate) struct VerboseLogMessage;
+#[violation_metadata(stable_since = "v0.0.250", category = Category::Complexity)]
+pub(crate) struct RedundantExceptionInLoggingMessage;
 
-impl Violation for VerboseLogMessage {
+impl Violation for RedundantExceptionInLoggingMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Redundant exception object included in `logging.exception` call".to_string()
@@ -83,7 +84,7 @@ pub(crate) fn verbose_log_message(checker: &Checker, handlers: &[ExceptHandler])
                     };
                     let binding = checker.semantic().binding(id);
                     if binding.kind.is_bound_exception() {
-                        checker.report_diagnostic(VerboseLogMessage, expr.range());
+                        checker.report_diagnostic(RedundantExceptionInLoggingMessage, expr.range());
                     }
                 }
             }

@@ -1,0 +1,150 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/unary_plus_py314.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..94,
+        body: [
+            Match(
+                StmtMatch {
+                    node_index: NodeIndex(None),
+                    range: 44..93,
+                    subject: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 50..53,
+                            id: Name("foo"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 59..71,
+                            node_index: NodeIndex(None),
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    node_index: NodeIndex(None),
+                                    range: 64..66,
+                                    value: UnaryOp(
+                                        ExprUnaryOp {
+                                            node_index: NodeIndex(None),
+                                            range: 64..66,
+                                            op: UAdd,
+                                            operand: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 65..66,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 68..71,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 68..71,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 76..93,
+                            node_index: NodeIndex(None),
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    node_index: NodeIndex(None),
+                                    range: 81..88,
+                                    keys: [
+                                        UnaryOp(
+                                            ExprUnaryOp {
+                                                node_index: NodeIndex(None),
+                                                range: 82..84,
+                                                op: UAdd,
+                                                operand: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 83..84,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 86..87,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 86..87,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 90..93,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 90..93,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | match foo:
+3 |     case +1: ...
+  |          ^^ Syntax Error: Unary '+' is not allowed in a literal pattern on Python 3.14 (syntax was added in Python 3.15)
+4 |     case {+1: 2}: ...
+  |
+
+
+  |
+2 | match foo:
+3 |     case +1: ...
+4 |     case {+1: 2}: ...
+  |           ^^ Syntax Error: Unary '+' is not allowed in a literal pattern on Python 3.14 (syntax was added in Python 3.15)

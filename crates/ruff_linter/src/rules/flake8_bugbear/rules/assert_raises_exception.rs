@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `assertRaises` and `pytest.raises` context managers that catch
@@ -29,7 +30,7 @@ use crate::checkers::ast::Checker;
 /// self.assertRaises(SomeSpecificException, foo)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.83")]
+#[violation_metadata(stable_since = "v0.0.83", category = Category::Suspicious)]
 pub(crate) struct AssertRaisesException {
     exception: ExceptionKind,
 }
@@ -67,9 +68,7 @@ fn detect_blind_exception(
         &Expr::Attribute(ast::ExprAttribute { ref attr, .. }) if attr.as_str() == "assertRaises"
     );
 
-    let is_pytest_raises = semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]));
+    let is_pytest_raises = semantic.matches_qualified_name(func, &["pytest", "raises"]);
 
     if !(is_assert_raises || is_pytest_raises) {
         return None;
@@ -139,7 +138,7 @@ pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCa
     } = call;
     let semantic = checker.semantic();
 
-    if arguments.args.len() < 2 && arguments.find_argument("func", 1).is_none() {
+    if arguments.args.len() < 2 && arguments.find_keyword("func").is_none() {
         return;
     }
 

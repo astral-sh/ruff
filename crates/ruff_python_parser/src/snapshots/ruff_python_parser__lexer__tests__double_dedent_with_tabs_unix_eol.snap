@@ -6,14 +6,14 @@ expression: double_dedent_with_tabs_eol(UNIX_EOL)
 ```
 [
     Def 0..3,
-    Name 4..7,
+    Identifier 4..7,
     Lpar 7..8,
     Rpar 8..9,
     Colon 9..10,
     Newline 10..11,
     Indent 11..12,
     If 12..14,
-    Name 15..16,
+    Identifier 15..16,
     Colon 16..17,
     Newline 17..18,
     NonLogicalNewline 18..19,

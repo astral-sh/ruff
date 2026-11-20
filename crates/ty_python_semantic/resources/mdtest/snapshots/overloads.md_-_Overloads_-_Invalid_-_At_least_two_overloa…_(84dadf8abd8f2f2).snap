@@ -16,7 +16,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 1 | from typing import overload
 2 | 
 3 | @overload
-4 | # error: [invalid-overload]
+4 | # error: [single-overload]
 5 | def func(x: int) -> int: ...
 6 | def func(x: int | str) -> int | str:
 7 |     return x
@@ -28,31 +28,31 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 1 | from typing import overload
 2 | 
 3 | @overload
-4 | # error: [invalid-overload]
+4 | # error: [single-overload]
 5 | def func(x: int) -> int: ...
 ```
 
 # Diagnostics
 
 ```
-error[invalid-overload]: Overloaded function `func` requires at least two overloads
+warning[single-overload]: Overloaded function `func` requires at least two overloads
  --> src/mdtest_snippet.py:5:5
   |
 3 | @overload
   | ---------
-4 | # error: [invalid-overload]
+4 | # error: [single-overload]
 5 | def func(x: int) -> int: ...
   |     ^^^^ Only one overload defined here
 
 ```
 
 ```
-error[invalid-overload]: Overloaded function `func` requires at least two overloads
+warning[single-overload]: Overloaded function `func` requires at least two overloads
  --> src/mdtest_snippet.pyi:5:5
   |
 3 | @overload
   | ---------
-4 | # error: [invalid-overload]
+4 | # error: [single-overload]
 5 | def func(x: int) -> int: ...
   |     ^^^^ Only one overload defined here
 

@@ -865,6 +865,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         Truthiness::AlwaysTrue => covariant = true,
                         Truthiness::AlwaysFalse => {}
+                        Truthiness::Uninhabited => return Type::Never,
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
@@ -891,6 +892,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         Truthiness::AlwaysTrue => contravariant = true,
                         Truthiness::AlwaysFalse => {}
+                        Truthiness::Uninhabited => return Type::Never,
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
@@ -917,6 +919,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         Truthiness::AlwaysTrue => infer_variance = true,
                         Truthiness::AlwaysFalse => {}
+                        Truthiness::Uninhabited => return Type::Never,
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
@@ -1117,6 +1120,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         Truthiness::AlwaysTrue => infer_variance = true,
                         Truthiness::AlwaysFalse => {}
+                        Truthiness::Uninhabited => return Type::Never,
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
@@ -1134,6 +1138,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         Truthiness::AlwaysTrue => covariant = true,
                         Truthiness::AlwaysFalse => {}
+                        Truthiness::Uninhabited => return Type::Never,
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
@@ -1151,6 +1156,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         Truthiness::AlwaysTrue => contravariant = true,
                         Truthiness::AlwaysFalse => {}
+                        Truthiness::Uninhabited => return Type::Never,
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
@@ -1345,6 +1351,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         Truthiness::AlwaysTrue => covariant = true,
                         Truthiness::AlwaysFalse => {}
+                        Truthiness::Uninhabited => return Type::Never,
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
@@ -1362,6 +1369,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         Truthiness::AlwaysTrue => contravariant = true,
                         Truthiness::AlwaysFalse => {}
+                        Truthiness::Uninhabited => return Type::Never,
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
@@ -1405,6 +1413,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         Truthiness::AlwaysTrue => infer_variance = true,
                         Truthiness::AlwaysFalse => {}
+                        Truthiness::Uninhabited => return Type::Never,
                         Truthiness::Ambiguous => {
                             return error(
                                 &self.context,
@@ -1574,11 +1583,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
         // only check presence/absence/number here.
 
-        let num_constraints = arguments.args.len().saturating_sub(1);
+        let constraints = arguments.args.get(1..).unwrap_or_default();
 
-        let bound_or_constraints = match (has_bound, num_constraints) {
-            (false, 0) => None,
-            (true, 0) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
+        let bound_or_constraints = match (has_bound, constraints) {
+            (false, []) => None,
+            (true, []) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
             (true, _) => {
                 return error(
                     &self.context,
@@ -1586,12 +1595,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     call_expr,
                 );
             }
-            (_, 1) => {
-                return error(
-                    &self.context,
-                    "A `TypeVar` cannot have exactly one constraint",
-                    &arguments.args[1],
-                );
+            (false, [constraint]) => {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, constraint)
+                {
+                    builder.into_diagnostic("A `TypeVar` cannot have exactly one constraint");
+                }
+                return KnownClass::TypeVar.to_instance(db, env);
             }
             (false, _) => Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints),
         };

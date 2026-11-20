@@ -12,6 +12,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix};
 
 /// ## What it does
@@ -49,7 +50,7 @@ use crate::{Edit, Fix};
 /// - [Python documentation: `str.startswith`](https://docs.python.org/3/library/stdtypes.html#str.startswith)
 /// - [Python documentation: `str.endswith`](https://docs.python.org/3/library/stdtypes.html#str.endswith)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.243")]
+#[violation_metadata(stable_since = "v0.0.243", category = Category::Complexity)]
 pub(crate) struct MultipleStartsEndsWith {
     attr: String,
 }
@@ -198,7 +199,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
             let node3 = Expr::Call(ast::ExprCall {
                 func: Box::new(node2),
                 arguments: Arguments {
-                    args: Box::from([node]),
+                    args: [node].into(),
                     keywords: std::iter::empty().collect(),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,

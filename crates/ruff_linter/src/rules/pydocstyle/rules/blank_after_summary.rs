@@ -3,6 +3,7 @@ use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -45,17 +46,17 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.68")]
-pub(crate) struct MissingBlankLineAfterSummary {
+#[violation_metadata(stable_since = "v0.0.68", category = Category::Pedantic)]
+pub(crate) struct IncorrectBlankLineAfterDocstringSummary {
     num_lines: usize,
 }
 
-impl Violation for MissingBlankLineAfterSummary {
+impl Violation for IncorrectBlankLineAfterDocstringSummary {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingBlankLineAfterSummary { num_lines } = self;
+        let IncorrectBlankLineAfterDocstringSummary { num_lines } = self;
         if *num_lines == 0 {
             "1 blank line required between summary line and description".to_string()
         } else {
@@ -90,7 +91,7 @@ pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
     }
     if lines_count > 1 && blanks_count != 1 {
         let mut diagnostic = checker.report_diagnostic(
-            MissingBlankLineAfterSummary {
+            IncorrectBlankLineAfterDocstringSummary {
                 num_lines: blanks_count,
             },
             docstring.range(),

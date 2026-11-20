@@ -11,18 +11,19 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::{Diagnostic, DummyFileResolver};
     use ruff_python_parser::ParseOptions;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
-    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_trivia::textwrap::dedent;
 
     use crate::linter::check_path;
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::RuntimeSemantics;
     use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -30,7 +31,9 @@ mod tests {
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
-    use crate::{Locator, assert_diagnostics, assert_diagnostics_diff, directives};
+    use crate::{
+        Applicability, Fix, Locator, assert_diagnostics, assert_diagnostics_diff, directives,
+    };
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"))]
@@ -187,7 +190,7 @@ mod tests {
     #[test_case(Rule::UnusedAnnotation, Path::new("F842.py"))]
     #[test_case(Rule::RaiseNotImplemented, Path::new("F901.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -201,15 +204,18 @@ mod tests {
         rule_code: Rule,
         path: &Path,
     ) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
                 flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
-                    runtime_required_base_classes: vec![
-                        "pydantic.BaseModel".to_string(),
-                        "sqlalchemy.orm.DeclarativeBase".to_string(),
-                    ],
+                    runtime_evaluated_base_classes: FxHashMap::from_iter([
+                        ("pydantic.BaseModel".to_string(), RuntimeSemantics::Required),
+                        (
+                            "sqlalchemy.orm.DeclarativeBase".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                    ]),
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
@@ -261,11 +267,7 @@ mod tests {
     #[test_case(Rule::UndefinedExport, Path::new("__init__.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_36.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code).with_preview_mode(),
@@ -327,11 +329,7 @@ mod tests {
     // Regression test for https://github.com/astral-sh/ruff/issues/12897
     #[test_case(Rule::UnusedImport, Path::new("F401_33/__init__.py"))]
     fn f401_preview_local_init_import(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let settings = LinterSettings {
             preview: PreviewMode::Enabled,
             isort: isort::settings::Settings {
@@ -360,11 +358,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     fn f401_stable(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "{}_stable_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("{}_stable_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -383,7 +377,7 @@ mod tests {
     fn f401_deprecated_option(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_deprecated_option_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -1031,7 +1025,10 @@ mod tests {
             target_version,
             &suppressions,
         );
-        messages.sort_by(Diagnostic::ruff_start_ordering);
+        messages.sort_by(|a, b| {
+            a.rendering_sort_key(&DummyFileResolver)
+                .cmp(&b.rendering_sort_key(&DummyFileResolver))
+        });
         let actual = messages
             .iter()
             .filter(|msg| !msg.is_invalid_syntax())
@@ -2712,7 +2709,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         ",
-            &[Rule::UnusedVariable, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
         );
     }
 
@@ -3263,6 +3260,94 @@ lambda: fu
         from __future__ import *
         ",
             &[Rule::FutureFeatureNotDefined],
+        );
+    }
+
+    #[test_case(PythonVersion::PY312, &[Rule::LateFutureImport]; "py312")]
+    #[test_case(PythonVersion::PY313, &[]; "py313")]
+    fn relative_future_import_position(target_version: PythonVersion, expected: &[Rule]) {
+        let diagnostics = test_snippet(
+            "
+            x = 5
+            from .__future__ import division
+            ",
+            &LinterSettings::for_rule(Rule::LateFutureImport).with_target_version(target_version),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            expected
+                .iter()
+                .map(|rule| rule.name().as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test_case(PythonVersion::PY312, &[Rule::FutureFeatureNotDefined]; "py312")]
+    #[test_case(PythonVersion::PY313, &[]; "py313")]
+    fn relative_future_import_feature(target_version: PythonVersion, expected: &[Rule]) {
+        let diagnostics = test_snippet(
+            "from .__future__ import unknown_feature",
+            &LinterSettings::for_rule(Rule::FutureFeatureNotDefined)
+                .with_target_version(target_version),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            expected
+                .iter()
+                .map(|rule| rule.name().as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn relative_future_import_star() {
+        let diagnostics = test_snippet(
+            "from .__future__ import *",
+            &LinterSettings::for_rule(Rule::UndefinedLocalWithImportStar)
+                .with_target_version(PythonVersion::PY313),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            [Rule::UndefinedLocalWithImportStar.name().as_str()]
+        );
+    }
+
+    #[test]
+    fn unused_relative_future_import_py313() {
+        let diagnostics = test_snippet(
+            "from .__future__ import annotations",
+            &LinterSettings::for_rule(Rule::UnusedImport).with_target_version(PythonVersion::PY313),
+        );
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(|diagnostic| (diagnostic.name(), diagnostic.fix().map(Fix::applicability)))
+                .collect::<Vec<_>>(),
+            [(
+                Rule::UnusedImport.name().as_str(),
+                Some(Applicability::Safe)
+            )]
+        );
+    }
+
+    #[test]
+    fn unused_relative_future_import_py312() {
+        let diagnostics = test_snippet(
+            "from .__future__ import annotations",
+            &LinterSettings::for_rule(Rule::UnusedImport).with_target_version(PythonVersion::PY312),
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn unused_relative_future_import_without_target_version() {
+        let diagnostics = test_snippet(
+            "from .__future__ import division",
+            &LinterSettings::for_rule(Rule::UnusedImport),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            [Rule::UnusedImport.name().as_str()]
         );
     }
 
@@ -4555,6 +4640,9 @@ lambda: fu
             List[TypedDict("x", x=int)]
             List[NamedTuple("a", a=int)]
             List[NamedTuple("a", [("a", int)])]
+
+            # Keyword arguments no longer define fields on Python 3.13+.
+            List[TypedDict("x", x="Y")]
         "#,
             &[],
         );
@@ -4563,7 +4651,6 @@ lambda: fu
             from typing import TypedDict, List, NamedTuple, TypeVar
 
             List[TypedDict("x", {"x": "Y"})]
-            List[TypedDict("x", x="Y")]
             List[NamedTuple("a", [("a", "Y")])]
             List[NamedTuple("a", a="Y")]
             List[TypedDict("x", {"x": List["a"]})]
@@ -4571,7 +4658,6 @@ lambda: fu
             List[TypeVar("A", List["C"])]
         "#,
             &[
-                Rule::UndefinedName,
                 Rule::UndefinedName,
                 Rule::UndefinedName,
                 Rule::UndefinedName,

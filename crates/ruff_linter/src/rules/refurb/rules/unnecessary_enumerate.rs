@@ -10,6 +10,7 @@ use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set, is_tuple};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -58,7 +59,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 /// - [Python documentation: `len`](https://docs.python.org/3/library/functions.html#len)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.291")]
+#[violation_metadata(preview_since = "v0.0.291", category = Category::Complexity)]
 pub(crate) struct UnnecessaryEnumerate {
     subset: EnumerateSubset,
 }
@@ -247,7 +248,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             .into(),
         ),
         arguments: Arguments {
-            args: Box::from([var.into()]),
+            args: [var.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -267,7 +268,7 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
             .into(),
         ),
         arguments: Arguments {
-            args: Box::from([len.into()]),
+            args: [len.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

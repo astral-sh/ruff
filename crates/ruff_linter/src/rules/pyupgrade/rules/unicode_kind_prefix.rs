@@ -3,6 +3,7 @@ use ruff_python_ast::StringLiteral;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -25,7 +26,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: Unicode HOWTO](https://docs.python.org/3/howto/unicode.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201")]
+#[violation_metadata(stable_since = "v0.0.201", category = Category::Complexity)]
 pub(crate) struct UnicodeKindPrefix;
 
 impl AlwaysFixableViolation for UnicodeKindPrefix {

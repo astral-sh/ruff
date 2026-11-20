@@ -8,6 +8,7 @@ use ruff_python_semantic::analyze::function_type::is_stub;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::fastapi::rules::is_fastapi_route;
 
@@ -36,7 +37,7 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 ///     bar()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.4.0")]
+#[violation_metadata(preview_since = "v0.4.0", category = Category::Pedantic)]
 pub(crate) struct UnusedAsync {
     name: String,
 }
@@ -162,14 +163,10 @@ where
 /// Returns `true` if the function is decorated with `contextlib.asynccontextmanager`.
 fn is_async_context_manager(function_def: &ast::StmtFunctionDef, semantic: &SemanticModel) -> bool {
     function_def.decorator_list.iter().any(|decorator| {
-        semantic
-            .resolve_qualified_name(&decorator.expression)
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["contextlib", "asynccontextmanager"]
-                )
-            })
+        semantic.matches_qualified_name(
+            &decorator.expression,
+            &["contextlib", "asynccontextmanager"],
+        )
     })
 }
 

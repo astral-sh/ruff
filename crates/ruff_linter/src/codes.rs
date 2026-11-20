@@ -1,12 +1,17 @@
 /// In this module we generate [`Rule`], an enum of all rules, and [`RuleCodePrefix`], an enum of
-/// all rules categories. A rule category is something like pyflakes or flake8-todos. Each rule
-/// category contains all rules and their common prefixes, i.e. everything you can specify in
-/// `--select`. For pylint this is e.g. C0414 and E0118 but also C and E01.
+/// all linter groups. A linter group is something like `pyflakes` or `flake8-todos`. Each linter
+/// group contains all rules and their common prefixes, i.e. everything you can specify in
+/// `--select`. For `pylint` this is e.g. `C0414` and `E0118` but also `C` and `E01`.
+///
+/// When [`crate::preview::is_rule_categories_enabled`] returns `true`, rules can also be selected by
+/// their [`Category`].
 use std::fmt::Formatter;
+use std::sync::LazyLock;
 
 use ruff_db::diagnostic::SecondaryCode;
 use serde::Serialize;
-use strum_macros::EnumIter;
+use strum::{IntoEnumIterator, VariantArray as _};
+use strum_macros::{Display, EnumIter, EnumMessage, EnumString, IntoStaticStr, VariantArray};
 
 use crate::registry::Linter;
 use crate::rules;
@@ -78,6 +83,132 @@ impl serde::Serialize for NoqaCode {
     }
 }
 
+/// The category assigned to a lint rule.
+///
+/// These categories are similar to those found in [Clippy] and form much broader groupings than the
+/// linter-based groups. Categories are intended to be our primary classification mechanism for
+/// rules going forward, with the linter groups eventually being deprecated and removed, albeit in
+/// the relatively distant future. The categorization of a rule determines two important properties:
+/// - its default status, `style` and above are currently enabled by default
+/// - its default severity, in a future where we have multiple diagnostic severities
+///
+/// Assuming we continue to follow Clippy, `correctness` lints will have a severity of `error` by
+/// default, while the other on-by-default categories will have a severity of `warn` by default.
+///
+/// Secondary groups like the legacy linter groups are orthogonal selection mechanisms that have no
+/// impact on severity or default status, and may, and usually do, include rules from multiple
+/// categories. For example, many `F` rules are `correctness` lints, but `F` includes `suspicious`
+/// and even `pedantic` rules too. At some point in the future, we may support additional secondary
+/// groups that are not legacy linter groups as well.
+///
+/// The precedence between categories, linter groups, linter prefixes, and rules is determined by
+/// the [`crate::rule_selector::Specificity`] returned by
+/// [`crate::rule_selector::RuleSelector::specificity`], and currently follows this ordering:
+///
+/// ```text
+/// ALL < category < linter group < linter prefix < rule
+/// ```
+///
+/// Variants are ordered by descending severity, with error categories first, followed by warning,
+/// and then by off-by-default categories. The rule documentation lists category filter options
+/// in this order.
+///
+/// See our [rule categorization guidelines] for more information on assigning categories.
+///
+/// [Clippy]: https://doc.rust-lang.org/clippy/lints.html
+/// [rule categorization guidelines]: https://docs.astral.sh/ruff/rule-proposals/#rule-categorization-guidelines
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumIter,
+    EnumString,
+    IntoStaticStr,
+    Display,
+    Serialize,
+    EnumMessage,
+    VariantArray,
+)]
+#[strum(serialize_all = "kebab-case", const_into_str)]
+#[serde(rename_all = "kebab-case")]
+pub enum Category {
+    /// Rules that flag outright wrong code
+    Correctness,
+
+    /// Rules that flag likely outright wrong code but that could be intentional
+    Suspicious,
+
+    /// Rules that suggest rewriting code in a shorter and more readable way
+    Complexity,
+
+    /// Rules that suggest rewriting code in a more efficient way
+    Performance,
+
+    /// Rules that suggest rewriting code in a more idiomatic way
+    Style,
+
+    /// Rules that flag potential security vulnerabilities but may be prone to false positives
+    Security,
+
+    /// Rules that flag formatting issues that do not affect semantics
+    Formatting,
+
+    /// Rules that are highly opinionated or prone to false positives
+    Pedantic,
+
+    /// Rules that restrict the use of certain features
+    Restriction,
+
+    /// Internal testing rules that shouldn't be exposed to users.
+    #[cfg(any(feature = "test-rules", test))]
+    #[strum(disabled)]
+    Testing,
+}
+
+impl Category {
+    /// Return the description of the category, derived from its documentation.
+    #[cfg(any(feature = "clap", test))]
+    pub(crate) fn description(self) -> &'static str {
+        let Some(docs) =
+            strum::EnumMessage::get_documentation(&self).and_then(|docs| docs.lines().next())
+        else {
+            panic!("Category `{self}` missing required documentation");
+        };
+
+        docs
+    }
+
+    /// Return the rules in this category.
+    pub(crate) fn rules(self) -> &'static [Rule] {
+        static RULES_BY_CATEGORY: LazyLock<[Box<[Rule]>; Category::VARIANTS.len()]> =
+            LazyLock::new(|| {
+                let mut rules = [const { Vec::new() }; Category::VARIANTS.len()];
+
+                for rule in Rule::iter() {
+                    rules[rule.category() as usize].push(rule);
+                }
+
+                rules.map(Vec::into_boxed_slice)
+            });
+
+        &RULES_BY_CATEGORY[self as usize]
+    }
+
+    /// Return the categories that should be enabled by default.
+    pub const fn default_categories() -> [Category; 5] {
+        [
+            Self::Correctness,
+            Self::Suspicious,
+            Self::Complexity,
+            Self::Performance,
+            Self::Style,
+        ]
+    }
+}
+
 #[derive(Debug, Copy, Clone, Serialize)]
 pub enum RuleStatus {
     /// The rule is stable since the provided Ruff version.
@@ -90,6 +221,17 @@ pub enum RuleStatus {
     Deprecated { since: &'static str },
     /// The rule was removed in the provided Ruff version, and errors will be displayed on use.
     Removed { since: &'static str },
+}
+
+impl std::fmt::Display for RuleStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            RuleStatus::Stable { .. } => "stable",
+            RuleStatus::Preview { .. } => "preview",
+            RuleStatus::Deprecated { .. } => "deprecated",
+            RuleStatus::Removed { .. } => "removed",
+        })
+    }
 }
 
 #[ruff_macros::map_codes]
@@ -239,6 +381,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pylint, "E0116") => rules::pylint::rules::ContinueInFinally,
         (Pylint, "E0117") => rules::pylint::rules::NonlocalWithoutBinding,
         (Pylint, "E0118") => rules::pylint::rules::LoadBeforeGlobalDeclaration,
+        (Pylint, "E0211") => rules::pylint::rules::NoMethodArgument,
         (Pylint, "E0237") => rules::pylint::rules::NonSlotAssignment,
         (Pylint, "E0241") => rules::pylint::rules::DuplicateBases,
         (Pylint, "E0302") => rules::pylint::rules::UnexpectedSpecialMethodSignature,
@@ -273,8 +416,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pylint, "E4703") => rules::pylint::rules::ModifiedIteratingSet,
         (Pylint, "R0124") => rules::pylint::rules::ComparisonWithItself,
         (Pylint, "R0133") => rules::pylint::rules::ComparisonOfConstant,
-        (Pylint, "R0202") => rules::pylint::rules::NoClassmethodDecorator,
-        (Pylint, "R0203") => rules::pylint::rules::NoStaticmethodDecorator,
+        (Pylint, "R0202") => rules::pylint::rules::NonDecoratorClassmethod,
+        (Pylint, "R0203") => rules::pylint::rules::NonDecoratorStaticmethod,
         (Pylint, "R0206") => rules::pylint::rules::PropertyWithParameters,
         (Pylint, "R0402") => rules::pylint::rules::ManualFromImport,
         (Pylint, "R0904") => rules::pylint::rules::TooManyPublicMethods,
@@ -303,7 +446,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pylint, "R5501") => rules::pylint::rules::CollapsibleElseIf,
         (Pylint, "R6104") => rules::pylint::rules::NonAugmentedAssignment,
         (Pylint, "R6201") => rules::pylint::rules::LiteralMembership,
-        (Pylint, "R6301") => rules::pylint::rules::NoSelfUse,
+        (Pylint, "R6301") => rules::pylint::rules::UnusedSelf,
         #[cfg(any(feature = "test-rules", test))]
         (Pylint, "W0101") => rules::pylint::rules::UnreachableCode,
         (Pylint, "W0108") => rules::pylint::rules::UnnecessaryLambda,
@@ -353,6 +496,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Async, "240") => rules::flake8_async::rules::BlockingPathMethodInAsyncFunction,
         (Flake8Async, "250") => rules::flake8_async::rules::BlockingInputInAsyncFunction,
         (Flake8Async, "251") => rules::flake8_async::rules::BlockingSleepInAsyncFunction,
+        (Flake8Async, "401") => rules::flake8_async::rules::PytestRaisesExceptionGroup,
 
         // flake8-builtins
         (Flake8Builtins, "001") => rules::flake8_builtins::rules::BuiltinVariableShadowing,
@@ -370,8 +514,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bugbear, "006") => rules::flake8_bugbear::rules::MutableArgumentDefault,
         (Flake8Bugbear, "007") => rules::flake8_bugbear::rules::UnusedLoopControlVariable,
         (Flake8Bugbear, "008") => rules::flake8_bugbear::rules::FunctionCallInDefaultArgument,
-        (Flake8Bugbear, "009") => rules::flake8_bugbear::rules::GetAttrWithConstant,
-        (Flake8Bugbear, "010") => rules::flake8_bugbear::rules::SetAttrWithConstant,
+        (Flake8Bugbear, "009") => rules::flake8_bugbear::rules::GetattrWithConstant,
+        (Flake8Bugbear, "010") => rules::flake8_bugbear::rules::SetattrWithConstant,
         (Flake8Bugbear, "011") => rules::flake8_bugbear::rules::AssertFalse,
         (Flake8Bugbear, "012") => rules::flake8_bugbear::rules::JumpStatementInFinally,
         (Flake8Bugbear, "013") => rules::flake8_bugbear::rules::RedundantTupleInExceptionHandler,
@@ -398,7 +542,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bugbear, "034") => rules::flake8_bugbear::rules::ReSubPositionalArgs,
         (Flake8Bugbear, "035") => rules::flake8_bugbear::rules::StaticKeyDictComprehension,
         (Flake8Bugbear, "039") => rules::flake8_bugbear::rules::MutableContextvarDefault,
-        (Flake8Bugbear, "043") => rules::flake8_bugbear::rules::DelAttrWithConstant,
+        (Flake8Bugbear, "043") => rules::flake8_bugbear::rules::DelattrWithConstant,
         (Flake8Bugbear, "901") => rules::flake8_bugbear::rules::ReturnInGenerator,
         (Flake8Bugbear, "903") => rules::flake8_bugbear::rules::ClassAsDataStructure,
         (Flake8Bugbear, "904") => rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
@@ -455,9 +599,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Return, "508") => rules::flake8_return::rules::SuperfluousElseBreak,
 
         // flake8-gettext
-        (Flake8GetText, "001") => rules::flake8_gettext::rules::FStringInGetTextFuncCall,
-        (Flake8GetText, "002") => rules::flake8_gettext::rules::FormatInGetTextFuncCall,
-        (Flake8GetText, "003") => rules::flake8_gettext::rules::PrintfInGetTextFuncCall,
+        (Flake8GetText, "001") => rules::flake8_gettext::rules::FStringInGettextCall,
+        (Flake8GetText, "002") => rules::flake8_gettext::rules::FormatInGettextCall,
+        (Flake8GetText, "003") => rules::flake8_gettext::rules::PrintfInGettextCall,
 
         // flake8-implicit-str-concat
         (Flake8ImplicitStrConcat, "001") => rules::flake8_implicit_str_concat::rules::SingleLineImplicitStringConcatenation,
@@ -467,7 +611,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-print
         (Flake8Print, "1") => rules::flake8_print::rules::Print,
-        (Flake8Print, "3") => rules::flake8_print::rules::PPrint,
+        (Flake8Print, "3") => rules::flake8_print::rules::Pprint,
 
         // flake8-quotes
         (Flake8Quotes, "000") => rules::flake8_quotes::rules::BadQuotesInlineString,
@@ -484,7 +628,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Annotations, "101") => rules::flake8_annotations::rules::MissingTypeSelf,
         #[allow(deprecated)]
         (Flake8Annotations, "102") => rules::flake8_annotations::rules::MissingTypeCls,
-        (Flake8Annotations, "201") => rules::flake8_annotations::rules::MissingReturnTypeUndocumentedPublicFunction,
+        (Flake8Annotations, "201") => rules::flake8_annotations::rules::MissingReturnTypePublicFunction,
         (Flake8Annotations, "202") => rules::flake8_annotations::rules::MissingReturnTypePrivateFunction,
         (Flake8Annotations, "204") => rules::flake8_annotations::rules::MissingReturnTypeSpecialMethod,
         (Flake8Annotations, "205") => rules::flake8_annotations::rules::MissingReturnTypeStaticMethod,
@@ -554,8 +698,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pyupgrade, "010") => rules::pyupgrade::rules::UnnecessaryFutureImport,
         (Pyupgrade, "011") => rules::pyupgrade::rules::LRUCacheWithoutParameters,
         (Pyupgrade, "012") => rules::pyupgrade::rules::UnnecessaryEncodeUTF8,
-        (Pyupgrade, "013") => rules::pyupgrade::rules::ConvertTypedDictFunctionalToClass,
-        (Pyupgrade, "014") => rules::pyupgrade::rules::ConvertNamedTupleFunctionalToClass,
+        (Pyupgrade, "013") => rules::pyupgrade::rules::FunctionalTypedDict,
+        (Pyupgrade, "014") => rules::pyupgrade::rules::FunctionalNamedTuple,
         (Pyupgrade, "015") => rules::pyupgrade::rules::RedundantOpenModes,
         (Pyupgrade, "017") => rules::pyupgrade::rules::DatetimeTimezoneUTC,
         (Pyupgrade, "018") => rules::pyupgrade::rules::NativeLiterals,
@@ -582,7 +726,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pyupgrade, "039") => rules::pyupgrade::rules::UnnecessaryClassParentheses,
         (Pyupgrade, "040") => rules::pyupgrade::rules::NonPEP695TypeAlias,
         (Pyupgrade, "041") => rules::pyupgrade::rules::TimeoutErrorAlias,
-        (Pyupgrade, "042") => rules::pyupgrade::rules::ReplaceStrEnum,
+        (Pyupgrade, "042") => rules::pyupgrade::rules::ManualStrEnum,
         (Pyupgrade, "043") => rules::pyupgrade::rules::UnnecessaryDefaultTypeArgs,
         (Pyupgrade, "044") => rules::pyupgrade::rules::NonPEP646Unpack,
         (Pyupgrade, "045") => rules::pyupgrade::rules::NonPEP604AnnotationOptional,
@@ -592,6 +736,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pyupgrade, "049") => rules::pyupgrade::rules::PrivateTypeParameter,
         (Pyupgrade, "050") => rules::pyupgrade::rules::UselessClassMetaclassType,
         (Pyupgrade, "051") => rules::pyupgrade::rules::DeprecatedAbcDecorator,
+        (Pyupgrade, "052") => rules::pyupgrade::rules::ContextManagerIterator,
 
         // pydocstyle
         (Pydocstyle, "100") => rules::pydocstyle::rules::UndocumentedPublicModule,
@@ -603,22 +748,22 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pydocstyle, "106") => rules::pydocstyle::rules::UndocumentedPublicNestedClass,
         (Pydocstyle, "107") => rules::pydocstyle::rules::UndocumentedPublicInit,
         (Pydocstyle, "200") => rules::pydocstyle::rules::UnnecessaryMultilineDocstring,
-        (Pydocstyle, "201") => rules::pydocstyle::rules::BlankLineBeforeFunction,
-        (Pydocstyle, "202") => rules::pydocstyle::rules::BlankLineAfterFunction,
-        (Pydocstyle, "203") => rules::pydocstyle::rules::IncorrectBlankLineBeforeClass,
-        (Pydocstyle, "204") => rules::pydocstyle::rules::IncorrectBlankLineAfterClass,
-        (Pydocstyle, "205") => rules::pydocstyle::rules::MissingBlankLineAfterSummary,
+        (Pydocstyle, "201") => rules::pydocstyle::rules::BlankLineBeforeFunctionDocstring,
+        (Pydocstyle, "202") => rules::pydocstyle::rules::BlankLineAfterFunctionDocstring,
+        (Pydocstyle, "203") => rules::pydocstyle::rules::IncorrectBlankLineBeforeClassDocstring,
+        (Pydocstyle, "204") => rules::pydocstyle::rules::IncorrectBlankLineAfterClassDocstring,
+        (Pydocstyle, "205") => rules::pydocstyle::rules::IncorrectBlankLineAfterDocstringSummary,
         (Pydocstyle, "206") => rules::pydocstyle::rules::DocstringTabIndentation,
-        (Pydocstyle, "207") => rules::pydocstyle::rules::UnderIndentation,
-        (Pydocstyle, "208") => rules::pydocstyle::rules::OverIndentation,
-        (Pydocstyle, "209") => rules::pydocstyle::rules::NewLineAfterLastParagraph,
-        (Pydocstyle, "210") => rules::pydocstyle::rules::SurroundingWhitespace,
-        (Pydocstyle, "211") => rules::pydocstyle::rules::BlankLineBeforeClass,
-        (Pydocstyle, "212") => rules::pydocstyle::rules::MultiLineSummaryFirstLine,
-        (Pydocstyle, "213") => rules::pydocstyle::rules::MultiLineSummarySecondLine,
-        (Pydocstyle, "214") => rules::pydocstyle::rules::OverindentedSection,
-        (Pydocstyle, "215") => rules::pydocstyle::rules::OverindentedSectionUnderline,
-        (Pydocstyle, "300") => rules::pydocstyle::rules::TripleSingleQuotes,
+        (Pydocstyle, "207") => rules::pydocstyle::rules::UnderIndentedDocstringLine,
+        (Pydocstyle, "208") => rules::pydocstyle::rules::OverIndentedDocstringLine,
+        (Pydocstyle, "209") => rules::pydocstyle::rules::MissingNewLineAfterLastDocstringParagraph,
+        (Pydocstyle, "210") => rules::pydocstyle::rules::WhitespaceAroundDocstringText,
+        (Pydocstyle, "211") => rules::pydocstyle::rules::BlankLineBeforeClassDocstring,
+        (Pydocstyle, "212") => rules::pydocstyle::rules::MultilineDocstringSummaryOnSeparateLine,
+        (Pydocstyle, "213") => rules::pydocstyle::rules::MultilineDocstringSummaryOnFirstLine,
+        (Pydocstyle, "214") => rules::pydocstyle::rules::OverIndentedDocstringSection,
+        (Pydocstyle, "215") => rules::pydocstyle::rules::OverIndentedDocstringSectionUnderline,
+        (Pydocstyle, "300") => rules::pydocstyle::rules::UnconventionalDocstringQuotes,
         (Pydocstyle, "301") => rules::pydocstyle::rules::EscapeSequenceInDocstring,
         (Pydocstyle, "400") => rules::pydocstyle::rules::MissingTrailingPeriod,
         (Pydocstyle, "401") => rules::pydocstyle::rules::NonImperativeMood,
@@ -628,37 +773,37 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pydocstyle, "405") => rules::pydocstyle::rules::NonCapitalizedSectionName,
         (Pydocstyle, "406") => rules::pydocstyle::rules::MissingNewLineAfterSectionName,
         (Pydocstyle, "407") => rules::pydocstyle::rules::MissingDashedUnderlineAfterSection,
-        (Pydocstyle, "408") => rules::pydocstyle::rules::MissingSectionUnderlineAfterName,
+        (Pydocstyle, "408") => rules::pydocstyle::rules::BlankLineBeforeDocstringSectionUnderline,
         (Pydocstyle, "409") => rules::pydocstyle::rules::MismatchedSectionUnderlineLength,
-        (Pydocstyle, "410") => rules::pydocstyle::rules::NoBlankLineAfterSection,
-        (Pydocstyle, "411") => rules::pydocstyle::rules::NoBlankLineBeforeSection,
+        (Pydocstyle, "410") => rules::pydocstyle::rules::MissingBlankLineAfterDocstringSection,
+        (Pydocstyle, "411") => rules::pydocstyle::rules::MissingBlankLineBeforeDocstringSection,
         (Pydocstyle, "412") => rules::pydocstyle::rules::BlankLinesBetweenHeaderAndContent,
-        (Pydocstyle, "413") => rules::pydocstyle::rules::MissingBlankLineAfterLastSection,
+        (Pydocstyle, "413") => rules::pydocstyle::rules::MissingBlankLineAfterLastDocstringSection,
         (Pydocstyle, "414") => rules::pydocstyle::rules::EmptyDocstringSection,
         (Pydocstyle, "415") => rules::pydocstyle::rules::MissingTerminalPunctuation,
         (Pydocstyle, "416") => rules::pydocstyle::rules::MissingSectionNameColon,
-        (Pydocstyle, "417") => rules::pydocstyle::rules::UndocumentedParam,
+        (Pydocstyle, "417") => rules::pydocstyle::rules::UndocumentedParameter,
         (Pydocstyle, "418") => rules::pydocstyle::rules::OverloadWithDocstring,
         (Pydocstyle, "419") => rules::pydocstyle::rules::EmptyDocstring,
         (Pydocstyle, "420") => rules::pydocstyle::rules::IncorrectSectionOrder,
         (Pydocstyle, "421") => rules::pydocstyle::rules::PropertyDocstringStartsWithVerb,
 
         // pep8-naming
-        (PEP8Naming, "801") => rules::pep8_naming::rules::InvalidClassName,
-        (PEP8Naming, "802") => rules::pep8_naming::rules::InvalidFunctionName,
-        (PEP8Naming, "803") => rules::pep8_naming::rules::InvalidArgumentName,
-        (PEP8Naming, "804") => rules::pep8_naming::rules::InvalidFirstArgumentNameForClassMethod,
-        (PEP8Naming, "805") => rules::pep8_naming::rules::InvalidFirstArgumentNameForMethod,
+        (PEP8Naming, "801") => rules::pep8_naming::rules::NonCamelCaseClassName,
+        (PEP8Naming, "802") => rules::pep8_naming::rules::NonLowercaseFunctionName,
+        (PEP8Naming, "803") => rules::pep8_naming::rules::NonLowercaseParameterName,
+        (PEP8Naming, "804") => rules::pep8_naming::rules::ClassMethodReceiverNotNamedCls,
+        (PEP8Naming, "805") => rules::pep8_naming::rules::InstanceMethodReceiverNotNamedSelf,
         (PEP8Naming, "806") => rules::pep8_naming::rules::NonLowercaseVariableInFunction,
         (PEP8Naming, "807") => rules::pep8_naming::rules::DunderFunctionName,
         (PEP8Naming, "811") => rules::pep8_naming::rules::ConstantImportedAsNonConstant,
         (PEP8Naming, "812") => rules::pep8_naming::rules::LowercaseImportedAsNonLowercase,
-        (PEP8Naming, "813") => rules::pep8_naming::rules::CamelcaseImportedAsLowercase,
-        (PEP8Naming, "814") => rules::pep8_naming::rules::CamelcaseImportedAsConstant,
+        (PEP8Naming, "813") => rules::pep8_naming::rules::CamelCaseImportedAsLowercase,
+        (PEP8Naming, "814") => rules::pep8_naming::rules::CamelCaseImportedAsConstant,
         (PEP8Naming, "815") => rules::pep8_naming::rules::MixedCaseVariableInClassScope,
         (PEP8Naming, "816") => rules::pep8_naming::rules::MixedCaseVariableInGlobalScope,
-        (PEP8Naming, "817") => rules::pep8_naming::rules::CamelcaseImportedAsAcronym,
-        (PEP8Naming, "818") => rules::pep8_naming::rules::ErrorSuffixOnExceptionName,
+        (PEP8Naming, "817") => rules::pep8_naming::rules::CamelCaseImportedAsAcronym,
+        (PEP8Naming, "818") => rules::pep8_naming::rules::ExceptionClassWithoutErrorSuffix,
         (PEP8Naming, "999") => rules::pep8_naming::rules::InvalidModuleName,
 
         // isort
@@ -670,7 +815,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-bandit
         (Flake8Bandit, "101") => rules::flake8_bandit::rules::Assert,
-        (Flake8Bandit, "102") => rules::flake8_bandit::rules::ExecBuiltin,
+        (Flake8Bandit, "102") => rules::flake8_bandit::rules::Exec,
         (Flake8Bandit, "103") => rules::flake8_bandit::rules::BadFilePermissions,
         (Flake8Bandit, "104") => rules::flake8_bandit::rules::HardcodedBindAllInterfaces,
         (Flake8Bandit, "105") => rules::flake8_bandit::rules::HardcodedPasswordString,
@@ -688,11 +833,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bandit, "304") => rules::flake8_bandit::rules::SuspiciousInsecureCipherUsage,
         (Flake8Bandit, "305") => rules::flake8_bandit::rules::SuspiciousInsecureCipherModeUsage,
         (Flake8Bandit, "306") => rules::flake8_bandit::rules::SuspiciousMktempUsage,
-        (Flake8Bandit, "307") => rules::flake8_bandit::rules::SuspiciousEvalUsage,
+        (Flake8Bandit, "307") => rules::flake8_bandit::rules::Eval,
         (Flake8Bandit, "308") => rules::flake8_bandit::rules::SuspiciousMarkSafeUsage,
         (Flake8Bandit, "310") => rules::flake8_bandit::rules::SuspiciousURLOpenUsage,
         (Flake8Bandit, "311") => rules::flake8_bandit::rules::SuspiciousNonCryptographicRandomUsage,
-        (Flake8Bandit, "312") => rules::flake8_bandit::rules::SuspiciousTelnetUsage,
+        (Flake8Bandit, "312") => rules::flake8_bandit::rules::SuspiciousTelnetlibUsage,
         (Flake8Bandit, "313") => rules::flake8_bandit::rules::SuspiciousXMLCElementTreeUsage,
         (Flake8Bandit, "314") => rules::flake8_bandit::rules::SuspiciousXMLElementTreeUsage,
         (Flake8Bandit, "315") => rules::flake8_bandit::rules::SuspiciousXMLExpatReaderUsage,
@@ -701,7 +846,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bandit, "318") => rules::flake8_bandit::rules::SuspiciousXMLMiniDOMUsage,
         (Flake8Bandit, "319") => rules::flake8_bandit::rules::SuspiciousXMLPullDOMUsage,
         (Flake8Bandit, "320") => rules::flake8_bandit::rules::SuspiciousXMLETreeUsage,
-        (Flake8Bandit, "321") => rules::flake8_bandit::rules::SuspiciousFTPLibUsage,
+        (Flake8Bandit, "321") => rules::flake8_bandit::rules::SuspiciousFtplibUsage,
         (Flake8Bandit, "323") => rules::flake8_bandit::rules::SuspiciousUnverifiedContextUsage,
         (Flake8Bandit, "324") => rules::flake8_bandit::rules::HashlibInsecureHashFunction,
         (Flake8Bandit, "401") => rules::flake8_bandit::rules::SuspiciousTelnetlibImport,
@@ -744,8 +889,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bandit, "704") => rules::flake8_bandit::rules::UnsafeMarkupUse,
 
         // flake8-boolean-trap
-        (Flake8BooleanTrap, "001") => rules::flake8_boolean_trap::rules::BooleanTypeHintPositionalArgument,
-        (Flake8BooleanTrap, "002") => rules::flake8_boolean_trap::rules::BooleanDefaultValuePositionalArgument,
+        (Flake8BooleanTrap, "001") => rules::flake8_boolean_trap::rules::BooleanAnnotatedPositionalParameter,
+        (Flake8BooleanTrap, "002") => rules::flake8_boolean_trap::rules::BooleanDefaultValuePositionalParameter,
         (Flake8BooleanTrap, "003") => rules::flake8_boolean_trap::rules::BooleanPositionalValueInCall,
 
         // flake8-unused-arguments
@@ -773,7 +918,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Datetimez, "901") => rules::flake8_datetimez::rules::DatetimeMinMax,
 
         // pygrep-hooks
-        (PygrepHooks, "001") => rules::pygrep_hooks::rules::Eval,
+        (PygrepHooks, "001") => rules::pygrep_hooks::rules::PygrepHooksEval,
         (PygrepHooks, "002") => rules::pygrep_hooks::rules::DeprecatedLogWarn,
         (PygrepHooks, "003") => rules::pygrep_hooks::rules::BlanketTypeIgnore,
         (PygrepHooks, "004") => rules::pygrep_hooks::rules::BlanketNOQA,
@@ -795,9 +940,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (PandasVet, "901") => rules::pandas_vet::rules::PandasDfVariableName,
 
         // flake8-errmsg
-        (Flake8ErrMsg, "101") => rules::flake8_errmsg::rules::RawStringInException,
+        (Flake8ErrMsg, "101") => rules::flake8_errmsg::rules::StringLiteralInException,
         (Flake8ErrMsg, "102") => rules::flake8_errmsg::rules::FStringInException,
-        (Flake8ErrMsg, "103") => rules::flake8_errmsg::rules::DotFormatInException,
+        (Flake8ErrMsg, "103") => rules::flake8_errmsg::rules::StrFormatInException,
 
         // flake8-pyi
         (Flake8Pyi, "001") => rules::flake8_pyi::rules::UnprefixedTypeParam,
@@ -810,10 +955,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Pyi, "008") => rules::flake8_pyi::rules::UnrecognizedPlatformName,
         (Flake8Pyi, "009") => rules::flake8_pyi::rules::PassStatementStubBody,
         (Flake8Pyi, "010") => rules::flake8_pyi::rules::NonEmptyStubBody,
-        (Flake8Pyi, "011") => rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
+        (Flake8Pyi, "011") => rules::flake8_pyi::rules::ComplexDefaultForAnnotatedParameterInStub,
         (Flake8Pyi, "012") => rules::flake8_pyi::rules::PassInClassBody,
         (Flake8Pyi, "013") => rules::flake8_pyi::rules::EllipsisInNonEmptyClassBody,
-        (Flake8Pyi, "014") => rules::flake8_pyi::rules::ArgumentDefaultInStub,
+        (Flake8Pyi, "014") => rules::flake8_pyi::rules::ComplexDefaultForUnannotatedParameterInStub,
         (Flake8Pyi, "015") => rules::flake8_pyi::rules::AssignmentDefaultInStub,
         (Flake8Pyi, "016") => rules::flake8_pyi::rules::DuplicateUnionMember,
         (Flake8Pyi, "017") => rules::flake8_pyi::rules::ComplexAssignmentInStub,
@@ -823,7 +968,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Pyi, "021") => rules::flake8_pyi::rules::DocstringInStub,
         (Flake8Pyi, "024") => rules::flake8_pyi::rules::CollectionsNamedTuple,
         (Flake8Pyi, "025") => rules::flake8_pyi::rules::UnaliasedCollectionsAbcSetImport,
-        (Flake8Pyi, "026") => rules::flake8_pyi::rules::TypeAliasWithoutAnnotation,
+        (Flake8Pyi, "026") => rules::flake8_pyi::rules::UnannotatedTypeAliasInStub,
         (Flake8Pyi, "029") => rules::flake8_pyi::rules::StrOrReprDefinedInStub,
         (Flake8Pyi, "030") => rules::flake8_pyi::rules::UnnecessaryLiteralUnion,
         (Flake8Pyi, "032") => rules::flake8_pyi::rules::AnyEqNeAnnotation,
@@ -840,15 +985,15 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Pyi, "047") => rules::flake8_pyi::rules::UnusedPrivateTypeAlias,
         (Flake8Pyi, "048") => rules::flake8_pyi::rules::StubBodyMultipleStatements,
         (Flake8Pyi, "049") => rules::flake8_pyi::rules::UnusedPrivateTypedDict,
-        (Flake8Pyi, "050") => rules::flake8_pyi::rules::NoReturnArgumentAnnotationInStub,
-        (Flake8Pyi, "051") => rules::flake8_pyi::rules::RedundantLiteralUnion,
+        (Flake8Pyi, "050") => rules::flake8_pyi::rules::ParameterAnnotatedWithNoReturn,
+        (Flake8Pyi, "051") => rules::flake8_pyi::rules::LiteralUnionWithSupertype,
         (Flake8Pyi, "052") => rules::flake8_pyi::rules::UnannotatedAssignmentInStub,
         (Flake8Pyi, "054") => rules::flake8_pyi::rules::NumericLiteralTooLong,
         (Flake8Pyi, "053") => rules::flake8_pyi::rules::StringOrBytesTooLong,
         (Flake8Pyi, "055") => rules::flake8_pyi::rules::UnnecessaryTypeUnion,
         (Flake8Pyi, "056") => rules::flake8_pyi::rules::UnsupportedMethodCallOnAll,
-        (Flake8Pyi, "058") => rules::flake8_pyi::rules::GeneratorReturnFromIterMethod,
-        (Flake8Pyi, "057") => rules::flake8_pyi::rules::ByteStringUsage,
+        (Flake8Pyi, "058") => rules::flake8_pyi::rules::IterMethodWithGeneratorReturnAnnotation,
+        (Flake8Pyi, "057") => rules::flake8_pyi::rules::DeprecatedByteStringType,
         (Flake8Pyi, "059") => rules::flake8_pyi::rules::GenericNotLastBaseClass,
         (Flake8Pyi, "061") => rules::flake8_pyi::rules::RedundantNoneLiteral,
         (Flake8Pyi, "062") => rules::flake8_pyi::rules::DuplicateLiteralMember,
@@ -922,22 +1067,22 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8TypeChecking, "003") => rules::flake8_type_checking::rules::TypingOnlyStandardLibraryImport,
         (Flake8TypeChecking, "004") => rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock,
         (Flake8TypeChecking, "005") => rules::flake8_type_checking::rules::EmptyTypeCheckingBlock,
-        (Flake8TypeChecking, "006") => rules::flake8_type_checking::rules::RuntimeCastValue,
+        (Flake8TypeChecking, "006") => rules::flake8_type_checking::rules::CastWithUnquotedType,
         (Flake8TypeChecking, "007") => rules::flake8_type_checking::rules::UnquotedTypeAlias,
         (Flake8TypeChecking, "008") => rules::flake8_type_checking::rules::QuotedTypeAlias,
         (Flake8TypeChecking, "010") => rules::flake8_type_checking::rules::RuntimeStringUnion,
 
         // tryceratops
-        (Tryceratops, "002") => rules::tryceratops::rules::RaiseVanillaClass,
-        (Tryceratops, "003") => rules::tryceratops::rules::RaiseVanillaArgs,
+        (Tryceratops, "002") => rules::tryceratops::rules::RaiseExceptionOrBaseException,
+        (Tryceratops, "003") => rules::tryceratops::rules::RaiseExceptionWithMessage,
         (Tryceratops, "004") => rules::tryceratops::rules::TypeCheckWithoutTypeError,
         (Tryceratops, "200") => rules::tryceratops::rules::ReraiseNoCause,
         (Tryceratops, "201") => rules::tryceratops::rules::VerboseRaise,
         (Tryceratops, "203") => rules::tryceratops::rules::UselessTryExcept,
         (Tryceratops, "300") => rules::tryceratops::rules::TryConsiderElse,
         (Tryceratops, "301") => rules::tryceratops::rules::RaiseWithinTry,
-        (Tryceratops, "400") => rules::tryceratops::rules::ErrorInsteadOfException,
-        (Tryceratops, "401") => rules::tryceratops::rules::VerboseLogMessage,
+        (Tryceratops, "400") => rules::tryceratops::rules::LoggingErrorInsteadOfException,
+        (Tryceratops, "401") => rules::tryceratops::rules::RedundantExceptionInLoggingMessage,
 
         // flake8-use-pathlib
         (Flake8UsePathlib, "100") => rules::flake8_use_pathlib::rules::OsPathAbspath,
@@ -967,7 +1112,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8UsePathlib, "124") => rules::flake8_use_pathlib::violations::PyPath,
         (Flake8UsePathlib, "201") => rules::flake8_use_pathlib::rules::PathConstructorCurrentDirectory,
         (Flake8UsePathlib, "202") => rules::flake8_use_pathlib::rules::OsPathGetsize,
-        (Flake8UsePathlib, "202") => rules::flake8_use_pathlib::rules::OsPathGetsize,
         (Flake8UsePathlib, "203") => rules::flake8_use_pathlib::rules::OsPathGetatime,
         (Flake8UsePathlib, "204") => rules::flake8_use_pathlib::rules::OsPathGetmtime,
         (Flake8UsePathlib, "205") => rules::flake8_use_pathlib::rules::OsPathGetctime,
@@ -984,7 +1128,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8LoggingFormat, "004") => rules::flake8_logging_format::violations::LoggingFString,
         (Flake8LoggingFormat, "010") => rules::flake8_logging_format::violations::LoggingWarn,
         (Flake8LoggingFormat, "101") => rules::flake8_logging_format::violations::LoggingExtraAttrClash,
-        (Flake8LoggingFormat, "201") => rules::flake8_logging_format::violations::LoggingExcInfo,
+        (Flake8LoggingFormat, "201") => rules::flake8_logging_format::violations::LoggingErrorWithExcInfo,
         (Flake8LoggingFormat, "202") => rules::flake8_logging_format::violations::LoggingRedundantExcInfo,
 
         // flake8-raise
@@ -1083,7 +1227,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
         (Ruff, "074") => rules::ruff::rules::IncorrectDecoratorOrder,
         (Ruff, "075") => rules::ruff::rules::FallibleContextManager,
-        (Ruff, "076") => rules::ruff::rules::PytestFixtureAutouse,
+        (Ruff, "077") => rules::ruff::rules::MethodReceiverDefault,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1095,6 +1239,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
         (Ruff, "201") => rules::ruff::rules::RuleCodesInSelectors,
+        (Ruff, "202") => rules::ruff::rules::RenamedRule,
 
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => rules::ruff::rules::StableTestRule,
@@ -1220,12 +1365,18 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-logging
         (Flake8Logging, "001") => rules::flake8_logging::rules::DirectLoggerInstantiation,
-        (Flake8Logging, "002") => rules::flake8_logging::rules::InvalidGetLoggerArgument,
-        (Flake8Logging, "004") => rules::flake8_logging::rules::LogExceptionOutsideExceptHandler,
-        (Flake8Logging, "007") => rules::flake8_logging::rules::ExceptionWithoutExcInfo,
-        (Flake8Logging, "009") => rules::flake8_logging::rules::UndocumentedWarn,
-        (Flake8Logging, "014") => rules::flake8_logging::rules::ExcInfoOutsideExceptHandler,
+        (Flake8Logging, "002") => rules::flake8_logging::rules::FilePathAsLoggerName,
+        (Flake8Logging, "004") => rules::flake8_logging::rules::LoggingExceptionOutsideExceptHandler,
+        (Flake8Logging, "007") => rules::flake8_logging::rules::LoggingExceptionWithFalsyExcInfo,
+        (Flake8Logging, "009") => rules::flake8_logging::rules::LoggingWarnConstant,
+        (Flake8Logging, "014") => rules::flake8_logging::rules::LoggingExcInfoOutsideExceptHandler,
         (Flake8Logging, "015") => rules::flake8_logging::rules::RootLoggerCall,
+
+        // Rules that belong only to categories, without linter groups or codes.
+        () => rules::ruff::rules::PytestFixtureAutouse,
+        () => rules::ruff::rules::SharedClockMock,
+        () => rules::ruff::rules::TarfileIgnoreZerosTrue,
+        () => rules::ruff::rules::UnnecessaryRegularExpressionCompile,
 
         _ => return None,
     })
@@ -1241,4 +1392,46 @@ impl std::fmt::Display for Rule {
 pub enum FromNameError {
     #[error("unknown rule name")]
     Unknown,
+}
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_snapshot;
+    use itertools::Itertools;
+    use strum::IntoEnumIterator;
+
+    use super::{Category, Rule};
+
+    #[test]
+    fn category_names_do_not_conflict_with_rule_names() {
+        for category in Category::iter() {
+            assert!(
+                Rule::from_name(category.into_str()).is_err(),
+                "category {category} conflicts with a rule name"
+            );
+        }
+    }
+
+    #[test]
+    fn category_descriptions() {
+        let snapshot = Category::iter().format_with("\n", |category, f| {
+            f(&format_args!(
+                "{name}: {description}",
+                name = category.into_str(),
+                description = category.description(),
+            ))
+        });
+
+        assert_snapshot!(snapshot, @"
+        correctness: Rules that flag outright wrong code
+        suspicious: Rules that flag likely outright wrong code but that could be intentional
+        complexity: Rules that suggest rewriting code in a shorter and more readable way
+        performance: Rules that suggest rewriting code in a more efficient way
+        style: Rules that suggest rewriting code in a more idiomatic way
+        security: Rules that flag potential security vulnerabilities but may be prone to false positives
+        formatting: Rules that flag formatting issues that do not affect semantics
+        pedantic: Rules that are highly opinionated or prone to false positives
+        restriction: Rules that restrict the use of certain features
+        ");
+    }
 }

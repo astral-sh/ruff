@@ -35,7 +35,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
@@ -43,7 +43,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
         let Some(requested_range) =
             params
                 .range
-                .to_text_range(db, file, snapshot.uri(), snapshot.encoding())
+                .to_text_range(db, file, snapshot.document().uri(), snapshot.encoding())
         else {
             return Ok(None);
         };

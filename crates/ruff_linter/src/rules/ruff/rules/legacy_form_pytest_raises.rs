@@ -1,6 +1,7 @@
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, AtomicNodeIndex, Expr, Stmt, StmtExpr, StmtWith, WithItem};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_indentation};
@@ -8,6 +9,7 @@ use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 
+use crate::codes::Category;
 use crate::{FixAvailability, Violation, checkers::ast::Checker};
 
 /// ## What it does
@@ -45,7 +47,7 @@ use crate::{FixAvailability, Violation, checkers::ast::Checker};
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 /// - [`pytest` documentation: `pytest.deprecated_call`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-deprecated-call)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Style)]
 pub(crate) struct LegacyFormPytestRaises {
     context_type: PytestContextType,
 }
@@ -90,14 +92,16 @@ impl fmt::Display for PytestContextType {
 
 impl PytestContextType {
     fn from_expr_name(func: &Expr, semantic: &SemanticModel) -> Option<Self> {
-        semantic
-            .resolve_qualified_name(func)
-            .and_then(|qualified_name| match qualified_name.segments() {
-                ["pytest", "raises"] => Some(Self::Raises),
-                ["pytest", "warns"] => Some(Self::Warns),
-                ["pytest", "deprecated_call"] => Some(Self::DeprecatedCall),
-                _ => None,
-            })
+        Self::from_qualified_name(&semantic.resolve_qualified_name(func)?)
+    }
+
+    fn from_qualified_name(qualified_name: &QualifiedName) -> Option<Self> {
+        match qualified_name.segments() {
+            ["pytest", "raises"] => Some(Self::Raises),
+            ["pytest", "warns"] => Some(Self::Warns),
+            ["pytest", "deprecated_call"] => Some(Self::DeprecatedCall),
+            _ => None,
+        }
     }
 
     fn expected_arg(self) -> Option<(&'static str, usize)> {
@@ -117,9 +121,13 @@ impl PytestContextType {
 }
 
 /// RUF061
-pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn legacy_raises_warns_deprecated_call(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     let semantic = checker.semantic();
-    let Some(context_type) = PytestContextType::from_expr_name(&call.func, semantic) else {
+    let Some(context_type) = PytestContextType::from_qualified_name(qualified_name) else {
         return;
     };
 
@@ -130,6 +138,15 @@ pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast:
         .is_none()
     {
         return;
+    }
+
+    if let Stmt::With(ast::StmtWith { items, .. }) = semantic.current_statement() {
+        if items
+            .iter()
+            .any(|item| item.context_expr.as_call_expr() == Some(call))
+        {
+            return;
+        }
     }
 
     let mut diagnostic =

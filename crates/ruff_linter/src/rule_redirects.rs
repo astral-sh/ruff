@@ -1,19 +1,201 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-/// Returns the redirect target for the given code.
-pub(crate) fn get_redirect_target(code: &str) -> Option<&'static str> {
-    REDIRECTS.get(code).copied()
+use crate::registry::Rule;
+
+/// Returns the redirect target for a rule code, prefix, or name.
+pub(crate) fn get_redirect_target(selector: &str) -> Option<&'static str> {
+    REDIRECTS.get(selector).copied()
 }
 
-/// Returns the code and the redirect target if the given code is a redirect.
-/// (The same code is returned to obtain it with a static lifetime).
-pub(crate) fn get_redirect(code: &str) -> Option<(&'static str, &'static str)> {
-    REDIRECTS.get_key_value(code).map(|(k, v)| (*k, *v))
+/// Returns the original selector and its redirect target, both with a static lifetime.
+pub(crate) fn get_redirect(selector: &str) -> Option<(&'static str, &'static str)> {
+    REDIRECTS.get_key_value(selector).map(|(k, v)| (*k, *v))
 }
+
+/// Former rule names and their current rules.
+pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
+    (
+        "missing-return-type-undocumented-public-function",
+        Rule::MissingReturnTypePublicFunction,
+    ),
+    (
+        "blank-line-before-function",
+        Rule::BlankLineBeforeFunctionDocstring,
+    ),
+    (
+        "blank-line-after-function",
+        Rule::BlankLineAfterFunctionDocstring,
+    ),
+    (
+        "incorrect-blank-line-before-class",
+        Rule::IncorrectBlankLineBeforeClassDocstring,
+    ),
+    (
+        "incorrect-blank-line-after-class",
+        Rule::IncorrectBlankLineAfterClassDocstring,
+    ),
+    (
+        "missing-blank-line-after-summary",
+        Rule::IncorrectBlankLineAfterDocstringSummary,
+    ),
+    ("under-indentation", Rule::UnderIndentedDocstringLine),
+    ("over-indentation", Rule::OverIndentedDocstringLine),
+    (
+        "new-line-after-last-paragraph",
+        Rule::MissingNewLineAfterLastDocstringParagraph,
+    ),
+    (
+        "surrounding-whitespace",
+        Rule::WhitespaceAroundDocstringText,
+    ),
+    (
+        "blank-line-before-class",
+        Rule::BlankLineBeforeClassDocstring,
+    ),
+    (
+        "multi-line-summary-first-line",
+        Rule::MultilineDocstringSummaryOnSeparateLine,
+    ),
+    (
+        "multi-line-summary-second-line",
+        Rule::MultilineDocstringSummaryOnFirstLine,
+    ),
+    ("overindented-section", Rule::OverIndentedDocstringSection),
+    (
+        "overindented-section-underline",
+        Rule::OverIndentedDocstringSectionUnderline,
+    ),
+    ("triple-single-quotes", Rule::UnconventionalDocstringQuotes),
+    (
+        "missing-section-underline-after-name",
+        Rule::BlankLineBeforeDocstringSectionUnderline,
+    ),
+    (
+        "no-blank-line-after-section",
+        Rule::MissingBlankLineAfterDocstringSection,
+    ),
+    (
+        "no-blank-line-before-section",
+        Rule::MissingBlankLineBeforeDocstringSection,
+    ),
+    (
+        "missing-blank-line-after-last-section",
+        Rule::MissingBlankLineAfterLastDocstringSection,
+    ),
+    ("undocumented-param", Rule::UndocumentedParameter),
+    ("get-attr-with-constant", Rule::GetattrWithConstant),
+    ("set-attr-with-constant", Rule::SetattrWithConstant),
+    ("del-attr-with-constant", Rule::DelattrWithConstant),
+    ("f-string-in-get-text-func-call", Rule::FStringInGettextCall),
+    ("format-in-get-text-func-call", Rule::FormatInGettextCall),
+    ("printf-in-get-text-func-call", Rule::PrintfInGettextCall),
+    ("exec-builtin", Rule::Exec),
+    ("suspicious-eval-usage", Rule::Eval),
+    ("suspicious-telnet-usage", Rule::SuspiciousTelnetlibUsage),
+    ("suspicious-ftp-lib-usage", Rule::SuspiciousFtplibUsage),
+    ("p-print", Rule::Pprint),
+    ("raw-string-in-exception", Rule::StringLiteralInException),
+    ("dot-format-in-exception", Rule::StrFormatInException),
+    ("logging-exc-info", Rule::LoggingErrorWithExcInfo),
+    ("invalid-get-logger-argument", Rule::FilePathAsLoggerName),
+    (
+        "log-exception-outside-except-handler",
+        Rule::LoggingExceptionOutsideExceptHandler,
+    ),
+    (
+        "exception-without-exc-info",
+        Rule::LoggingExceptionWithFalsyExcInfo,
+    ),
+    (
+        "exc-info-outside-except-handler",
+        Rule::LoggingExcInfoOutsideExceptHandler,
+    ),
+    ("undocumented-warn", Rule::LoggingWarnConstant),
+    ("raise-vanilla-class", Rule::RaiseExceptionOrBaseException),
+    ("raise-vanilla-args", Rule::RaiseExceptionWithMessage),
+    (
+        "error-instead-of-exception",
+        Rule::LoggingErrorInsteadOfException,
+    ),
+    (
+        "verbose-log-message",
+        Rule::RedundantExceptionInLoggingMessage,
+    ),
+    (
+        "boolean-type-hint-positional-argument",
+        Rule::BooleanAnnotatedPositionalParameter,
+    ),
+    (
+        "boolean-default-value-positional-argument",
+        Rule::BooleanDefaultValuePositionalParameter,
+    ),
+    ("invalid-class-name", Rule::NonCamelCaseClassName),
+    ("invalid-function-name", Rule::NonLowercaseFunctionName),
+    ("invalid-argument-name", Rule::NonLowercaseParameterName),
+    (
+        "invalid-first-argument-name-for-class-method",
+        Rule::ClassMethodReceiverNotNamedCls,
+    ),
+    (
+        "invalid-first-argument-name-for-method",
+        Rule::InstanceMethodReceiverNotNamedSelf,
+    ),
+    (
+        "camelcase-imported-as-lowercase",
+        Rule::CamelCaseImportedAsLowercase,
+    ),
+    (
+        "camelcase-imported-as-constant",
+        Rule::CamelCaseImportedAsConstant,
+    ),
+    (
+        "camelcase-imported-as-acronym",
+        Rule::CamelCaseImportedAsAcronym,
+    ),
+    (
+        "error-suffix-on-exception-name",
+        Rule::ExceptionClassWithoutErrorSuffix,
+    ),
+    ("no-classmethod-decorator", Rule::NonDecoratorClassmethod),
+    ("no-staticmethod-decorator", Rule::NonDecoratorStaticmethod),
+    ("no-self-use", Rule::UnusedSelf),
+    (
+        "typed-argument-default-in-stub",
+        Rule::ComplexDefaultForAnnotatedParameterInStub,
+    ),
+    (
+        "argument-default-in-stub",
+        Rule::ComplexDefaultForUnannotatedParameterInStub,
+    ),
+    (
+        "type-alias-without-annotation",
+        Rule::UnannotatedTypeAliasInStub,
+    ),
+    (
+        "no-return-argument-annotation-in-stub",
+        Rule::ParameterAnnotatedWithNoReturn,
+    ),
+    ("redundant-literal-union", Rule::LiteralUnionWithSupertype),
+    ("byte-string-usage", Rule::DeprecatedByteStringType),
+    (
+        "generator-return-from-iter-method",
+        Rule::IterMethodWithGeneratorReturnAnnotation,
+    ),
+    ("runtime-cast-value", Rule::CastWithUnquotedType),
+    (
+        "convert-typed-dict-functional-to-class",
+        Rule::FunctionalTypedDict,
+    ),
+    (
+        "convert-named-tuple-functional-to-class",
+        Rule::FunctionalNamedTuple,
+    ),
+    ("replace-str-enum", Rule::ManualStrEnum),
+];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
-    HashMap::from_iter([
+    let mut redirects = HashMap::from([
         // The following are here because we don't yet have the many-to-one mapping enabled.
         ("SIM111", "SIM110"),
         // The following are deprecated.
@@ -135,30 +317,64 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
         ("TCH006", "TC010"),
         ("TCH010", "TC010"),
         ("RUF035", "S704"),
-    ])
+    ]);
+    redirects.extend(
+        RULE_NAME_REDIRECTS
+            .iter()
+            .map(|&(old_name, rule)| (old_name, rule.name().as_str())),
+    );
+    redirects
 });
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use crate::codes::{Rule, RuleStatus};
-    use crate::rule_redirects::REDIRECTS;
+    use crate::rule_redirects::{REDIRECTS, RULE_NAME_REDIRECTS};
     use strum::IntoEnumIterator;
 
-    /// Tests for rule codes that overlap with a redirect.
+    /// Tests for rule names and codes that overlap with a redirect.
     #[test]
     fn overshadowing_redirects() {
         for rule in Rule::iter() {
-            let (code, status) = (rule.noqa_code(), rule.status());
-
-            if matches!(status, RuleStatus::Removed { .. }) {
+            if matches!(rule.status(), RuleStatus::Removed { .. }) {
                 continue;
             }
 
-            if let Some(redirect_target) = REDIRECTS.get(&*code.to_string()) {
+            let name = rule.name();
+            if let Some(redirect_target) = REDIRECTS.get(name.as_str()) {
+                panic!(
+                    "Rule {name} is overshadowed by a redirect, which points to {redirect_target}."
+                );
+            }
+            if let Some(code) = rule.noqa_code()
+                && let Some(redirect_target) = REDIRECTS.get(&*code.to_string())
+            {
                 panic!(
                     "Rule {code} is overshadowed by a redirect, which points to {redirect_target}."
                 );
             }
+        }
+    }
+
+    /// Tests for redirected rule names and codes that overlap with each other.
+    #[test]
+    fn unique_redirects() {
+        let codes = Rule::iter()
+            .filter_map(|rule| rule.noqa_code())
+            .flat_map(|code| {
+                let code = code.to_string();
+                [code.to_ascii_lowercase(), code]
+            });
+        let old_names = RULE_NAME_REDIRECTS.iter().map(|&(name, _)| name.to_owned());
+
+        let mut sources = HashSet::new();
+        for source in codes.chain(old_names) {
+            assert!(
+                sources.insert(source.clone()),
+                "Duplicate redirect for `{source}`",
+            );
         }
     }
 }

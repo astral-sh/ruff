@@ -3,6 +3,7 @@ use ruff_python_ast::{Expr, ExprSubscript, PythonVersion};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -38,7 +39,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Options
 /// - `lint.ruff.parenthesize-tuple-in-subscript`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.7")]
+#[violation_metadata(preview_since = "0.5.7", category = Category::Pedantic)]
 pub(crate) struct IncorrectlyParenthesizedTupleInSubscript {
     prefer_parentheses: bool,
 }

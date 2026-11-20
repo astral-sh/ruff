@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -35,7 +36,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.196")]
+#[violation_metadata(stable_since = "v0.0.196", category = Category::Style)]
 pub(crate) struct ReplaceUniversalNewlines;
 
 impl AlwaysFixableViolation for ReplaceUniversalNewlines {
@@ -57,8 +58,7 @@ pub(crate) fn replace_universal_newlines(checker: &Checker, call: &ast::ExprCall
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
+        .matches_qualified_name(&call.func, &["subprocess", "run"])
     {
         let Some(kwarg) = call.arguments.find_keyword("universal_newlines") else {
             return;

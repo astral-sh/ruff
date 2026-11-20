@@ -30,7 +30,7 @@ from collections.abc import (
 from contextlib import AbstractAsyncContextManager as AsyncContextManager, AbstractContextManager as ContextManager
 from re import Match as Match, Pattern as Pattern
 from types import GenericAlias, ModuleType, UnionType
-from typing import (  # noqa: Y022,Y037,Y038,Y039,UP035
+from typing import (  # noqa: Y022,Y037,Y038,Y039  # ruff: ignore[deprecated-import]
     IO as IO,
     TYPE_CHECKING as TYPE_CHECKING,
     AbstractSet as AbstractSet,
@@ -220,12 +220,15 @@ if sys.version_info < (3, 15):
         function in @no_type_check.
         """
 
+@type_check_only
+class _Protocol: ...
+
 # Do not import (and re-export) Protocol or runtime_checkable from
 # typing module because type checkers need to be able to distinguish
 # typing.Protocol and typing_extensions.Protocol so they can properly
 # warn users about potential runtime exceptions when using typing.Protocol
 # on older versions of Python.
-Protocol: _SpecialForm
+Protocol: type[_Protocol]
 """Base class for protocol classes.
 
 Protocol classes are defined as::
@@ -804,6 +807,7 @@ else:
         order_default: bool = False,
         kw_only_default: bool = False,
         frozen_default: bool = False,
+        slots_default: bool = False,
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
     ) -> IdentityFunction:
         """Decorator that marks a function, class, or metaclass as providing
@@ -1277,7 +1281,7 @@ else:
             self,
             name: str,
             *,
-            bound: None | AnnotationForm | str = None,
+            bound: AnnotationForm | str | None = None,
             contravariant: bool = False,
             covariant: bool = False,
             default: AnnotationForm = ...,
@@ -1336,7 +1340,7 @@ else:
 
     For example::
 
-        def is_awaitable(val: object) -> TypeIs[Awaitable[object]]:
+        def is_awaitable(val: object) -> TypeIs[Awaitable[Any]]:
             return hasattr(val, '__await__')
 
         def f(val: Union[int, Awaitable[int]]) -> int:
@@ -1487,26 +1491,27 @@ class _NoExtraItemsType: ...
 NoExtraItems: _NoExtraItemsType
 
 # PEP 747
-TypeForm: _SpecialForm
-"""A special form representing the value that results from the evaluation
-of a type expression.
+if sys.version_info >= (3, 15):
+    from typing import TypeForm as TypeForm
+else:
+    TypeForm: _SpecialForm
+    """A special form representing the value that results from the evaluation
+    of a type expression. This value encodes the information supplied in the
+    type expression, and it represents the type described by that type expression.
 
-This value encodes the information supplied in the type expression, and it
-represents the type described by that type expression.
+    When used in a type expression, TypeForm describes a set of type form objects.
+    It accepts a single type argument, which must be a valid type expression.
+    ``TypeForm[T]`` describes the set of all type form objects that represent
+    the type T or types that are assignable to T.
 
-When used in a type expression, TypeForm describes a set of type form
-objects. It accepts a single type argument, which must be a valid type
-expression. ``TypeForm[T]`` describes the set of all type form objects that
-represent the type T or types that are assignable to T.
+    Usage:
 
-Usage::
+        def cast[T](typ: TypeForm[T], value: Any) -> T: ...
 
-    def cast[T](typ: TypeForm[T], value: Any) -> T: ...
+        reveal_type(cast(int, "x"))  # int
 
-    reveal_type(cast(int, "x"))  # int
-
-See PEP 747 for more information.
-"""
+    See PEP 747 for more information.
+    """
 
 # PEP 649/749
 if sys.version_info >= (3, 14):

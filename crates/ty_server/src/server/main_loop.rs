@@ -1,12 +1,13 @@
-use crate::server::schedule::Scheduler;
-use crate::server::{Server, api};
+use crate::server::schedule::{Scheduler, Task};
+use crate::server::{MAX_QUEUED_REQUESTS, Server, api};
 use crate::session::client::{Client, ClientResponseHandler};
-use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
+use crate::session::{ClientOptions, Session, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
-use crossbeam::select;
-use lsp_server::Message;
+use crossbeam::channel::TrySendError;
+use lsp_server::{ErrorCode, Message, Request, ResponseError};
 use lsp_types::Notification;
 use lsp_types::Uri;
+use ruff_db::system::SystemPathBuf;
 
 pub(crate) type ConnectionSender = crossbeam::channel::Sender<Message>;
 pub(crate) type MainLoopSender = crossbeam::channel::Sender<Event>;
@@ -37,7 +38,7 @@ impl Server {
                         continue;
                     };
 
-                    let task = match msg {
+                    match msg {
                         Message::Request(req) => {
                             self.session
                                 .request_queue_mut()
@@ -51,8 +52,8 @@ impl Server {
                                 );
                                 client.respond_err(
                                     req.id,
-                                    lsp_server::ResponseError {
-                                        code: lsp_server::ErrorCode::InvalidRequest as i32,
+                                    ResponseError {
+                                        code: ErrorCode::InvalidRequest as i32,
                                         message: "Shutdown already requested".to_owned(),
                                         data: None,
                                     },
@@ -60,7 +61,13 @@ impl Server {
                                 continue;
                             }
 
-                            api::request(req)
+                            dispatch_request(
+                                &mut scheduler,
+                                req,
+                                &mut self.session,
+                                &client,
+                                RequestAttempt::Initial,
+                            )?;
                         }
                         Message::Notification(notification) => {
                             if notification.method == lsp_types::ExitNotification::METHOD.as_str() {
@@ -74,7 +81,11 @@ impl Server {
                                 return Ok(());
                             }
 
-                            api::notification(notification)
+                            scheduler.dispatch(
+                                api::notification(notification),
+                                &mut self.session,
+                                &client,
+                            )?;
                         }
 
                         // Handle the response from the client to a server request
@@ -85,19 +96,16 @@ impl Server {
                                 .outgoing_mut()
                                 .complete(&response.id)
                             {
-                                handler.handle_response(&client, response);
+                                handler.handle_response(&client, &mut self.session, response);
                             } else {
                                 tracing::error!(
                                     "Received a response with ID {}, which was not expected",
                                     response.id
                                 );
                             }
-
                             continue;
                         }
-                    };
-
-                    scheduler.dispatch(task, &mut self.session, client);
+                    }
                 }
                 Event::Action(action) => match action {
                     Action::SendResponse(response) => {
@@ -128,8 +136,13 @@ impl Server {
                             .incoming()
                             .is_pending(&request.id)
                         {
-                            let task = api::request(request);
-                            scheduler.dispatch(task, &mut self.session, client);
+                            dispatch_request(
+                                &mut scheduler,
+                                request,
+                                &mut self.session,
+                                &client,
+                                RequestAttempt::Retry,
+                            )?;
                         } else {
                             tracing::debug!(
                                 "Request {}/{} was cancelled, not retrying",
@@ -157,6 +170,9 @@ impl Server {
                         // self.try_register_file_watcher(&client);
                     }
                 },
+                Event::PollUvEnvironments { project_root } => {
+                    self.session.poll_uv_sync(&client, &project_root);
+                }
             }
         }
 
@@ -167,6 +183,11 @@ impl Server {
     ///
     /// Returns `Ok(None)` if the client connection is closed.
     fn next_event(&mut self) -> Result<Option<Event>, crossbeam::channel::RecvError> {
+        // Deliver ready worker responses before replaying more deferred requests.
+        if let Ok(event) = self.main_loop_receiver.try_recv() {
+            return Ok(Some(event));
+        }
+
         // We can't queue those into the main loop because that could result in reordering if
         // the `select` below picks a client message first.
         if let Some(deferred) = self.session.take_deferred_messages() {
@@ -185,19 +206,77 @@ impl Server {
             return Ok(Some(Event::Message(deferred)));
         }
 
-        select!(
-            recv(self.connection.receiver) -> msg => {
-                // Ignore disconnect errors, they're handled by the main loop (it will exit).
-                Ok(msg.ok().map(Event::Message))
-            },
-            recv(self.main_loop_receiver) -> event => event.map(Some),
-        )
+        let uv_sync = UvSyncWakeups(self.session.uv_sync_wakeups());
+        uv_sync.select(&self.connection.receiver, &self.main_loop_receiver)
     }
 
     fn initialize(&mut self, client: &Client) {
         self.session
             .request_uninitialized_workspace_folder_configurations(client);
     }
+}
+
+/// Dispatches a new request or retries one interrupted by Salsa.
+///
+/// Synchronous requests such as `shutdown` run directly on the main loop. Background
+/// requests such as hover need a slot in the worker queue. If the queue is full, the
+/// main loop replies to a new background request with `RequestFailed`. Waiting for a
+/// slot would prevent the main loop from forwarding completed responses and could
+/// cause the editor to time out waiting for `shutdown` during a restart.
+///
+/// An edit can also interrupt a completion that's already running. Normally we retry it.
+/// If shutdown has started, we return `ContentModified` so we don't restart work that
+/// shutdown just cancelled. We also return `ContentModified` if the queue is full.
+/// Posting another retry could keep the main loop busy until a worker frees a slot.
+fn dispatch_request(
+    scheduler: &mut Scheduler,
+    request: Request,
+    session: &mut Session,
+    client: &Client,
+    attempt: RequestAttempt,
+) -> crate::Result<()> {
+    let id = request.id.clone();
+    let task = api::request(request);
+    let retry_error = match (&task, attempt) {
+        (Task::Background(background), RequestAttempt::Retry) => background.cancellation_error,
+        _ => None,
+    };
+    if session.is_shutdown_requested()
+        && let Some(cancelled) = retry_error
+    {
+        client.respond_err(id, cancelled());
+        return Ok(());
+    }
+
+    match scheduler.dispatch(task, session, client) {
+        Ok(()) => Ok(()),
+        Err(TrySendError::Full(())) => {
+            tracing::warn!(
+                %id,
+                method = session.request_queue().incoming().method(&id),
+                ?attempt,
+                capacity = MAX_QUEUED_REQUESTS,
+                "Worker queue is full, cannot schedule request"
+            );
+            let error = match retry_error {
+                Some(cancelled) => cancelled(),
+                None => ResponseError {
+                    code: ErrorCode::RequestFailed as i32,
+                    message: "ty is busy: too many queued requests".to_owned(),
+                    data: None,
+                },
+            };
+            client.respond_err(id, error);
+            Ok(())
+        }
+        Err(TrySendError::Disconnected(())) => anyhow::bail!("Worker pool disconnected"),
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum RequestAttempt {
+    Initial,
+    Retry,
 }
 
 /// An action that should be performed on the main loop.
@@ -225,6 +304,10 @@ pub(crate) enum Event {
     Message(lsp_server::Message),
 
     Action(Action),
+
+    PollUvEnvironments {
+        project_root: SystemPathBuf,
+    },
 }
 
 pub(crate) struct SendRequest {
@@ -239,5 +322,110 @@ impl std::fmt::Debug for SendRequest {
             .field("method", &self.method)
             .field("params", &self.params)
             .finish_non_exhaustive()
+    }
+}
+
+/// Uv-environment wakeups for the currently active project databases.
+struct UvSyncWakeups(Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)>);
+
+impl UvSyncWakeups {
+    /// Waits for a main-loop action, project wakeup, or client message, in that order.
+    fn select(
+        &self,
+        connection: &crossbeam::channel::Receiver<Message>,
+        main_loop: &MainLoopReceiver,
+    ) -> Result<Option<Event>, crossbeam::channel::RecvError> {
+        let mut select = crossbeam::channel::Select::new_biased();
+        let main_loop_index = select.recv(main_loop);
+        for (_, receiver) in &self.0 {
+            select.recv(receiver);
+        }
+        let connection_index = select.recv(connection);
+        let operation = select.select();
+        let index = operation.index();
+
+        if index == main_loop_index {
+            return operation.recv(main_loop).map(Some);
+        }
+
+        if let Some((project_root, receiver)) = index.checked_sub(1).and_then(|i| self.0.get(i)) {
+            return operation.recv(receiver).map(|()| {
+                Some(Event::PollUvEnvironments {
+                    project_root: project_root.clone(),
+                })
+            });
+        }
+
+        debug_assert_eq!(index, connection_index);
+        // Ignore disconnect errors, they're handled by the main loop (it will exit).
+        Ok(operation.recv(connection).ok().map(Event::Message))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroUsize;
+    use std::sync::Arc;
+
+    use crossbeam::channel::unbounded;
+    use lsp_server::{ErrorCode, Request};
+    use lsp_types::{CompletionRequest, Request as _};
+    use ruff_db::system::TestSystem;
+    use serde_json::json;
+
+    use super::{Action, Event, RequestAttempt, dispatch_request};
+    use crate::PositionEncoding;
+    use crate::capabilities::ResolvedClientCapabilities;
+    use crate::server::schedule::Scheduler;
+    use crate::session::client::Client;
+    use crate::session::{ClientName, InitializationOptions, Session};
+
+    #[test]
+    fn shutdown_finishes_pending_completion_retry() -> anyhow::Result<()> {
+        let mut session = Session::new(
+            ResolvedClientCapabilities::empty(),
+            PositionEncoding::default(),
+            vec![],
+            InitializationOptions::default(),
+            Arc::new(TestSystem::default()),
+            ClientName::Other,
+            true,
+        )?;
+        // A retry that reaches the worker would return InvalidParams for this unopened file.
+        let request = Request::new(
+            42.into(),
+            CompletionRequest::METHOD.to_string(),
+            json!({"textDocument": {"uri": "file:///example.py"}, "position": {"line": 0, "character": 0}}),
+        );
+        let id = request.id.clone();
+        session
+            .request_queue_mut()
+            .incoming_mut()
+            .register(id.clone(), request.method.clone());
+        session.set_shutdown_requested(true);
+
+        let (sender, actions) = unbounded();
+        let (writer, _messages) = unbounded();
+        let client = Client::new(sender, writer);
+        let mut scheduler = Scheduler::new(NonZeroUsize::MIN);
+        dispatch_request(
+            &mut scheduler,
+            request,
+            &mut session,
+            &client,
+            RequestAttempt::Retry,
+        )?;
+        drop(scheduler);
+
+        let Event::Action(Action::SendResponse(response)) = actions.try_recv()? else {
+            anyhow::bail!("expected a response to the pending completion request");
+        };
+        assert_eq!(response.id, id);
+        assert_eq!(
+            response.response_result.unwrap_err().code,
+            ErrorCode::ContentModified as i32
+        );
+        assert!(actions.is_empty());
+        Ok(())
     }
 }

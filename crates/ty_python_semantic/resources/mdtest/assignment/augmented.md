@@ -13,7 +13,20 @@ reveal_type(x)  # revealed: float
 
 x = (1, 2)
 x += (3, 4)
-reveal_type(x)  # revealed: tuple[Literal[1, 2, 3, 4], ...]
+reveal_type(x)  # revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4]]
+```
+
+## Fixed-length tuples of `Any`
+
+Dynamic element types do not make a fixed-length tuple accept a different number of elements.
+Augmented concatenation reports the incompatible length and retains the declared type.
+
+```py
+from typing import Any
+
+def append(value: tuple[Any, Any]) -> None:
+    value += (1,)  # error: [invalid-assignment]
+    reveal_type(value)  # revealed: tuple[Any, Any]
 ```
 
 ## Walrus target
@@ -411,7 +424,7 @@ assignment is attempted.
 class Missing: ...
 
 missing = Missing()
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 missing.value += 1
 ```
 
@@ -422,7 +435,7 @@ class Counter:
     count: int
 
 def update(counter: Counter | None) -> None:
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     counter.count += 1
 ```
 
@@ -432,10 +445,10 @@ an existing value before writing its result.
 ```py
 class UninitializedCounter:
     def increment(self) -> None:
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         self.value += 1
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(UninitializedCounter().value)  # revealed: Unknown
 ```
 
@@ -452,7 +465,7 @@ class DynamicCounter:
 
     def increment(self) -> None:
         # TODO: Recognize the instance attribute established after reading from a dynamic hook.
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         self.value += 1
 
 reveal_type(DynamicCounter().value)  # revealed: int
@@ -467,7 +480,7 @@ class InterceptedCounter:
 
     def increment(self) -> None:
         # TODO: Recognize the instance attribute established after reading from a dynamic hook.
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         self.value += 1
 
 reveal_type(InterceptedCounter().value)  # revealed: int
@@ -488,7 +501,7 @@ class Second(Base):
     value: int | None
 
 class Child(First, Second):
-    value: int = 1
+    value: int = 1  # error: [incompatible-mutable-override]
 
     def update(self) -> None:
         self.value |= 2
@@ -522,7 +535,7 @@ errors.
 class Missing: ...
 
 missing = Missing()
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 # error: [unresolved-reference]
 missing.value += missing_attribute_operand
 ```

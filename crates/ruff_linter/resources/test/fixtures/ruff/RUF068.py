@@ -29,6 +29,7 @@ __all__ = [
 ]
 __all__ += ["B", "B"]
 __all__.extend(["B", "B"])
+__all__ = ["A", ("B"), ("B")]
 
 # Bad, unsafe
 __all__ = [

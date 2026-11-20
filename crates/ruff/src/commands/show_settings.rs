@@ -4,19 +4,19 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 use itertools::Itertools;
 
-use ruff_workspace::resolver::{PyprojectConfig, ResolvedFile, project_files_in_path};
+use ruff_workspace::resolver::{ResolvedFile, RootSettings, project_files_in_path};
 
 use crate::args::ConfigArguments;
 
 /// Print the user-facing configuration settings.
 pub(crate) fn show_settings(
     files: &[PathBuf],
-    pyproject_config: &PyprojectConfig,
+    root_settings: &RootSettings,
     config_arguments: &ConfigArguments,
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, resolver) = project_files_in_path(files, pyproject_config, config_arguments)?;
+    let (paths, resolver) = project_files_in_path(files, root_settings, config_arguments)?;
 
     // Print the list of files.
     let Some(path) = paths
@@ -29,13 +29,13 @@ pub(crate) fn show_settings(
         bail!("No files found under the given path");
     };
 
-    let (settings, config_path) = resolver.resolve_with_path(&path);
+    let resolved = resolver.resolve_with_path(&path);
 
     writeln!(writer, "Resolved settings for: \"{}\"", path.display())?;
-    if let Some(settings_path) = config_path {
+    if let Some(settings_path) = resolved.config_path() {
         writeln!(writer, "Settings path: \"{}\"", settings_path.display())?;
     }
-    write!(writer, "{settings}")?;
+    write!(writer, "{}", resolved.settings)?;
 
     Ok(())
 }

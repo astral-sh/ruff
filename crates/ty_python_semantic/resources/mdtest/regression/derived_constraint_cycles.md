@@ -55,7 +55,7 @@ class Concrete[T]:
         return ""
 
 def convert[T](value: Concrete[T]) -> Array:
-    return cast(Array, value)
+    return cast(Array, value)  # error: [disjoint-cast]
 
 invalid: Array = Concrete[int]()  # error: [invalid-assignment]
 ```
@@ -161,7 +161,7 @@ OptionSequence: TypeAlias = Iterable[V_co] | Compatible
 
 def convert(obj: OptionSequence[V_co]) -> list[V_co]:
     if isinstance(obj, float):
-        return [obj]  # ty: ignore[invalid-return-type]
+        return [obj]  # ty: ignore[invalid-explicit-return]
     return []
 ```
 

@@ -147,7 +147,7 @@ class _:
 
     class _:
         a = 1
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         a.b.c1.d = D()
 
         class _3:
@@ -161,7 +161,7 @@ class _:
     a.b = B()
 
     class _:
-        # error: [unresolved-attribute]
+        # error: [missing-union-attribute]
         reveal_type(a.b.c1.d)  # revealed: D | None
         reveal_type(a.b.c1)  # revealed: C | None
 ```
@@ -363,6 +363,39 @@ def f(non_local: str | None):
     if non_local is not None:
         def _():
             reveal_type(non_local)  # revealed: str | None
+```
+
+Nonlocal writes do not invalidate snapshots for other names. Eager scopes retain their narrowing
+even when a lazy scope can write the same name.
+
+```py
+def f(value: str | None, other: str | None):
+    if value is not None and other is not None:
+        class Eager:
+            reveal_type(value)  # revealed: str
+
+        def read():
+            reveal_type(value)  # revealed: str | None
+            reveal_type(other)  # revealed: str
+
+        def write():
+            nonlocal value
+            value = None
+```
+
+A nonlocal write in an earlier, unrelated scope does not invalidate a later snapshot of the same
+name.
+
+```py
+def earlier(value: str | None):
+    def write():
+        nonlocal value
+        value = None
+
+def later(value: str | None):
+    if value is not None:
+        def read():
+            reveal_type(value)  # revealed: str
 ```
 
 The same goes for public variables, attributes, and subscripts, because it is difficult to track all

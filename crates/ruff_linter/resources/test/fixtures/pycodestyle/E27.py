@@ -83,3 +83,27 @@ pass;
 
 def foo():
     yield, x
+
+# `None`, `True`, and `False` are not keywords for these rules.
+# https://github.com/astral-sh/ruff/issues/29215
+#: Okay
+values = {
+    "X":    None,
+    "XXXX": None,
+    "Y":	True,
+    "Z":    False,
+}
+#: Okay
+values = (None,   True,	False)
+#: Okay
+values = [None   , True	, False  ]
+#: E271
+x = y if z else  None
+#: E272
+x = None  if y else 1
+#: E273
+x = a is	None
+#: E274
+x = None	if y else 1
+#: E271 E272
+x = None  and  True

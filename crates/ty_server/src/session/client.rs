@@ -114,6 +114,23 @@ impl Client {
         }
     }
 
+    /// Attempts to send a notification, dropping it if the stdout channel to the editor
+    /// is full or disconnected.
+    ///
+    /// This channel (`Writer`) has zero capacity, so the thread that writes to stdout
+    /// must be ready to receive the notification immediately.
+    pub(crate) fn try_send_notification<N>(&self, params: N::Params)
+    where
+        N: lsp_types::Notification,
+    {
+        let _ = self
+            .client_sender
+            .try_send(lsp_server::Message::Notification(Notification::new(
+                N::METHOD.to_string(),
+                params,
+            )));
+    }
+
     /// Sends a notification without any parameters to the client.
     ///
     /// This is useful for notifications that don't require any data.
@@ -252,15 +269,23 @@ impl Client {
 
 /// Type erased handler for client responses.
 #[expect(clippy::type_complexity)]
-pub(crate) struct ClientResponseHandler(Box<dyn FnOnce(&Client, lsp_server::Response) + Send>);
+pub(crate) struct ClientResponseHandler(
+    Box<dyn FnOnce(&Client, &mut Session, lsp_server::Response) + Send>,
+);
 
 impl ClientResponseHandler {
+    pub(crate) fn new(
+        handler: impl FnOnce(&Client, &mut Session, lsp_server::Response) + Send + 'static,
+    ) -> Self {
+        Self(Box::new(handler))
+    }
+
     fn for_request<R>(response_handler: impl FnOnce(&Client, R::Result) + Send + 'static) -> Self
     where
         R: lsp_types::Request,
     {
-        Self(Box::new(
-            move |client: &Client, response: lsp_server::Response| {
+        Self::new(
+            move |client: &Client, _session: &mut Session, response: lsp_server::Response| {
                 let _span =
                     tracing::debug_span!("client_response", id=%response.id, method = %R::METHOD)
                         .entered();
@@ -285,11 +310,16 @@ impl ClientResponseHandler {
                     },
                 }
             },
-        ))
+        )
     }
 
-    pub(crate) fn handle_response(self, client: &Client, response: lsp_server::Response) {
+    pub(crate) fn handle_response(
+        self,
+        client: &Client,
+        session: &mut Session,
+        response: lsp_server::Response,
+    ) {
         let handler = self.0;
-        handler(client, response);
+        handler(client, session, response);
     }
 }

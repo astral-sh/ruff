@@ -6,6 +6,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -43,7 +44,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.199")]
+#[violation_metadata(stable_since = "v0.0.199", category = Category::Complexity)]
 pub(crate) struct ReplaceStdoutStderr;
 
 impl Violation for ReplaceStdoutStderr {
@@ -67,8 +68,7 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
 
     if checker
         .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["subprocess", "run"]))
+        .matches_qualified_name(&call.func, &["subprocess", "run"])
     {
         // Find `stdout` and `stderr` kwargs.
         let Some(stdout) = call.arguments.find_keyword("stdout") else {
@@ -81,16 +81,10 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
         // Verify that they're both set to `subprocess.PIPE`.
         if !checker
             .semantic()
-            .resolve_qualified_name(&stdout.value)
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["subprocess", "PIPE"])
-            })
+            .matches_qualified_name(&stdout.value, &["subprocess", "PIPE"])
             || !checker
                 .semantic()
-                .resolve_qualified_name(&stderr.value)
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["subprocess", "PIPE"])
-                })
+                .matches_qualified_name(&stderr.value, &["subprocess", "PIPE"])
         {
             return;
         }

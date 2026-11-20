@@ -3,10 +3,11 @@ use anyhow::{Error, bail};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers;
 use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::{CmpOp, Expr};
+use ruff_python_ast::{CmpOp, ExprCompare};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -51,7 +52,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: Value comparisons](https://docs.python.org/3/reference/expressions.html#value-comparisons)
 /// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.39")]
+#[violation_metadata(stable_since = "v0.0.39", category = Category::Suspicious)]
 pub(crate) struct IsLiteral {
     cmp_op: IsCmpOp,
 }
@@ -75,16 +76,9 @@ impl AlwaysFixableViolation for IsLiteral {
 }
 
 /// F632
-pub(crate) fn invalid_literal_comparison(
-    checker: &Checker,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-    expr: &Expr,
-) {
+pub(crate) fn invalid_literal_comparison(checker: &Checker, compare: &ExprCompare) {
     let mut lazy_located = None;
-    let mut left = left;
-    for (index, (op, right)) in ops.iter().zip(comparators).enumerate() {
+    for (index, (left, op, right)) in compare.iter().enumerate() {
         if matches!(op, CmpOp::Is | CmpOp::IsNot)
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right)
@@ -92,9 +86,9 @@ pub(crate) fn invalid_literal_comparison(
                 || helpers::is_mutable_iterable_initializer(right))
         {
             let mut diagnostic =
-                checker.report_diagnostic(IsLiteral { cmp_op: op.into() }, expr.range());
+                checker.report_diagnostic(IsLiteral { cmp_op: op.into() }, compare.range());
             if lazy_located.is_none() {
-                lazy_located = Some(locate_cmp_ops(expr, checker.tokens()));
+                lazy_located = Some(locate_cmp_ops(compare.range(), checker.tokens()));
             }
             diagnostic.try_set_optional_fix(|| {
                 if let Some(located_op) =
@@ -120,7 +114,6 @@ pub(crate) fn invalid_literal_comparison(
                 }
             });
         }
-        left = right;
     }
 }
 
@@ -144,9 +137,9 @@ impl From<&CmpOp> for IsCmpOp {
 ///
 /// This method iterates over the token stream and re-identifies [`CmpOp`] nodes, annotating them
 /// with valid ranges.
-fn locate_cmp_ops(expr: &Expr, tokens: &Tokens) -> Vec<LocatedCmpOp> {
+fn locate_cmp_ops(range: TextRange, tokens: &Tokens) -> Vec<LocatedCmpOp> {
     let mut tok_iter = tokens
-        .in_range(expr.range())
+        .in_range(range)
         .iter()
         .filter(|token| !token.kind().is_trivia())
         .peekable();
@@ -241,13 +234,13 @@ mod tests {
 
     use ruff_python_ast::CmpOp;
     use ruff_python_parser::parse_expression;
-    use ruff_text_size::TextSize;
+    use ruff_text_size::{Ranged, TextSize};
 
     use super::{LocatedCmpOp, locate_cmp_ops};
 
     fn extract_cmp_op_locations(source: &str) -> Result<Vec<LocatedCmpOp>> {
         let parsed = parse_expression(source)?;
-        Ok(locate_cmp_ops(parsed.expr(), parsed.tokens()))
+        Ok(locate_cmp_ops(parsed.expr().range(), parsed.tokens()))
     }
 
     #[test]

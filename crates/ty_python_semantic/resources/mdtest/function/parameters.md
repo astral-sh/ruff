@@ -22,7 +22,7 @@ def g(*args: int, **kwargs: int):
 
 ## Unannotated parameters with defaults
 
-If there is no annotation but there is a default value, the inferred paramter type is the union of
+If there is no annotation but there is a default value, the inferred parameter type is the union of
 the inferred type of the default value and `Unknown`:
 
 ```py
@@ -133,7 +133,7 @@ def missing_key(a: Foo = {"x": 42}): ...
 # error: [invalid-argument-type]
 def wrong_type(a: Foo = {"x": "s", "y": 1}): ...
 
-# error: [invalid-key]
+# error: [unknown-typed-dict-constructor-key]
 def extra_key(a: Foo = {"x": 1, "y": 2, "z": 3}): ...
 ```
 

@@ -799,19 +799,19 @@ Module(
                             ExprCompare {
                                 node_index: NodeIndex(None),
                                 range: 549..558,
-                                left: Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 549..550,
-                                        id: Name("a"),
-                                        ctx: Load,
-                                    },
-                                ),
                                 ops: [
                                     Lt,
                                     Lt,
                                 ],
-                                comparators: [
+                                operands: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 549..550,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
                                     Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -891,37 +891,35 @@ Module(
                                 range: 576..585,
                                 value: FStringValue {
                                     inner: Single(
-                                        FString(
-                                            FString {
-                                                range: 576..585,
-                                                node_index: NodeIndex(None),
-                                                elements: [
-                                                    Interpolation(
-                                                        InterpolatedElement {
-                                                            range: 578..584,
-                                                            node_index: NodeIndex(None),
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 579..583,
-                                                                    id: Name("quux"),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            debug_text: None,
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: FStringFlags {
-                                                    quote_style: Double,
-                                                    prefix: Regular,
-                                                    triple_quoted: false,
-                                                    unclosed: false,
-                                                },
+                                        FString {
+                                            range: 576..585,
+                                            node_index: NodeIndex(None),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 578..584,
+                                                        node_index: NodeIndex(None),
+                                                        expression: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 579..583,
+                                                                id: Name("quux"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                                unclosed: false,
                                             },
-                                        ),
+                                        },
                                     ),
                                 },
                             },
@@ -949,61 +947,59 @@ Module(
                                 range: 591..609,
                                 value: FStringValue {
                                     inner: Single(
-                                        FString(
-                                            FString {
-                                                range: 591..609,
-                                                node_index: NodeIndex(None),
-                                                elements: [
-                                                    Interpolation(
-                                                        InterpolatedElement {
-                                                            range: 593..598,
-                                                            node_index: NodeIndex(None),
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 594..597,
-                                                                    id: Name("foo"),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            debug_text: None,
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                    Literal(
-                                                        InterpolatedStringLiteralElement {
-                                                            range: 598..603,
-                                                            node_index: NodeIndex(None),
-                                                            value: " and ",
-                                                        },
-                                                    ),
-                                                    Interpolation(
-                                                        InterpolatedElement {
-                                                            range: 603..608,
-                                                            node_index: NodeIndex(None),
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 604..607,
-                                                                    id: Name("bar"),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            debug_text: None,
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: FStringFlags {
-                                                    quote_style: Double,
-                                                    prefix: Regular,
-                                                    triple_quoted: false,
-                                                    unclosed: false,
-                                                },
+                                        FString {
+                                            range: 591..609,
+                                            node_index: NodeIndex(None),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 593..598,
+                                                        node_index: NodeIndex(None),
+                                                        expression: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 594..597,
+                                                                id: Name("foo"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                                Literal(
+                                                    InterpolatedStringLiteralElement {
+                                                        range: 598..603,
+                                                        node_index: NodeIndex(None),
+                                                        value: " and ",
+                                                    },
+                                                ),
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 603..608,
+                                                        node_index: NodeIndex(None),
+                                                        expression: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 604..607,
+                                                                id: Name("bar"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                                unclosed: false,
                                             },
-                                        ),
+                                        },
                                     ),
                                 },
                             },

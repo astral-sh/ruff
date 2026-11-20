@@ -1,12 +1,12 @@
 use anyhow::bail;
-use itertools::Itertools;
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprCompare};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for comparisons to empty strings.
@@ -41,7 +41,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [#4282]: https://github.com/astral-sh/ruff/issues/4282
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.255")]
+#[violation_metadata(preview_since = "v0.0.255", category = Category::Pedantic)]
 pub(crate) struct CompareToEmptyString {
     existing: String,
     replacement: String,
@@ -59,12 +59,7 @@ impl Violation for CompareToEmptyString {
 }
 
 /// PLC1901
-pub(crate) fn compare_to_empty_string(
-    checker: &Checker,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
+pub(crate) fn compare_to_empty_string(checker: &Checker, compare: &ExprCompare) {
     // Omit string comparison rules within subscripts. This is mostly commonly used within
     // DataFrame and np.ndarray indexing.
     if checker
@@ -76,11 +71,7 @@ pub(crate) fn compare_to_empty_string(
     }
 
     let mut first = true;
-    for ((lhs, rhs), op) in std::iter::once(left)
-        .chain(comparators)
-        .tuple_windows::<(&Expr, &Expr)>()
-        .zip(ops)
-    {
+    for (lhs, op, rhs) in compare.iter() {
         if let Ok(op) = EmptyStringCmpOp::try_from(op) {
             if std::mem::take(&mut first) {
                 // Check the left-most expression.

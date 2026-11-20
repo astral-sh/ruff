@@ -87,6 +87,14 @@ pub(crate) struct DisplayTypeVar<'a> {
 }
 
 impl TypeVar<'_> {
+    /// PEP 695 has no syntax for bounds or constraints on `TypeVarTuple` or `ParamSpec`.
+    fn has_unsupported_restriction(&self) -> bool {
+        matches!(
+            self.kind,
+            TypeParamKind::TypeVarTuple | TypeParamKind::ParamSpec
+        ) && self.restriction.is_some()
+    }
+
     fn display<'a>(&'a self, source: &'a str) -> DisplayTypeVar<'a> {
         DisplayTypeVar {
             type_var: self,
@@ -111,15 +119,21 @@ impl Display for DisplayTypeVar<'_> {
                 }
                 TypeVarRestriction::AnyStr => f.write_str("(bytes, str)")?,
                 TypeVarRestriction::Constraint(vec) => {
-                    let len = vec.len();
-                    f.write_str("(")?;
-                    for (i, v) in vec.iter().enumerate() {
-                        f.write_str(&self.source[v.range()])?;
-                        if i < len - 1 {
-                            f.write_str(", ")?;
+                    match vec.as_slice() {
+                        // A single starred expression needs a comma to form a constraint tuple:
+                        // `TypeVar("T", *constraints)` becomes `T: (*constraints,)`.
+                        [element] => {
+                            write!(f, "({element},)", element = &self.source[element.range()])?;
+                        }
+                        _ => {
+                            write!(
+                                f,
+                                "({})",
+                                vec.iter()
+                                    .format_with(", ", |expr, f| f(&&self.source[expr.range()])),
+                            )?;
                         }
                     }
-                    f.write_str(")")?;
                 }
             }
         }
@@ -387,6 +401,10 @@ fn non_default_follows_default(type_vars: &[TypeVar]) -> bool {
 /// the default argument, but the rule should be skipped in that case.
 fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<TypeVar<'a>>> {
     if vars.is_empty() {
+        return None;
+    }
+
+    if vars.iter().any(TypeVar::has_unsupported_restriction) {
         return None;
     }
 

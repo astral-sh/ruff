@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks that Django's `@receiver` decorator is listed first, prior to
@@ -41,7 +42,7 @@ use crate::checkers::ast::Checker;
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = Category::Suspicious)]
 pub(crate) struct DjangoNonLeadingReceiverDecorator;
 
 impl Violation for DjangoNonLeadingReceiverDecorator {
@@ -62,13 +63,7 @@ pub(crate) fn non_leading_receiver_decorator(checker: &Checker, decorator_list: 
         let is_receiver = decorator.expression.as_call_expr().is_some_and(|call| {
             checker
                 .semantic()
-                .resolve_qualified_name(&call.func)
-                .is_some_and(|qualified_name| {
-                    matches!(
-                        qualified_name.segments(),
-                        ["django", "dispatch", "receiver"]
-                    )
-                })
+                .matches_qualified_name(&call.func, &["django", "dispatch", "receiver"])
         });
         if i > 0 && is_receiver && !seen_receiver {
             checker.report_diagnostic(DjangoNonLeadingReceiverDecorator, decorator.range());

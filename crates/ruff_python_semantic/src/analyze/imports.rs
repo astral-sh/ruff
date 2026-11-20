@@ -38,9 +38,9 @@ pub fn is_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
                 }),
             _ => false,
         },
-        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => semantic
-            .resolve_qualified_name(map_subscript(target))
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "path"])),
+        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            semantic.matches_qualified_name(map_subscript(target), &["sys", "path"])
+        }
         _ => false,
     }
 }
@@ -70,25 +70,17 @@ pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool
             _ => false,
         },
         Stmt::Delete(ast::StmtDelete { targets, .. }) => targets.iter().any(|target| {
-            semantic
-                .resolve_qualified_name(map_subscript(target))
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["os", "environ"])
-                })
+            semantic.matches_qualified_name(map_subscript(target), &["os", "environ"])
         }),
         Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.iter().any(|target| {
-            semantic
-                .resolve_qualified_name(map_subscript(target))
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["os", "environ"])
-                })
+            semantic.matches_qualified_name(map_subscript(target), &["os", "environ"])
         }),
-        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => semantic
-            .resolve_qualified_name(map_subscript(target))
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "environ"])),
-        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => semantic
-            .resolve_qualified_name(map_subscript(target))
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "environ"])),
+        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+            semantic.matches_qualified_name(map_subscript(target), &["os", "environ"])
+        }
+        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            semantic.matches_qualified_name(map_subscript(target), &["os", "environ"])
+        }
         _ => false,
     }
 }
@@ -111,9 +103,7 @@ pub fn is_matplotlib_activation(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
         return false;
     };
-    semantic
-        .resolve_qualified_name(func.as_ref())
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["matplotlib", "use"]))
+    semantic.matches_qualified_name(func.as_ref(), &["matplotlib", "use"])
 }
 
 /// Returns `true` if a [`Stmt`] is a `pytest.importorskip()` call, as in:
@@ -130,11 +120,7 @@ pub fn is_pytest_importorskip(stmt: &Stmt, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    semantic
-        .resolve_qualified_name(func.as_ref())
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["pytest", "importorskip"])
-        })
+    semantic.matches_qualified_name(func.as_ref(), &["pytest", "importorskip"])
 }
 
 /// Returns `true` if a [`Stmt`] is a dynamic modification of the Python
@@ -147,11 +133,7 @@ pub fn is_pytest_importorskip(stmt: &Stmt, semantic: &SemanticModel) -> bool {
 pub fn is_site_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     if let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt {
         if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-            return semantic
-                .resolve_qualified_name(func.as_ref())
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["site", "addsitedir"])
-                });
+            return semantic.matches_qualified_name(func.as_ref(), &["site", "addsitedir"]);
         }
     }
     false

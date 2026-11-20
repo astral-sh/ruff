@@ -3,8 +3,8 @@ use anyhow::{Result, bail};
 use libcst_native::{
     Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FormattedString,
     FormattedStringContent, FormattedStringExpression, FunctionDef, GeneratorExp, If, Import,
-    ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda, ListComp, Module, SmallStatement,
-    Statement, Suite, Tuple, With,
+    ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda, LazyImport, LazyImportFrom,
+    ListComp, Module, NameOrAttribute, SmallStatement, Statement, Suite, Tuple, With,
 };
 use ruff_python_codegen::Stylist;
 
@@ -22,36 +22,44 @@ pub(crate) fn match_statement(statement_text: &str) -> Result<Statement<'_>> {
     }
 }
 
-pub(crate) fn match_import<'a, 'b>(statement: &'a mut Statement<'b>) -> Result<&'a mut Import<'b>> {
-    if let Statement::Simple(expr) = statement {
-        if let Some(SmallStatement::Import(expr)) = expr.body.first_mut() {
-            Ok(expr)
-        } else {
-            bail!("Expected SmallStatement::Import")
-        }
-    } else {
+pub(crate) fn match_import<'a, 'b>(
+    statement: &'a mut Statement<'b>,
+) -> Result<(&'a mut Vec<ImportAlias<'b>>, bool)> {
+    let Statement::Simple(statement) = statement else {
         bail!("Expected Statement::Simple")
+    };
+    match statement.body.first_mut() {
+        Some(SmallStatement::Import(Import { names, .. })) => Ok((names, false)),
+        Some(SmallStatement::LazyImport(LazyImport { names, .. })) => Ok((names, true)),
+        _ => bail!("Expected SmallStatement::Import | SmallStatement::LazyImport"),
     }
 }
 
 pub(crate) fn match_import_from<'a, 'b>(
     statement: &'a mut Statement<'b>,
-) -> Result<&'a mut ImportFrom<'b>> {
-    if let Statement::Simple(expr) = statement {
-        if let Some(SmallStatement::ImportFrom(expr)) = expr.body.first_mut() {
-            Ok(expr)
-        } else {
-            bail!("Expected SmallStatement::ImportFrom")
-        }
-    } else {
+) -> Result<(
+    &'a mut Option<NameOrAttribute<'b>>,
+    &'a mut ImportNames<'b>,
+    bool,
+)> {
+    let Statement::Simple(statement) = statement else {
         bail!("Expected Statement::Simple")
+    };
+    match statement.body.first_mut() {
+        Some(SmallStatement::ImportFrom(ImportFrom { module, names, .. })) => {
+            Ok((module, names, false))
+        }
+        Some(SmallStatement::LazyImportFrom(LazyImportFrom { module, names, .. })) => {
+            Ok((module, names, true))
+        }
+        _ => bail!("Expected SmallStatement::ImportFrom | SmallStatement::LazyImportFrom"),
     }
 }
 
 pub(crate) fn match_aliases<'a, 'b>(
-    import_from: &'a mut ImportFrom<'b>,
+    names: &'a mut ImportNames<'b>,
 ) -> Result<&'a mut Vec<ImportAlias<'b>>> {
-    if let ImportNames::Aliases(aliases) = &mut import_from.names {
+    if let ImportNames::Aliases(aliases) = names {
         Ok(aliases)
     } else {
         bail!("Expected ImportNames::Aliases")

@@ -19,7 +19,7 @@ impl NodeKey {
         NodeKey(node.node_index().load())
     }
 
-    pub fn from_node_ref<T>(node_ref: &AstNodeRef<T>) -> Self {
+    pub(crate) fn from_node_ref<T>(node_ref: &AstNodeRef<T>) -> Self {
         NodeKey(node_ref.index())
     }
 }

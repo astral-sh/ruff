@@ -29,7 +29,7 @@ reveal_type(Slotted.value)  # revealed: MemberDescriptorType
 def accepts_property(descriptor: property) -> None: ...
 
 accepts_property(Slotted.value)  # error: [invalid-argument-type]
-Slotted.value.fget  # error: [unresolved-attribute]
+Slotted.value.fget  # error: [missing-attribute]
 ```
 
 ## Slot names appear on classes and instances
@@ -309,10 +309,10 @@ class AnnotatedSlots:
     __slots__: tuple[str, ...] = ("value",)
 
     def initialize(self) -> None:
-        self.extra = 1  # error: [unresolved-attribute]
+        self.extra = 1  # error: [missing-attribute]
 
 reveal_type(AnnotatedSlots().value)  # revealed: Unknown
-AnnotatedSlots().missing  # error: [unresolved-attribute]
+AnnotatedSlots().missing  # error: [missing-attribute]
 ```
 
 A statically known tuple can also be supplied through another variable.
@@ -324,10 +324,10 @@ class IndirectSlots:
     __slots__ = slot_names
 
     def initialize(self) -> None:
-        self.extra = 1  # error: [unresolved-attribute]
+        self.extra = 1  # error: [missing-attribute]
 
 reveal_type(IndirectSlots().value)  # revealed: Unknown
-IndirectSlots().missing  # error: [unresolved-attribute]
+IndirectSlots().missing  # error: [missing-attribute]
 ```
 
 The elements of mutable slot declarations can also refer to statically known string values.
@@ -339,7 +339,7 @@ class IndirectListSlots:
     __slots__ = [slot_name]
 
 reveal_type(IndirectListSlots().value)  # revealed: Unknown
-IndirectListSlots().missing  # error: [unresolved-attribute]
+IndirectListSlots().missing  # error: [missing-attribute]
 ```
 
 The same inference applies to set elements.
@@ -349,7 +349,7 @@ class IndirectSetSlots:
     __slots__ = {slot_name}
 
 reveal_type(IndirectSetSlots().value)  # revealed: Unknown
-IndirectSetSlots().missing  # error: [unresolved-attribute]
+IndirectSetSlots().missing  # error: [missing-attribute]
 ```
 
 Dictionary keys are evaluated in the same way.
@@ -359,7 +359,7 @@ class IndirectDictionarySlots:
     __slots__ = {slot_name: "Documentation for the slot."}
 
 reveal_type(IndirectDictionarySlots().value)  # revealed: Unknown
-IndirectDictionarySlots().missing  # error: [unresolved-attribute]
+IndirectDictionarySlots().missing  # error: [missing-attribute]
 ```
 
 ## Mutated slot declarations
@@ -375,7 +375,7 @@ class MutatedSlots:
 
     def __init__(self) -> None:
         self.value = 1
-        self.extra = 2  # error: [unresolved-attribute]
+        self.extra = 2  # error: [missing-attribute]
 ```
 
 ## Dynamic slot declarations
@@ -426,7 +426,7 @@ class Base:
     __slots__ = ()
     value: int
 
-Base().value = 1  # error: [unresolved-attribute]
+Base().value = 1  # error: [missing-slot]
 ```
 
 A subclass can create the missing slot. Its inherited annotation controls both reads and writes.
@@ -461,8 +461,8 @@ IntegerChild().value = "wrong"  # error: [invalid-assignment]
 
 ## Subclass annotations override inherited slot types
 
-A subclass can narrow an inherited attribute declaration even when its storage remains in a base
-class's slot. Reads and writes use the subclass's declared type, as they do without slots.
+A subclass declaration determines its read and write types even when storage remains in a base
+class's slot. Narrowing the type is unsafe because it rejects writes accepted by the base.
 
 ```py
 class Base:
@@ -471,8 +471,7 @@ class Base:
 
 class Child(Base):
     __slots__ = ()
-    # TODO: Reject this unsafe override when mutable attribute overrides are checked.
-    value: int
+    value: int  # error: [incompatible-mutable-override]
 
 reveal_type(Child().value)  # revealed: int
 Child().value = 2
@@ -484,8 +483,7 @@ An annotation on an assignment in the subclass's initializer establishes the sam
 ```py
 class InitializedChild(Base):
     def __init__(self) -> None:
-        # TODO: Reject this unsafe override when mutable attribute overrides are checked.
-        self.value: int = 1
+        self.value: int = 1  # error: [incompatible-mutable-override]
 
     def get(self) -> int:
         return self.value
@@ -499,8 +497,7 @@ As with an ordinary instance attribute, an overriding annotation replaces the in
 ```py
 class StringChild(Base):
     def __init__(self) -> None:
-        # TODO: Reject this unsafe override when mutable attribute overrides are checked.
-        self.value: str = "valid"
+        self.value: str = "valid"  # error: [incompatible-attribute-override]
 
 reveal_type(StringChild().value)  # revealed: str
 StringChild().value = 1  # error: [invalid-assignment]
@@ -520,10 +517,10 @@ class Slotted:
 
     def __init__(self) -> None:
         self.value = 1
-        self.extra = 2  # error: [unresolved-attribute]
+        self.extra = 2  # error: [missing-attribute]
 
-Slotted().other = 3  # error: [unresolved-attribute]
-Slotted().shared = 3  # error: [unresolved-attribute]
+Slotted().other = 3  # error: [missing-attribute]
+Slotted().shared = 3  # error: [missing-slot]
 reveal_type(Slotted.value)  # revealed: MemberDescriptorType
 reveal_type(Slotted.shared)  # revealed: int
 reveal_type(Slotted.explicit_classvar)  # revealed: int
@@ -588,7 +585,7 @@ class SlottedPoint(Point):
     __slots__ = ()
     extra: int
 
-SlottedPoint(1).extra = 2  # error: [unresolved-attribute]
+SlottedPoint(1).extra = 2  # error: [missing-slot]
 ```
 
 Named tuples created with the functional syntax have the same empty-slot layout.
@@ -600,7 +597,7 @@ class SlottedFunctionalPoint(FunctionalPoint):
     __slots__ = ()
     extra: int
 
-SlottedFunctionalPoint(1).extra = 2  # error: [unresolved-attribute]
+SlottedFunctionalPoint(1).extra = 2  # error: [missing-slot]
 ```
 
 The `collections.namedtuple` factory also creates a class without an instance dictionary.
@@ -614,7 +611,7 @@ class SlottedLegacyPoint(LegacyPoint):
     __slots__ = ()
     extra: int
 
-SlottedLegacyPoint(1).extra = 2  # error: [unresolved-attribute]
+SlottedLegacyPoint(1).extra = 2  # error: [missing-slot]
 ```
 
 ## Dataclass-generated slots
@@ -628,7 +625,7 @@ from dataclasses import dataclass
 class SlottedDataclass:
     value: int
 
-SlottedDataclass(1).extra = 1  # error: [unresolved-attribute]
+SlottedDataclass(1).extra = 1  # error: [missing-attribute]
 ```
 
 Its subclasses inherit that restricted instance layout unless they introduce a dictionary.
@@ -638,7 +635,7 @@ class SlottedChild(SlottedDataclass):
     __slots__ = ("other",)
 
     def initialize(self) -> None:
-        self.extra = 1  # error: [unresolved-attribute]
+        self.extra = 1  # error: [missing-attribute]
 ```
 
 ## Dataclass-generated slots exclude inherited slots
@@ -747,7 +744,7 @@ class SlottedModel:
     value: int
 
     def initialize(self) -> None:
-        self.other = 1  # error: [unresolved-attribute]
+        self.other = 1  # error: [missing-attribute]
 ```
 
 ## Slotted subclasses of built-in types without instance dictionaries
@@ -759,7 +756,7 @@ class SlottedString(str):
     __slots__ = ("value",)
 
     def initialize(self) -> None:
-        self.extra = 1  # error: [unresolved-attribute]
+        self.extra = 1  # error: [missing-attribute]
 ```
 
 The structural mapping bases used to describe `dict` in typeshed do not add an instance dictionary.
@@ -769,7 +766,7 @@ class SlottedDictionary(dict[str, int]):
     __slots__ = ()
 
     def initialize(self) -> None:
-        self.extra = 1  # error: [unresolved-attribute]
+        self.extra = 1  # error: [missing-attribute]
 ```
 
 ## Built-in bases with instance dictionaries
@@ -811,7 +808,7 @@ class SlottedPath(Path):
     __slots__ = ()
 
     def initialize(self) -> None:
-        self.extra = 1  # error: [unresolved-attribute]
+        self.extra = 1  # error: [missing-attribute]
 ```
 
 An ordinary standard-library class without a slot declaration supplies an instance dictionary even
@@ -839,7 +836,7 @@ class SlottedAlias(GenericAlias):
     __slots__ = ()
 
     def initialize(self) -> None:
-        self.extra = 1  # error: [unresolved-attribute]
+        self.extra = 1  # error: [missing-attribute]
 ```
 
 ## Descriptor setters do not require instance dictionaries
@@ -885,19 +882,53 @@ class CustomSetter:
 CustomSetter().shared = 1
 ```
 
-## Instance dictionaries and inherited annotations
+## Instance dictionaries require dictionary storage
 
-Typeshed declares `__dict__` on `object`. As an intentional limitation, the attribute therefore
-remains available through ordinary attribute lookup even when accessing it would raise an
-`AttributeError` at runtime.
+A slotted instance without dictionary storage does not expose `__dict__`, even though typeshed
+declares the attribute on `object`. The class itself still has its own namespace.
 
 ```py
 class Slotted:
     __slots__ = ("value",)
 
-reveal_type(Slotted().__dict__)  # revealed: dict[str, Any]
+Slotted().__dict__  # error: [missing-attribute]
 reveal_type(Slotted.__dict__)  # revealed: dict[str, Any]
 ```
+
+A slotted dataclass also omits the instance dictionary.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(slots=True)
+class SlottedDataclass:
+    value: int
+
+SlottedDataclass(1).__dict__  # error: [missing-attribute]
+```
+
+An explicit dictionary slot restores access to the instance dictionary.
+
+```py
+class WithDictionary:
+    __slots__ = ("value", "__dict__")
+
+reveal_type(WithDictionary().__dict__)  # revealed: dict[str, Any]
+```
+
+An ordinary base class can also provide inherited dictionary storage.
+
+```py
+class OrdinaryBase:
+    pass
+
+class InheritedDictionary(OrdinaryBase):
+    __slots__ = ("value",)
+
+reveal_type(InheritedDictionary().__dict__)  # revealed: dict[str, Any]
+```
+
+## Guarded instance dictionary access
 
 An unslotted subclass can introduce an instance dictionary, so methods on a slotted base may access
 the dictionary after checking whether it exists.
@@ -919,6 +950,33 @@ class OrdinaryChild(SlottedBase):
 reveal_type(OrdinaryChild().__dict__)  # revealed: dict[str, Any]
 ```
 
+A positive `hasattr` check can also establish that a value annotated with the slotted base is
+actually an instance of a subclass with a dictionary.
+
+```py
+def attributes(instance: SlottedBase) -> dict[str, Any]:
+    if hasattr(instance, "__dict__"):
+        reveal_type(instance.__dict__)  # revealed: dict[str, Any]
+        return instance.__dict__
+    return {}
+```
+
+## Virtual instance dictionaries
+
+A custom attribute getter can expose a virtual dictionary without providing dictionary-backed
+attribute storage.
+
+```py
+class VirtualDictionary:
+    __slots__ = ()
+
+    def __getattr__(self, name: str) -> int:
+        return 1
+
+reveal_type(VirtualDictionary().__dict__)  # revealed: int
+VirtualDictionary().extra = 1  # error: [missing-attribute]
+```
+
 ## Weak-reference slots create descriptors
 
 A slotted instance does not expose `__weakref__` unless the slot is explicitly declared.
@@ -927,7 +985,7 @@ A slotted instance does not expose `__weakref__` unless the slot is explicitly d
 class Slotted:
     __slots__ = ("value",)
 
-Slotted().__weakref__  # error: [unresolved-attribute]
+Slotted().__weakref__  # error: [missing-attribute]
 ```
 
 An explicit `__weakref__` slot permits reads on the class and its instances. The typeshed descriptor
@@ -964,7 +1022,7 @@ class VirtualDictionary:
         return {"virtual": 1}
 
     def initialize(self) -> None:
-        self.extra = 1  # error: [unresolved-attribute]
+        self.extra = 1  # error: [missing-attribute]
 
 reveal_type(VirtualDictionary().__dict__)  # revealed: dict[str, int]
 ```
@@ -986,8 +1044,8 @@ class OrdinaryBase:
 class SlottedChild(OrdinaryBase):
     __slots__ = ("value",)
 
-OrdinaryBase().__weakref__  # error: [unresolved-attribute]
-SlottedChild().__weakref__  # error: [unresolved-attribute]
+OrdinaryBase().__weakref__  # error: [missing-attribute]
+SlottedChild().__weakref__  # error: [missing-attribute]
 ```
 
 Without modeling that inherited storage, a slotted dataclass also includes a requested
@@ -1014,7 +1072,7 @@ class Slotted:
     value: int
     missing: int
 
-Slotted().missing = 1  # error: [unresolved-attribute]
+Slotted().missing = 1  # error: [missing-slot]
 ```
 
 A subclass can provide the missing slot and use the inherited annotation.
@@ -1025,6 +1083,24 @@ class Child(Slotted):
 
 reveal_type(Child().missing)  # revealed: int
 Child().missing = 1
+```
+
+## Receiver annotations do not create instance storage
+
+Redeclaring an inherited nested class as an instance attribute still requires a slot or an instance
+dictionary.
+
+```py
+class Base:
+    __slots__ = ()
+
+    class Inner: ...
+
+class Child(Base):
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        self.Inner: type[Base.Inner] = Base.Inner  # error: [missing-slot]
 ```
 
 ## Class attributes cannot have the same name as a slot

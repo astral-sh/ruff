@@ -10,6 +10,7 @@ pub(crate) use blocking_process_invocation::*;
 pub(crate) use blocking_sleep::*;
 pub(crate) use cancel_scope_no_checkpoint::*;
 pub(crate) use long_sleep_not_forever::*;
+pub(crate) use pytest_raises_exception_group::*;
 pub(crate) use sync_call::*;
 pub(crate) use yield_in_context_manager_in_async_generator::*;
 
@@ -25,5 +26,6 @@ mod blocking_process_invocation;
 mod blocking_sleep;
 mod cancel_scope_no_checkpoint;
 mod long_sleep_not_forever;
+mod pytest_raises_exception_group;
 mod sync_call;
 mod yield_in_context_manager_in_async_generator;

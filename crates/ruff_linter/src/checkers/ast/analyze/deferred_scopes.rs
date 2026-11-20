@@ -18,11 +18,13 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
-        Rule::InvalidFirstArgumentNameForClassMethod,
-        Rule::InvalidFirstArgumentNameForMethod,
+        Rule::ClassMethodReceiverNotNamedCls,
+        Rule::InstanceMethodReceiverNotNamedSelf,
+        Rule::MethodReceiverDefault,
         Rule::MutableClassDefault,
         Rule::MutableDataclassDefault,
-        Rule::NoSelfUse,
+        Rule::NoMethodArgument,
+        Rule::UnusedSelf,
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
         Rule::RuntimeImportInTypeCheckingBlock,
@@ -164,12 +166,14 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                             && !binding.is_nonlocal()
                             && !binding.is_global()
                             && !checker.settings().dummy_variable_rgx.is_match(name)
+                            // semi-standard names read from frame locals at runtime by some tools
                             && !matches!(
                                 name,
-                                "__tracebackhide__"
-                                    | "__traceback_info__"
-                                    | "__traceback_supplement__"
-                                    | "__debuggerskip__"
+                                "__tracebackhide__" // used by pytest, IPython
+                                    | "__traceback_hide__" // used by Django, Sentry, Werkzeug
+                                    | "__traceback_info__" // used by Zope
+                                    | "__traceback_supplement__" // used by Zope
+                                    | "__debuggerskip__" // used by IPython debugger
                             )
                         {
                             return Some((name, binding));
@@ -243,7 +247,11 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if scope.kind.is_function() {
-            if checker.is_rule_enabled(Rule::NoSelfUse) {
+            if checker.is_rule_enabled(Rule::NoMethodArgument) {
+                pylint::rules::no_method_argument(checker, scope);
+            }
+
+            if checker.is_rule_enabled(Rule::UnusedSelf) {
                 pylint::rules::no_self_use(checker, scope_id, scope);
             }
 
@@ -264,10 +272,14 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
 
             if checker.any_rule_enabled(&[
-                Rule::InvalidFirstArgumentNameForClassMethod,
-                Rule::InvalidFirstArgumentNameForMethod,
+                Rule::ClassMethodReceiverNotNamedCls,
+                Rule::InstanceMethodReceiverNotNamedSelf,
             ]) {
                 pep8_naming::rules::invalid_first_argument_name(checker, scope);
+            }
+
+            if checker.is_rule_enabled(Rule::MethodReceiverDefault) {
+                ruff::rules::method_receiver_default(checker, scope);
             }
         }
     }

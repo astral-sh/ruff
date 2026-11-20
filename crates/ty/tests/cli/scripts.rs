@@ -4,7 +4,7 @@ use ty_static::EnvVars;
 use crate::CliTest;
 
 #[test]
-fn project_settings_and_overrides_do_not_apply() -> anyhow::Result<()> {
+fn inline_settings_replace_project_settings_and_overrides() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
             "pyproject.toml",
@@ -115,43 +115,32 @@ fn unknown_rule_diagnostics_point_to_script_metadata() -> anyhow::Result<()> {
 }
 
 #[test]
-fn python_version_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
-    let case = CliTest::with_file(
-        "script.py",
-        r#"
+fn shared_config_override_warns_once_across_scripts() -> anyhow::Result<()> {
+    let script = "
         # /// script
-        # requires-python = ">=3.12"
+        # [tool.ty]
         # ///
+    ";
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [[overrides]]
+            [overrides.rules]
+            division-by-zero = "warn"
+            "#,
+        ),
+        ("a.py", script),
+        ("b.py", script),
+    ])?;
 
-        PythonFinalizationError
-        "#,
-    )?;
-
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command().args([
+        "--config-file", "ty.toml", "--output-format", "concise", "a.py", "b.py"
+    ]), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
-     --> script.py:6:1
-      |
-    6 | PythonFinalizationError
-      | ^^^^^^^^^^^^^^^^^^^^^^^
-    info: `PythonFinalizationError` was added as a builtin in Python 3.13
-    info: Python 3.12 was assumed when resolving types because it was specified in script metadata
-     --> script.py:3:21
-      |
-    3 | # requires-python = ">=3.12"
-      |                     ^^^^^^^^ Python version configured here
-
-    Found 1 diagnostic
-
-    ----- stderr -----
-    "#);
-    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    script.py:6:1: error[unresolved-reference] Name `PythonFinalizationError` used when not defined
+    ty.toml:2:1: warning[unnecessary-overrides-section] Unnecessary `overrides` section: This overrides section applies to all files
     Found 1 diagnostic
 
     ----- stderr -----
@@ -161,47 +150,183 @@ fn python_version_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
 }
 
 #[test]
-fn metadata_without_tool_ty_uses_default_settings() -> anyhow::Result<()> {
-    let case = CliTest::with_files([
-        (
-            "pyproject.toml",
-            r#"
-            [tool.ty.rules]
-            all = "ignore"
+fn renamed_rule_in_script_metadata() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [tool.ty.rules]
+        # unresolved-import = "ignore"
+        # ///
 
-            [tool.ty.analysis]
-            respect-type-ignore-comments = false
-            "#,
-        ),
-        (
-            "script.py",
-            r#"
-            # /// script
-            # dependencies = []
-            # ///
-
-            value: int = "not an int"
-            suppressed: int = "not an int"  # type: ignore
-            "#,
-        ),
-    ])?;
+        import missing
+        "#,
+    )?;
 
     assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[invalid-assignment]: Object of type `Literal["not an int"]` is not assignable to `int`
-     --> script.py:6:14
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> script.py:4:3
       |
-    6 | value: int = "not an int"
-      |        ---   ^^^^^^^^^^^^ Incompatible value of type `Literal["not an int"]`
-      |        |
-      |        Declared type
+    4 | # unresolved-import = "ignore"
+      |   ^^^^^^^^^^^^^^^^^
 
     Found 1 diagnostic
 
     ----- stderr -----
     "#);
+    Ok(())
+}
+
+#[test]
+fn script_inherits_project_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("ty.toml", "environment.python-version = '3.14'"),
+        (
+            "script.py",
+            "
+            # /// script
+            # dependencies = []
+            # ///
+
+            import sys
+            from typing import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    script.py:9:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn script_python_requirement_overrides_project_version() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("ty.toml", "environment.python-version = '3.14'"),
+        (
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.13"
+            # ///
+
+            import sys
+            from typing import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    script.py:9:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[13]]`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn metadata_without_tool_ty_inherits_project_settings_and_overrides() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            unresolved-reference = "ignore"
+
+            [tool.ty.analysis]
+            respect-type-ignore-comments = false
+
+            [[tool.ty.overrides]]
+            include = ["scripts/*.py"]
+
+            [tool.ty.overrides.rules]
+            invalid-assignment = "warn"
+            "#,
+        ),
+        (
+            "scripts/inherit.py",
+            r#"
+            # /// script
+            # dependencies = []
+            # [tool.uv]
+            # ///
+
+            print(missing)
+            value: int = "not an int"  # type: ignore
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    scripts/inherit.py:8:14: warning[invalid-assignment] Object of type `Literal["not an int"]` is not assignable to `int`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn empty_tool_ty_disables_project_settings_and_overrides() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            unresolved-reference = "ignore"
+
+            [[tool.ty.overrides]]
+            include = ["script.py"]
+
+            [tool.ty.overrides.rules]
+            unresolved-reference = "warn"
+            "#,
+        ),
+        (
+            "script.py",
+            "
+            # /// script
+            # [tool.ty]
+            # ///
+
+            print(missing)
+            ",
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:6:7: error[unresolved-reference] Name `missing` used when not defined
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -464,6 +589,11 @@ fn explicit_config_replaces_inline_metadata() -> anyhow::Result<()> {
             unresolved-reference = "warn"
 
             [analysis]
+            respect-type-ignore-comments = false
+
+            [[overrides]]
+            include = ["script.py"]
+            [overrides.analysis]
             respect-type-ignore-comments = true
             "#,
         ),
@@ -727,7 +857,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `layout_dependency`
+    error[import-not-found]: Cannot resolve imported module `layout_dependency`
      --> scripts/script.py:6:6
       |
     6 | from layout_dependency import value as layout_value
@@ -736,7 +866,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `local_dependency`
+    error[import-not-found]: Cannot resolve imported module `local_dependency`
      --> scripts/script.py:7:6
       |
     7 | from local_dependency import value as local_value
@@ -745,7 +875,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
 
-    error[unresolved-import]: Cannot resolve imported module `shared`
+    error[import-not-found]: Cannot resolve imported module `shared`
      --> scripts/script.py:8:6
       |
     8 | from shared import value
@@ -795,12 +925,12 @@ fn configured_source_roots_and_extra_paths_are_relative_to_the_script() -> anyho
 }
 
 #[test]
-fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
+fn scripts_use_their_own_roots() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
-            "pyproject.toml",
+            "ty.toml",
             r#"
-            [tool.ty.environment]
+            [environment]
             root = ["./project-source"]
             extra-paths = ["./project-extra"]
             "#,
@@ -809,7 +939,10 @@ fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
         ("project-extra/extra_only.py", "value = 1\n"),
         (
             "ordinary.py",
-            "from extra_only import value as extra\nfrom project_only import value as project\n",
+            "
+            from extra_only import value as extra
+            from project_only import value as project
+            ",
         ),
         (
             "scripts/script.py",
@@ -824,29 +957,20 @@ fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `extra_only`
-     --> scripts/script.py:6:6
-      |
-    6 | from extra_only import value as extra
-      |      ^^^^^^^^^^
-    info: Searched in the following paths during module resolution:
-    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    scripts/script.py:7:6: error[import-not-found] Cannot resolve imported module `project_only`
+    Found 1 diagnostic
 
-    error[unresolved-import]: Cannot resolve imported module `project_only`
-     --> scripts/script.py:7:6
-      |
-    7 | from project_only import value as project
-      |      ^^^^^^^^^^^^
-    info: Searched in the following paths during module resolution:
-    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-
-    Found 2 diagnostics
+    ----- stderr -----
+    ");
+    assert_cmd_snapshot!(case.command().args(["--config-file", "ty.toml"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     ");
@@ -925,19 +1049,30 @@ fn shared_imports_use_each_scripts_platform() -> anyhow::Result<()> {
 }
 
 #[test]
-fn inherited_file_settings_are_relative_to_the_script() -> anyhow::Result<()> {
+fn user_configuration_paths_are_relative_to_the_active_configuration_root() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("user-extra/project_dependency.py", "value = 1\n"),
         ("scripts/user-extra/user_dependency.py", "value = 1\n"),
         ("cli-extra/cli_dependency.py", "value = 1\n"),
         (
-            "scripts/script.py",
+            "scripts/inline.py",
+            r#"
+            # /// script
+            # [tool.ty]
+            # ///
+
+            from user_dependency import value as user_value
+            from cli_dependency import value as cli_value
+            "#,
+        ),
+        (
+            "scripts/inherit.py",
             r#"
             # /// script
             # dependencies = []
             # ///
 
-            from user_dependency import value as user_value
+            from project_dependency import value as project_value
             from cli_dependency import value as cli_value
             "#,
         ),
@@ -989,7 +1124,7 @@ fn scripts_do_not_use_an_inactive_project_environment() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `project_dependency`
+    error[import-not-found]: Cannot resolve imported module `project_dependency`
      --> scripts/script.py:6:6
       |
     6 | from project_dependency import value
@@ -1174,8 +1309,9 @@ fn invalid_python_requirement_reports_configuration_error() -> anyhow::Result<()
     Ok(())
 }
 
+// TODO: Consider warning that the entire `.src` table is unused.
 #[test]
-fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
+fn invalid_inline_src_glob_does_not_prevent_checking_script() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
             "pyproject.toml",
@@ -1203,19 +1339,79 @@ fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    error[invalid-glob]: Invalid pattern
-     --> script.py:4:14
-      |
-    4 | # include = ["src/**test/"]
-      |              ^^^^^^^^^^^^^ Too many stars at position 5
+    info[revealed-type]: Revealed type
+      --> script.py:12:13
+       |
+    12 | reveal_type(sys.platform)
+       |             ^^^^^^^^^^^^ `Literal["win32"]`
 
     Found 1 diagnostic
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_glob_in_script_analysis_override_is_ignored() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [[tool.ty.overrides]]
+        # include = ["script.py"]
+        # [tool.ty.overrides.analysis]
+        # allowed-unresolved-imports = ["foo**"]
+        # ///
+
+        from typing_extensions import reveal_type
+
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    script.py:11:13: info[revealed-type] Revealed type: `Literal[1]`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_glob_in_top_level_script_analysis_is_an_error() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [tool.ty.analysis]
+        # allowed-unresolved-imports = ["foo**"]
+        # ///
+
+        from typing_extensions import reveal_type
+
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().args(["--exit-zero-on-warning", "--output-format=concise"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:4:33: error[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -1324,30 +1520,68 @@ fn invalid_script_search_paths_do_not_blame_python_environment() -> anyhow::Resu
 fn unavailable_uv_reports_metadata_error() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "script.py",
-        "#!/usr/bin/env python3\n\n# /// script\n# dependencies = []\n# ///\nprint(missing)\n",
+        r#"
+        # /// script
+        # dependencies = []
+        # [tool.ty]
+        # project-manager.script = "uv"
+        # ///
+        print(missing)
+        "#,
     )?
     .with_filter(
         "program not found",
         "No such file or directory (os error 2)",
     );
 
-    assert_cmd_snapshot!(
-        case.command()
-            .arg("script.py")
-            .env(EnvVars::TY_UV, "1")
-            .env(EnvVars::UV, "missing-uv-executable"),
-        @"
+    let mut command = case.command();
+    command.arg("script.py").env("PATH", "");
+    assert_cmd_snapshot!(command, @r#"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[uv-metadata]: Failed to invoke `uv workspace metadata`: No such file or directory (os error 2)
-    --> script.py:3:1
+    error[project-manager]: Setting up the Python environment with uv failed: could not find `uv` on `PATH`
+    --> script.py:2:1
+    info: ty uses uv to install this script's dependencies because of your configuration
+     --> script.py:5:28
+      |
+    5 | # project-manager.script = "uv"
+      |                            ^^^^ uv specified here
+    info: To install uv, see https://docs.astral.sh/uv/
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "
-    );
+    "#);
+
+    command.env(EnvVars::UV, "missing-uv-executable");
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[project-manager]: Setting up the Python environment with uv failed: failed to run `missing-uv-executable`: No such file or directory (os error 2)
+    --> script.py:2:1
+    info: ty uses uv to install this script's dependencies because of your configuration
+     --> script.py:5:28
+      |
+    5 | # project-manager.script = "uv"
+      |                            ^^^^ uv specified here
+    info: The uv executable was specified by the `UV` environment variable
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    assert_cmd_snapshot!(command.arg("--output-format=concise"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:2:1: error[project-manager] Setting up the Python environment with uv failed: failed to run `missing-uv-executable`: No such file or directory (os error 2)
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -1364,7 +1598,7 @@ fn ordinary_files_do_not_initialize_scripts() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case.command()
             .arg("ordinary.py")
-            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::TY_UV, "scripts")
             .env(EnvVars::UV, "missing-uv-executable"),
         @"
     success: true
@@ -1404,6 +1638,37 @@ fn disabled_integration_does_not_initialize_scripts() -> anyhow::Result<()> {
 }
 
 #[test]
+fn ty_uv_off_overrides_script_and_cli_settings() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r"
+        # /// script
+        # [tool.ty]
+        # project-manager.script = 'uv'
+        # ///
+        ",
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("script.py")
+            .args(["--config", "project-manager.script='uv'"])
+            .env(EnvVars::TY_UV, "off")
+            .env(EnvVars::UV, "missing-uv-executable"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
 fn excluded_scripts_do_not_initialize_their_environments() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("ty.toml", "[src]\nexclude-scripts = true\n"),
@@ -1417,7 +1682,7 @@ fn excluded_scripts_do_not_initialize_their_environments() -> anyhow::Result<()>
         case.command()
             .arg(".")
             .args(["--config-file", "ty.toml"])
-            .env(EnvVars::TY_UV, "1")
+            .env(EnvVars::TY_UV, "scripts")
             .env(EnvVars::UV, "missing-uv-executable"),
         @"
     success: true
@@ -1437,13 +1702,16 @@ mod uv_metadata {
     use std::{fs, process::Command};
 
     use insta_cmd::assert_cmd_snapshot;
+    use ty_project::uv_test_env_vars;
     use ty_static::EnvVars;
 
     use crate::CliTest;
+    use crate::uv_workspace::{uv_sync_command, write_dependency_wheel};
 
     fn command_with_script_uv(case: &CliTest) -> Command {
-        let mut command = case.command_inheriting_environment();
+        let mut command = case.command();
         command
+            .envs(uv_test_env_vars())
             .env(EnvVars::TY_UV, "1")
             .env(EnvVars::UV, "uv")
             .env("UV_CACHE_DIR", case.root().join("cache"));
@@ -1452,6 +1720,8 @@ mod uv_metadata {
 
     fn assert_uv_supports_script_metadata() -> anyhow::Result<()> {
         let output = Command::new("uv")
+            .env_clear()
+            .envs(uv_test_env_vars())
             .args(["workspace", "metadata", "--help"])
             .output()?;
 
@@ -1474,7 +1744,7 @@ mod uv_metadata {
         # requires-python = ">=3.12"
         # dependencies = ["attrs==25.4.0"]
         # [tool.ty.environment]
-        # python-version = "3.10"
+        # python-version = "3.11"
         # ///
 
         import sys
@@ -1488,35 +1758,9 @@ mod uv_metadata {
         reveal_type(User(1).value)
         reveal_type(sys.version_info[:2])
         "#,
-        )?
-        .with_filter(r"Literal\[(?:1[2-9]|[2-9][0-9])\]", "Literal[<uv-minor>]");
+        )?;
 
         assert_cmd_snapshot!(command_with_script_uv(&case).arg("script.py"), @"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-        info[revealed-type]: Revealed type
-          --> script.py:17:13
-           |
-        17 | reveal_type(User(1).value)
-           |             ^^^^^^^^^^^^^ `int`
-
-        info[revealed-type]: Revealed type
-          --> script.py:18:13
-           |
-        18 | reveal_type(sys.version_info[:2])
-           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[<uv-minor>]]`
-
-        Found 2 diagnostics
-
-        ----- stderr -----
-        ");
-
-        assert_cmd_snapshot!(
-            command_with_script_uv(&case)
-                .arg("script.py")
-                .args(["--python-version", "3.11"]),
-            @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -1533,6 +1777,157 @@ mod uv_metadata {
            |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
 
         Found 2 diagnostics
+
+        ----- stderr -----
+        ");
+
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("script.py")
+                .args(["--python-version", "3.12"]),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        info[revealed-type]: Revealed type
+          --> script.py:17:13
+           |
+        17 | reveal_type(User(1).value)
+           |             ^^^^^^^^^^^^^ `int`
+
+        info[revealed-type]: Revealed type
+          --> script.py:18:13
+           |
+        18 | reveal_type(sys.version_info[:2])
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
+
+        Found 2 diagnostics
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
+
+    fn script_with_indirect_dependency() -> anyhow::Result<CliTest> {
+        let case = CliTest::with_file(
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.8"
+            # dependencies = ["direct-dependency"]
+            # [tool.uv]
+            # no-index = true
+            # find-links = ["wheels"]
+            # ///
+
+            import direct_module
+            from indirect_module import value
+            import indirect_module
+            "#,
+        )?;
+        write_dependency_wheel(&case, "indirect-dependency", "indirect_module", &[])?;
+        write_dependency_wheel(
+            &case,
+            "direct-dependency",
+            "direct_module",
+            &["indirect-dependency"],
+        )?;
+        Ok(case)
+    }
+
+    #[test]
+    fn indirect_dependencies_use_script_declarations() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = script_with_indirect_dependency()?;
+        let mut command = command_with_script_uv(&case);
+        command
+            .arg("script.py")
+            .env("UV_OFFLINE", "1")
+            .env("UV_PYTHON_DOWNLOADS", "never");
+
+        assert_cmd_snapshot!(command, @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        ");
+
+        command.args(["--error", "missing-direct-dependency"]);
+        assert_cmd_snapshot!(command, @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+          --> script.py:11:6
+           |
+        11 | from indirect_module import value
+           |      ^^^^^^^^^^^^^^^
+        help: Declare `indirect-dependency` in the script's inline `dependencies` metadata
+        info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
+
+        error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+          --> script.py:12:8
+           |
+        12 | import indirect_module
+           |        ^^^^^^^^^^^^^^^
+        help: Declare `indirect-dependency` in the script's inline `dependencies` metadata
+        info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
+
+        Found 2 diagnostics
+
+        ----- stderr -----
+        ");
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_dependencies_do_not_apply_to_scripts() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = script_with_indirect_dependency()?;
+        case.write_files([
+            (
+                "pyproject.toml",
+                r#"
+                [project]
+                name = "project"
+                version = "0.1.0"
+                requires-python = ">=3.8"
+                dependencies = ["indirect-dependency"]
+
+                [tool.uv]
+                no-index = true
+                find-links = ["wheels"]
+                "#,
+            ),
+            (
+                "ordinary.py",
+                r#"
+                import indirect_module
+                from typing_extensions import reveal_type
+
+                reveal_type(indirect_module.value)
+                "#,
+            ),
+        ])?;
+
+        assert_cmd_snapshot!(
+            uv_sync_command(&case, None)?
+                .args(["--error", "missing-direct-dependency"]),
+            @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        ordinary.py:5:13: info[revealed-type] Revealed type: `int`
+        script.py:11:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+        script.py:12:8: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+        Found 3 diagnostics
 
         ----- stderr -----
         "
@@ -1560,32 +1955,23 @@ mod uv_metadata {
                 from typing import Literal, assert_type
 
                 foo = 1
-                assert_type(sys.version_info[:2], tuple[Literal[3], Literal[12]])
+                assert_type(sys.version_info[:2], tuple[Literal[3], Literal[11]])
                 "#,
             ),
         ])?;
 
-        // FIXME: Checking a.py can create b.py's environment before synchronization, causing
-        // b.py to use its Python 3.11 fallback instead of the Python 3.12 environment from uv.
+        // Same as for regular projects. An explicit `python-version` takes precedence
+        // over a `requires-python` constraint.
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .args(["a.py", "b.py"])
                 .env(EnvVars::TY_UV, "scripts")
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[type-assertion-failure]: Argument does not have asserted type `tuple[Literal[3], Literal[12]]`
-          --> b.py:12:1
-           |
-        12 | assert_type(sys.version_info[:2], tuple[Literal[3], Literal[12]])
-           | ^^^^^^^^^^^^--------------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-           |             |
-           |             Inferred type is `tuple[Literal[3], Literal[11]]`
-        info: `tuple[Literal[3], Literal[12]]` and `tuple[Literal[3], Literal[11]]` are not equivalent types
-
-        Found 1 diagnostic
+        All checks passed!
 
         ----- stderr -----
         "
@@ -1636,13 +2022,19 @@ mod uv_metadata {
     fn synchronizes_multiple_scripts_with_one_worker() -> anyhow::Result<()> {
         assert_uv_supports_script_metadata()?;
 
-        let script =
-            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n";
+        let script = r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # dependencies = ["attrs==25.4.0"]
+        # ///
+        from attrs import define
+        "#;
         let case = CliTest::with_files([("first.py", script), ("second.py", script)])?;
 
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .args(["first.py", "second.py"])
+                .env(EnvVars::TY_UV, "scripts")
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
         success: true
@@ -1685,8 +2077,13 @@ mod uv_metadata {
 
         // The CLI environment selects uv's interpreter, but the script's dependencies must still
         // come from the separate environment that uv creates for the script.
+        // As for projects, `requires-python` takes precedence over the virtual environment because
+        // it defines the minimum Python version the script must support. This allows ty to detect
+        // accidental use of newer language features.
         let environment = case.root().join(".venv");
         let output = Command::new("uv")
+            .env_clear()
+            .envs(uv_test_env_vars())
             .args(["venv", "--no-project", "--python", "3.12"])
             .arg(&environment)
             .env("UV_CACHE_DIR", case.root().join("cache"))
@@ -1715,7 +2112,7 @@ mod uv_metadata {
           --> scripts/script.py:16:13
            |
         16 | reveal_type(sys.version_info[:2])
-           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
 
         Found 2 diagnostics
 
@@ -1775,12 +2172,14 @@ mod uv_metadata {
 
         let case = CliTest::with_file(
             "script.py",
-            "# /// script\n# requires-python = '>=3.8'\n# dependencies = ['missing-script-dependency==99.0.0']\n# ///\nprint(missing)\n",
-        )?
-        .with_filter(
-            r"(?s)`uv workspace metadata` failed with status.*?missing-script-dependency==99\.0\.0.*?\n(Found 1 diagnostic)",
-            "`uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved\n$1",
-        );
+            "
+            # /// script
+            # requires-python = '>=3.8'
+            # dependencies = ['missing-script-dependency==99.0.0']
+            # ///
+            print(missing)
+            ",
+        )?;
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .arg("script.py")
@@ -1789,7 +2188,14 @@ mod uv_metadata {
         success: false
         exit_code: 1
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved
+        error[project-manager]: Setting up the Python environment with uv failed
+        --> script.py:2:1
+        error: No solution found when resolving dependencies
+          cause: Because missing-script-dependency was not found in the cache and you require missing-script-dependency==99.0.0, we can conclude that your requirements are unsatisfiable.
+
+        hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
+        error: `uv workspace metadata` exited with status 1
+
         Found 1 diagnostic
 
         ----- stderr -----

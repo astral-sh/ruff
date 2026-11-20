@@ -1,7 +1,7 @@
 import { Icons, Theme } from "shared";
 import classNames from "classnames";
 import { useState } from "react";
-import { FileId, FileMetadata } from "../Playground";
+import type { FileId, FileMetadata } from "../Playground";
 import { type FileHandle } from "ty_wasm";
 
 export interface Props {
@@ -63,9 +63,11 @@ export function Files({
               name={file.name}
               onClicked={() => onSelect(id)}
               onRenamed={(newName) => {
-                if (!hasFileNamed(newName)) {
-                  onRename(id, newName);
+                const name = normalizeFileName(newName);
+                if (!name || hasFileNamed(name)) {
+                  return;
                 }
+                onRename(id, name);
               }}
             />
 
@@ -211,4 +213,18 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
 export function isPythonFile(handle: FileHandle): boolean {
   const extension = handle.path().toLowerCase().split(".").pop() ?? "";
   return ["py", "pyi", "pyw"].includes(extension);
+}
+
+function normalizeFileName(name: string): string {
+  const parts: string[] = [];
+
+  for (const part of name.split("/")) {
+    if (part === "..") {
+      parts.pop();
+    } else if (part !== "." && part !== "") {
+      parts.push(part);
+    }
+  }
+
+  return `${name.startsWith("/") ? "/" : ""}${parts.join("/")}`;
 }

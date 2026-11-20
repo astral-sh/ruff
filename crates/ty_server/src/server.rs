@@ -19,14 +19,26 @@ mod api;
 mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
+mod script_progress;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
-pub(crate) use api::publish_settings_diagnostics;
+pub(crate) use api::{
+    publish_all_document_diagnostics, publish_diagnostics_if_needed, publish_settings_diagnostics,
+};
+pub(crate) use lazy_work_done_progress::LazyWorkDoneProgress;
 pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };
+pub(crate) use script_progress::ScriptProgress;
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
+
+/// Maximum number of requests waiting for a worker.
+///
+/// The exact number is arbitrary. A high limit leaves room for bursts of editor
+/// requests. When the queue fills, the server rejects new background requests
+/// to apply back pressure.
+pub(crate) const MAX_QUEUED_REQUESTS: usize = 2048;
 
 pub struct Server {
     connection: Connection,
@@ -104,9 +116,9 @@ impl Server {
             }),
         )?;
 
-        // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
-        // some responses before blocking.
-        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
+        // An edit can wait for database snapshots held by queued jobs. Workers must be
+        // able to return their results while the main loop waits for those snapshots.
+        let (main_loop_sender, main_loop_receiver) = crossbeam::channel::unbounded();
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
         let unknown_options = &initialization_options.options.unknown;
@@ -250,86 +262,5 @@ impl Drop for ServerPanicHookHandler {
         if let Some(hook) = self.hook.take() {
             std::panic::set_hook(hook);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::num::NonZeroUsize;
-    use std::sync::Arc;
-
-    use lsp_server::{Connection, ErrorCode, Message, Notification, Request};
-    use ruff_db::system::OsSystem;
-    use serde_json::{Value, json};
-
-    use super::Server;
-    use crate::system::WorkspaceTrust;
-
-    #[test]
-    fn malformed_trust_rejects_initialization() -> anyhow::Result<()> {
-        let (connection, client) = initialize_connection(&json!({
-            "untrustedWorkspace": "true",
-            "logLevel": "invalid"
-        }))?;
-        assert!(
-            Server::new(
-                NonZeroUsize::MIN,
-                connection,
-                Arc::new(OsSystem::default()),
-                true,
-            )
-            .is_err()
-        );
-
-        let Message::Response(response) = client.receiver.try_recv()? else {
-            anyhow::bail!("Expected an initialization error response");
-        };
-        assert_eq!(response.id, 1.into());
-        let error = response.response_result.unwrap_err();
-        assert_eq!(error.code, ErrorCode::InvalidParams as i32);
-        assert_eq!(
-            error.message,
-            "Invalid initialization options: Invalid `untrustedWorkspace` setting: \
-             invalid type: string \"true\", expected a boolean",
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn malformed_initialization_options_preserve_workspace_trust() -> anyhow::Result<()> {
-        let (connection, _client_connection) = initialize_connection(&json!({
-            "untrustedWorkspace": true,
-            "diagnosticMode": "invalid"
-        }))?;
-        let server = Server::new(
-            NonZeroUsize::MIN,
-            connection,
-            Arc::new(OsSystem::default()),
-            true,
-        )?;
-        assert_eq!(
-            server.session.initialization_options().workspace_trust,
-            WorkspaceTrust::Untrusted,
-        );
-        Ok(())
-    }
-
-    fn initialize_connection(
-        initialization_options: &Value,
-    ) -> anyhow::Result<(Connection, Connection)> {
-        let (server, client) = Connection::memory();
-        client.sender.send(Message::Request(Request::new(
-            1.into(),
-            "initialize".into(),
-            json!({
-                "capabilities": {},
-                "initializationOptions": initialization_options
-            }),
-        )))?;
-        client.sender.send(Message::Notification(Notification::new(
-            "initialized".into(),
-            json!({}),
-        )))?;
-        Ok((server, client))
     }
 }

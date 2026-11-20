@@ -79,7 +79,6 @@ impl ModuleName {
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().components().collect::<Vec<_>>(), vec!["foo", "bar", "baz"]);
     /// ```
-    #[must_use]
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
     }
@@ -263,6 +262,14 @@ impl ModuleName {
             name.push_str(part);
         }
         Some(Self(name))
+    }
+
+    /// Returns a new module name with the components of `other` appended to `self`.
+    #[must_use]
+    pub fn join(&self, other: &ModuleName) -> Self {
+        let mut name = self.clone();
+        name.extend(other);
+        name
     }
 
     /// Extend `self` with the components of `other`
@@ -507,7 +514,7 @@ impl<'db> ImportingFile<'db> {
         }
     }
 
-    pub fn resolver_environment(self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
+    pub(crate) fn resolver_environment(self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
         match self {
             Self::ResolverFile(file) => file.environment(db),
             Self::File(_, resolver_environment) => resolver_environment,

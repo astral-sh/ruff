@@ -38,6 +38,7 @@ bitflags::bitflags! {
         const FULL_DIAGNOSTIC_OUTPUT = 1 << 20;
         const IMPLEMENTATION_LINK_SUPPORT = 1 << 21;
         const TRIGGER_SIGNATURE_HELP_COMMAND = 1 << 22;
+        const SEMANTIC_TOKENS_REFRESH = 1 << 23;
     }
 }
 
@@ -102,6 +103,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports inlay hint refresh.
     pub(crate) const fn supports_inlay_hint_refresh(self) -> bool {
         self.contains(Self::INLAY_HINT_REFRESH)
+    }
+
+    /// Returns `true` if the client supports refreshing semantic tokens.
+    pub(crate) const fn supports_semantic_tokens_refresh(self) -> bool {
+        self.contains(Self::SEMANTIC_TOKENS_REFRESH)
     }
 
     /// Returns `true` if the client supports pull diagnostics.
@@ -232,6 +238,13 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::INLAY_HINT_REFRESH;
+        }
+
+        if workspace
+            .and_then(|workspace| workspace.semantic_tokens.as_ref()?.refresh_support)
+            .unwrap_or_default()
+        {
+            flags |= Self::SEMANTIC_TOKENS_REFRESH;
         }
 
         if let Some(capabilities) =
@@ -533,6 +546,27 @@ pub(crate) fn server_capabilities(
                 // https://github.com/microsoft/language-server-protocol/issues/1720#issuecomment-1514732305
                 supported: Some(true),
                 change_notifications: Some(true.into()),
+            }),
+            file_operations: Some(types::FileOperationOptions {
+                will_rename: Some(types::FileOperationRegistrationOptions::new(vec![
+                    types::FileOperationFilter::new(
+                        Some("file".to_string()),
+                        types::FileOperationPattern::new(
+                            "**/*.{py,pyi}".to_string(),
+                            Some(types::FileOperationPatternKind::File),
+                            None,
+                        ),
+                    ),
+                    types::FileOperationFilter::new(
+                        Some("file".to_string()),
+                        types::FileOperationPattern::new(
+                            "**/*".to_string(),
+                            Some(types::FileOperationPatternKind::Folder),
+                            None,
+                        ),
+                    ),
+                ])),
+                ..types::FileOperationOptions::default()
             }),
             ..Default::default()
         }),

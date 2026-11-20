@@ -10,7 +10,7 @@ use libcst_native as cst;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::token::Tokens;
-use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
+use ruff_python_ast::{self as ast, Expr, ModModule, PythonVersion, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
 use ruff_python_parser::Parsed;
@@ -34,6 +34,8 @@ pub(crate) struct Importer<'a> {
     source: &'a str,
     /// The [`Stylist`] for the Python AST.
     stylist: &'a Stylist<'a>,
+    /// The target Python version.
+    target_version: PythonVersion,
     /// The list of visited, top-level runtime imports in the Python AST.
     runtime_imports: Vec<&'a Stmt>,
     /// The list of visited, top-level `if TYPE_CHECKING:` blocks in the Python AST.
@@ -45,12 +47,14 @@ impl<'a> Importer<'a> {
         parsed: &'a Parsed<ModModule>,
         source: &'a str,
         stylist: &'a Stylist<'a>,
+        target_version: PythonVersion,
     ) -> Self {
         Self {
             python_ast: parsed.suite(),
             tokens: parsed.tokens(),
             source,
             stylist,
+            target_version,
             runtime_imports: Vec::default(),
             type_checking_blocks: Vec::default(),
         }
@@ -66,14 +70,18 @@ impl<'a> Importer<'a> {
         self.type_checking_blocks.push(type_checking_block);
     }
 
-    /// Add an import statement to import the given module.
+    /// Add an import statement to import the given module, with an explicit `lazy` keyword if requested.
     ///
     /// If there are no existing imports, the new import will be added at the top
     /// of the file. If there are future imports, the new import will be added
     /// after the last future import. Otherwise, it will be added after the most
     /// recent top-level import statement.
-    pub(crate) fn add_import(&self, import: &NameImport, at: TextSize) -> Edit {
-        let required_import = import.to_string();
+    pub(crate) fn add_import(&self, import: &NameImport, at: TextSize, is_lazy: bool) -> Edit {
+        let required_import = if is_lazy {
+            format!("lazy {import}")
+        } else {
+            import.to_string()
+        };
         if let Some(stmt) = self.preceding_import(at) {
             // Insert after the last top-level import.
             Insertion::end_of_statement(stmt, self.source, self.stylist).into_edit(&required_import)
@@ -420,6 +428,7 @@ impl<'a> Importer<'a> {
                                 symbol.module.to_string(),
                             )),
                             at,
+                            false,
                         );
                         Ok((
                             import_edit,
@@ -443,6 +452,7 @@ impl<'a> Importer<'a> {
                                 symbol.member.to_string(),
                             )),
                             at,
+                            false,
                         );
                         Ok((import_edit, symbol.member.to_string()))
                     } else {
@@ -484,8 +494,8 @@ impl<'a> Importer<'a> {
     /// Add the given member to an existing `Stmt::ImportFrom` statement.
     fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
         let mut statement = match_statement(&self.source[stmt.range()])?;
-        let import_from = match_import_from(&mut statement)?;
-        let aliases = match_aliases(import_from)?;
+        let (_, names, _) = match_import_from(&mut statement)?;
+        let aliases = match_aliases(names)?;
         aliases.push(cst::ImportAlias {
             name: cst::NameOrAttribute::N(Box::new(cst::Name {
                 value: member,
@@ -549,7 +559,7 @@ impl<'a> Importer<'a> {
 
         body.take_while(|stmt| {
             stmt.as_import_from_stmt().is_some_and(|import_from| {
-                !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+                !import_from.is_lazy && import_from.is_future_import(self.target_version)
             })
         })
         .last()
@@ -563,7 +573,7 @@ impl<'a> Importer<'a> {
         ));
         // Note that `TextSize::default` should ensure that the import is added at the very
         // beginning of the file via `Insertion::start_of_file`.
-        self.add_import(import, TextSize::default())
+        self.add_import(import, TextSize::default(), false)
     }
 }
 

@@ -1,7 +1,7 @@
-use crate::config::{Analysis, Rules, ScriptOptions};
+use crate::config::{Analysis, Rules, ScriptMetadata};
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
-use ruff_db::diagnostic::{Diagnostic, Severity};
+use ruff_db::diagnostic::{Diagnostic, LintName, Severity};
 use ruff_db::files::{File, Files};
 use ruff_db::source::source_text;
 use ruff_db::system::{
@@ -12,15 +12,16 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
 use salsa::Setter as _;
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tempfile::TempDir;
 use ty_module_resolver::ModuleGlobSetBuilder;
 use ty_python_core::program::ProgramSettings;
 use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
-use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::dependency::DependencyMetadata;
+use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, LintStatus, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap,
-    default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap, declare_lint,
+    register_lints,
 };
 
 #[salsa::db]
@@ -75,6 +76,13 @@ impl Db {
         let settings = self.settings();
         if settings.analysis(self) != &analysis {
             settings.set_analysis(self).to(analysis);
+        }
+    }
+
+    pub(crate) fn update_dependency_metadata(&mut self, metadata: Option<&DependencyMetadata>) {
+        let settings = self.settings();
+        if settings.dependency_metadata(self).as_ref() != metadata {
+            settings.set_dependency_metadata(self).to(metadata.cloned());
         }
     }
 
@@ -156,7 +164,7 @@ impl SemanticDb for Db {
     }
 
     fn lint_registry(&self) -> &LintRegistry {
-        default_lint_registry()
+        mdtest_lint_registry()
     }
 
     fn verbose(&self) -> bool {
@@ -169,6 +177,17 @@ impl SemanticDb for Db {
 
     fn analysis_settings(&self, file: File) -> &AnalysisSettings {
         file_settings(self, file).analysis(self)
+    }
+
+    fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
+        match file_settings(self, file) {
+            FileSettings::Global => self.settings().dependency_metadata(self).as_ref(),
+            FileSettings::InheritProjectConfig => None,
+            FileSettings::File {
+                dependency_metadata,
+                ..
+            } => dependency_metadata.as_ref(),
+        }
     }
 
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
@@ -187,9 +206,8 @@ impl TestProgramDb for Db {
 impl salsa::Database for Db {}
 
 impl DbWithWritableSystem for Db {
-    type System = MdtestSystem;
-    fn writable_system(&self) -> &Self::System {
-        &self.system
+    fn writable_system(&self) -> ruff_db::system::Result<&dyn WritableSystem> {
+        Ok(&self.system)
     }
 }
 
@@ -199,36 +217,43 @@ fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
     if source.is_notebook() {
         return FileSettings::Global;
     }
-    let Some(options) = ScriptOptions::from_source(&source) else {
+    let Some(metadata) = ScriptMetadata::from_source(&source) else {
         return FileSettings::Global;
+    };
+    let Some(options) = metadata.into_options() else {
+        return FileSettings::InheritProjectConfig;
     };
 
     FileSettings::File {
         rules: MdtestRuleSelection(mdtest_rule_selection(options.rules.as_ref(), None)),
         analysis: mdtest_analysis_settings(options.analysis.as_ref()),
+        dependency_metadata: options.dependency_metadata.map(|fixture| fixture.metadata),
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum FileSettings {
     Global,
+    /// A script without `[tool.ty]` inherits settings but has its own dependency metadata.
+    InheritProjectConfig,
     File {
         rules: MdtestRuleSelection,
         analysis: AnalysisSettings,
+        dependency_metadata: Option<DependencyMetadata>,
     },
 }
 
 impl FileSettings {
     fn rules<'db>(&'db self, db: &'db Db) -> &'db RuleSelection {
         match self {
-            Self::Global => db.settings().rule_selection(db),
+            Self::Global | Self::InheritProjectConfig => db.settings().rule_selection(db),
             Self::File { rules, .. } => rules,
         }
     }
 
     fn analysis<'db>(&'db self, db: &'db Db) -> &'db AnalysisSettings {
         match self {
-            Self::Global => db.settings().analysis(db),
+            Self::Global | Self::InheritProjectConfig => db.settings().analysis(db),
             Self::File { analysis, .. } => analysis,
         }
     }
@@ -241,6 +266,9 @@ struct Settings {
     #[default]
     #[returns(ref)]
     analysis: AnalysisSettings,
+    #[default]
+    #[returns(ref)]
+    dependency_metadata: Option<DependencyMetadata>,
     #[default]
     #[returns(deref)]
     rule_selection: MdtestRuleSelection,
@@ -272,6 +300,7 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
     };
 
     let AnalysisSettings {
+        return_type_inference: return_type_inference_default,
         strict_generic_narrowing: strict_generic_narrowing_default,
         strict_equality_semantics: strict_equality_semantics_default,
         respect_type_ignore_comments: respect_type_ignore_comments_default,
@@ -306,6 +335,9 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
         };
 
     AnalysisSettings {
+        return_type_inference: options
+            .return_type_inference
+            .unwrap_or(return_type_inference_default),
         strict_generic_narrowing: options
             .strict_generic_narrowing
             .unwrap_or(strict_generic_narrowing_default),
@@ -320,6 +352,26 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
     }
 }
 
+/// Includes a no-op rule for testing renamed rules in suppression comments.
+fn mdtest_lint_registry() -> &'static LintRegistry {
+    declare_lint! {
+        /// A rule that never emits a diagnostic.
+        static NEW_RULE_NAME = {
+            summary: "example of a renamed rule",
+            status: LintStatus::stable("0.0.0"),
+        }
+    }
+
+    static REGISTRY: LazyLock<LintRegistry> = LazyLock::new(|| {
+        let mut registry = LintRegistryBuilder::default();
+        register_lints(&mut registry);
+        registry.register_lint(&NEW_RULE_NAME);
+        registry.register_alias(LintName::of("old-rule-name"), &NEW_RULE_NAME);
+        registry.build()
+    });
+    &REGISTRY
+}
+
 fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> RuleSelection {
     // In general (as shown by the initialization of `selection` below), we enable even rules that
     // are ignored by default in mdtests so that their behaviour is covered alongside the default
@@ -331,15 +383,16 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
         // negation types in our tests for better readability.
         "experimental-syntax",
-        // The `unsound-*` rules are also exceptions because they are very strict, would
-        // result in lots of additional diagnostics in mdtests, and are not the default behaviour
-        // we'll show to our users.
+        // The `unsound-*` rules and `redundant-condition-strict` are also exceptions because they
+        // are very strict, would result in lots of additional diagnostics in mdtests, and are not
+        // the default behaviour we'll show to our users.
         "unsound-assignment",
-        "unsound-return-statement",
+        "unsound-return",
         "unsound-yield",
+        "redundant-condition-strict",
     ];
 
-    let registry = default_lint_registry();
+    let registry = mdtest_lint_registry();
     let mut selection = RuleSelection::all(registry, Severity::Info);
 
     for rule in DISABLED_IN_MDTESTS {
@@ -567,6 +620,10 @@ impl WritableSystem for MdtestSystem {
     fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> ruff_db::system::Result<()> {
         self.as_system()
             .write_file_bytes(&self.normalize_path(path), content)
+    }
+
+    fn remove_file(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
+        self.as_system().remove_file(&self.normalize_path(path))
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {

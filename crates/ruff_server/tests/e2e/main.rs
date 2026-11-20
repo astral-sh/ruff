@@ -66,7 +66,7 @@ use lsp_types::{
     DidChangeWorkspaceFoldersNotification, DidCloseTextDocumentNotification,
     DidOpenTextDocumentNotification, ExitNotification, InitializedNotification, Notification,
 };
-use ruff_server::{ConnectionInitializer, LogLevel, Server, init_logging};
+use ruff_server::{ConnectionInitializer, LogLevel, Server, WorkspaceTrust, init_logging};
 use rustc_hash::FxHashMap;
 use tempfile::TempDir;
 
@@ -207,7 +207,13 @@ impl TestServer {
             // TODO: This should probably be configurable to test concurrency issues
             let worker_threads = NonZeroUsize::new(1).unwrap();
 
-            match Server::new(worker_threads, server_connection, None, true) {
+            match Server::new(
+                worker_threads,
+                server_connection,
+                None,
+                WorkspaceTrust::Trusted,
+                true,
+            ) {
                 Ok(server) => {
                     if let Err(err) = server.run() {
                         panic!("Server stopped with error: {err:?}");

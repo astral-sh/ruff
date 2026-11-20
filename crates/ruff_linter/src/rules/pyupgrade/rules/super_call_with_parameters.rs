@@ -6,6 +6,7 @@ use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -52,7 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
 /// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Style)]
 pub(crate) struct SuperCallWithParameters;
 
 impl Violation for SuperCallWithParameters {
@@ -230,8 +231,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 
         if checker
             .semantic()
-            .resolve_qualified_name(func)
-            .is_some_and(|name| name.segments() == ["dataclasses", "dataclass"])
+            .matches_qualified_name(func, &["dataclasses", "dataclass"])
         {
             arguments.find_keyword("slots").is_some_and(|keyword| {
                 matches!(
@@ -316,9 +316,7 @@ fn has_local_dunder_class_var_ref(
 
 /// Returns `true` if the call is to the built-in `builtins.super` function.
 fn is_builtins_super(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
-    semantic
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["builtins", "super"]))
+    semantic.matches_qualified_name(&call.func, &["builtins", "super"])
 }
 
 /// A [`Visitor`] that searches for implicit reference to `__class__` cell,

@@ -14,6 +14,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -52,22 +53,22 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
-pub(crate) struct ConvertNamedTupleFunctionalToClass {
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Style)]
+pub(crate) struct FunctionalNamedTuple {
     name: String,
 }
 
-impl Violation for ConvertNamedTupleFunctionalToClass {
+impl Violation for FunctionalNamedTuple {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertNamedTupleFunctionalToClass { name } = self;
+        let FunctionalNamedTuple { name } = self;
         format!("Convert `{name}` from `NamedTuple` functional to class syntax")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ConvertNamedTupleFunctionalToClass { name } = self;
+        let FunctionalNamedTuple { name } = self;
 
         Some(format!("Convert `{name}` to class syntax"))
     }
@@ -118,7 +119,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     };
 
     let mut diagnostic = checker.report_diagnostic(
-        ConvertNamedTupleFunctionalToClass {
+        FunctionalNamedTuple {
             name: typename.to_string(),
         },
         stmt.range(),
@@ -236,7 +237,7 @@ fn create_class_def_stmt(typename: &str, body: Suite, base_class: &Expr) -> Stmt
     ast::StmtClassDef {
         name: Identifier::new(typename.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
-            args: Box::from([base_class.clone()]),
+            args: [base_class.clone()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

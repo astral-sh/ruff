@@ -1,4 +1,3 @@
-# ruff: noqa: PYI021
 """
 Internal-only symbols for special forms and type-system tests.
 
@@ -6,11 +5,13 @@ Some symbols provide definitions and on-hover documentation for special forms. O
 helpers for ty's tests. None of these symbols are intended to be directly imported by end users.
 """
 
+import collections.abc
+import sys
 import types
 from enum import Enum
-from typing import Any, Protocol, _SpecialForm
+from typing import Any, ClassVar, Protocol, _SpecialForm
 
-from typing_extensions import LiteralString, Self, TypeForm  # noqa: UP035
+from typing_extensions import LiteralString, Self, TypeForm
 
 # -------------
 # Special forms
@@ -91,6 +92,36 @@ Unlike `Unknown`, it does not represent missing type information. It is an inter
 used by ty and cannot be used in annotations.
 """
 
+class NamedTupleLike(Protocol):
+    """
+    A protocol describing an interface that should be satisfied by all named tuples
+    created using `typing.NamedTuple` or `collections.namedtuple`.
+    """
+
+    # _fields is defined as `tuple[Any, ...]` rather than `tuple[str, ...]` so
+    # that instances of actual `NamedTuple` classes with more precise `_fields`
+    # types are considered assignable to this protocol (protocol attribute members
+    # are invariant, and `tuple[str, str]` is not invariantly assignable to
+    # `tuple[str, ...]`).
+    _fields: ClassVar[tuple[Any, ...]]
+    _field_defaults: ClassVar[dict[str, Any]]
+    @classmethod
+    def _make(cls: type[Self], iterable: collections.abc.Iterable[Any]) -> Self: ...
+    def _asdict(self, /) -> dict[str, Any]: ...
+
+    # Positional arguments aren't actually accepted by these methods at runtime,
+    # but adding the `*args` parameters means that all `NamedTuple` classes
+    # are understood as assignable to this protocol due to the special case
+    # outlined in https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable:
+    #
+    # > If the input signature in a function definition includes both a
+    # > `*args` and `**kwargs` parameter and both are typed as `Any`
+    # > (explicitly or implicitly because it has no annotation), a type
+    # > checker should treat this as the equivalent of `...`.
+    def _replace(self, *args, **kwargs) -> Self: ...
+    if sys.version_info >= (3, 13):
+        def __replace__(self, *args, **kwargs) -> Self: ...
+
 # -----------
 # Constraints
 # -----------
@@ -164,6 +195,38 @@ class ConstraintSet:
         Universally abstracts the given type variables from this constraint set.
         """
 
+    def is_always_satisfied(self, *, inferable: TypeForm[tuple[object, ...]]) -> bool:
+        """
+        Returns whether this constraint set always holds with the given inferable
+        type variables, without checking their declared bounds or constraints.
+
+        If the computation budget is exceeded, the result has type `bool` rather
+        than a known literal value.
+        """
+
+    def is_never_satisfied(self, *, inferable: TypeForm[tuple[object, ...]]) -> bool:
+        """
+        Returns whether this constraint set never holds with the given inferable
+        type variables, without checking their declared bounds or constraints.
+
+        If the computation budget is exceeded, the result has type `bool` rather
+        than a known literal value.
+        """
+
+    def is_trivially_always_satisfied(self) -> bool:
+        """
+        Returns whether this constraint set is the true terminal BDD.
+
+        A nonterminal BDD returns `False` even if it is semantically always satisfied.
+        """
+
+    def is_trivially_never_satisfied(self) -> bool:
+        """
+        Returns whether this constraint set is the false terminal BDD.
+
+        A nonterminal BDD returns `False` even if it is semantically never satisfied.
+        """
+
     def solutions_for(
         self,
         typevar: TypeForm[object],
@@ -230,6 +293,20 @@ def is_equivalent_to(
 
 def is_subtype_of(ty: TypeForm[object], of: TypeForm[object]) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
+
+    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    """
+
+def is_constraint_set_subtype_of(
+    ty: TypeForm[object], of: TypeForm[object]
+) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
+
+    This differs from `is_subtype_of` in how it treats typevars.
+    `is_subtype_of` will assume that all typevars are non-inferable, and will
+    require all possible specializations of a typevar to satisfy the relation.
+    This method will instead return a constraint set describing which
+    specializations (possibly not all of them) satisfy the relation.
 
     .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     """

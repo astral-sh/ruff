@@ -4,6 +4,7 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -34,7 +35,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// y: Final = 42
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Complexity)]
 pub(crate) struct RedundantFinalLiteral {
     literal: SourceCodeSnippet,
 }

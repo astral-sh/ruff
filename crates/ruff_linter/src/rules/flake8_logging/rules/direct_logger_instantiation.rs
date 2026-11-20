@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -42,7 +43,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [Logger Objects]: https://docs.python.org/3/library/logging.html#logger-objects
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Correctness)]
 pub(crate) struct DirectLoggerInstantiation;
 
 impl Violation for DirectLoggerInstantiation {
@@ -66,8 +67,7 @@ pub(crate) fn direct_logger_instantiation(checker: &Checker, call: &ast::ExprCal
 
     if checker
         .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["logging", "Logger"]))
+        .matches_qualified_name(call.func.as_ref(), &["logging", "Logger"])
     {
         let mut diagnostic =
             checker.report_diagnostic(DirectLoggerInstantiation, call.func.range());

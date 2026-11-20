@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::declare_lint;
 use crate::lint::{Level, LintStatus};
+use crate::types::diagnostic::autofix_with_literal;
 use crate::types::infer::InferenceFlags;
 
 use super::context::InferContext;
@@ -20,9 +21,9 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/implicit-concatenated-string-type-annotation.md")]
-    pub(crate) static IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION = {
-        summary: "detects implicit concatenated strings in type annotations",
+    #[doc = include_str!("../../resources/lint_docs/implicit-string-concatenation-in-annotation.md")]
+    pub(crate) static IMPLICIT_STRING_CONCATENATION_IN_ANNOTATION = {
+        summary: "detects type expressions written as multiple adjacent string literals",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
@@ -102,6 +103,7 @@ pub(crate) fn parse_string_annotation(
                                 "Did you mean `typing.Literal[\"{}\"]`?",
                                 string_literal.as_str()
                             ));
+                            autofix_with_literal(context, &mut diagnostic, string_expr);
                         }
                     }
                 }
@@ -117,7 +119,7 @@ pub(crate) fn parse_string_annotation(
             ));
         }
     } else if let Some(builder) =
-        context.report_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, string_expr)
+        context.report_lint(&IMPLICIT_STRING_CONCATENATION_IN_ANNOTATION, string_expr)
     {
         // String is implicitly concatenated.
         builder.into_diagnostic("Type expressions cannot span multiple string literals");

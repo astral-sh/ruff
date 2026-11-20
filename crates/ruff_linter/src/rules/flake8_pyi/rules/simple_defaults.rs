@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 
@@ -41,10 +42,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
-pub(crate) struct TypedArgumentDefaultInStub;
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Pedantic)]
+pub(crate) struct ComplexDefaultForAnnotatedParameterInStub;
 
-impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
+impl AlwaysFixableViolation for ComplexDefaultForAnnotatedParameterInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Only simple default values allowed for typed arguments".to_string()
@@ -88,10 +89,10 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
-pub(crate) struct ArgumentDefaultInStub;
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Pedantic)]
+pub(crate) struct ComplexDefaultForUnannotatedParameterInStub;
 
-impl AlwaysFixableViolation for ArgumentDefaultInStub {
+impl AlwaysFixableViolation for ComplexDefaultForUnannotatedParameterInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Only simple default values allowed for arguments".to_string()
@@ -133,7 +134,7 @@ impl AlwaysFixableViolation for ArgumentDefaultInStub {
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260")]
+#[violation_metadata(stable_since = "v0.0.260", category = Category::Style)]
 pub(crate) struct AssignmentDefaultInStub;
 
 impl AlwaysFixableViolation for AssignmentDefaultInStub {
@@ -154,7 +155,7 @@ impl AlwaysFixableViolation for AssignmentDefaultInStub {
 /// Stub files exist to provide type hints, and are never executed. As such,
 /// all assignments in stub files should be annotated with a type.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Suspicious)]
 pub(crate) struct UnannotatedAssignmentInStub {
     name: String,
 }
@@ -186,7 +187,7 @@ impl Violation for UnannotatedAssignmentInStub {
 /// __all__: list[str] = ["foo", "bar"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
 pub(crate) struct UnassignedSpecialVariableInStub {
     name: String,
 }
@@ -202,7 +203,7 @@ impl Violation for UnassignedSpecialVariableInStub {
 }
 
 /// ## What it does
-/// Checks for type alias definitions that are not annotated with
+/// Checks for type alias definitions in stub files that are not annotated with
 /// `typing.TypeAlias`.
 ///
 /// ## Why is this bad?
@@ -235,17 +236,17 @@ impl Violation for UnassignedSpecialVariableInStub {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
-pub(crate) struct TypeAliasWithoutAnnotation {
+#[violation_metadata(stable_since = "v0.0.279", category = Category::Style)]
+pub(crate) struct UnannotatedTypeAliasInStub {
     module: TypingModule,
     name: String,
     value: String,
 }
 
-impl AlwaysFixableViolation for TypeAliasWithoutAnnotation {
+impl AlwaysFixableViolation for UnannotatedTypeAliasInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeAliasWithoutAnnotation {
+        let UnannotatedTypeAliasInStub {
             module,
             name,
             value,
@@ -522,8 +523,8 @@ pub(crate) fn typed_argument_simple_defaults(checker: &Checker, parameters: &Par
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic =
-                    checker.report_diagnostic(TypedArgumentDefaultInStub, default.range());
+                let mut diagnostic = checker
+                    .report_diagnostic(ComplexDefaultForAnnotatedParameterInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
@@ -547,8 +548,10 @@ pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameter
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic =
-                    checker.report_diagnostic(ArgumentDefaultInStub, default.range());
+                let mut diagnostic = checker.report_diagnostic(
+                    ComplexDefaultForUnannotatedParameterInStub,
+                    default.range(),
+                );
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
@@ -698,7 +701,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
     };
 
     let mut diagnostic = checker.report_diagnostic(
-        TypeAliasWithoutAnnotation {
+        UnannotatedTypeAliasInStub {
             module,
             name: id.to_string(),
             value: checker.generator().expr(value),

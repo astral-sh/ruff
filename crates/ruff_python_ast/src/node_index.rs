@@ -62,11 +62,11 @@ pub struct NodeIndex(NonZeroU32);
 
 impl NodeIndex {
     /// A placeholder `NodeIndex`.
-    const NONE: NodeIndex = NodeIndex(NonZeroU32::new(NodeIndex::_NONE).unwrap());
+    const NONE: NodeIndex = NodeIndex(NonZeroU32::new(NodeIndex::NONE_).unwrap());
 
     // Note that the index `u32::MAX` is reserved for the `NonZeroU32` niche, and
     // this placeholder also reserves the second highest index.
-    const _NONE: u32 = u32::MAX - 1;
+    const NONE_: u32 = u32::MAX - 1;
 
     /// Returns the index as a `u32`. or `None` for `NodeIndex::NONE`.
     pub fn as_u32(self) -> Option<u32> {
@@ -89,7 +89,7 @@ pub enum NodeIndexError {
 }
 
 const MAX_LEVEL: u32 = 2;
-const LEVEL_BITS: u32 = 32 - MAX_LEVEL.leading_zeros();
+const LEVEL_BITS: u32 = MAX_LEVEL.bit_width();
 const LEVEL_SHIFT: u32 = 32 - LEVEL_BITS;
 const LEVEL_MASK: u32 = ((LEVEL_BITS << 1) - 1) << LEVEL_SHIFT;
 const SUB_NODES: u32 = 256;
@@ -163,7 +163,7 @@ pub struct AtomicNodeIndex(AtomicU32);
 #[expect(clippy::declare_interior_mutable_const)]
 impl AtomicNodeIndex {
     /// A placeholder `AtomicNodeIndex`.
-    pub const NONE: AtomicNodeIndex = AtomicNodeIndex(AtomicU32::new(NodeIndex::_NONE));
+    pub const NONE: AtomicNodeIndex = AtomicNodeIndex(AtomicU32::new(NodeIndex::NONE_));
 
     /// Load the current value of the `AtomicNodeIndex`.
     pub fn load(&self) -> NodeIndex {

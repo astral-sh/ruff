@@ -9,11 +9,10 @@ use ignore::Error;
 use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff_linter::message::create_panic_diagnostic;
+use ruff_linter::message::{RenderContext, create_panic_diagnostic};
 use ruff_python_ast::{SourceType, TomlSourceType};
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::Diagnostic;
 use ruff_db::panic::catch_unwind;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
@@ -23,7 +22,7 @@ use ruff_linter::{IOError, Violation, fs, warn_user_once};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, match_exclusion, project_files_in_path,
+    ResolvedFile, RootSettings, match_exclusion, project_files_in_path,
 };
 
 use crate::args::ConfigArguments;
@@ -33,7 +32,7 @@ use crate::diagnostics::Diagnostics;
 /// Run the linter over a collection of files.
 pub(crate) fn check(
     files: &[PathBuf],
-    pyproject_config: &PyprojectConfig,
+    root_settings: &RootSettings,
     config_arguments: &ConfigArguments,
     cache: flags::Cache,
     noqa: flags::Noqa,
@@ -42,7 +41,7 @@ pub(crate) fn check(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (mut paths, resolver) = project_files_in_path(files, pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(files, root_settings, config_arguments)?;
     debug!("Identified files to lint in: {:?}", start.elapsed());
 
     // Filter out paths for file types not supported for linting
@@ -177,9 +176,11 @@ pub(crate) fn check(
             |a, b| (a.0 + b.0, a.1 + b.1),
         );
 
-    all_diagnostics
-        .inner
-        .sort_by(Diagnostic::ruff_start_ordering);
+    let context = RenderContext::new(&all_diagnostics.notebook_indexes);
+    all_diagnostics.inner.sort_by(|a, b| {
+        a.rendering_sort_key(&context)
+            .cmp(&b.rendering_sort_key(&context))
+    });
 
     // Store the caches.
     caches.persist()?;
@@ -224,13 +225,14 @@ mod test {
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff_db::diagnostic::{DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics};
-    use ruff_linter::message::EmitterContext;
+    use ruff_db::diagnostic::DisplayDiagnosticConfig;
+    use ruff_db::diagnostic::render::{ConciseRenderer, Renderer};
+    use ruff_linter::message::RenderContext;
     use ruff_linter::registry::Rule;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{LinterSettings, flags};
     use ruff_workspace::Settings;
-    use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+    use ruff_workspace::resolver::{PyprojectDiscoveryStrategy, ResolvedSettings, RootSettings};
 
     use crate::args::ConfigArguments;
 
@@ -258,19 +260,21 @@ mod test {
         }
 
         // Configure
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path);
+        let snapshot = format!("{}_{}", rule_code.name(), path);
         // invalid pyproject.toml is not active by default
         let settings = Settings {
             linter: LinterSettings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
             ..Settings::default()
         };
-        let pyproject_config =
-            PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
+        let root_settings = RootSettings {
+            strategy: PyprojectDiscoveryStrategy::Fixed,
+            resolved: ResolvedSettings::new(settings),
+        };
 
         // Run
         let diagnostics = check(
             &[tempdir.path().to_path_buf()],
-            &pyproject_config,
+            &root_settings,
             &ConfigArguments::default(),
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
@@ -279,15 +283,10 @@ mod test {
         )
         .unwrap();
 
-        let config = DisplayDiagnosticConfig::new("ruff")
-            .format(DiagnosticFormat::Concise)
-            .hide_severity(true);
-        let messages = DisplayDiagnostics::new(
-            &EmitterContext::new(&FxHashMap::default()),
-            &config,
-            &diagnostics.inner,
-        )
-        .to_string();
+        let config = DisplayDiagnosticConfig::new("ruff").hide_severity(true);
+        let messages = ConciseRenderer::new(&RenderContext::new(&FxHashMap::default()), &config)
+            .display(&diagnostics.inner)
+            .to_string();
 
         insta::with_settings!({
             omit_expression => true,

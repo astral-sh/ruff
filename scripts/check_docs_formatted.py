@@ -4,18 +4,11 @@
 # requires-python = ">=3.12"
 # dependencies = ["ruff"]
 #
-# [tool.ty.rules]
-# blanket-ignore-comment = "warn"
-# missing-type-argument = "warn"
-# possibly-unresolved-reference = "warn"
-# unsound-return-statement = "warn"
-# unsound-yield = "warn"
-# unsupported-dynamic-base = "warn"
-# division-by-zero = "warn"
-#
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 """Check code snippets in docs are formatted by Ruff."""
@@ -64,8 +57,8 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "bad-quotes-inline-string",
     "bad-quotes-multiline-string",
     "blank-line-after-decorator",
-    "blank-line-before-class",
-    "blank-line-before-function",
+    "blank-line-before-class-docstring",
+    "blank-line-before-function-docstring",
     "blank-line-between-methods",
     "blank-lines-after-function-or-class",
     "blank-lines-before-nested-definition",
@@ -73,8 +66,8 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "docstring-tab-indentation",
     "explicit-string-concatenation",
     "f-string-missing-placeholders",
-    "incorrect-blank-line-after-class",
-    "incorrect-blank-line-before-class",
+    "incorrect-blank-line-after-class-docstring",
+    "incorrect-blank-line-before-class-docstring",
     "indentation-with-invalid-multiple",
     "indentation-with-invalid-multiple-comment",
     "line-too-long",
@@ -97,24 +90,23 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "multiple-statements-on-one-line-colon",
     "multiple-statements-on-one-line-semicolon",
     "no-indented-block-comment",
-    "no-return-argument-annotation-in-stub",
     "no-space-after-block-comment",
     "no-space-after-inline-comment",
     "non-empty-stub-body",
-    "over-indentation",
     "over-indented",
+    "over-indented-docstring-line",
+    "parameter-annotated-with-no-return",
     "pass-statement-stub-body",
     "prohibited-trailing-comma",
     "redundant-backslash",
     "shebang-leading-whitespace",
     "single-line-implicit-string-concatenation",
-    "surrounding-whitespace",
     "too-few-spaces-before-inline-comment",
     "too-many-blank-lines",
     "too-many-boolean-expressions",
     "trailing-comma-on-bare-tuple",
-    "triple-single-quotes",
-    "under-indentation",
+    "unconventional-docstring-quotes",
+    "under-indented-docstring-line",
     "unexpected-indentation-comment",
     "unexpected-spaces-around-keyword-parameter-equals",
     "unicode-kind-prefix",
@@ -123,6 +115,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "useless-semicolon",
     "whitespace-after-decorator",
     "whitespace-after-open-bracket",
+    "whitespace-around-docstring-text",
     "whitespace-before-close-bracket",
     "whitespace-before-parameters",
     "whitespace-before-punctuation",
@@ -207,8 +200,8 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
             code = format_str(code, extension)
         except InvalidInput as e:
             errors.append(CodeBlockError(e))
-        except NotImplementedError as e:
-            raise e
+        except NotImplementedError:
+            raise
 
         code = textwrap.indent(code, match["indent"])
         return f"{match['before']}{code}{match['after']}"

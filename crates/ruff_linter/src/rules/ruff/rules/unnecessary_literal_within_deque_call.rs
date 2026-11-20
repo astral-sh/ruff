@@ -2,11 +2,13 @@ use ruff_diagnostics::{Applicability, Edit};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::helpers::is_empty_f_string;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Fix, FixAvailability, Violation};
 
@@ -46,7 +48,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `collections.deque`](https://docs.python.org/3/library/collections.html#collections.deque)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Complexity)]
 pub(crate) struct UnnecessaryEmptyIterableWithinDequeCall {
     has_maxlen: bool,
 }
@@ -70,15 +72,14 @@ impl Violation for UnnecessaryEmptyIterableWithinDequeCall {
 }
 
 /// RUF037
-pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &ast::ExprCall) {
-    let ast::ExprCall {
-        func, arguments, ..
-    } = deque;
+pub(crate) fn unnecessary_literal_within_deque_call(
+    checker: &Checker,
+    deque: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    let arguments = &deque.arguments;
 
-    let Some(qualified) = checker.semantic().resolve_qualified_name(func) else {
-        return;
-    };
-    if !matches!(qualified.segments(), ["collections", "deque"]) || arguments.len() > 2 {
+    if !matches!(qualified_name.segments(), ["collections", "deque"]) || arguments.len() > 2 {
         return;
     }
 

@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::rules::flake8_return::has_conditional_body;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -40,7 +41,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// variable assignment changes the local variable bindings visible to
 /// `locals()` and debuggers when the generator is suspended at the `yield`.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.3")]
+#[violation_metadata(preview_since = "0.15.3", category = Category::Pedantic)]
 pub(crate) struct UnnecessaryAssignBeforeYield {
     name: String,
     is_yield_from: bool,

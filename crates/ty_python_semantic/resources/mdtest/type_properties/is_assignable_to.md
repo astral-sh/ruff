@@ -285,6 +285,20 @@ static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[bool]]))
 static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))
 ```
 
+## Gradual class types in constraint-producing assignability
+
+`type[Any]` is assignable to class-object types, including specialized generic classes.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_constraint_set_assignable_to
+
+static_assert(is_constraint_set_assignable_to(type, type[Any]))
+static_assert(is_constraint_set_assignable_to(type[Any], TypeOf[list[int]]))
+static_assert(not is_constraint_set_assignable_to(object, type[Any]))
+```
+
 ## `type[]` is not assignable to types disjoint from `builtins.type`
 
 ```py
@@ -383,6 +397,31 @@ static_assert(is_assignable_to(type[Any], type[Any]))
 static_assert(is_assignable_to(type[object], type[Any]))
 static_assert(is_assignable_to(type[Any], type[Arbitrary]))
 static_assert(is_assignable_to(type[Any], type[object]))
+```
+
+### Narrowed instances with a gradual base
+
+A class with a gradual base can match a union arm outside its known inheritance hierarchy, even
+after narrowing rules out another type.
+
+```py
+from typing import Any
+from missing import UnknownBase  # error: [import-not-found]
+from ty_extensions import Intersection, Not, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class A: ...
+class B: ...
+class FromAny(Any): ...
+class Mixed(A, UnknownBase): ...
+
+static_assert(is_assignable_to(Intersection[FromAny, Not[int]], A | B))
+```
+
+The first arm excludes `Mixed` itself, but its unknown base can still match `B`.
+
+```py
+static_assert(is_assignable_to(Intersection[Mixed, Not[int]], Intersection[A, Not[Mixed]] | B))
 ```
 
 ## Heterogeneous tuple types
@@ -684,6 +723,140 @@ static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int]
 static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int, int]))
 ```
 
+An unbounded homogeneous tuple whose element type is an alias of `Any` is also gradual. It is
+assignable to fixed-length tuples, including the empty tuple, even through a chain of aliases.
+
+```py
+type Dynamic = Any
+type DynamicAlias = Dynamic
+
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[()]))
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[int]))
+static_assert(is_assignable_to(tuple[DynamicAlias, ...], tuple[int, str]))
+```
+
+When unpacked into a mixed tuple, the gradual segment can supply additional elements, but the fixed
+prefix and suffix must still fit within the target and have compatible types.
+
+```py
+static_assert(is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int, bool, str]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[str, bool, str]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int, bool, int]))
+```
+
+## Constraint-producing assignability of gradual tuples
+
+A gradual segment can supply any fixed number of elements, including zero. These concrete tuple
+comparisons produce always-satisfied constraints, matching eager assignability.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_assignable_to, is_constraint_set_assignable_to
+
+static_assert(is_assignable_to(tuple[Any, ...], tuple[()]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[()]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, str]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int, str]))
+
+type Dynamic = Any
+
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[int]))
+static_assert(is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[int]))
+```
+
+The gradual segment can also supply a variable-length target's required prefix or suffix.
+
+```py
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, *tuple[str, ...]]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int, *tuple[str, ...]]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[*tuple[str, ...], int]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[*tuple[str, ...], int]))
+```
+
+A mixed tuple's fixed elements must still fit within the target and have compatible types. The
+gradual segment cannot remove a required element or change its type.
+
+```py
+static_assert(is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int, bool, str]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[str, bool, str]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int, bool, int]))
+static_assert(not is_constraint_set_assignable_to(tuple[str, *tuple[Any, ...]], tuple[int, *tuple[bytes, ...]]))
+static_assert(not is_constraint_set_assignable_to(tuple[*tuple[Any, ...], str], tuple[*tuple[bytes, ...], int]))
+```
+
+A static homogeneous tuple can have any length, so it cannot guarantee a fixed length or a required
+element in a variable-length target.
+
+```py
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, ...], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...]]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...]]))
+```
+
+Type variables in fixed source elements are compared normally. The gradual segment can be empty or
+supply additional target elements without discarding constraints on the fixed source elements.
+
+```py
+def source_type_variables[T]() -> None:
+    static_assert(is_constraint_set_assignable_to(tuple[list[T], *tuple[Any, ...]], tuple[object]))
+    static_assert(is_constraint_set_assignable_to(tuple[*tuple[Any, ...], list[T]], tuple[object]))
+    static_assert(is_constraint_set_assignable_to(tuple[T, *tuple[Any, ...]], tuple[int]) == ConstraintSet.upper_bound(T, int))
+    static_assert(is_constraint_set_assignable_to(tuple[*tuple[Any, ...], T], tuple[str]) == ConstraintSet.upper_bound(T, str))
+    static_assert(
+        is_constraint_set_assignable_to(tuple[T, *tuple[Any, ...]], tuple[int, str, *tuple[bytes, ...]])
+        == ConstraintSet.upper_bound(T, int)
+    )
+    static_assert(
+        is_constraint_set_assignable_to(tuple[*tuple[Any, ...], T], tuple[*tuple[bytes, ...], str, int])
+        == ConstraintSet.upper_bound(T, int)
+    )
+```
+
+Each element supplied by the gradual segment contributes its own constraints, even when the variable
+is hidden behind an alias or nested within a container.
+
+```py
+type Identity[T] = T
+
+def _[T, U, V]():
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[T]) == ConstraintSet.lower_bound(Any, T))
+    static_assert(is_assignable_to(tuple[Any, ...], tuple[Identity[T]]))
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[Identity[T]]) == ConstraintSet.lower_bound(Any, T))
+
+    static_assert(
+        is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[T, U, V])
+        == (ConstraintSet.lower_bound(int, T) & ConstraintSet.lower_bound(Any, U) & ConstraintSet.lower_bound(str, V))
+    )
+    static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[T]))
+
+    static_assert(
+        is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[T, *tuple[int, ...]]) == ConstraintSet.lower_bound(Any, T)
+    )
+    static_assert(
+        is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[*tuple[int, ...], T]) == ConstraintSet.lower_bound(Any, T)
+    )
+
+    static_assert(is_assignable_to(tuple[Any, ...], tuple[list[T]]))
+    # TODO: This should be ConstraintSet.equality(T, Any).
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[list[T]]) == ConstraintSet.always())
+```
+
+A symbolic `TypeVarTuple` is not gradual: its specialization can have a different length from a
+fixed target tuple.
+
+```py
+def symbolic_pack[T, *Ts]() -> None:
+    static_assert(not is_assignable_to(tuple[*Ts], tuple[int]))
+    static_assert(is_constraint_set_assignable_to(tuple[*Ts], tuple[int]) == ConstraintSet.never())
+    static_assert(is_constraint_set_assignable_to(tuple[*Ts], tuple[T]) == ConstraintSet.never())
+```
+
 ## Union types
 
 ```py
@@ -718,6 +891,28 @@ static_assert(is_assignable_to(bool, Literal[True] | AlwaysFalsy))
 # error: [static-assert-error]
 static_assert(is_assignable_to(LiteralString, Literal[""] | AlwaysTruthy))
 static_assert(not is_assignable_to(Literal[True] | AlwaysFalsy, Literal[False] | AlwaysTruthy))
+```
+
+## Gradual unions with complementary arms
+
+Separate arms of a gradual union can collectively cover the source. The top materialization of
+`Not[Top[list[Any]]] | list[Any]` is `object`, so every object is assignable to this union. This
+does not make `object` a subtype of the union.
+
+```py
+from typing import Any
+from ty_extensions import Intersection, Not, Top, static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+static_assert(is_assignable_to(object, Not[Top[list[Any]]] | list[Any]))
+static_assert(not is_subtype_of(object, Not[Top[list[Any]]] | list[Any]))
+```
+
+A type variable in the remaining arm still restricts which values the union accepts.
+
+```py
+def restricted[T]() -> None:
+    static_assert(not is_assignable_to(object, Intersection[T, Not[Top[list[Any]]]] | list[Any]))
 ```
 
 ## Intersection types
@@ -801,6 +996,11 @@ static_assert(is_assignable_to(LiteralString & ~Literal["", "a"], AlwaysTruthy))
 static_assert(is_assignable_to(LiteralString & ~Literal[""], ~AlwaysFalsy))
 # error: [static-assert-error]
 static_assert(is_assignable_to(LiteralString & ~Literal["", "a"], ~AlwaysFalsy))
+
+# Each member of a union must be assignable to the target intersection
+static_assert(is_assignable_to(Literal[1, 2], int & ~Literal[3]))
+static_assert(not is_assignable_to(Literal[1, 2], int & ~Literal[2]))
+static_assert(not is_assignable_to(Literal[1, "a"], int & ~Literal[3]))
 ```
 
 ## Callable types with Unknown/missing return type
@@ -1077,6 +1277,136 @@ static_assert(is_assignable_to(RegularCallableTypeOf[keyword_variadic], Callable
 static_assert(is_assignable_to(RegularCallableTypeOf[mixed], Callable[..., None]))
 ```
 
+### Explicit parameters alongside gradual variadics
+
+An explicit parameter keeps its type when the variadic parameters have explicit or implicit `Any`
+annotations.
+
+```py
+from typing import Any, Callable, Concatenate
+from ty_extensions._internal import RegularCallableTypeOf
+
+def takes_str(value: str, *args: Any, **kwargs: Any) -> None: ...
+def implicit(value: str, *args, **kwargs) -> None: ...
+
+one_int: Callable[[int], None] = takes_str  # error: [invalid-assignment]
+one_int = implicit  # error: [invalid-assignment]
+one_str: Callable[[str], None] = takes_str  # ok
+one_str = implicit  # ok
+
+starts_with_int: Callable[Concatenate[int, ...], None] = takes_str  # error: [invalid-assignment]
+starts_with_int = implicit  # error: [invalid-assignment]
+starts_with_str: Callable[Concatenate[str, ...], None] = takes_str  # ok
+starts_with_str = implicit  # ok
+
+two_ints: Callable[[int, int], None] = takes_str  # error: [invalid-assignment]
+two_ints = implicit  # error: [invalid-assignment]
+str_then_int: Callable[[str, int], None] = takes_str  # ok
+str_then_int = implicit  # ok
+```
+
+Calling with `other=""` sends `other` to `**kwargs`, so `value` needs a default.
+
+```py
+def takes_other(other: str) -> None: ...
+def optional_value(value: str = "", *args: Any, **kwargs: Any) -> None: ...
+def optional_positional(value: str = "", /, *args: Any, debug: bool = False, **kwargs: Any) -> None: ...
+
+named: RegularCallableTypeOf[takes_other] = takes_str  # error: [invalid-assignment]
+named = optional_value  # ok
+named = optional_positional  # ok
+```
+
+If the source also declares `other`, it receives the keyword argument and must accept a string.
+
+```py
+def keyword_str(value: str = "", *args: Any, other: str = "", **kwargs: Any) -> None: ...
+def keyword_int(value: str = "", *args: Any, other: int = 0, **kwargs: Any) -> None: ...
+def second_str(value: str = "", other: str = "", *args: Any, **kwargs: Any) -> None: ...
+
+named = keyword_str  # ok
+named = keyword_int  # error: [invalid-assignment]
+named = second_str  # ok
+```
+
+The first positional argument still binds to `value` when the target accepts arbitrary positional
+arguments.
+
+```py
+def strings(*args: str) -> None: ...
+def integers(*args: int) -> None: ...
+
+all_strings: RegularCallableTypeOf[strings] = optional_value  # ok
+all_ints: RegularCallableTypeOf[integers] = optional_value  # error: [invalid-assignment]
+```
+
+Both targets admit the call `callback("one", value="two")`, which binds `value` twice in
+`takes_str`.
+
+```py
+def two_args(other: str, /, *, value: str) -> None: ...
+def gradual_two_args(other: str, /, *args: Any, value: str, **kwargs: Any) -> None: ...
+
+fixed: RegularCallableTypeOf[two_args] = takes_str  # error: [invalid-assignment]
+gradual: RegularCallableTypeOf[gradual_two_args] = takes_str  # error: [invalid-assignment]
+```
+
+A gradual target can accommodate additional required parameters in the source. An explicit
+keyword-only parameter still constrains its type and how it can be passed.
+
+```py
+def keyword_only(*args: Any, value: str, **kwargs: Any) -> None: ...
+def extra(*, value: str, width: int) -> None: ...
+def wrong_type(*, value: int) -> None: ...
+def by_position_or_keyword(value: str) -> None: ...
+
+keyword: RegularCallableTypeOf[keyword_only] = extra  # ok
+keyword = wrong_type  # error: [invalid-assignment]
+either: RegularCallableTypeOf[by_position_or_keyword] = keyword_only  # error: [invalid-assignment]
+```
+
+### Keyword binding with unrestricted variadics
+
+The variadics accept arbitrary arguments because `Obj` is an alias for `object`. Calling
+`takes_value(other="two")` sends `other` to `**kwargs` and uses the default for `value`.
+
+```pyi
+from typing import Never
+from ty_extensions._internal import RegularCallableTypeOf
+
+type Obj = object
+
+def takes_value(value: str = ..., *args: Obj, **kwargs: Obj) -> None: ...
+def takes_other(other: str) -> None: ...
+
+renamed: RegularCallableTypeOf[takes_other] = takes_value  # ok
+```
+
+An optional positional parameter of type `Never` can only be omitted. The caller can still pass
+`value="two"` by keyword. A target that allows `value=2` is incompatible with `takes_value`.
+
+```pyi
+def str_keywords(unused: Never = ..., /, **kw: str) -> None: ...
+def int_keywords(unused: Never = ..., /, **kw: int) -> None: ...
+
+by_keyword: RegularCallableTypeOf[str_keywords] = takes_value  # ok
+by_keyword_int: RegularCallableTypeOf[int_keywords] = takes_value  # error: [invalid-assignment]
+```
+
+Likewise, `*args: Never` accepts no positional arguments. A required `str` after that empty segment
+allows `callback("one", value="two")`, which binds `value` twice in `takes_value`. Using the alias
+`Empty` keeps the variadic segment in the signature until ty compares the callables.
+
+```pyi
+type Empty = Never
+
+def no_positionals(*args: Never, **kw: str) -> None: ...
+def with_suffix(*args: *tuple[*tuple[Empty, ...], str], **kw: str) -> None: ...
+
+empty: RegularCallableTypeOf[no_positionals] = takes_value  # ok
+duplicate: RegularCallableTypeOf[with_suffix] = takes_value  # error: [invalid-assignment]
+```
+
 ### Unpacked positional parameters with a required suffix
 
 A variadic positional parameter can accept both the unpacked tuple and a required positional
@@ -1123,6 +1453,33 @@ static_assert(
         Callable[[Unpack[tuple[str, ...]], None], None],
     )
 )
+```
+
+An optional positional prefix can receive a variadic argument or the first argument in the required
+suffix. With two optional parameters, the second can also receive the second suffix argument.
+
+```py
+def optional_string(first: str = "", /, *args: Any, **kwargs: Any) -> None: ...
+def two_optional_strings(first: str = "", second: str = "", /, *args: Any, **kwargs: Any) -> None: ...
+
+strings: Callable[[*tuple[str, ...], str], None] = optional_string
+strings_then_int: Callable[[*tuple[str, ...], str, int], None] = optional_string
+strings_then_int = two_optional_strings  # error: [invalid-assignment]
+wrong_element: Callable[[*tuple[int, ...], str], None] = optional_string  # error: [invalid-assignment]
+wrong_suffix: Callable[[*tuple[str, ...], int], None] = optional_string  # error: [invalid-assignment]
+```
+
+Each required suffix element guarantees one positional argument, even when the variadic tuple is
+empty.
+
+```py
+def required_string(first: str, *args: Any, **kwargs: Any) -> None: ...
+def two_required(first: str, second: str | int, *args: Any, **kwargs: Any) -> None: ...
+
+strings = required_string  # ok
+maybe_empty: Callable[[*tuple[str, ...]], None] = required_string  # error: [invalid-assignment]
+strings_then_int = two_required  # ok
+strings = two_required  # error: [invalid-assignment]
 ```
 
 A required keyword-only parameter cannot be supplied by the positional callback signature.

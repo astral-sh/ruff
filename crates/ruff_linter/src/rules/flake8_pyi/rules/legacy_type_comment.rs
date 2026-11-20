@@ -1,7 +1,3 @@
-use std::sync::LazyLock;
-
-use regex::Regex;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PySourceType;
 use ruff_python_trivia::CommentRanges;
@@ -9,6 +5,7 @@ use ruff_python_trivia::CommentRanges;
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::preview::is_legacy_type_comment_in_non_stub_enabled;
 
 /// ## What it does
@@ -35,7 +32,7 @@ use crate::preview::is_legacy_type_comment_in_non_stub_enabled;
 /// x: int = 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.254")]
+#[violation_metadata(stable_since = "v0.0.254", category = Category::Suspicious)]
 pub(crate) struct LegacyTypeComment;
 
 impl Violation for LegacyTypeComment {
@@ -59,14 +56,18 @@ pub(crate) fn legacy_type_comment(
     for range in comment_ranges {
         let comment = locator.slice(range);
 
-        if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
+        let Some(annotation) = comment
+            .strip_prefix('#')
+            .and_then(|body| body.trim_start().strip_prefix("type:"))
+        else {
+            continue;
+        };
+
+        if !annotation.is_empty()
+            && !annotation.starts_with('#')
+            && !annotation.trim_start().starts_with("ignore")
+        {
             context.report_diagnostic(LegacyTypeComment, range);
         }
     }
 }
-
-static TYPE_COMMENT_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^#\s*type:\s*([^#]+)(\s*#.*?)?$").unwrap());
-
-static TYPE_IGNORE_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^#\s*type:\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());

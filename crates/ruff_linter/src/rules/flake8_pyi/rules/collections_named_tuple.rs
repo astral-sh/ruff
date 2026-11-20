@@ -6,9 +6,10 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
-/// Checks for uses of `collections.namedtuple` in stub files.
+/// Checks for uses of `collections.namedtuple`.
 ///
 /// ## Why is this bad?
 /// `typing.NamedTuple` is the "typed version" of `collections.namedtuple`.
@@ -36,7 +37,7 @@ use crate::checkers::ast::Checker;
 ///     age: int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Pedantic)]
 pub(crate) struct CollectionsNamedTuple;
 
 impl Violation for CollectionsNamedTuple {
@@ -58,10 +59,7 @@ pub(crate) fn collections_named_tuple(checker: &Checker, expr: &Expr) {
 
     if checker
         .semantic()
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["collections", "namedtuple"])
-        })
+        .matches_qualified_name(expr, &["collections", "namedtuple"])
     {
         checker.report_diagnostic(CollectionsNamedTuple, expr.range());
     }

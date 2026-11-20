@@ -996,12 +996,12 @@ from typing import NoReturn
 import sys
 
 # TODO: this is currently not yet supported
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def _() -> NoReturn:
     3 + sys.exit(1)
 
 # TODO: this is currently not yet supported
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def _() -> NoReturn:
     3 if sys.exit(1) else 4
 ```
@@ -1274,7 +1274,7 @@ if bool(input()):
     Example().method()  # error: [no-matching-overload]
 
 reveal_type(value)  # revealed: Literal[1, "reachable"]
-value.bit_count()  # error: [unresolved-attribute]
+value.bit_count()  # error: [missing-union-attribute]
 ```
 
 ### Possibly unresolved diagnostics
@@ -1416,7 +1416,7 @@ def _() -> NoReturn:
     f(3)
 
 # This should be an error because of implicitly returning `None`
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def _() -> NoReturn:
     f("")
 ```
@@ -1494,6 +1494,22 @@ async def main(flag: bool):
         pass
 
     reveal_type(x)  # revealed: Literal["test"]
+```
+
+### Calls before loop-back imports
+
+Inference converges when a call's target is imported later in the same loop, even if the imported
+function never returns. The import does not guarantee that `sys` is defined at the call. The
+function definition before the call also requires looking for previous definitions of its name
+across loop iterations.
+
+```py
+for i in range(1):
+    def f():
+        pass
+
+    sys.exit()  # error: [possibly-unresolved-reference]
+    import sys
 ```
 
 ## Nested functions

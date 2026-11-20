@@ -3,22 +3,26 @@ use std::fmt::Write;
 
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
+use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
-use crate::types::{KnownClass, KnownInstanceType, check_types};
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
+use crate::types::{KnownClass, KnownInstanceType, TypeAndQualifiers, check_types};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
-use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+use ruff_db::testing::{
+    assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
+    assert_function_query_was_run, find_will_execute_event_by_name,
+};
 use ruff_python_ast::PythonVersion;
+use salsa::Database as _;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
-use ty_python_core::program::{Program, ProgramSettings};
+use ty_python_core::program::Program;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{
     ProgramFile, TestProgramDb as _, global_scope, place_table, semantic_index, use_def_map,
 };
-use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use super::*;
 
@@ -117,41 +121,12 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     db.write_dedented("src/py312_dependency.py", "value: int = 312")?;
 
     let file = system_path_to_file(&db, "src/main.py").expect("file to exist");
-    let default_program = db.program();
-    let search_paths = default_program.search_paths(&db).clone();
-    let python_platform = default_program.python_platform(&db).clone();
-    let py311 = ProgramFile::new(
-        &db,
-        file,
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::PY311,
-                    source: PythonVersionSource::Default,
-                },
-                python_platform: python_platform.clone(),
-                search_paths: search_paths.clone(),
-            },
-        ),
-    );
-    let py312 = ProgramFile::new(
-        &db,
-        file,
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::PY312,
-                    source: PythonVersionSource::Default,
-                },
-                python_platform,
-                search_paths,
-            },
-        ),
-    );
+    let py311 = db.program().program_file(&db, file);
+    let mut settings = db.program_settings().clone();
+    settings.python_version.version = PythonVersion::PY312;
+    let py312 = Program::from_settings(&db, &settings).program_file(&db, file);
 
-    let check = |file, expected_type, expect_invalid_syntax, expect_unresolved_import| {
+    let check = |file, expected_type, expect_invalid_syntax, expect_import_not_found| {
         let diagnostics = crate::check_file_unwrap(&db, file);
 
         assert_eq!(
@@ -165,7 +140,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
             diagnostics
                 .iter()
                 .any(|diagnostic| diagnostic.headline_message().contains("zipfile._path")),
-            expect_unresolved_import,
+            expect_import_not_found,
             "{diagnostics:#?}"
         );
 
@@ -177,7 +152,7 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
         assert_eq!(revealed, Some(expected_type), "{diagnostics:#?}");
         assert_eq!(
             diagnostics.len(),
-            1 + usize::from(expect_invalid_syntax) + usize::from(expect_unresolved_import),
+            1 + usize::from(expect_invalid_syntax) + usize::from(expect_import_not_found),
             "{diagnostics:#?}"
         );
     };
@@ -202,31 +177,16 @@ fn program_file_changes_with_python_version() -> anyhow::Result<()> {
         (program_file.as_id(), program_file.python_file(&db).as_id())
     };
 
-    let equivalent_program = Program::from_settings(
-        &db,
-        &ProgramSettings {
-            python_version: db.program_settings().python_version.clone(),
-            python_platform: program.python_platform(&db).clone(),
-            search_paths: program.search_paths(&db).clone(),
-        },
-    );
+    let mut settings = db.program_settings().clone();
+    let equivalent_program = Program::from_settings(&db, &settings);
     assert_eq!(program, equivalent_program);
     assert_eq!(
         program_file_id,
         equivalent_program.program_file(&db, file).as_id()
     );
 
-    let py312_program = Program::from_settings(
-        &db,
-        &ProgramSettings {
-            python_version: PythonVersionWithSource {
-                version: PythonVersion::PY312,
-                source: PythonVersionSource::Default,
-            },
-            python_platform: program.python_platform(&db).clone(),
-            search_paths: program.search_paths(&db).clone(),
-        },
-    );
+    settings.python_version.version = PythonVersion::PY312;
+    let py312_program = Program::from_settings(&db, &settings);
 
     let program_file = py312_program.program_file(&db, file);
     assert_ne!(program_file_id, program_file.as_id());
@@ -336,7 +296,14 @@ fn not_literal_string() -> anyhow::Result<()> {
     );
     db.write_dedented("src/a.py", &content)?;
 
-    assert_file_diagnostics(&db, "src/a.py", &[]);
+    assert_file_diagnostics(
+        &db,
+        "src/a.py",
+        &[
+            "An empty string is always falsy",
+            "An empty string is always falsy",
+        ],
+    );
 
     Ok(())
 }
@@ -380,6 +347,28 @@ fn multiplied_literal_string() -> anyhow::Result<()> {
             assert_type((-100)*"{y}", Literal[""])
             "#,
         y = "a".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1),
+    );
+    db.write_dedented("src/a.py", &content)?;
+
+    assert_file_diagnostics(&db, "src/a.py", &[]);
+
+    Ok(())
+}
+
+#[test]
+fn concatenated_bytes_literal_size_limit() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let limit = TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE;
+    let content = format!(
+        r#"
+            from typing_extensions import Literal, assert_type
+
+            value = b"{prefix}" + b"x"
+            assert_type(len(value), Literal[{limit}])
+            value += b"x"
+            assert_type(value, bytes)
+            "#,
+        prefix = "x".repeat(limit - 1),
     );
     db.write_dedented("src/a.py", &content)?;
 
@@ -518,6 +507,351 @@ fn simple_assignment_does_not_enter_salsa_cycle() {
             .collect::<Vec<_>>()
     });
     assert_eq!(cycles, Vec::<String>::new());
+}
+
+/// Mutually dependent loop conditions must not select different fixed points depending on which
+/// imported variable is inferred first. Both inputs are `Never`, so neither conditional assignment
+/// can execute. Regression test for <https://github.com/astral-sh/ty/issues/4577>.
+#[test]
+fn loop_variable_types_are_independent_of_file_order() -> anyhow::Result<()> {
+    for (x_condition, y_condition) in [
+        ("x", "y"),
+        ("bool(x)", "bool(y)"),
+        ("bool(x or False)", "bool(y or False)"),
+        ("bool(bool(x) or False)", "bool(bool(y) or False)"),
+        ("x not in (False,)", "y not in (False,)"),
+    ] {
+        for order in [["x", "y"], ["y", "x"]] {
+            let mut db = TestDbBuilder::new()
+                .with_python_version(PythonVersion::PY313)
+                .build()?;
+            db.write_dedented(
+                "src/initial.pyi",
+                r#"
+                from typing import Never
+
+                a: Never
+                b: Never
+                stop: bool
+                "#,
+            )?;
+            db.write_dedented(
+                "src/loop.py",
+                &format!(
+                    r#"
+                    from initial import a, b, stop
+
+                    while True:
+                        x = a
+                        y = b
+                        if {y_condition}:
+                            pass
+                        else:
+                            a = "large"
+                        if {x_condition}:
+                            pass
+                        else:
+                            b = True
+                        if stop:
+                            break
+                    "#
+                ),
+            )?;
+            for name in ["x", "y"] {
+                db.write_file(
+                    format!("src/check_{name}.py"),
+                    format!(
+                        "from typing import reveal_type\nfrom loop import {name}\nreveal_type({name})\n"
+                    ),
+                )?;
+            }
+            for name in order {
+                assert_revealed_type(&db, &format!("src/check_{name}.py"), "Never");
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn loop_predicate_tracks_changes_to_bool_method() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from flags import Flag
+
+        def f(flag: Flag, running: bool) -> None:
+            while running:
+                if flag:  # ty: ignore[redundant-condition]
+                    result = 1
+                else:
+                    result = 2
+                reveal_type(result)
+                break
+        "#,
+    )?;
+
+    for (boolean, expected) in [("True", "Literal[1]"), ("False", "Literal[2]")] {
+        db.write_dedented(
+            "/src/flags.pyi",
+            &format!(
+                r#"
+                from typing import Literal
+
+                class Flag:
+                    def __bool__(self) -> Literal[{boolean}]: ...
+                "#
+            ),
+        )?;
+        assert_revealed_type(&db, "/src/main.py", expected);
+    }
+    Ok(())
+}
+
+/// Comparison truthiness widens consistently in expression, statement, and definition inference
+/// when an override is present in only one iteration.
+///
+/// A missing override falls back to the expression type's truthiness. Widening must compare the
+/// effective truthiness from both iterations, including this fallback. Discarding an override from
+/// the previous iteration could otherwise make a previously ambiguous condition definite again.
+///
+/// We construct inference results directly because mdtests cannot prescribe intermediate Salsa
+/// results. A Python cycle can converge before widening starts, or drop an override without
+/// changing any final types or diagnostics. No known Python example exposes the failures checked
+/// here, so this is defensive coverage of the widening invariant.
+#[test]
+fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("src/comparison.py", "0 < 1 < 2")?;
+    let file = program_file(&db, system_path_to_file(&db, "src/comparison.py")?);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let Some(ast::Stmt::Expr(statement)) = module.syntax().body.first() else {
+        anyhow::bail!("expected a comparison expression statement");
+    };
+    let expression = ExpressionNodeKey::from(statement.value.as_ref());
+    let scope = global_scope(&db, file);
+    let env = ProgramEnvironment::from_scope(scope);
+    let inference = |ty, truthiness: Option<Truthiness>| {
+        (
+            ExpressionInference {
+                expressions: [(expression, ty)].into_iter().collect(),
+                extra: truthiness.map(|truthiness| {
+                    Box::new(ExpressionInferenceExtra {
+                        comparison_truthiness: [(expression, truthiness)].into_iter().collect(),
+                        ..ExpressionInferenceExtra::default()
+                    })
+                }),
+                #[cfg(debug_assertions)]
+                scope,
+            },
+            StatementInferenceInner {
+                expressions: [(expression, ty)].into_iter().collect(),
+                bindings: Box::default(),
+                declarations: Box::default(),
+                extra: truthiness.map(|truthiness| {
+                    Box::new(StatementInferenceInnerExtra {
+                        comparison_truthiness: [(expression, truthiness)].into_iter().collect(),
+                        ..StatementInferenceInnerExtra::default()
+                    })
+                }),
+                #[cfg(debug_assertions)]
+                scope,
+            },
+            DefinitionInference {
+                expressions: [(expression, ty)].into_iter().collect(),
+                types: DefinitionTypes::Empty,
+                extra: truthiness.map(|truthiness| {
+                    Box::new(DefinitionInferenceExtra::Other(Box::new(
+                        OtherDefinitionInferenceExtra {
+                            comparison_truthiness: [(expression, truthiness)].into_iter().collect(),
+                            ..OtherDefinitionInferenceExtra::default()
+                        },
+                    )))
+                }),
+                #[cfg(debug_assertions)]
+                scope,
+            },
+        )
+    };
+
+    for (previous, current, expected) in [
+        // A previously widened condition stays ambiguous even when the new result omits its
+        // override and has a definite value-type fallback.
+        (
+            (Type::bool_literal(false), Some(Truthiness::Ambiguous)),
+            (Type::bool_literal(false), None),
+            Truthiness::Ambiguous,
+        ),
+        // A new override is compared with the previous result's value-type fallback.
+        (
+            (Type::bool_literal(true), None),
+            (Type::unknown(), Some(Truthiness::AlwaysFalse)),
+            Truthiness::Ambiguous,
+        ),
+        // Matching effective truthiness stays precise. Keep the override even though it agrees
+        // with the current type: subsequent type widening can make that fallback ambiguous again.
+        (
+            (Type::unknown(), Some(Truthiness::AlwaysFalse)),
+            (Type::bool_literal(false), None),
+            Truthiness::AlwaysFalse,
+        ),
+    ] {
+        let (previous_expression, previous_statement, previous_definition) =
+            inference(previous.0, previous.1);
+        let (mut current_expression, mut current_statement, mut current_definition) =
+            inference(current.0, current.1);
+        current_expression.widen_comparison_truthiness(&db, &env, &previous_expression);
+        current_statement.widen_comparison_truthiness(&db, &env, &previous_statement);
+        current_definition.widen_comparison_truthiness(&db, &env, &previous_definition);
+        assert_eq!(
+            current_expression.comparison_truthiness(expression),
+            Some(expected)
+        );
+        assert_eq!(
+            current_statement
+                .extra
+                .as_deref()
+                .and_then(|extra| extra.comparison_truthiness.get(&expression))
+                .copied(),
+            Some(expected)
+        );
+        assert_eq!(
+            current_definition
+                .extra
+                .as_deref()
+                .and_then(DefinitionInferenceExtra::comparison_truthiness)
+                .and_then(|overrides| overrides.get(&expression))
+                .copied(),
+            Some(expected)
+        );
+    }
+
+    Ok(())
+}
+
+/// Resolving environment-guard provenance must not re-enter inference of the scope being checked.
+/// This lookup runs during scope inference; asking for completed use-site types would create a
+/// Salsa cycle. Cycle recovery can hide that mistake in the final diagnostics, so inspect Salsa's
+/// events as well as checking that each condition produces a diagnostic.
+#[test]
+fn redundant_condition_lookup_does_not_reenter_scope_inference() -> anyhow::Result<()> {
+    // Cover builtin names, including the numeric-compatibility special cases for `float` and
+    // `complex`, and attribute lookup using an already-inferred receiver type.
+    for source in [
+        "if isinstance({}, dict):\n    pass\n",
+        "if isinstance(1.0, float):\n    pass\n",
+        "if isinstance(1j, complex):\n    pass\n",
+        "class C:\n    flag = (1, 2)\n\nif C.flag:\n    pass\n",
+    ] {
+        let registry = crate::default_lint_registry();
+        let mut rules = RuleSelection::from_registry(registry);
+        rules.enable(
+            registry.get("redundant-condition-strict")?,
+            Severity::Warning,
+            LintSource::File,
+        );
+        let mut db = TestDbBuilder::new()
+            .with_file("/src/main.py", source)
+            .with_rule_selection(rules)
+            .build()?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        // Require the diagnostic so the cycle check cannot pass merely because the redundant
+        // condition was never checked.
+        assert_eq!(diagnostics.len(), 1, "{source}\n{diagnostics:#?}");
+
+        let events = db.take_salsa_events();
+        let scope_cycles = salsa::attach(&db, || {
+            events
+                .iter()
+                .filter_map(|event| match event.kind {
+                    salsa::EventKind::WillIterateCycle { database_key, .. } => {
+                        Some(format!("{database_key:?}"))
+                    }
+                    _ => None,
+                })
+                .filter(|query| query.starts_with("infer_scope_types_impl("))
+                .collect::<Vec<_>>()
+        });
+        assert!(scope_cycles.is_empty(), "{source}\n{scope_cycles:#?}");
+    }
+    Ok(())
+}
+
+/// Repeated conditions share cached definition and reachability summaries. Reassigned names need
+/// different definitions at each read, but share the index of their original assignment guards.
+/// Rebuilding that index for every condition would make these examples quadratic even if their
+/// diagnostics were unchanged. Attribute fallback lookup also shares its definition summary.
+/// Lazy closure reads share both the summary and boundness analysis of their outer bindings.
+/// Conditions on distinct names also share the reachability summaries for preceding calls,
+/// rather than traversing an increasingly long call prefix for each name.
+#[test]
+fn repeated_tuple_conditions_share_provenance() -> anyhow::Result<()> {
+    let repetitions = 100;
+    let names = "value = (1,)\nif value:\n    pass\n".repeat(repetitions);
+    let lazy_closure = format!(
+        "def outer():\n    def inner():\n{}{}",
+        "        if value:\n            pass\n".repeat(repetitions),
+        "    value = (1,)\n".repeat(repetitions),
+    );
+    let attributes = format!(
+        "class C:\n{}\n{}",
+        "    value = (1,)\n".repeat(repetitions),
+        "if C.value:\n    pass\n".repeat(repetitions),
+    );
+    let mut calls = String::from(
+        "def noop() -> None: ...
+",
+    );
+    for index in 0..repetitions {
+        writeln!(
+            calls,
+            "noop()
+value_{index} = (1,)
+if value_{index}:
+    pass"
+        )?;
+    }
+
+    for (source, query_name, max_queries) in [
+        (names, "definition_reachability", 1),
+        (lazy_closure, "owning_scope_condition_definition_info", 1),
+        (attributes, "attribute_condition_definition_info", 1),
+        (
+            calls,
+            "reachability_contains_special_cased_condition",
+            3 * repetitions,
+        ),
+    ] {
+        let mut db = TestDbBuilder::new()
+            .with_file("/src/main.py", &source)
+            .build()?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        // Sharing the definition lookup must still leave a diagnostic on every condition.
+        assert_eq!(diagnostics.len(), repetitions);
+
+        // Count actual query executions, excluding cache hits. This checks reuse deterministically
+        // without a timing threshold, which would depend on the machine running the test.
+        let events = db.take_salsa_events();
+        let lookups = events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event.kind,
+                    salsa::EventKind::WillExecute { database_key }
+                        if db.ingredient_debug_name(database_key.ingredient_index()) == query_name
+                )
+            })
+            .count();
+        assert!(
+            (1..=max_queries).contains(&lookups),
+            "{query_name} should be shared across conditions; executed {lookups} queries"
+        );
+    }
+    Ok(())
 }
 
 /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
@@ -771,6 +1105,47 @@ value.bit_count()
     Ok(())
 }
 
+#[test]
+fn suppressed_call_error_skips_callable_description() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let path = "/src/main.py";
+    let source = "def f() -> int: return 1\nf(1)";
+    let query = "CallableDescription < 'db >::from_overload_";
+
+    db.write_file(
+        path,
+        format!("{source}  # ty: ignore[too-many-positional-arguments]"),
+    )?;
+    assert_file_diagnostics(&db, path, &[]);
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run_by_name(&db, query, None, &events);
+
+    db.write_file(path, source)?;
+    assert_file_diagnostics(
+        &db,
+        path,
+        &["Too many positional arguments to function `f`: expected 0, got 1"],
+    );
+    let events = db.take_salsa_events();
+    assert!(find_will_execute_event_by_name(&db, query, None, &events).is_some());
+    Ok(())
+}
+
+#[test]
+fn redundant_cast_without_closing_parenthesis() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    // A final newline changes the recovered argument range, so these files deliberately omit it.
+    for suffix in ["", " # comment"] {
+        let source =
+            format!("from typing import cast\n\ndef f(x: int):\n    return cast(int, x{suffix}");
+        db.write_file("/src/main.py", &source)?;
+        assert_file_diagnostics(&db, "/src/main.py", &["Value is already of type `int`"]);
+    }
+
+    Ok(())
+}
+
 // Incremental inference tests
 #[track_caller]
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
@@ -779,6 +1154,36 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
         .end_of_scope_symbol_bindings(place_table(db, scope).symbol_id(name).unwrap())
         .find_map(|b| b.binding.definition())
         .expect("no binding found")
+}
+
+#[test]
+fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        ("/src/main.py", "from dependency import x"),
+        ("/src/dependency.py", "x: int = 1\nlist\ndict\nlist"),
+    ])?;
+
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    let assert_imported_type = |db: &TestDb| {
+        let ty = global_symbol(db, main, "x").place.expect_type();
+        assert_eq!(ty.display(db, &db.program_environment()).to_string(), "int");
+    };
+    let query_name = "place_by_id";
+    db.clear_salsa_events();
+    assert_imported_type(&db);
+    let events = db.take_salsa_events();
+    assert!(
+        find_will_execute_event_by_name(&db, query_name, None, &events).is_some(),
+        "Expected the first lookup to run {query_name}"
+    );
+
+    db.write_file("/src/dependency.py", "x: int = 1\nlist\ndict\ndict")?;
+    db.clear_salsa_events();
+    assert_imported_type(&db);
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run_by_name(&db, query_name, None, &events);
+    Ok(())
 }
 
 #[test]
@@ -810,6 +1215,161 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
         "bool"
     );
 
+    Ok(())
+}
+
+#[test]
+fn undefined_reveal_fix_updates_after_source_changes() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY311)
+        .build()?;
+
+    // Recheck the same file after changing its imports and line endings. Both function
+    // scopes should use the current file's import locations and formatting.
+    for (prefix, line_ending, fixed_prefix) in [
+        (
+            "from typing import Any\n\n",
+            "\n",
+            "from typing import Any, reveal_type\n\n",
+        ),
+        (
+            "from __future__ import annotations\r\n\r\n",
+            "\r\n",
+            "from __future__ import annotations\r\nfrom typing import reveal_type\r\n\r\n",
+        ),
+        ("", "\n", "from typing import reveal_type\n"),
+    ] {
+        let body = "def f():\n    reveal_type(1)\ndef g():\n    reveal_type(2)\n"
+            .replace('\n', line_ending);
+        let source = format!("{prefix}{body}");
+        db.write_file("/src/main.py", &source)?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        let fixes: Vec<_> = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.id() == DiagnosticId::lint("undefined-reveal"))
+            .filter_map(Diagnostic::fix)
+            .collect();
+        assert_eq!(fixes.len(), 2);
+        for fix in fixes {
+            let [edit] = fix.edits() else {
+                anyhow::bail!("expected a single import edit");
+            };
+            let mut fixed = source.clone();
+            fixed.replace_range(edit.range().to_std_range(), edit.content().unwrap_or(""));
+            assert_eq!(fixed, format!("{fixed_prefix}{body}"));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn redundant_elif_fix_preserves_line_endings_and_checks_cleanly() -> anyhow::Result<()> {
+    let registry = crate::default_lint_registry();
+    let mut rules = RuleSelection::from_registry(registry);
+    rules.enable(
+        registry.get("redundant-condition-strict")?,
+        Severity::Warning,
+        LintSource::File,
+    );
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY311)
+        .with_rule_selection(rules)
+        .build()?;
+
+    // Reuse the file to check that edits use the current imports and source style.
+    for (newline, indent, trailing_newline, existing_import) in [
+        ("\n", "    ", true, false),
+        ("\r\n", "\t", false, true),
+        ("\r", "  ", false, false),
+    ] {
+        let mut source = format!(
+            "def f(value: str | int):\n\
+            {indent}if isinstance(value, str):\n\
+            {indent}{indent}print(value)\n\
+            {indent}elif isinstance(value, int):\n\
+            {indent}{indent}print(value)  # Inline comment.\n\
+            {indent}{indent}# Trailing comment."
+        )
+        .replace('\n', newline);
+        let (import, name) = if existing_import {
+            (
+                "from typing import assert_never as unreachable",
+                "unreachable",
+            )
+        } else {
+            ("from typing import assert_never", "assert_never")
+        };
+        if existing_import {
+            source = format!("{import}{newline}{source}");
+        }
+        if trailing_newline {
+            source.push_str(newline);
+        }
+        db.write_file("/src/main.py", &source)?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        let [diagnostic] = diagnostics.as_slice() else {
+            anyhow::bail!("expected one diagnostic: {diagnostics:#?}");
+        };
+        let fix = diagnostic
+            .fix()
+            .ok_or_else(|| anyhow::anyhow!("expected an autofix"))?;
+        let mut fixed = source.clone();
+        for edit in fix.edits().iter().rev() {
+            fixed.replace_range(edit.range().to_std_range(), edit.content().unwrap_or(""));
+        }
+        let prefix = if existing_import {
+            String::new()
+        } else {
+            format!("{import}{newline}")
+        };
+        let separator = if trailing_newline { "" } else { newline };
+        assert_eq!(
+            fixed,
+            format!(
+                "{prefix}{source}{separator}{indent}else:{newline}{indent}{indent}{name}(value){newline}"
+            )
+        );
+        db.write_file("/src/main.py", fixed)?;
+        assert_file_diagnostics(&db, "/src/main.py", &[]);
+    }
+    Ok(())
+}
+
+#[test]
+fn overload_signatures_track_imported_annotations() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/api.pyi",
+        r#"
+        from typing import overload
+        from payload import Result
+
+        @overload
+        def parse(value: int) -> Result: ...
+        @overload
+        def parse(value: bytes) -> bytes: ...
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from api import parse
+
+        reveal_type((parse(1), parse(b"x")))
+        "#,
+    )?;
+
+    for (payload, expected) in [
+        ("int", "tuple[int, bytes]"),
+        ("str", "tuple[str, bytes]"),
+        ("int", "tuple[int, bytes]"),
+    ] {
+        db.write_file("/src/payload.py", format!("Result = {payload}"))?;
+        assert_revealed_type(&db, "/src/main.py", expected);
+    }
     Ok(())
 }
 
@@ -954,6 +1514,40 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 }
 
 #[test]
+fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let base = "\
+class Meta1(type): ...
+class Meta2(type): ...
+class Base(metaclass=Meta1): ...
+";
+    db.write_files([
+        ("/src/base.py", base),
+        (
+            "/src/main.py",
+            "\
+from typing_extensions import reveal_type
+from base import Base
+
+C = type('C', (Base,), {})
+reveal_type(type(C))
+",
+        ),
+    ])?;
+    assert_revealed_type(&db, "/src/main.py", "<class 'Meta1'>");
+
+    db.write_file(
+        "/src/base.py",
+        base.replace("metaclass=Meta1", "metaclass=Meta2"),
+    )?;
+    assert_revealed_type(&db, "/src/main.py", "<class 'Meta2'>");
+
+    db.write_file("/src/base.py", base)?;
+    assert_revealed_type(&db, "/src/main.py", "<class 'Meta1'>");
+    Ok(())
+}
+
+#[test]
 fn field_specifier_default_value_invalidates_caller() -> anyhow::Result<()> {
     let mut db = setup_db();
     let field_source = r#"from typing import Any
@@ -991,6 +1585,60 @@ class Model(ModelBase):
 
     db.write_file("/src/fields.py", field_source)?;
     assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
+fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Result<()> {
+    // Changing an imported type must invalidate the cached proof even when the protocol and its
+    // consumer are unchanged. Cover both direct inspection and the type-parameter proof needed
+    // for growing specializations.
+    const STATIC: &str = "Payload = int\n";
+    const GRADUAL: &str = "from typing import Any\nPayload = Any\n";
+    const FAILURE: &str =
+        "Static assertion error: argument of type `ConstraintSet[Literal[False]]` is always falsy";
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/node.py",
+        r#"
+        from __future__ import annotations
+        from typing import Protocol, TypeVar
+        from other import Payload
+
+        class Node(Protocol):
+            def payload(self) -> Payload: ...
+            def edit(self, nodes: list[Node]) -> list[Node]: ...
+
+        T = TypeVar("T", covariant=True)
+
+        class GenericNode(Protocol[T]):
+            def child(self) -> GenericNode[tuple[T, T]]: ...
+            def read(self: GenericNode[int]) -> int: ...
+            def payload(self) -> Payload: ...
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from node import GenericNode, Node
+        from ty_extensions import Top, static_assert
+        from ty_extensions._internal import is_subtype_of
+
+        static_assert(is_subtype_of(Top[Node], Node))
+        static_assert(is_subtype_of(Top[GenericNode[int]], GenericNode[int]))
+        "#,
+    )?;
+
+    for (payload, diagnostics) in [
+        (STATIC, &[][..]),
+        (GRADUAL, &[FAILURE, FAILURE][..]),
+        (STATIC, &[][..]),
+    ] {
+        db.write_file("/src/other.py", payload)?;
+        assert_file_diagnostics(&db, "/src/main.py", diagnostics);
+    }
+
     Ok(())
 }
 
@@ -1074,6 +1722,156 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
         first_public_binding(&db, a, "x"),
         &events,
     );
+    Ok(())
+}
+
+#[test]
+fn specialized_alias_values_track_imported_types() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY312)
+        .build()?;
+    db.write_dedented(
+        "/src/aliases.py",
+        r#"
+        from typing import TypeAliasType, TypeVar
+        from payload import Payload
+
+        type Declared[T] = tuple[T, Payload]
+        T = TypeVar("T")
+        Manual = TypeAliasType("Manual", tuple[T, Payload], type_params=(T,))
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from aliases import Declared, Manual
+
+        def check(declared: Declared[int], manual: Manual[bytes]):
+            reveal_type((declared[1], manual[1]))
+        "#,
+    )?;
+
+    for (payload, expected) in [
+        ("int", "tuple[int, int]"),
+        ("str", "tuple[str, str]"),
+        ("int", "tuple[int, int]"),
+    ] {
+        db.write_file("/src/payload.py", format!("Payload = {payload}"))?;
+        assert_revealed_type(&db, "/src/main.py", expected);
+    }
+    Ok(())
+}
+
+#[test]
+fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/main.py",
+        "from aliases import Alias\nvalue: Alias = []",
+    )?;
+    let main = system_path_to_file(&db, "/src/main.py")?;
+
+    for (alias, unrelated, should_run) in [
+        ("list[int]", 1, true),
+        // The alias's meaning is unchanged by edits elsewhere in its defining module.
+        ("list[int]", 2, false),
+        ("list[str]", 2, true),
+    ] {
+        let source = format!("Alias = {alias}\ndef unrelated(): return {unrelated}");
+        db.write_file("/src/aliases.py", source)?;
+        db.clear_salsa_events();
+
+        let value = global_symbol(&db, main, "value").place.expect_type();
+        assert_eq!(
+            value.display(&db, &db.program_environment()).to_string(),
+            alias
+        );
+
+        let events = db.take_salsa_events();
+        let definition = first_public_binding(&db, main, "value");
+        if should_run {
+            assert_function_query_was_run(&db, infer_definition_types, definition, &events);
+        } else {
+            assert_function_query_was_not_run(&db, infer_definition_types, definition, &events);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/dependency.py", "value = 42")?;
+    db.write_dedented(
+        "/src/model.py",
+        r#"
+        class Model:
+            value: int
+
+            def reset(self):
+                from dependency import value
+                self.value = value
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from model import Model
+
+        def read(model: Model):
+            return model.value
+        "#,
+    )?;
+
+    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+
+    // The declaration determines the result. Looking up `Model.value` should not even
+    // index modules that are only used by assignments to it in method bodies.
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
+
+    Ok(())
+}
+
+#[test]
+fn inherited_class_defaults_avoid_inferring_instance_assignments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/dependency.py", "value = 'updated'")?;
+    db.write_dedented(
+        "/src/bases.py",
+        r#"
+        class First:
+            value: int = 0
+
+        class Second:
+            value: str = ""
+
+            def reset(self):
+                from dependency import value
+                self.value = value
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from bases import First, Second
+
+        class Child(First, Second): ...
+        "#,
+    )?;
+
+    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["Incompatible inherited attribute `value`"],
+    );
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
     Ok(())
 }
 

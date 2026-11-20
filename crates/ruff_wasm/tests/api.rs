@@ -59,7 +59,7 @@ fn empty_config() {
         "if (1, 2):\n    pass",
         r#"{}"#,
         [ExpandedMessage {
-            code: Rule::IfTuple.noqa_code().to_string(),
+            code: Rule::IfTuple.noqa_code().unwrap().to_string(),
             message: "If test is a tuple, which is always `True`".to_string(),
             tags: vec![],
             annotations: vec![primary_annotation(
@@ -183,7 +183,7 @@ fn sub_diagnostics() {
 fn diagnostic_tags() {
     ruff_wasm::before_main();
 
-    let config = js_sys::JSON::parse(r#"{"select": ["F401", "RUF071"], "preview": true}"#).unwrap();
+    let config = js_sys::JSON::parse(r#"{"select": ["F401", "RUF071"]}"#).unwrap();
     let output = Workspace::new(config, PositionEncoding::Utf8)
         .unwrap()
         .check("import os\nimport sys\nos.path.commonprefix([])\n")

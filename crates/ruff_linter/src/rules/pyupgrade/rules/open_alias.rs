@@ -1,10 +1,12 @@
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::Expr;
+use ruff_python_ast::ExprCall;
+use ruff_python_ast::name::QualifiedName;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -33,7 +35,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `io.open`](https://docs.python.org/3/library/io.html#io.open)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.196")]
+#[violation_metadata(stable_since = "v0.0.196", category = Category::Style)]
 pub(crate) struct OpenAlias;
 
 impl Violation for OpenAlias {
@@ -50,28 +52,24 @@ impl Violation for OpenAlias {
 }
 
 /// UP020
-pub(crate) fn open_alias(checker: &Checker, expr: &Expr, func: &Expr) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["io", "open"]))
-    {
-        let mut diagnostic = checker.report_diagnostic(OpenAlias, expr.range());
+pub(crate) fn open_alias(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
+    if matches!(qualified_name.segments(), ["io", "open"]) {
+        let mut diagnostic = checker.report_diagnostic(OpenAlias, call.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
                 "open",
-                expr.start(),
+                call.start(),
                 checker.semantic(),
             )?;
 
-            let applicability = if checker.comment_ranges().intersects(func.range()) {
+            let applicability = if checker.comment_ranges().intersects(call.func.range()) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
             };
 
             Ok(Fix::applicable_edits(
-                Edit::range_replacement(binding, func.range()),
+                Edit::range_replacement(binding, call.func.range()),
                 import_edit,
                 applicability,
             ))

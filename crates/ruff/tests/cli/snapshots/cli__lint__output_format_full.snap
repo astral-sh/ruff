@@ -51,6 +51,6 @@ invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in 
   |
 
 Found 3 errors.
-[*] 1 fixable with the `--fix` option.
+[*] 1 fixable with `--fix`.
 
 ----- stderr -----

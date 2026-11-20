@@ -18,7 +18,6 @@ from typing import TypeAlias
 
 from steam.message import Message
 
-# error: [missing-type-argument]
 TestAlias: TypeAlias = tuple[Message]  # error: [missing-type-argument]
 ```
 

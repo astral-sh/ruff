@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -45,10 +46,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [logging documentation]: https://docs.python.org/3/library/logging.html#logger-objects
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
-pub(crate) struct InvalidGetLoggerArgument;
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Suspicious)]
+pub(crate) struct FilePathAsLoggerName;
 
-impl Violation for InvalidGetLoggerArgument {
+impl Violation for FilePathAsLoggerName {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -83,13 +84,12 @@ pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCal
 
     if !checker
         .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["logging", "getLogger"]))
+        .matches_qualified_name(call.func.as_ref(), &["logging", "getLogger"])
     {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(InvalidGetLoggerArgument, expr.range());
+    let mut diagnostic = checker.report_diagnostic(FilePathAsLoggerName, expr.range());
     if checker.semantic().has_builtin_binding("__name__") {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             "__name__".to_string(),

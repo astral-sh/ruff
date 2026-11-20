@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::function_type;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -40,7 +41,7 @@ use ruff_python_ast::PythonVersion;
 /// [PEP 484]: https://peps.python.org/pep-0484/#positional-only-arguments
 /// [PEP 570]: https://peps.python.org/pep-0570
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Style)]
 pub(crate) struct Pep484StylePositionalOnlyParameter;
 
 impl Violation for Pep484StylePositionalOnlyParameter {
@@ -83,7 +84,9 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
     // If the method has a `self` or `cls` argument, skip it.
     let skip = usize::from(matches!(
         function_type,
-        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::NewMethod
     ));
 
     if let Some(param) = function_def.parameters.args.get(skip) {

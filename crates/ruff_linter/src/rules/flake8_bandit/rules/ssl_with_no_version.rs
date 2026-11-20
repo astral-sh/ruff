@@ -1,9 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
+use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for calls to `ssl.wrap_socket()` without an `ssl_version`.
@@ -26,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1_2)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Security)]
 pub(crate) struct SslWithNoVersion;
 
 impl Violation for SslWithNoVersion {
@@ -37,14 +39,14 @@ impl Violation for SslWithNoVersion {
 }
 
 /// S504
-pub(crate) fn ssl_with_no_version(checker: &Checker, call: &ExprCall) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["ssl", "wrap_socket"]))
+pub(crate) fn ssl_with_no_version(
+    checker: &Checker,
+    call: &ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if matches!(qualified_name.segments(), ["ssl", "wrap_socket"])
+        && call.arguments.find_keyword("ssl_version").is_none()
     {
-        if call.arguments.find_keyword("ssl_version").is_none() {
-            checker.report_diagnostic(SslWithNoVersion, call.range());
-        }
+        checker.report_diagnostic(SslWithNoVersion, call.range());
     }
 }

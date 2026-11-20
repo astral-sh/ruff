@@ -5,6 +5,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -33,10 +34,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// logging.basicConfig(level=logging.WARNING)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
-pub(crate) struct UndocumentedWarn;
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Suspicious)]
+pub(crate) struct LoggingWarnConstant;
 
-impl Violation for UndocumentedWarn {
+impl Violation for LoggingWarnConstant {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -57,10 +58,9 @@ pub(crate) fn undocumented_warn(checker: &Checker, expr: &Expr) {
 
     if checker
         .semantic()
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["logging", "WARN"]))
+        .matches_qualified_name(expr, &["logging", "WARN"])
     {
-        let mut diagnostic = checker.report_diagnostic(UndocumentedWarn, expr.range());
+        let mut diagnostic = checker.report_diagnostic(LoggingWarnConstant, expr.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("logging", "WARNING"),

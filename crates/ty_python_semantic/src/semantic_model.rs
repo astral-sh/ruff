@@ -9,20 +9,26 @@ use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, list_modules, resolve_module,
+    resolve_module_for_import_from,
 };
 
 use crate::Db;
+use crate::place::definitions::{DefinitionResolution, definitions_for_module_global};
 use crate::place::implicit_globals::all_implicit_module_globals;
+use crate::place::{builtins_module_scope, implicit_builtins_symbol_scope};
+use crate::place_load::{PlaceLoadMode, PlaceLoadResolver};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
     CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
-    infer_complete_scope_types, inferred_declaration,
+    infer_complete_scope_types, infer_definition_types, inferred_declaration,
+    is_discarded_dict_key_assignment,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::place::PlaceExpr;
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
@@ -89,12 +95,45 @@ impl<'db> SemanticModel<'db> {
         line_index(self.db, self.file())
     }
 
+    /// Returns whether `name` refers to a standard builtin in the scope containing `node`.
+    ///
+    /// This method uses a simplified implementation of name resolution: any binding or declaration
+    /// in a visible scope shadows the builtin, even if it does not reach `node`. As a result, it
+    /// can return `false` when the builtin is actually available. That is acceptable when deciding
+    /// whether to offer an autofix: we can safely omit the fix in edge cases where resolving the
+    /// name precisely would require more complex analysis.
+    ///
+    /// Definitions in a project-level `__builtins__.pyi` also shadow standard builtins.
+    pub(crate) fn definitely_has_builtin_binding(
+        &self,
+        name: &str,
+        node: ast::AnyNodeRef<'_>,
+    ) -> bool {
+        let index = semantic_index(self.db, self.program_file());
+        let Some(scope) = self.scope(node) else {
+            return false;
+        };
+
+        if index.visible_ancestor_scopes(scope).any(|(scope, _)| {
+            index
+                .place_table(scope)
+                .symbol_by_name(name)
+                .is_some_and(|symbol| symbol.is_bound() || symbol.is_declared())
+        }) {
+            return false;
+        }
+
+        let env = self.program_environment();
+        implicit_builtins_symbol_scope(self.db, &env, name)
+            .is_some_and(|scope| Some(scope) == builtins_module_scope(self.db, &env))
+    }
+
     /// Returns a map from symbol name to that symbol's
     /// type and definition site (if available).
     ///
     /// The symbols are the symbols in scope at the given
     /// AST node.
-    pub fn members_in_scope_at(
+    pub(crate) fn members_in_scope_at(
         &self,
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
@@ -418,6 +457,61 @@ impl<'db> SemanticModel<'db> {
             .flat_map(move |scope| index.ancestor_scopes(scope))
     }
 
+    /// Returns the definitions that may supply the value read by this use of a name.
+    ///
+    /// An unbound name and a name supplied by a builtin can both have an empty list of
+    /// definitions. [`DefinitionResolution::identifies_all_bindings()`] distinguishes these cases.
+    ///
+    /// Returns `None` if the scope is unavailable, the name is a plain assignment or deletion
+    /// target, or inference skipped the name inside a string annotation.
+    pub fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
+        if name.ctx.is_del() {
+            return None;
+        }
+
+        let index = semantic_index(self.db, self.file);
+        let expression = ast::ExprRef::Name(name);
+
+        // Require an expression use ID to exclude plain stores. Names in parsed string annotations
+        // have no use IDs, so check them after inference instead.
+        if self.in_string_annotation_expr.is_none() {
+            index.try_expression_use_id(expression)?;
+        }
+
+        let env = self.program_environment();
+        let scope = self.scope(name.into())?.to_scope_id(self.db, self.file);
+        let place_expr = PlaceExpr::from_expr_name(name);
+        let scope_inference = infer_complete_scope_types(self.db, scope);
+
+        // Exclude names in scopes that inference skipped, such as lambda bodies.
+        if self.in_string_annotation_expr.is_some() {
+            scope_inference.try_expression_type(expression)?;
+        }
+
+        let mode = if self.in_string_annotation_expr.is_some() {
+            PlaceLoadMode::StringAnnotation
+        } else if scope_inference.is_deferred_name_load(name) {
+            PlaceLoadMode::Deferred
+        } else {
+            PlaceLoadMode::AtExpression(expression)
+        };
+        let resolver = PlaceLoadResolver::new(self.db, &env, index, scope, &place_expr, mode, None);
+
+        Some(DefinitionResolution::from_resolver(self.db, resolver))
+    }
+
+    /// Returns the definitions that may supply a module global at the end of its scope.
+    ///
+    /// Returns `None` if the module has no file or the name has no symbol-table entry.
+    pub fn definitions_for_module_global(
+        &self,
+        module: Module<'db>,
+        name: &str,
+    ) -> Option<DefinitionResolution<'db>> {
+        let file = ProgramFile::new(self.db(), module.file(self.db())?, self.program());
+        definitions_for_module_global(self.db(), file, name)
+    }
+
     /// Returns the first local definition created by `covering_node`, if any.
     ///
     /// A local definition is a user-visible definition associated with `covering_node` itself, or
@@ -595,10 +689,15 @@ impl<'db> SemanticModel<'db> {
         }
     }
 
-    /// Returns completion candidates for a string-literal expression based on its expected type.
+    /// Returns completion candidates from a string's expected type and dictionary initializer.
+    ///
+    /// If provided, `subscript` must have `string_expr` as its complete slice.
+    /// Initializer keys are suggestions, not a guarantee that a mutable dictionary still contains
+    /// them or that it contains no other keys.
     pub fn expected_string_literal_completions(
         &self,
         string_expr: &ast::ExprStringLiteral,
+        subscript: Option<&ast::ExprSubscript>,
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
         struct StringLiteralCandidates;
         type StringLiteralCandidatesVisitor<'db> = CycleDetector<
@@ -615,16 +714,15 @@ impl<'db> SemanticModel<'db> {
             visitor: &StringLiteralCandidatesVisitor<'db>,
         ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
             match ty {
-                Type::LiteralValue(literal) => literal
-                    .as_string()
-                    .map(|string_literal| {
+                Type::LiteralValue(literal) => {
+                    literal.as_string().map_or_default(|string_literal| {
                         let value = string_literal.value(db).to_string();
                         vec![ExpectedStringLiteralCompletion {
                             ty: Type::string_literal(db, &*value),
                             value,
                         }]
                     })
-                    .unwrap_or_default(),
+                }
                 Type::Union(union) => union
                     .elements(db)
                     .iter()
@@ -638,19 +736,178 @@ impl<'db> SemanticModel<'db> {
                 Type::TypeAlias(alias) => {
                     visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
                 }
+                Type::Recursive(recursive) => visitor.visit(db, ty, || {
+                    recursive
+                        .unfold(db, &recursive.environment(db))
+                        .map(|unfolded| collect(db, unfolded, visitor))
+                        .unwrap_or_else(Vec::new)
+                }),
                 _ => Vec::new(),
             }
         }
         let db = self.db;
 
-        let Some(expected_ty) = self.string_literal_completion_expected_type(string_expr) else {
-            return Vec::new();
-        };
-
-        let mut candidates = collect(db, expected_ty, &StringLiteralCandidatesVisitor::default());
+        let expected_ty = self.string_literal_completion_expected_type(string_expr);
+        let mut candidates = expected_ty.map_or_default(|expected_ty| {
+            collect(db, expected_ty, &StringLiteralCandidatesVisitor::default())
+        });
+        // Finite choices from the expected type take precedence. A string used as the complete
+        // subscript key can fall back to initializer keys that fit any known expected type.
+        if candidates.is_empty()
+            && self.in_string_annotation_expr.is_none()
+            && let Some(subscript) = subscript
+        {
+            self.dictionary_initializer_keys(
+                &subscript.value,
+                &mut FxHashSet::default(),
+                &mut candidates,
+            );
+            if let Some(expected_ty) = expected_ty {
+                candidates.retain(|candidate| {
+                    candidate
+                        .ty
+                        .is_assignable_to(db, &self.program_environment(), expected_ty)
+                });
+            }
+        }
         candidates.sort_unstable_by(|left, right| left.value.cmp(&right.value));
         candidates.dedup_by(|left, right| left.value == right.value);
         candidates
+    }
+
+    /// Appends literal string keys from dictionary initializers that can reach `receiver`.
+    ///
+    /// Follows reaching definitions, aliases, `from` imports, and nested dictionary lookups,
+    /// ignoring unreachable or discarded assignments. The caller's `visited` set breaks
+    /// definition cycles. The caller filters candidates against the expected type, sorts them,
+    /// and removes duplicates.
+    fn dictionary_initializer_keys(
+        &self,
+        receiver: &ast::Expr,
+        visited: &mut FxHashSet<Definition<'db>>,
+        candidates: &mut Vec<ExpectedStringLiteralCompletion<'db>>,
+    ) {
+        if let ast::Expr::Dict(dict) = receiver {
+            candidates.extend(dict.items.iter().filter_map(|item| {
+                let ast::Expr::StringLiteral(key) = item.key.as_ref()? else {
+                    return None;
+                };
+                let value = key.value.to_string();
+                Some(ExpectedStringLiteralCompletion {
+                    ty: Type::string_literal(self.db, value.as_str()),
+                    value,
+                })
+            }));
+            return;
+        }
+
+        let mut definitions = self.definitions_for_dictionary_key_completion(receiver);
+        while let Some(definition) = definitions.pop() {
+            if !visited.insert(definition) {
+                continue;
+            }
+            let kind = definition.kind(self.db);
+            if kind.is_import() {
+                self.extend_imported_definitions(definition, &mut definitions);
+                continue;
+            }
+            let file = definition.program_file(self.db);
+            let module = parsed_module(self.db, file.python_file(self.db)).load(self.db);
+            let value = match kind {
+                DefinitionKind::Assignment(assignment) => assignment
+                    .unpack()
+                    .is_none()
+                    .then(|| assignment.value(&module)),
+                DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(&module),
+                DefinitionKind::DictKeyAssignment(assignment) => Some(assignment.value(&module)),
+                _ => None,
+            };
+            if let Some(value) = value
+                && !infer_definition_types(self.db, definition).discards_dict_key_assignments()
+                && !is_discarded_dict_key_assignment(self.db, definition)
+            {
+                Self::new(self.db, file).dictionary_initializer_keys(value, visited, candidates);
+            }
+        }
+    }
+
+    /// Returns definitions that may supply `receiver`'s value for dictionary key completion.
+    ///
+    /// Names use [`Self::reaching_definitions()`], including any definitions it finds when
+    /// resolution is incomplete.
+    /// Other tracked places use the bindings recorded at their use site.
+    fn definitions_for_dictionary_key_completion(
+        &self,
+        receiver: &ast::Expr,
+    ) -> Vec<Definition<'db>> {
+        if let ast::Expr::Name(name) = receiver {
+            return self
+                .reaching_definitions(name)
+                .map_or_default(|resolution| resolution.definitions().to_vec());
+        }
+
+        let index = semantic_index(self.db, self.file);
+        let Some(scope) = index.try_expression_scope_id(receiver) else {
+            return Vec::new();
+        };
+        let Some(use_id) = index.try_expression_use_id(receiver.into()) else {
+            return Vec::new();
+        };
+        DefinitionResolution::from_bindings(
+            self.db,
+            index.use_def_map(scope).bindings_at_use(use_id),
+        )
+        .definitions()
+        .to_vec()
+    }
+
+    /// Appends the reachable bindings of a `from` import's symbol in its target module.
+    ///
+    /// Follows one import at a time so an overwritten re-export cannot contribute keys.
+    fn extend_imported_definitions(
+        &self,
+        definition: Definition<'db>,
+        definitions: &mut Vec<Definition<'db>>,
+    ) {
+        let file = definition.program_file(self.db);
+        let kind = definition.kind(self.db);
+        let module = parsed_module(self.db, file.python_file(self.db)).load(self.db);
+        let (import, name) = match &kind {
+            DefinitionKind::ImportFrom(import) => {
+                (import.import(&module), import.alias(&module).name.as_str())
+            }
+            DefinitionKind::StarImport(import) => {
+                let Some(symbol) = semantic_index(self.db, file)
+                    .place_table(definition.file_scope(self.db))
+                    .place(definition.place(self.db))
+                    .as_symbol()
+                else {
+                    return;
+                };
+                (import.import(&module), symbol.name().as_str())
+            }
+            _ => return,
+        };
+        let env = ProgramEnvironment::from_file(file);
+        let importing_file =
+            ImportingFile::File(file.file(self.db), env.resolver_environment(self.db));
+        let Some(target_file) = resolve_module_for_import_from(self.db, importing_file, import)
+            .and_then(|module| module.file(self.db))
+        else {
+            return;
+        };
+        let target_file = ProgramFile::new(self.db, target_file, env.program(self.db));
+        let index = semantic_index(self.db, target_file);
+        let Some(id) = index.place_table(FileScopeId::global()).symbol_id(name) else {
+            return;
+        };
+        let resolution = DefinitionResolution::from_bindings(
+            self.db,
+            index
+                .use_def_map(FileScopeId::global())
+                .end_of_scope_symbol_bindings(id),
+        );
+        definitions.extend_from_slice(resolution.definitions());
     }
 
     fn string_literal_completion_expected_type(
@@ -668,9 +925,9 @@ impl<'db> SemanticModel<'db> {
 
 /// The type and definition of a symbol.
 #[derive(Clone, Debug)]
-pub struct MemberDefinition<'db> {
-    pub ty: Type<'db>,
-    pub first_reachable_definition: Definition<'db>,
+pub(crate) struct MemberDefinition<'db> {
+    pub(crate) ty: Type<'db>,
+    pub(crate) first_reachable_definition: Definition<'db>,
 }
 
 /// A classification of symbol names.
@@ -752,7 +1009,7 @@ pub trait HasDefinition {
     fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
-pub(crate) trait HasOptionalDefinition {
+trait HasOptionalDefinition {
     /// Returns the definition of `self`, if it has one.
     ///
     /// ## Panics
@@ -921,10 +1178,18 @@ impl HasType for ast::ExceptHandlerExceptHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write;
+
     use crate::db::tests::TestDbBuilder;
-    use crate::{HasType, SemanticModel};
+    use crate::{DefinitionResolution, HasType, SemanticModel};
+    use insta::assert_snapshot;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_python_ast as ast;
+    use ruff_python_ast::visitor::{Visitor, walk_expr};
+    use ruff_python_trivia::textwrap::dedent;
+    use ruff_source_file::LineIndex;
+    use ruff_text_size::{Ranged, TextRange};
     use ty_python_core::ProgramFile;
 
     #[test]
@@ -987,5 +1252,551 @@ mod tests {
         assert!(ty.is_class_literal());
 
         Ok(())
+    }
+
+    #[test]
+    fn reaching_definitions_follow_statement_order() {
+        let source = "
+            value = 0
+            def function(condition):
+                value
+                if condition:
+                    value = 1
+                value
+                value = 2
+                value
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "value", "/src/test.py", None), @"
+        1 | value = 0
+        2 | def function(condition):
+        3 |     value
+          |     ^^^^^ -> <none>
+        4 |     if condition:
+        5 |         value = 1
+        6 |     value
+          |     ^^^^^ -> value = 1 (line 5)
+        7 |     value = 2
+        8 |     value
+          |     ^^^^^ -> value = 2 (line 7)
+        ");
+    }
+
+    #[test]
+    fn reaching_definitions_distinguish_reads_from_deletion_targets() {
+        let source = "
+            value = 1
+            value += 1
+            del value
+            ";
+
+        assert_snapshot!(render_name_resolutions(source, "/src/test.py", None, |name| name.id == "value"), @"
+        1 | value = 1
+          | ^^^^^ -> <no resolution>
+        2 | value += 1
+          | ^^^^^ -> value = 1 (line 1)
+        3 | del value
+          |     ^^^^^ -> <no resolution>
+        ");
+    }
+
+    #[test]
+    fn reaching_definitions_distinguish_eager_and_deferred_uses() {
+        let source = "
+            from __future__ import annotations
+            from typing import Annotated
+
+            def tagged(tag):
+                return lambda function: function
+
+            label = 'first'
+
+            @tagged(label)
+            def function(argument: Annotated[str, label] = label):
+                return [label for label in (label,)]
+            label = 'second'
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "label", "/src/test.py", None), @"
+         1 | from __future__ import annotations
+         2 | from typing import Annotated
+         3 |
+         4 | def tagged(tag):
+         5 |     return lambda function: function
+         6 |
+         7 | label = 'first'
+         8 |
+         9 | @tagged(label)
+           |         ^^^^^ -> label = 'first' (line 7)
+        10 | def function(argument: Annotated[str, label] = label):
+           |                                       ^^^^^ -> label = 'first' (line 7), label = 'second' (line 12)
+           |                                                ^^^^^ -> label = 'first' (line 7)
+        11 |     return [label for label in (label,)]
+           |             ^^^^^ -> label (line 11)
+           |                                 ^^^^^ -> label = 'first' (line 7), label = 'second' (line 12)
+        12 | label = 'second'
+        ");
+    }
+
+    #[test]
+    fn reaching_definitions_preserve_deferred_uses_in_function_decorators() {
+        let source = "
+            def register(cls): ...
+
+            @register(list[Item])
+            def handle_items(items): ...
+
+            class Item: ...
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "Item", "/src/test.pyi", None), @"
+        1 | def register(cls): ...
+        2 |
+        3 | @register(list[Item])
+          |                ^^^^ -> class Item: ... (line 6)
+        4 | def handle_items(items): ...
+        5 |
+        6 | class Item: ...
+        ");
+    }
+
+    #[test]
+    fn reaching_definitions_follow_type_dependent_deferredness() {
+        let source = "
+            from builtins import list as Marker
+
+            Marker[Later]
+
+            class Later: ...
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "Later", "/src/test.pyi", None), @"
+        1 | from builtins import list as Marker
+        2 |
+        3 | Marker[Later]
+          |        ^^^^^ -> class Later: ... (line 5)
+        4 |
+        5 | class Later: ...
+        ");
+
+        let source = "
+            Marker: dict[object, object]
+
+            Marker[Later]
+
+            class Later: ...
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "Later", "/src/test.pyi", None), @"
+        1 | Marker: dict[object, object]
+        2 |
+        3 | Marker[Later]
+          |        ^^^^^ -> <none>
+        4 |
+        5 | class Later: ...
+        ");
+    }
+
+    #[test]
+    fn string_annotations_resolve_forward_references() {
+        let source = "
+            item: \"Value\"
+            class Value: ...
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "Value", "/src/test.py", None), @r#"
+        1 | item: "Value"
+          |        ^^^^^ -> class Value: ... (line 2)
+        2 | class Value: ...
+        "#);
+    }
+
+    #[test]
+    fn reaching_definitions_skip_unsupported_scopes_in_string_annotations() {
+        // Lambdas and comprehensions inside string annotations have no indexed scopes. Resolving
+        // names in their bodies against the enclosing scope could return unrelated bindings.
+        let source = "
+            from typing import Annotated
+
+            tag = 'module'
+            plain: \"Annotated[int, tag]\"
+            function: \"Annotated[int, lambda tag=tag: tag]\"
+            items: \"Annotated[int, [tag for tag in (tag,)]]\"
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "tag", "/src/test.py", None), @r#"
+        1 | from typing import Annotated
+        2 |
+        3 | tag = 'module'
+        4 | plain: "Annotated[int, tag]"
+          |                        ^^^ -> tag = 'module' (line 3)
+        5 | function: "Annotated[int, lambda tag=tag: tag]"
+          |                                      ^^^ -> tag = 'module' (line 3)
+          |                                           ^^^ -> <no resolution>
+        6 | items: "Annotated[int, [tag for tag in (tag,)]]"
+          |                         ^^^ -> <no resolution>
+          |                                         ^^^ -> tag = 'module' (line 3)
+        "#);
+    }
+
+    #[test]
+    fn class_scope_loads_resolve_local_and_enclosing_definitions() {
+        let source = "
+            value = 1
+            class C:
+                if condition:
+                    value = 2
+                result = value
+                value = 3
+                definite = value
+            ";
+
+        assert_snapshot!(render_reaching_definitions(source, "value", "/src/test.py", None), @"
+        1 | value = 1
+        2 | class C:
+        3 |     if condition:
+        4 |         value = 2
+        5 |     result = value
+          |              ^^^^^ -> value = 2 (line 4), value = 1 (line 1)
+        6 |     value = 3
+        7 |     definite = value
+          |                ^^^^^ -> value = 3 (line 6)
+        ");
+    }
+
+    #[test]
+    fn scope_declarations_are_reported_when_crossed() {
+        let source = "
+            value = 1
+            def with_global():
+                global value
+                return value
+            value = 2
+
+            def outer():
+                value = 3
+                def with_nonlocal():
+                    nonlocal value
+                    return value
+                def without_nonlocal():
+                    return value
+
+            def eager_outer():
+                value = 4
+                def intermediate():
+                    nonlocal value
+                    value = 5
+                    class Eager:
+                        result = value
+            ";
+
+        let detail = Some(ResolutionDetail::CrossesScopeDeclaration);
+        assert_snapshot!(render_reaching_definitions(source, "value", "/src/test.py", detail), @"
+         1 | value = 1
+         2 | def with_global():
+         3 |     global value
+         4 |     return value
+           |            ^^^^^ -> value = 1 (line 1), value = 2 (line 5)
+           | crosses_scope_declaration: true
+         5 | value = 2
+         6 |
+         7 | def outer():
+         8 |     value = 3
+         9 |     def with_nonlocal():
+        10 |         nonlocal value
+        11 |         return value
+           |                ^^^^^ -> value = 3 (line 8)
+           | crosses_scope_declaration: true
+        12 |     def without_nonlocal():
+        13 |         return value
+           |                ^^^^^ -> value = 3 (line 8)
+           | crosses_scope_declaration: false
+        14 |
+        15 | def eager_outer():
+        16 |     value = 4
+        17 |     def intermediate():
+        18 |         nonlocal value
+        19 |         value = 5
+        20 |         class Eager:
+        21 |             result = value
+           |                      ^^^^^ -> value = 5 (line 19)
+           | crosses_scope_declaration: true
+        ");
+    }
+
+    #[test]
+    fn annotation_only_values_prevent_identifying_all_bindings() {
+        let source = "
+            widget: int
+
+            def read():
+                return widget
+            ";
+
+        let detail = Some(ResolutionDetail::IdentifiesAllBindings);
+        assert_snapshot!(render_reaching_definitions(source, "widget", "/src/test.py", detail), @"
+        1 | widget: int
+        2 |
+        3 | def read():
+        4 |     return widget
+          |            ^^^^^^ -> <none>
+          | identifies_all_bindings: false
+        ");
+    }
+
+    #[test]
+    fn unreachable_reads_identify_all_bindings() {
+        let source = "
+            def unreachable():
+                widget = 1
+                return
+                widget
+            ";
+
+        let detail = Some(ResolutionDetail::IdentifiesAllBindings);
+        assert_snapshot!(render_reaching_definitions(source, "widget", "/src/test.py", detail), @"
+        1 | def unreachable():
+        2 |     widget = 1
+        3 |     return
+        4 |     widget
+          |     ^^^^^^ -> <none>
+          | identifies_all_bindings: true
+        ");
+    }
+
+    #[test]
+    fn comprehension_forwarding_preserves_written_scope_declarations() {
+        let source = "
+            [seen for item in [1] if (seen := item)]
+
+            def local():
+                return [seen for item in [1] if (seen := item)]
+
+            def explicit_global():
+                global seen
+                return [seen for item in [1] if (seen := item)]
+            ";
+
+        let detail = Some(ResolutionDetail::CrossesScopeDeclaration);
+        assert_snapshot!(render_reaching_definitions(source, "seen", "/src/test.py", detail), @"
+        1 | [seen for item in [1] if (seen := item)]
+          |  ^^^^ -> seen := item (line 1)
+          | crosses_scope_declaration: false
+        2 |
+        3 | def local():
+        4 |     return [seen for item in [1] if (seen := item)]
+          |             ^^^^ -> seen := item (line 4)
+          | crosses_scope_declaration: false
+        5 |
+        6 | def explicit_global():
+        7 |     global seen
+        8 |     return [seen for item in [1] if (seen := item)]
+          |             ^^^^ -> seen := item (line 8)
+          | crosses_scope_declaration: true
+        ");
+    }
+
+    #[test]
+    fn builtin_fallbacks_prevent_identifying_all_bindings() {
+        let source = "
+            len
+            if condition:
+                len = 1
+            len
+            len = 2
+            len
+            ";
+
+        let detail = Some(ResolutionDetail::IdentifiesAllBindings);
+        assert_snapshot!(render_reaching_definitions(source, "len", "/src/test.py", detail), @"
+        1 | len
+          | ^^^ -> <none>
+          | identifies_all_bindings: false
+        2 | if condition:
+        3 |     len = 1
+        4 | len
+          | ^^^ -> len = 1 (line 3)
+          | identifies_all_bindings: false
+        5 | len = 2
+        6 | len
+          | ^^^ -> len = 2 (line 5)
+          | identifies_all_bindings: true
+        ");
+    }
+
+    #[test]
+    fn reaching_definitions_expand_loop_headers() {
+        let source = "
+            value = 1
+            while outer():
+                value
+                while inner():
+                    value = 2
+            ";
+
+        let detail = Some(ResolutionDetail::IdentifiesAllBindings);
+        assert_snapshot!(render_reaching_definitions(source, "value", "/src/test.py", detail), @"
+        1 | value = 1
+        2 | while outer():
+        3 |     value
+          |     ^^^^^ -> value = 1 (line 1), value = 2 (line 5)
+          | identifies_all_bindings: true
+        4 |     while inner():
+        5 |         value = 2
+        ");
+    }
+
+    #[test]
+    fn loop_deletions_preserve_builtin_fallbacks() {
+        let source = "
+            len = 1
+            while condition:
+                len
+                len = 2
+                if condition:
+                    del len
+            ";
+
+        let detail = Some(ResolutionDetail::IdentifiesAllBindings);
+        assert_snapshot!(render_reaching_definitions(source, "len", "/src/test.py", detail), @"
+        1 | len = 1
+        2 | while condition:
+        3 |     len
+          |     ^^^ -> len = 1 (line 1), len = 2 (line 4)
+          | identifies_all_bindings: false
+        4 |     len = 2
+        5 |     if condition:
+        6 |         del len
+        ");
+    }
+
+    #[derive(Clone, Copy)]
+    enum ResolutionDetail {
+        CrossesScopeDeclaration,
+        IdentifiesAllBindings,
+    }
+
+    /// Annotates reads of `name`, including those in parsed string annotations.
+    #[track_caller]
+    fn render_reaching_definitions(
+        source: &str,
+        name: &str,
+        path: &str,
+        detail: Option<ResolutionDetail>,
+    ) -> String {
+        render_name_resolutions(source, path, detail, |node| {
+            node.id == name && node.ctx.is_load()
+        })
+    }
+
+    /// Annotates matching names, including those in parsed string annotations.
+    #[track_caller]
+    fn render_name_resolutions(
+        source: &str,
+        path: &str,
+        detail: Option<ResolutionDetail>,
+        include_name: impl Fn(&ast::ExprName) -> bool,
+    ) -> String {
+        let source = dedent(source);
+        let source = source.trim();
+        let db = TestDbBuilder::new()
+            .with_file(path, source)
+            .build()
+            .expect("valid semantic model test database");
+        let file = system_path_to_file(&db, path).expect("test file exists");
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let mut names = NameResolutions {
+            model: SemanticModel::new(&db, file),
+            include_name: &include_name,
+            resolutions: Vec::new(),
+        };
+        names.visit_body(module.suite());
+        names.resolutions.sort_by_key(|(range, _)| range.start());
+        let line_index = LineIndex::from_source_text(source);
+
+        // Formatting into a String cannot fail.
+        let mut output = String::new();
+        for (line_number, line) in source.lines().enumerate() {
+            let space = if line.is_empty() { "" } else { " " };
+            let _ = writeln!(output, "{:>2} |{space}{line}", line_number + 1);
+            for (range, resolution) in &names.resolutions {
+                if line_index.line_index(range.start()).get() != line_number + 1 {
+                    continue;
+                }
+
+                let start = line_index.line_column(range.start(), source).column;
+                let end = line_index.line_column(range.end(), source).column;
+                let indent = " ".repeat(start.to_zero_indexed());
+                let marker = "^".repeat(end.get() - start.get());
+                let _ = write!(output, "   | {indent}{marker} -> ");
+                let Some(resolution) = resolution else {
+                    output.push_str("<no resolution>\n");
+                    continue;
+                };
+
+                if resolution.definitions().is_empty() {
+                    output.push_str("<none>");
+                }
+                for (index, definition) in resolution.definitions().iter().enumerate() {
+                    if index > 0 {
+                        output.push_str(", ");
+                    }
+                    let definition = definition.full_range(&db, &module).range();
+                    // Keep multiline definitions on one line.
+                    let first_line = source[definition].lines().next().unwrap_or_default();
+                    let _ = write!(
+                        output,
+                        "{} (line {})",
+                        first_line,
+                        line_index.line_index(definition.start())
+                    );
+                }
+                output.push('\n');
+                if let Some(detail) = detail {
+                    let (label, value) = match detail {
+                        ResolutionDetail::CrossesScopeDeclaration => (
+                            "crosses_scope_declaration",
+                            resolution.crosses_scope_declaration(),
+                        ),
+                        ResolutionDetail::IdentifiesAllBindings => (
+                            "identifies_all_bindings",
+                            resolution.identifies_all_bindings(),
+                        ),
+                    };
+                    let _ = writeln!(output, "   | {label}: {value}");
+                }
+            }
+        }
+
+        output
+    }
+
+    struct NameResolutions<'db, 'filter> {
+        model: SemanticModel<'db>,
+        include_name: &'filter dyn Fn(&ast::ExprName) -> bool,
+        resolutions: Vec<(TextRange, Option<DefinitionResolution<'db>>)>,
+    }
+
+    impl<'ast> Visitor<'ast> for NameResolutions<'_, '_> {
+        fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+            if let ast::Expr::Name(name) = expression
+                && (self.include_name)(name)
+            {
+                self.resolutions
+                    .push((name.range(), self.model.reaching_definitions(name)));
+            } else if let ast::Expr::StringLiteral(string) = expression
+                && let Some((parsed, model)) = self.model.enter_string_annotation(string)
+            {
+                let mut nested = NameResolutions {
+                    model,
+                    include_name: self.include_name,
+                    resolutions: Vec::new(),
+                };
+                nested.visit_expr(parsed.expr());
+                self.resolutions.extend(nested.resolutions);
+            }
+            walk_expr(self, expression);
+        }
     }
 }
