@@ -363,12 +363,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let name_arg = name_arg?;
         let env = self.program_environment();
 
-        for arg in arguments.args() {
-            self.infer_expression(arg, TypeContext::default());
-        }
-        for kw in arguments.keywords() {
-            self.infer_expression(&kw.value, TypeContext::default());
-        }
+        arguments.for_each_in_evaluation_order(|argument| {
+            self.infer_expression(argument.value(), TypeContext::default());
+        });
 
         let name_type = self.expression_type(name_arg);
         let name = self.infer_enum_name_argument(name_arg, name_type, base_class);

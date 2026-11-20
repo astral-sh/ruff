@@ -3559,7 +3559,12 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
         // but this causes more problems than it fixes.
         Some(KnownClass::NotImplementedType) => vec![],
         _ => {
-            let mut expanded_bases = Vec::with_capacity(class_stmt.bases().count());
+            let mut expanded_bases = Vec::with_capacity(
+                class_stmt
+                    .arguments
+                    .as_deref()
+                    .map_or(0, ast::Arguments::len),
+            );
 
             for base_node in class_stmt.bases() {
                 if let Some(tuple) =

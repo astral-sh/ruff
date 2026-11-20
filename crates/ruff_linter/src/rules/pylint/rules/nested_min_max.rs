@@ -173,9 +173,6 @@ fn collect_nested_args(
 
 /// PLW3301
 pub(crate) fn nested_min_max(checker: &Checker, expr: &Expr, func: &Expr, arguments: &Arguments) {
-    let Some(min_max) = MinMax::try_from_call(func, arguments, checker.semantic()) else {
-        return;
-    };
     // It's only safe to flatten nested calls if the outer call has more than one argument.
     // When the outer call has a single argument, flattening would change the semantics by
     // changing the shape of the call from treating the inner result as an iterable (or a scalar)
@@ -184,6 +181,9 @@ pub(crate) fn nested_min_max(checker: &Checker, expr: &Expr, func: &Expr, argume
         return;
     }
 
+    let Some(min_max) = MinMax::try_from_call(func, arguments, checker.semantic()) else {
+        return;
+    };
     if arguments.args().any(|arg| {
         let Expr::Call(ast::ExprCall {
             func, arguments, ..

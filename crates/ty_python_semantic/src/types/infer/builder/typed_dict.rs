@@ -125,12 +125,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let arguments = &call_expr.arguments;
 
-        let starred_arguments: SmallVec<[&ast::Expr; 1]> = arguments
-            .args()
-            .filter(|arg| arg.is_starred_expr())
-            .collect();
-        let double_starred_arguments: SmallVec<[&ast::Keyword; 1]> =
-            arguments.keywords().filter(|kw| kw.arg.is_none()).collect();
+        let mut starred_arguments: SmallVec<[_; 1]> = SmallVec::new();
+        let mut double_starred_arguments: SmallVec<[_; 1]> = SmallVec::new();
+        for argument in arguments.iter_source_order() {
+            match argument {
+                ast::ArgOrKeyword::Arg(arg) if arg.is_starred_expr() => starred_arguments.push(arg),
+                ast::ArgOrKeyword::Keyword(kw) if kw.is_variadic() => {
+                    double_starred_arguments.push(kw);
+                }
+                _ => {}
+            }
+        }
 
         // The fallback type reflects the fact that if the call were successful,
         // it would return a class that is a subclass of `Mapping[str, object]`
@@ -187,8 +192,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let mut total = true;
-        let mut closed = false;
+        let mut closed = None;
         let mut extra_items = None;
+        let mut extra_items_kwarg = None;
         let supports_pep_728 = self.in_stub()
             || typed_dict_module == TypingModule::TypingExtensions
             || self.program_environment().python_version(db) >= PythonVersion::PY315;
@@ -231,10 +237,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             total = true;
                         }
                     } else {
-                        closed = kw_type.bool(db, env).is_always_true();
+                        closed = Some(kw_type.bool(db, env).is_always_true());
                     }
                 }
                 "extra_items" => {
+                    extra_items_kwarg.get_or_insert(kw);
                     if definition.is_none() {
                         let annotation = self.infer_extra_items_kwarg(kw.value.as_ref());
                         extra_items = Some(TypedDictOpenness::extra(
@@ -255,8 +262,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        if let Some(extra_items_kwarg) = call_expr.arguments.find_keyword("extra_items")
-            && call_expr.arguments.find_keyword("closed").is_some()
+        if let Some(extra_items_kwarg) = extra_items_kwarg
+            && closed.is_some()
             && let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ARGUMENT_TYPE, extra_items_kwarg)
@@ -271,18 +278,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return fallback();
         }
 
-        if let Some(extra_arg) = arguments.args().nth(2)
+        let mut positional = arguments.args();
+        let name_arg = positional.next();
+        let fields_arg = positional.next();
+        let mut extra_args = positional.peekable();
+        if let Some(&extra_arg) = extra_args.peek()
             && let Some(builder) = self
                 .context
                 .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, extra_arg)
         {
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to function `TypedDict`: expected 2, got {}",
-                arguments.args().count()
+                2 + extra_args.clone().count()
             ));
         }
 
-        let Some(name_arg) = arguments.args().next() else {
+        let Some(name_arg) = name_arg else {
             if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
                 builder.into_diagnostic(
                     "No arguments provided for required parameters `typename` \
@@ -295,7 +306,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let name_type = self.infer_expression(name_arg, TypeContext::default());
 
-        let Some(fields_arg) = arguments.args().nth(1) else {
+        let Some(fields_arg) = fields_arg else {
             if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
                 builder.into_diagnostic(
                     "No argument provided for required parameter `fields` of function `TypedDict`",
@@ -304,7 +315,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return fallback();
         };
 
-        for arg in arguments.args().skip(2) {
+        for arg in extra_args {
             self.infer_expression(arg, TypeContext::default());
         }
 
@@ -361,7 +372,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     scope,
                     offset: self.dynamic_class_scope_offset(call_expr),
                     schema,
-                    openness: extra_items.unwrap_or(if closed {
+                    openness: extra_items.unwrap_or(if closed.unwrap_or(false) {
                         TypedDictOpenness::Closed
                     } else {
                         TypedDictOpenness::ImplicitlyOpen
@@ -675,13 +686,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             | TypedDictConstructorForm::MultiplePositionalArguments => {}
         }
 
-        if arguments.keywords().next().is_some() {
-            self.infer_typed_dict_constructor_keyword_values(
-                typed_dict,
-                arguments,
-                TypeContext::default(),
-            );
-        }
+        self.infer_typed_dict_constructor_keyword_values(
+            typed_dict,
+            arguments,
+            TypeContext::default(),
+        );
 
         validate_typed_dict_constructor(
             &self.context,
