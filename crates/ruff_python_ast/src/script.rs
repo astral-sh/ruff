@@ -1,3 +1,4 @@
+use std::ops::Range;
 use std::sync::LazyLock;
 
 use memchr::memmem::Finder;
@@ -189,6 +190,14 @@ impl ScriptSourceMap {
     /// Maps a metadata range to its corresponding range in the Python source.
     pub fn map_range(&self, range: TextRange) -> TextRange {
         TextRange::new(self.map_offset(range.start()), self.map_offset(range.end()))
+    }
+
+    /// Maps a byte span from the TOML parser to a range in the Python source.
+    pub fn map_toml_span(&self, span: Option<Range<usize>>) -> Option<TextRange> {
+        let span = span?;
+        let start = TextSize::try_from(span.start).ok()?;
+        let end = TextSize::try_from(span.end).ok()?;
+        Some(self.map_range(TextRange::new(start, end)))
     }
 
     fn push_marker(&mut self, metadata_offset: TextSize, source_offset: TextSize) {

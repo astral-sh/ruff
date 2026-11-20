@@ -228,8 +228,7 @@ impl<'a> Resolver<'a> {
 #[derive(Debug)]
 pub struct Project {
     /// The merged configuration before CLI or editor overrides are applied.
-    #[expect(dead_code)]
-    configuration: Configuration,
+    pub(super) configuration: Configuration,
     /// The resolved settings, including CLI or editor overrides.
     pub settings: Settings,
     /// Absolute, normalized path to the configuration file, if one was loaded.

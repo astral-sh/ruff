@@ -17,8 +17,8 @@ use ruff_linter::settings::types::{PythonVersion, RequiredVersion};
 use crate::options::{Options, validate_required_version};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct Tools {
-    ruff: Option<Options>,
+pub(super) struct Tools {
+    pub(super) ruff: Option<Options>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -115,7 +115,7 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
-fn check_required_version(value: &toml::de::DeTable, table_path: &[&str]) -> Result<()> {
+pub(super) fn check_required_version(value: &toml::de::DeTable, table_path: &[&str]) -> Result<()> {
     let mut current = value;
     for key in table_path {
         let Some(next) = current.get(*key) else {
@@ -234,7 +234,9 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
 }
 
 /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
-fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<PythonVersion> {
+pub(super) fn get_minimum_supported_version(
+    requires_version: &VersionSpecifiers,
+) -> Option<PythonVersion> {
     /// Truncate a version to its major and minor components.
     fn major_minor(version: &Version) -> Option<Version> {
         let major = version.release().first()?;

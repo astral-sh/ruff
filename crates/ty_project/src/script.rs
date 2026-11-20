@@ -7,7 +7,7 @@ use ruff_db::files::File;
 use ruff_db::source::{is_notebook, source_text};
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 use serde::Deserialize;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, UseDefaultStrategy};
@@ -282,11 +282,7 @@ fn script_metadata(db: &dyn Db, file: File) -> Option<Box<Result<ScriptMetadata,
     let mut metadata = match result {
         Ok(metadata) => metadata,
         Err(error) => {
-            let range = error.span().and_then(|span| {
-                let start = TextSize::try_from(span.start).ok()?;
-                let end = TextSize::try_from(span.end).ok()?;
-                Some(tag.source_map().map_range(TextRange::new(start, end)))
-            });
+            let range = tag.source_map().map_toml_span(error.span());
             return Some(Box::new(Err(invalid_script_metadata_diagnostic(
                 file,
                 error.message(),
