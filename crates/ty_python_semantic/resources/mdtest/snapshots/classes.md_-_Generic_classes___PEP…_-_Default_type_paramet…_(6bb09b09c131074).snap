@@ -13,26 +13,26 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.
 ## mdtest_snippet.py
 
 ```
- 1 | # error: [invalid-type-variable-default] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
+ 1 | # error: [invalid-type-parameter-order] "Type parameter `T` with a default follows TypeVarTuple `Ts`"
  2 | class Foo[*Ts, T = int]: ...
  3 | 
- 4 | # error: [invalid-type-variable-default]
+ 4 | # error: [invalid-type-parameter-order]
  5 | class Bar[T1, *Ts, T2 = int]: ...
  6 | 
- 7 | # error: [invalid-type-variable-default]
+ 7 | # error: [invalid-type-parameter-order]
  8 | class Baz[*Ts, T1 = int, T2 = str]: ...
  9 | 
-10 | # error: [invalid-type-variable-default]
+10 | # error: [invalid-type-parameter-order]
 11 | class Separated[*Ts, U, T = int]: ...
 12 | 
 13 | # A parameter list for a ParamSpec is distinguishable from the types that fill the pack.
 14 | # CPython raises TypeError here (https://github.com/python/typing/issues/2211).
 15 | class Qux[*Ts, **P = [int, str]]: ...
 16 | 
-17 | # error: [invalid-type-variable-default]
+17 | # error: [invalid-type-parameter-order]
 18 | class Quux[*Ts, T1 = int, **P = [int, str]]: ...
 19 | 
-20 | # error: [invalid-type-variable-default]
+20 | # error: [invalid-type-parameter-order]
 21 | class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
 22 | 
 23 | # error: [invalid-type-form] "Generic class `Grault` cannot have multiple `TypeVarTuple` type parameters"
@@ -46,7 +46,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.
 # Diagnostics
 
 ```
-error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+error[invalid-type-parameter-order]: TypeVars with defaults cannot follow a TypeVarTuple
  --> src/mdtest_snippet.py:2:16
   |
 2 | class Foo[*Ts, T = int]: ...
@@ -58,7 +58,7 @@ info: Using the default would let the TypeVarTuple consume an extra positional t
 ```
 
 ```
-error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+error[invalid-type-parameter-order]: TypeVars with defaults cannot follow a TypeVarTuple
  --> src/mdtest_snippet.py:5:20
   |
 5 | class Bar[T1, *Ts, T2 = int]: ...
@@ -70,7 +70,7 @@ info: Using the default would let the TypeVarTuple consume an extra positional t
 ```
 
 ```
-error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+error[invalid-type-parameter-order]: TypeVars with defaults cannot follow a TypeVarTuple
  --> src/mdtest_snippet.py:8:16
   |
 8 | class Baz[*Ts, T1 = int, T2 = str]: ...
@@ -83,7 +83,7 @@ info: Using the default would let the TypeVarTuple consume an extra positional t
 ```
 
 ```
-error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+error[invalid-type-parameter-order]: TypeVars with defaults cannot follow a TypeVarTuple
   --> src/mdtest_snippet.py:11:25
    |
 11 | class Separated[*Ts, U, T = int]: ...
@@ -95,7 +95,7 @@ info: Using the default would let the TypeVarTuple consume an extra positional t
 ```
 
 ```
-error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+error[invalid-type-parameter-order]: TypeVars with defaults cannot follow a TypeVarTuple
   --> src/mdtest_snippet.py:18:17
    |
 18 | class Quux[*Ts, T1 = int, **P = [int, str]]: ...
@@ -107,7 +107,7 @@ info: Using the default would let the TypeVarTuple consume an extra positional t
 ```
 
 ```
-error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+error[invalid-type-parameter-order]: TypeVars with defaults cannot follow a TypeVarTuple
   --> src/mdtest_snippet.py:21:18
    |
 21 | class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...

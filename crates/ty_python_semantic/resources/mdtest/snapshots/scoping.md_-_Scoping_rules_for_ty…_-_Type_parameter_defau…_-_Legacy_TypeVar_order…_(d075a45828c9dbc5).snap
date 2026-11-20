@@ -20,15 +20,15 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
  5 | T3 = TypeVar("T3")
  6 | DefaultStrT = TypeVar("DefaultStrT", default=str)
  7 | 
- 8 | # error: [invalid-type-variable-default]
+ 8 | # error: [invalid-type-parameter-order]
  9 | def f(x: T1, y: T2) -> tuple[T1, T2]:
 10 |     return x, y
 11 | 
-12 | # error: [invalid-type-variable-default]
+12 | # error: [invalid-type-parameter-order]
 13 | def g(x: T2, y: T1, z: T3) -> tuple[T2, T1, T3]:
 14 |     return x, y, z
 15 | 
-16 | # error: [invalid-type-variable-default]
+16 | # error: [invalid-type-parameter-order]
 17 | def h(x: T1, y: T2, z: DefaultStrT, w: T3) -> tuple[T1, T2, DefaultStrT, T3]:
 18 |     return x, y, z, w
 19 | 
@@ -42,7 +42,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 # Diagnostics
 
 ```
-error[invalid-type-variable-default]: Type parameters without defaults cannot follow type parameters with defaults
+error[invalid-type-parameter-order]: Type parameters without defaults cannot follow type parameters with defaults
  --> src/mdtest_snippet.py:9:17
   |
 9 | def f(x: T1, y: T2) -> tuple[T1, T2]:
@@ -60,7 +60,7 @@ error[invalid-type-variable-default]: Type parameters without defaults cannot fo
 ```
 
 ```
-error[invalid-type-variable-default]: Type parameters without defaults cannot follow type parameters with defaults
+error[invalid-type-parameter-order]: Type parameters without defaults cannot follow type parameters with defaults
   --> src/mdtest_snippet.py:13:24
    |
 13 | def g(x: T2, y: T1, z: T3) -> tuple[T2, T1, T3]:
@@ -79,7 +79,7 @@ error[invalid-type-variable-default]: Type parameters without defaults cannot fo
 ```
 
 ```
-error[invalid-type-variable-default]: Type parameters without defaults cannot follow type parameters with defaults
+error[invalid-type-parameter-order]: Type parameters without defaults cannot follow type parameters with defaults
   --> src/mdtest_snippet.py:17:17
    |
 17 | def h(x: T1, y: T2, z: DefaultStrT, w: T3) -> tuple[T1, T2, DefaultStrT, T3]:

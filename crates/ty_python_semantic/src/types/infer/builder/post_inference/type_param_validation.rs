@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::diagnostic::format_enumeration;
 use crate::types::{
     context::InferContext,
-    diagnostic::{INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_DEFAULT},
+    diagnostic::{INVALID_TYPE_FORM, INVALID_TYPE_PARAMETER_ORDER},
 };
 
 #[derive(Clone, Copy)]
@@ -93,7 +93,7 @@ pub(in crate::types::infer::builder) fn check_no_default_after_typevar_tuple<'a,
     as_pack: impl FnMut(P) -> Option<(&'a Name, TextRange)>,
     as_defaulted_typevar: impl FnMut(P) -> Option<(&'a Name, TextRange)>,
 ) {
-    if !context.is_lint_enabled(&INVALID_TYPE_VARIABLE_DEFAULT) {
+    if !context.is_lint_enabled(&INVALID_TYPE_PARAMETER_ORDER) {
         return;
     }
 
@@ -104,7 +104,7 @@ pub(in crate::types::infer::builder) fn check_no_default_after_typevar_tuple<'a,
     let Some((&(first_name, first_range), others)) = defaults.split_first() else {
         return;
     };
-    let Some(builder) = context.report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, first_range) else {
+    let Some(builder) = context.report_lint(&INVALID_TYPE_PARAMETER_ORDER, first_range) else {
         return;
     };
 
