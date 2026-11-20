@@ -1,20 +1,16 @@
 //! Extract docstrings from an AST.
 
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, StmtKind, Suite};
 use ruff_python_semantic::{Definition, DefinitionId, Definitions, Member, MemberKind};
 
 /// Extract a docstring from a function or class body.
-pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&ast::ExprStringLiteral> {
+pub(crate) fn docstring_from(suite: Suite<'_>) -> Option<ast::ExprStringLiteral<'_>> {
     let stmt = suite.first()?;
     // Require the docstring to be a standalone expression.
-    let Stmt::Expr(ast::StmtExpr {
-        value,
-        range: _,
-        node_index: _,
-    }) = stmt
-    else {
+    let StmtKind::Expr(expr) = stmt.classify() else {
         return None;
     };
+    let value = expr.value();
     // Only match strings.
     value.as_string_literal_expr()
 }
@@ -22,7 +18,7 @@ pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&ast::ExprStringLiteral> 
 /// Extract a docstring from a `Definition`.
 pub(crate) fn extract_docstring<'a>(
     definition: &'a Definition<'a>,
-) -> Option<&'a ast::ExprStringLiteral> {
+) -> Option<ast::ExprStringLiteral<'a>> {
     match definition {
         Definition::Module(module) => docstring_from(module.python_ast),
         Definition::Member(member) => docstring_from(member.body()),
@@ -31,8 +27,8 @@ pub(crate) fn extract_docstring<'a>(
 
 #[derive(Copy, Clone)]
 pub(crate) enum ExtractionTarget<'a> {
-    Class(&'a ast::StmtClassDef),
-    Function(&'a ast::StmtFunctionDef),
+    Class(ast::StmtClassDef<'a>),
+    Function(ast::StmtFunctionDef<'a>),
 }
 
 /// Extract a `Definition` from the AST node defined by a `Stmt`.
