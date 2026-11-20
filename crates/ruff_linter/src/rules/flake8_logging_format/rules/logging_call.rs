@@ -11,7 +11,7 @@ use crate::preview::is_fix_f_string_logging_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_logging_format::violations::{
     LoggingErrorWithExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
-    LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
+    LoggingRedundantExcInfo, LoggingStrFormat, LoggingStringConcat, LoggingWarn,
 };
 use crate::{Edit, Fix};
 
@@ -167,11 +167,11 @@ fn check_msg(checker: &Checker, msg: &Expr, arguments: &Arguments, msg_pos: usiz
         }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. })
-            if checker.is_rule_enabled(Rule::LoggingStringFormat) =>
+            if checker.is_rule_enabled(Rule::LoggingStrFormat) =>
         {
             if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                 if attr == "format" && value.is_literal_expr() {
-                    checker.report_diagnostic(LoggingStringFormat, msg.range());
+                    checker.report_diagnostic(LoggingStrFormat, msg.range());
                 }
             }
         }

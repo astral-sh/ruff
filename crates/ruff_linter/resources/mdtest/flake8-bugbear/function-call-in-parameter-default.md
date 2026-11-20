@@ -1,4 +1,4 @@
-# `function-call-in-default-argument` (`B008`)
+# `function-call-in-parameter-default` (`B008`)
 
 ```toml
 lint.select = ["B008"]
@@ -24,7 +24,7 @@ A non-frozen dataclass still triggers `B008`.
 @dataclass
 class Mutable: ...
 
-def f(value=Mutable()): ...  # error: [function-call-in-default-argument]
+def f(value=Mutable()): ...  # error: [function-call-in-parameter-default]
 ```
 
 Calls inside the constructor arguments are still checked.
@@ -33,7 +33,7 @@ Calls inside the constructor arguments are still checked.
 def get_items() -> list[int]:
     return []
 
-def f(value=Frozen(get_items())): ...  # error: [function-call-in-default-argument] "Do not perform function call `get_items`"
+def f(value=Frozen(get_items())): ...  # error: [function-call-in-parameter-default] "Do not perform function call `get_items`"
 ```
 
 ## Name resolution in defaults

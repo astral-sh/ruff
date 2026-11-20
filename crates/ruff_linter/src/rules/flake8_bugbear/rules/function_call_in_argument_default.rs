@@ -65,11 +65,11 @@ use crate::rules::ruff::rules::is_frozen_dataclass_instantiation;
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.102", category = Category::Suspicious)]
-pub(crate) struct FunctionCallInDefaultArgument {
+pub(crate) struct FunctionCallInParameterDefault {
     name: Option<String>,
 }
 
-impl Violation for FunctionCallInDefaultArgument {
+impl Violation for FunctionCallInParameterDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
         if let Some(name) = &self.name {
@@ -120,7 +120,7 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                         })
                 {
                     self.checker.report_diagnostic(
-                        FunctionCallInDefaultArgument {
+                        FunctionCallInParameterDefault {
                             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
                         },
                         expr.range(),

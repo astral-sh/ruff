@@ -32,9 +32,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.271", category = Category::Pedantic)]
-pub(crate) struct NumericLiteralTooLong;
+pub(crate) struct NumericLiteralTooLongInStub;
 
-impl AlwaysFixableViolation for NumericLiteralTooLong {
+impl AlwaysFixableViolation for NumericLiteralTooLongInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Numeric literals with a string representation longer than ten characters are not permitted"
@@ -52,7 +52,7 @@ pub(crate) fn numeric_literal_too_long(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(NumericLiteralTooLong, expr.range());
+    let mut diagnostic = checker.report_diagnostic(NumericLiteralTooLongInStub, expr.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         expr.range(),

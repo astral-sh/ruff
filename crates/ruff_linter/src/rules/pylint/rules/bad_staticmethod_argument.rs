@@ -44,11 +44,11 @@ use crate::codes::Category;
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
-pub(crate) struct BadStaticmethodArgument {
+pub(crate) struct BadStaticmethodParameter {
     argument_name: String,
 }
 
-impl Violation for BadStaticmethodArgument {
+impl Violation for BadStaticmethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { argument_name } = self;
@@ -109,7 +109,7 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
     }
 
     checker.report_diagnostic(
-        BadStaticmethodArgument {
+        BadStaticmethodParameter {
             argument_name: self_or_cls.name.to_string(),
         },
         self_or_cls.range(),

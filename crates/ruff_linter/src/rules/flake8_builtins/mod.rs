@@ -17,10 +17,10 @@ mod tests {
     use crate::{assert_diagnostics, assert_diagnostics_diff};
     use ruff_python_ast::PythonVersion;
 
-    #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"))]
-    #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"))]
-    #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"))]
-    #[test_case(Rule::BuiltinImportShadowing, Path::new("A004.py"))]
+    #[test_case(Rule::VariableShadowsBuiltin, Path::new("A001.py"))]
+    #[test_case(Rule::ParameterShadowsBuiltin, Path::new("A002.py"))]
+    #[test_case(Rule::AttributeShadowsBuiltin, Path::new("A003.py"))]
+    #[test_case(Rule::ImportShadowsBuiltin, Path::new("A004.py"))]
     #[test_case(
         Rule::StdlibModuleShadowing,
         Path::new("A005/modules/non_builtin/__init__.py")
@@ -46,7 +46,7 @@ mod tests {
         Path::new("A005/modules/_abc/__init__.py")
     )]
     #[test_case(Rule::StdlibModuleShadowing, Path::new("A005/modules/package/xml.py"))]
-    #[test_case(Rule::BuiltinLambdaArgumentShadowing, Path::new("A006.py"))]
+    #[test_case(Rule::LambdaParameterShadowsBuiltin, Path::new("A006.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -63,7 +63,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"))]
+    #[test_case(Rule::AttributeShadowsBuiltin, Path::new("A003.py"))]
     fn deferred_annotations_diff(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "deferred_annotations_diff_{}_{}",
@@ -152,11 +152,11 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"))]
-    #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"))]
-    #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"))]
-    #[test_case(Rule::BuiltinImportShadowing, Path::new("A004.py"))]
-    #[test_case(Rule::BuiltinLambdaArgumentShadowing, Path::new("A006.py"))]
+    #[test_case(Rule::VariableShadowsBuiltin, Path::new("A001.py"))]
+    #[test_case(Rule::ParameterShadowsBuiltin, Path::new("A002.py"))]
+    #[test_case(Rule::AttributeShadowsBuiltin, Path::new("A003.py"))]
+    #[test_case(Rule::ImportShadowsBuiltin, Path::new("A004.py"))]
+    #[test_case(Rule::LambdaParameterShadowsBuiltin, Path::new("A006.py"))]
     fn builtins_ignorelist(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_{}_builtins_ignorelist",
@@ -223,7 +223,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::BuiltinImportShadowing, Path::new("A004.py"))]
+    #[test_case(Rule::ImportShadowsBuiltin, Path::new("A004.py"))]
     fn rules_py312(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}_py38", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

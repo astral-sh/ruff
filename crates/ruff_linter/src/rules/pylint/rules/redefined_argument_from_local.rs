@@ -32,17 +32,17 @@ use crate::codes::Category;
 /// - `lint.dummy-variable-rgx`
 ///
 /// ## References
-/// - [Pylint documentation](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/redefined-argument-from-local.html)
+/// - [Pylint documentation](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/redefined-parameter-from-local.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
-pub(crate) struct RedefinedArgumentFromLocal {
+pub(crate) struct RedefinedParameterFromLocal {
     name: String,
 }
 
-impl Violation for RedefinedArgumentFromLocal {
+impl Violation for RedefinedParameterFromLocal {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedArgumentFromLocal { name } = self;
+        let RedefinedParameterFromLocal { name } = self;
         format!("Redefining argument with the local name `{name}`")
     }
 }
@@ -70,7 +70,7 @@ pub(crate) fn redefined_argument_from_local(checker: &Checker, scope_id: ScopeId
                 continue;
             }
             checker.report_diagnostic(
-                RedefinedArgumentFromLocal {
+                RedefinedParameterFromLocal {
                     name: name.to_string(),
                 },
                 binding.range(),

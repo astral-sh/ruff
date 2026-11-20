@@ -57,15 +57,15 @@ use crate::codes::Category;
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
-pub(crate) struct TooManyPositionalArguments {
+pub(crate) struct TooManyPositionalParameters {
     c_pos: usize,
     max_pos: usize,
 }
 
-impl Violation for TooManyPositionalArguments {
+impl Violation for TooManyPositionalParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyPositionalArguments { c_pos, max_pos } = self;
+        let TooManyPositionalParameters { c_pos, max_pos } = self;
         format!("Too many positional arguments ({c_pos} > {max_pos})")
     }
 }
@@ -128,7 +128,7 @@ pub(crate) fn too_many_positional_arguments(
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        TooManyPositionalArguments {
+        TooManyPositionalParameters {
             c_pos: num_positional_args,
             max_pos: checker.settings().pylint.max_positional_args,
         },

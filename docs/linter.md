@@ -274,7 +274,7 @@ We expect virtually all projects to want the `correctness` rules enabled. The li
 include syntax errors that are not yet mapped to `invalid-syntax` diagnostics and other problems
 that cause immediate runtime errors. From there, `suspicious` is likely to be the next most helpful
 category. It includes rules that flag deprecated code, as well as classic footguns like
-`mutable-argument-default` (`B006`) that are almost always wrong but may be intentional in some
+`mutable-parameter-default` (`B006`) that are almost always wrong but may be intentional in some
 cases. We tried to be conservative with the rules in `correctness`, so many rules like this that are
 only _usually_ accurate are found in `suspicious` instead. In general, you should feel comfortable
 using a `ruff: ignore` comment on diagnostics from the `suspicious` or lower categories but think

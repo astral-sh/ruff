@@ -23,14 +23,14 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// - `lint.flake8-builtins.ignorelist`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.9.0", category = Category::Pedantic)]
-pub(crate) struct BuiltinLambdaArgumentShadowing {
+pub(crate) struct LambdaParameterShadowsBuiltin {
     name: String,
 }
 
-impl Violation for BuiltinLambdaArgumentShadowing {
+impl Violation for LambdaParameterShadowsBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinLambdaArgumentShadowing { name } = self;
+        let LambdaParameterShadowsBuiltin { name } = self;
         format!("Lambda argument `{name}` is shadowing a Python builtin")
     }
 }
@@ -49,7 +49,7 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &Expr
             checker.target_version(),
         ) {
             checker.report_diagnostic(
-                BuiltinLambdaArgumentShadowing {
+                LambdaParameterShadowsBuiltin {
                     name: name.to_string(),
                 },
                 name.range(),

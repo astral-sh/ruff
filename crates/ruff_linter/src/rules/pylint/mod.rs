@@ -141,14 +141,14 @@ mod tests {
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
     #[test_case(Rule::RedeclaredAssignedName, Path::new("redeclared_assigned_name.py"))]
     #[test_case(
-        Rule::RedefinedArgumentFromLocal,
+        Rule::RedefinedParameterFromLocal,
         Path::new("redefined_argument_from_local.py")
     )]
     #[test_case(Rule::RedefinedForOrWithTarget, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
-    #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
+    #[test_case(Rule::TooManyParameters, Path::new("too_many_arguments.py"))]
     #[test_case(
-        Rule::TooManyPositionalArguments,
+        Rule::TooManyPositionalParameters,
         Path::new("too_many_positional_arguments.py")
     )]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"))]
@@ -241,7 +241,7 @@ mod tests {
     )]
     #[test_case(Rule::NanComparison, Path::new("nan_comparison.py"))]
     #[test_case(
-        Rule::BadStaticmethodArgument,
+        Rule::BadStaticmethodParameter,
         Path::new("bad_staticmethod_argument.py")
     )]
     #[test_case(Rule::LenTest, Path::new("len_as_condition.py"))]
@@ -327,7 +327,7 @@ mod tests {
                     max_args: 4,
                     ..pylint::settings::Settings::default()
                 },
-                ..LinterSettings::for_rule(Rule::TooManyArguments)
+                ..LinterSettings::for_rule(Rule::TooManyParameters)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -340,7 +340,7 @@ mod tests {
             Path::new("pylint/too_many_arguments_params.py"),
             &LinterSettings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap(),
-                ..LinterSettings::for_rule(Rule::TooManyArguments)
+                ..LinterSettings::for_rule(Rule::TooManyParameters)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -356,7 +356,7 @@ mod tests {
                     max_positional_args: 4,
                     ..pylint::settings::Settings::default()
                 },
-                ..LinterSettings::for_rule(Rule::TooManyPositionalArguments)
+                ..LinterSettings::for_rule(Rule::TooManyPositionalParameters)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -490,7 +490,7 @@ mod tests {
             Path::new("pylint/swap_with_temporary_variable_1.py"),
             &LinterSettings::for_rules(vec![
                 Rule::SwapWithTemporaryVariable,
-                Rule::MissingTypeFunctionArgument,
+                Rule::UnannotatedParameter,
             ]),
         )?;
         assert_diagnostics!(diagnostics);

@@ -374,14 +374,14 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.138", category = Category::Correctness)]
-pub(crate) struct StringDotFormatInvalidFormat {
+pub(crate) struct StrFormatInvalidFormat {
     pub(crate) message: String,
 }
 
-impl Violation for StringDotFormatInvalidFormat {
+impl Violation for StrFormatInvalidFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StringDotFormatInvalidFormat { message } = self;
+        let StrFormatInvalidFormat { message } = self;
         format!("`.format` call has invalid format string: {message}")
     }
 }
@@ -417,22 +417,22 @@ impl Violation for StringDotFormatInvalidFormat {
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.139", category = Category::Correctness)]
-pub(crate) struct StringDotFormatExtraNamedArguments {
+pub(crate) struct StrFormatExtraNamedArguments {
     missing: Vec<Name>,
 }
 
-impl Violation for StringDotFormatExtraNamedArguments {
+impl Violation for StrFormatExtraNamedArguments {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StringDotFormatExtraNamedArguments { missing } = self;
+        let StrFormatExtraNamedArguments { missing } = self;
         let message = missing.join(", ");
         format!("`.format` call has unused named argument(s): {message}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let StringDotFormatExtraNamedArguments { missing } = self;
+        let StrFormatExtraNamedArguments { missing } = self;
         let message = missing.join(", ");
         Some(format!("Remove extra named arguments: {message}"))
     }
@@ -469,22 +469,22 @@ impl Violation for StringDotFormatExtraNamedArguments {
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.139", category = Category::Correctness)]
-pub(crate) struct StringDotFormatExtraPositionalArguments {
+pub(crate) struct StrFormatExtraPositionalArguments {
     missing: Vec<String>,
 }
 
-impl Violation for StringDotFormatExtraPositionalArguments {
+impl Violation for StrFormatExtraPositionalArguments {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StringDotFormatExtraPositionalArguments { missing } = self;
+        let StrFormatExtraPositionalArguments { missing } = self;
         let message = missing.join(", ");
         format!("`.format` call has unused arguments at position(s): {message}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let StringDotFormatExtraPositionalArguments { missing } = self;
+        let StrFormatExtraPositionalArguments { missing } = self;
         let message = missing.join(", ");
         Some(format!(
             "Remove extra positional arguments at position(s): {message}"
@@ -513,14 +513,14 @@ impl Violation for StringDotFormatExtraPositionalArguments {
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.139", category = Category::Correctness)]
-pub(crate) struct StringDotFormatMissingArguments {
+pub(crate) struct StrFormatMissingArguments {
     missing: Vec<String>,
 }
 
-impl Violation for StringDotFormatMissingArguments {
+impl Violation for StrFormatMissingArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StringDotFormatMissingArguments { missing } = self;
+        let StrFormatMissingArguments { missing } = self;
         let message = missing.join(", ");
         format!("`.format` call is missing argument(s) for placeholder(s): {message}")
     }
@@ -552,9 +552,9 @@ impl Violation for StringDotFormatMissingArguments {
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.139", category = Category::Correctness)]
-pub(crate) struct StringDotFormatMixingAutomatic;
+pub(crate) struct StrFormatMixedPlaceholderNumbering;
 
-impl Violation for StringDotFormatMixingAutomatic {
+impl Violation for StrFormatMixedPlaceholderNumbering {
     #[derive_message_formats]
     fn message(&self) -> String {
         "`.format` string mixes automatic and manual numbering".to_string()
@@ -837,7 +837,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 
     let names: Vec<Name> = missing.iter().map(|(_, name)| (*name).clone()).collect();
     let mut diagnostic = checker.report_diagnostic(
-        StringDotFormatExtraNamedArguments { missing: names },
+        StrFormatExtraNamedArguments { missing: names },
         call.range(),
     );
     let indexes: Vec<usize> = missing.into_iter().map(|(index, _)| index).collect();
@@ -911,7 +911,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        StringDotFormatExtraPositionalArguments {
+        StrFormatExtraPositionalArguments {
             missing: missing
                 .iter()
                 .map(ToString::to_string)
@@ -977,7 +977,7 @@ pub(crate) fn string_dot_format_missing_argument(
         .collect();
 
     if !missing.is_empty() {
-        checker.report_diagnostic(StringDotFormatMissingArguments { missing }, call.range());
+        checker.report_diagnostic(StrFormatMissingArguments { missing }, call.range());
     }
 }
 
@@ -988,6 +988,6 @@ pub(crate) fn string_dot_format_mixing_automatic(
     summary: &FormatSummary,
 ) {
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {
-        checker.report_diagnostic(StringDotFormatMixingAutomatic, call.range());
+        checker.report_diagnostic(StrFormatMixedPlaceholderNumbering, call.range());
     }
 }

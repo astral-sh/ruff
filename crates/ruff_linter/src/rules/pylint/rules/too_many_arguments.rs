@@ -59,15 +59,15 @@ use crate::codes::Category;
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.238", category = Category::Pedantic)]
-pub(crate) struct TooManyArguments {
+pub(crate) struct TooManyParameters {
     c_args: usize,
     max_args: usize,
 }
 
-impl Violation for TooManyArguments {
+impl Violation for TooManyParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyArguments { c_args, max_args } = self;
+        let TooManyParameters { c_args, max_args } = self;
         format!("Too many arguments in function definition ({c_args} > {max_args})")
     }
 }
@@ -124,7 +124,7 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        TooManyArguments {
+        TooManyParameters {
             c_args: num_arguments,
             max_args: checker.settings().pylint.max_args,
         },

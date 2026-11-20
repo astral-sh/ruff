@@ -77,9 +77,9 @@ use crate::{AlwaysFixableViolation, Violation};
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
-pub(crate) struct LoggingStringFormat;
+pub(crate) struct LoggingStrFormat;
 
-impl Violation for LoggingStringFormat {
+impl Violation for LoggingStrFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Logging statement uses `str.format`".to_string()
