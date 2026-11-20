@@ -103,12 +103,20 @@ struct NarrowingAlias<'ast> {
     first_definition_after_alias: ScopedDefinitionId,
 }
 
+#[derive(Default)]
+struct NarrowingAliases<'ast> {
+    by_name: FxHashMap<Name, NarrowingAlias<'ast>>,
+    /// Every place narrowed by a live alias in this scope. Places can stay in the set
+    /// after an alias is removed, since we only use it to rule out invalidations.
+    narrowed_places: PossiblyNarrowedPlaces,
+}
+
 struct ScopeInfo<'ast> {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
     /// Saved narrowing aliases from the enclosing scope, restored on `pop_scope`.
-    narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    narrowing_aliases: NarrowingAliases<'ast>,
     /// `global` and `nonlocal` declarations from scopes nested under this one. This is used for:
     ///
     /// 1. Visibility of nested writes. A nested function that binds a variable might affect the
@@ -312,7 +320,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Maps alias variable names to their narrowing expressions (same-scope only).
     /// TODO: cross-scope alias narrowing support
-    narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    narrowing_aliases: NarrowingAliases<'ast>,
 
     /// Alias metadata for predicate leaf names in the current file.
     alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
@@ -371,7 +379,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try_statement: false,
             semantic_syntax_errors: RefCell::default(),
-            narrowing_aliases: FxHashMap::default(),
+            narrowing_aliases: NarrowingAliases::default(),
             alias_predicates: FxHashMap::default(),
         };
 
@@ -1145,7 +1153,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .is_some_and(|symbol| narrowed_places.contains(&symbol.into()));
 
         if !narrowed_places.is_empty() && !target_is_narrowed {
-            self.narrowing_aliases.insert(
+            self.narrowing_aliases
+                .narrowed_places
+                .extend(&narrowed_places);
+            self.narrowing_aliases.by_name.insert(
                 target_name.clone(),
                 NarrowingAlias {
                     expression: value,
@@ -1159,31 +1170,33 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Invalidate any narrowing aliases affected by a new definition of `place`.
     fn invalidate_narrowing_aliases_for(&mut self, place: ScopedPlaceId) {
+        if self.narrowing_aliases.by_name.is_empty() {
+            return;
+        }
+
         let place_table = &self.place_tables[self.current_scope()];
+        // Rebinding the alias itself invalidates it: `is_none = x is None; is_none = False`.
+        if let Some(symbol) = place.as_symbol() {
+            self.narrowing_aliases
+                .by_name
+                .remove(place_table.symbol(symbol).name());
+        }
+
+        // Rebinding a place also invalidates aliases that narrow it or any of its members,
+        // e.g. `is_none = a.x is None; a = A()`.
         let associated_members = place_table.associated_place_ids(place);
-        let reassigned_alias_name = place
-            .as_symbol()
-            .map(|symbol_id| place_table.symbol(symbol_id).name());
+        let affected = |places: &PossiblyNarrowedPlaces| {
+            places.contains(&place)
+                || associated_members
+                    .iter()
+                    .any(|member| places.contains(&(*member).into()))
+        };
 
-        self.narrowing_aliases.retain(|name, alias| {
-            // Drop aliases that narrow the reassigned place or any of its members.
-            //  e.g. `is_none = x is None and ...; x = 1`
-            if alias.narrowed_places.contains(&place) {
-                return false;
-            }
-
-            //  e.g. `is_none = a.x is None; a = A()`
-            if associated_members
-                .iter()
-                .any(|m| alias.narrowed_places.contains(&(*m).into()))
-            {
-                return false;
-            }
-
-            // Drop the alias whose own variable is the reassigned place.
-            // e.g. `is_none = x is None; is_none = False`
-            reassigned_alias_name != Some(name)
-        });
+        if affected(&self.narrowing_aliases.narrowed_places) {
+            self.narrowing_aliases
+                .by_name
+                .retain(|_, alias| !affected(&alias.narrowed_places));
+        }
     }
 
     fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
@@ -1251,7 +1264,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let Some(name) = leaf.as_name_expr() else {
                 return;
             };
-            let Some(alias) = self.narrowing_aliases.get(&name.id) else {
+            let Some(alias) = self.narrowing_aliases.by_name.get(&name.id) else {
                 return;
             };
             if self
