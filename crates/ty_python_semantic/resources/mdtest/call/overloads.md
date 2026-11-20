@@ -142,6 +142,28 @@ reveal_type(select_text)  # revealed: partial[(value: str) -> str]
 select_text(1)  # error: [invalid-argument-type]
 ```
 
+### Literal promotion in a matching overload
+
+The literal bound in the matching overload keeps `"blue"` from widening to `str` when the call
+result becomes a list element.
+
+```py
+from typing import Literal, TypeVar, overload
+
+T = TypeVar("T", bound=Literal["blue"])
+
+@overload
+def color(value: Literal["red"]) -> str: ...
+@overload
+def color(value: Literal["green"]) -> str: ...
+@overload
+def color(value: T) -> T: ...
+def color(value: str) -> str:
+    return value
+
+reveal_type([color("blue")])  # revealed: list[Literal["blue"]]
+```
+
 ### Type context when no overload matches
 
 Both overloads reject the value, but only the first also rejects the key. The second overload
