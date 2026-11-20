@@ -7,6 +7,7 @@ use std::str;
 
 use anyhow::Result;
 
+use indoc::indoc;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 
 use crate::CliTest;
@@ -5541,6 +5542,61 @@ fn fix_redirected_selectors_with_rule_names() -> Result<()> {
 
     ----- stderr -----
     "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn script_rule_selectors() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        indoc! {r#"
+            # /// script
+            # [tool.ruff.lint]
+            # select = ["TCH", "F401"]
+            # ///
+            print("hello")
+        "#},
+    )?;
+
+    assert_cmd_snapshot!(
+        test.check_command()
+            .args(["--preview", "--select", "RUF201,RUF202", "script.py"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:3:14: renamed-rule: [*] Rule selector `TCH` redirects to `TC` in `lint.select`
+    script.py:3:21: rule-codes-in-selectors: [*] Rule code used instead of name in `lint.select`
+    Found 2 errors.
+    [*] 2 fixable with `--fix`.
+
+    ----- stderr -----
+    "
+    );
+
+    assert_cmd_snapshot!(
+        test.check_command()
+            .args(["--preview", "--select", "RUF201,RUF202", "--diff", "script.py"]),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- script.py
+    +++ script.py
+    @@ -1,5 +1,5 @@
+     # /// script
+     # [tool.ruff.lint]
+    -# select = ["TCH", "F401"]
+    +# select = ["TC", "unused-import"]
+     # ///
+     print("hello")
+
+    Would fix 2 errors.
+
+    ----- stderr -----
+    "#
     );
 
     Ok(())

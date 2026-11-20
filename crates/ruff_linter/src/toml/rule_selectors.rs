@@ -2,6 +2,7 @@ use toml::Spanned;
 use toml::de::{DeArray, DeTable, DeValue};
 
 use ruff_python_ast::TomlSourceType;
+use ruff_python_ast::script::ScriptTag;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::LintContext;
@@ -14,6 +15,7 @@ pub(super) fn check_rule_selectors(
     context: &LintContext,
     document: &DeTable<'_>,
     source_type: TomlSourceType,
+    source: SelectorSource,
 ) {
     let ruff = match source_type {
         TomlSourceType::Pyproject => document
@@ -28,10 +30,27 @@ pub(super) fn check_rule_selectors(
         return;
     };
 
-    check_selectors(context, ruff, false);
+    check_selectors(context, ruff, false, source);
 
     if let Some(lint) = ruff.get("lint").and_then(|lint| lint.get_ref().as_table()) {
-        check_selectors(context, lint, true);
+        check_selectors(context, lint, true, source);
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum SelectorSource<'a> {
+    Toml(&'a str),
+    Script(&'a ScriptTag),
+}
+
+impl SelectorSource<'_> {
+    fn selector_range(self, value: &Spanned<DeValue<'_>>) -> TextRange {
+        match self {
+            Self::Toml(source) => selector_range(value, source),
+            Self::Script(tag) => tag
+                .source_map()
+                .map_range(selector_range(value, tag.metadata())),
+        }
     }
 }
 
@@ -64,14 +83,19 @@ const ARRAY_SELECTORS: &[&str] = &[
 /// ```
 const TABLE_SELECTORS: &[&str] = &["per-file-ignores", "extend-per-file-ignores"];
 
-fn check_selectors(context: &LintContext, table: &DeTable<'_>, in_lint_table: bool) {
+fn check_selectors(
+    context: &LintContext,
+    table: &DeTable<'_>,
+    in_lint_table: bool,
+    source: SelectorSource,
+) {
     for &selector in ARRAY_SELECTORS {
         let Some(value) = table.get(selector) else {
             continue;
         };
 
         if let DeValue::Array(values) = value.get_ref() {
-            check_selector_array(context, values, selector, in_lint_table);
+            check_selector_array(context, values, selector, in_lint_table, source);
         }
     }
 
@@ -85,7 +109,7 @@ fn check_selectors(context: &LintContext, table: &DeTable<'_>, in_lint_table: bo
                 let Some(values) = value.get_ref().as_array() else {
                     continue;
                 };
-                check_selector_array(context, values, selector, in_lint_table);
+                check_selector_array(context, values, selector, in_lint_table, source);
             }
         }
     }
@@ -96,9 +120,8 @@ fn check_selector_array(
     values: &DeArray<'_>,
     setting: &'static str,
     in_lint_table: bool,
+    source: SelectorSource,
 ) {
-    let source = context.source_file().source_text();
-
     for value in values {
         let Some(selector) = value.get_ref().as_str() else {
             continue;
@@ -107,7 +130,7 @@ fn check_selector_array(
         if context.is_rule_enabled(Rule::RenamedRule)
             && let Some((original, target)) = redirect
         {
-            let range = selector_range(value, source);
+            let range = source.selector_range(value);
             renamed_rule(context, original, target, range, setting, in_lint_table);
         }
 
@@ -116,7 +139,7 @@ fn check_selector_array(
             && is_human_readable_names_enabled(context.settings().preview)
             && let Ok(rule) = Rule::from_code(code)
         {
-            let range = selector_range(value, source);
+            let range = source.selector_range(value);
             rule_codes_in_selectors(context, rule.name(), range, setting, in_lint_table);
         }
     }

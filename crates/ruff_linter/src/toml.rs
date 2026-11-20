@@ -5,6 +5,7 @@ use toml::de::DeTable;
 
 use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::TomlSourceType;
+use ruff_python_ast::script::ScriptTag;
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
@@ -36,7 +37,12 @@ pub fn lint_toml(
     if context.any_rule_enabled(&[Rule::RuleCodesInSelectors, Rule::RenamedRule])
         && let Ok(document) = &document
     {
-        rule_selectors::check_rule_selectors(&context, document.get_ref(), source_type);
+        rule_selectors::check_rule_selectors(
+            &context,
+            document.get_ref(),
+            source_type,
+            rule_selectors::SelectorSource::Toml(contents),
+        );
     }
 
     if source_type.is_pyproject() && context.is_rule_enabled(Rule::InvalidPyprojectToml) {
@@ -44,6 +50,19 @@ pub fn lint_toml(
     }
 
     context.into_diagnostics()
+}
+
+pub(crate) fn lint_script_metadata(context: &LintContext, contents: &str) {
+    if let Some(tag) = ScriptTag::parse(contents)
+        && let Ok(document) = DeTable::parse(tag.metadata())
+    {
+        rule_selectors::check_rule_selectors(
+            context,
+            document.get_ref(),
+            TomlSourceType::Pyproject,
+            rule_selectors::SelectorSource::Script(&tag),
+        );
+    }
 }
 
 /// Generate [`Diagnostic`]s for a TOML configuration file, iteratively fixing until stable.
