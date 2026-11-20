@@ -441,6 +441,24 @@ impl<'db> SequentMap<'db> {
         ))
     }
 
+    /// Whether the rules for these constraints forbid assigning both positively.
+    pub(super) fn is_impossible_pair(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: AtomicConstraint<'db>,
+        right: AtomicConstraint<'db>,
+    ) -> bool {
+        Self::for_constraint_pair(db, env, left, right).is_some_and(|map| {
+            map.all_sequents().any(|sequent| {
+                let Sequent::PairImpossibility { ante1, ante2 } = sequent else {
+                    return false;
+                };
+                let pair = (ante1.constraint(db), ante2.constraint(db));
+                pair == (left, right) || pair == (right, left)
+            })
+        })
+    }
+
     /// Returns a sequent map containing the sequents that we can infer from a pair of constraints.
     /// This method is cached so that we only perform this work once per constraint pair.
     ///
