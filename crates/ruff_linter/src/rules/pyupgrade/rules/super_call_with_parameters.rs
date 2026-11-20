@@ -54,9 +54,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155", category = Category::Style)]
-pub(crate) struct SuperCallWithParameters;
+pub(crate) struct SuperCallWithArguments;
 
-impl Violation for SuperCallWithParameters {
+impl Violation for SuperCallWithArguments {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -246,7 +246,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
+    let mut diagnostic = checker.report_diagnostic(SuperCallWithArguments, call.arguments.range());
 
     // Only provide a fix if there are no keyword arguments, since super() doesn't accept keyword arguments
     if call.arguments.keywords.is_empty() {

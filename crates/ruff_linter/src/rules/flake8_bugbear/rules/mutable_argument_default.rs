@@ -81,9 +81,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.92", category = Category::Suspicious)]
-pub(crate) struct MutableArgumentDefault;
+pub(crate) struct MutableParameterDefault;
 
-impl Violation for MutableArgumentDefault {
+impl Violation for MutableParameterDefault {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -125,7 +125,8 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
         {
-            let mut diagnostic = checker.report_diagnostic(MutableArgumentDefault, default.range());
+            let mut diagnostic =
+                checker.report_diagnostic(MutableParameterDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
             if let Some(fix) = move_initialization(function_def, parameter, default, checker) {

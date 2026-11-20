@@ -41,9 +41,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Let lru_cache be used as a decorator with no arguments](https://github.com/python/cpython/issues/80953)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155", category = Category::Style)]
-pub(crate) struct LRUCacheWithoutParameters;
+pub(crate) struct LRUCacheWithoutArguments;
 
-impl AlwaysFixableViolation for LRUCacheWithoutParameters {
+impl AlwaysFixableViolation for LRUCacheWithoutArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Unnecessary parentheses to `functools.lru_cache`".to_string()
@@ -75,7 +75,7 @@ pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[
                 .matches_qualified_name(func, &["functools", "lru_cache"])
         {
             let mut diagnostic = checker.report_diagnostic(
-                LRUCacheWithoutParameters,
+                LRUCacheWithoutArguments,
                 TextRange::new(func.end(), decorator.end()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(arguments.range())));

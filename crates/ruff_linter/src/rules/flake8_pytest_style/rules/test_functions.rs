@@ -33,11 +33,11 @@ use ruff_text_size::Ranged;
 /// - [Original Pytest issue](https://github.com/pytest-dev/pytest/issues/12693)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.12.0", category = Category::Suspicious)]
-pub(crate) struct PytestParameterWithDefaultArgument {
+pub(crate) struct PytestParameterWithDefaultValue {
     parameter_name: String,
 }
 
-impl Violation for PytestParameterWithDefaultArgument {
+impl Violation for PytestParameterWithDefaultValue {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -62,7 +62,7 @@ pub(crate) fn parameter_with_default_argument(checker: &Checker, function_def: &
             continue;
         };
         let parameter_name = parameter.name().to_string();
-        let kind = PytestParameterWithDefaultArgument { parameter_name };
+        let kind = PytestParameterWithDefaultValue { parameter_name };
         let edit = Edit::deletion(parameter.parameter.end(), parameter.end());
         let fix = Fix::display_only_edit(edit);
         checker

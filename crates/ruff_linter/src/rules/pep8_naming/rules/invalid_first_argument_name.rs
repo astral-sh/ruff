@@ -85,7 +85,7 @@ impl Violation for InstanceMethodReceiverNotNamedSelf {
 ///
 /// The method `__new__` is exempted from this
 /// check and the corresponding violation is caught by
-/// [`bad-staticmethod-argument`][PLW0211].
+/// [`bad-staticmethod-parameter`][PLW0211].
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends the use of `cls` as the first argument for all class
@@ -129,7 +129,7 @@ impl Violation for InstanceMethodReceiverNotNamedSelf {
 /// - `lint.pep8-naming.extend-ignore-names`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
-/// [PLW0211]: https://docs.astral.sh/ruff/rules/bad-staticmethod-argument/
+/// [PLW0211]: https://docs.astral.sh/ruff/rules/bad-staticmethod-parameter/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
 pub(crate) struct ClassMethodReceiverNotNamedCls {

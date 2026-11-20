@@ -38,14 +38,14 @@ use crate::registry::Rule;
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168", category = Category::Pedantic)]
-pub(crate) struct UnusedFunctionArgument {
+pub(crate) struct UnusedFunctionParameter {
     name: String,
 }
 
-impl Violation for UnusedFunctionArgument {
+impl Violation for UnusedFunctionParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedFunctionArgument { name } = self;
+        let UnusedFunctionParameter { name } = self;
         format!("Unused function argument: `{name}`")
     }
 }
@@ -91,14 +91,14 @@ impl Violation for UnusedFunctionArgument {
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168", category = Category::Pedantic)]
-pub(crate) struct UnusedMethodArgument {
+pub(crate) struct UnusedMethodParameter {
     name: String,
 }
 
-impl Violation for UnusedMethodArgument {
+impl Violation for UnusedMethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedMethodArgument { name } = self;
+        let UnusedMethodParameter { name } = self;
         format!("Unused method argument: `{name}`")
     }
 }
@@ -146,14 +146,14 @@ impl Violation for UnusedMethodArgument {
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168", category = Category::Pedantic)]
-pub(crate) struct UnusedClassMethodArgument {
+pub(crate) struct UnusedClassMethodParameter {
     name: String,
 }
 
-impl Violation for UnusedClassMethodArgument {
+impl Violation for UnusedClassMethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedClassMethodArgument { name } = self;
+        let UnusedClassMethodParameter { name } = self;
         format!("Unused class method argument: `{name}`")
     }
 }
@@ -201,14 +201,14 @@ impl Violation for UnusedClassMethodArgument {
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168", category = Category::Pedantic)]
-pub(crate) struct UnusedStaticMethodArgument {
+pub(crate) struct UnusedStaticMethodParameter {
     name: String,
 }
 
-impl Violation for UnusedStaticMethodArgument {
+impl Violation for UnusedStaticMethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedStaticMethodArgument { name } = self;
+        let UnusedStaticMethodParameter { name } = self;
         format!("Unused static method argument: `{name}`")
     }
 }
@@ -241,14 +241,14 @@ impl Violation for UnusedStaticMethodArgument {
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168", category = Category::Pedantic)]
-pub(crate) struct UnusedLambdaArgument {
+pub(crate) struct UnusedLambdaParameter {
     name: String,
 }
 
-impl Violation for UnusedLambdaArgument {
+impl Violation for UnusedLambdaParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedLambdaArgument { name } = self;
+        let UnusedLambdaParameter { name } = self;
         format!("Unused lambda argument: `{name}`")
     }
 }
@@ -266,26 +266,26 @@ enum Argumentable {
 impl Argumentable {
     fn check_for(self, checker: &Checker, name: String, range: TextRange) {
         let mut diagnostic = match self {
-            Self::Function => checker.report_diagnostic(UnusedFunctionArgument { name }, range),
-            Self::Method => checker.report_diagnostic(UnusedMethodArgument { name }, range),
+            Self::Function => checker.report_diagnostic(UnusedFunctionParameter { name }, range),
+            Self::Method => checker.report_diagnostic(UnusedMethodParameter { name }, range),
             Self::ClassMethod => {
-                checker.report_diagnostic(UnusedClassMethodArgument { name }, range)
+                checker.report_diagnostic(UnusedClassMethodParameter { name }, range)
             }
             Self::StaticMethod => {
-                checker.report_diagnostic(UnusedStaticMethodArgument { name }, range)
+                checker.report_diagnostic(UnusedStaticMethodParameter { name }, range)
             }
-            Self::Lambda => checker.report_diagnostic(UnusedLambdaArgument { name }, range),
+            Self::Lambda => checker.report_diagnostic(UnusedLambdaParameter { name }, range),
         };
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
     }
 
     const fn rule_code(self) -> Rule {
         match self {
-            Self::Function => Rule::UnusedFunctionArgument,
-            Self::Method => Rule::UnusedMethodArgument,
-            Self::ClassMethod => Rule::UnusedClassMethodArgument,
-            Self::StaticMethod => Rule::UnusedStaticMethodArgument,
-            Self::Lambda => Rule::UnusedLambdaArgument,
+            Self::Function => Rule::UnusedFunctionParameter,
+            Self::Method => Rule::UnusedMethodParameter,
+            Self::ClassMethod => Rule::UnusedClassMethodParameter,
+            Self::StaticMethod => Rule::UnusedStaticMethodParameter,
+            Self::Lambda => Rule::UnusedLambdaParameter,
         }
     }
 }

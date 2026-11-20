@@ -63,11 +63,11 @@ use crate::rules::ruff::helpers::{
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.262", category = Category::Suspicious)]
-pub(crate) struct FunctionCallInDataclassDefaultArgument {
+pub(crate) struct FunctionCallInDataclassFieldDefault {
     name: Option<String>,
 }
 
-impl Violation for FunctionCallInDataclassDefaultArgument {
+impl Violation for FunctionCallInDataclassFieldDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
         if let Some(name) = &self.name {
@@ -155,7 +155,7 @@ pub(crate) fn function_call_in_dataclass_default(
             continue;
         }
 
-        let kind = FunctionCallInDataclassDefaultArgument {
+        let kind = FunctionCallInDataclassFieldDefault {
             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
         };
         checker.report_diagnostic(kind, expr.range());

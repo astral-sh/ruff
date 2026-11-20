@@ -385,7 +385,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::AmbiguousVariableName) {
                         pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range());
                     }
-                    if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
+                    if checker.is_rule_enabled(Rule::VariableShadowsBuiltin) {
                         flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
                     }
                 }
@@ -552,11 +552,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 // pylint
                 Rule::BadStringFormatCharacter,
                 // pyflakes
-                Rule::StringDotFormatInvalidFormat,
-                Rule::StringDotFormatExtraNamedArguments,
-                Rule::StringDotFormatExtraPositionalArguments,
-                Rule::StringDotFormatMissingArguments,
-                Rule::StringDotFormatMixingAutomatic,
+                Rule::StrFormatInvalidFormat,
+                Rule::StrFormatExtraNamedArguments,
+                Rule::StrFormatExtraPositionalArguments,
+                Rule::StrFormatMissingArguments,
+                Rule::StrFormatMixedPlaceholderNumbering,
                 // pyupgrade
                 Rule::UnnecessaryPositionalStrFormatIndices,
                 Rule::StrFormat,
@@ -600,35 +600,32 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                 Err(e) => {
                                     // F521
                                     checker.report_diagnostic_if_enabled(
-                                        pyflakes::rules::StringDotFormatInvalidFormat {
+                                        pyflakes::rules::StrFormatInvalidFormat {
                                             message: pyflakes::format::error_to_string(&e),
                                         },
                                         location,
                                     );
                                 }
                                 Ok(summary) => {
-                                    if checker
-                                        .is_rule_enabled(Rule::StringDotFormatExtraNamedArguments)
-                                    {
+                                    if checker.is_rule_enabled(Rule::StrFormatExtraNamedArguments) {
                                         pyflakes::rules::string_dot_format_extra_named_arguments(
                                             checker, call, &summary, keywords,
                                         );
                                     }
-                                    if checker.is_rule_enabled(
-                                        Rule::StringDotFormatExtraPositionalArguments,
-                                    ) {
+                                    if checker
+                                        .is_rule_enabled(Rule::StrFormatExtraPositionalArguments)
+                                    {
                                         pyflakes::rules::string_dot_format_extra_positional_arguments(
                                             checker, call, &summary, args,
                                         );
                                     }
-                                    if checker
-                                        .is_rule_enabled(Rule::StringDotFormatMissingArguments)
-                                    {
+                                    if checker.is_rule_enabled(Rule::StrFormatMissingArguments) {
                                         pyflakes::rules::string_dot_format_missing_argument(
                                             checker, call, &summary, args, keywords,
                                         );
                                     }
-                                    if checker.is_rule_enabled(Rule::StringDotFormatMixingAutomatic)
+                                    if checker
+                                        .is_rule_enabled(Rule::StrFormatMixedPlaceholderNumbering)
                                     {
                                         pyflakes::rules::string_dot_format_mixing_automatic(
                                             checker, call, &summary,
@@ -671,7 +668,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::DeprecatedUnittestAlias) {
                 pyupgrade::rules::deprecated_unittest_alias(checker, func);
             }
-            if checker.is_rule_enabled(Rule::SuperCallWithParameters) {
+            if checker.is_rule_enabled(Rule::SuperCallWithArguments) {
                 pyupgrade::rules::super_call_with_parameters(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryEncodeUTF8) {
@@ -1001,7 +998,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_use_pathlib::rules::os_sep_split(checker, call);
             }
             if checker.any_rule_enabled(&[
-                Rule::LoggingStringFormat,
+                Rule::LoggingStrFormat,
                 Rule::LoggingPercentFormat,
                 Rule::LoggingStringConcat,
                 Rule::LoggingFString,
@@ -1141,7 +1138,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::NonOctalPermissions) {
                 ruff::rules::non_octal_permissions(checker, call);
             }
-            if checker.is_rule_enabled(Rule::AssertRaisesException) {
+            if checker.is_rule_enabled(Rule::AssertRaisesOverlyBroadException) {
                 flake8_bugbear::rules::assert_raises_exception_call(checker, call);
             }
         }
@@ -1468,7 +1465,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         Expr::NumberLiteral(number_literal @ ast::ExprNumberLiteral { .. }) => {
-            if checker.source_type.is_stub() && checker.is_rule_enabled(Rule::NumericLiteralTooLong)
+            if checker.source_type.is_stub()
+                && checker.is_rule_enabled(Rule::NumericLiteralTooLongInStub)
             {
                 flake8_pyi::rules::numeric_literal_too_long(checker, expr);
             }

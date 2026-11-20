@@ -46,11 +46,11 @@ use crate::codes::Category;
 /// - [Python documentation: Instance methods](https://docs.python.org/3/reference/datamodel.html#instance-methods)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.17.5", category = Category::Suspicious)]
-pub(crate) struct NoMethodArgument {
+pub(crate) struct MethodWithoutParameters {
     method_name: String,
 }
 
-impl Violation for NoMethodArgument {
+impl Violation for MethodWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { method_name } = self;
@@ -77,7 +77,7 @@ pub(crate) fn no_method_argument(checker: &Checker, scope: &Scope) {
     }
 
     checker.report_diagnostic(
-        NoMethodArgument {
+        MethodWithoutParameters {
             method_name: function.name.to_string(),
         },
         function.identifier(),

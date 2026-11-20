@@ -1,4 +1,4 @@
-# `string-or-bytes-too-long` (`PYI053`)
+# `string-or-bytes-too-long-in-stub` (`PYI053`)
 
 ```toml
 [lint]

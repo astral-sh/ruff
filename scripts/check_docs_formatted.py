@@ -107,7 +107,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "unconventional-docstring-quotes",
     "under-indented-docstring-line",
     "unexpected-indentation-comment",
-    "unexpected-spaces-around-keyword-parameter-equals",
+    "unexpected-spaces-around-argument-or-parameter-equals",
     "unicode-kind-prefix",
     "unnecessary-class-parentheses",
     "unnecessary-escaped-quote",
@@ -117,7 +117,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "whitespace-after-open-bracket",
     "whitespace-around-docstring-text",
     "whitespace-before-close-bracket",
-    "whitespace-before-parameters",
+    "whitespace-before-open-bracket",
     "whitespace-before-punctuation",
 ]
 

@@ -17,7 +17,7 @@ pub(crate) fn get_redirect(selector: &str) -> Option<(&'static str, &'static str
 pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     (
         "missing-return-type-undocumented-public-function",
-        Rule::MissingReturnTypePublicFunction,
+        Rule::MissingReturnAnnotationForPublicFunction,
     ),
     (
         "blank-line-before-function",
@@ -389,6 +389,152 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         Rule::UnnecessaryPositionalStrFormatIndices,
     ),
     ("f-string", Rule::StrFormat),
+    (
+        "string-dot-format-invalid-format",
+        Rule::StrFormatInvalidFormat,
+    ),
+    (
+        "string-dot-format-extra-named-arguments",
+        Rule::StrFormatExtraNamedArguments,
+    ),
+    (
+        "string-dot-format-extra-positional-arguments",
+        Rule::StrFormatExtraPositionalArguments,
+    ),
+    (
+        "string-dot-format-missing-arguments",
+        Rule::StrFormatMissingArguments,
+    ),
+    (
+        "string-dot-format-mixing-automatic",
+        Rule::StrFormatMixedPlaceholderNumbering,
+    ),
+    ("blind-except", Rule::ExceptOverlyBroadException),
+    (
+        "assert-raises-exception",
+        Rule::AssertRaisesOverlyBroadException,
+    ),
+    ("logging-string-format", Rule::LoggingStrFormat),
+    ("builtin-argument-shadowing", Rule::ParameterShadowsBuiltin),
+    (
+        "builtin-lambda-argument-shadowing",
+        Rule::LambdaParameterShadowsBuiltin,
+    ),
+    ("missing-type-function-argument", Rule::UnannotatedParameter),
+    (
+        "missing-type-args",
+        Rule::UnannotatedVariadicPositionalParameter,
+    ),
+    (
+        "missing-type-kwargs",
+        Rule::UnannotatedVariadicKeywordParameter,
+    ),
+    ("unused-function-argument", Rule::UnusedFunctionParameter),
+    ("unused-method-argument", Rule::UnusedMethodParameter),
+    (
+        "unused-class-method-argument",
+        Rule::UnusedClassMethodParameter,
+    ),
+    (
+        "unused-static-method-argument",
+        Rule::UnusedStaticMethodParameter,
+    ),
+    ("unused-lambda-argument", Rule::UnusedLambdaParameter),
+    ("mutable-argument-default", Rule::MutableParameterDefault),
+    (
+        "function-call-in-default-argument",
+        Rule::FunctionCallInParameterDefault,
+    ),
+    ("no-method-argument", Rule::MethodWithoutParameters),
+    ("bad-staticmethod-argument", Rule::BadStaticmethodParameter),
+    ("too-many-arguments", Rule::TooManyParameters),
+    (
+        "too-many-positional-arguments",
+        Rule::TooManyPositionalParameters,
+    ),
+    (
+        "redefined-argument-from-local",
+        Rule::RedefinedParameterFromLocal,
+    ),
+    (
+        "pytest-use-fixtures-without-parameters",
+        Rule::PytestUseFixturesWithoutArguments,
+    ),
+    (
+        "pytest-parameter-with-default-argument",
+        Rule::PytestParameterWithDefaultValue,
+    ),
+    ("super-call-with-parameters", Rule::SuperCallWithArguments),
+    (
+        "lru-cache-without-parameters",
+        Rule::LRUCacheWithoutArguments,
+    ),
+    (
+        "whitespace-before-parameters",
+        Rule::WhitespaceBeforeOpenBracket,
+    ),
+    (
+        "unexpected-spaces-around-keyword-parameter-equals",
+        Rule::UnexpectedSpacesAroundArgumentOrParameterEquals,
+    ),
+    (
+        "function-call-in-dataclass-default-argument",
+        Rule::FunctionCallInDataclassFieldDefault,
+    ),
+    (
+        "invalid-assert-message-literal-argument",
+        Rule::InvalidAssertMessageLiteral,
+    ),
+    ("unprefixed-type-param", Rule::UnprefixedTypeParameterInStub),
+    (
+        "unrecognized-version-info-check",
+        Rule::UnrecognizedVersionInfoCheckInStub,
+    ),
+    (
+        "patch-version-comparison",
+        Rule::PatchVersionComparisonInStub,
+    ),
+    (
+        "wrong-tuple-length-version-comparison",
+        Rule::WrongTupleLengthVersionComparisonInStub,
+    ),
+    (
+        "unrecognized-platform-check",
+        Rule::UnrecognizedPlatformCheckInStub,
+    ),
+    (
+        "unrecognized-platform-name",
+        Rule::UnrecognizedPlatformNameInStub,
+    ),
+    ("pass-in-class-body", Rule::PassInStubClassBody),
+    ("string-or-bytes-too-long", Rule::StringOrBytesTooLongInStub),
+    (
+        "numeric-literal-too-long",
+        Rule::NumericLiteralTooLongInStub,
+    ),
+    ("builtin-variable-shadowing", Rule::VariableShadowsBuiltin),
+    ("builtin-attribute-shadowing", Rule::AttributeShadowsBuiltin),
+    ("builtin-import-shadowing", Rule::ImportShadowsBuiltin),
+    (
+        "missing-return-type-public-function",
+        Rule::MissingReturnAnnotationForPublicFunction,
+    ),
+    (
+        "missing-return-type-private-function",
+        Rule::MissingReturnAnnotationForPrivateFunction,
+    ),
+    (
+        "missing-return-type-special-method",
+        Rule::MissingReturnAnnotationForSpecialMethod,
+    ),
+    (
+        "missing-return-type-static-method",
+        Rule::MissingReturnAnnotationForStaticMethod,
+    ),
+    (
+        "missing-return-type-class-method",
+        Rule::MissingReturnAnnotationForClassMethod,
+    ),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

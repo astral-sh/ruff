@@ -34,9 +34,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [PEP 8]: https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
-pub(crate) struct UnexpectedSpacesAroundKeywordParameterEquals;
+pub(crate) struct UnexpectedSpacesAroundArgumentOrParameterEquals;
 
-impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
+impl AlwaysFixableViolation for UnexpectedSpacesAroundArgumentOrParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Unexpected spaces around keyword / parameter equals".to_string()
@@ -160,7 +160,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(line: &LogicalLine, conte
                     // If there's space between the preceding token and the equals sign, report it.
                     if token.start() != prev_end {
                         if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
-                            UnexpectedSpacesAroundKeywordParameterEquals,
+                            UnexpectedSpacesAroundArgumentOrParameterEquals,
                             TextRange::new(prev_end, token.start()),
                         ) {
                             diagnostic
@@ -175,7 +175,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(line: &LogicalLine, conte
                         } else {
                             if next.start() != token.end() {
                                 if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
-                                    UnexpectedSpacesAroundKeywordParameterEquals,
+                                    UnexpectedSpacesAroundArgumentOrParameterEquals,
                                     TextRange::new(token.end(), next.start()),
                                 ) {
                                     diagnostic.set_fix(Fix::safe_edit(Edit::deletion(

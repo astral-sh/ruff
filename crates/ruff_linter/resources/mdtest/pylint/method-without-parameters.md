@@ -1,4 +1,4 @@
-# `no-method-argument` (`PLE0211`)
+# `method-without-parameters` (`PLE0211`)
 
 ```toml
 lint.preview = true
@@ -11,10 +11,10 @@ A bound instance method receives the instance as an implicit positional argument
 
 ```py
 class Example:
-    def method():  # snapshot: no-method-argument
+    def method():  # snapshot: method-without-parameters
         return 1
 
-    async def async_method():  # error: [no-method-argument]
+    async def async_method():  # error: [method-without-parameters]
         return 1
 ```
 
@@ -22,7 +22,7 @@ class Example:
 error[PLE0211]: Method `method` has no parameter for its implicit argument
  --> src/mdtest_snippet.py:2:9
   |
-2 |     def method():  # snapshot: no-method-argument
+2 |     def method():  # snapshot: method-without-parameters
   |         ^^^^^^
 ```
 
@@ -100,20 +100,20 @@ class Example:
 
 ```py
 class Example:
-    def __new__():  # error: [no-method-argument]
+    def __new__():  # error: [method-without-parameters]
         return object.__new__(Example)
 
-    def __init__():  # error: [no-method-argument]
+    def __init__():  # error: [method-without-parameters]
         pass
 
-    def __init_subclass__():  # error: [no-method-argument]
+    def __init_subclass__():  # error: [method-without-parameters]
         pass
 
-    def __class_getitem__():  # error: [no-method-argument]
+    def __class_getitem__():  # error: [method-without-parameters]
         return 1
 
 class Meta(type):
-    def method():  # error: [no-method-argument]
+    def method():  # error: [method-without-parameters]
         return 1
 ```
 
@@ -125,7 +125,7 @@ An explicit `staticmethod` or a suppression can express that this is intentional
 
 ```py
 class Example:
-    def method():  # error: [no-method-argument]
+    def method():  # error: [method-without-parameters]
         return 1
 
     def intentional():  # noqa: PLE0211

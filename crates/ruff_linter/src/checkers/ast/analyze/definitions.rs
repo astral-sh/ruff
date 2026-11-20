@@ -19,14 +19,14 @@ use crate::{docstrings, warn_user};
 pub(crate) fn definitions(checker: &mut Checker) {
     let enforce_annotations = checker.any_rule_enabled(&[
         Rule::AnyType,
-        Rule::MissingReturnTypeClassMethod,
-        Rule::MissingReturnTypePrivateFunction,
-        Rule::MissingReturnTypeSpecialMethod,
-        Rule::MissingReturnTypeStaticMethod,
-        Rule::MissingReturnTypePublicFunction,
-        Rule::MissingTypeArgs,
-        Rule::MissingTypeFunctionArgument,
-        Rule::MissingTypeKwargs,
+        Rule::MissingReturnAnnotationForClassMethod,
+        Rule::MissingReturnAnnotationForPrivateFunction,
+        Rule::MissingReturnAnnotationForSpecialMethod,
+        Rule::MissingReturnAnnotationForStaticMethod,
+        Rule::MissingReturnAnnotationForPublicFunction,
+        Rule::UnannotatedVariadicPositionalParameter,
+        Rule::UnannotatedParameter,
+        Rule::UnannotatedVariadicKeywordParameter,
     ]);
     let enforce_stubs =
         checker.source_type.is_stub() && checker.is_rule_enabled(Rule::DocstringInStub);

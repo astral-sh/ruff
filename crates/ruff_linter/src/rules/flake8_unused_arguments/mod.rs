@@ -13,11 +13,11 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
-    #[test_case(Rule::UnusedFunctionArgument, Path::new("ARG.py"))]
-    #[test_case(Rule::UnusedMethodArgument, Path::new("ARG.py"))]
-    #[test_case(Rule::UnusedClassMethodArgument, Path::new("ARG.py"))]
-    #[test_case(Rule::UnusedStaticMethodArgument, Path::new("ARG.py"))]
-    #[test_case(Rule::UnusedLambdaArgument, Path::new("ARG.py"))]
+    #[test_case(Rule::UnusedFunctionParameter, Path::new("ARG.py"))]
+    #[test_case(Rule::UnusedMethodParameter, Path::new("ARG.py"))]
+    #[test_case(Rule::UnusedClassMethodParameter, Path::new("ARG.py"))]
+    #[test_case(Rule::UnusedStaticMethodParameter, Path::new("ARG.py"))]
+    #[test_case(Rule::UnusedLambdaParameter, Path::new("ARG.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -37,11 +37,11 @@ mod tests {
                     ignore_variadic_names: true,
                 },
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedFunctionArgument,
-                    Rule::UnusedMethodArgument,
-                    Rule::UnusedClassMethodArgument,
-                    Rule::UnusedStaticMethodArgument,
-                    Rule::UnusedLambdaArgument,
+                    Rule::UnusedFunctionParameter,
+                    Rule::UnusedMethodParameter,
+                    Rule::UnusedClassMethodParameter,
+                    Rule::UnusedStaticMethodParameter,
+                    Rule::UnusedLambdaParameter,
                 ])
             },
         )?;
@@ -58,11 +58,11 @@ mod tests {
                     ignore_variadic_names: false,
                 },
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedFunctionArgument,
-                    Rule::UnusedMethodArgument,
-                    Rule::UnusedClassMethodArgument,
-                    Rule::UnusedStaticMethodArgument,
-                    Rule::UnusedLambdaArgument,
+                    Rule::UnusedFunctionParameter,
+                    Rule::UnusedMethodParameter,
+                    Rule::UnusedClassMethodParameter,
+                    Rule::UnusedStaticMethodParameter,
+                    Rule::UnusedLambdaParameter,
                 ])
             },
         )?;

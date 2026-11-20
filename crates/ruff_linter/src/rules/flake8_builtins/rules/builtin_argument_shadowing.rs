@@ -56,14 +56,14 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// [overload]: https://docs.python.org/3/library/typing.html#typing.overload
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.48", category = Category::Pedantic)]
-pub(crate) struct BuiltinArgumentShadowing {
+pub(crate) struct ParameterShadowsBuiltin {
     name: String,
 }
 
-impl Violation for BuiltinArgumentShadowing {
+impl Violation for ParameterShadowsBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinArgumentShadowing { name } = self;
+        let ParameterShadowsBuiltin { name } = self;
         format!("Function argument `{name}` is shadowing a Python builtin")
     }
 }
@@ -99,7 +99,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
         }
 
         checker.report_diagnostic(
-            BuiltinArgumentShadowing {
+            ParameterShadowsBuiltin {
                 name: parameter.name.to_string(),
             },
             parameter.name.range(),
