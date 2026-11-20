@@ -280,21 +280,23 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("trio-sync-call", Rule::TrioCallNotAwaited),
     (
         "blocking-path-method-in-async-function",
-        Rule::BlockingPathOperationInAsyncFunction,
+        Rule::BlockingPathCallInAsyncFunction,
     ),
     (
         "strip-with-multi-characters",
         Rule::StripWithDuplicateCharacters,
     ),
-    ("unnecessary-literal-set", Rule::UnnecessaryLiteralInSetCall),
-    ("static-join-to-f-string", Rule::StaticStrJoin),
+    ("static-join-to-f-string", Rule::UnnecessaryStrJoin),
     ("read-whole-file", Rule::ManualPathRead),
     ("write-whole-file", Rule::ManualPathWrite),
-    ("f-string-number-format", Rule::SlicedIntegerFormatting),
-    ("math-constant", Rule::ApproximateMathConstant),
+    ("f-string-number-format", Rule::SlicedIntegerBaseConversion),
+    ("math-constant", Rule::HardcodedMathConstant),
     ("invalid-envvar-value", Rule::InvalidGetenvKey),
     ("legacy-form-pytest-raises", Rule::PytestLegacyCallableForm),
-    ("hardcoded-sql-expression", Rule::SqlStringConstruction),
+    (
+        "hardcoded-sql-expression",
+        Rule::SuspiciousSqlStringConstruction,
+    ),
     (
         "open-file-with-context-handler",
         Rule::OpenFileWithoutContextManager,
@@ -302,10 +304,16 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("native-literals", Rule::UnnecessaryLiteralConstructor),
     (
         "replace-universal-newlines",
-        Rule::SubprocessUniversalNewlines,
+        Rule::SubprocessRunWithUniversalNewlines,
     ),
-    ("replace-stdout-stderr", Rule::SubprocessPipeStdoutStderr),
-    ("format-literals", Rule::UnnecessaryPositionalIndices),
+    (
+        "replace-stdout-stderr",
+        Rule::SubprocessRunWithPipedStdoutAndStderr,
+    ),
+    (
+        "format-literals",
+        Rule::UnnecessaryPositionalStrFormatIndices,
+    ),
     ("f-string", Rule::StrFormat),
 ];
 

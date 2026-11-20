@@ -34,17 +34,17 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// if the expression contains comments that would be removed by the fix.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.13.0", category = Category::Pedantic)]
-pub(crate) struct SlicedIntegerFormatting {
+pub(crate) struct SlicedIntegerBaseConversion {
     replacement: Option<SourceCodeSnippet>,
     base: Base,
 }
 
-impl Violation for SlicedIntegerFormatting {
+impl Violation for SlicedIntegerBaseConversion {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SlicedIntegerFormatting { replacement, base } = self;
+        let SlicedIntegerBaseConversion { replacement, base } = self;
         let function_name = base.function_name();
 
         if let Some(display) = replacement
@@ -153,7 +153,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     let replacement = try_create_replacement(checker, arg, base);
 
     let mut diagnostic = checker.report_diagnostic(
-        SlicedIntegerFormatting {
+        SlicedIntegerBaseConversion {
             replacement: replacement.as_deref().map(SourceCodeSnippet::from_str),
             base,
         },

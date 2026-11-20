@@ -34,22 +34,22 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `math` constants](https://docs.python.org/3/library/math.html#constants)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.1.6", category = Category::Suspicious)]
-pub(crate) struct ApproximateMathConstant {
+pub(crate) struct HardcodedMathConstant {
     literal: String,
     constant: &'static str,
 }
 
-impl Violation for ApproximateMathConstant {
+impl Violation for HardcodedMathConstant {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ApproximateMathConstant { literal, constant } = self;
+        let HardcodedMathConstant { literal, constant } = self;
         format!("Replace `{literal}` with `math.{constant}`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ApproximateMathConstant { constant, .. } = self;
+        let HardcodedMathConstant { constant, .. } = self;
         Some(format!("Use `math.{constant}`"))
     }
 }
@@ -62,7 +62,7 @@ pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral)
 
     if let Some(constant) = Constant::from_value(value) {
         let mut diagnostic = checker.report_diagnostic(
-            ApproximateMathConstant {
+            HardcodedMathConstant {
                 literal: checker.locator().slice(literal).into(),
                 constant: constant.name(),
             },

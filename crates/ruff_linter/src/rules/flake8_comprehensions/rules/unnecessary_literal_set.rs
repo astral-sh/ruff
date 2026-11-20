@@ -36,14 +36,14 @@ use crate::rules::flake8_comprehensions::helpers;
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.61", category = Category::Complexity)]
-pub(crate) struct UnnecessaryLiteralInSetCall {
+pub(crate) struct UnnecessaryLiteralSet {
     kind: UnnecessaryLiteral,
 }
 
-impl AlwaysFixableViolation for UnnecessaryLiteralInSetCall {
+impl AlwaysFixableViolation for UnnecessaryLiteralSet {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralInSetCall { kind } = self;
+        let UnnecessaryLiteralSet { kind } = self;
         format!("Unnecessary {kind} literal (rewrite as a set literal)")
     }
 
@@ -69,8 +69,7 @@ pub(crate) fn unnecessary_literal_set(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic =
-        checker.report_diagnostic(UnnecessaryLiteralInSetCall { kind }, call.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryLiteralSet { kind }, call.range());
 
     // Convert `set((1, 2))` to `{1, 2}`.
     diagnostic.set_fix({

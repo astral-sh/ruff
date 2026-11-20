@@ -30,7 +30,7 @@ mod tests {
     #[test_case(Rule::ForLoopSetMutations, Path::new("FURB142.py"))]
     #[test_case(Rule::SliceCopy, Path::new("FURB145.py"))]
     #[test_case(Rule::UnnecessaryEnumerate, Path::new("FURB148.py"))]
-    #[test_case(Rule::ApproximateMathConstant, Path::new("FURB152.py"))]
+    #[test_case(Rule::HardcodedMathConstant, Path::new("FURB152.py"))]
     #[test_case(Rule::ConsecutiveGlobalOrNonlocalStatements, Path::new("FURB154.py"))]
     #[test_case(Rule::HardcodedStringCharset, Path::new("FURB156.py"))]
     #[test_case(Rule::VerboseDecimalConstructor, Path::new("FURB157.py"))]
@@ -51,7 +51,7 @@ mod tests {
     #[test_case(Rule::ManualPathWrite, Path::new("FURB103_0.py"))]
     #[test_case(Rule::ManualPathWrite, Path::new("FURB103_1.py"))]
     #[test_case(Rule::ManualPathWrite, Path::new("FURB103_2.py"))]
-    #[test_case(Rule::SlicedIntegerFormatting, Path::new("FURB116.py"))]
+    #[test_case(Rule::SlicedIntegerBaseConversion, Path::new("FURB116.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192_1.py"))]
     #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]
@@ -94,7 +94,7 @@ mod tests {
     fn fstring_number_format_python_311() -> Result<()> {
         let diagnostics = test_path(
             Path::new("refurb/FURB116.py"),
-            &settings::LinterSettings::for_rule(Rule::SlicedIntegerFormatting)
+            &settings::LinterSettings::for_rule(Rule::SlicedIntegerBaseConversion)
                 .with_target_version(PythonVersion::PY311),
         )?;
         assert_diagnostics!(diagnostics);

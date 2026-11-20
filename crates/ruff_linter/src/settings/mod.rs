@@ -400,7 +400,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryGeneratorDict), // C402
     RuleSelector::rule(Rule::UnnecessaryListComprehensionSet), // C403
     RuleSelector::rule(Rule::UnnecessaryListComprehensionDict), // C404
-    RuleSelector::rule(Rule::UnnecessaryLiteralInSetCall), // C405
+    RuleSelector::rule(Rule::UnnecessaryLiteralSet), // C405
     RuleSelector::rule(Rule::UnnecessaryLiteralDict), // C406
     RuleSelector::rule(Rule::UnnecessaryCollectionCall), // C408
     RuleSelector::rule(Rule::UnnecessaryLiteralWithinTupleCall), // C409
@@ -464,7 +464,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::RaiseNotImplemented), // F901
     RuleSelector::rule(Rule::FutureRewritableTypeAnnotation), // FA100
     RuleSelector::rule(Rule::FutureRequiredTypeAnnotation), // FA102
-    RuleSelector::rule(Rule::StaticStrJoin), // FLY002
+    RuleSelector::rule(Rule::UnnecessaryStrJoin), // FLY002
     RuleSelector::rule(Rule::PrintEmptyString), // FURB105
     RuleSelector::rule(Rule::ForLoopWrites), // FURB122
     RuleSelector::rule(Rule::ReadlinesInFor), // FURB129
@@ -725,15 +725,15 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryLiteralConstructor), // UP018
     RuleSelector::rule(Rule::TypingTextStrAlias), // UP019
     RuleSelector::rule(Rule::OpenAlias), // UP020
-    RuleSelector::rule(Rule::SubprocessUniversalNewlines), // UP021
-    RuleSelector::rule(Rule::SubprocessPipeStdoutStderr), // UP022
+    RuleSelector::rule(Rule::SubprocessRunWithUniversalNewlines), // UP021
+    RuleSelector::rule(Rule::SubprocessRunWithPipedStdoutAndStderr), // UP022
     RuleSelector::rule(Rule::DeprecatedCElementTree), // UP023
     RuleSelector::rule(Rule::OSErrorAlias), // UP024
     RuleSelector::rule(Rule::UnicodeKindPrefix), // UP025
     RuleSelector::rule(Rule::DeprecatedMockImport), // UP026
     RuleSelector::rule(Rule::YieldInForLoop), // UP028
     RuleSelector::rule(Rule::UnnecessaryBuiltinImport), // UP029
-    RuleSelector::rule(Rule::UnnecessaryPositionalIndices), // UP030
+    RuleSelector::rule(Rule::UnnecessaryPositionalStrFormatIndices), // UP030
     RuleSelector::rule(Rule::PrintfStringFormatting), // UP031
     RuleSelector::rule(Rule::StrFormat), // UP032
     RuleSelector::rule(Rule::LRUCacheWithMaxsizeNone), // UP033
@@ -980,7 +980,7 @@ mod tests {
         	fast-api-non-annotated-dependency (FAST002),
         	fast-api-unused-path-parameter (FAST003),
         	blocking-http-call-httpx-in-async-function (ASYNC212),
-        	blocking-path-operation-in-async-function (ASYNC240),
+        	blocking-path-call-in-async-function (ASYNC240),
         	blocking-input-in-async-function (ASYNC250),
         	abstract-base-class-without-abstract-method (B024),
         	empty-method-without-abstract-decorator (B027),
@@ -1028,7 +1028,7 @@ mod tests {
         	for-loop-set-mutations (FURB142),
         	slice-copy (FURB145),
         	unnecessary-enumerate (FURB148),
-        	approximate-math-constant (FURB152),
+        	hardcoded-math-constant (FURB152),
         	hardcoded-string-charset (FURB156),
         	single-item-membership-test (FURB171),
         	meta-class-abc-meta (FURB180),

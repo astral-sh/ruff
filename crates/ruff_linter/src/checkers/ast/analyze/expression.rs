@@ -180,7 +180,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::SortedMinMax) {
                 refurb::rules::sorted_min_max(checker, subscript);
             }
-            if checker.is_rule_enabled(Rule::SlicedIntegerFormatting) {
+            if checker.is_rule_enabled(Rule::SlicedIntegerBaseConversion) {
                 refurb::rules::fstring_number_format(checker, subscript);
             }
             if checker.is_rule_enabled(Rule::IncorrectlyParenthesizedTupleInSubscript) {
@@ -558,10 +558,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::StringDotFormatMissingArguments,
                 Rule::StringDotFormatMixingAutomatic,
                 // pyupgrade
-                Rule::UnnecessaryPositionalIndices,
+                Rule::UnnecessaryPositionalStrFormatIndices,
                 Rule::StrFormat,
                 // flynt
-                Rule::StaticStrJoin,
+                Rule::UnnecessaryStrJoin,
                 // refurb
                 Rule::HashlibDigestHex,
                 // flake8-simplify
@@ -576,7 +576,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     {
                         if attr == "join" {
                             // "...".join(...) call
-                            if checker.is_rule_enabled(Rule::StaticStrJoin) {
+                            if checker.is_rule_enabled(Rule::UnnecessaryStrJoin) {
                                 flynt::rules::static_join_to_fstring(
                                     checker,
                                     expr,
@@ -634,7 +634,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                             checker, call, &summary,
                                         );
                                     }
-                                    if checker.is_rule_enabled(Rule::UnnecessaryPositionalIndices) {
+                                    if checker.is_rule_enabled(
+                                        Rule::UnnecessaryPositionalStrFormatIndices,
+                                    ) {
                                         pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
                                     if checker.is_rule_enabled(Rule::StrFormat) {
@@ -682,10 +684,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     checker.semantic().current_expression_parent(),
                 );
             }
-            if checker.is_rule_enabled(Rule::SubprocessUniversalNewlines) {
+            if checker.is_rule_enabled(Rule::SubprocessRunWithUniversalNewlines) {
                 pyupgrade::rules::replace_universal_newlines(checker, call);
             }
-            if checker.is_rule_enabled(Rule::SubprocessPipeStdoutStderr) {
+            if checker.is_rule_enabled(Rule::SubprocessRunWithPipedStdoutAndStderr) {
                 pyupgrade::rules::replace_stdout_stderr(checker, call);
             }
             if checker.is_rule_enabled(Rule::NonPEP604Isinstance) {
@@ -702,7 +704,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::BlockingOpenCallInAsyncFunction) {
                 flake8_async::rules::blocking_open_call(checker, call);
             }
-            if checker.is_rule_enabled(Rule::BlockingPathOperationInAsyncFunction) {
+            if checker.is_rule_enabled(Rule::BlockingPathCallInAsyncFunction) {
                 flake8_async::rules::blocking_os_path(checker, call);
             }
             if checker.any_rule_enabled(&[
@@ -798,7 +800,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::HardcodedPasswordFuncArg) {
                 flake8_bandit::rules::hardcoded_password_func_arg(checker, keywords);
             }
-            if checker.is_rule_enabled(Rule::SqlStringConstruction) {
+            if checker.is_rule_enabled(Rule::SuspiciousSqlStringConstruction) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
             }
             if checker.is_rule_enabled(Rule::HashlibInsecureHashFunction) {
@@ -858,7 +860,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     checker, expr, func, args, keywords,
                 );
             }
-            if checker.is_rule_enabled(Rule::UnnecessaryLiteralInSetCall) {
+            if checker.is_rule_enabled(Rule::UnnecessaryLiteralSet) {
                 flake8_comprehensions::rules::unnecessary_literal_set(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryLiteralDict) {
@@ -1188,7 +1190,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     ruff::rules::explicit_f_string_type_conversion(checker, f_string);
                 }
             }
-            if checker.is_rule_enabled(Rule::SqlStringConstruction) {
+            if checker.is_rule_enabled(Rule::SuspiciousSqlStringConstruction) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
             }
             if checker.is_rule_enabled(Rule::UnicodeKindPrefix) {
@@ -1308,7 +1310,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.is_rule_enabled(Rule::BadStringFormatType) {
                     pylint::rules::bad_string_format_type(checker, bin_op, format_string);
                 }
-                if checker.is_rule_enabled(Rule::SqlStringConstruction) {
+                if checker.is_rule_enabled(Rule::SuspiciousSqlStringConstruction) {
                     flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
                 }
             }
@@ -1325,7 +1327,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::CollectionLiteralConcatenation) {
                 ruff::rules::collection_literal_concatenation(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::SqlStringConstruction) {
+            if checker.is_rule_enabled(Rule::SuspiciousSqlStringConstruction) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
             }
         }
@@ -1470,7 +1472,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             {
                 flake8_pyi::rules::numeric_literal_too_long(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::ApproximateMathConstant) {
+            if checker.is_rule_enabled(Rule::HardcodedMathConstant) {
                 refurb::rules::math_constant(checker, number_literal);
             }
         }

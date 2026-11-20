@@ -63,11 +63,11 @@ use ruff_text_size::Ranged;
 /// - [Trio documentation: `trio.Path`](https://trio.readthedocs.io/en/stable/reference-io.html#trio.Path)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
-pub(crate) struct BlockingPathOperationInAsyncFunction {
+pub(crate) struct BlockingPathCallInAsyncFunction {
     path_library: String,
 }
 
-impl Violation for BlockingPathOperationInAsyncFunction {
+impl Violation for BlockingPathCallInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -99,7 +99,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
 
         if maybe_calling_io_operation(os_path_method) {
             checker.report_diagnostic(
-                BlockingPathOperationInAsyncFunction {
+                BlockingPathCallInAsyncFunction {
                     path_library: "os.path".to_string(),
                 },
                 call.func.range(),
@@ -120,7 +120,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
     // calls an I/O method.
     if PathlibPathChecker::match_initializer(value, semantic) {
         checker.report_diagnostic(
-            BlockingPathOperationInAsyncFunction {
+            BlockingPathCallInAsyncFunction {
                 path_library: "pathlib.Path".to_string(),
             },
             call.func.range(),
@@ -140,7 +140,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
 
     if check_type::<PathlibPathChecker>(binding, semantic) {
         checker.report_diagnostic(
-            BlockingPathOperationInAsyncFunction {
+            BlockingPathCallInAsyncFunction {
                 path_library: "pathlib.Path".to_string(),
             },
             call.func.range(),
