@@ -79,6 +79,13 @@ warning[mismatched-paramspec-name]: The name passed to `ParamSpec` must match th
   |
 6 | P2 = ParamSpec("P3")
   |                ^^^^ Expected "P2", got "P3"
+help: Use `"P2"` as the name
+  |
+5 | # snapshot: mismatched-paramspec-name
+  - P2 = ParamSpec("P3")
+6 + P2 = ParamSpec("P2")
+7 |
+  |
 ```
 
 ### Name supplied at runtime

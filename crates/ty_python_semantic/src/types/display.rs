@@ -9,7 +9,7 @@ use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
 
 use ruff_db::files::FilePath;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::{AsciiEscape, UnicodeEscape};
@@ -39,10 +39,9 @@ use crate::types::{
     TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType, WrapperDescriptorKind,
     visitor,
 };
-use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
-use ty_python_core::scope::{FileScopeId, ScopeKind};
-use ty_python_core::semantic_index;
+use ty_python_core::scope::{FileScopeId, NodeWithScopeKind};
+use ty_python_core::{ProgramFile, SemanticIndex, semantic_index};
 
 /// Bound display expansion even when recursive specialization keeps changing the signature.
 const MAX_SIGNATURE_DISPLAY_DEPTH: usize = 4;
@@ -880,28 +879,10 @@ pub(super) fn qualified_name_components_from_scope(
     let module_ast = parsed_module(db, file.python_file(db)).load(db);
     let index = semantic_index(db, file);
 
-    let mut name_parts = vec![];
-
-    for (_, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(skip_count) {
-        let node = ancestor_scope.node();
-
-        match ancestor_scope.kind() {
-            ScopeKind::Class => {
-                if let Some(class_def) = node.as_class() {
-                    name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
-                }
-            }
-            ScopeKind::Function => {
-                if let Some(function_def) = node.as_function() {
-                    name_parts.push(format!(
-                        "<locals of function '{}'>",
-                        function_def.node(&module_ast).name.as_str()
-                    ));
-                }
-            }
-            _ => {}
-        }
-    }
+    let mut name_parts: Vec<_> =
+        scope_name_components(&module_ast, index, file_scope_id, skip_count)
+            .map(Cow::into_owned)
+            .collect();
 
     if let Some(module) = file_to_module(db, file.resolver_file(db)) {
         let module_name = module.name(db);
@@ -910,6 +891,29 @@ pub(super) fn qualified_name_components_from_scope(
 
     name_parts.reverse();
     name_parts
+}
+
+/// Walks from `file_scope_id` towards the module, skipping the first `skip_count` scopes.
+/// Yields class names and function labels such as `<locals of function 'f'>`, innermost first.
+pub(super) fn scope_name_components<'ast>(
+    module: &'ast ParsedModuleRef,
+    index: &SemanticIndex<'_>,
+    file_scope_id: FileScopeId,
+    skip_count: usize,
+) -> impl Iterator<Item = Cow<'ast, str>> {
+    index
+        .ancestor_scopes(file_scope_id)
+        .skip(skip_count)
+        .filter_map(move |(_, scope)| match scope.node() {
+            NodeWithScopeKind::Class(class) => {
+                Some(Cow::Borrowed(class.node(module).name.as_str()))
+            }
+            NodeWithScopeKind::Function(function) => Some(Cow::Owned(format!(
+                "<locals of function '{}'>",
+                function.node(module).name.as_str()
+            ))),
+            _ => None,
+        })
 }
 
 impl<'db> ClassLiteral<'db> {

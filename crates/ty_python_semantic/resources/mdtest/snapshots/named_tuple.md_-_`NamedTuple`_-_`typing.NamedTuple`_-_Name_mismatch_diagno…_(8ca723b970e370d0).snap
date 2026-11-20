@@ -30,5 +30,13 @@ info[mismatched-namedtuple-name]: The name passed to `NamedTuple` must match the
   |
 5 | Mismatch = NamedTuple("WrongName", [("x", int)])
   |                       ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
+help: Use `"Mismatch"` as the name
+  |
+4 | # error: [mismatched-namedtuple-name]
+  - Mismatch = NamedTuple("WrongName", [("x", int)])
+5 + Mismatch = NamedTuple("Mismatch", [("x", int)])
+6 | reveal_type(Mismatch)  # revealed: <class 'WrongName'>
+  |
+note: This is an unsafe fix and may change runtime behavior
 
 ```

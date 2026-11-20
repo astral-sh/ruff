@@ -25,6 +25,7 @@ use ruff_db::{
     diagnostic::{Annotation, Span},
     parsed::parsed_module,
 };
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_core::{
@@ -782,8 +783,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut covariant = false;
         let mut contravariant = false;
         let mut infer_variance = false;
-        let mut name_param_ty = None;
-        let mut name_param_node = None;
+        let mut name_argument = None;
 
         if arguments.args.len() > 1 {
             return error(
@@ -818,9 +818,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             kwarg,
                         );
                     }
-                    name_param_node = Some(&kwarg.value);
-                    name_param_ty =
-                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                    let ty = self.infer_expression(&kwarg.value, TypeContext::default());
+                    name_argument = Some((&kwarg.value, ty));
                 }
                 "default" => {
                     if !assume_all_features
@@ -965,10 +964,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (false, false, true) => None,
         };
 
-        let Some(name_param_ty) = name_param_ty.or_else(|| {
+        let Some((name_arg, name_param_ty)) = name_argument.or_else(|| {
             arguments
                 .find_positional(0)
-                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+                .map(|arg| (arg, self.infer_expression(arg, TypeContext::default())))
         }) else {
             return error(
                 &self.context,
@@ -989,7 +988,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         }
-        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -1006,13 +1004,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_TYPEVARTUPLE_NAME,
-                name_param_node
-                    .map(Ranged::range)
-                    .unwrap_or_else(|| call_expr.range()),
+                name_arg,
                 "TypeVarTuple",
                 target_name,
-                name_param,
-                name_param_ty,
+                name_param.ok_or(name_param_ty),
+                Applicability::Safe,
             );
         }
 
@@ -1062,8 +1058,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut covariant = false;
         let mut contravariant = false;
         let mut infer_variance = false;
-        let mut name_param_ty = None;
-        let mut name_param_node = None;
+        let mut name_argument = None;
 
         if arguments.args.len() > 1 {
             return error(
@@ -1092,7 +1087,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             match identifier.id().as_str() {
                 "name" => {
                     // Duplicate keyword argument is a syntax error, so we don't have to check if
-                    // `name_param_ty.is_some()` here.
+                    // `name_argument.is_some()` here.
                     if !arguments.args.is_empty() {
                         return error(
                             &self.context,
@@ -1100,9 +1095,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             kwarg,
                         );
                     }
-                    name_param_node = Some(&kwarg.value);
-                    name_param_ty =
-                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                    let ty = self.infer_expression(&kwarg.value, TypeContext::default());
+                    name_argument = Some((&kwarg.value, ty));
                 }
                 "bound" => {
                     return error(
@@ -1224,10 +1218,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (false, false, true) => None,
         };
 
-        let Some(name_param_ty) = name_param_ty.or_else(|| {
+        let Some((name_arg, name_param_ty)) = name_argument.or_else(|| {
             arguments
                 .find_positional(0)
-                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+                .map(|arg| (arg, self.infer_expression(arg, TypeContext::default())))
         }) else {
             return error(
                 &self.context,
@@ -1248,7 +1242,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         }
-        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -1265,13 +1258,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_PARAMSPEC_NAME,
-                name_param_node
-                    .map(Ranged::range)
-                    .unwrap_or_else(|| call_expr.range()),
+                name_arg,
                 "ParamSpec",
                 target_name,
-                name_param,
-                name_param_ty,
+                name_param.ok_or(name_param_ty),
+                Applicability::Safe,
             );
         }
 
@@ -1322,8 +1313,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut covariant = false;
         let mut contravariant = false;
         let mut infer_variance = false;
-        let mut name_param_ty = None;
-        let mut name_param_node = None;
+        let mut name_argument = None;
 
         if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
             return error(
@@ -1344,7 +1334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             match identifier.id().as_str() {
                 "name" => {
                     // Duplicate keyword argument is a syntax error, so we don't have to check if
-                    // `name_param_ty.is_some()` here.
+                    // `name_argument.is_some()` here.
                     if !arguments.args.is_empty() {
                         return error(
                             &self.context,
@@ -1352,9 +1342,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             kwarg,
                         );
                     }
-                    name_param_node = Some(&kwarg.value);
-                    name_param_ty =
-                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
+                    let ty = self.infer_expression(&kwarg.value, TypeContext::default());
+                    name_argument = Some((&kwarg.value, ty));
                 }
                 "bound" => has_bound = true,
                 "covariant" => {
@@ -1473,10 +1462,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (false, false, true) => None,
         };
 
-        let Some(name_param_ty) = name_param_ty.or_else(|| {
+        let Some((name_arg, name_param_ty)) = name_argument.or_else(|| {
             arguments
                 .find_positional(0)
-                .map(|arg| self.infer_expression(arg, TypeContext::default()))
+                .map(|arg| (arg, self.infer_expression(arg, TypeContext::default())))
         }) else {
             return error(
                 &self.context,
@@ -1497,7 +1486,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 call_expr,
             );
         }
-        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
             id: target_name, ..
@@ -1514,13 +1502,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_TYPEVAR_NAME,
-                name_param_node
-                    .map(Ranged::range)
-                    .unwrap_or_else(|| call_expr.range()),
+                name_arg,
                 "TypeVar",
                 target_name,
-                name_param,
-                name_param_ty,
+                name_param.ok_or(name_param_ty),
+                Applicability::Safe,
             );
         }
         let previous_definition_in = |scope, place, before| {

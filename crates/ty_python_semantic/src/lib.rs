@@ -18,6 +18,7 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
+use ruff_python_codegen::Stylist;
 use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, NameKind, SemanticModel,
@@ -224,6 +225,14 @@ pub(crate) fn module_docstring(db: &dyn Db, file: PythonFile<'_>) -> Option<Stri
     let module = parsed_module(db, file).load(db);
     docstring_from_body(module.suite())
         .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+}
+
+/// Detects source style once per file revision, shared by diagnostics and IDE features.
+#[salsa::tracked(returns(ref), no_eq)]
+pub(crate) fn stylist(db: &dyn Db, file: PythonFile<'_>) -> Stylist<'static> {
+    let parsed = parsed_module(db, file).load(db);
+    let source = source_text(db, file.file(db));
+    Stylist::from_tokens(parsed.tokens(), &source).into_owned()
 }
 
 pub fn check_file_unwrap(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {

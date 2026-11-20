@@ -37,6 +37,13 @@ warning[mismatched-typevar-name]: The name passed to `TypeVar` must match the va
   |
 8 | Q = TypeVar("T")
   |             ^^^ Expected "Q", got "T"
+help: Use `"Q"` as the name
+  |
+7 | # error: [mismatched-typevar-name]
+  - Q = TypeVar("T")
+8 + Q = TypeVar("Q")
+9 |
+  |
 
 ```
 

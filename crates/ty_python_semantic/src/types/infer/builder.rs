@@ -10,7 +10,7 @@ use ruff_db::diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
-use ruff_diagnostics::{Edit, Fix};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
@@ -76,8 +76,8 @@ use crate::types::diagnostic::{
     MISMATCHED_NEWTYPE_NAME, MISMATCHED_SENTINEL_NAME, MISMATCHED_TYPE_ALIAS_NAME,
     MISSING_ATTRIBUTE, MISSING_UNION_ATTRIBUTE, NOT_CALLABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     POSSIBLY_MISSING_SUBMODULE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
-    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, add_mismatched_name_fix,
+    autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
@@ -94,6 +94,7 @@ use crate::types::diagnostic::{
     report_unsupported_comparison,
 };
 use crate::types::dict::dict_literal_key_value_types;
+use crate::types::display::scope_name_components;
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral, report_revealed_type,
@@ -3880,8 +3881,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &arguments.args[0],
                 "NewType",
                 target_name,
-                name,
-                name_param_ty,
+                name.ok_or(name_param_ty),
+                Applicability::Safe,
             );
         }
 
@@ -3942,7 +3943,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             repr_arg = Some(&keyword.value);
         }
 
-        let ast::Expr::StringLiteral(name_arg) = name_arg else {
+        let ast::Expr::StringLiteral(name_literal) = name_arg else {
             return None;
         };
 
@@ -3952,9 +3953,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        let name = name_arg.value.to_str();
+        let name = name_literal.value.to_str();
+        let expected_name = self.expected_sentinel_name(name, target_name);
 
-        if !self.sentinel_name_matches_target(name, target_name)
+        if name != expected_name
             && let Some(builder) = self
                 .context
                 .report_lint(&MISMATCHED_SENTINEL_NAME, name_arg)
@@ -3964,8 +3966,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 KnownClass::Sentinel.name(self.program_environment().python_version(self.db())),
             ));
             diagnostic.set_primary_annotation_message(format_args!(
-                "Expected \"{target_name}\", got \"{name}\""
+                "Expected \"{expected_name}\", got \"{name}\""
             ));
+            add_mismatched_name_fix(
+                &self.context,
+                &mut diagnostic,
+                name_arg,
+                &expected_name,
+                Applicability::Unsafe,
+            );
         }
 
         Some(Type::KnownInstance(KnownInstanceType::Sentinel(
@@ -3973,34 +3982,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )))
     }
 
-    /// Sentinel names can be unqualified or include their exact enclosing class path.
-    fn sentinel_name_matches_target(&self, name: &str, target_name: &Name) -> bool {
-        if name == target_name.as_str() {
-            return true;
+    /// Returns the expected name for a sentinel assigned to `target_name`. If the supplied name
+    /// contains a dot, prefix `target_name` with the names of all enclosing classes.
+    ///
+    /// The caller checks [`Self::sentinel_definition_scope_is_supported`], so every scope
+    /// between the definition and the module is a class scope.
+    fn expected_sentinel_name<'a>(&self, name: &str, target_name: &'a str) -> Cow<'a, str> {
+        if !name.contains('.') {
+            return Cow::Borrowed(target_name);
         }
 
-        let mut name_components = name.rsplit('.');
-
-        if name_components.next() != Some(target_name.as_str()) {
-            return false;
-        }
-
-        for (_, scope) in self
-            .index
-            .ancestor_scopes(self.scope.file_scope_id(self.db()))
-        {
-            match scope.node() {
-                NodeWithScopeKind::Class(class) => {
-                    if name_components.next() != Some(class.node(self.module()).name.as_str()) {
-                        return false;
-                    }
-                }
-                NodeWithScopeKind::Module => return name_components.next().is_none(),
-                _ => return false,
-            }
-        }
-
-        false
+        // We expect nesting deeper than `Outer.Middle.Inner.MISSING` to be rare, so keep
+        // four components inline (three enclosing classes and the sentinel itself).
+        let mut components = SmallVec::<[_; 4]>::new();
+        components.push(Cow::Borrowed(target_name));
+        components.extend(scope_name_components(
+            self.module(),
+            self.index,
+            self.scope.file_scope_id(self.db()),
+            0,
+        ));
+        components.reverse();
+        Cow::Owned(components.join("."))
     }
 
     fn sentinel_definition_scope_is_supported(&self) -> bool {
@@ -4308,8 +4311,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 name_arg,
                 "TypeAliasType",
                 target_name,
-                name,
-                name_param_ty,
+                name.ok_or(name_param_ty),
+                Applicability::Safe,
             );
         }
 

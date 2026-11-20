@@ -998,6 +998,13 @@ warning[mismatched-type-alias-name]: The name passed to `TypeAliasType` must mat
   |
 5 | IntOrStr = TypeAliasType("WrongName", Union[int, str])
   |                          ^^^^^^^^^^^ Expected "IntOrStr", got "WrongName"
+help: Use `"IntOrStr"` as the name
+  |
+4 | # snapshot: mismatched-type-alias-name
+  - IntOrStr = TypeAliasType("WrongName", Union[int, str])
+5 + IntOrStr = TypeAliasType("IntOrStr", Union[int, str])
+6 | reveal_type(IntOrStr)  # revealed: TypeAliasType
+  |
 ```
 
 #### Invalid constructor arguments
