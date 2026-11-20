@@ -32,6 +32,7 @@ use ruff_linter::registry::Rule;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{warn_user_once, warn_user_once_by_message};
+use ruff_python_ast::script::ScriptTag;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{FormatModuleError, QuoteStyle, format_module_source, format_range};
 use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFile, SourceFileBuilder};
@@ -43,7 +44,7 @@ use ruff_workspace::script::{ScriptSettingsError, script};
 use ruff_workspace::{FormatterSettings, Settings};
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
-use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
+use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches, ScriptCacheMode};
 use crate::{ExitStatus, resolve_default_files};
 
 #[derive(Debug, Copy, Clone, is_macro::Is)]
@@ -261,12 +262,13 @@ pub(crate) fn format_path(
     range: Option<FormatRange>,
     cache: Option<&Cache>,
 ) -> Result<FormatResult, FormatCommandError> {
+    let script_mode = ScriptCacheMode::new(project.settings.preview, source_type, overrides);
     if let Some(cache) = cache {
         let relative_path = cache
             .relative_path(path)
             .expect("wrong package cache for file");
 
-        if let Ok(cache_key) = FileCacheKey::from_path(path) {
+        if let Ok(cache_key) = FileCacheKey::from_path(path, script_mode) {
             if cache.is_formatted(relative_path, &cache_key) {
                 return Ok(FormatResult::Unchanged);
             }
@@ -314,8 +316,14 @@ pub(crate) fn format_path(
                     .write(&mut writer)
                     .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
 
+                // Formatting can change script metadata or turn `#/// script` into a valid
+                // opening marker. The rewritten file may now use different settings.
+                let cache = cache.filter(|_| {
+                    matches!(script_mode, ScriptCacheMode::MetadataDisabled)
+                        || (script.is_none() && ScriptTag::parse(formatted.source_code()).is_none())
+                });
                 if let Some(cache) = cache {
-                    if let Ok(cache_key) = FileCacheKey::from_path(path) {
+                    if let Ok(cache_key) = FileCacheKey::from_path(path, script_mode) {
                         let relative_path = cache
                             .relative_path(path)
                             .expect("wrong package cache for file");
@@ -331,8 +339,9 @@ pub(crate) fn format_path(
             },
         },
         FormattedSource::Unchanged => {
+            let cache = cache.filter(|_| script_mode.allows(script.as_ref()));
             if let Some(cache) = cache {
-                if let Ok(cache_key) = FileCacheKey::from_path(path) {
+                if let Ok(cache_key) = FileCacheKey::from_path(path, script_mode) {
                     let relative_path = cache
                         .relative_path(path)
                         .expect("wrong package cache for file");

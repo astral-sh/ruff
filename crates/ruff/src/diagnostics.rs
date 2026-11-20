@@ -29,7 +29,7 @@ use ruff_workspace::script::script;
 use rustc_hash::FxHashMap;
 
 use crate::args::ConfigArguments;
-use crate::cache::{Cache, FileCache, FileCacheKey};
+use crate::cache::{Cache, FileCache, FileCacheKey, ScriptCacheMode};
 
 /// A collection of [`Diagnostic`]s and additional information needed to render them.
 ///
@@ -195,14 +195,17 @@ pub(crate) fn lint_path(
     unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     let settings = &project.settings.linter;
+    let source_type = settings.extension.get_source_type(path);
+    let script_mode = ScriptCacheMode::new(project.settings.preview, source_type, overrides);
     // Check the cache.
-    let caching = match cache {
+    let mut caching = match cache {
         Some(cache) if noqa.is_enabled() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
 
-            let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
+            let cache_key =
+                FileCacheKey::from_path(path, script_mode).context("Failed to create cache key")?;
             let cached_diagnostics = cache
                 .get(relative_path, &cache_key)
                 .is_some_and(FileCache::linted);
@@ -219,7 +222,7 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    let source_type = match settings.extension.get_source_type(path) {
+    let source_type = match source_type {
         SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
             let (diagnostics, fixed) = if settings
                 .rules
@@ -307,6 +310,7 @@ pub(crate) fn lint_path(
             ));
         }
     };
+    caching = caching.filter(|_| script_mode.allows(script.as_ref()));
     let package = script.as_ref().map_or(package, |script| {
         script.package_root(path, &project.settings.linter, package, package_roots)
     });

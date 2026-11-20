@@ -2547,6 +2547,44 @@ fn inline_script_configuration() -> Result<()> {
 }
 
 #[test]
+fn formatting_activates_script_settings() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            #/// script
+            # tool.ruff.format.quote-style = "single"
+            # ///
+            x = "hello"
+        "#,
+    )?;
+    let args = ["format", "--preview", "--quiet", "script.py"];
+
+    assert_cmd_snapshot!(test.command().args(args), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    assert_cmd_snapshot!(test.command().args(args).arg("--check"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    unformatted: File would be reformatted
+     --> script.py:4:5
+      |
+    3 | # ///
+      - x = "hello"
+    4 + x = 'hello'
+      |
+
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
 fn inline_script_conflicts() -> Result<()> {
     let test = CliTest::with_files([
         (

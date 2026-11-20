@@ -44,6 +44,7 @@ pub enum ScriptConfiguration {
 /// A Python file with a PEP 723 script metadata header.
 #[derive(Debug)]
 pub struct Script {
+    has_ruff_table: bool,
     settings: ScriptSettings,
     config_path: Option<PathBuf>,
 }
@@ -54,6 +55,16 @@ impl Script {
         self.config_path
             .as_deref()
             .or_else(|| project.config_path())
+    }
+
+    /// Whether the script contains a `[tool.ruff]` table, even if empty or ignored.
+    pub fn has_ruff_table(&self) -> bool {
+        self.has_ruff_table
+    }
+
+    /// Whether the script declares `requires-python` or `[tool.ruff]`, even if ignored.
+    pub fn declares_settings(&self) -> bool {
+        matches!(self.settings, ScriptSettings::Declared(_))
     }
 
     /// Return the script's resolved settings, falling back to the project's settings.
@@ -152,7 +163,8 @@ pub fn script(
 
     let requires_python = metadata.requires_python.as_ref();
     let options = metadata.tool.and_then(|tool| tool.ruff);
-    let declared = requires_python.is_some() || options.is_some();
+    let has_ruff_table = options.is_some();
+    let declared = requires_python.is_some() || has_ruff_table;
 
     let config_error = |err| ScriptSettingsError::configuration(path, &err);
     let resolve = |configuration, root: &Path| {
@@ -185,6 +197,7 @@ pub fn script(
     };
 
     Ok(Some(Script {
+        has_ruff_table,
         config_path,
         settings: if declared {
             ScriptSettings::Declared(settings.map(Box::new))
