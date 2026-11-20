@@ -119,24 +119,15 @@ pub(crate) fn remove_exception_handler_assignment(
     // ```
     // There can't be any comments in that range.
     let (before, after) = tokens.split_at(bound_exception.start());
-    let is_trivia = |kind: TokenKind| {
-        kind.is_trivia()
-            || matches!(
-                kind,
-                TokenKind::Newline | TokenKind::Indent | TokenKind::Dedent
-            )
-    };
-    let mut preceding_tokens = before.iter().rev().filter(|token| !is_trivia(token.kind()));
-
-    // Eat the `as` token.
-    let preceding = preceding_tokens
-        .next()
+    // Whitespace and explicit line continuations do not produce parser tokens.
+    let (as_token, before) = before
+        .split_last()
         .context("expected the exception name to be preceded by `as`")?;
-    debug_assert_eq!(preceding.kind(), TokenKind::As);
+    debug_assert_eq!(as_token.kind(), TokenKind::As);
 
     // Find the end of the preceding token, which should be the exception value.
-    let preceding = preceding_tokens
-        .next()
+    let preceding = before
+        .last()
         .context("expected the exception name to be preceded by a token")?;
 
     debug_assert!(
@@ -146,9 +137,7 @@ pub(crate) fn remove_exception_handler_assignment(
     );
     // Skip the bound name and find the `:` token.
     let following = after
-        .iter()
-        .skip(1)
-        .find(|token| !is_trivia(token.kind()))
+        .get(1)
         .context("expected the exception name to be followed by a colon")?;
     debug_assert_eq!(following.kind(), TokenKind::Colon);
 
