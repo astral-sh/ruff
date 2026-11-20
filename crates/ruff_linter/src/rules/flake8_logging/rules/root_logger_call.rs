@@ -48,14 +48,14 @@ impl Violation for RootLoggerCall {
 }
 
 /// LOG015
-pub(crate) fn root_logger_call(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn root_logger_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     let semantic = checker.semantic();
 
     if !semantic.seen_module(Modules::LOGGING) {
         return;
     }
 
-    let Some(qualified_name) = semantic.resolve_qualified_name(call.func()) else {
+    let Some(qualified_name) = semantic.resolve_qualified_name(call.func) else {
         return;
     };
 

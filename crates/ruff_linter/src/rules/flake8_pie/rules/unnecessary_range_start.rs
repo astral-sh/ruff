@@ -44,9 +44,9 @@ impl AlwaysFixableViolation for UnnecessaryRangeStart {
 }
 
 /// PIE808
-pub(crate) fn unnecessary_range_start(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     // A third positional argument supplies the step.
-    let Some([start, _]) = call.arguments().as_positional_array() else {
+    let Some([start, _]) = call.arguments.as_positional_array() else {
         return;
     };
 
@@ -59,7 +59,7 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: ast::ExprCall<'_>
     }
 
     // Verify that the call is to the `range` builtin.
-    if !checker.semantic().match_builtin_expr(call.func(), "range") {
+    if !checker.semantic().match_builtin_expr(call.func, "range") {
         return;
     }
 
@@ -67,7 +67,7 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: ast::ExprCall<'_>
     diagnostic.try_set_fix(|| {
         remove_argument(
             &start,
-            call.arguments(),
+            call.arguments,
             Parentheses::Preserve,
             checker.source(),
             checker.tokens(),

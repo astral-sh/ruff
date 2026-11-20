@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{ExprCall, ExprKind, OperatorPrecedence, StmtKind};
+use ruff_python_ast::{ExprCallFields, ExprKind, OperatorPrecedence, StmtKind};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -95,8 +95,8 @@ impl Violation for UnnecessaryDunderCall {
 }
 
 /// PLC2801
-pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: ExprCall<'_>) {
-    let ExprKind::Attribute(attribute_node) = call.func().classify() else {
+pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ExprCallFields<'_>) {
+    let ExprKind::Attribute(attribute_node) = call.func.classify() else {
         return;
     };
     let value = attribute_node.value();
@@ -136,11 +136,8 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: ExprCall<'_>) {
         }
     }
 
-    let singleton = call.arguments().as_single_positional();
-    if singleton.is_none()
-        && !call.arguments().is_empty()
-        && !call.arguments().keywords().is_empty()
-    {
+    let singleton = call.arguments.as_single_positional();
+    if singleton.is_none() && !call.arguments.is_empty() && !call.arguments.keywords().is_empty() {
         return;
     }
 
@@ -152,7 +149,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: ExprCall<'_>) {
     if let Some(dunder) = DunderReplacement::from_method(attr.as_str()) {
         match (singleton, dunder) {
             (None, DunderReplacement::Builtin(replacement, message))
-                if call.arguments().is_empty() =>
+                if call.arguments.is_empty() =>
             {
                 if !checker.semantic().has_builtin_binding(replacement) {
                     return;

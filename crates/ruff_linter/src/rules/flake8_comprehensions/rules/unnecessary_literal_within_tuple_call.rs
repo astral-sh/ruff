@@ -69,7 +69,10 @@ impl Violation for UnnecessaryLiteralWithinTupleCall {
 }
 
 /// C409
-pub(crate) fn unnecessary_literal_within_tuple_call(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn unnecessary_literal_within_tuple_call(
+    checker: &Checker,
+    call: &ast::ExprCallFields<'_>,
+) {
     let Some(argument) = exactly_one_argument_with_matching_function("tuple", call) else {
         return;
     };

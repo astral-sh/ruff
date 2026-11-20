@@ -108,8 +108,8 @@ impl Violation for LoggingEagerConversion {
 }
 
 /// RUF065
-pub(crate) fn logging_eager_conversion(checker: &Checker, call: ast::ExprCall<'_>) {
-    let Some((logging_call_type, _range)) = find_logging_call(checker, call.func()) else {
+pub(crate) fn logging_eager_conversion(checker: &Checker, call_fields: &ast::ExprCallFields<'_>) {
+    let Some((logging_call_type, _range)) = find_logging_call(checker, call_fields.func) else {
         return;
     };
 
@@ -119,8 +119,8 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: ast::ExprCall<'_
     };
 
     // Extract a format string from the logging statement msg argument
-    let Some(ExprKind::StringLiteral(string_literal)) = call
-        .arguments()
+    let Some(ExprKind::StringLiteral(string_literal)) = call_fields
+        .arguments
         .find_argument_value("msg", msg_pos)
         .map(ast::Expr::classify)
     else {
@@ -141,7 +141,8 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: ast::ExprCall<'_
             }
         })
         .zip(
-            call.arguments()
+            call_fields
+                .arguments
                 .args()
                 .iter()
                 .skip(msg_pos + 1)

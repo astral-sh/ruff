@@ -71,12 +71,12 @@ impl Violation for MutableContextvarDefault {
 }
 
 /// B039
-pub(crate) fn mutable_contextvar_default(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::CONTEXTVARS) {
         return;
     }
 
-    let Some(default) = call.arguments().find_keyword("default").map(Keyword::value) else {
+    let Some(default) = call.arguments.find_keyword("default").map(Keyword::value) else {
         return;
     };
 
@@ -95,7 +95,7 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: ast::ExprCall<
         }))
         && checker
             .semantic()
-            .matches_qualified_name(map_subscript(call.func()), &["contextvars", "ContextVar"])
+            .matches_qualified_name(map_subscript(call.func), &["contextvars", "ContextVar"])
     {
         checker.report_diagnostic(MutableContextvarDefault, default.range());
     }

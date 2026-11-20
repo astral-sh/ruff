@@ -787,10 +787,11 @@ pub(crate) fn percent_format_star_requires_sequence(
 /// F522
 pub(crate) fn string_dot_format_extra_named_arguments(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call_fields: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
 ) {
-    let keywords = call.arguments().keywords();
+    let keywords = call_fields.arguments.keywords();
+    let call = call_fields.node;
     let mut missing = Vec::new();
     for (index, keyword) in keywords.iter().enumerate() {
         let Some(name) = keyword.arg() else {
@@ -809,7 +810,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     let names: Vec<Name> = missing.iter().map(|(_, name, _)| (*name).clone()).collect();
     let mut diagnostic = checker.report_diagnostic(
         StringDotFormatExtraNamedArguments { missing: names },
-        call.range(),
+        call_fields.range(),
     );
     diagnostic.try_set_fix(|| {
         let side_effects = missing.iter().any(|(_, _, value)| {
@@ -838,7 +839,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 /// F523
 pub(crate) fn string_dot_format_extra_positional_arguments(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
 ) {
     // We can only fix if the positional arguments we're removing don't require re-indexing
@@ -848,7 +849,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     let mut missing = Vec::new();
     let mut side_effects = false;
     let mut can_fix = true;
-    for (index, arg) in call.arguments().args().iter().enumerate() {
+    for (index, arg) in call.arguments.args().iter().enumerate() {
         if arg.is_starred_expr()
             || summary.autos.contains(&index)
             || summary.indices.contains(&index)
@@ -880,7 +881,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         diagnostic.try_set_fix(|| {
             let edit = remove_unused_positional_arguments_from_format_call(
                 &missing,
-                call,
+                call.node,
                 checker.locator(),
                 checker.stylist(),
             )?;
@@ -900,12 +901,12 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
 /// F524
 pub(crate) fn string_dot_format_missing_argument(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
 ) {
     let mut positional_count = 0;
     let mut keywords = FxHashSet::default();
-    for argument in call.arguments().iter_source_order() {
+    for argument in call.arguments.iter_source_order() {
         match argument {
             ast::ArgOrKeyword::Arg(arg) if !arg.is_starred_expr() => positional_count += 1,
             ast::ArgOrKeyword::Keyword(keyword) if let Some(name) = keyword.arg() => {
@@ -938,7 +939,7 @@ pub(crate) fn string_dot_format_missing_argument(
 /// F525
 pub(crate) fn string_dot_format_mixing_automatic(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     summary: &FormatSummary,
 ) {
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {

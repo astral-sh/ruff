@@ -56,8 +56,13 @@ impl Violation for UnnecessaryLiteralWithinDictCall {
 }
 
 /// C418
-pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: ast::ExprCall<'_>) {
-    let Some(argument) = helpers::exactly_one_argument_with_matching_function("dict", call) else {
+pub(crate) fn unnecessary_literal_within_dict_call(
+    checker: &Checker,
+    call_fields: &ast::ExprCallFields<'_>,
+) {
+    let call = call_fields.node;
+    let Some(argument) = helpers::exactly_one_argument_with_matching_function("dict", call_fields)
+    else {
         return;
     };
     let Some(argument_kind) = DictKind::try_from_expr(argument) else {
@@ -71,7 +76,7 @@ pub(crate) fn unnecessary_literal_within_dict_call(checker: &Checker, call: ast:
         UnnecessaryLiteralWithinDictCall {
             kind: argument_kind,
         },
-        call.range(),
+        call_fields.range(),
     );
 
     // Convert `dict({"a": 1})` to `{"a": 1}`

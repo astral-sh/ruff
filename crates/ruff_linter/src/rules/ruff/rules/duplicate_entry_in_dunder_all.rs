@@ -87,10 +87,10 @@ pub(crate) fn duplicate_entry_in_dunder_all_aug_assign(
 /// Apply RUF068 to `__all__.extend()`.
 pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
     checker: &Checker,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
 ) {
-    let func = call.func();
-    let Some(value_passed) = call.arguments().as_single_positional() else {
+    let func = call.func;
+    let Some(value_passed) = call.arguments.as_single_positional() else {
         return;
     };
     let ExprKind::Attribute(attribute) = func.classify() else {

@@ -77,17 +77,17 @@ impl Violation for PrintEmptyString {
 }
 
 /// FURB105
-pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
-    if !checker.semantic().match_builtin_expr(call.func(), "print") {
+pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    if !checker.semantic().match_builtin_expr(call.func, "print") {
         return;
     }
 
-    let mut positional = call.arguments().args().iter();
+    let mut positional = call.arguments.args().iter();
     let first = positional.next();
     let (reason, separator) = if let Some(second) = positional.next() {
         // An unpacked mapping can supply the separator at runtime.
         let mut sep = None;
-        for kw in call.arguments().keywords() {
+        for kw in call.arguments.keywords() {
             let Some(name) = kw.arg() else {
                 return;
             };
@@ -125,7 +125,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
         if first.is_some_and(ast::Expr::is_starred_expr) {
             return;
         }
-        let has_sep = call.arguments().find_keyword("sep").is_some();
+        let has_sep = call.arguments.find_keyword("sep").is_some();
         let reason = match (first.is_some_and(is_empty_string), has_sep) {
             (true, true) => Reason::Both,
             (true, false) => Reason::EmptyArgument,
@@ -138,7 +138,7 @@ pub(crate) fn print_empty_string(checker: &Checker, call: ast::ExprCall<'_>) {
     let mut diagnostic = checker.report_diagnostic(PrintEmptyString { reason }, call.range());
     diagnostic.set_fix(
         EmptyStringFix::from_call(
-            call,
+            call.node,
             separator,
             checker.generator(),
             checker.comment_ranges(),

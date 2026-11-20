@@ -134,16 +134,20 @@ impl Violation for WaitForProcessInAsyncFunction {
 }
 
 /// ASYNC220, ASYNC221, ASYNC222
-pub(crate) fn blocking_process_invocation(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn blocking_process_invocation(
+    checker: &Checker,
+    call_fields: &ast::ExprCallFields<'_>,
+) {
+    let call = call_fields.node;
     if !checker.semantic().in_async_context() {
         return;
     }
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call_fields.func) else {
         return;
     };
 
-    let range = call.func().range();
+    let range = call_fields.func.range();
     match qualified_name.segments() {
         ["subprocess", "Popen"] | ["os", "popen"] => {
             checker.report_diagnostic_if_enabled(CreateSubprocessInAsyncFunction, range)

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::ExprKind;
 use ruff_text_size::Ranged;
 
@@ -48,7 +48,7 @@ impl AlwaysFixableViolation for UnnecessaryGeneratorDict {
 }
 
 /// C402 (`dict((x, y) for x, y in iterable)`)
-pub(crate) fn unnecessary_generator_dict(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn unnecessary_generator_dict(checker: &Checker, call: &ExprCallFields<'_>) {
     let Some(argument) = exactly_one_argument_with_matching_function("dict", call) else {
         return;
     };
@@ -67,6 +67,6 @@ pub(crate) fn unnecessary_generator_dict(checker: &Checker, call: ExprCall<'_>) 
     }
     let mut diagnostic = checker.report_diagnostic(UnnecessaryGeneratorDict, call.range());
     diagnostic.try_set_fix(|| {
-        fixes::fix_unnecessary_generator_dict(call.into(), checker).map(Fix::unsafe_edit)
+        fixes::fix_unnecessary_generator_dict(call.node.into(), checker).map(Fix::unsafe_edit)
     });
 }

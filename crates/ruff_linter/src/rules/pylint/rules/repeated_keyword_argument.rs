@@ -38,8 +38,8 @@ impl Violation for RepeatedKeywordArgument {
 }
 
 /// PLE1132
-pub(crate) fn repeated_keyword_argument(checker: &Checker, call: ast::ExprCall<'_>) {
-    let arguments = call.arguments();
+pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let arguments = call.arguments;
 
     let mut unpacked_dicts = arguments
         .keywords()
