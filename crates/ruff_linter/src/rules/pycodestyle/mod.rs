@@ -292,12 +292,12 @@ mod tests {
     #[test_case(1, 1)]
     #[test_case(0, 0)]
     #[test_case(4, 4)]
-    fn blank_lines_top_level_isort_compatibility(
+    fn missing_blank_lines_before_top_level_definition_isort_compatibility(
         lines_after_imports: isize,
         lines_between_types: usize,
     ) -> Result<()> {
         let snapshot = format!(
-            "blank_lines_top_level_isort_compatibility-lines-after({lines_after_imports})-between({lines_between_types})"
+            "missing_blank_lines_before_top_level_definition_isort_compatibility-lines-after({lines_after_imports})-between({lines_between_types})"
         );
         let diagnostics = test_path(
             Path::new("pycodestyle").join("E30_isort.py"),
