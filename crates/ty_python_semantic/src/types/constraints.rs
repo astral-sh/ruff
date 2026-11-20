@@ -3985,6 +3985,7 @@ impl<'db> CandidateSolutions<'db> {
 
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, CandidateTypeVarSolver<'db>> =
             FxIndexMap::default();
+        let path_visits = constraints.len() + 1;
         constraints.sort_by_key(|(_, source_order)| *source_order);
         for (constraint, _) in constraints {
             match constraint {
@@ -4017,6 +4018,7 @@ impl<'db> CandidateSolutions<'db> {
         // that the solution does not depend on any cross-typevar relationships, so the validity
         // bounds of unmentioned typevars cannot affect the solution of the typevars we have
         // evidence for.
+        let mut single_unbounded_variable = mappings.len() == 1;
         for (bound_typevar, bounds) in &mut mappings {
             let bound = match bound_typevar.typevar(db).bound_or_constraints(db, env) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
@@ -4036,6 +4038,7 @@ impl<'db> CandidateSolutions<'db> {
                 return ControlFlow::Continue(None);
             }
 
+            single_unbounded_variable = false;
             bounds.add_upper(ConstraintProvenance::VALIDITY, bound);
         }
 
@@ -4043,14 +4046,23 @@ impl<'db> CandidateSolutions<'db> {
         let mut typevars = Vec::with_capacity(mappings.len());
         for (bound_typevar, bounds) in mappings {
             let Some(solution) = bounds.finish(db, env, storage, bound_typevar, inferable) else {
-                return ControlFlow::Continue(match report_diagnostics {
-                    ReportDiagnostics::No => Some(Self::Unsatisfiable),
-                    // If any of the typevars doesn't have a solution (either because the constraint
-                    // set is overly restrictive, or because a candidate solution doesn't satisfy
-                    // the declared upper bounds), fall back on the slow path to construct useful
-                    // diagnostics.
-                    ReportDiagnostics::Yes => None,
-                });
+                if !report_diagnostics.is_yes() {
+                    return ControlFlow::Continue(Some(Self::Unsatisfiable));
+                }
+
+                // If the walker sees the same single unbounded variable, it has no declared
+                // bound to validate or diagnose. Compare instances because `type[T]` can change
+                // the bound while preserving T's identity.
+                let can_skip_walk = single_unbounded_variable
+                    && storage.node_support(node).is_some_and(|support| {
+                        support.iter().map(|id| storage.typevar_data(id)).eq([bound_typevar])
+                    })
+                    // The walker visits at most one node per constraint plus the terminal.
+                    // Keep the walk if it might exhaust the budget and trigger recovery.
+                    && limits
+                        .traversal_budget()
+                        .is_none_or(|(limits, _)| limits.remaining_visits >= path_visits);
+                return ControlFlow::Continue(can_skip_walk.then_some(Self::Unsatisfiable));
             };
             typevars.push(solution);
         }

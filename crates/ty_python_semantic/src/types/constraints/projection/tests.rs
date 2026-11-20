@@ -246,6 +246,19 @@ fn invalid_paths_respect_projection_budgets() {
         ),
         Ok(Solutions::Unsatisfiable(_))
     ));
+
+    // The simple pass uses all three visits on this conflicting conjunction. The retry
+    // exhausts the budget, which triggers different recovery than an unsatisfiable result.
+    let u = create_typevar(db, "U");
+    let conflict = exact(db, &builder, u, int).and(db, &builder, || exact(db, &builder, u, str));
+    let budget = SolutionBudget {
+        visits: 3,
+        ..SolutionBudget::default()
+    };
+    assert_eq!(
+        collect_paths(db, &builder, conflict, &[u], budget),
+        Err(ProjectionError::TraversalBudgetExceeded)
+    );
 }
 
 #[test]
