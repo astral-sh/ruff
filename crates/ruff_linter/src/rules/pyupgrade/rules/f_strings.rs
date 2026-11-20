@@ -7,7 +7,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{self as ast, Expr, ExprCall, ExprKind, Number, StringFlags};
+use ruff_python_ast::{self as ast, Expr, ExprCallFields, ExprKind, Number, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -421,7 +421,7 @@ impl FStringConversion {
 }
 
 /// UP032
-pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatSummary) {
+pub(crate) fn f_strings(checker: &Checker, call: &ExprCallFields<'_>, summary: &FormatSummary) {
     if summary.has_nested_parts {
         return;
     }
@@ -431,7 +431,7 @@ pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatS
         return;
     }
 
-    let ExprKind::Attribute(attribute_node) = call.func().classify() else {
+    let ExprKind::Attribute(attribute_node) = call.func.classify() else {
         return;
     };
     let value = attribute_node.value();
@@ -441,13 +441,13 @@ pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatS
     };
 
     let Some(mut summary) =
-        FormatSummaryValues::try_from_arguments(call.arguments(), checker.locator())
+        FormatSummaryValues::try_from_arguments(call.arguments, checker.locator())
     else {
         return;
     };
 
     let mut patches: Vec<(TextRange, FStringConversion)> = vec![];
-    let mut tokens = checker.tokens().in_range(call.func().range()).iter();
+    let mut tokens = checker.tokens().in_range(call.func.range()).iter();
     let end = loop {
         let Some(token) = tokens.next() else {
             unreachable!("Should break from the `Tok::Dot` arm");
@@ -557,9 +557,7 @@ pub(crate) fn f_strings(checker: &Checker, call: ExprCall<'_>, summary: &FormatS
     //     0,  # 0
     // )
     // ```
-    let has_comments = checker
-        .comment_ranges()
-        .intersects(call.arguments().range());
+    let has_comments = checker.comment_ranges().intersects(call.arguments.range());
 
     if !has_comments {
         if contents.is_empty() {

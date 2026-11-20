@@ -61,18 +61,18 @@ impl Violation for ReplaceStdoutStderr {
 }
 
 /// UP022
-pub(crate) fn replace_stdout_stderr(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::SUBPROCESS) {
         return;
     }
 
     if checker
         .semantic()
-        .matches_qualified_name(call.func(), &["subprocess", "run"])
+        .matches_qualified_name(call.func, &["subprocess", "run"])
     {
         // Find `stdout` and `stderr` kwargs.
         let [Some(stdout), Some(stderr), capture_output] =
-            call.arguments()
+            call.arguments
                 .find_keywords(["stdout", "stderr", "capture_output"])
         else {
             return;
@@ -95,7 +95,7 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: ast::ExprCall<'_>) 
                 generate_fix(
                     stdout,
                     stderr,
-                    call,
+                    call.node,
                     checker.locator().contents(),
                     checker.tokens(),
                 )

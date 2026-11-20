@@ -59,13 +59,13 @@ impl Violation for TrioSyncCall {
 }
 
 /// ASYNC105
-pub(crate) fn sync_call(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn sync_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::TRIO) {
         return;
     }
 
     let Some(method_name) = ({
-        let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
+        let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
             return;
         };
         MethodName::try_from(&qualified_name)
@@ -90,10 +90,10 @@ pub(crate) fn sync_call(checker: &Checker, call: ast::ExprCall<'_>) {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             pad(
                 "await".to_string(),
-                TextRange::new(call.func().start(), call.func().start()),
+                TextRange::new(call.func.start(), call.func.start()),
                 checker.locator(),
             ),
-            call.func().start(),
+            call.func.start(),
         )));
     }
 }

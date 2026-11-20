@@ -42,8 +42,8 @@ impl Violation for UnnecessarySubscriptReversal {
 }
 
 /// C415
-pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: ast::ExprCall<'_>) {
-    let Some(first_arg) = call.arguments().args().first() else {
+pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    let Some(first_arg) = call.arguments.args().first() else {
         return;
     };
     let ExprKind::Subscript(subscript_node) = first_arg.classify() else {
@@ -76,7 +76,7 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: ast::ExprC
     if *val != 1 {
         return;
     }
-    let Some(function_name) = checker.semantic().resolve_builtin_symbol(call.func()) else {
+    let Some(function_name) = checker.semantic().resolve_builtin_symbol(call.func) else {
         return;
     };
     if !matches!(function_name, "reversed" | "set" | "sorted") {

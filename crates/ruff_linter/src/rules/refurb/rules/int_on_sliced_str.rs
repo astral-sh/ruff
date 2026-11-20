@@ -67,14 +67,14 @@ impl AlwaysFixableViolation for IntOnSlicedStr {
 }
 
 /// FURB166
-pub(crate) fn int_on_sliced_str(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn int_on_sliced_str(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     // Verify that the function is `int`.
-    if !checker.semantic().match_builtin_expr(call.func(), "int") {
+    if !checker.semantic().match_builtin_expr(call.func, "int") {
         return;
     }
 
     // There must be exactly two arguments (e.g., `int(num[2:], 16)`).
-    let Some(pair) = call.arguments().items().as_array() else {
+    let Some(pair) = call.arguments.items().as_array() else {
         return;
     };
     let (expression, base) = match pair {

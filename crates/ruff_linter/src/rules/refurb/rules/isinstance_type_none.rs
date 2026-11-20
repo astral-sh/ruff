@@ -51,9 +51,9 @@ impl Violation for IsinstanceTypeNone {
 }
 
 /// FURB168
-pub(crate) fn isinstance_type_none(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     let semantic = checker.semantic();
-    let (func, arguments) = (call.func(), call.arguments());
+    let (func, arguments) = (call.func, call.arguments);
 
     let Some(
         [

@@ -97,10 +97,10 @@ impl Violation for LoggingTooManyArgs {
 
 /// PLE1205
 /// PLE1206
-pub(crate) fn logging_call(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     let mut first = None;
     let mut num_positional = 0;
-    for argument in call.arguments().iter_source_order() {
+    for argument in call.arguments.iter_source_order() {
         if argument.is_variadic() {
             return;
         }
@@ -110,7 +110,7 @@ pub(crate) fn logging_call(checker: &Checker, call: ast::ExprCall<'_>) {
         }
     }
 
-    match call.func().classify() {
+    match call.func.classify() {
         ExprKind::Attribute(expr_attribute) => {
             let attr = expr_attribute.attr();
 
@@ -118,7 +118,7 @@ pub(crate) fn logging_call(checker: &Checker, call: ast::ExprCall<'_>) {
                 return;
             }
             if !logging::is_logger_candidate(
-                call.func(),
+                call.func,
                 checker.semantic(),
                 &checker.settings().logger_objects,
             ) {
@@ -126,8 +126,7 @@ pub(crate) fn logging_call(checker: &Checker, call: ast::ExprCall<'_>) {
             }
         }
         ExprKind::Name(_) => {
-            let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func())
-            else {
+            let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
                 return;
             };
             let ["logging", attribute] = qualified_name.segments() else {
@@ -160,17 +159,17 @@ pub(crate) fn logging_call(checker: &Checker, call: ast::ExprCall<'_>) {
     }
 
     let num_message_args = num_positional - 1;
-    let has_keywords = call.arguments().len() != num_positional;
+    let has_keywords = call.arguments.len() != num_positional;
 
     if checker.is_rule_enabled(Rule::LoggingTooManyArgs) {
         if summary.num_positional < num_message_args {
-            checker.report_diagnostic(LoggingTooManyArgs, call.func().range());
+            checker.report_diagnostic(LoggingTooManyArgs, call.func.range());
         }
     }
 
     if checker.is_rule_enabled(Rule::LoggingTooFewArgs) {
         if num_message_args > 0 && !has_keywords && summary.num_positional > num_message_args {
-            checker.report_diagnostic(LoggingTooFewArgs, call.func().range());
+            checker.report_diagnostic(LoggingTooFewArgs, call.func.range());
         }
     }
 }

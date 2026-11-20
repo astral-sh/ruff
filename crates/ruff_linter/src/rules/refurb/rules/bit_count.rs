@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::{ExprKind, PythonVersion};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
@@ -65,13 +65,13 @@ impl AlwaysFixableViolation for BitCount {
 }
 
 /// FURB161
-pub(crate) fn bit_count(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn bit_count(checker: &Checker, call: &ExprCallFields<'_>) {
     // `int.bit_count()` was added in Python 3.10
     if checker.target_version() < PythonVersion::PY310 {
         return;
     }
 
-    let ExprKind::Attribute(attribute) = call.func().classify() else {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
     let attr = attribute.attr();
@@ -82,7 +82,7 @@ pub(crate) fn bit_count(checker: &Checker, call: ExprCall<'_>) {
         return;
     }
 
-    let Some(arg) = call.arguments().as_single_positional() else {
+    let Some(arg) = call.arguments.as_single_positional() else {
         return;
     };
 

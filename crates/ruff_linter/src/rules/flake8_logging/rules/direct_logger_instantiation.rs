@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -60,24 +60,24 @@ impl Violation for DirectLoggerInstantiation {
 }
 
 /// LOG001
-pub(crate) fn direct_logger_instantiation(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn direct_logger_instantiation(checker: &Checker, call: &ExprCallFields<'_>) {
     if !checker.semantic().seen_module(Modules::LOGGING) {
         return;
     }
 
     if checker
         .semantic()
-        .matches_qualified_name(call.func(), &["logging", "Logger"])
+        .matches_qualified_name(call.func, &["logging", "Logger"])
     {
         let mut diagnostic =
-            checker.report_diagnostic(DirectLoggerInstantiation, call.func().range());
+            checker.report_diagnostic(DirectLoggerInstantiation, call.func.range());
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("logging", "getLogger"),
-                call.func().start(),
+                call.func.start(),
                 checker.semantic(),
             )?;
-            let reference_edit = Edit::range_replacement(binding, call.func().range());
+            let reference_edit = Edit::range_replacement(binding, call.func.range());
             Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
         });
     }

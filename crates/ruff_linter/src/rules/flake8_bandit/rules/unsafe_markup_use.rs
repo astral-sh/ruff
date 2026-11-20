@@ -1,4 +1,4 @@
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::{Arguments, Expr, ExprKind};
 use ruff_text_size::Ranged;
 
@@ -91,7 +91,7 @@ impl Violation for UnsafeMarkupUse {
 }
 
 /// S704
-pub(crate) fn unsafe_markup_call(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn unsafe_markup_call(checker: &Checker, call: &ExprCallFields<'_>) {
     if checker
         .settings()
         .flake8_bandit
@@ -103,11 +103,11 @@ pub(crate) fn unsafe_markup_call(checker: &Checker, call: ExprCall<'_>) {
         return;
     }
 
-    if !is_unsafe_call(call.arguments(), checker.semantic(), checker.settings()) {
+    if !is_unsafe_call(call.arguments, checker.semantic(), checker.settings()) {
         return;
     }
 
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func) else {
         return;
     };
 
