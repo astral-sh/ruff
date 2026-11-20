@@ -9,9 +9,12 @@ use pep440_rs::VersionSpecifiers;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
+};
 use ruff_db::system::SystemPathBuf;
 use ruff_linter::fs;
+use ruff_linter::message::RenderContext;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::detect_package_root;
 use ruff_linter::preview::is_script_metadata_enabled;
@@ -254,6 +257,18 @@ pub struct ScriptSettingsError {
 }
 
 impl ScriptSettingsError {
+    /// Render the diagnostic as an error for commands that cannot return diagnostics.
+    pub fn into_anyhow(self) -> anyhow::Error {
+        let rendered = self
+            .diagnostic
+            .display(
+                &RenderContext::new(&FxHashMap::default()),
+                &DisplayDiagnosticConfig::new("ruff").hide_severity(true),
+            )
+            .to_string();
+        anyhow::Error::msg(rendered.trim_end().to_owned())
+    }
+
     fn new(span: Span, message: impl fmt::Display) -> Self {
         let mut diagnostic = Diagnostic::new(
             DiagnosticId::InvalidScriptMetadata,

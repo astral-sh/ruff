@@ -214,7 +214,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
-    pub fn settings(&self) -> impl Iterator<Item = &Settings> {
+    pub fn settings(&self) -> impl Iterator<Item = &Settings> + Clone {
         std::iter::once(self.root_settings())
             .chain(self.projects.iter().map(|entry| &entry.settings))
     }
