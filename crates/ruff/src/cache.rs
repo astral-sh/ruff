@@ -513,18 +513,34 @@ mod tests {
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
+    use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::package::PackageRoot;
-    use ruff_linter::registry::Rule;
-    use ruff_linter::settings::LinterSettings;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_python_ast::PySourceType;
-    use ruff_workspace::Settings;
+    use ruff_python_ast::PythonVersion;
+    use ruff_workspace::configuration::{Configuration, RuleSelection};
+    use ruff_workspace::resolver::Project;
+
+    use crate::args::ConfigArguments;
 
     use crate::cache::{self, ChangeData, FileCache, FileCacheData, FileCacheKey};
     use crate::cache::{Cache, RelativePathBuf};
     use crate::commands::format::{FormatCommandError, FormatMode, FormatResult, format_path};
     use crate::diagnostics::{Diagnostics, lint_path};
+
+    fn test_project(root: &Path, cache_dir: PathBuf, rule: &str) -> Project {
+        let mut configuration = Configuration {
+            cache_dir: Some(cache_dir),
+            target_version: Some(PythonVersion::latest()),
+            ..Configuration::default()
+        };
+        configuration.lint.rule_selections.push(RuleSelection {
+            select: Some(vec![UnresolvedRuleSelector::cli(rule)]),
+            ..RuleSelection::default()
+        });
+        Project::resolve(configuration, root, &ConfigArguments::default()).unwrap()
+    }
 
     #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
     #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]
@@ -534,14 +550,10 @@ mod tests {
         let _ = fs::remove_dir_all(&cache_dir);
         cache::init(&cache_dir).unwrap();
 
-        let settings = Settings {
-            cache_dir,
-            linter: LinterSettings::for_rule(Rule::UnusedVariable),
-            ..Settings::default()
-        };
-
+        let overrides = ConfigArguments::default();
         let package_root = fs::canonicalize(package_root).unwrap();
-        let cache = Cache::open(package_root.clone(), &settings);
+        let project = test_project(&package_root, cache_dir, "F841");
+        let cache = Cache::open(package_root.clone(), &project.settings);
         assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
@@ -572,7 +584,8 @@ mod tests {
                 let mut diagnostics = lint_path(
                     &path,
                     Some(PackageRoot::root(&package_root)),
-                    &settings.linter,
+                    &project,
+                    &overrides,
                     Some(&cache),
                     flags::Noqa::Enabled,
                     flags::FixMode::Generate,
@@ -597,7 +610,7 @@ mod tests {
 
         cache.persist().unwrap();
 
-        let cache = Cache::open(package_root.clone(), &settings);
+        let cache = Cache::open(package_root.clone(), &project.settings);
         assert_ne!(cache.package.files.len(), 0);
 
         paths_with_diagnostics.sort();
@@ -621,7 +634,8 @@ mod tests {
             got_diagnostics += lint_path(
                 &path,
                 Some(PackageRoot::root(&package_root)),
-                &settings.linter,
+                &project,
+                &overrides,
                 Some(&cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -1008,7 +1022,7 @@ mod tests {
 
     struct TestCache {
         package_root: PathBuf,
-        settings: Settings,
+        project: Project,
     }
 
     impl TestCache {
@@ -1027,15 +1041,10 @@ mod tests {
             cache::init(&cache_dir).unwrap();
             fs::create_dir(package_root.clone()).unwrap();
 
-            let settings = Settings {
-                cache_dir,
-                linter: LinterSettings::for_rule(Rule::UndefinedExport),
-                ..Settings::default()
-            };
-
+            let project = test_project(&package_root, cache_dir, "F822");
             Self {
                 package_root,
-                settings,
+                project,
             }
         }
 
@@ -1053,7 +1062,7 @@ mod tests {
         }
 
         fn open(&self) -> Cache {
-            Cache::open(self.package_root.clone(), &self.settings)
+            Cache::open(self.package_root.clone(), &self.project.settings)
         }
 
         fn lint_file_with_cache(
@@ -1064,7 +1073,8 @@ mod tests {
             lint_path(
                 &self.package_root.join(path),
                 Some(PackageRoot::root(&self.package_root)),
-                &self.settings.linter,
+                &self.project,
+                &ConfigArguments::default(),
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -1080,7 +1090,7 @@ mod tests {
             let file_path = self.package_root.join(path);
             format_path(
                 &file_path,
-                &self.settings.formatter,
+                &self.project.settings.formatter,
                 SourceType::Python(PySourceType::Python),
                 FormatMode::Write,
                 None,
@@ -1091,7 +1101,7 @@ mod tests {
 
     impl Drop for TestCache {
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.settings.cache_dir);
+            let _ = fs::remove_dir_all(&self.project.settings.cache_dir);
         }
     }
 }

@@ -6,6 +6,7 @@ use std::process::{Command, Stdio};
 use std::str;
 
 use anyhow::Result;
+use indoc::indoc;
 
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 
@@ -4118,6 +4119,376 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
     ----- stderr -----
     ");
 
+    Ok(())
+}
+
+#[test]
+fn script_without_tool_ruff_inherits_project_rules() -> Result<()> {
+    let test = CliTest::with_files([
+        ("ruff.toml", "lint.select = ['T201']"),
+        (
+            "script.py",
+            r"
+                # /// script
+                # [tool.other]
+                # ///
+                print(missing)
+            ",
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:5:1: print: `print` found
+    Found 1 error.
+    1 unsafe fix available with `--fix --unsafe-fixes`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_with_empty_tool_ruff_uses_default_rules() -> Result<()> {
+    let test = CliTest::with_files([
+        ("config/ruff/ruff.toml", "lint.ignore = ['F821']"),
+        ("ruff.toml", "lint.select = ['T201']"),
+        (
+            "script.py",
+            r"
+                # /// script
+                # [tool.ruff]
+                # ///
+                print(missing)
+            ",
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command()
+        .env("HOME", test.root())
+        .env("XDG_CONFIG_HOME", test.root().join("config"))
+        .args(["--preview", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:5:7: undefined-name: Undefined name `missing`
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_with_tool_ruff_uses_inline_rules() -> Result<()> {
+    let test = CliTest::with_files([
+        ("ruff.toml", "lint.select = ['T201']"),
+        (
+            "script.py",
+            r"
+                # /// script
+                # [tool.ruff.lint]
+                # ignore = ['F821']
+                # ///
+                print(missing)
+            ",
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "script.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn explicit_config_overrides_script_settings() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "explicit.toml",
+            r#"
+                target-version = 'py310'
+                lint.select = ['UP045']
+            "#,
+        ),
+        (
+            "script.py",
+            r#"
+                # /// script
+                # requires-python = '>=3.9'
+                # tool.ruff.lint.ignore = ['UP045']
+                # ///
+                from typing import Optional
+
+                x: Optional[int]
+            "#,
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--config", "explicit.toml", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:8:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn invalid_script_python_requirement() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        indoc! {r#"
+            #!/usr/bin/env python
+
+            # /// script
+            # requires-python = 'invalid'
+            # ///
+        "#},
+    )?;
+    assert_cmd_snapshot!(test.command().args(["check", "--preview", "--no-cache", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    invalid-script-metadata: Failed to parse version: Unexpected end of version specifier, expected operator:
+    invalid
+    ^^^^^^^
+     --> script.py:4:21
+      |
+    3 | # /// script
+    4 | # requires-python = 'invalid'
+      |                     ^^^^^^^^^
+    5 | # ///
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn invalid_inline_script_configuration() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # tool.ruff.preview = true
+            # tool.ruff.extend = 'missing.toml'
+            # ///
+        "#,
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py: invalid-script-metadata: Failed to load configuration `[TMP]/missing.toml`: Failed to read [TMP]/missing.toml: No such file or directory (os error 2)
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_target_overrides_extended_per_file_targets() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "common.toml",
+            r#"
+                lint.select = ["UP045"]
+                per-file-target-version = { "*.py" = "py312" }
+            "#,
+        ),
+        (
+            "inferred.py",
+            r#"
+                # /// script
+                # requires-python = ">=3.8"
+                # [tool.ruff]
+                # extend = "common.toml"
+                # ///
+                from typing import Optional
+                x: Optional[int]
+            "#,
+        ),
+        (
+            "explicit.py",
+            r#"
+                # /// script
+                # requires-python = ">=3.8"
+                # [tool.ruff]
+                # extend = "common.toml"
+                # target-version = "py38"
+                # ///
+                from typing import Optional
+                x: Optional[int]
+            "#,
+        ),
+        (
+            "own.py",
+            r#"
+                # /// script
+                # requires-python = ">=3.8"
+                # [tool.ruff]
+                # extend = "common.toml"
+                # target-version = "py38"
+                # per-file-target-version = { "own.py" = "py310" }
+                # ///
+                from typing import Optional
+                x: Optional[int]
+            "#,
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "inferred.py", "explicit.py", "own.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    own.py:10:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_requires_python() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+                [project]
+                requires-python = ">=3.10"
+
+                [tool.ruff]
+                preview = true
+                per-file-target-version = { "old_*.py" = "py39" }
+
+                [tool.ruff.lint]
+                select = ["UP045"]
+            "#,
+        ),
+        (
+            "old_script.py",
+            r#"
+                # /// script
+                # requires-python = '>=3.10'
+                # ///
+                from typing import Optional
+                x: Optional[int]
+            "#,
+        ),
+        (
+            "old_fallback.py",
+            r#"
+                # /// script
+                # dependencies = []
+                # ///
+                from typing import Optional
+                x: Optional[int]
+            "#,
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().arg("."), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    old_script.py:6:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn cli_target_version_overrides_script_requirement() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r"
+            # /// script
+            # requires-python = '>=3.9'
+            # ///
+            from typing import Optional
+            x: Optional[int]
+        ",
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--select=UP045", "--target-version=py310", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:6:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn isolated_ignores_script_settings() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # requires-python = '>=3.9'
+            # tool.ruff.extend = 'missing.toml'
+            # ///
+            from typing import Optional
+            x: Optional[int]
+        "#,
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--isolated", "--select", "UP045", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:7:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+
+    test.write_file(
+        "script.py",
+        r#"
+            # /// script
+            # invalid TOML
+            # ///
+        "#,
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--isolated", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:3:11: invalid-script-metadata: key with no value, expected `=`
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    test.write_file("ruff.toml", "")?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--config", "ruff.toml", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:3:11: invalid-script-metadata: key with no value, expected `=`
+    Found 1 error.
+
+    ----- stderr -----
+    ");
     Ok(())
 }
 
