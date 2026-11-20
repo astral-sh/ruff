@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
 use rustc_hash::FxHashMap;
 use std::sync::LazyLock;
 
@@ -80,16 +80,19 @@ static DEPRECATED_ALIASES: LazyLock<FxHashMap<&'static str, &'static str>> = Laz
 });
 
 /// UP005
-pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: &Expr) {
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
+pub(crate) fn deprecated_unittest_alias(checker: &Checker, expr: Expr<'_>) {
+    let ExprKind::Attribute(attribute) = expr.classify() else {
         return;
     };
+    let value = attribute.value();
+    let attr = attribute.attr();
     let Some(target) = DEPRECATED_ALIASES.get(attr.as_str()) else {
         return;
     };
-    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+    let ExprKind::Name(name) = value.classify() else {
         return;
     };
+    let id = name.id();
     if id != "self" {
         return;
     }

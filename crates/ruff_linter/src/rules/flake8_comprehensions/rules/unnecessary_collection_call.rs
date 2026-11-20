@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -61,20 +61,20 @@ impl AlwaysFixableViolation for UnnecessaryCollectionCall {
 /// C408
 pub(crate) fn unnecessary_collection_call(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     settings: &Settings,
 ) {
-    let empty = call.arguments.is_empty();
+    let empty = call.arguments().is_empty();
     if !empty
         && (settings.allow_dict_calls_with_keyword_arguments
-            || call.arguments.iter_source_order().any(|item| match item {
+            || call.arguments().iter_source_order().any(|item| match item {
                 ast::ArgOrKeyword::Arg(_) => true,
-                ast::ArgOrKeyword::Keyword(keyword) => keyword.arg.is_none(),
+                ast::ArgOrKeyword::Keyword(keyword) => keyword.is_variadic(),
             }))
     {
         return;
     }
-    let Some(builtin) = checker.semantic().resolve_builtin_symbol(&call.func) else {
+    let Some(builtin) = checker.semantic().resolve_builtin_symbol(call.func()) else {
         return;
     };
     let collection = match builtin {
@@ -100,7 +100,7 @@ pub(crate) fn unnecessary_collection_call(
                     Collection::Tuple => "(".to_string(),
                 },
                 call.start(),
-                call.arguments.start() + TextSize::from(1),
+                call.arguments().start() + TextSize::from(1),
             );
 
             // Replace from the end of the inner list or tuple to the end of the call with `}`.
@@ -112,7 +112,7 @@ pub(crate) fn unnecessary_collection_call(
                     Collection::List => "]".to_string(),
                     Collection::Tuple => ")".to_string(),
                 },
-                call.arguments.end() - TextSize::from(1),
+                call.arguments().end() - TextSize::from(1),
                 call.end(),
             );
 

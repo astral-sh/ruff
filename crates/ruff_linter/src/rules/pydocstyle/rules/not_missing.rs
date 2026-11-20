@@ -613,7 +613,7 @@ pub(crate) fn not_missing(
             kind: MemberKind::Function(function) | MemberKind::NestedFunction(function),
             ..
         }) => {
-            if is_overload(&function.decorator_list, checker.semantic()) {
+            if is_overload(function.decorator_list(), checker.semantic()) {
                 true
             } else {
                 checker.report_diagnostic_if_enabled(
@@ -627,18 +627,18 @@ pub(crate) fn not_missing(
             kind: MemberKind::Method(function),
             ..
         }) => {
-            if is_overload(&function.decorator_list, checker.semantic())
-                || is_override(&function.decorator_list, checker.semantic())
+            if is_overload(function.decorator_list(), checker.semantic())
+                || is_override(function.decorator_list(), checker.semantic())
             {
                 true
-            } else if is_init(&function.name) {
+            } else if is_init(function.name().as_str()) {
                 checker.report_diagnostic_if_enabled(UndocumentedPublicInit, function.identifier());
                 true
-            } else if is_new(&function.name) || is_call(&function.name) {
+            } else if is_new(function.name().as_str()) || is_call(function.name().as_str()) {
                 checker
                     .report_diagnostic_if_enabled(UndocumentedPublicMethod, function.identifier());
                 true
-            } else if is_magic(&function.name) {
+            } else if is_magic(function.name().as_str()) {
                 checker
                     .report_diagnostic_if_enabled(UndocumentedMagicMethod, function.identifier());
                 true

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_ast::{self as ast, ExprKind, Number};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -62,21 +62,18 @@ impl Violation for LongSleepNotForever {
 }
 
 /// ASYNC116
-pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
+pub(crate) fn long_sleep_not_forever(checker: &Checker, call: ast::ExprCall<'_>) {
     if !(checker.semantic().seen_module(Modules::TRIO)
         || checker.semantic().seen_module(Modules::ANYIO))
     {
         return;
     }
 
-    if call.arguments.len() != 1 {
+    if call.arguments().len() != 1 {
         return;
     }
 
-    let Some(qualified_name) = checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-    else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
         return;
     };
 
@@ -91,13 +88,14 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
         AsyncModule::AsyncIo => return,
     };
 
-    let Some(arg) = call.arguments.find_argument_value(arg_name, 0) else {
+    let Some(arg) = call.arguments().find_argument_value(arg_name, 0) else {
         return;
     };
 
-    let Expr::NumberLiteral(ExprNumberLiteral { value, .. }) = arg else {
+    let ExprKind::NumberLiteral(number_literal) = arg.classify() else {
         return;
     };
+    let value = number_literal.value();
 
     // TODO(ekohilas): Replace with Duration::from_days(1).as_secs(); when available.
     let one_day_in_secs = 60 * 60 * 24;
@@ -116,10 +114,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
         Number::Complex { .. } => return,
     }
 
-    let Some(qualified_name) = checker
-        .semantic()
-        .resolve_qualified_name(call.func.as_ref())
-    else {
+    let Some(qualified_name) = checker.semantic().resolve_qualified_name(call.func()) else {
         return;
     };
 
@@ -140,11 +135,11 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: &ExprCall) {
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import_from(&module.to_string(), replacement_function),
-            call.func.start(),
+            call.func().start(),
             checker.semantic(),
         )?;
-        let reference_edit = Edit::range_replacement(binding, call.func.range());
-        let arg_edit = Edit::range_replacement("()".to_string(), call.arguments.range());
+        let reference_edit = Edit::range_replacement(binding, call.func().range());
+        let arg_edit = Edit::range_replacement("()".to_string(), call.arguments().range());
         Ok(Fix::unsafe_edits(import_edit, [reference_edit, arg_edit]))
     });
 }

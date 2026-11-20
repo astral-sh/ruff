@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::{self as ast, CmpOp, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -238,46 +238,32 @@ impl Violation for SysVersionCmpStr10 {
 }
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
-pub(crate) fn compare(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
     let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
-    match left {
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. })
-            if is_sys(value, "version_info", checker.semantic()) =>
+    match left.classify() {
+        ExprKind::Subscript(subscript)
+            if is_sys(subscript.value(), "version_info", checker.semantic()) =>
         {
-            if let Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(i),
-                ..
-            }) = slice.as_ref()
-            {
+            if let Some(i) = subscript.slice().as_int_literal() {
                 if *i == 0 {
-                    if let (
-                        operator @ (CmpOp::Eq | CmpOp::NotEq),
-                        Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(n),
-                            ..
-                        }),
-                    ) = (op, right)
+                    if let (operator @ (CmpOp::Eq | CmpOp::NotEq), Some(n)) =
+                        (op, right.as_int_literal())
                     {
                         if *n == 3 && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3) {
                             checker.report_diagnostic(
                                 SysVersionInfo0Eq3 {
-                                    eq: matches!(*operator, CmpOp::Eq),
+                                    eq: matches!(operator, CmpOp::Eq),
                                 },
                                 left.range(),
                             );
                         }
                     }
                 } else if *i == 1 {
-                    if let (
-                        CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
-                        Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(_),
-                            ..
-                        }),
-                    ) = (op, right)
+                    if let (CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE, Some(_)) =
+                        (op, right.as_int_literal())
                     {
                         checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
                     }
@@ -285,16 +271,12 @@ pub(crate) fn compare(checker: &Checker, compare: &ast::ExprCompare) {
             }
         }
 
-        Expr::Attribute(ast::ExprAttribute { value, attr, .. })
-            if is_sys(value, "version_info", checker.semantic()) && attr == "minor" =>
+        ExprKind::Attribute(attribute)
+            if is_sys(attribute.value(), "version_info", checker.semantic())
+                && attribute.attr() == "minor" =>
         {
-            if let (
-                CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(_),
-                    ..
-                }),
-            ) = (op, right)
+            if let (CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE, Some(_)) =
+                (op, right.as_int_literal())
             {
                 checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
             }
@@ -304,12 +286,10 @@ pub(crate) fn compare(checker: &Checker, compare: &ast::ExprCompare) {
     }
 
     if is_sys(left, "version", checker.semantic()) {
-        if let (
-            CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }),
-        ) = (op, right)
+        if let (CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE, Some(literal)) =
+            (op, right.as_string_literal_expr())
         {
-            if value.len() == 1 {
+            if literal.value().len() == 1 {
                 checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());
             } else {
                 checker.report_diagnostic_if_enabled(SysVersionCmpStr3, left.range());

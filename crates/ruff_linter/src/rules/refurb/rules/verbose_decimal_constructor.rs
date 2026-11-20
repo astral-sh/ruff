@@ -4,7 +4,7 @@ use itertools::Itertools;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{ExprCall, ExprKind};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
 
@@ -75,7 +75,7 @@ impl Violation for VerboseDecimalConstructor {
 /// FURB157
 pub(crate) fn verbose_decimal_constructor(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: ExprCall<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !matches!(qualified_name.segments(), ["decimal", "Decimal"]) {
@@ -83,14 +83,14 @@ pub(crate) fn verbose_decimal_constructor(
     }
 
     // Decimal accepts arguments of the form: `Decimal(value='0', context=None)`
-    let Some(value) = call.arguments.find_argument_value("value", 0) else {
+    let Some(value) = call.arguments().find_argument_value("value", 0) else {
         return;
     };
 
-    match value {
-        Expr::StringLiteral(ast::ExprStringLiteral {
-            value: str_literal, ..
-        }) => {
+    match value.classify() {
+        ExprKind::StringLiteral(expr_string_literal) => {
+            let str_literal = expr_string_literal.value();
+
             // Parse the inner string as an integer.
             //
             // For reference, a string argument to `Decimal` is parsed in CPython
@@ -169,9 +169,10 @@ pub(crate) fn verbose_decimal_constructor(
                 applicability,
             ));
         }
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
+        ExprKind::Call(expr_call) => {
+            let func = expr_call.func();
+            let arguments = expr_call.arguments();
+
             // Must be a call to the `float` builtin.
             if !checker.semantic().match_builtin_expr(func, "float") {
                 return;

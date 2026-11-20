@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprKind};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
@@ -53,7 +54,7 @@ impl AlwaysFixableViolation for TypeNoneComparison {
 }
 
 /// FURB169
-pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare) {
+pub(crate) fn type_none_comparison(checker: &Checker, compare: ast::ExprCompare<'_>) {
     let Some((left, op, right)) = compare.as_single() else {
         return;
     };
@@ -71,27 +72,27 @@ pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare
         return;
     };
 
-    let other_arg = match (left_arg, right_arg) {
-        (Expr::NoneLiteral(_), _) => right_arg,
-        (_, Expr::NoneLiteral(_)) => left_arg,
+    let other_arg = match (left_arg.classify(), right_arg.classify()) {
+        (ExprKind::NoneLiteral(_), _) => right_arg,
+        (_, ExprKind::NoneLiteral(_)) => left_arg,
         _ => return,
     };
 
     let negate = replacement == IdentityCheck::IsNot;
-    let fix = replace_with_identity_check(other_arg, compare.range, negate, checker);
+    let fix = replace_with_identity_check(other_arg, compare.range(), negate, checker);
 
     checker
-        .report_diagnostic(TypeNoneComparison { replacement }, compare.range)
+        .report_diagnostic(TypeNoneComparison { replacement }, compare.range())
         .set_fix(fix);
 }
 
 /// Returns the object passed to the function, if the expression is a call to
 /// `type` with a single argument.
-fn type_call_arg<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
+fn type_call_arg<'a>(expr: Expr<'a>, semantic: &'a SemanticModel) -> Option<Expr<'a>> {
     // The expression must be a single-argument call to `type`.
-    let ast::ExprCall {
-        func, arguments, ..
-    } = expr.as_call_expr()?;
+    let expr_call = expr.as_call_expr()?;
+    let func = expr_call.func();
+    let arguments = expr_call.arguments();
     if arguments.len() != 1 {
         return None;
     }

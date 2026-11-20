@@ -1,8 +1,7 @@
-use ast::{ExprAttribute, ExprName, Identifier};
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Argument::{Keyword, Positional};
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::ArgOrKeyword::{Arg as Positional, Keyword};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprKind, ExprName, Identifier};
 use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::Ranged;
 
@@ -67,24 +66,21 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 }
 
 /// SIM911
-pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) {
-    let ast::ExprCall {
-        func, arguments, ..
-    } = expr;
+pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: ast::ExprCall<'_>) {
+    let func = expr.func();
+    let arguments = expr.arguments();
     let [arg1, arg2] = if let Some(pair) = arguments.as_positional_array::<2>() {
         pair
     } else {
-        let ([Positional(a), Positional(b), Keyword(keyword)]
-        | [Positional(a), Keyword(keyword), Positional(b)]
-        | [Keyword(keyword), Positional(a), Positional(b)]) = arguments.items.as_slice()
+        let Some(
+            [Positional(a), Positional(b), Keyword(keyword)]
+            | [Positional(a), Keyword(keyword), Positional(b)]
+            | [Keyword(keyword), Positional(a), Positional(b)],
+        ) = arguments.items().as_array()
         else {
             return;
         };
-        if keyword
-            .arg
-            .as_ref()
-            .is_none_or(|name| name.as_str() != "strict")
-        {
+        if keyword.arg().is_none_or(|name| name.as_str() != "strict") {
             return;
         }
         [a, b]
@@ -95,7 +91,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
     let Some((var2, attr2, args2)) = get_var_attr_args(arg2) else {
         return;
     };
-    if var1.id != var2.id
+    if var1.name_id() != var2.name_id()
         || attr1 != "keys"
         || attr2 != "values"
         || !args1.is_empty()
@@ -145,17 +141,18 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
     ));
 }
 
-fn get_var_attr_args(expr: &Expr) -> Option<(&ExprName, &Identifier, &Arguments)> {
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+fn get_var_attr_args(expr: Expr<'_>) -> Option<(ExprName<'_>, Identifier<'_>, Arguments<'_>)> {
+    let ExprKind::Call(call) = expr.classify() else {
         return None;
     };
-    let Expr::Attribute(ExprAttribute { value, attr, .. }) = func.as_ref() else {
+    let func = call.func();
+    let arguments = call.arguments();
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return None;
     };
-    let Expr::Name(var_name) = value.as_ref() else {
+    let value = attribute.value();
+    let attr = attribute.attr();
+    let ExprKind::Name(var_name) = value.classify() else {
         return None;
     };
     Some((var_name, attr, arguments))

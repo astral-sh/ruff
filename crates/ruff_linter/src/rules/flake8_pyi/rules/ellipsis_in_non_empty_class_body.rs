@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace::trailing_comment_start_offset;
-use ruff_python_ast::{Stmt, StmtExpr};
+use ruff_python_ast::{StmtKind, Suite};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -46,23 +46,24 @@ impl Violation for EllipsisInNonEmptyClassBody {
 }
 
 /// PYI013
-pub(crate) fn ellipsis_in_non_empty_class_body(checker: &Checker, body: &[Stmt]) {
+pub(crate) fn ellipsis_in_non_empty_class_body(checker: &Checker, body: Suite<'_>) {
     // If the class body contains a single statement, then it's fine for it to be an ellipsis.
     if body.len() == 1 {
         return;
     }
 
     for stmt in body {
-        let Stmt::Expr(StmtExpr { value, .. }) = stmt else {
+        let StmtKind::Expr(expr) = stmt.classify() else {
             continue;
         };
+        let value = expr.value();
 
         if value.is_ellipsis_literal_expr() {
             let mut diagnostic =
                 checker.report_diagnostic(EllipsisInNonEmptyClassBody, stmt.range());
 
             // Try to preserve trailing comment if it exists
-            let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.source()) {
+            let edit = if let Some(index) = trailing_comment_start_offset(&stmt, checker.source()) {
                 Edit::range_deletion(stmt.range().add_end(index))
             } else {
                 fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer())

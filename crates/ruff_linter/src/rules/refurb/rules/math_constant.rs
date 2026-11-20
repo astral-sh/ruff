@@ -55,12 +55,12 @@ impl Violation for MathConstant {
 }
 
 /// FURB152
-pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral) {
-    let Number::Float(value) = literal.value else {
+pub(crate) fn math_constant(checker: &Checker, literal: ast::ExprNumberLiteral<'_>) {
+    let Number::Float(value) = literal.value() else {
         return;
     };
 
-    if let Some(constant) = Constant::from_value(value) {
+    if let Some(constant) = Constant::from_value(*value) {
         let mut diagnostic = checker.report_diagnostic(
             MathConstant {
                 literal: checker.locator().slice(literal).into(),
@@ -73,7 +73,7 @@ pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral)
 }
 
 fn convert_to_constant(
-    literal: &ast::ExprNumberLiteral,
+    literal: ast::ExprNumberLiteral<'_>,
     constant: &'static str,
     checker: &Checker,
 ) -> Result<Fix> {

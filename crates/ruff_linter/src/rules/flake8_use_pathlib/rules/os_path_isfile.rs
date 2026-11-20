@@ -63,7 +63,7 @@ impl Violation for OsPathIsfile {
 }
 
 /// PTH113
-pub(crate) fn os_path_isfile(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_path_isfile(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if segments != ["os", "path", "isfile"] {
         return;
     }

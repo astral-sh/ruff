@@ -1,4 +1,5 @@
 use ruff_python_ast::StmtImportFrom;
+use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -38,20 +39,20 @@ impl Violation for FutureAnnotationsInStub {
 }
 
 /// PYI044
-pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
+pub(crate) fn from_future_import(checker: &Checker, target: StmtImportFrom<'_>) {
     if !target.is_future_import(checker.parser_version()) {
         return;
     }
 
     if target
-        .names
+        .names()
         .iter()
-        .all(|alias| &*alias.name != "annotations")
+        .all(|alias| alias.name() != "annotations")
     {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, target.range);
+    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, target.range());
 
     let stmt = checker.semantic().current_statement();
 

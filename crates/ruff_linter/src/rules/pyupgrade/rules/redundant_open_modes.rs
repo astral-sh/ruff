@@ -2,7 +2,7 @@ use anyhow::Result;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 use ruff_python_stdlib::open_mode::OpenMode;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -61,7 +61,7 @@ impl AlwaysFixableViolation for RedundantOpenModes {
 /// UP015
 pub(crate) fn redundant_open_modes(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !matches!(
@@ -71,12 +71,13 @@ pub(crate) fn redundant_open_modes(
         return;
     }
 
-    let Some(mode_arg) = call.arguments.find_argument_value("mode", 1) else {
+    let Some(mode_arg) = call.arguments().find_argument_value("mode", 1) else {
         return;
     };
-    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_arg else {
+    let ExprKind::StringLiteral(string_literal) = mode_arg.classify() else {
         return;
     };
+    let value = string_literal.value();
     let Ok(mode) = OpenMode::from_chars(value.chars()) else {
         return;
     };
@@ -86,7 +87,12 @@ pub(crate) fn redundant_open_modes(
     }
 }
 
-fn create_diagnostic(call: &ast::ExprCall, mode_arg: &Expr, mode: OpenMode, checker: &Checker) {
+fn create_diagnostic(
+    call: ast::ExprCall<'_>,
+    mode_arg: Expr<'_>,
+    mode: OpenMode,
+    checker: &Checker,
+) {
     let mut diagnostic = checker.report_diagnostic(
         RedundantOpenModes {
             replacement: mode.to_string(),
@@ -108,8 +114,8 @@ fn create_diagnostic(call: &ast::ExprCall, mode_arg: &Expr, mode: OpenMode, chec
 }
 
 fn create_remove_argument_fix(
-    call: &ast::ExprCall,
-    mode_arg: &Expr,
+    call: ast::ExprCall<'_>,
+    mode_arg: Expr<'_>,
     tokens: &Tokens,
 ) -> Result<Edit> {
     // Find the last comma before mode_arg and create a deletion fix

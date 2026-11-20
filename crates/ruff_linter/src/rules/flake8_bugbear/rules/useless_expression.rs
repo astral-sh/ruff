@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::Expr;
 use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -73,7 +73,7 @@ impl Violation for UselessExpression {
 }
 
 /// B018
-pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
+pub(crate) fn useless_expression(checker: &Checker, value: Expr<'_>) {
     // Ignore comparisons, as they're handled by `useless_comparison`.
     if value.is_compare_expr() {
         return;
@@ -81,8 +81,8 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
 
     // Ignore strings, to avoid false positives with docstrings.
     if matches!(
-        value,
-        Expr::FString(_) | Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
+        value.classify(),
+        ExprKind::FString(_) | ExprKind::StringLiteral(_) | ExprKind::EllipsisLiteral(_)
     ) {
         return;
     }

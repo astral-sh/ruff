@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::{self as ast, ArgOrKeyword, ExprKind};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -106,7 +106,7 @@ impl Violation for FastApiNonAnnotatedDependency {
 /// FAST002
 pub(crate) fn fastapi_non_annotated_dependency(
     checker: &Checker,
-    function_def: &ast::StmtFunctionDef,
+    function_def: ast::StmtFunctionDef<'_>,
 ) {
     if !checker.semantic().seen_module(Modules::FASTAPI)
         || !is_fastapi_route(function_def, checker.semantic())
@@ -117,14 +117,14 @@ pub(crate) fn fastapi_non_annotated_dependency(
     // Only remove a positional default if all earlier positional parameters are already required.
     // A `noqa` or a conflicting edit can prevent an earlier fix from removing its default.
     let mut seen_default = false;
-    for parameter in &function_def.parameters.items {
+    for parameter in function_def.parameters().items().iter() {
         match parameter {
             ast::ParameterItem::PositionalOnly(parameter) => {
-                seen_default |= parameter.default.is_some();
+                seen_default |= parameter.default().is_some();
             }
             ast::ParameterItem::PositionalOrKeyword(parameter) => {
                 check_parameter(checker, parameter, seen_default);
-                seen_default |= parameter.default.is_some();
+                seen_default |= parameter.default().is_some();
             }
             // Keyword-only parameters can be required after a parameter with a default.
             ast::ParameterItem::KeywordOnly(parameter) => {
@@ -135,7 +135,7 @@ pub(crate) fn fastapi_non_annotated_dependency(
     }
 }
 
-fn is_fastapi_dependency(checker: &Checker, expr: &ast::Expr) -> Option<FastApiDependency> {
+fn is_fastapi_dependency(checker: &Checker, expr: ast::Expr<'_>) -> Option<FastApiDependency> {
     checker
         .semantic()
         .resolve_qualified_name(map_callable(expr))
@@ -170,18 +170,19 @@ enum FastApiDependency {
 }
 
 struct DependencyCall<'a> {
-    default_argument: ast::ArgOrKeyword<'a>,
-    keyword_arguments: Vec<&'a ast::Keyword>,
+    default_argument: ArgOrKeyword<'a>,
+    keyword_arguments: Vec<ast::Keyword<'a>>,
 }
 
 impl<'a> DependencyCall<'a> {
-    fn from_expression(expr: &'a ast::Expr) -> Option<Self> {
+    fn from_expression(expr: ast::Expr<'a>) -> Option<Self> {
         let call = expr.as_call_expr()?;
-        let default_argument = call.arguments.find_argument("default", 0)?;
+        let default_argument = call.arguments().find_argument("default", 0)?;
         let keyword_arguments = call
-            .arguments
+            .arguments()
             .keywords()
-            .filter(|kwarg| kwarg.arg.as_ref().is_some_and(|name| name != "default"))
+            .iter()
+            .filter(|kwarg| kwarg.arg().is_some_and(|name| name != "default"))
             .collect();
 
         Some(Self {
@@ -191,7 +192,11 @@ impl<'a> DependencyCall<'a> {
     }
 }
 
-fn check_parameter(checker: &Checker, parameter: &ast::ParameterWithDefault, seen_default: bool) {
+fn check_parameter(
+    checker: &Checker,
+    parameter: ast::ParameterWithDefault<'_>,
+    seen_default: bool,
+) {
     let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default()) else {
         return;
     };
@@ -206,12 +211,12 @@ fn check_parameter(checker: &Checker, parameter: &ast::ParameterWithDefault, see
         FastApiNonAnnotatedDependency {
             py_version: checker.target_version(),
         },
-        parameter.range,
+        parameter.range(),
     );
 
     let dependency_call = DependencyCall::from_expression(default);
     let try_generate_fix = || {
-        let (import_edit, binding) = importer.import(parameter.range.start())?;
+        let (import_edit, binding) = importer.import(parameter.range().start())?;
 
         // Each of these classes takes a single, optional default
         // argument, followed by kw-only arguments
@@ -237,8 +242,8 @@ fn check_parameter(checker: &Checker, parameter: &ast::ParameterWithDefault, see
 
                 // Check if the default argument is ellipsis (...), which in FastAPI means "required"
                 let is_default_argument_ellipsis = matches!(
-                    dependency_call.default_argument.value(),
-                    ast::Expr::EllipsisLiteral(_)
+                    dependency_call.default_argument.value().classify(),
+                    ExprKind::EllipsisLiteral(_)
                 );
 
                 if is_default_argument_ellipsis && seen_default {
@@ -287,7 +292,7 @@ fn check_parameter(checker: &Checker, parameter: &ast::ParameterWithDefault, see
                 )
             }
         };
-        let parameter_edit = Edit::range_replacement(content, parameter.range);
+        let parameter_edit = Edit::range_replacement(content, parameter.range());
         Ok(Some(Fix::unsafe_edits(import_edit, [parameter_edit])))
     };
 

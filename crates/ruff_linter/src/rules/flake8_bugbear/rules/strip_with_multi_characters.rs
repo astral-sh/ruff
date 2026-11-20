@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
@@ -76,22 +76,26 @@ impl Violation for StripWithMultiCharacters {
 /// B005
 pub(crate) fn strip_with_multi_characters(
     checker: &Checker,
-    expr: &Expr,
-    func: &Expr,
-    arguments: &ast::Arguments,
+    &expr: &Expr<'_>,
+    func: Expr<'_>,
+    arguments: ast::Arguments<'_>,
 ) {
-    let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func else {
+    let args = arguments.args();
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return;
     };
+    let attr = attribute.attr();
     let Some(strip) = StripKind::from_str(attr.as_str()) else {
         return;
     };
 
-    let Some([Expr::StringLiteral(ast::ExprStringLiteral { value, .. })]) =
-        arguments.args().collect_array()
+    let Some(string) = args
+        .as_array()
+        .and_then(|[arg]| arg.as_string_literal_expr())
     else {
         return;
     };
+    let value = string.value();
 
     if value.chars().count() > 1 && !value.chars().all_unique() {
         let (strip, range) = if is_b005_precise_diagnostic_enabled(checker.settings()) {

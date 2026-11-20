@@ -1,9 +1,11 @@
-use std::borrow::Cow;
+use itertools::Either;
+use ruff_python_ast::{
+    self as ast, DictItem, Expr, ExprKind, ExprName, NodeList, StmtKind, kind, name,
+};
 
 use itertools::izip;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_semantic::Binding;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -86,7 +88,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.8.0", category = Category::Style)]
 pub(crate) struct UnsortedDunderSlots {
-    class_name: ast::name::Name,
+    class_name: name::Name,
 }
 
 impl Violation for UnsortedDunderSlots {
@@ -120,20 +122,24 @@ pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) {
         return;
     };
 
-    let (target, value) = match stmt {
-        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => match targets.as_slice() {
-            [target] => (target, &**value),
-            _ => return,
-        },
-        ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-            target,
-            value: Some(value),
-            ..
-        }) => (&**target, &**value),
+    let (target, value) = match stmt.classify() {
+        StmtKind::Assign(stmt_assign) => {
+            let targets = stmt_assign.targets();
+            let value = stmt_assign.value();
+
+            match targets.as_array() {
+                Some([target]) => (target, value),
+                _ => return,
+            }
+        }
+        StmtKind::AnnAssign(stmt_ann_assign) if let Some(value) = stmt_ann_assign.value() => {
+            let target = stmt_ann_assign.target();
+            (target, value)
+        }
         _ => return,
     };
 
-    let Some(ast::ExprName { id, .. }) = target.as_name_expr() else {
+    let Some(ast::ExprNameFields { id, .. }) = target.as_name_expr().map(ExprName::fields) else {
         return;
     };
 
@@ -151,14 +157,14 @@ pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) {
         return;
     };
 
-    let sort_classification = SortClassification::of_elements(&display.elts, SORTING_STYLE);
+    let sort_classification = SortClassification::of_elements(display.elements(), SORTING_STYLE);
     if sort_classification.is_not_a_list_of_string_literals() || sort_classification.is_sorted() {
         return;
     }
 
     let mut diagnostic = checker.report_diagnostic(
         UnsortedDunderSlots {
-            class_name: enclosing_class.name.id.clone(),
+            class_name: enclosing_class.name().id().clone(),
         },
         display.range,
     );
@@ -187,7 +193,7 @@ struct StringLiteralDisplay<'a> {
     /// The elts from the original AST node representing the display.
     /// Each elt is the AST representation of a single string literal
     /// element in the display
-    elts: Cow<'a, [ast::Expr]>,
+    elts: Either<NodeList<'a, ruff_python_ast::kind::Expr>, Vec<Expr<'a>>>,
     /// The source-code range of the display as a whole
     range: TextRange,
     /// What kind of a display is it? A dict, set, list or tuple?
@@ -201,64 +207,72 @@ impl Ranged for StringLiteralDisplay<'_> {
 }
 
 impl<'a> StringLiteralDisplay<'a> {
-    fn new(node: &'a ast::Expr) -> Option<Self> {
-        let result = match node {
-            ast::Expr::List(ast::ExprList { elts, range, .. }) => {
+    fn new(node: Expr<'a>) -> Option<Self> {
+        let result = match node.classify() {
+            ExprKind::List(expr_list) => {
+                let elts = expr_list.elts();
+                let range = expr_list.range();
+
                 let kind = DisplayKind::Sequence(SequenceKind::List);
                 Self {
-                    elts: Cow::Borrowed(elts),
-                    range: *range,
+                    elts: Either::Left(elts),
+                    range,
                     kind,
                 }
             }
-            ast::Expr::Tuple(ast::ExprTuple {
-                elts,
-                range,
-                parenthesized,
-                ..
-            }) => {
-                let kind = DisplayKind::Sequence(SequenceKind::Tuple {
-                    parenthesized: *parenthesized,
-                });
+            ExprKind::Tuple(expr_tuple) => {
+                let elts = expr_tuple.elts();
+                let range = expr_tuple.range();
+                let parenthesized = expr_tuple.parenthesized();
+
+                let kind = DisplayKind::Sequence(SequenceKind::Tuple { parenthesized });
                 Self {
-                    elts: Cow::Borrowed(elts),
-                    range: *range,
+                    elts: Either::Left(elts),
+                    range,
                     kind,
                 }
             }
-            ast::Expr::Set(ast::ExprSet {
-                elts,
-                range,
-                node_index: _,
-            }) => {
+            ExprKind::Set(expr_set) => {
+                let elts = expr_set.elts();
+                let range = expr_set.range();
+
                 let kind = DisplayKind::Sequence(SequenceKind::Set);
                 Self {
-                    elts: Cow::Borrowed(elts),
-                    range: *range,
+                    elts: Either::Left(elts),
+                    range,
                     kind,
                 }
             }
-            ast::Expr::Dict(dict) => {
-                let mut narrowed_keys = Vec::with_capacity(dict.len());
+            ExprKind::Dict(dict) => {
+                let mut narrowed_keys = Vec::with_capacity(dict.items().len());
                 for key in dict.iter_keys() {
                     // This is somewhat unfortunate,
                     // *but* using a dict for __slots__ is very rare
-                    narrowed_keys.push(key?.to_owned());
+                    narrowed_keys.push(key?);
                 }
                 // If `None` was present in the keys, it indicates a "** splat", .e.g
                 // `__slots__ = {"foo": "bar", **other_dict}`
                 // If `None` wasn't present in the keys,
                 // the length of the keys should always equal the length of the values
-                assert_eq!(narrowed_keys.len(), dict.len());
+                assert_eq!(narrowed_keys.len(), dict.items().len());
                 Self {
-                    elts: Cow::Owned(narrowed_keys),
+                    elts: Either::Right(narrowed_keys),
                     range: dict.range(),
-                    kind: DisplayKind::Dict { items: &dict.items },
+                    kind: DisplayKind::Dict {
+                        items: dict.items(),
+                    },
                 }
             }
             _ => return None,
         };
         Some(result)
+    }
+
+    fn elements(&self) -> impl ExactSizeIterator<Item = Expr<'a>> + Clone + '_ {
+        match &self.elts {
+            Either::Left(elements) => Either::Left(elements.iter()),
+            Either::Right(keys) => Either::Right(keys.iter().copied()),
+        }
     }
 
     fn generate_sorted_source_code(
@@ -283,7 +297,7 @@ impl<'a> StringLiteralDisplay<'a> {
                     checker.tokens(),
                     elements,
                 )?;
-                assert_eq!(analyzed_sequence.len(), self.elts.len());
+                assert_eq!(analyzed_sequence.len(), self.elements().len());
                 let comment_complexity = analyzed_sequence.comment_complexity();
                 let sorted_code = analyzed_sequence.into_sorted_source_code(
                     SORTING_STYLE,
@@ -297,7 +311,7 @@ impl<'a> StringLiteralDisplay<'a> {
             (DisplayKind::Sequence(sequence_kind), MultilineClassification::SingleLine) => {
                 let sorted_code = sort_single_line_elements_sequence(
                     *sequence_kind,
-                    &self.elts,
+                    self.elements(),
                     elements,
                     locator,
                     SORTING_STYLE,
@@ -306,7 +320,7 @@ impl<'a> StringLiteralDisplay<'a> {
             }
             (DisplayKind::Dict { items }, MultilineClassification::SingleLine) => {
                 let sorted_code =
-                    sort_single_line_elements_dict(&self.elts, elements, items, locator);
+                    sort_single_line_elements_dict(self.elements(), elements, *items, locator);
                 Some((sorted_code, CommentComplexity::Simple))
             }
         }
@@ -325,7 +339,7 @@ enum MultilineClassification {
 #[derive(Debug, Copy, Clone)]
 enum DisplayKind<'a> {
     Sequence(SequenceKind),
-    Dict { items: &'a [ast::DictItem] },
+    Dict { items: NodeList<'a, kind::DictItem> },
 }
 
 impl DisplayKind<'_> {
@@ -345,17 +359,28 @@ impl DisplayKind<'_> {
 ///
 /// 1. The three iterables that are zipped together have the same length; and,
 /// 2. The length of all three iterables is >= 2
-struct DictElements<'a>(Vec<(&'a &'a str, &'a ast::Expr, &'a ast::Expr)>);
+struct DictElements<'a>(Vec<(&'a str, Expr<'a>, Expr<'a>)>);
 
 impl<'a> DictElements<'a> {
-    fn new(elements: &'a [&str], key_elts: &'a [ast::Expr], items: &'a [ast::DictItem]) -> Self {
+    fn new(
+        elements: &[&'a str],
+        key_elts: impl ExactSizeIterator<Item = Expr<'a>>,
+        items: NodeList<'a, kind::DictItem>,
+    ) -> Self {
         assert_eq!(key_elts.len(), elements.len());
         assert_eq!(elements.len(), items.len());
         assert!(
             elements.len() >= 2,
             "A sequence with < 2 elements cannot be unsorted"
         );
-        Self(izip!(elements, key_elts, items.iter().map(|item| &item.value)).collect())
+        Self(
+            izip!(
+                elements.iter().copied(),
+                key_elts,
+                items.iter().map(DictItem::value)
+            )
+            .collect(),
+        )
     }
 
     fn last_item_index(&self) -> usize {
@@ -364,7 +389,7 @@ impl<'a> DictElements<'a> {
         self.0.len() - 1
     }
 
-    fn into_sorted_elts(mut self) -> impl Iterator<Item = (&'a ast::Expr, &'a ast::Expr)> {
+    fn into_sorted_elts(mut self) -> impl Iterator<Item = (Expr<'a>, Expr<'a>)> {
         self.0
             .sort_by(|(elem1, _, _), (elem2, _, _)| SORTING_STYLE.compare(elem1, elem2));
         self.0.into_iter().map(|(_, key, value)| (key, value))
@@ -381,9 +406,9 @@ impl<'a> DictElements<'a> {
 /// but stays here for now, since this is currently the
 /// only module that needs it
 fn sort_single_line_elements_dict<'a>(
-    key_elts: &'a [ast::Expr],
-    elements: &'a [&str],
-    original_items: &'a [ast::DictItem],
+    key_elts: impl ExactSizeIterator<Item = Expr<'a>>,
+    elements: &[&'a str],
+    original_items: NodeList<'a, kind::DictItem>,
     locator: &Locator,
 ) -> String {
     let element_trios = DictElements::new(elements, key_elts, original_items);
