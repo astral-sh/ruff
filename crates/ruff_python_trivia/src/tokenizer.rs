@@ -478,7 +478,7 @@ pub enum SimpleTokenKind {
     /// Any other non trivia token.
     Other,
 
-    /// Returned for each character after [`SimpleTokenKind::Other`] has been returned once.
+    /// Returned once for any remaining input after [`SimpleTokenKind::Other`].
     Bogus,
 }
 
@@ -503,10 +503,11 @@ impl SimpleTokenKind {
 /// The tokenizer must start at an offset that is trivia (e.g. not inside of a multiline string).
 ///
 /// In case it finds something it can't parse, the tokenizer will return a
-/// [`SimpleTokenKind::Other`] and then only a final [`SimpleTokenKind::Bogus`] afterwards.
+/// [`SimpleTokenKind::Other`], followed by a single [`SimpleTokenKind::Bogus`] token
+/// covering any remaining text in the requested range.
 pub struct SimpleTokenizer<'a> {
     offset: TextSize,
-    /// `true` when it is known that the current `back` line has no comment for sure.
+    /// Whether an unsupported token has been encountered.
     bogus: bool,
     source: &'a str,
     cursor: Cursor<'a>,
@@ -539,14 +540,15 @@ impl<'a> SimpleTokenizer<'a> {
 
         if self.bogus {
             // Emit a single final bogus token
+            let end = self.offset + first.text_len() + self.cursor.text_len();
             let token = SimpleToken {
                 kind: SimpleTokenKind::Bogus,
-                range: TextRange::new(self.offset, self.source.text_len()),
+                range: TextRange::new(self.offset, end),
             };
 
             // Set the cursor to EOF
             self.cursor = Cursor::new("");
-            self.offset = self.source.text_len();
+            self.offset = end;
             return token;
         }
 
