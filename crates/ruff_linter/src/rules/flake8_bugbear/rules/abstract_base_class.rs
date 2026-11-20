@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ExprKind, Stmt, StmtKind, Suite};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -116,28 +116,28 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
     }
 }
 
-fn is_abc_class(arguments: &Arguments, semantic: &SemanticModel) -> bool {
-    match arguments.items.as_slice() {
-        [ast::Argument::Positional(base)] => semantic.matches_qualified_name(base, &["abc", "ABC"]),
-        [ast::Argument::Keyword(keyword)] => {
-            keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
-                && semantic.matches_qualified_name(&keyword.value, &["abc", "ABCMeta"])
+fn is_abc_class(arguments: Arguments<'_>, semantic: &SemanticModel) -> bool {
+    match arguments.items().as_array() {
+        Some([ast::ArgOrKeyword::Arg(base)]) => {
+            semantic.matches_qualified_name(base, &["abc", "ABC"])
         }
-        _ => false,
+        Some([ast::ArgOrKeyword::Keyword(keyword)]) => {
+            keyword.arg().is_some_and(|arg| arg == "metaclass")
+                && semantic.matches_qualified_name(keyword.value(), &["abc", "ABCMeta"])
+        }
+        None => false,
     }
 }
 
-fn is_empty_body(body: &[Stmt]) -> bool {
-    body.iter().all(|stmt| match stmt {
-        Stmt::Pass(_) => true,
-        Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _,
-            node_index: _,
-        }) => {
+fn is_empty_body(body: Suite<'_>) -> bool {
+    body.iter().all(|stmt| match stmt.classify() {
+        StmtKind::Pass(_) => true,
+        StmtKind::Expr(stmt_expr) => {
+            let value = stmt_expr.value();
+
             matches!(
-                value.as_ref(),
-                Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
+                value.classify(),
+                ExprKind::StringLiteral(_) | ExprKind::EllipsisLiteral(_)
             )
         }
         _ => false,
@@ -148,10 +148,10 @@ fn is_empty_body(body: &[Stmt]) -> bool {
 /// B027
 pub(crate) fn abstract_base_class(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     name: &str,
-    arguments: Option<&Arguments>,
-    body: &[Stmt],
+    arguments: Option<Arguments<'_>>,
+    body: Suite<'_>,
 ) {
     let Some(arguments) = arguments else {
         return;
@@ -167,23 +167,20 @@ pub(crate) fn abstract_base_class(
         // If an ABC declares an attribute by providing a type annotation
         // but does not actually assign a value for that attribute,
         // assume it is intended to be an "abstract attribute"
-        if matches!(
-            stmt,
-            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) {
+        if stmt
+            .as_ann_assign_stmt()
+            .is_some_and(|assignment| assignment.value().is_none())
+        {
             has_abstract_method = true;
             continue;
         }
 
-        let Stmt::FunctionDef(ast::StmtFunctionDef {
-            decorator_list,
-            body,
-            name: method_name,
-            ..
-        }) = stmt
-        else {
+        let StmtKind::FunctionDef(function_def) = stmt.classify() else {
             continue;
         };
+        let decorator_list = function_def.decorator_list();
+        let body = function_def.body();
+        let method_name = function_def.name();
 
         let has_abstract_decorator = is_abstract(decorator_list, checker.semantic());
         has_abstract_method |= has_abstract_decorator;

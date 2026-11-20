@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
 use ruff_python_semantic::{ScopeKind, analyze::function_type};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -71,15 +71,17 @@ impl AlwaysFixableViolation for SuperWithoutBrackets {
 }
 
 /// PLW0245
-pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
+pub(crate) fn super_without_brackets(checker: &Checker, func: Expr<'_>) {
     // The call must be to `super` (without parentheses).
-    let Expr::Attribute(ast::ExprAttribute { value, .. }) = func else {
+    let ExprKind::Attribute(attribute_node) = func.classify() else {
         return;
     };
+    let value = attribute_node.value();
 
-    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+    let ExprKind::Name(name_node) = value.classify() else {
         return;
     };
+    let id = name_node.id();
 
     if id.as_str() != "super" {
         return;
@@ -102,8 +104,8 @@ pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
 
     // The function must be a method, class method, or static method.
     let classification = function_type::classify(
-        &function_def.name,
-        &function_def.decorator_list,
+        function_def.name().as_str(),
+        function_def.decorator_list(),
         parent,
         checker.semantic(),
         &checker.settings().pep8_naming.classmethod_decorators,

@@ -52,7 +52,7 @@ impl Violation for CollectionsNamedTuple {
 }
 
 /// PYI024
-pub(crate) fn collections_named_tuple(checker: &Checker, expr: &Expr) {
+pub(crate) fn collections_named_tuple(checker: &Checker, &expr: &Expr<'_>) {
     if !checker.semantic().seen_module(Modules::COLLECTIONS) {
         return;
     }

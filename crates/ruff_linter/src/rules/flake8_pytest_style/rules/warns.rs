@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
+use ruff_python_ast::{self as ast, Expr, ExprKind, NodeList, Stmt, Suite};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -9,7 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::registry::Rule;
 
-use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
+use crate::rules::flake8_pytest_style::helpers::{
+    is_complex_context_manager_body, is_empty_or_null_string,
+};
 
 const PYTEST_WARNS: &[&str] = &["pytest", "warns"];
 
@@ -166,29 +167,25 @@ fn is_pytest_warns(qualified_name: &QualifiedName) -> bool {
     qualified_name.segments() == PYTEST_WARNS
 }
 
-const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
-    if let [stmt] = body {
-        is_compound_statement(stmt)
-    } else {
-        true
-    }
-}
-
 /// PT029, PT030
-pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall, qualified_name: &QualifiedName) {
+pub(crate) fn warns_call(
+    checker: &Checker,
+    call: ast::ExprCall<'_>,
+    qualified_name: &QualifiedName,
+) {
     if is_pytest_warns(qualified_name) {
         if checker.is_rule_enabled(Rule::PytestWarnsWithoutWarning) {
-            if call.arguments.is_empty() {
-                checker.report_diagnostic(PytestWarnsWithoutWarning, call.func.range());
+            if call.arguments().is_empty() {
+                checker.report_diagnostic(PytestWarnsWithoutWarning, call.func().range());
             }
         }
 
         if checker.is_rule_enabled(Rule::PytestWarnsTooBroad) {
-            if let Some(warning) = call.arguments.find_argument_value("expected_warning", 0) {
+            if let Some(warning) = call.arguments().find_argument_value("expected_warning", 0) {
                 if call
-                    .arguments
+                    .arguments()
                     .find_keyword("match")
-                    .is_none_or(|k| is_empty_or_null_string(&k.value))
+                    .is_none_or(|k| is_empty_or_null_string(k.value()))
                 {
                     warning_needs_match(checker, warning);
                 }
@@ -198,41 +195,29 @@ pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall, qualified_name
 }
 
 /// PT031
-pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], body: &[Stmt]) {
-    let warns_called = items.iter().any(|item| match &item.context_expr {
-        Expr::Call(ast::ExprCall { func, .. }) => checker
-            .semantic()
-            .matches_qualified_name(func, PYTEST_WARNS),
-        _ => false,
-    });
+pub(crate) fn complex_warns(
+    checker: &Checker,
+    stmt: Stmt<'_>,
+    items: NodeList<'_, ruff_python_ast::kind::WithItem>,
+    body: Suite<'_>,
+) {
+    let warns_called = items
+        .iter()
+        .any(|item| match item.context_expr().classify() {
+            ExprKind::Call(call) => checker
+                .semantic()
+                .matches_qualified_name(call.func(), PYTEST_WARNS),
+            _ => false,
+        });
 
     // Check body for `pytest.warns` context manager
-    if warns_called {
-        let is_too_complex = if let [stmt] = body {
-            match stmt {
-                Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
-                // Allow function and class definitions to test decorators.
-                Stmt::ClassDef(_) | Stmt::FunctionDef(_) => false,
-                // Allow empty `for` loops to test iterators.
-                Stmt::For(ast::StmtFor { body, .. }) => match &body[..] {
-                    [Stmt::Pass(_)] => false,
-                    [Stmt::Expr(ast::StmtExpr { value, .. })] => !value.is_ellipsis_literal_expr(),
-                    _ => true,
-                },
-                stmt => is_compound_statement(stmt),
-            }
-        } else {
-            true
-        };
-
-        if is_too_complex {
-            checker.report_diagnostic(PytestWarnsWithMultipleStatements, stmt.range());
-        }
+    if warns_called && is_complex_context_manager_body(body) {
+        checker.report_diagnostic(PytestWarnsWithMultipleStatements, stmt.range());
     }
 }
 
 /// PT030
-fn warning_needs_match(checker: &Checker, warning: &Expr) {
+fn warning_needs_match(checker: &Checker, warning: Expr<'_>) {
     if let Some(qualified_name) =
         checker
             .semantic()

@@ -1,9 +1,8 @@
-use itertools::Itertools;
 use std::collections::HashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{ExprKind, Stmt, StmtKind};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -92,21 +91,21 @@ enum MethodType {
 }
 
 /// PLR0202
-pub(crate) fn no_classmethod_decorator(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn no_classmethod_decorator(checker: &Checker, stmt: Stmt<'_>) {
     get_undecorated_methods(checker, stmt, &MethodType::Classmethod);
 }
 
 /// PLR0203
-pub(crate) fn no_staticmethod_decorator(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn no_staticmethod_decorator(checker: &Checker, stmt: Stmt<'_>) {
     get_undecorated_methods(checker, stmt, &MethodType::Staticmethod);
 }
 
-fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &MethodType) {
-    let Stmt::ClassDef(class_def) = class_stmt else {
+fn get_undecorated_methods(checker: &Checker, class_stmt: Stmt<'_>, method_type: &MethodType) {
+    let StmtKind::ClassDef(class_def) = class_stmt.classify() else {
         return;
     };
 
-    let mut explicit_decorator_calls: HashMap<Name, &Stmt> = HashMap::default();
+    let mut explicit_decorator_calls: HashMap<Name, Stmt<'_>> = HashMap::default();
 
     let method_name = match method_type {
         MethodType::Classmethod => "classmethod",
@@ -114,27 +113,19 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
     };
 
     // gather all explicit *method calls
-    for stmt in &class_def.body {
-        if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
-            if let Expr::Call(ast::ExprCall {
-                func, arguments, ..
-            }) = value.as_ref()
-            {
-                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if id == method_name && checker.semantic().has_builtin_binding(method_name) {
-                        let Some([Expr::Name(ast::ExprName { id, .. })]) =
-                            arguments.args().collect_array()
-                        else {
-                            continue;
-                        };
-                        if let [Expr::Name(target)] = targets.as_slice()
-                            && target.id == *id
-                        {
-                            explicit_decorator_calls.insert(id.clone(), stmt);
-                        }
-                    }
-                }
-            }
+    for stmt in class_def.body() {
+        if let StmtKind::Assign(assign) = stmt.classify()
+            && let Some(call) = assign.value().as_call_expr()
+            && let Some(func) = call.func().as_name_expr()
+            && func.id() == method_name
+            && checker.semantic().has_builtin_binding(method_name)
+            && let Some([target]) = assign.targets().as_array()
+            && let Some(target) = target.as_name_expr()
+            && let Some([arg]) = call.arguments().args().as_array()
+            && let Some(arg) = arg.as_name_expr()
+            && arg.name_id() == target.name_id()
+        {
+            explicit_decorator_calls.insert(arg.id().clone(), stmt);
         }
     }
 
@@ -142,20 +133,18 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
         return;
     }
 
-    for stmt in &class_def.body {
-        if let Stmt::FunctionDef(ast::StmtFunctionDef {
-            name,
-            decorator_list,
-            ..
-        }) = stmt
-        {
+    for stmt in class_def.body() {
+        if let StmtKind::FunctionDef(function_def) = stmt.classify() {
+            let name = function_def.name();
+            let decorator_list = function_def.decorator_list();
             let Some(decorator_call_statement) = explicit_decorator_calls.get(name.id()) else {
                 continue;
             };
 
             // if we find the decorator we're looking for, skip
             if decorator_list.iter().any(|decorator| {
-                if let Expr::Name(ast::ExprName { id, .. }) = &decorator.expression {
+                if let ExprKind::Name(name_node) = decorator.expression().classify() {
+                    let id = name_node.id();
                     if id == method_name && checker.semantic().has_builtin_binding(method_name) {
                         return true;
                     }
@@ -186,7 +175,7 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
                             stmt.range().start(),
                         ),
                         [fix::edits::delete_stmt(
-                            decorator_call_statement,
+                            *decorator_call_statement,
                             Some(class_stmt),
                             checker.locator(),
                             checker.indexer(),

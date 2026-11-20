@@ -53,7 +53,7 @@ impl Violation for DunderFunctionName {
 pub(crate) fn dunder_function_name(
     checker: &Checker,
     scope: &Scope,
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     name: &str,
     ignore_names: &IgnoreNames,
 ) {

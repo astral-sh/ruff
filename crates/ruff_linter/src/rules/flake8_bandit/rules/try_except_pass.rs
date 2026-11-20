@@ -1,4 +1,4 @@
-use ruff_python_ast::{ExceptHandler, Expr, Stmt};
+use ruff_python_ast::{ExceptHandler, Expr, Stmt, StmtKind, Suite};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -55,12 +55,15 @@ impl Violation for TryExceptPass {
 /// S110
 pub(crate) fn try_except_pass(
     checker: &Checker,
-    except_handler: &ExceptHandler,
-    type_: Option<&Expr>,
-    body: &[Stmt],
+    except_handler: ExceptHandler<'_>,
+    type_: Option<Expr<'_>>,
+    body: Suite<'_>,
     check_typed_exception: bool,
 ) {
-    if matches!(body, [Stmt::Pass(_)]) {
+    if matches!(
+        body.as_array().map(|items| items.map(Stmt::classify)),
+        Some([StmtKind::Pass(_)])
+    ) {
         if check_typed_exception || is_untyped_exception(type_, checker.semantic()) {
             checker.report_diagnostic(TryExceptPass, except_handler.range());
         }

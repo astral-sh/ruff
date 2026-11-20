@@ -52,7 +52,7 @@ impl Violation for BannedImportAlias {
 /// ICN002
 pub(crate) fn banned_import_alias(
     checker: &Checker,
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     name: &str,
     asname: &str,
     banned_conventions: &FxHashMap<String, BannedAliases>,

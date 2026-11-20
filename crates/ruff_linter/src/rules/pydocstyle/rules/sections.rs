@@ -1903,8 +1903,8 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
 
     // If this is a non-static method, skip `cls` or `self`.
     let mut skip_receiver = docstring.definition.is_method()
-        && !is_staticmethod(&function.decorator_list, checker.semantic());
-    let (vararg, kwarg) = function.parameters.split_variadic(|parameter| {
+        && !is_staticmethod(function.decorator_list(), checker.semantic());
+    let (vararg, kwarg) = function.parameters().split_variadic(|parameter| {
         if std::mem::take(&mut skip_receiver) {
             return;
         }
@@ -1918,7 +1918,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
     // single or double star, respectively.
     if !checker.settings().pydocstyle.ignore_var_parameters() {
         if let Some(arg) = vararg {
-            let arg_name = arg.name.as_str();
+            let arg_name = arg.name().as_str();
             let starred_arg_name = format!("*{arg_name}");
             if !arg_name.starts_with('_')
                 && !docstrings_args.contains(arg_name)
@@ -1930,7 +1930,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
         if let Some(arg) = kwarg
             && !has_unpack_annotation(checker, arg)
         {
-            let arg_name = arg.name.as_str();
+            let arg_name = arg.name().as_str();
             let starred_arg_name = format!("**{arg_name}");
             if !arg_name.starts_with('_')
                 && !docstrings_args.contains(arg_name)
@@ -1956,8 +1956,8 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
 }
 
 /// Returns `true` if the parameter is annotated with `typing.Unpack`
-fn has_unpack_annotation(checker: &Checker, parameter: &Parameter) -> bool {
-    parameter.annotation.as_ref().is_some_and(|annotation| {
+fn has_unpack_annotation(checker: &Checker, parameter: Parameter<'_>) -> bool {
+    parameter.annotation().is_some_and(|annotation| {
         checker
             .semantic()
             .match_typing_expr(map_subscript(annotation), "Unpack")

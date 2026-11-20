@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Comprehension, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind, NodeList};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -79,7 +79,7 @@ impl AlwaysFixableViolation for UnnecessaryComprehension {
 }
 
 /// Add diagnostic for C416 based on the expression node id.
-fn add_diagnostic(checker: &Checker, expr: &Expr) {
+fn add_diagnostic(checker: &Checker, expr: Expr<'_>) {
     let Some(comprehension_kind) = ComprehensionKind::try_from_expr(expr) else {
         return;
     };
@@ -104,37 +104,24 @@ fn add_diagnostic(checker: &Checker, expr: &Expr) {
 /// C416
 pub(crate) fn unnecessary_dict_comprehension(
     checker: &Checker,
-    expr: &Expr,
-    key: &Expr,
-    value: &Expr,
-    generators: &[Comprehension],
+    &expr: &Expr<'_>,
+    key: Expr<'_>,
+    value: Expr<'_>,
+    generators: NodeList<'_, ruff_python_ast::kind::Comprehension>,
 ) {
-    let [generator] = generators else {
+    let Some([generator]) = generators.as_array() else {
         return;
     };
-    if !generator.ifs.is_empty() || generator.is_async {
+    if !generator.ifs().is_empty() || generator.is_async() {
         return;
     }
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = &generator.target else {
+    let ExprKind::Tuple(tuple) = generator.target().classify() else {
         return;
     };
-    let [
-        Expr::Name(ast::ExprName { id: target_key, .. }),
-        Expr::Name(ast::ExprName {
-            id: target_value, ..
-        }),
-    ] = elts.as_slice()
-    else {
-        return;
-    };
-    let Expr::Name(ast::ExprName { id: key, .. }) = &key else {
-        return;
-    };
-    let Expr::Name(ast::ExprName { id: value, .. }) = &value else {
-        return;
-    };
-
-    if target_key == key && target_value == value {
+    if let Some(target_names) = name_pair(tuple.elts())
+        && let (Some(key), Some(value)) = (key.as_name_expr(), value.as_name_expr())
+        && target_names == [key.name_id(), value.name_id()]
+    {
         add_diagnostic(checker, expr);
     }
 }
@@ -142,90 +129,64 @@ pub(crate) fn unnecessary_dict_comprehension(
 /// C416
 pub(crate) fn unnecessary_list_set_comprehension(
     checker: &Checker,
-    expr: &Expr,
-    elt: &Expr,
-    generators: &[Comprehension],
+    &expr: &Expr<'_>,
+    elt: Expr<'_>,
+    generators: NodeList<'_, ruff_python_ast::kind::Comprehension>,
 ) {
-    let [generator] = generators else {
+    let Some([generator]) = generators.as_array() else {
         return;
     };
-    if !generator.ifs.is_empty() || generator.is_async {
+    if !generator.ifs().is_empty() || generator.is_async() {
         return;
     }
-    if is_dict_items(checker, &generator.iter) {
-        match (&generator.target, elt) {
-            // [(k, v) for k, v in dict.items()] or [(k, v) for [k, v] in dict.items()]
-            (
-                Expr::Tuple(ast::ExprTuple {
-                    elts: target_elts, ..
-                })
-                | Expr::List(ast::ExprList {
-                    elts: target_elts, ..
-                }),
-                Expr::Tuple(ast::ExprTuple { elts, .. }),
-            ) => {
-                let [
-                    Expr::Name(ast::ExprName { id: target_key, .. }),
-                    Expr::Name(ast::ExprName {
-                        id: target_value, ..
-                    }),
-                ] = target_elts.as_slice()
-                else {
-                    return;
-                };
-                let [
-                    Expr::Name(ast::ExprName { id: key, .. }),
-                    Expr::Name(ast::ExprName { id: value, .. }),
-                ] = elts.as_slice()
-                else {
-                    return;
-                };
-                if target_key == key && target_value == value {
-                    add_diagnostic(checker, expr);
-                }
-            }
-            // [x for x in dict.items()]
-            (
-                Expr::Name(ast::ExprName {
-                    id: target_name, ..
-                }),
-                Expr::Name(ast::ExprName { id: elt_name, .. }),
-            ) if target_name == elt_name => {
+    match (generator.target().classify(), elt.classify()) {
+        // [(k, v) for k, v in dict.items()] or [(k, v) for [k, v] in dict.items()]
+        (target, ExprKind::Tuple(tuple)) => {
+            let target_elts = match target {
+                ExprKind::Tuple(tuple) => tuple.elts(),
+                ExprKind::List(list) => list.elts(),
+                _ => return,
+            };
+            if let Some(target_names) = name_pair(target_elts)
+                && Some(target_names) == name_pair(tuple.elts())
+                && is_dict_items(checker, generator.iter())
+            {
                 add_diagnostic(checker, expr);
             }
-            _ => {}
         }
-    } else {
         // [x for x in iterable]
-        let Expr::Name(ast::ExprName {
-            id: target_name, ..
-        }) = &generator.target
-        else {
-            return;
-        };
-        let Expr::Name(ast::ExprName { id: elt_name, .. }) = &elt else {
-            return;
-        };
-        if elt_name == target_name {
+        (ExprKind::Name(target), ExprKind::Name(elt)) if target.name_id() == elt.name_id() => {
             add_diagnostic(checker, expr);
         }
+        _ => {}
     }
 }
 
-fn is_dict_items(checker: &Checker, expr: &Expr) -> bool {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return false;
-    };
+fn name_pair(elts: NodeList<'_, ast::kind::Expr>) -> Option<[ast::NameId; 2]> {
+    let [key, value] = elts.as_array()?;
+    Some([
+        key.as_name_expr()?.name_id(),
+        value.as_name_expr()?.name_id(),
+    ])
+}
 
-    let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
+fn is_dict_items(checker: &Checker, expr: Expr<'_>) -> bool {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
+    let func = call_node.func();
+
+    let ExprKind::Attribute(attribute) = func.classify() else {
+        return false;
+    };
+    let value = attribute.value();
+    let attr = attribute.attr();
 
     if attr.as_str() != "items" {
         return false;
     }
 
-    let Expr::Name(name) = value.as_ref() else {
+    let ExprKind::Name(name) = value.classify() else {
         return false;
     };
 
@@ -252,11 +213,11 @@ impl ComprehensionKind {
         }
     }
 
-    const fn try_from_expr(expr: &Expr) -> Option<Self> {
-        match expr {
-            Expr::ListComp(_) => Some(Self::List),
-            Expr::DictComp(_) => Some(Self::Dict),
-            Expr::SetComp(_) => Some(Self::Set),
+    fn try_from_expr(expr: Expr<'_>) -> Option<Self> {
+        match expr.classify() {
+            ExprKind::ListComp(_) => Some(Self::List),
+            ExprKind::DictComp(_) => Some(Self::Dict),
+            ExprKind::SetComp(_) => Some(Self::Set),
             _ => None,
         }
     }

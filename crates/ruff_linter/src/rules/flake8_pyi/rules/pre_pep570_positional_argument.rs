@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
 use ruff_python_ast::ParameterItem;
+use ruff_python_ast::StmtFunctionDef;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::function_type;
 
@@ -57,13 +57,13 @@ impl Violation for Pep484StylePositionalOnlyParameter {
 }
 
 /// PYI063
-pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: StmtFunctionDef<'_>) {
     // PEP 570 was introduced in Python 3.8.
     if checker.target_version() < PythonVersion::PY38 {
         return;
     }
 
-    let mut positional = function_def.parameters.items.iter().filter(|item| {
+    let mut positional = function_def.parameters().items().iter().filter(|item| {
         matches!(
             item,
             ParameterItem::PositionalOnly(_) | ParameterItem::PositionalOrKeyword(_)
@@ -77,8 +77,8 @@ pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast
     let semantic = checker.semantic();
     let scope = semantic.current_scope();
     let function_type = function_type::classify(
-        &function_def.name,
-        &function_def.decorator_list,
+        function_def.name().as_str(),
+        function_def.decorator_list(),
         scope,
         semantic,
         &checker.settings().pep8_naming.classmethod_decorators,

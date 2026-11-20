@@ -1,3 +1,4 @@
+use ruff_text_size::Ranged;
 use std::sync::LazyLock;
 
 use anyhow::{Result, anyhow};
@@ -5,9 +6,8 @@ use libcst_native::{Arg, Expression};
 use regex::Regex;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use ruff_python_codegen::Stylist;
-use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
@@ -65,7 +65,7 @@ impl Violation for FormatLiterals {
 }
 
 /// UP030
-pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
+pub(crate) fn format_literals(checker: &Checker, call: ast::ExprCall<'_>, summary: &FormatSummary) {
     // The format we expect is, e.g.: `"{0} {1}".format(...)`
     if summary.has_nested_parts {
         return;
@@ -87,26 +87,25 @@ pub(crate) fn format_literals(checker: &Checker, call: &ast::ExprCall, summary: 
     // need to reorder the function arguments; so we need to ensure that the function
     // arguments aren't splatted (e.g., `"{1} {0}".format(*foo)`), that there are a sufficient
     // number of them, etc.
-    let arguments = if is_sequential(&summary.indices) {
-        Arguments::Preserve
-    } else {
-        if call.arguments.len() < summary.indices.len()
-            || call
-                .arguments
-                .iter_source_order()
-                .enumerate()
-                .any(|(index, item)| match item {
-                    ast::ArgOrKeyword::Arg(arg) => {
-                        index < summary.indices.len() && arg.is_starred_expr()
-                    }
-                    ast::ArgOrKeyword::Keyword(_) => true,
-                })
-        {
-            return;
-        }
+    let arguments =
+        if is_sequential(&summary.indices) {
+            Arguments::Preserve
+        } else {
+            if call.arguments().len() < summary.indices.len()
+                || call.arguments().iter_source_order().enumerate().any(
+                    |(index, item)| match item {
+                        ast::ArgOrKeyword::Arg(arg) => {
+                            index < summary.indices.len() && arg.is_starred_expr()
+                        }
+                        ast::ArgOrKeyword::Keyword(_) => true,
+                    },
+                )
+            {
+                return;
+            }
 
-        Arguments::Reorder(&summary.indices)
-    };
+            Arguments::Reorder(&summary.indices)
+        };
 
     let mut diagnostic = checker.report_diagnostic(FormatLiterals, call.range());
     diagnostic.try_set_fix(|| {
@@ -204,7 +203,7 @@ enum Arguments<'a> {
 
 /// Returns the corrected function call.
 fn generate_call(
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     arguments: Arguments,
     locator: &Locator,
     stylist: &Stylist,

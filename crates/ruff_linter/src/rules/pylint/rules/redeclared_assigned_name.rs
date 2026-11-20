@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind, NameId, NodeList};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -49,8 +49,11 @@ impl Violation for RedeclaredAssignedName {
 }
 
 /// PLW0128
-pub(crate) fn redeclared_assigned_name(checker: &Checker, targets: &[Expr]) {
-    if matches!(targets, [Expr::Name(_)]) {
+pub(crate) fn redeclared_assigned_name(
+    checker: &Checker,
+    targets: NodeList<'_, ruff_python_ast::kind::Expr>,
+) {
+    if targets.len() == 1 && targets.at(0).is_name_expr() {
         return;
     }
 
@@ -61,23 +64,27 @@ pub(crate) fn redeclared_assigned_name(checker: &Checker, targets: &[Expr]) {
     }
 }
 
-fn check_expr<'a>(checker: &Checker, expr: &'a Expr, names: &mut FxHashSet<&'a str>) {
-    match expr {
-        Expr::Tuple(tuple) => {
-            for target in tuple {
+fn check_expr(checker: &Checker, expr: Expr<'_>, names: &mut FxHashSet<NameId>) {
+    match expr.classify() {
+        ExprKind::Tuple(tuple) => {
+            for target in tuple.elts() {
                 check_expr(checker, target, names);
             }
         }
-        Expr::List(list) => {
-            for target in list {
+        ExprKind::List(list) => {
+            for target in list.elts() {
                 check_expr(checker, target, names);
             }
         }
-        Expr::Starred(starred) => {
-            check_expr(checker, &starred.value, names);
+        ExprKind::Starred(starred) => {
+            check_expr(checker, starred.value(), names);
         }
-        Expr::Name(ast::ExprName { id, .. }) => {
-            if !names.insert(id.as_str()) && !checker.settings().dummy_variable_rgx.is_match(id) {
+        ExprKind::Name(expr_name) => {
+            if names.insert(expr_name.name_id()) {
+                return;
+            }
+            let id = expr_name.id();
+            if !checker.settings().dummy_variable_rgx.is_match(id) {
                 checker.report_diagnostic(
                     RedeclaredAssignedName {
                         name: id.to_string(),

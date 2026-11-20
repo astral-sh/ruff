@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, Expr, ExprKind};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -47,7 +47,7 @@ impl Violation for MapIntVersionParsing {
 }
 
 /// RUF048
-pub(crate) fn map_int_version_parsing(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn map_int_version_parsing(checker: &Checker, call: ast::ExprCall<'_>) {
     let semantic = checker.semantic();
 
     let Some((first, second)) = map_call_with_two_arguments(semantic, call) else {
@@ -61,24 +61,10 @@ pub(crate) fn map_int_version_parsing(checker: &Checker, call: &ast::ExprCall) {
 
 fn map_call_with_two_arguments<'a>(
     semantic: &SemanticModel,
-    call: &'a ast::ExprCall,
-) -> Option<(&'a ast::Expr, &'a ast::Expr)> {
-    let ast::ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    } = call;
-
-    let [
-        ast::Argument::Positional(first),
-        ast::Argument::Positional(second),
-    ] = arguments.items.as_slice()
-    else {
-        return None;
-    };
-
-    if !semantic.match_builtin_expr(func, "map") {
+    call: ast::ExprCall<'a>,
+) -> Option<(Expr<'a>, Expr<'a>)> {
+    let [first, second] = call.arguments().as_positional_array()?;
+    if !semantic.match_builtin_expr(call.func(), "map") {
         return None;
     }
 
@@ -86,23 +72,19 @@ fn map_call_with_two_arguments<'a>(
 }
 
 /// Whether `expr` has the form `__version__.split(".")` or `something.__version__.split(".")`.
-fn is_dunder_version_split_dot(expr: &ast::Expr) -> bool {
-    let ast::Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+fn is_dunder_version_split_dot(expr: Expr<'_>) -> bool {
+    let ExprKind::Call(call_node) = expr.classify() else {
         return false;
     };
+    let func = call_node.func();
+    let arguments = call_node.arguments();
 
     if arguments.len() != 1 {
         return false;
     }
 
-    let Some(ast::Expr::StringLiteral(ast::ExprStringLiteral {
-        value,
-        range: _,
-        node_index: _,
-    })) = arguments.find_argument_value("sep", 0)
+    let Some(ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, node: _ })) =
+        arguments.find_argument_value("sep", 0).map(Expr::fields)
     else {
         return false;
     };
@@ -114,28 +96,32 @@ fn is_dunder_version_split_dot(expr: &ast::Expr) -> bool {
     is_dunder_version_split(func)
 }
 
-fn is_dunder_version_split(func: &ast::Expr) -> bool {
+fn is_dunder_version_split(func: Expr<'_>) -> bool {
     // foo.__version__.split(".")
     // ---- value ---- ^^^^^ attr
-    let ast::Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
+    let ExprKind::Attribute(attribute) = func.classify() else {
         return false;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
     if attr != "split" {
         return false;
     }
     is_dunder_version(value)
 }
 
-fn is_dunder_version(expr: &ast::Expr) -> bool {
-    if let ast::Expr::Name(ast::ExprName { id, .. }) = expr {
+fn is_dunder_version(expr: Expr<'_>) -> bool {
+    if let ExprKind::Name(name) = expr.classify() {
+        let id = name.id();
         return id == "__version__";
     }
 
     // foo.__version__.split(".")
     //     ^^^^^^^^^^^ attr
-    let ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) = expr else {
+    let ExprKind::Attribute(attribute) = expr.classify() else {
         return false;
     };
+    let attr = attribute.attr();
 
     attr == "__version__"
 }

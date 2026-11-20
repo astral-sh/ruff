@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, ExprKind, StmtKind};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
@@ -101,19 +101,18 @@ impl Violation for MutableClassDefault {
 }
 
 /// RUF012
-pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn mutable_class_default(checker: &Checker, class_def: ast::StmtClassDef<'_>) {
     // Collect any `ClassVar`s we find in case they get reassigned later.
     let mut class_var_targets = FxHashSet::default();
 
-    for statement in &class_def.body {
-        match statement {
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                annotation,
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                if let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+    for statement in class_def.body() {
+        match statement.classify() {
+            StmtKind::AnnAssign(stmt_ann_assign) if let Some(value) = stmt_ann_assign.value() => {
+                let annotation = stmt_ann_assign.annotation();
+                let target = stmt_ann_assign.target();
+
+                if let ExprKind::Name(name_node) = target.classify() {
+                    let id = name_node.id();
                     if is_class_var_annotation(annotation, checker.semantic()) {
                         class_var_targets.insert(id);
                     }
@@ -137,14 +136,17 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                     checker.report_diagnostic(MutableClassDefault, value.range());
                 }
             }
-            Stmt::Assign(ast::StmtAssign { value, targets, .. })
-                if !targets.iter().all(|target| {
+            StmtKind::Assign(stmt_assign)
+                if !stmt_assign.targets().iter().all(|target| {
                     is_special_attribute(target)
                         || target
                             .as_name_expr()
-                            .is_some_and(|name| class_var_targets.contains(&name.id))
-                }) && is_mutable_expr(value, checker.semantic()) =>
+                            .is_some_and(|name| class_var_targets.contains(name.id()))
+                }) && is_mutable_expr(stmt_assign.value(), checker.semantic()) =>
             {
+                let value = stmt_assign.value();
+                let targets = stmt_assign.targets();
+
                 // The `_fields_` property of a `ctypes.Structure` base class has its
                 // immutability enforced  by the base class itself which will throw an error if
                 // it's set a second time

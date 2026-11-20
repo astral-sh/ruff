@@ -1,8 +1,9 @@
 use std::ops::Range;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
 use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{Expr, ExprBinOp, ExprCall, Operator};
+use ruff_python_ast::{ExprKind, Operator};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -58,7 +59,7 @@ impl AlwaysFixableViolation for PathConstructorCurrentDirectory {
 /// PTH201
 pub(crate) fn path_constructor_current_directory(
     checker: &Checker,
-    call: &ExprCall,
+    call: ExprCall<'_>,
     segments: &[&str],
 ) {
     let applicability = |range| {
@@ -69,17 +70,20 @@ pub(crate) fn path_constructor_current_directory(
         }
     };
 
-    let arguments = &call.arguments;
+    let arguments = call.arguments();
 
     if !is_pure_path_subclass_with_preview(checker, segments) {
         return;
     }
 
-    let Some(Expr::StringLiteral(arg)) = arguments.as_single_positional() else {
+    let Some(arg) = arguments
+        .as_single_positional()
+        .and_then(ruff_python_ast::Expr::as_string_literal_expr)
+    else {
         return;
     };
 
-    if !matches!(arg.value.to_str(), "" | ".") {
+    if !matches!(arg.value().to_str(), "" | ".") {
         return;
     }
 
@@ -91,7 +95,7 @@ pub(crate) fn path_constructor_current_directory(
             let call_expr = checker.locator().slice(call.range());
 
             let relative_argument_range: Range<usize> = {
-                let range = arg.range() - call.start();
+                let range = arg.range() - call.range().start();
                 range.start().into()..range.end().into()
             };
 
@@ -104,7 +108,7 @@ pub(crate) fn path_constructor_current_directory(
         }
         None => diagnostic.try_set_fix(|| {
             let edit = remove_argument(
-                arg,
+                &arg,
                 arguments,
                 Parentheses::Preserve,
                 checker.source(),
@@ -121,9 +125,11 @@ fn parent_and_next_path_fragment_range(
 ) -> Option<(TextRange, TextRange)> {
     let parent = semantic.current_expression_parent()?;
 
-    let Expr::BinOp(parent @ ExprBinOp { op, right, .. }) = parent else {
+    let ExprKind::BinOp(parent) = parent.classify() else {
         return None;
     };
+    let op = parent.op();
+    let right = parent.right();
 
     let range = right.range();
 
@@ -133,6 +139,6 @@ fn parent_and_next_path_fragment_range(
 
     Some((
         parent.range(),
-        parenthesized_range(right.into(), parent.into(), tokens).unwrap_or(range),
+        parenthesized_range(right, parent.into(), tokens).unwrap_or(range),
     ))
 }

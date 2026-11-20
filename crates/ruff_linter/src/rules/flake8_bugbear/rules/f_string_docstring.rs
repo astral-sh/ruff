@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{StmtKind, Suite};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -46,18 +46,14 @@ impl Violation for FStringDocstring {
 }
 
 /// B021
-pub(crate) fn f_string_docstring(checker: &Checker, body: &[Stmt]) {
+pub(crate) fn f_string_docstring(checker: &Checker, body: Suite<'_>) {
     let Some(stmt) = body.first() else {
         return;
     };
-    let Stmt::Expr(ast::StmtExpr {
-        value,
-        range: _,
-        node_index: _,
-    }) = stmt
-    else {
+    let StmtKind::Expr(expr) = stmt.classify() else {
         return;
     };
+    let value = expr.value();
     if !value.is_f_string_expr() {
         return;
     }

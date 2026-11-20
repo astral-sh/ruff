@@ -1,8 +1,7 @@
 use std::fmt;
 
-use ast::Stmt;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind, StmtKind};
 use ruff_python_semantic::{Scope, SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
@@ -83,10 +82,11 @@ impl Violation for AsyncioDanglingTask {
 }
 
 /// RUF006
-pub(crate) fn asyncio_dangling_task(checker: &Checker, expr: &Expr, semantic: &SemanticModel) {
-    let Expr::Call(ast::ExprCall { func, .. }) = expr else {
+pub(crate) fn asyncio_dangling_task(checker: &Checker, expr: Expr<'_>, semantic: &SemanticModel) {
+    let ExprKind::Call(call) = expr.classify() else {
         return;
     };
+    let func = call.func();
 
     // Ex) `asyncio.create_task(...)`
     if let Some(method) = semantic
@@ -106,9 +106,11 @@ pub(crate) fn asyncio_dangling_task(checker: &Checker, expr: &Expr, semantic: &S
         );
     } else
     // Ex) `loop = ...; loop.create_task(...)`
-    if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() {
+    if let ExprKind::Attribute(attribute) = func.classify() {
+        let attr = attribute.attr();
+        let value = attribute.value();
         if attr == "create_task" {
-            if let Expr::Name(name) = value.as_ref() {
+            if let ExprKind::Name(name) = value.classify() {
                 if typing::resolve_assignment(value, semantic).is_some_and(|qualified_name| {
                     matches!(
                         qualified_name.segments(),
@@ -120,7 +122,7 @@ pub(crate) fn asyncio_dangling_task(checker: &Checker, expr: &Expr, semantic: &S
                 }) {
                     checker.report_diagnostic(
                         AsyncioDanglingTask {
-                            expr: name.id.to_string(),
+                            expr: name.id().to_string(),
                             method: Method::CreateTask,
                         },
                         expr.range(),
@@ -167,13 +169,17 @@ pub(crate) fn asyncio_dangling_binding(scope: &Scope, checker: &Checker) {
                 continue;
             };
 
-            match semantic.statement(source) {
-                Stmt::Assign(ast::StmtAssign { value, targets, .. }) if targets.len() == 1 => {
+            match semantic.statement(source).classify() {
+                StmtKind::Assign(stmt_assign) if stmt_assign.targets().len() == 1 => {
+                    let value = stmt_assign.value();
+
                     asyncio_dangling_task(checker, value, semantic);
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign {
-                    value: Some(value), ..
-                }) => asyncio_dangling_task(checker, value, semantic),
+                StmtKind::AnnAssign(stmt_ann_assign)
+                    if let Some(value) = stmt_ann_assign.value() =>
+                {
+                    asyncio_dangling_task(checker, value, semantic);
+                }
                 _ => {}
             }
         }

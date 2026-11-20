@@ -68,15 +68,15 @@ impl Violation for OsGetcwd {
 }
 
 /// PTH109
-pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+pub(crate) fn os_getcwd(checker: &Checker, call: ExprCall<'_>, segments: &[&str]) {
     if !matches!(segments, ["os", "getcwd" | "getcwdb"]) {
         return;
     }
 
     let range = call.range();
-    let mut diagnostic = checker.report_diagnostic(OsGetcwd, call.func.range());
+    let mut diagnostic = checker.report_diagnostic(OsGetcwd, call.func().range());
 
-    if !call.arguments.is_empty() {
+    if !call.arguments().is_empty() {
         return;
     }
 
@@ -84,7 +84,7 @@ pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import("pathlib", "Path"),
-                call.start(),
+                call.range().start(),
                 checker.semantic(),
             )?;
 

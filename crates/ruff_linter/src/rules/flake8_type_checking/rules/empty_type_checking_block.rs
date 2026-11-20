@@ -1,4 +1,4 @@
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing;
@@ -49,16 +49,16 @@ impl AlwaysFixableViolation for EmptyTypeCheckingBlock {
 }
 
 /// TC005
-pub(crate) fn empty_type_checking_block(checker: &Checker, stmt: &ast::StmtIf) {
+pub(crate) fn empty_type_checking_block(checker: &Checker, stmt: ast::StmtIf<'_>) {
     if !typing::is_type_checking_block(stmt, checker.semantic()) {
         return;
     }
 
-    if !stmt.elif_else_clauses.is_empty() {
+    if !stmt.elif_else_clauses().is_empty() {
         return;
     }
 
-    let [stmt] = stmt.body.as_slice() else {
+    let Some([stmt]) = stmt.body().as_array() else {
         return;
     };
     if !stmt.is_pass_stmt() {

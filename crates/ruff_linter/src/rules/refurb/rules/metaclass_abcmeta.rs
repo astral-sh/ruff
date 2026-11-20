@@ -67,35 +67,32 @@ impl AlwaysFixableViolation for MetaClassABCMeta {
 }
 
 /// FURB180
-pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
+pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: StmtClassDef<'_>) {
     // Determine whether the class definition contains at least one argument.
-    let Some(arguments) = &class_def.arguments.as_ref() else {
+    let Some(arguments) = class_def.arguments() else {
         return;
     };
 
     // Identify the `metaclass` keyword.
-    let mut keywords = arguments.keywords().peekable();
+    let mut keywords = arguments.keywords().iter().peekable();
     let Some(&first_keyword) = keywords.peek() else {
         return;
     };
-    let Some((position, keyword)) = keywords.find_position(|&keyword| {
-        keyword
-            .arg
-            .as_ref()
-            .is_some_and(|arg| arg.as_str() == "metaclass")
-    }) else {
+    let Some((position, keyword)) = keywords
+        .find_position(|&keyword| keyword.arg().is_some_and(|arg| arg.as_str() == "metaclass"))
+    else {
         return;
     };
 
     // Determine whether it's assigned to `abc.ABCMeta`.
     if !checker
         .semantic()
-        .matches_qualified_name(&keyword.value, &["abc", "ABCMeta"])
+        .matches_qualified_name(keyword.value(), &["abc", "ABCMeta"])
     {
         return;
     }
 
-    let applicability = if class_def.bases().next().is_some() {
+    let applicability = if !class_def.bases().is_empty() {
         // The class has base arguments (not just a `metaclass` keyword).
         // Applying the fix may change semantics, so it is considered unsafe.
         Applicability::Unsafe
@@ -108,12 +105,12 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         // Applying the fix is considered safe.
         Applicability::Safe
     };
-    let mut diagnostic = checker.report_diagnostic(MetaClassABCMeta, keyword.range);
+    let mut diagnostic = checker.report_diagnostic(MetaClassABCMeta, keyword.range());
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("abc", "ABC"),
-            keyword.range.start(),
+            keyword.range().start(),
             checker.semantic(),
         )?;
 
@@ -125,7 +122,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         );
 
         let delete_metaclass_keyword = remove_argument(
-            keyword,
+            &keyword,
             arguments,
             Parentheses::Remove,
             checker.source(),
@@ -153,7 +150,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
                 delete_metaclass_keyword
             } else {
                 // Replace `metaclass` keyword by `abc.ABC`.
-                Edit::range_replacement(binding, keyword.range)
+                Edit::range_replacement(binding, keyword.range())
             };
 
             Fix::applicable_edits(edit_action, [import_edit], applicability)

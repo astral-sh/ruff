@@ -1,7 +1,7 @@
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprCall, ExprStringLiteral};
+use ruff_python_ast::{self as ast, ExprKind};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -38,14 +38,15 @@ impl Violation for RepeatedKeywordArgument {
 }
 
 /// PLE1132
-pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
-    let ExprCall { arguments, .. } = call;
+pub(crate) fn repeated_keyword_argument(checker: &Checker, call: ast::ExprCall<'_>) {
+    let arguments = call.arguments();
 
     let mut unpacked_dicts = arguments
         .keywords()
+        .iter()
         .filter_map(|keyword| {
-            if keyword.arg.is_none() {
-                keyword.value.as_dict_expr()
+            if keyword.is_variadic() {
+                keyword.value().as_dict_expr()
             } else {
                 None
             }
@@ -58,16 +59,13 @@ pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
     // Explicit names anywhere in the call take precedence over names in unpacked dicts.
     let mut seen: FxHashSet<_> = arguments
         .keywords()
-        .filter_map(|keyword| {
-            keyword
-                .arg
-                .as_ref()
-                .map(ruff_python_ast::Identifier::as_str)
-        })
+        .iter()
+        .filter_map(|keyword| keyword.arg().map(ruff_python_ast::Identifier::as_str))
         .collect();
     for dict in unpacked_dicts {
         for key in dict.iter_keys().flatten() {
-            if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = key {
+            if let ExprKind::StringLiteral(string_literal) = key.classify() {
+                let value = string_literal.value();
                 if !seen.insert(value.to_str()) {
                     checker.report_diagnostic(
                         RepeatedKeywordArgument {

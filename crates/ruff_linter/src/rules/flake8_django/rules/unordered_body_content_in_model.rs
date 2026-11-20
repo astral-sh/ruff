@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, ExprKind, Stmt, StmtKind};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
@@ -84,7 +84,7 @@ impl Violation for DjangoUnorderedBodyContentInModel {
 }
 
 /// DJ012
-pub(crate) fn unordered_body_content_in_model(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn unordered_body_content_in_model(checker: &Checker, class_def: ast::StmtClassDef<'_>) {
     if !checker.semantic().seen_module(Modules::DJANGO) {
         return;
     }
@@ -96,7 +96,7 @@ pub(crate) fn unordered_body_content_in_model(checker: &Checker, class_def: &ast
     // Track all the element types we've seen so far.
     let mut element_types = Vec::new();
     let mut prev_element_type = None;
-    for element in &class_def.body {
+    for element in class_def.body() {
         let Some(element_type) = get_element_type(element, checker.semantic()) else {
             continue;
         };
@@ -152,37 +152,48 @@ impl fmt::Display for ContentType {
     }
 }
 
-fn get_element_type(element: &Stmt, semantic: &SemanticModel) -> Option<ContentType> {
-    match element {
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-            if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+fn get_element_type(element: Stmt<'_>, semantic: &SemanticModel) -> Option<ContentType> {
+    match element.classify() {
+        StmtKind::Assign(stmt_assign) => {
+            let targets = stmt_assign.targets();
+            let value = stmt_assign.value();
+
+            if let ExprKind::Call(call) = value.classify() {
+                let func = call.func();
                 if helpers::is_model_field(func, semantic) {
                     return Some(ContentType::FieldDeclaration);
                 }
             }
             let expr = targets.first()?;
-            let Expr::Name(ast::ExprName { id, .. }) = expr else {
+            let ExprKind::Name(name_node) = expr.classify() else {
                 return None;
             };
+            let id = name_node.id();
             if id == "objects" {
                 Some(ContentType::ManagerDeclaration)
             } else {
                 None
             }
         }
-        Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
+        StmtKind::ClassDef(stmt_class_def) => {
+            let name = stmt_class_def.name();
+
             if name == "Meta" {
                 Some(ContentType::MetaClass)
             } else {
                 None
             }
         }
-        Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => match name.as_str() {
-            name if is_dunder(name) => Some(ContentType::MagicMethod),
-            "save" => Some(ContentType::SaveMethod),
-            "get_absolute_url" => Some(ContentType::GetAbsoluteUrlMethod),
-            _ => Some(ContentType::CustomMethod),
-        },
+        StmtKind::FunctionDef(stmt_function_def) => {
+            let name = stmt_function_def.name();
+
+            match name.as_str() {
+                name if is_dunder(name) => Some(ContentType::MagicMethod),
+                "save" => Some(ContentType::SaveMethod),
+                "get_absolute_url" => Some(ContentType::GetAbsoluteUrlMethod),
+                _ => Some(ContentType::CustomMethod),
+            }
+        }
         _ => None,
     }
 }

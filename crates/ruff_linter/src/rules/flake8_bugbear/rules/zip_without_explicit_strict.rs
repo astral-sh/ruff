@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -55,18 +54,18 @@ impl AlwaysFixableViolation for ZipWithoutExplicitStrict {
 }
 
 /// B905
-pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: ExprCall<'_>) {
     let semantic = checker.semantic();
 
     // any call to `zip()` with at least 2 iterables, or a starred argument.
-    if semantic.match_builtin_expr(&call.func, "zip")
-        && needs_strict_argument(&call.arguments, 2)
-        && !any_infinite_iterables(call.arguments.args(), semantic)
+    if semantic.match_builtin_expr(call.func(), "zip")
+        && needs_strict_argument(call.arguments(), 2)
+        && !any_infinite_iterables(call.arguments().args().iter(), semantic)
     {
         checker
             .report_diagnostic(ZipWithoutExplicitStrict, call.range())
             .set_fix(Fix::applicable_edit(
-                add_argument("strict=False", &call.arguments, checker.tokens()),
+                add_argument("strict=False", call.arguments(), checker.tokens()),
                 Applicability::Unsafe,
             ));
     }
