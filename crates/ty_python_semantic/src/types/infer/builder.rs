@@ -7967,7 +7967,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut narrowed = Vec::new();
                     // Reuse nested expressions that receive the same field context across candidates.
                     let teardown_expression_cache = self.setup_expression_cache();
-                    for typed_dict in typed_dicts {
+                    for typed_dict in typed_dict::literal_candidates(db, dict, typed_dicts) {
                         let mut builder = self.speculate();
                         builder.infer_typed_dict_items(dict, typed_dict, tcx, &mut item_types);
 
