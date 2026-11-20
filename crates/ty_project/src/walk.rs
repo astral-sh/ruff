@@ -24,6 +24,7 @@ use thiserror::Error;
 pub(crate) struct ProjectFilesFilter<'a> {
     /// The same as [`Project::included_paths_or_root`].
     included_paths: &'a [SystemPathBuf],
+    sorted_path_indices: &'a [usize],
 
     /// The resolved `src.include` and `src.exclude` filter.
     src_filter: &'a IncludeExcludeFilter,
@@ -33,8 +34,14 @@ pub(crate) struct ProjectFilesFilter<'a> {
 
 impl<'a> ProjectFilesFilter<'a> {
     pub(crate) fn from_project(db: &'a dyn Db, project: Project) -> Self {
+        let included_paths = project.included_paths_or_root(db);
         Self {
-            included_paths: project.included_paths_or_root(db),
+            included_paths,
+            sorted_path_indices: if included_paths.len() > 1 {
+                project.sorted_included_path_indices(db)
+            } else {
+                &[]
+            },
             src_filter: &project.settings(db).src().files,
             force_exclude: project.force_exclude(db),
         }
@@ -52,22 +59,34 @@ impl<'a> ProjectFilesFilter<'a> {
         match mode {
             GlobFilterCheckMode::TopDown => Some(CheckPathMatch::Partial),
             GlobFilterCheckMode::Adhoc => {
-                let exact = match self.included_paths {
-                    [root] => path.strip_prefix(root).ok()?.as_str().is_empty(),
-                    paths => {
-                        let included = path.ancestors().find(|ancestor| {
-                            paths
-                                .binary_search_by_key(ancestor, SystemPathBuf::as_path)
-                                .is_ok()
-                        })?;
-                        included == path
+                // An exact match takes precedence over every parent directory. If the spelling
+                // differs, strip_prefix below also handles equivalent paths and descendants.
+                let exact = self
+                    .sorted_path_indices
+                    .binary_search_by_key(&path.as_str(), |&index| {
+                        self.included_paths[index].as_str()
+                    });
+                let candidates = match exact {
+                    Ok(index) => {
+                        std::slice::from_ref(&self.included_paths[self.sorted_path_indices[index]])
                     }
+                    Err(_) => self.included_paths,
                 };
-                if exact && !self.force_exclude {
-                    Some(CheckPathMatch::Full)
-                } else {
-                    Some(CheckPathMatch::Partial)
-                }
+                candidates
+                    .iter()
+                    .filter_map(|included_path| {
+                        if let Ok(relative_path) = path.strip_prefix(included_path) {
+                            // Exact matches are always included, unless forced to exclude
+                            if relative_path.as_str().is_empty() && !self.force_exclude {
+                                Some(CheckPathMatch::Full)
+                            } else {
+                                Some(CheckPathMatch::Partial)
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .max()
             }
         }
     }
@@ -116,7 +135,7 @@ impl<'a> ProjectFilesFilter<'a> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum CheckPathMatch {
     /// The path is a partial match of the checked path (it's a sub path)
     Partial,

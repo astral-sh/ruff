@@ -102,7 +102,7 @@ pub struct Project {
     /// However, it's sometimes desired to only check a subset of the project, e.g. to see
     /// the diagnostics for a single file or a folder.
     ///
-    /// The paths passed to `ty check <paths>` are sorted for binary search during inclusion checks.
+    /// This list gets initialized by the paths passed to `ty check <paths>`
     ///
     /// ## How is this different from `open_files`?
     ///
@@ -618,10 +618,9 @@ impl Project {
         removed
     }
 
-    pub fn set_included_paths(self, db: &mut dyn Db, mut paths: Vec<SystemPathBuf>) {
+    pub fn set_included_paths(self, db: &mut dyn Db, paths: Vec<SystemPathBuf>) {
         tracing::debug!("Setting included paths: {paths}", paths = paths.len());
 
-        paths.sort_unstable();
         self.set_included_paths_list(db).to(paths);
         self.reload_files(db);
     }
@@ -661,6 +660,17 @@ impl Project {
             [] => std::slice::from_ref(&self.metadata(db).root),
             paths => paths,
         }
+    }
+
+    /// Indices into the explicit check paths, ordered lexicographically by path string.
+    ///
+    /// Sorting the indices lets us look up an exact match without changing the traversal order.
+    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+    fn sorted_included_path_indices(self, db: &dyn Db) -> Box<[usize]> {
+        let paths = self.included_paths_list(db);
+        let mut indices: Box<[_]> = (0..paths.len()).collect();
+        indices.sort_unstable_by_key(|&index| paths[index].as_str());
+        indices
     }
 
     /// Returns the open files in the project.
