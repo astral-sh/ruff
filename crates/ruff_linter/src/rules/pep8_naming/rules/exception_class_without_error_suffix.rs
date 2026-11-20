@@ -50,7 +50,7 @@ impl Violation for ExceptionClassWithoutErrorSuffix {
 }
 
 /// N818
-pub(crate) fn error_suffix_on_exception_name(
+pub(crate) fn exception_class_without_error_suffix(
     checker: &Checker,
     class_def: &Stmt,
     arguments: Option<&Arguments>,

@@ -43,7 +43,7 @@ impl Violation for InvalidGetenvKey {
 }
 
 /// PLE1507
-pub(crate) fn invalid_envvar_value(
+pub(crate) fn invalid_getenv_key(
     checker: &Checker,
     call: &ast::ExprCall,
     qualified_name: &QualifiedName,

@@ -57,7 +57,7 @@ impl Violation for BadStaticmethodParameter {
 }
 
 /// PLW0211
-pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
+pub(crate) fn bad_staticmethod_parameter(checker: &Checker, scope: &Scope) {
     let Some(func) = scope.kind.as_function() else {
         return;
     };

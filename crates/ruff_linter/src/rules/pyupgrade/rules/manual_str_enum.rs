@@ -102,7 +102,7 @@ impl Violation for ManualStrEnum {
 }
 
 /// UP042
-pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn manual_str_enum(checker: &Checker, class_def: &ast::StmtClassDef) {
     let Some(arguments) = class_def.arguments.as_deref() else {
         // class does not inherit anything, exit early
         return;

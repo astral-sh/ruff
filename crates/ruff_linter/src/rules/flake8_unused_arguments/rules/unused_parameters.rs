@@ -428,7 +428,7 @@ pub(crate) fn is_not_implemented_stub_with_variable(
 }
 
 /// ARG001, ARG002, ARG003, ARG004, ARG005
-pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
+pub(crate) fn unused_parameters(checker: &Checker, scope: &Scope) {
     if scope.uses_locals() {
         return;
     }

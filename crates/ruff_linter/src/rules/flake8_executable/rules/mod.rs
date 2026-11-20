@@ -33,7 +33,7 @@ pub(crate) fn from_tokens(
             shebang_missing_python(range, &shebang, context);
 
             if context.is_rule_enabled(Rule::NonExecutableFileWithShebang) {
-                shebang_not_executable(path, range, context);
+                non_executable_file_with_shebang(path, range, context);
             }
 
             shebang_leading_whitespace(context, range, locator);
@@ -44,7 +44,7 @@ pub(crate) fn from_tokens(
 
     if !has_any_shebang {
         if context.is_rule_enabled(Rule::ExecutableFileWithoutShebang) {
-            shebang_missing_executable_file(path, context);
+            executable_file_without_shebang(path, context);
         }
     }
 }

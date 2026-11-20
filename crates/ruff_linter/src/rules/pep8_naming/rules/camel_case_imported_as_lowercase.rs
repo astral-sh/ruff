@@ -52,7 +52,7 @@ impl Violation for CamelCaseImportedAsLowercase {
 }
 
 /// N813
-pub(crate) fn camelcase_imported_as_lowercase(
+pub(crate) fn camel_case_imported_as_lowercase(
     checker: &Checker,
     name: &str,
     asname: &str,

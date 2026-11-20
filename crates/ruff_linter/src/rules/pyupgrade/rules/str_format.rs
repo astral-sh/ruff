@@ -422,7 +422,7 @@ impl FStringConversion {
 }
 
 /// UP032
-pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
+pub(crate) fn str_format(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
     if summary.has_nested_parts {
         return;
     }

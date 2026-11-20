@@ -98,7 +98,7 @@ fn contains_blind_exception<'a>(
 }
 
 /// BLE001
-pub(crate) fn blind_except(
+pub(crate) fn except_overly_broad_exception(
     checker: &Checker,
     type_: Option<&Expr>,
     name: Option<&str>,

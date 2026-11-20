@@ -81,7 +81,7 @@ impl Violation for ManualPathWrite<'_> {
 }
 
 /// FURB103
-pub(crate) fn write_whole_file(checker: &Checker, with: &ast::StmtWith) {
+pub(crate) fn manual_path_write(checker: &Checker, with: &ast::StmtWith) {
     // `async` check here is more of a precaution.
     if with.is_async {
         return;

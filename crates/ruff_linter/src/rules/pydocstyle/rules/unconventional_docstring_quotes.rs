@@ -74,7 +74,7 @@ impl Violation for UnconventionalDocstringQuotes {
 }
 
 /// D300
-pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
+pub(crate) fn unconventional_docstring_quotes(checker: &Checker, docstring: &Docstring) {
     let opener = docstring.opener();
     let prefixes = docstring.prefix_str();
 

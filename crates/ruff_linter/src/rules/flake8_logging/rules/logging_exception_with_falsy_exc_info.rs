@@ -47,7 +47,7 @@ impl Violation for LoggingExceptionWithFalsyExcInfo {
 }
 
 /// LOG007
-pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
+pub(crate) fn logging_exception_with_falsy_exc_info(checker: &Checker, call: &ExprCall) {
     match call.func.as_ref() {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if !matches!(

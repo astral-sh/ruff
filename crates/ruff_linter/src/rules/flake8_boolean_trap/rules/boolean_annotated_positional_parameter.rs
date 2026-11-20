@@ -110,7 +110,7 @@ impl Violation for BooleanAnnotatedPositionalParameter {
 }
 
 /// FBT001
-pub(crate) fn boolean_type_hint_positional_argument(
+pub(crate) fn boolean_annotated_positional_parameter(
     checker: &Checker,
     name: &str,
     decorator_list: &[Decorator],

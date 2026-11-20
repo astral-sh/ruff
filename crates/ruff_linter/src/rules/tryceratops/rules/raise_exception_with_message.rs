@@ -56,7 +56,7 @@ impl Violation for RaiseExceptionWithMessage {
 }
 
 /// TRY003
-pub(crate) fn raise_vanilla_args(checker: &Checker, expr: &Expr) {
+pub(crate) fn raise_exception_with_message(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, .. },

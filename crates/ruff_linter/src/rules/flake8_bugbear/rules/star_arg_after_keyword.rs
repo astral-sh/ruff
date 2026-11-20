@@ -58,11 +58,7 @@ impl Violation for StarArgAfterKeyword {
 }
 
 /// B026
-pub(crate) fn star_arg_unpacking_after_keyword_arg(
-    checker: &Checker,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub(crate) fn star_arg_after_keyword(checker: &Checker, args: &[Expr], keywords: &[Keyword]) {
     let Some(keyword) = keywords.first() else {
         return;
     };

@@ -72,7 +72,10 @@ impl Violation for IncorrectBlankLineAfterDocstringSummary {
 }
 
 /// D205
-pub(crate) fn blank_after_summary(checker: &Checker, docstring: &Docstring) {
+pub(crate) fn incorrect_blank_line_after_docstring_summary(
+    checker: &Checker,
+    docstring: &Docstring,
+) {
     let body = docstring.body();
 
     if !docstring.is_triple_quoted() {

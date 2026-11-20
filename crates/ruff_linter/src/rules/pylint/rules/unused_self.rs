@@ -73,7 +73,7 @@ impl Violation for UnusedSelf {
 }
 
 /// PLR6301
-pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
+pub(crate) fn unused_self(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     let semantic = checker.semantic();
 
     let Some(parent) = semantic.first_non_type_parent_scope(scope) else {

@@ -28,7 +28,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &Checker) 
                 );
             }
             if checker.is_rule_enabled(Rule::CatchExceptionOrBaseException) {
-                flake8_blind_except::rules::blind_except(
+                flake8_blind_except::rules::except_overly_broad_exception(
                     checker,
                     type_.as_deref(),
                     name.as_deref(),
@@ -71,7 +71,7 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &Checker) 
                     );
                 }
                 if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
-                    flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
+                    flake8_builtins::rules::variable_shadows_builtin(checker, name, name.range());
                 }
             }
         }

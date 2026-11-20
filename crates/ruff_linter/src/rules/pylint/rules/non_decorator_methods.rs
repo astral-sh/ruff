@@ -91,12 +91,12 @@ enum MethodType {
 }
 
 /// PLR0202
-pub(crate) fn no_classmethod_decorator(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn non_decorator_classmethod(checker: &Checker, stmt: &Stmt) {
     get_undecorated_methods(checker, stmt, &MethodType::Classmethod);
 }
 
 /// PLR0203
-pub(crate) fn no_staticmethod_decorator(checker: &Checker, stmt: &Stmt) {
+pub(crate) fn non_decorator_staticmethod(checker: &Checker, stmt: &Stmt) {
     get_undecorated_methods(checker, stmt, &MethodType::Staticmethod);
 }
 

@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for DocstringStartsWithLowercaseLetter {
 }
 
 /// D403
-pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
+pub(crate) fn docstring_starts_with_lowercase_letter(checker: &Checker, docstring: &Docstring) {
     if docstring.definition.as_function_def().is_none() {
         return;
     }

@@ -64,7 +64,7 @@ impl Violation for PrintfInGettextCall {
 }
 
 /// INT003
-pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn printf_in_gettext_call(checker: &Checker, func: &Expr, args: &[Expr]) {
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if is_printf_format(first) {

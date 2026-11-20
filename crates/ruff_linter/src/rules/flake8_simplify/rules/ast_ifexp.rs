@@ -236,7 +236,7 @@ pub(crate) fn if_expr_with_false_true(
 }
 
 /// SIM212
-pub(crate) fn twisted_arms_in_ifexpr(
+pub(crate) fn if_expr_with_negated_else_as_condition(
     checker: &Checker,
     expr: &Expr,
     test: &Expr,

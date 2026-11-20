@@ -202,7 +202,7 @@ impl FunctionType {
 }
 
 /// N804, N805
-pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
+pub(crate) fn method_receiver_name(checker: &Checker, scope: &Scope) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
         parameters,

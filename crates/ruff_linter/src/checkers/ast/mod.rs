@@ -2794,7 +2794,7 @@ impl<'a> Checker<'a> {
         self.visit_type_definition(arg);
 
         if !self.source_type.is_stub() && self.is_rule_enabled(Rule::CastWithUnquotedType) {
-            flake8_type_checking::rules::runtime_cast_value(self, arg);
+            flake8_type_checking::rules::cast_with_unquoted_type(self, arg);
         }
     }
 

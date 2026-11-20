@@ -28,7 +28,7 @@ pub(crate) fn deferred_for_loops(checker: &mut Checker) {
             refurb::rules::unnecessary_enumerate(checker, stmt_for);
         }
         if checker.is_rule_enabled(Rule::ManualLoopCounter) {
-            flake8_simplify::rules::enumerate_for_loop(checker, stmt_for);
+            flake8_simplify::rules::manual_loop_counter(checker, stmt_for);
         }
         if checker.is_rule_enabled(Rule::LoopIteratorMutation) {
             flake8_bugbear::rules::loop_iterator_mutation(checker, stmt_for);

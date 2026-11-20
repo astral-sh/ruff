@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for NumericLiteralTooLongInStub {
 }
 
 /// PYI054
-pub(crate) fn numeric_literal_too_long(checker: &Checker, expr: &Expr) {
+pub(crate) fn numeric_literal_too_long_in_stub(checker: &Checker, expr: &Expr) {
     if expr.range().len() <= TextSize::new(10) {
         return;
     }

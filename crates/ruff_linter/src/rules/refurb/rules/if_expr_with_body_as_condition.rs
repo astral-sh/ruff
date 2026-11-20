@@ -60,7 +60,7 @@ impl Violation for IfExprWithBodyAsCondition {
 }
 
 /// FURB110
-pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::ExprIf) {
+pub(crate) fn if_expr_with_body_as_condition(checker: &Checker, if_expr: &ast::ExprIf) {
     let ast::ExprIf {
         test,
         body,

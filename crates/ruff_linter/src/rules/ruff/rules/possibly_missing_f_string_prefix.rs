@@ -82,7 +82,7 @@ impl AlwaysFixableViolation for PossiblyMissingFStringPrefix {
 }
 
 /// RUF027
-pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLiteral) {
+pub(crate) fn possibly_missing_f_string_prefix(checker: &Checker, literal: &ast::StringLiteral) {
     let semantic = checker.semantic();
 
     // fstrings are never correct as type definitions

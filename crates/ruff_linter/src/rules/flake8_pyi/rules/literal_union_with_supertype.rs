@@ -66,7 +66,7 @@ impl Violation for LiteralUnionWithSupertype {
 }
 
 /// PYI051
-pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
+pub(crate) fn literal_union_with_supertype<'a>(checker: &Checker, union: &'a Expr) {
     let mut typing_literal_exprs = Vec::new();
     let mut builtin_types_in_union = FxHashSet::default();
 

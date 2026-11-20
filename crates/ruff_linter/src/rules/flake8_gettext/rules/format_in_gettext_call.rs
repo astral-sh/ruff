@@ -66,7 +66,7 @@ impl Violation for StrFormatInGettextCall {
 }
 
 /// INT002
-pub(crate) fn format_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
+pub(crate) fn format_in_gettext_call(checker: &Checker, func: &Expr, args: &[Expr]) {
     // Check first argument (singular)
     if let Some(first) = args.first() {
         if is_format_call(first) {

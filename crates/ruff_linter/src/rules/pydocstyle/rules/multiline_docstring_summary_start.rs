@@ -141,7 +141,7 @@ impl AlwaysFixableViolation for MultilineDocstringSummaryOnFirstLine {
 }
 
 /// D212, D213
-pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring) {
+pub(crate) fn multiline_docstring_summary_start(checker: &Checker, docstring: &Docstring) {
     let body = docstring.body();
 
     if NewlineWithTrailingNewline::from(body.as_str())

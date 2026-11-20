@@ -55,7 +55,7 @@ impl Violation for HardcodedMathConstant {
 }
 
 /// FURB152
-pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral) {
+pub(crate) fn hardcoded_math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral) {
     let Number::Float(value) = literal.value else {
         return;
     };

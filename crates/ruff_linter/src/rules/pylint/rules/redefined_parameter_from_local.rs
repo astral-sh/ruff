@@ -47,7 +47,7 @@ impl Violation for RedefinedParameterFromLocal {
 }
 
 /// PLR1704
-pub(crate) fn redefined_argument_from_local(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
+pub(crate) fn redefined_parameter_from_local(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     for (name, binding_id) in scope.bindings() {
         for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
             let binding = &checker.semantic().bindings[shadow.binding_id()];

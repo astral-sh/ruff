@@ -58,7 +58,7 @@ impl AlwaysFixableViolation for ConsecutiveGlobalOrNonlocalStatements {
 }
 
 /// FURB154
-pub(crate) fn repeated_global(checker: &Checker, mut suite: &[Stmt]) {
+pub(crate) fn consecutive_global_or_nonlocal_statements(checker: &Checker, mut suite: &[Stmt]) {
     while let Some(idx) = suite
         .iter()
         .position(|stmt| GlobalKind::from_stmt(stmt).is_some())

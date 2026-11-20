@@ -87,7 +87,7 @@ impl Violation for LoggingExcInfoOutsideExceptHandler {
 }
 
 /// LOG014
-pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall) {
+pub(crate) fn logging_exc_info_outside_except_handler(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
     if !outside_handlers(call.start(), semantic) {
