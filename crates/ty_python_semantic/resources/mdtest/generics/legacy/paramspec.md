@@ -2077,6 +2077,95 @@ def word(f: Callable[P, str]) -> Word[P]:
 reveal_type(return_type_of(word))  # revealed: str
 ```
 
+### Currying a generic function with an invariant input
+
+The mapper's parameter type sets an upper bound on the element type of each list.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+U = TypeVar("U")
+S = TypeVar("S", bound=str)
+
+def curry_flip(f: Callable[Concatenate[T, P], U]) -> Callable[P, Callable[[T], U]]:
+    raise NotImplementedError
+
+def map_list(items: list[T], mapper: Callable[[T], U]) -> list[U]:
+    return [mapper(item) for item in items]
+
+map_items = curry_flip(map_list)
+
+def pipe(items: T, f: Callable[[T], U]) -> U:
+    return f(items)
+
+def text_identity(word: S) -> S:
+    return word
+
+numbers = [1]
+words = ["word"]
+render = map_items(str)
+reveal_type(pipe(numbers, render))  # revealed: list[str]
+reveal_type(render(words))  # revealed: list[str]
+copy_words = map_items(mapper=text_identity)
+reveal_type(copy_words(words))  # revealed: list[str]
+copy_words(numbers)  # error: [invalid-argument-type]
+pipe(numbers, copy_words)  # error: [invalid-argument-type]
+for transform in (render, copy_words):
+    transform(numbers)  # error: [invalid-argument-type]
+```
+
+A wrapper can apply the same mapper to two lists. Both lists in each call share one element type.
+
+```py
+def pair(f: Callable[Concatenate[T, P], U]) -> Callable[P, Callable[[tuple[T, T]], tuple[U, U]]]:
+    raise NotImplementedError
+
+render_pair = pair(map_list)(str)
+reveal_type(render_pair((numbers, numbers)))  # revealed: tuple[list[str], list[str]]
+render_pair((numbers, words))  # error: [invalid-argument-type]
+```
+
+The list or an expected callable type can specialize a generic mapper within its constraints.
+
+```py
+from copy import copy
+
+reveal_type(map_items(copy)([1]))  # revealed: list[int]
+copy_ints: Callable[[list[int]], list[int]] = map_items(copy)  # ok
+
+X = TypeVar("X", int, str)
+
+def wrap(value: X) -> list[X]:
+    return [value]
+
+reveal_type(map_items(wrap)([1, "word"]))  # revealed: list[list[int] | list[str]]
+map_items(wrap)([b"word"])  # error: [invalid-argument-type]
+```
+
+A mapper can also have disjoint overloads or accept a variadic tuple.
+
+```py
+from typing import TypeVarTuple, overload
+
+@overload
+def unpack(item: int) -> str: ...
+@overload
+def unpack(item: tuple[T]) -> list[T]: ...
+def unpack(item: int | tuple[object]) -> object:
+    return str(item) if isinstance(item, int) else list(item)
+
+reveal_type(map_items(unpack)([1]))  # revealed: list[str]
+
+Ts = TypeVarTuple("Ts")
+
+def box(items: tuple[*Ts]) -> list[tuple[*Ts]]:
+    return [items]
+
+map_items(box)([(1, "word")])  # ok
+```
+
 ### Captured and fixed variables in a return type
 
 Capturing a callable's type variable does not permit a second, enclosing variable in its return type

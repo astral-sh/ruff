@@ -9605,8 +9605,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .context
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
-        let callable_type =
-            self.infer_maybe_standalone_expression(expression, TypeContext::default());
+        let tcx = TypeContext::default().with_immediate_call(expression.is_call_expr());
+        let callable_type = self.infer_maybe_standalone_expression(expression, tcx);
         self.context.inference_flags.set(
             InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound,

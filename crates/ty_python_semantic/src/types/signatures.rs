@@ -24,7 +24,7 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::constraints::{
     CandidateSolutions, ConstraintProvenance, ConstraintSet, ConstraintSetBuilder,
-    IteratorConstraintsExtension, OwnedConstraintSet, Solutions,
+    IteratorConstraintsExtension, OwnedConstraintSet, SolutionPaths, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -1223,6 +1223,263 @@ impl<'db> Signature<'db> {
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
         }
+    }
+
+    fn parameter_variance(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        variable: BoundTypeVarInstance<'db>,
+    ) -> TypeVarVariance {
+        self.parameters
+            .iter()
+            .map(|p| {
+                p.annotated_type()
+                    .variance_of(db, env, variable.identity(db))
+                    .evaluate(db)
+            })
+            .collect()
+    }
+
+    /// In `[T](sink: (T) -> None) -> ((list[T]) -> T)`, every subtype of a
+    /// valid choice for `T` also satisfies the argument constraints. Bind a
+    /// fresh `S <: T` on the returned callable. The sink specializes the bound
+    /// and the list specializes `S`. For a reusable callable, the choice must
+    /// be independent across invocations.
+    pub(super) fn defer_contravariant_variables(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut result: Type<'db>,
+        bind: impl Fn(BoundTypeVarInstance<'db>) -> Option<BoundTypeVarInstance<'db>>,
+    ) -> Option<Type<'db>> {
+        let returned = result.single_callable_signature(db)?;
+        let mut deferred = SmallVec::<[_; 1]>::new();
+        for var in self.generic_context?.variables(db) {
+            if self.parameter_variance(db, env, var) == TypeVarVariance::Contravariant
+                && returned.parameter_variance(db, env, var) != TypeVarVariance::Bivariant
+                && let Some(fresh) = bind(var)
+            {
+                result = result.substitute_one_typevar(
+                    db,
+                    env,
+                    var,
+                    Type::TypeVar(fresh),
+                    AliasPolicy::Preserve,
+                );
+                deferred.push(fresh);
+            }
+        }
+        let context = GenericContext::try_from_typevar_instances(db, env, deferred)?;
+        result.bind_callable_variables(db, context)
+    }
+
+    /// Bind variables from a captured parameter list independently on each call
+    /// when their only invariant use comes from an opaque input to the callback.
+    pub(super) fn defer_captured_variables(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+        result: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let callable = result.as_callable()?;
+        let signature = result.single_callable_signature(db)?;
+        let declared = self.return_ty.single_callable_signature(db)?;
+        let (_, pack) = declared.parameters.as_paramspec_with_prefix()?;
+        let variance = |ty: Type<'db>, var: BoundTypeVarInstance<'db>| {
+            ty.variance_of(db, env, var.identity(db)).evaluate(db)
+        };
+        if variance(declared.return_ty, pack) != TypeVarVariance::Bivariant {
+            return None;
+        }
+
+        let bind = |var| {
+            // Apart from P, T must originate from exactly one solution, e.g. A = list[T].
+            let (input, ty) = specialization
+                .generic_context(db)
+                .variables(db)
+                .zip(specialization.types(db))
+                .filter(|(param, ty)| {
+                    *param != pack && variance(**ty, var) != TypeVarVariance::Bivariant
+                })
+                .exactly_one()
+                .ok()?;
+            // The wrapper passes A to the callback as one opaque argument. Another
+            // operation on A could combine values supplied on distinct calls.
+            let only_use = |params: &[Parameter<'db>]| {
+                params
+                    .iter()
+                    .map(Parameter::annotated_type)
+                    .filter(|ty| variance(*ty, input) != TypeVarVariance::Bivariant)
+                    .exactly_one()
+                    .ok()
+            };
+            let callback = only_use(self.parameters.as_slice())?.single_callable_signature(db)?;
+            let (prefix, captured) = callback.parameters.as_paramspec_with_prefix()?;
+            if captured == pack
+                && input.typevar(db).is_simple(db)
+                && only_use(prefix)? == Type::TypeVar(input)
+                && variance(*ty, var) == TypeVarVariance::Invariant
+                && variance(callback.return_ty, input) == TypeVarVariance::Bivariant
+                && variance(declared.return_ty, input) == TypeVarVariance::Contravariant
+            {
+                var.defer(db)
+            } else {
+                None
+            }
+        };
+        let result = signature.defer_contravariant_variables(db, env, signature.return_ty, bind)?;
+        let signature = signature.clone().with_return_type(result);
+        Some(Type::Callable(
+            callable.with_signatures(db, CallableSignature::single(signature)),
+        ))
+    }
+
+    /// Infer a generic callback whose input constrains a parameter of a returned callable.
+    ///
+    /// Matching `[V](V) -> V` against `(T) -> U` gives `T <: V <: U`. If the
+    /// result is called immediately, its arguments can determine `V`. Otherwise
+    /// the result may retain state between calls and needs a single choice of `U`.
+    pub(super) fn instantiate_callback(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        formal: Type<'db>,
+        argument: Type<'db>,
+        immediate_result: Option<&mut Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let factory = self.generic_context?;
+        let returned = self.return_ty.single_callable_signature(db)?;
+        let formal = formal.resolve_type_alias(db);
+        formal.as_callable()?;
+        let callback = argument.try_upcast_to_callable(db, env)?.exactly_one()?;
+        let signatures = callback.signatures(db);
+        let (generic, others) = signatures.overloads.split_last()?;
+        let locals = generic.generic_context?;
+        if !self.callback_constrains_input(db, env, formal, returned)
+            || generic.receiver_constraints().is_some()
+            || locals
+                .variables(db)
+                .any(|v| v.is_paramspec(db) || v.is_typevartuple(db))
+        {
+            return None;
+        }
+
+        let local_delta = immediate_result
+            .as_deref()
+            .and_then(|ty| ty.single_callable_signature(db))
+            .and_then(|sig| sig.freshening_delta_for(db, locals));
+        let mut open = match self.freshening_delta_for(db, locals).max(local_delta) {
+            Some(delta) => generic.freshen_bound_typevars(db, env, delta),
+            None => generic.clone(),
+        };
+        let locals = open.generic_context.take()?;
+        // A final generic overload can cover all calls to the earlier ones.
+        // For example, `[V](V | None) -> tuple[V] | None` covers `(None) -> None`.
+        let domain = Type::single_callable(db, open.clone().with_return_type(Type::Never));
+        if others.iter().any(|other| {
+            !other.is_non_generic()
+                || !domain.is_subtype_of(db, env, Type::single_callable(db, other.clone()))
+                || !other.return_ty.is_subtype_of(db, env, open.return_ty)
+        }) {
+            return None;
+        }
+
+        let bounds = factory
+            .unknown_specialization(db, None)
+            .with_typevar_bounds(db);
+        let target = formal
+            .apply_specialization(db, bounds)
+            .top_materialization(db, env);
+        // A fixed input in the formal, e.g. `T | int`, already gives `V` a
+        // lower bound. Let ordinary argument inference use that evidence.
+        if !domain.is_assignable_to(db, env, target) {
+            return None;
+        }
+        let target = target.single_callable_signature(db)?;
+        let unrestricted = open.return_ty.is_assignable_to(db, env, target.return_ty);
+        if let Some(result) = immediate_result
+            && locals
+                .variables(db)
+                .all(|v| !v.typevar(db).is_constrained(db))
+            && unrestricted
+        {
+            // If every choice of V meets the callback's declared requirements,
+            // keep it rigid during this call and rebind it on the result.
+            *result = result.bind_callable_variables(db, locals)?;
+            return Some(Type::single_callable(db, open));
+        }
+
+        // Include the widest admissible choices of V alongside the generic
+        // overload, which can still match a more specific expected type.
+        let variable = locals.variables(db).exactly_one().ok()?;
+        let (actual, expected) = if unrestricted {
+            // Solving `V <: object` yields its declared bound or constraints.
+            (Type::TypeVar(variable), Type::object())
+        } else {
+            (open.return_ty, target.return_ty)
+        };
+        let builder = ConstraintSetBuilder::new();
+        let solutions = actual
+            .when_constraint_set_assignable_to(db, env, expected, &builder)
+            .solutions(db, env, locals.inferable_typevars(db))
+            .ok()?;
+        let choices: SmallVec<[_; 1]> = match solutions {
+            Solutions::Constrained(SolutionPaths::Complete(paths)) => paths
+                .into_iter()
+                .flat_map(|path| path.solved_typevars)
+                .map(|var| var.solution)
+                .collect(),
+            Solutions::Unsatisfiable(_) => smallvec_inline![Type::Never],
+            Solutions::Constrained(SolutionPaths::BudgetExceeded(_)) | Solutions::Unconstrained => {
+                return None;
+            }
+        };
+        let mut signatures = signatures.clone();
+        if choices.as_slice() == [Type::Never] {
+            // No inhabited specialization satisfies the declared return.
+            signatures.overloads.pop();
+        }
+        signatures.overloads.extend(
+            choices
+                .into_iter()
+                .map(|ty| open.apply_specialization(db, locals.specialize(db, &[ty]))),
+        );
+        Some(Type::Callable(callback.with_signatures(db, signatures)))
+    }
+
+    fn callback_constrains_input(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        formal: Type<'db>,
+        returned: &Self,
+    ) -> bool {
+        let mut shared_input = false;
+        for variable in self.inferable_typevars(db).iter(db) {
+            let variance = formal
+                .variance_of(db, env, variable.identity(db))
+                .evaluate(db);
+            if variance == TypeVarVariance::Bivariant {
+                continue;
+            }
+            let id = variable.typevar(db).identity(db);
+            let mentions = |parameter: &Parameter<'db>| {
+                parameter
+                    .annotated_type()
+                    .references_typevar_through_aliases(db, env, id)
+            };
+            // Other arguments can supply additional bounds. Let the call
+            // solver combine their evidence before selecting a specialization.
+            let mut parameters = self.parameters.iter().filter(|p| mentions(p));
+            if variable.is_paramspec(db) || parameters.nth(1).is_some() {
+                return false;
+            }
+            shared_input |= variance == TypeVarVariance::Contravariant
+                && returned.parameters.iter().any(mentions);
+        }
+        shared_input
     }
 
     pub(crate) fn freshen_bound_typevars(
@@ -2986,18 +3243,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
         let source_inferable = signature_typevars(source);
         let target_inferable = signature_typevars(target);
-        let signature_inferable = source_inferable.merge(db, target_inferable);
-
-        let inferable = self.inferable.merge(db, signature_inferable);
+        // A caller may choose any type within a deferred bound. Variables
+        // from enclosing scopes are already fixed when that choice is made.
+        let (signature_inferable, inferable) = if target_inferable
+            .iter(db)
+            .any(|var| var.deferred_bound(db).is_some())
+        {
+            (source_inferable, source_inferable)
+        } else {
+            let local = source_inferable.merge(db, target_inferable);
+            (local, self.inferable.merge(db, local))
+        };
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
-        // Preserve receiver typevar constraints until the complete signature relation is solved.
-        if [source, target].iter().any(|signature| {
-            signature
-                .receiver_constraints()
-                .is_some_and(|constraints| constraints.requires_lazy_evaluation(db, &checker))
-        }) {
+        // Preserve constraints on receivers and deferred inputs until the complete
+        // signature relation is solved. Eagerly choosing T's bound when comparing
+        // [T](list[T]) to (list[int]) would lose the valid specialization T = int.
+        let bounds = source_inferable.deferred_constraints(db, env, self.constraints);
+        if bounds.is_some()
+            || [source, target].iter().any(|signature| {
+                signature
+                    .receiver_constraints()
+                    .is_some_and(|constraints| constraints.requires_lazy_evaluation(db, &checker))
+            })
+        {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let check_parameters_and_return = || {
@@ -3032,7 +3302,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
             result
         };
-        let when = checker.with_signature_recursion_guard(source, target, || {
+        let mut when = checker.with_signature_recursion_guard(source, target, || {
             // A target that permits no calls imposes no receiver requirements. Still compare
             // return types so that their constraints contribute to inference.
             if target.parameters.is_top() {
@@ -3055,6 +3325,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         .and(db, self.constraints, check_parameters_and_return)
                 })
         });
+
+        // Include the inferred bound before quantifying the source variables. For example,
+        // matching `[S: str](list[S])` against `(list[int])` requires both S = int and S <: str.
+        if let Some(bounds) = bounds {
+            when.intersect(db, self.constraints, bounds);
+        }
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.

@@ -6088,8 +6088,7 @@ def decorate_value(f: Callable[[IntT], IntOrStr]) -> Callable[[IntT], IntOrStr]:
 def identity_value(value: A) -> A:
     return value
 
-# TODO: Since identity_value returns its argument, the decorated call should infer int.
-reveal_type(decorate_value(identity_value)(1))  # revealed: int | str
+reveal_type(decorate_value(identity_value)(1))  # revealed: int
 ```
 
 Composing two identity functions relates three type parameters without fixing a concrete element
@@ -6104,6 +6103,64 @@ def compose(f: Transform[A, B], g: Transform[B, C]) -> Transform[A, C]:
 # TODO: The shared element type should be bound by the returned callable.
 # revealed: (tuple[B@compose, ...], /) -> tuple[B@compose, ...]
 reveal_type(compose(identity, identity))
+```
+
+## Inferring an invariant type argument across two calls
+
+The key function sets an upper bound on `T`. Calling the result immediately lets the list refine
+`T`.
+
+```py
+from copy import copy
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S", bound=str)
+
+def index(key: Callable[[T], S], limit: int) -> Callable[[list[T]], dict[S, T]]:
+    return lambda items: {key(item): item for item in items[:limit]}
+
+numbers = [1]
+reveal_type(index(repr, 2)(numbers))  # revealed: dict[str, int]
+reveal_type(index(str.upper, 2)([]))  # revealed: dict[str, str]
+reveal_type(index(repr, 2))  # revealed: (list[object], /) -> dict[str, object]
+
+# With copy as the key function, each item must itself satisfy the bound on S.
+reveal_type(index(copy, 2)(["word"]))  # revealed: dict[str, str]
+index(copy, 2)(numbers)  # error: [invalid-argument-type]
+```
+
+## Specializing a generic callback in a stateful factory
+
+An immediate call can specialize `present` to the input element type. A saved collector uses one
+specialization across calls because its result includes previously collected values.
+
+```py
+from typing import Callable, Iterable, TypeVar, overload
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def collector(pick: Callable[[T], tuple[U] | None]) -> Callable[[Iterable[T]], Iterable[U]]:
+    collected: list[U] = []
+
+    def collect(items: Iterable[T]) -> Iterable[U]:
+        for item in items:
+            collected.extend(pick(item) or ())
+        return collected
+
+    return collect
+
+@overload
+def present(value: None) -> None: ...
+@overload
+def present(value: T | None) -> tuple[T] | None: ...
+def present(value: object) -> tuple[object] | None:
+    return None if value is None else (value,)
+
+reveal_type(collector(present)(["word", None]))  # revealed: Iterable[str]
+reveal_type((collect := collector(present))([1]))  # revealed: Iterable[object]
+only_words: Iterable[str] = collect(["word"])  # error: [invalid-assignment]
 ```
 
 ## Dictionary value context containing a bounded type variable
