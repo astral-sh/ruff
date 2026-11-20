@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
 PLR0203 [*] Static method defined without decorator
-  --> no_method_decorator.py:15:5
+  --> non_decorator_methods.py:15:5
    |
 13 |     pick_colors = classmethod(pick_colors)
 14 |
@@ -24,7 +24,7 @@ help: Add @staticmethod decorator
    |
 
 PLR0203 [*] Static method defined without decorator
-  --> no_method_decorator.py:27:5
+  --> non_decorator_methods.py:27:5
    |
 25 |     class_method = classmethod(class_method);another_statement
 26 |

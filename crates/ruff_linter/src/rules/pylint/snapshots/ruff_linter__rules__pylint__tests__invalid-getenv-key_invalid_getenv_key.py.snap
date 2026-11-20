@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
 PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
- --> invalid_envvar_value.py:3:11
+ --> invalid_getenv_key.py:3:11
   |
 1 | import os
 2 |
@@ -13,7 +13,7 @@ PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
   |
 
 PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
- --> invalid_envvar_value.py:7:15
+ --> invalid_getenv_key.py:7:15
   |
 5 | os.getenv("test")
 6 | os.getenv(key="testingAgain")
@@ -24,7 +24,7 @@ PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
   |
 
 PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
-  --> invalid_envvar_value.py:8:11
+  --> invalid_getenv_key.py:8:11
    |
  6 | os.getenv(key="testingAgain")
  7 | os.getenv(key=11)  # [invalid-envvar-value]
@@ -35,7 +35,7 @@ PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
    |
 
 PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
-  --> invalid_envvar_value.py:12:15
+  --> invalid_getenv_key.py:12:15
    |
 10 | os.getenv(key=f"foo", default="bar")
 11 | os.getenv(key="foo" + "bar", default=1)
@@ -46,7 +46,7 @@ PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
    |
 
 PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
-  --> invalid_envvar_value.py:14:11
+  --> invalid_getenv_key.py:14:11
    |
 12 | os.getenv(key=1 + "bar", default=1)  # [invalid-envvar-value]
 13 | os.getenv("PATH_TEST" if using_clear_path else "PATH_ORIG")

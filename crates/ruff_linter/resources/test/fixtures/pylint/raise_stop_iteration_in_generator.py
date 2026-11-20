@@ -1,4 +1,4 @@
-"""Test cases for PLR1708 stop-iteration-return."""
+"""Test cases for `raise-stop-iteration-in-generator` (`PLR1708`)."""
 
 
 # Valid cases - should not trigger the rule
