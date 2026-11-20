@@ -2373,8 +2373,7 @@ impl<T> InstanceProjection<T> {
     }
 }
 
-/// An ordered pair of types and their Python version shared by type-relation and set-theoretic
-/// queries.
+/// An ordered pair of types and the program in which they are interpreted.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct TypePair<'db> {
     #[returns(copy)]
@@ -7046,19 +7045,41 @@ impl<'db> Type<'db> {
         }
     }
 
-    // Returns the value type of a `__getitem__` dunder call on this object.
-    //
-    // Returns `None` if `__getitem__` is undefined or results in a call error.
-    fn getitem_dunder_call(
+    /// Infer the value supplied by `**mapping` for a particular key, or for an unknown key.
+    /// Matching a call against overloads can request the same key once per overload.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None during cycle recovery"
+    )]
+    fn unpacked_value_type(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         key: Option<&str>,
-    ) -> Option<Type<'db>> {
-        let key = key
-            .map(|key| Type::string_literal(db, key))
-            .unwrap_or(Type::unknown());
+    ) -> Type<'db> {
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn cached<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Option<Type<'db>> {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            Some(
+                types
+                    .first(db)
+                    .compute_unpacked_value_type(db, &env, types.second(db)),
+            )
+        }
 
+        let key = key.map_or_else(Type::unknown, |key| Type::string_literal(db, key));
+        // If `__getitem__` unpacks the same mapping in its body, let its return type
+        // inference recover the cycle as it would for a direct call.
+        cached(db, TypePair::new(db, env.program(db), self, key))
+            .unwrap_or_else(|| self.compute_unpacked_value_type(db, env, key))
+    }
+
+    fn compute_unpacked_value_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        key: Type<'db>,
+    ) -> Type<'db> {
         match self
             .member_lookup_with_policy(
                 db,
@@ -7074,10 +7095,12 @@ impl<'db> Type<'db> {
                 ..
             }) => getitem_method
                 .try_call(db, env, &CallArguments::positional([key]))
-                .ok()
-                .map(|bindings| bindings.return_type(db, env)),
+                .map_or_else(
+                    |_| Type::unknown(),
+                    |bindings| bindings.return_type(db, env),
+                ),
 
-            _ => None,
+            _ => Type::unknown(),
         }
     }
 
@@ -7112,11 +7135,7 @@ impl<'db> Type<'db> {
             _ => return None,
         };
 
-        let value_ty = self
-            .getitem_dunder_call(db, env, None)
-            .unwrap_or(Type::unknown());
-
-        Some((key_ty, value_ty))
+        Some((key_ty, self.unpacked_value_type(db, env, None)))
     }
 
     /// Returns a [`Bindings`] that can be used to analyze a call to this type. You must call
