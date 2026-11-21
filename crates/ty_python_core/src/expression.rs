@@ -158,6 +158,12 @@ pub struct Expression<'db> {
     /// The inference context for this expression.
     #[returns(copy)]
     pub kind: ExpressionKind,
+
+    /// Creation order among expressions of this kind in this scope. Salsa otherwise
+    /// hashes them all identically, making large scopes quadratic to index. If this
+    /// counter wraps, Salsa still disambiguates identical keys by creation order.
+    #[returns(copy)]
+    ordinal: u16,
 }
 
 // The Salsa heap is tracked separately.
