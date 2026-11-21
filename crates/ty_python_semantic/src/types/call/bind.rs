@@ -78,7 +78,7 @@ use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGener
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    walk_non_atomic_type, walk_type_with_recursion_guard,
+    any_over_type_including_alias_arguments, walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
@@ -8425,6 +8425,64 @@ struct ArgumentContextSpecialization<'db> {
 }
 
 impl<'db> ArgumentContextSpecialization<'db> {
+    /// Stop propagating a bound that recurs inside its own intersection.
+    ///
+    /// An overload like `def dot[T: Scalar](a: Vector[T], ...) -> T` can infer
+    /// `Vector[...] & Scalar` for T from an expected vector type. Passing this
+    /// down to a nested call gives `Vector[Vector[...] & Scalar] & Scalar`,
+    /// with a distinct hint for each combination of possible wrappers.
+    ///
+    /// Keep a single intersection, which can supply useful context. If the
+    /// bound repeats, let the arguments supply evidence for that variable.
+    /// The final inference and validity checks still use the original bounds.
+    fn specialization_for_nested_call(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        kind: TypeContextKind,
+    ) -> Specialization<'db> {
+        let generic = self.specialization.generic_context(db);
+        let mut hints = Cow::Borrowed(self.specialization.types(db));
+        for (index, typevar) in generic.variables(db).enumerate() {
+            if self.kinds[index] != Some(kind) {
+                continue;
+            }
+            let hint = hints[index];
+            let members = hint
+                .as_union()
+                .map_or(std::slice::from_ref(&hint), |union| union.elements(db));
+            let repeated = members.iter().any(|member| {
+                let Type::Intersection(outer) = member else {
+                    return false;
+                };
+                let Some(bound) = typevar.typevar(db).upper_bound(db, env) else {
+                    return false;
+                };
+                let positive = outer.positive(db);
+                positive.iter().any(|&element| {
+                    any_over_type_including_alias_arguments(db, env, element, |nested| {
+                        let Type::Intersection(inner) = nested else {
+                            return false;
+                        };
+                        inner.positive(db).iter().any(|&shared| {
+                            !shared.is_dynamic()
+                                && shared != element
+                                && positive.contains(&shared)
+                                && shared.is_assignable_to(db, env, bound)
+                        })
+                    })
+                })
+            });
+            if repeated {
+                hints.to_mut()[index] = Type::Dynamic(DynamicType::UnspecializedTypeVar);
+            }
+        }
+        match hints {
+            Cow::Owned(hints) => generic.specialize(db, hints),
+            Cow::Borrowed(_) => self.specialization,
+        }
+    }
+
     fn kind_for(
         &self,
         db: &'db dyn Db,
@@ -9044,6 +9102,7 @@ impl<'db> Binding<'db> {
         arguments_types: &CallArguments<'_, 'db>,
         argument_index: usize,
         call_expression_tcx: TypeContext<'db>,
+        nested_overload_argument: bool,
         cache: &ArgumentContextCache<'db>,
     ) -> Option<ArgumentTypeContext<'db>> {
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
@@ -9127,6 +9186,13 @@ impl<'db> Binding<'db> {
                 tcx_kind = parameter_tcx_kind;
             }
 
+            let specialization = if nested_overload_argument
+                && call_expression_tcx.expected_type().is_some()
+            {
+                ordinary_context.specialization_for_nested_call(db, env, call_expression_tcx.kind())
+            } else {
+                ordinary_context.specialization
+            };
             let nested_context = || {
                 self.inference?;
                 let (union, nested) =
@@ -9160,13 +9226,12 @@ impl<'db> Binding<'db> {
                     {
                         member.apply_specialization(db, nested_specialization)
                     } else {
-                        member.apply_specialization(db, ordinary_context.specialization)
+                        member.apply_specialization(db, specialization)
                     }
                 }))
             };
-            parameter_type = nested_context().unwrap_or_else(|| {
-                parameter_type.apply_specialization(db, ordinary_context.specialization)
-            });
+            parameter_type = nested_context()
+                .unwrap_or_else(|| parameter_type.apply_specialization(db, specialization));
             if let Some(expected_return_ty) = call_expression_tcx.expected_type()
                 && let Some(expected) = self.typevartuple_argument_context(
                     db,

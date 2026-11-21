@@ -3905,6 +3905,33 @@ def _(handlers: list[Callable[[str], str]]):
     register(handlers, lambda s: reveal_type(s))  # revealed: str
 ```
 
+## A repeated bound in the context for a lambda
+
+The result of `unwrap` and the box returned by `find` must both be instances of `Item`. The lambda
+needs the complete context to infer the type of the nested attribute.
+
+```py
+from typing import Callable, overload
+
+class Item: ...
+
+class Box[T]:
+    item: T
+
+@overload
+def find[T: Item](condition: Callable[[T], bool]) -> T: ...
+@overload
+def find(condition: str) -> Item: ...
+def find(condition):
+    raise NotImplementedError
+
+def unwrap[T: Item](box: Box[T]) -> T:
+    return box.item
+
+# revealed: Box[Box[int] & Item] & Item
+result: Box[int] = unwrap(find(lambda x: reveal_type(x).item.item == 42))
+```
+
 ## Nested calls with optional return context
 
 When checking a nested call like `first(wrap(value))`, we use the expected return type to infer a
