@@ -102,7 +102,16 @@ pub fn goto_implementation(
             // Go-to-implementation searches can scan the whole project, so release closed files'
             // ASTs as we go. Keep the guard through target conversion, which can also load this
             // file's AST.
-            let _ast_guard = parsed_module(db, file.python_file(db)).load_then_clear_on_drop(db);
+            let module = parsed_module(db, file.python_file(db));
+            if definitions.is_empty() {
+                // If the class list was cached, the AST might already be gone. Don't
+                // reparse the file just to clear it when there are no targets to convert.
+                if !db.system().is_file_open(module.file().path(db)) {
+                    module.clear();
+                }
+                return Vec::new();
+            }
+            let _ast_guard = module.load_then_clear_on_drop(db);
             definitions_to_implementation_targets(db, definitions)
         })
         .collect::<Vec<_>>();

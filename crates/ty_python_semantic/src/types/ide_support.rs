@@ -471,7 +471,7 @@ fn class_implementations_for_file<'db>(
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = Vec::new();
 
-    for candidate in reachable_class_literals_in_file(db, file) {
+    for &candidate in reachable_class_literals_in_file(db, file) {
         if roots.contains(&candidate) || !class_mro_intersects(db, candidate, roots) {
             continue;
         }
@@ -509,7 +509,7 @@ fn member_implementations_for_file<'db>(
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = Vec::new();
 
-    for candidate in reachable_class_literals_in_file(db, file) {
+    for &candidate in reachable_class_literals_in_file(db, file) {
         // The implementations selected for the roots were collected during finder preparation.
         if roots.contains(&candidate) {
             continue;
@@ -1987,7 +1987,7 @@ fn direct_subtypes<'db>(
         // guard through class search and range collection, which can also load this file's AST.
         let _ast_guard =
             parsed_module(db, program_file.python_file(db)).load_then_clear_on_drop(db);
-        for class_ty in reachable_class_literals_in_file(db, program_file) {
+        for &class_ty in reachable_class_literals_in_file(db, program_file) {
             let bases = class_ty.explicit_bases(db);
             let is_subtype = if target_is_object
                 && bases.is_empty()
@@ -2009,10 +2009,11 @@ fn direct_subtypes<'db>(
 }
 
 /// Enumerates the reachable class definitions in `file`.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn reachable_class_literals_in_file<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
-) -> Vec<ClassLiteral<'db>> {
+) -> Box<[ClassLiteral<'db>]> {
     let env = ProgramEnvironment::from_file(file);
     let index = semantic_index(db, file);
     let parsed = parsed_module(db, file.python_file(db)).load(db);
@@ -2042,7 +2043,7 @@ fn reachable_class_literals_in_file<'db>(
         }
     }
 
-    classes
+    classes.into_boxed_slice()
 }
 
 /// Extract a `ClassLiteral` from a `Type`, handling various type forms.
