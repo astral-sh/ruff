@@ -1,6 +1,5 @@
 use crate::Db;
 use crate::FxOrderSet;
-use crate::ProgramEnvironment;
 use crate::place::PlaceAndQualifiers;
 use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
@@ -13,6 +12,7 @@ use crate::types::{
     TypeQualifiers, TypeRecursionContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
     todo_type,
 };
+use crate::{Program, ProgramEnvironment};
 use ty_python_core::definition::Definition;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
@@ -325,6 +325,10 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this type".
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None when the metaclass participates in a cycle"
+    )]
     pub(crate) fn to_metaclass_instance(
         self,
         db: &'db dyn Db,
@@ -335,7 +339,19 @@ impl<'db> SubclassOfType<'db> {
         // And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
         // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
         // `to_instance` then resolves to `M`.
-        metaclass_instance_type(db, env, self.to_meta_type(db, env))
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: SubclassOfType<'db>,
+        ) -> Option<Type<'db>> {
+            let env = &ProgramEnvironment::from_program(program);
+            Some(metaclass_instance_type(db, env, ty.to_meta_type(db, env)))
+        }
+
+        // When the metaclass depends on a provisional type, compute the instance in the caller.
+        cached(db, env.program(db), self)
+            .unwrap_or_else(|| metaclass_instance_type(db, env, self.to_meta_type(db, env)))
     }
 
     /// Compute the metatype of this `type[T]`.
