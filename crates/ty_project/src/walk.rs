@@ -24,6 +24,7 @@ use thiserror::Error;
 pub(crate) struct ProjectFilesFilter<'a> {
     /// The same as [`Project::included_paths_or_root`].
     included_paths: &'a [SystemPathBuf],
+    sorted_path_indices: &'a [usize],
 
     /// The resolved `src.include` and `src.exclude` filter.
     src_filter: &'a IncludeExcludeFilter,
@@ -33,8 +34,14 @@ pub(crate) struct ProjectFilesFilter<'a> {
 
 impl<'a> ProjectFilesFilter<'a> {
     pub(crate) fn from_project(db: &'a dyn Db, project: Project) -> Self {
+        let included_paths = project.included_paths_or_root(db);
         Self {
-            included_paths: project.included_paths_or_root(db),
+            included_paths,
+            sorted_path_indices: if included_paths.len() > 1 {
+                project.sorted_included_path_indices(db)
+            } else {
+                &[]
+            },
             src_filter: &project.settings(db).src().files,
             force_exclude: project.force_exclude(db),
         }
@@ -52,7 +59,20 @@ impl<'a> ProjectFilesFilter<'a> {
         match mode {
             GlobFilterCheckMode::TopDown => Some(CheckPathMatch::Partial),
             GlobFilterCheckMode::Adhoc => {
-                self.included_paths
+                // An exact match takes precedence over every parent directory. If the spelling
+                // differs, strip_prefix below also handles equivalent paths and descendants.
+                let exact = self
+                    .sorted_path_indices
+                    .binary_search_by_key(&path.as_str(), |&index| {
+                        self.included_paths[index].as_str()
+                    });
+                let candidates = match exact {
+                    Ok(index) => {
+                        std::slice::from_ref(&self.included_paths[self.sorted_path_indices[index]])
+                    }
+                    Err(_) => self.included_paths,
+                };
+                candidates
                     .iter()
                     .filter_map(|included_path| {
                         if let Ok(relative_path) = path.strip_prefix(included_path) {

@@ -662,6 +662,17 @@ impl Project {
         }
     }
 
+    /// Indices into the explicit check paths, ordered lexicographically by path string.
+    ///
+    /// Sorting the indices lets us look up an exact match without changing the traversal order.
+    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+    fn sorted_included_path_indices(self, db: &dyn Db) -> Box<[usize]> {
+        let paths = self.included_paths_list(db);
+        let mut indices: Box<[_]> = (0..paths.len()).collect();
+        indices.sort_unstable_by_key(|&index| paths[index].as_str());
+        indices
+    }
+
     /// Returns the open files in the project.
     fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
         self.open_fileset(db)
@@ -1259,7 +1270,7 @@ mod tests {
         let mut db = TestDb::new(project);
         let project = db.project();
 
-        project.set_included_paths(&mut db, vec![root, explicit_file.clone()]);
+        project.set_included_paths(&mut db, vec![explicit_file.clone(), root]);
 
         assert_eq!(
             project.is_file_included(&db, &explicit_file),
