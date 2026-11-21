@@ -19,3 +19,6 @@ from aws_cdk import (
     aws_iam as iam,
     aws_logs as logs,
 )
+
+# Multiple non-aliased members keep the trailing comma when split from aliases.
+from m import (a, b, c as d,)

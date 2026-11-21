@@ -25,7 +25,10 @@ I001 [*] Import block is un-sorted or un-formatted
 19 | |     aws_iam as iam,
 20 | |     aws_logs as logs,
 21 | | )
-   | |_^
+22 | |
+23 | | # Multiple non-aliased members keep the trailing comma when split from aliases.
+24 | | from m import (a, b, c as d,)
+   | |_____________________________^
 help: Organize imports
    |
 12 | # Split into one statement per aliased member, so the trailing comma is ignored.
@@ -45,4 +48,12 @@ help: Organize imports
 17 + from aws_cdk import aws_events_targets as targets
 18 + from aws_cdk import aws_iam as iam
 19 + from aws_cdk import aws_logs as logs
+20 |
+21 | # Multiple non-aliased members keep the trailing comma when split from aliases.
+   - from m import (a, b, c as d,)
+22 + from m import (
+23 +     a,
+24 +     b,
+25 + )
+26 + from m import c as d
    |
