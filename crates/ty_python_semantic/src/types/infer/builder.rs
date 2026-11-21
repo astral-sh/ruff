@@ -6982,6 +6982,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty
             }
 
+            Some(ExpressionCacheEntry::Expressions(types)) => {
+                self.extend_expression_types(types.iter().map(|(key, ty)| (*key, *ty)));
+                types
+                    .get(&expression_key)
+                    .copied()
+                    .unwrap_or_else(Type::unknown)
+            }
+
             Some(ExpressionCacheEntry::Full(inference)) => {
                 let ty = inference.expression_type(expression_key);
                 self.extend_expression_cache_entry(&inference);
@@ -6997,6 +7005,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let cached = if inference.is_single_expression(expression_key, ty) {
                     self.store_expression_type(expression, ty);
                     ExpressionCacheEntry::Small(ty)
+                } else if !inference.has_extra() {
+                    self.extend_expression_types(
+                        inference.expressions.iter().map(|(key, ty)| (*key, *ty)),
+                    );
+                    ExpressionCacheEntry::Expressions(Rc::new(inference.expressions))
                 } else {
                     self.extend_expression_cache_entry(&inference);
                     ExpressionCacheEntry::Full(Rc::new(inference))
@@ -13059,6 +13072,7 @@ impl<'db> ExpressionCacheEntries<'db> {
 #[derive(Clone)]
 enum ExpressionCacheEntry<'db> {
     Small(Type<'db>),
+    Expressions(Rc<FxHashMap<ExpressionNodeKey, Type<'db>>>),
     Full(Rc<FullExpressionCacheEntry<'db>>),
 }
 
