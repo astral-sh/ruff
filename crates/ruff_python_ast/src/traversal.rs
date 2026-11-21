@@ -94,3 +94,25 @@ impl std::ops::Deref for EnclosingSuite<'_> {
         self.suite
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ruff_text_size::TextRange;
+
+    use super::EnclosingSuite;
+    use crate::{AtomicNodeIndex, Stmt, StmtPass};
+
+    #[test]
+    fn statements_with_identical_ranges_are_matched_by_identity() {
+        let stmt = Stmt::Pass(StmtPass {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::empty(4.into()),
+        });
+        let body = [stmt.clone(), stmt];
+
+        for (position, stmt) in body.iter().enumerate() {
+            let suite = EnclosingSuite::new(&body, stmt.into()).unwrap();
+            assert_eq!(suite.position, position);
+        }
+    }
+}

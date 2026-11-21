@@ -147,3 +147,34 @@ impl fmt::Debug for CoveringNode<'_> {
         f.debug_tuple("CoveringNode").field(&self.node()).finish()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ruff_text_size::TextRange;
+    use thin_vec::thin_vec;
+
+    use super::covering_node;
+    use crate::{AtomicNodeIndex, ModModule, Stmt, StmtPass};
+
+    #[test]
+    fn empty_range_at_shared_boundary_prefers_earlier_statement() {
+        let pass = |range| {
+            Stmt::Pass(StmtPass {
+                node_index: AtomicNodeIndex::NONE,
+                range,
+            })
+        };
+        let boundary = 4.into();
+        let module = ModModule {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::up_to(8.into()),
+            body: thin_vec![
+                pass(TextRange::up_to(boundary)),
+                pass(TextRange::new(boundary, 8.into())),
+            ],
+        };
+
+        let covering = covering_node((&module).into(), TextRange::empty(boundary));
+        assert!(covering.node().ptr_eq((&module.body[0]).into()));
+    }
+}
