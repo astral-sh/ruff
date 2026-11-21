@@ -190,9 +190,15 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        let elements = elements.into_iter();
-        if elements.size_hint().0 >= WIDE_UNION {
-            let elements = elements.map(Into::into).collect::<Box<[_]>>();
+        let mut elements = elements.into_iter().map(Into::into).peekable();
+        let (min, max) = elements.size_hint();
+        // Iterating a homogeneous tuple can supply one element that is itself a wide union.
+        // Normalizing it still compares the members of that union against each other.
+        if min >= WIDE_UNION
+            || (max == Some(1)
+                && matches!(elements.peek(), Some(Type::Union(union)) if union.elements(db).len() >= WIDE_UNION))
+        {
+            let elements = elements.collect::<Box<[_]>>();
             return OrderedUnionInput::new(
                 db,
                 env.program(db),
@@ -204,7 +210,7 @@ impl<'db> UnionType<'db> {
         }
         let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
         for element in elements {
-            builder.add_in_place(element.into());
+            builder.add_in_place(element);
         }
         builder.build()
     }
