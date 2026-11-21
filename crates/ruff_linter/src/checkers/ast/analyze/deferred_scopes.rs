@@ -102,7 +102,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if checker.is_rule_enabled(Rule::RedefinedParameterFromLocal) {
-            pylint::rules::redefined_argument_from_local(checker, scope_id, scope);
+            pylint::rules::redefined_parameter_from_local(checker, scope_id, scope);
         }
 
         if checker.is_rule_enabled(Rule::ImportShadowedByLoopVar) {
@@ -136,12 +136,12 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
         if let Some(class_def) = scope.kind.as_class() {
             if checker.is_rule_enabled(Rule::AttributeShadowsBuiltin) {
-                flake8_builtins::rules::builtin_attribute_shadowing(
+                flake8_builtins::rules::attribute_shadows_builtin(
                     checker, scope_id, scope, class_def,
                 );
             }
             if checker.is_rule_enabled(Rule::FunctionCallInDataclassFieldDefault) {
-                ruff::rules::function_call_in_dataclass_default(checker, class_def, scope_id);
+                ruff::rules::function_call_in_dataclass_field_default(checker, class_def, scope_id);
             }
             if checker.is_rule_enabled(Rule::MutableClassDefault) {
                 ruff::rules::mutable_class_default(checker, class_def);
@@ -205,7 +205,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     Rule::UnusedMethodParameter,
                     Rule::UnusedStaticMethodParameter,
                 ]) {
-                    flake8_unused_arguments::rules::unused_arguments(checker, scope);
+                    flake8_unused_arguments::rules::unused_parameters(checker, scope);
                 }
             }
         }
@@ -248,11 +248,11 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
         if scope.kind.is_function() {
             if checker.is_rule_enabled(Rule::MethodWithoutParameters) {
-                pylint::rules::no_method_argument(checker, scope);
+                pylint::rules::method_without_parameters(checker, scope);
             }
 
             if checker.is_rule_enabled(Rule::UnusedSelf) {
-                pylint::rules::no_self_use(checker, scope_id, scope);
+                pylint::rules::unused_self(checker, scope_id, scope);
             }
 
             if checker.is_rule_enabled(Rule::TooManyLocals) {
@@ -268,14 +268,14 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             }
 
             if checker.is_rule_enabled(Rule::BadStaticmethodParameter) {
-                pylint::rules::bad_staticmethod_argument(checker, scope);
+                pylint::rules::bad_staticmethod_parameter(checker, scope);
             }
 
             if checker.any_rule_enabled(&[
                 Rule::ClassMethodReceiverNotNamedCls,
                 Rule::InstanceMethodReceiverNotNamedSelf,
             ]) {
-                pep8_naming::rules::invalid_first_argument_name(checker, scope);
+                pep8_naming::rules::method_receiver_name(checker, scope);
             }
 
             if checker.is_rule_enabled(Rule::MethodReceiverDefault) {

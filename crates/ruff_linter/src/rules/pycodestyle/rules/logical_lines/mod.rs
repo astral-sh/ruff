@@ -13,10 +13,10 @@ use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub(crate) use space_around_operator::*;
+pub(crate) use whitespace_around_argument_or_parameter_equals::*;
 pub(crate) use whitespace_around_keywords::*;
-pub(crate) use whitespace_around_named_parameter_equals::*;
 pub(crate) use whitespace_before_comment::*;
-pub(crate) use whitespace_before_parameters::*;
+pub(crate) use whitespace_before_open_bracket::*;
 
 use crate::Locator;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
@@ -28,10 +28,10 @@ mod missing_whitespace_after_keyword;
 mod missing_whitespace_around_operator;
 mod redundant_backslash;
 mod space_around_operator;
+mod whitespace_around_argument_or_parameter_equals;
 mod whitespace_around_keywords;
-mod whitespace_around_named_parameter_equals;
 mod whitespace_before_comment;
-mod whitespace_before_parameters;
+mod whitespace_before_open_bracket;
 
 bitflags! {
     #[derive(Default, Eq, PartialEq, Clone, Copy, Debug)]

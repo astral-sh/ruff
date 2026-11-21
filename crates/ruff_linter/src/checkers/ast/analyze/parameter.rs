@@ -15,6 +15,6 @@ pub(crate) fn parameter(parameter: &Parameter, checker: &Checker) {
         );
     }
     if checker.is_rule_enabled(Rule::ParameterShadowsBuiltin) {
-        flake8_builtins::rules::builtin_argument_shadowing(checker, parameter);
+        flake8_builtins::rules::parameter_shadows_builtin(checker, parameter);
     }
 }

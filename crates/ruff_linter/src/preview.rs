@@ -256,7 +256,7 @@ pub(crate) const fn is_b006_unsafe_fix_preserve_assignment_expr_enabled(
 }
 
 // https://github.com/astral-sh/ruff/pull/21395
-pub(crate) const fn is_enumerate_for_loop_int_index_enabled(settings: &LinterSettings) -> bool {
+pub(crate) const fn is_manual_loop_counter_int_index_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 

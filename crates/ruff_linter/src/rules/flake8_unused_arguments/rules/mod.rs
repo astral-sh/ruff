@@ -1,3 +1,3 @@
-pub(crate) use unused_arguments::*;
+pub(crate) use unused_parameters::*;
 
-mod unused_arguments;
+mod unused_parameters;

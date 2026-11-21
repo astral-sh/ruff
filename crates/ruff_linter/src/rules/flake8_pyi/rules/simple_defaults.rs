@@ -677,7 +677,7 @@ pub(crate) fn unassigned_special_variable_in_stub(checker: &Checker, target: &Ex
 }
 
 /// PYI026
-pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn unannotated_type_alias_in_stub(checker: &Checker, value: &Expr, targets: &[Expr]) {
     let [target] = targets else {
         return;
     };

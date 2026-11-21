@@ -935,7 +935,7 @@ reveal_type(c_instance.b2)  # revealed: int
 
 ```py
 class C:
-    # This might trigger a stylistic lint like `invalid-first-argument-name-for-method`, but
+    # This might trigger a stylistic lint like `instance-method-receiver-not-named-self`, but
     # it should be supported in general:
     def __init__(this) -> None:
         this.declared_and_bound: str | None = "a"

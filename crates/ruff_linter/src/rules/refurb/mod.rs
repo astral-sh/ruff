@@ -68,7 +68,7 @@ mod tests {
     }
 
     #[test]
-    fn read_whole_file_newline_python_version_diff() -> Result<()> {
+    fn manual_path_read_newline_python_version_diff() -> Result<()> {
         assert_diagnostics_diff!(
             Path::new("refurb/FURB101_3.py"),
             &settings::LinterSettings::for_rule(Rule::ManualPathRead)
@@ -80,7 +80,7 @@ mod tests {
     }
 
     #[test]
-    fn write_whole_file_python_39() -> Result<()> {
+    fn manual_path_write_python_39() -> Result<()> {
         let diagnostics = test_path(
             Path::new("refurb/FURB103_0.py"),
             &settings::LinterSettings::for_rule(Rule::ManualPathWrite)

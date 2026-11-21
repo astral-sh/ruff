@@ -1,0 +1,74 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Alias;
+
+use crate::Violation;
+use crate::checkers::ast::Checker;
+use crate::codes::Category;
+use crate::rules::flake8_builtins::helpers::shadows_builtin;
+
+/// ## What it does
+/// Checks for imports that use the same names as builtins.
+///
+/// ## Why is this bad?
+/// Reusing a builtin for the name of an import increases the difficulty
+/// of reading and maintaining the code, and can cause non-obvious errors,
+/// as readers may mistake the variable for the builtin and vice versa.
+///
+/// Builtins can be marked as exceptions to this rule via the
+/// [`lint.flake8-builtins.ignorelist`] configuration option.
+///
+/// ## Example
+/// ```python
+/// from rich import print
+///
+/// print("Some message")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from rich import print as rich_print
+///
+/// rich_print("Some message")
+/// ```
+///
+/// or:
+/// ```python
+/// import rich
+///
+/// rich.print("Some message")
+/// ```
+///
+/// ## Options
+/// - `lint.flake8-builtins.ignorelist`
+/// - `target-version`
+#[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Pedantic)]
+pub(crate) struct ImportShadowsBuiltin {
+    name: String,
+}
+
+impl Violation for ImportShadowsBuiltin {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ImportShadowsBuiltin { name } = self;
+        format!("Import `{name}` is shadowing a Python builtin")
+    }
+}
+
+/// A004
+pub(crate) fn import_shadows_builtin(checker: &Checker, alias: &Alias) {
+    let name = alias.asname.as_ref().unwrap_or(&alias.name);
+    if shadows_builtin(
+        name.as_str(),
+        checker.source_type,
+        &checker.settings().flake8_builtins.ignorelist,
+        checker.target_version(),
+    ) {
+        checker.report_diagnostic(
+            ImportShadowsBuiltin {
+                name: name.to_string(),
+            },
+            name.range,
+        );
+    }
+}

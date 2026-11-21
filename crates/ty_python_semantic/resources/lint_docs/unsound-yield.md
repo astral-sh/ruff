@@ -121,11 +121,11 @@ generator boundaries.
     unsound `yield` expressions
 - `unsound-assignment` is a similar rule that triggers on unsound assignments
 
-[ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
-[ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/
-[ann204]: https://docs.astral.sh/ruff/rules/missing-return-type-special-method/
-[ann205]: https://docs.astral.sh/ruff/rules/missing-return-type-static-method/
-[ann206]: https://docs.astral.sh/ruff/rules/missing-return-type-class-method/
+[ann201]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-public-function/
+[ann202]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-private-function/
+[ann204]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-special-method/
+[ann205]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-static-method/
+[ann206]: https://docs.astral.sh/ruff/rules/missing-return-annotation-for-class-method/
 [assignable]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 [fully-static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
 [subtype]: https://typing.python.org/en/latest/spec/glossary.html#term-subtype

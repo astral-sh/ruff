@@ -73,16 +73,16 @@ second argument.
 
 Ruff has several rules that will encourage you to rename a parameter, or change its type signature,
 if it thinks you're falling into a certain anti-pattern. For example, Ruff's
-[ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an unused
-parameter should either be removed or renamed to start with `_`. Renaming the parameter in an
+[`ARG002`](https://docs.astral.sh/ruff/rules/unused-method-parameter/) rule recommends that an
+unused parameter should either be removed or renamed to start with `_`. Renaming the parameter in an
 override can trigger `lost-keyword-for-regular-parameter` if the base method accepts it by keyword.
 Removing the parameter can trigger `incompatible-method-override` if the override no longer accepts
 a call allowed by the base method.
 
 This can usually be resolved by adding [`@typing.override`][override] to your method definition.
 Ruff knows that a method decorated with `@typing.override` is intended to override a method by the
-same name on a superclass, and avoids reporting rules like ARG002 for such methods; it knows that
-the changes recommended by ARG002 would violate the Liskov Substitution Principle.
+same name on a superclass, and avoids reporting rules like `ARG002` for such methods; it knows that
+the changes recommended by `ARG002` would violate the Liskov Substitution Principle.
 
 Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
 
