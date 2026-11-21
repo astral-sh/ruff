@@ -1,5 +1,5 @@
-use crate::AnyNodeRef;
 use crate::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_node};
+use crate::{AnyNodeRef, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 use std::fmt::Formatter;
@@ -19,6 +19,19 @@ pub fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode {
     }
 
     impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
+        fn visit_body(&mut self, body: &'a [Stmt]) {
+            if self.found {
+                return;
+            }
+
+            // Siblings are in source order and don't overlap. At a shared boundary,
+            // prefer the earlier statement for an empty range, just as a linear scan does.
+            let index = body.partition_point(|stmt| stmt.end() < self.range.end());
+            if let Some(stmt) = body.get(index) {
+                self.visit_stmt(stmt);
+            }
+        }
+
         fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
             // If the node fully contains the range, than it is a possible match but traverse into its children
             // to see if there's a node with a narrower range.
