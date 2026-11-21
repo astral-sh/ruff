@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
+use indoc::indoc;
 use insta_cmd::assert_cmd_snapshot;
 
 use super::CliTest;
@@ -2477,6 +2478,94 @@ fn range_formatting_notebook() -> Result<()> {
     ----- stderr -----
     error: Failed to format main.ipynb: Range formatting is only supported for Python files.
     ");
+    Ok(())
+}
+
+#[test]
+fn inline_script_formatter() -> Result<()> {
+    let test = CliTest::with_files([
+        ("ruff.toml", "format.quote-style = 'double'"),
+        ("shared.toml", "format.quote-style = 'single'"),
+        (
+            "scripts/example.py",
+            indoc! {r#"
+                # /// script
+                # tool.ruff.extend = '../shared.toml'
+                # ///
+                x = "hello"
+            "#},
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.format_command().args(["--no-preview", "--check", "scripts/example.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file already formatted
+
+    ----- stderr -----
+    ");
+
+    let mut format = test.command();
+    format.args(["format", "--quiet", "--preview", "scripts/example.py"]);
+    assert_cmd_snapshot!(format, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    insta::assert_snapshot!(test.read_file("scripts/example.py")?, @"
+    # /// script
+    # tool.ruff.extend = '../shared.toml'
+    # ///
+    x = 'hello'
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_requires_python_formatter() -> Result<()> {
+    let test = CliTest::with_file(
+        "ruff.toml",
+        r#"
+            preview = true
+            per-file-target-version = { 'script.py' = 'py38' }
+        "#,
+    )?;
+    let script = indoc! {r#"
+        # /// script
+        # requires-python = '>=3.10'
+        # ///
+        with open('a_really_long_foo') as foo, open('a_really_long_bar') as bar, open('a_really_long_baz') as baz:
+            pass
+    "#};
+    test.write_file("script.py", script)?;
+    assert_cmd_snapshot!(test.format_command().arg("script.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    ");
+    let formatted = test.read_file("script.py")?;
+    assert!(formatted.lines().any(|line| line == "with ("));
+    assert_cmd_snapshot!(test.format_command().args(["--stdin-filename=script.py", "-"]).pass_stdin(script), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # requires-python = '>=3.10'
+    # ///
+    with (
+        open("a_really_long_foo") as foo,
+        open("a_really_long_bar") as bar,
+        open("a_really_long_baz") as baz,
+    ):
+        pass
+
+    ----- stderr -----
+    "#);
     Ok(())
 }
 

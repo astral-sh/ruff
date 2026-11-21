@@ -8,6 +8,7 @@ use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_python_ast::SourceType;
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{Resolver, RootProject, match_exclusion, project_file_at_path};
+use ruff_workspace::script::script;
 
 use crate::ExitStatus;
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -59,8 +60,23 @@ pub(crate) fn format_stdin(
         return Ok(ExitStatus::Success);
     }
 
+    // Read the source from stdin.
+    let source_code = read_from_stdin()?;
+    let project = &root_project.project;
+    let script = script(
+        project,
+        config_arguments,
+        config_arguments.script_configuration(),
+        path,
+        source_type,
+        &source_code,
+    )?;
+    let settings = match &script {
+        Some(script) => &script.settings.formatter,
+        None => &project.settings.formatter,
+    };
     // Format the file.
-    match format_source_code(path, cli.range, settings, source_type, mode) {
+    match format_source_code(path, cli.range, settings, source_type, source_code, mode) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
             FormatMode::Check | FormatMode::Diff => {
@@ -84,12 +100,9 @@ fn format_source_code(
     range: Option<FormatRange>,
     settings: &FormatterSettings,
     source_type: SourceType,
+    source_code: String,
     mode: FormatMode,
 ) -> Result<FormatResult, FormatCommandError> {
-    // Read the source from stdin.
-    let source_code = read_from_stdin()
-        .map_err(|err| FormatCommandError::Read(path.map(Path::to_path_buf), err.into()))?;
-
     let source_kind = match SourceKind::from_source_code(source_code, source_type) {
         Ok(Some(source_kind)) => source_kind,
         Ok(None) => return Ok(FormatResult::Unchanged),
