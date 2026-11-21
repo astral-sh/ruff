@@ -311,6 +311,26 @@ FalsyInt = Intersection[int, Not[AlwaysTruthy]]
 reveal_type(Union[bool, TruthyInt, FalsyInt])  # revealed: <types.UnionType special-form 'int'>
 ```
 
+## Unions of gradual literals
+
+When we intersect literals with `Any`, distinct values still give distinct alternatives.
+`LiteralString` can subsume a particular string.
+
+```py
+from typing import Any, Literal
+from typing_extensions import LiteralString
+from ty_extensions import Intersection
+
+def _(
+    distinct: Intersection[Any, Literal["a"]] | Intersection[Literal["b"], Any],
+    same: Intersection[Literal["a"], Any] | Intersection[Any, Literal["a"]],
+    broader: Intersection[Literal["a"], Any] | Intersection[Any, LiteralString],
+):
+    reveal_type(distinct)  # revealed: (Any & Literal["a"]) | (Literal["b"] & Any)
+    reveal_type(same)  # revealed: Literal["a"] & Any
+    reveal_type(broader)  # revealed: Any & LiteralString
+```
+
 ## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`
 
 ```toml
