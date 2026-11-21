@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
-use ruff_python_semantic::Modules;
+use ruff_python_ast::name::QualifiedName;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -53,48 +53,36 @@ impl Violation for NumpyDeprecatedTypeAlias {
 }
 
 /// NPY001
-pub(crate) fn deprecated_type_alias(checker: &Checker, expr: &Expr) {
-    if !checker.semantic().seen_module(Modules::NUMPY) {
+pub(crate) fn deprecated_type_alias(
+    checker: &Checker,
+    expr: &Expr,
+    qualified_name: &QualifiedName,
+) {
+    let [
+        "numpy",
+        type_name @ ("int" | "float" | "complex" | "object" | "str" | "unicode"),
+    ] = qualified_name.segments()
+    else {
         return;
-    }
-
-    if let Some(type_name) =
-        checker
-            .semantic()
-            .resolve_qualified_name(expr)
-            .and_then(|qualified_name| {
-                if matches!(
-                    qualified_name.segments(),
-                    [
-                        "numpy",
-                        "int" | "float" | "complex" | "object" | "str" | "unicode"
-                    ]
-                ) {
-                    Some(qualified_name.segments()[1])
-                } else {
-                    None
-                }
-            })
-    {
-        let mut diagnostic = checker.report_diagnostic(
-            NumpyDeprecatedTypeAlias {
-                type_name: type_name.to_string(),
-            },
-            expr.range(),
-        );
-        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-        let type_name = match type_name {
-            "unicode" => "str",
-            _ => type_name,
-        };
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
-                type_name,
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let binding_edit = Edit::range_replacement(binding, expr.range());
-            Ok(Fix::safe_edits(binding_edit, import_edit))
-        });
-    }
+    };
+    let mut diagnostic = checker.report_diagnostic(
+        NumpyDeprecatedTypeAlias {
+            type_name: type_name.to_string(),
+        },
+        expr.range(),
+    );
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+    let type_name = match *type_name {
+        "unicode" => "str",
+        _ => type_name,
+    };
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_builtin_symbol(
+            type_name,
+            expr.start(),
+            checker.semantic(),
+        )?;
+        let binding_edit = Edit::range_replacement(binding, expr.range());
+        Ok(Fix::safe_edits(binding_edit, import_edit))
+    });
 }

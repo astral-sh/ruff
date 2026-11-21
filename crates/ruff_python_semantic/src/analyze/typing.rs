@@ -18,7 +18,7 @@ use smallvec::{SmallVec, smallvec};
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
-use crate::{Binding, BindingKind, Modules};
+use crate::{Binding, BindingKind};
 
 #[derive(Debug, Copy, Clone)]
 pub enum Callable {
@@ -128,23 +128,17 @@ impl std::fmt::Display for ModuleMember {
 
 /// Returns the PEP 585 standard library generic variant for a `typing` module reference, if such
 /// a variant exists.
-pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<ModuleMember> {
-    semantic
-        .seen_module(Modules::TYPING | Modules::TYPING_EXTENSIONS)
-        .then(|| semantic.resolve_qualified_name(expr))
-        .flatten()
-        .and_then(|qualified_name| {
-            let [module, member] = qualified_name.segments() else {
-                return None;
-            };
-            as_pep_585_generic(module, member).map(|(module, member)| {
-                if module.is_empty() {
-                    ModuleMember::BuiltIn(member)
-                } else {
-                    ModuleMember::Member(module, member)
-                }
-            })
-        })
+pub fn to_pep585_generic(qualified_name: &QualifiedName) -> Option<ModuleMember> {
+    let [module, member] = qualified_name.segments() else {
+        return None;
+    };
+    as_pep_585_generic(module, member).map(|(module, member)| {
+        if module.is_empty() {
+            ModuleMember::BuiltIn(member)
+        } else {
+            ModuleMember::Member(module, member)
+        }
+    })
 }
 
 /// Return whether a given expression uses a PEP 585 standard library generic.

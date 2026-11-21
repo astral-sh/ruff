@@ -2,14 +2,11 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::airflow::helpers::{
     ProviderReplacement, generate_import_edit, generate_remove_and_runtime_import_edit,
-    is_guarded_by_try_except,
+    is_guarded_by_try_except, member_range,
 };
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Expr;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Expr, ExprAttribute};
-use ruff_python_semantic::Modules;
-use ruff_text_size::Ranged;
-use ruff_text_size::TextRange;
 
 use crate::{FixAvailability, Violation};
 
@@ -95,25 +92,11 @@ impl Violation for Airflow3MovedToProvider<'_> {
 }
 
 /// AIR302
-pub(crate) fn moved_to_provider_in_3(checker: &Checker, expr: &Expr) {
-    if !checker.semantic().seen_module(Modules::AIRFLOW) {
-        return;
-    }
-
-    match expr {
-        Expr::Attribute(ExprAttribute { attr, .. }) => {
-            check_names_moved_to_provider(checker, expr, attr.range());
-        }
-        Expr::Name(_) => check_names_moved_to_provider(checker, expr, expr.range()),
-        _ => {}
-    }
-}
-
-fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRange) {
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) else {
-        return;
-    };
-
+pub(crate) fn moved_to_provider_in_3(
+    checker: &Checker,
+    expr: &Expr,
+    qualified_name: &QualifiedName,
+) {
     let replacement = match qualified_name.segments() {
         // apache-airflow-providers-amazon
         [
@@ -1194,15 +1177,16 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         return;
     }
 
+    let range = member_range(expr);
     let mut diagnostic = checker.report_diagnostic(
         Airflow3MovedToProvider {
-            deprecated: qualified_name,
+            deprecated: qualified_name.clone(),
             replacement: replacement.clone(),
         },
-        ranged,
+        range,
     );
 
-    if let Some(fix) = generate_import_edit(expr, checker, module, name, ranged)
+    if let Some(fix) = generate_import_edit(expr, checker, module, name, range)
         .or_else(|| generate_remove_and_runtime_import_edit(expr, checker, module, name))
     {
         diagnostic.set_fix(fix);
