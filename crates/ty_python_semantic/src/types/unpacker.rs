@@ -717,7 +717,7 @@ fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
 }
 
 /// Extract the element slice from a list or tuple expression.
-fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
+pub(super) fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
     match expr {
         ast::Expr::List(list) => Some(&list.elts),
         ast::Expr::Tuple(tuple) => Some(&tuple.elts),
