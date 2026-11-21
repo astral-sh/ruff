@@ -48,7 +48,7 @@ use crate::{
         relation::TypeRelation,
         signatures::{ReturnCallableTypeVarScope, function_signature_expression_type},
         tuple::{TupleSpec, TupleSpecBuilder, TupleType},
-        typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
+        typed_dict::unpacked_typed_dict_from_kwargs_annotation,
         typevar::TypeVarSet,
         visitor::non_any_dynamic_content,
     },
@@ -977,11 +977,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let annotated_type = self.file_expression_type(annotation);
-        let Some(unpacked_keys) = extract_unpacked_typed_dict_keys_from_kwargs_annotation(
-            db,
-            annotated_type,
-            annotation_flags,
-        ) else {
+        let Some(typed_dict) =
+            unpacked_typed_dict_from_kwargs_annotation(db, annotated_type, annotation_flags)
+        else {
             if !annotated_type.is_unknown()
                 && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation)
             {
@@ -1009,11 +1007,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             0
         };
 
+        let fields = typed_dict.items(db);
         let overlapping = parameters
             .iter_non_variadic_params()
             .skip(parameters.posonlyargs.len() + pep_484_positional_only_count)
             .map(|parameter| &parameter.parameter)
-            .filter(|parameter| unpacked_keys.contains_key(&parameter.name.id))
+            .filter(|parameter| fields.contains_key(&parameter.name.id))
             .collect::<Vec<_>>();
 
         if overlapping.is_empty() {
@@ -1353,7 +1352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let annotated_type =
                 self.variadic_parameter_annotation(annotation, ParamSpecAttrKind::Kwargs);
             let ty = if matches!(annotated_type, Type::TypeVar(typevar) if typevar.is_paramspec(db))
-                || extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+                || unpacked_typed_dict_from_kwargs_annotation(
                     db,
                     annotated_type,
                     self.file_type_expression_flags(annotation),

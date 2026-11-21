@@ -2119,36 +2119,19 @@ fn merge_unpacked_key_definitions<'db>(
     if existing == new { existing } else { None }
 }
 
-/// Extracts unpacked `TypedDict` keys for a `**kwargs` annotation only when the annotation
-/// explicitly uses `Unpack[...]`.
+/// Returns the `TypedDict` unpacked by a `**kwargs` annotation.
 ///
 /// Per [PEP 692](https://peps.python.org/pep-0692/#typeddict-unions), this accepts only a concrete
 /// `TypedDict` target, or a type alias resolving to one.
-pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
+pub(crate) fn unpacked_typed_dict_from_kwargs_annotation<'db>(
     db: &'db dyn Db,
     annotated_type: Type<'db>,
     annotation_flags: TypeExpressionFlags,
-) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
-    let typed_dict = annotation_flags
-        .contains(TypeExpressionFlags::UNPACK)
-        .then(|| annotated_type.resolve_type_alias(db).as_typed_dict())??;
-
-    Some(
-        typed_dict
-            .items(db)
-            .iter()
-            .map(|(name, field)| {
-                (
-                    name.clone(),
-                    UnpackedTypedDictKey {
-                        value_ty: field.declared_ty,
-                        is_required: field.is_required(),
-                        definition: field.first_declaration(),
-                    },
-                )
-            })
-            .collect(),
-    )
+) -> Option<TypedDictType<'db>> {
+    if !annotation_flags.contains(TypeExpressionFlags::UNPACK) {
+        return None;
+    }
+    annotated_type.resolve_type_alias(db).as_typed_dict()
 }
 
 /// Infers each unpacked `**kwargs` constructor argument exactly once.
