@@ -449,11 +449,19 @@ class SSLSocket(socket.socket):
     def sendto(self, data: ReadableBuffer, flags_or_addr: int, addr: socket._Address) -> int: ...
 
     def shutdown(self, how: int) -> None: ...
+
+    @overload
     @deprecated("Deprecated since Python 3.6. Use `SSLSocket.recv` method instead.")
-    def read(self, len: int = 1024, buffer: WriteableBuffer | None = None) -> bytes:
+    def read(self, len: int = 1024, buffer: None = None) -> bytes:
         """Read up to LEN bytes and return them.
         Return zero-length string on EOF.
         """
+    @overload
+    @deprecated("Deprecated since Python 3.6. Use `SSLSocket.recv` method instead.")
+    def read(self, len: int, buffer: WriteableBuffer) -> int: ...
+    @overload
+    @deprecated("Deprecated since Python 3.6. Use `SSLSocket.recv` method instead.")
+    def read(self, *, buffer: WriteableBuffer) -> int: ...
 
     @deprecated("Deprecated since Python 3.6. Use `SSLSocket.send` method instead.")
     def write(self, data: ReadableBuffer) -> int:
@@ -787,12 +795,18 @@ class SSLObject:
         """Was the client session reused during handshake"""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
-    def read(self, len: int = 1024, buffer: WriteableBuffer | None = None) -> bytes:
+
+    @overload
+    def read(self, len: int = 1024, buffer: None = None) -> bytes:
         """Read up to 'len' bytes from the SSL object and return them.
 
         If 'buffer' is provided, read into this buffer and return the number of
         bytes read.
         """
+    @overload
+    def read(self, len: int, buffer: WriteableBuffer) -> int: ...
+    @overload
+    def read(self, *, buffer: WriteableBuffer) -> int: ...
 
     def write(self, data: ReadableBuffer) -> int:
         """Write 'data' to the SSL object and return the number of bytes

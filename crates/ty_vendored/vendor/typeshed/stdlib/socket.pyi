@@ -1008,6 +1008,11 @@ if sys.platform == "linux" and sys.version_info >= (3, 13):
 
     __all__ += ["NI_IDN", "SO_BINDTOIFINDEX"]
 
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    from _socket import SO_PASSRIGHTS as SO_PASSRIGHTS
+
+    __all__ += ["SO_PASSRIGHTS"]
+
 if sys.version_info >= (3, 12):
     from _socket import (
         IP_ADD_SOURCE_MEMBERSHIP as IP_ADD_SOURCE_MEMBERSHIP,

@@ -140,7 +140,7 @@ reveal_type(Data.__init__)
 
 data = Data([1, 2, 3])
 reveal_type(data.content)  # revealed: list[int]
-reveal_type(data.timestamp)  # revealed: datetime
+reveal_type(data.timestamp)  # revealed: datetime[Any]
 ```
 
 ## `kw_only`

@@ -4,6 +4,7 @@ Written by Martin v. Löwis.
 """
 
 import codecs
+from _typeshed import ReadableBuffer
 from typing import Literal
 
 def segregate(str: str) -> tuple[bytes, list[int]]:
@@ -45,13 +46,13 @@ def punycode_decode(text: memoryview | bytes | bytearray | str, errors: str) -> 
 
 class Codec(codecs.Codec):
     def encode(self, input: str, errors: str = "strict") -> tuple[bytes, int]: ...
-    def decode(self, input: memoryview | bytes | bytearray | str, errors: str = "strict") -> tuple[str, int]: ...
+    def decode(self, input: str | ReadableBuffer, errors: str = "strict") -> tuple[str, int]: ...
 
 class IncrementalEncoder(codecs.IncrementalEncoder):
     def encode(self, input: str, final: bool = False) -> bytes: ...
 
 class IncrementalDecoder(codecs.IncrementalDecoder):
-    def decode(self, input: memoryview | bytes | bytearray | str, final: bool = False) -> str: ...  # type: ignore[override]
+    def decode(self, input: str | ReadableBuffer, final: bool = False) -> str: ...
 
 class StreamWriter(Codec, codecs.StreamWriter): ...
 class StreamReader(Codec, codecs.StreamReader): ...

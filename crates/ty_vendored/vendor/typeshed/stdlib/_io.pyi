@@ -36,7 +36,7 @@ import builtins
 import codecs
 import sys
 from _typeshed import FileDescriptorOrPath, MaybeNone, ReadableBuffer, WriteableBuffer
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Iterable, Iterator
 from io import BufferedIOBase, RawIOBase, TextIOBase, UnsupportedOperation as UnsupportedOperation
 from os import _Opener
 from types import TracebackType
@@ -135,7 +135,8 @@ if sys.version_info >= (3, 12):
             If False, read() will raise OSError.
             """
 
-        read: Callable[..., Any]
+        # Abstract method that doesn't exist at runtime, the exact return type depends on the sub-class
+        def read(self, size: int = ..., /) -> Any: ...
         def readlines(self, hint: int = -1, /) -> list[bytes]:
             """Return a list of lines from the stream.
 
@@ -187,7 +188,8 @@ if sys.version_info >= (3, 12):
             If False, write() will raise OSError.
             """
 
-        write: Callable[..., Any]
+        # Abstract method that doesn't exist at runtime, the exact arguments and return type depend on the sub-class
+        def write(self, s: Any, /) -> Any: ...
         def writelines(self, lines: Iterable[ReadableBuffer], /) -> None:
             """Write a list of lines to stream.
 
@@ -285,7 +287,8 @@ else:
             If False, read() will raise OSError.
             """
 
-        read: Callable[..., Any]
+        # Abstract method that doesn't exist at runtime, the exact arguments and return type depend on the sub-class
+        def read(self) -> Any: ...
         def readlines(self, hint: int = -1, /) -> list[bytes]:
             """Return a list of lines from the stream.
 
@@ -335,7 +338,8 @@ else:
             If False, write() will raise OSError.
             """
 
-        write: Callable[..., Any]
+        # Abstract method that doesn't exist at runtime, the exact arguments and return type depend on the sub-class
+        def write(self, s: Any, /) -> Any: ...
         def writelines(self, lines: Iterable[ReadableBuffer], /) -> None:
             """Write a list of lines to stream.
 

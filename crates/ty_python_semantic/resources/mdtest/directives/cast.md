@@ -445,9 +445,9 @@ info[disjoint-cast]: Cast to a disjoint type
      |          |          Inferred as `list[int | str]`
      |          Disjoint from the inferred type
      |
-    ::: stdlib/builtins.pyi:2977:7
+    ::: stdlib/builtins.pyi:2988:7
      |
-2977 | class list(MutableSequence[_T]):
+2988 | class list(MutableSequence[_T]):
      |       ---- `list` defined here
 info: `list[int]` is disjoint from `list[int | str]`
 info: `int | str` and `int` are not mutual subtypes of each other, but must be due to invariance
@@ -525,9 +525,9 @@ info[disjoint-cast]: Cast to a disjoint type
      |          |          Inferred as `list[str] | list[bytes]`
      |          Disjoint from the inferred type
      |
-    ::: stdlib/builtins.pyi:2977:7
+    ::: stdlib/builtins.pyi:2988:7
      |
-2977 | class list(MutableSequence[_T]):
+2988 | class list(MutableSequence[_T]):
      |       ---- `list` defined here
 info: `list[int]` is disjoint from `list[str] | list[bytes]`
 info: every element of union `list[str] | list[bytes]` is disjoint from `list[int]`
@@ -558,9 +558,9 @@ info[disjoint-cast]: Cast to a disjoint type
      |          |                Inferred as `tuple[int, str]`
      |          Disjoint from the inferred type
      |
-    ::: stdlib/builtins.pyi:2862:7
+    ::: stdlib/builtins.pyi:2873:7
      |
-2862 | class tuple(Sequence[_T_co]):
+2873 | class tuple(Sequence[_T_co]):
      |       ----- `tuple` defined here
 info: `tuple[int, int]` is disjoint from `tuple[int, str]`
 info: tuple element 2 has disjoint types `str` and `int`
@@ -589,9 +589,9 @@ info[disjoint-cast]: Cast to a disjoint type
      |          |                Inferred as `tuple[int]`
      |          Disjoint from the inferred type
      |
-    ::: stdlib/builtins.pyi:2862:7
+    ::: stdlib/builtins.pyi:2873:7
      |
-2862 | class tuple(Sequence[_T_co]):
+2873 | class tuple(Sequence[_T_co]):
      |       ----- `tuple` defined here
 info: `tuple[int, int]` is disjoint from `tuple[int]`
 info: the tuples have incompatible lengths: 1 and 2

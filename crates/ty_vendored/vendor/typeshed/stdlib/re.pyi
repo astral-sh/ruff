@@ -584,6 +584,8 @@ def escape(pattern: AnyStr) -> AnyStr:
     """
 @overload
 def escape(pattern: ReadableBuffer) -> bytes: ...
+@overload
+def escape(pattern: str | ReadableBuffer) -> str | bytes: ...
 
 def purge() -> None:
     """Clear the regular expression caches"""

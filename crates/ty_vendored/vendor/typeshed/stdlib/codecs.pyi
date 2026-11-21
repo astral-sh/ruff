@@ -398,7 +398,7 @@ class Codec:
 
         """
 
-    def decode(self, input: bytes, errors: str = "strict") -> tuple[str, int]:
+    def decode(self, input: ReadableBuffer, errors: str = "strict") -> tuple[str, int]:
         """Decodes the object input and returns a tuple (output
         object, length consumed).
 
