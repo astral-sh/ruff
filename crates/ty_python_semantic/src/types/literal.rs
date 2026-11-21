@@ -127,6 +127,11 @@ impl<'db> LiteralValueType<'db> {
         }
     }
 
+    /// Whether the two literals have the same promotion and recursion flags.
+    pub(super) fn has_same_flags(self, other: Self) -> bool {
+        self.flags() == other.flags()
+    }
+
     fn map_flags(self, func: impl FnOnce(LiteralFlags) -> LiteralFlags) -> Self {
         Self(match self.0 {
             LiteralValueTypeInner::Int(v, f) => LiteralValueTypeInner::Int(v, func(f)),
@@ -251,6 +256,17 @@ impl<'db> LiteralValueType<'db> {
         } else {
             None
         }
+    }
+
+    /// Whether this literal represents a single built-in value.
+    pub(super) fn is_concrete_builtin(self) -> bool {
+        matches!(
+            self.kind(),
+            LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+        )
     }
 
     pub(crate) fn is_int(self) -> bool {
