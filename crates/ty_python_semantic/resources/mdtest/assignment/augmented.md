@@ -173,6 +173,23 @@ def _(flag: bool):
     reveal_type(f)  # revealed: str | Literal[54]
 ```
 
+## Integer literals and a custom in-place operator
+
+The integer literals fall back to `__or__` while the other union member uses `__ior__`.
+
+```py
+from typing import Literal
+
+class Flags:
+    def __ior__(self, other: int) -> str:
+        return ""
+
+def update(initial: Literal[0, 1] | Flags):
+    value = initial
+    value |= 2
+    reveal_type(value)  # revealed: Literal[2, 3] | str
+```
+
 ## Partially bound target union with `__add__`
 
 ```py

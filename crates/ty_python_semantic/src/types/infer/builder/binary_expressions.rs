@@ -60,6 +60,8 @@ pub(super) struct BinaryInferenceState<'db> {
     emitted_division_by_zero_diagnostic: bool,
     pub(super) deprecated_functions: Vec<OverloadLiteral<'db>>,
     used_tuple_addition: bool,
+    /// A literal's builtin class that lacks the current in-place operator.
+    pub(super) missing_in_place_method: Option<KnownClass>,
 }
 
 impl<'db> BinaryInferenceState<'db> {
