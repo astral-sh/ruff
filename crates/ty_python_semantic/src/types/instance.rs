@@ -267,6 +267,21 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Whether tuple length or class ancestry rules out redundancy in a union.
+    pub(super) fn is_incomparable_for_union(self, db: &'db dyn Db, other: Self) -> bool {
+        // Two fixed-length tuples can only subsume one another if their lengths match.
+        if let (NominalInstanceInner::ExactTuple(left), NominalInstanceInner::ExactTuple(right)) =
+            (self.0, other.0)
+        {
+            return matches!(
+                (left.tuple(db), right.tuple(db)),
+                (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) if left.len() != right.len()
+            );
+        }
+
+        self.has_unrelated_class(db, other)
+    }
+
     /// Can neither instance be redundant with the other in a union, regardless of
     /// their type arguments? Only ordinary instances are decided by class ancestry.
     ///
