@@ -466,33 +466,20 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
             if &new_ty != ty {
-                if elements.len() >= WIDE_UNION {
-                    let mapped = elements[..i]
-                        .iter()
-                        .copied()
-                        .chain(std::iter::once(new_ty))
-                        .chain(iter.map(|(_, element)| transform_fn(element)))
-                        .collect::<Box<[_]>>();
-                    return OrderedUnionInput::new(
-                        db,
-                        env.program(db),
-                        mapped,
-                        false,
-                        self.recursively_defined(db),
-                    )
-                    .normalize(db);
-                }
-                let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
-                for prev in &elements[..i] {
-                    builder.add_in_place(*prev);
-                }
-                builder.add_in_place(new_ty);
-                for (_, element) in iter {
-                    builder.add_in_place(transform_fn(element));
-                }
-                return builder
-                    .or_recursively_defined(self.recursively_defined(db))
-                    .build();
+                let mapped = elements[..i]
+                    .iter()
+                    .copied()
+                    .chain(std::iter::once(new_ty))
+                    .chain(iter.map(|(_, element)| transform_fn(element)))
+                    .collect::<Box<[_]>>();
+                return OrderedUnionInput::new(
+                    db,
+                    env.program(db),
+                    mapped,
+                    false,
+                    self.recursively_defined(db),
+                )
+                .normalize(db);
             }
         }
 
