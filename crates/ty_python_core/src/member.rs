@@ -81,14 +81,14 @@ impl Member {
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
     fn as_instance_attribute_candidate(&self) -> Option<&str> {
-        let mut segments = self.expression().segments();
-        let first_segment = segments.next()?;
-
-        if first_segment.kind == SegmentKind::Attribute && segments.next().is_none() {
-            Some(first_segment.text)
-        } else {
-            None
+        let expression = self.expression();
+        if expression.num_segments() != 1 {
+            return None;
         }
+
+        let segment = expression.segment_infos().next()?;
+        (segment.kind() == SegmentKind::Attribute)
+            .then(|| &expression.path.as_str()[usize::from(segment.offset())..])
     }
 
     /// Return `true` if the place expression has the form `<NAME>.<MEMBER>`,
