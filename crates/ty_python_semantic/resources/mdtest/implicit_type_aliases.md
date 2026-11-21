@@ -1293,7 +1293,9 @@ An unreachable class binding gives the same result whether the argument or the e
 quoted.
 
 ```py
-Alias = list[int]
+from typing import Union
+
+Alias = Union[int, str]
 
 class C:
     if False:
@@ -3094,6 +3096,51 @@ State = Union[int, DictState, ListState]
 
 valid: State = {"children": [1]}
 invalid: State = [b"leaf"]  # error: [invalid-assignment]
+```
+
+The recursive reference can also occur inside another union.
+
+```py
+JsonDict = dict[str, Union[int, "JsonStruct"]]
+JsonList = list[Union[int, "JsonStruct"]]
+JsonStruct = Union[JsonDict, JsonList]
+
+valid_struct: JsonStruct = [{"key": 1}]
+invalid_struct: JsonStruct = {"key": b"leaf"}  # error: [invalid-assignment]
+```
+
+The outer alias can also include `None` via `Optional`.
+
+```py
+from typing import Optional
+
+Obj = dict[str, "Value"]
+Array = list["Value"]
+Value = Optional[Union[Obj, Array]]
+
+valid_optional: Value = [None, {"key": None}]
+invalid_optional: Value = [1]  # error: [invalid-assignment]
+```
+
+### A recursive union used in a generic base class
+
+Both the base class and the sequence refer forward to the same union, as in
+[Eclipse AAS Core Meta](https://github.com/eclipse-aascw/aas-core-meta/blob/feab6a1c7047e4b05f636c1fa16dfe5d3469b661/aas_core_meta/marker.py#L29).
+
+```py
+from typing import Mapping, Sequence, TypeVar, Union
+
+K = TypeVar("K", bound=str)
+
+class JSONObject(Mapping[K, "JSONValue"]): ...
+
+JSONArray = Sequence["JSONValue"]
+JSONValue = Union[None, bool, int, float, str, JSONArray, JSONObject[str]]
+
+def read(obj: JSONObject[str]) -> JSONValue:
+    return obj["key"]
+
+invalid: JSONValue = object()  # error: [invalid-assignment]
 ```
 
 ### Forward references in mutually recursive aliases
