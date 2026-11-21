@@ -123,6 +123,24 @@ pub(crate) fn remove_unused_imports<'a>(
     }
 }
 
+/// Generate a `Fix` to remove the imports at the specified positions from an `import` statement.
+///
+/// Prefer this over [`remove_unused_imports`] when the exact imports are known, since it can tell
+/// apart imports of the same name (e.g., `from os.path import join, join as path_join`).
+pub(crate) fn remove_unused_imports_at(
+    positions: &[usize],
+    stmt: &Stmt,
+    parent: Option<&Stmt>,
+    locator: &Locator,
+    stylist: &Stylist,
+    indexer: &Indexer,
+) -> Result<Edit> {
+    match codemods::remove_imports_at(positions, stmt, locator, stylist)? {
+        None => Ok(delete_stmt(stmt, parent, locator, indexer)),
+        Some(content) => Ok(Edit::range_replacement(content, stmt.range())),
+    }
+}
+
 /// Edits to make the specified imports explicit, e.g. change `import x` to `import x as x`.
 pub(crate) fn make_redundant_alias<'a>(
     member_names: impl Iterator<Item = &'a str>,

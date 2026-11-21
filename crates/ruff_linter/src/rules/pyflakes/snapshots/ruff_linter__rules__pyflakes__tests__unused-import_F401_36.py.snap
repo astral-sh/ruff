@@ -1,0 +1,74 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401 [*] `os.path.join` imported but unused
+  --> F401_36.py:9:39
+   |
+ 7 | def f():
+ 8 |     # Only the alias is unused, so `join` should be kept.
+ 9 |     from os.path import join, join as path_join
+   |                                       ^^^^^^^^^
+10 |
+11 |     print(join("a", "b"))
+   |
+help: Remove unused import: `os.path.join`
+   |
+8  |     # Only the alias is unused, so `join` should be kept.
+   -     from os.path import join, join as path_join
+9  +     from os.path import join
+10 |
+   |
+
+F401 [*] `os.path.join` imported but unused
+  --> F401_36.py:16:25
+   |
+14 | def f():
+15 |     # Only the plain import is unused, so `path_join` should be kept.
+16 |     from os.path import join, join as path_join
+   |                         ^^^^
+17 |
+18 |     print(path_join("a", "b"))
+   |
+help: Remove unused import: `os.path.join`
+   |
+15 |     # Only the plain import is unused, so `path_join` should be kept.
+   -     from os.path import join, join as path_join
+16 +     from os.path import join as path_join
+17 |
+   |
+
+F401 [*] `os.path.join` imported but unused
+  --> F401_36.py:23:33
+   |
+21 | def f():
+22 |     # Only the first alias is unused.
+23 |     from os.path import join as a, join as b
+   |                                 ^
+24 |
+25 |     print(b("a", "b"))
+   |
+help: Remove unused import: `os.path.join`
+   |
+22 |     # Only the first alias is unused.
+   -     from os.path import join as a, join as b
+23 +     from os.path import join as b
+24 |
+   |
+
+F401 [*] `os.path` imported but unused
+  --> F401_36.py:30:32
+   |
+28 | def f():
+29 |     # Plain `import` statements with the same module twice.
+30 |     import os.path, os.path as osp
+   |                                ^^^
+31 |
+32 |     print(os.path.sep)
+   |
+help: Remove unused import: `os.path`
+   |
+29 |     # Plain `import` statements with the same module twice.
+   -     import os.path, os.path as osp
+30 +     import os.path
+31 |
+   |

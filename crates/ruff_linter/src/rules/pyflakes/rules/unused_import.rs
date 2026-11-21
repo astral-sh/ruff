@@ -1,7 +1,6 @@
-use std::borrow::Cow;
 use std::iter;
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use std::collections::BTreeMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -570,16 +569,28 @@ fn fix_by_removing_imports<'a>(
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
-    let member_names: Vec<Cow<'_, str>> = imports
-        .map(|ImportBinding { import, .. }| import)
-        .map(Imported::member_name)
-        .collect();
-    if member_names.is_empty() {
+    let (Stmt::Import(ast::StmtImport { names: aliases, .. })
+    | Stmt::ImportFrom(ast::StmtImportFrom { names: aliases, .. })) = statement
+    else {
+        bail!("Expected import statement");
+    };
+
+    // Identify each import by its position in the statement rather than by its name, since the
+    // same name can be imported more than once, as in `from os.path import join, join as j`.
+    let positions = imports
+        .map(|import| {
+            aliases
+                .iter()
+                .position(|alias| alias.range().contains_range(import.range))
+                .context("Expected import binding to be part of its statement")
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if positions.is_empty() {
         bail!("Expected import bindings");
     }
 
-    let edit = fix::edits::remove_unused_imports(
-        member_names.iter().map(AsRef::as_ref),
+    let edit = fix::edits::remove_unused_imports_at(
+        &positions,
         statement,
         parent,
         checker.locator(),
