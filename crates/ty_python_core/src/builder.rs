@@ -111,8 +111,40 @@ struct NarrowingAliases<'ast> {
     narrowed_places: PossiblyNarrowedPlaces,
 }
 
+/// Count each kind separately so that inserting a predicate, for example,
+/// does not change the identities of later assignment right-hand sides.
+#[derive(Default)]
+struct ExpressionCounts {
+    normal: u16,
+    callee: u16,
+    type_expression: u16,
+    value_predicates: [u16; 2],
+    condition_predicates: [u16; 2],
+}
+
+impl ExpressionCounts {
+    fn next(&mut self, kind: ExpressionKind) -> u16 {
+        let count = match kind {
+            ExpressionKind::Normal => &mut self.normal,
+            ExpressionKind::Callee => &mut self.callee,
+            ExpressionKind::TypeExpression => &mut self.type_expression,
+            ExpressionKind::Predicate { context, in_loop } => {
+                let counts = match context {
+                    ExpressionContext::Value => &mut self.value_predicates,
+                    ExpressionContext::Condition => &mut self.condition_predicates,
+                };
+                &mut counts[usize::from(in_loop)]
+            }
+        };
+        let ordinal = *count;
+        *count = count.wrapping_add(1);
+        ordinal
+    }
+}
+
 struct ScopeInfo<'ast> {
     file_scope_id: FileScopeId,
+    expression_counts: ExpressionCounts,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
     /// Saved narrowing aliases from the enclosing scope, restored on `pop_scope`.
@@ -545,6 +577,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let saved_aliases = std::mem::take(&mut self.narrowing_aliases);
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
+            expression_counts: ExpressionCounts::default(),
             current_loop: None,
             narrowing_aliases: saved_aliases,
             nested_global_or_nonlocal_declarations: FxHashMap::default(),
@@ -1299,6 +1332,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 AstNodeRef::new(self.module, alias.expression),
                 None,
                 ExpressionKind::Normal,
+                self.current_scope_info_mut()
+                    .expression_counts
+                    .next(ExpressionKind::Normal),
             );
             self.alias_predicates.insert(
                 ExpressionNodeKey::from(leaf),
@@ -2969,6 +3005,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             AstNodeRef::new(self.module, expression_node),
             assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
+            self.current_scope_info_mut()
+                .expression_counts
+                .next(expression_kind),
         );
         self.expressions_by_node
             .insert(expression_node.into(), expression);

@@ -1173,9 +1173,11 @@ mod tests {
     use ruff_db::{
         files::{File, system_path_to_file},
         parsed::ParsedModuleRef,
+        system::DbWithWritableSystem as _,
     };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
+    use salsa::plumbing::AsId;
     use test_case::test_case;
 
     use super::Truthiness::{AlwaysFalse, AlwaysTrue, Ambiguous, Uninhabited};
@@ -1443,6 +1445,24 @@ mod tests {
             .first_public_binding(global_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert_matches!(binding.kind(&db), DefinitionKind::Assignment(_));
+    }
+
+    #[test]
+    fn expression_identity_ignores_other_scopes_and_kinds() {
+        let TestCase { mut db, file } = test_case("def f(): pass\nx.a = 1");
+        let rhs_id = |db: &TestDb| {
+            let file = program_file(db, file);
+            let module = parsed_module(db, file.python_file(db)).load(db);
+            let assignment = module.suite().last().unwrap().as_assign_stmt().unwrap();
+            semantic_index(db, file)
+                .expression(&assignment.value)
+                .as_id()
+        };
+        let original = rhs_id(&db);
+
+        db.write_file("test.py", "def f(): y.b = 1\nif flag: pass\nx.a = 2")
+            .unwrap();
+        assert_eq!(rhs_id(&db), original);
     }
 
     #[test]
