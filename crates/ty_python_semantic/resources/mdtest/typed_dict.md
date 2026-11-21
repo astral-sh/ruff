@@ -9135,18 +9135,36 @@ def _(record: Closed, key: Literal["name", "typo"]) -> None:
 ### Constructing a closed TypedDict with a union of declared keys
 
 A single entry is sufficient when both possible fields are optional and accept the supplied value.
+Each possible key must be declared and accept the supplied value. A union of keys does not guarantee
+that any one required field is present.
 
 ```py
-from typing_extensions import Literal, TypedDict
+from typing_extensions import Literal, NotRequired, TypedDict
 
 class Dimensions(TypedDict, closed=True, total=False):
     width: int
     height: int
 
+class Heterogeneous(TypedDict, closed=True, total=False):
+    width: int
+    label: str
+
+class RequiredDimensions(TypedDict, closed=True):
+    width: int
+    height: NotRequired[int]
+
 def _(key: Literal["width", "height"]) -> None:
-    # TODO: Accept this constructor by checking each literal key in the union.
-    # error: [unknown-typed-dict-constructor-key] "Non-literal string key may be unknown for TypedDict `Dimensions`"
-    Dimensions({key: 1})
+    assigned: Dimensions = {key: 1}  # ok
+    Dimensions({key: 1})  # ok
+
+def _(key: Literal["width", "depth"]) -> None:
+    Dimensions({key: 1})  # error: [unknown-typed-dict-constructor-key]
+
+def _(key: Literal["width", "label"]) -> None:
+    Heterogeneous({key: 1})  # error: [invalid-argument-type]
+
+def _(key: Literal["width", "height"]) -> None:
+    RequiredDimensions({key: 1})  # error: [missing-typed-dict-key]
 ```
 
 ### Mixed constructors validate source-only keys against `extra_items`

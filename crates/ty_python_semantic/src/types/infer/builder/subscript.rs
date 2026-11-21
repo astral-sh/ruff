@@ -1,4 +1,4 @@
-use itertools::{Either, EitherOrBoth, Itertools};
+use itertools::{EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::helpers::is_dotted_name;
@@ -27,6 +27,7 @@ use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErro
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictExtraItems, TypedDictField, TypedDictKeyAssignment,
+    string_literal_values,
 };
 use crate::types::typevar::{BindingContext, TypeVarKind, TypeVarSet};
 use crate::types::{
@@ -40,29 +41,6 @@ use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{SemanticIndex, place_table};
-
-/// Given a string literal or a union of string literals, return an iterator over the contained
-/// strings, or `None` if the type is neither.
-fn string_literal_values<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> Option<impl Iterator<Item = &'db str> + 'db> {
-    if let Some(literal) = ty.as_string_literal() {
-        Some(Either::Left(std::iter::once(literal.value(db))))
-    } else {
-        let elements = ty.as_union()?.elements(db);
-        elements
-            .iter()
-            .all(|ty| ty.as_string_literal().is_some())
-            .then(|| {
-                Either::Right(
-                    elements
-                        .iter()
-                        .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
-                )
-            })
-    }
-}
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {

@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, btree_map::Entry};
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
+use itertools::Either;
 use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::parsed_module;
@@ -2876,6 +2877,29 @@ fn validate_from_keywords<'db, 'ast>(
     guaranteed_keys.into_keys().collect()
 }
 
+/// Given a string literal or a union of string literals, return an iterator over the contained
+/// strings, or `None` if the type is neither.
+pub(super) fn string_literal_values<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<impl Iterator<Item = &'db str> + 'db> {
+    if let Some(literal) = ty.as_string_literal() {
+        Some(Either::Left(std::iter::once(literal.value(db))))
+    } else {
+        let elements = ty.as_union()?.elements(db);
+        elements
+            .iter()
+            .all(|ty| ty.as_string_literal().is_some())
+            .then(|| {
+                Either::Right(
+                    elements
+                        .iter()
+                        .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
+                )
+            })
+    }
+}
+
 #[expect(clippy::too_many_arguments)]
 fn validate_merged_dict_literal<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
@@ -2894,7 +2918,9 @@ fn validate_merged_dict_literal<'db, 'ast>(
     for item in dict_expr.items.iter().rev() {
         if let Some(key_expr) = &item.key {
             let key_ty = expression_type_fn(key_expr, TypeContext::default());
-            let Some(key_literal) = key_ty.as_string_literal() else {
+            let Some(key_literals) = string_literal_values(db, key_ty)
+                .map(|values| values.map(Name::new).collect::<Vec<_>>())
+            else {
                 if key_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env)) {
                     if let Some(expected_ty) = typed_dict
                         .arbitrary_key_initialization_type_excluding(db, env, shadowed_keys)
@@ -2942,32 +2968,49 @@ fn validate_merged_dict_literal<'db, 'ast>(
                 continue;
             };
 
-            let key = Name::new(key_literal.value(db));
-            let is_shadowed = shadowed_keys.contains(&key);
+            let unshadowed_keys = key_literals
+                .iter()
+                .filter(|key| !shadowed_keys.contains(*key))
+                .collect::<Vec<_>>();
 
-            if !is_shadowed {
-                let value_tcx = typed_dict
-                    .item(db, key.as_str())
-                    .map_or_default(|field| TypeContext::preference(Some(field.declared_ty)));
-                let value_ty = expression_type_fn(&item.value, value_tcx);
-                valid &= TypedDictKeyAssignment {
-                    context,
-                    typed_dict,
-                    full_object_ty: None,
-                    key: key.as_str(),
-                    value_ty,
-                    typed_dict_node: nodes.typed_dict,
-                    key_node: key_expr.into(),
-                    value_node: (&item.value).into(),
-                    assignment_kind: TypedDictAssignmentKind::Constructor,
-                    emit_diagnostic: true,
+            if !unshadowed_keys.is_empty() {
+                let expected_ty = unshadowed_keys
+                    .iter()
+                    .filter_map(|key| {
+                        typed_dict
+                            .item(db, key.as_str())
+                            .map(|field| field.declared_ty)
+                    })
+                    .reduce(|left, right| {
+                        IntersectionType::from_two_elements(db, env, left, right)
+                    });
+                let value_ty =
+                    expression_type_fn(&item.value, TypeContext::preference(expected_ty));
+
+                for key in unshadowed_keys {
+                    valid &= TypedDictKeyAssignment {
+                        context,
+                        typed_dict,
+                        full_object_ty: None,
+                        key: key.as_str(),
+                        value_ty,
+                        typed_dict_node: nodes.typed_dict,
+                        key_node: key_expr.into(),
+                        value_node: (&item.value).into(),
+                        assignment_kind: TypedDictAssignmentKind::Constructor,
+                        emit_diagnostic: true,
+                    }
+                    .validate();
+                    if key_literals.len() == 1 {
+                        guaranteed_keys
+                            .entry(key.clone())
+                            .or_insert(Some(key_expr.into()));
+                    }
                 }
-                .validate();
-                guaranteed_keys
-                    .entry(key.clone())
-                    .or_insert(Some(key_expr.into()));
             }
-            shadowed_keys.insert(key);
+            if let [key] = key_literals.as_slice() {
+                shadowed_keys.insert(key.clone());
+            }
         } else {
             let nested_ty = expression_type_fn(&item.value, TypeContext::default());
             valid &= validate_merged_unpacked_keyword_argument(
