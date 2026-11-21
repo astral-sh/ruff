@@ -58,13 +58,25 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
             return Ok(None);
         };
 
+        // An omitted field falls back to the top-level active parameter or parameter zero.
+        let to_active_parameter = |parameter: Option<usize>| {
+            parameter
+                .and_then(|parameter| u32::try_from(parameter).ok())
+                .map(ActiveParameter::Int)
+                .or_else(|| {
+                    resolved_capabilities
+                        .supports_signature_no_active_parameter()
+                        .then_some(ActiveParameter::Null)
+                })
+        };
+
         // Compute active parameter from the active signature
-        let active_parameter = signature_help_info
-            .active_signature
-            .and_then(|s| signature_help_info.signatures.get(s))
-            .and_then(|sig| sig.active_parameter)
-            .and_then(|p| u32::try_from(p).ok())
-            .map(ActiveParameter::Int);
+        let active_parameter = to_active_parameter(
+            signature_help_info
+                .active_signature
+                .and_then(|s| signature_help_info.signatures.get(s))
+                .and_then(|sig| sig.active_parameter),
+        );
 
         // Convert from IDE types to LSP types
         let signatures = signature_help_info
@@ -120,9 +132,7 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
 
                 let active_parameter =
                     if resolved_capabilities.supports_signature_active_parameter() {
-                        sig.active_parameter
-                            .and_then(|p| u32::try_from(p).ok())
-                            .map(ActiveParameter::Int)
+                        to_active_parameter(sig.active_parameter)
                     } else {
                         None
                     };
