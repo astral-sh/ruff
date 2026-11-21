@@ -2358,14 +2358,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        let rhs_scope = self
-            .index
-            .node_scope(NodeWithScopeRef::TypeAlias(type_alias))
-            .to_scope_id(self.db(), self.program_file());
-
         let type_alias_ty =
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None, None),
+                PEP695TypeAliasType::new(self.db(), alias_name, definition, None, None),
             )));
 
         self.store_expression_type(&type_alias.name, type_alias_ty);
