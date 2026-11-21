@@ -7663,7 +7663,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
-        let inferred = if let TupleInferenceMode::FixedElements = mode
+        if let TupleInferenceMode::FixedElements = mode
             && let Some(spec) = candidate.exact_tuple_instance_spec(db)
             && let Tuple::Fixed(expected) = spec.as_ref()
         {
@@ -7671,23 +7671,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return None;
             }
             let mut elements = Vec::with_capacity(expected.len());
-            for (index, (elt, expected_ty)) in tuple
-                .elts
-                .iter()
-                .zip(expected.iter_all_elements())
-                .enumerate()
-            {
+            for (elt, expected_ty) in tuple.elts.iter().zip(expected.iter_all_elements()) {
                 let ty = self.infer_expression(elt, tcx.with_expected_type(Some(expected_ty)));
-                // The whole-tuple check below already checks the last element.
-                if index + 1 < expected.len() && !ty.is_assignable_to(db, env, expected_ty) {
+                if !ty.is_assignable_to(db, env, expected_ty) {
                     return None;
                 }
                 elements.push(ty);
             }
-            Type::heterogeneous_tuple(db, env, elements)
-        } else {
-            self.infer_tuple_expression_impl(tuple, tcx.with_expected_type(Some(candidate)))
-        };
+            // Fixed-length tuples are assignable position by position. Checking the tuple
+            // again would create a separate query for every distinct combination of literals.
+            return Some(Type::heterogeneous_tuple(db, env, elements));
+        }
+
+        let inferred =
+            self.infer_tuple_expression_impl(tuple, tcx.with_expected_type(Some(candidate)));
         inferred
             .is_assignable_to(db, env, candidate)
             .then_some(inferred)
