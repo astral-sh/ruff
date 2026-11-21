@@ -6372,6 +6372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         let requires_overload_evaluation = requires_overload_evaluation(candidates);
         let arguments_tcx = self.collect_call_arguments_type_context(
+            ast_arguments.clone(),
             argument_types,
             bindings,
             requires_overload_evaluation.then_some(candidates),
@@ -6428,6 +6429,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // And re-infer argument types after overload evaluation, ensuring that only
         // inferred types and diagnostics from matching overloads are preserved.
         let arguments_tcx = self.collect_call_arguments_type_context(
+            ast_arguments.clone(),
             &checked_argument_types,
             bindings,
             None,
@@ -6466,6 +6468,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let requires_overload_evaluation = requires_overload_evaluation(candidates);
 
         let mut arguments_tcx = self.collect_call_arguments_type_context(
+            ast_arguments.clone(),
             argument_types,
             bindings,
             Some(candidates),
@@ -6528,6 +6531,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Collect the argument constraints based on the newly inferred types.
             let next_arguments_tcx = self.collect_call_arguments_type_context(
+                ast_arguments.clone(),
                 &next_argument_types,
                 &next_bindings,
                 Some(candidates),
@@ -6562,6 +6566,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // and inferred types are preserved.
         if requires_overload_evaluation {
             let arguments_tcx = self.collect_call_arguments_type_context(
+                ast_arguments.clone(),
                 &converged_argument_types,
                 &next_bindings,
                 None,
@@ -6591,6 +6596,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Collects the type contexts used to infer the arguments of a call expression.
     fn collect_call_arguments_type_context<'bindings>(
         &self,
+        ast_arguments: ArgumentsIter<'_>,
         argument_types: &CallArguments<'_, 'db>,
         bindings: &'bindings Bindings<'db>,
         candidates: Option<&'bindings OverloadSet>,
@@ -6622,8 +6628,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Collect the type context of each argument from each matching overload.
-        (0..argument_types.len())
-            .map(|argument_index| {
+        ast_arguments
+            .enumerate()
+            .map(|(argument_index, argument)| {
                 if argument_types.is_variadic(argument_index) {
                     return None;
                 }
@@ -6639,6 +6646,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             argument_types,
                             argument_index,
                             call_expression_tcx,
+                            argument.value().is_call_expr() && overloads_with_binding.len() > 1,
                             cache,
                         )
                     });
