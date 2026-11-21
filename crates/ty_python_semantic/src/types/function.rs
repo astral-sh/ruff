@@ -279,6 +279,11 @@ pub struct OverloadLiteral<'db> {
     #[returns(copy)]
     pub(crate) body_scope: ScopeId<'db>,
 
+    /// The binding in the enclosing scope. Retain it so callers don't need
+    /// the defining module's semantic index to identify this declaration.
+    #[returns(copy)]
+    definition: Definition<'db>,
+
     /// A set of special decorators that were applied to this function
     #[returns(copy)]
     pub(crate) decorators: FunctionDecorators,
@@ -312,6 +317,7 @@ impl<'db> OverloadLiteral<'db> {
             self.name(db),
             self.known(db),
             self.body_scope(db),
+            self.definition(db),
             self.decorators(db),
             Some(deprecated),
             self.dataclass_transformer_params(db),
@@ -329,6 +335,7 @@ impl<'db> OverloadLiteral<'db> {
             self.name(db),
             self.known(db),
             self.body_scope(db),
+            self.definition(db),
             self.decorators(db),
             self.deprecated(db),
             Some(params),
@@ -449,20 +456,6 @@ impl<'db> OverloadLiteral<'db> {
                 .name
                 .range,
         )
-    }
-
-    /// Returns the [`Definition`] of this function.
-    ///
-    /// ## Warning
-    ///
-    /// This uses the semantic index to find the definition of the function. This means that if the
-    /// calling query is not in the same file as this function is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
-    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.program_file(db));
-        index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
     /// Overload sets ending at different declarations share their earlier links.
@@ -880,6 +873,7 @@ impl<'db> FunctionLiteral<'db> {
                 definition.name(db),
                 definition.known(db),
                 definition.body_scope(db),
+                definition.definition(db),
                 definition.decorators(db),
                 decorated.deprecated(db),
                 decorated.dataclass_transformer_params(db),
@@ -1629,14 +1623,7 @@ impl<'db> FunctionType<'db> {
         self.literal(db).implementation_deprecated(db)
     }
 
-    /// Returns the [`Definition`] of the implementation or first overload of this function.
-    ///
-    /// ## Warning
-    ///
-    /// This uses the semantic index to find the definition of the function. This means that if the
-    /// calling query is not in the same file as this function is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
+    /// Returns the [`Definition`] of the implementation or last overload of this function.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.literal(db).definition(db)
     }

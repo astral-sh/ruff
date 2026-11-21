@@ -539,6 +539,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &name.id,
             known_function,
             body_scope,
+            definition,
             function_decorators,
             None,
             dataclass_transformer_params,
