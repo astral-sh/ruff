@@ -68,12 +68,30 @@ impl QueryPattern {
         }
     }
 
-    fn is_match_symbol(&self, symbol: &SymbolInfo<'_>) -> bool {
-        self.is_match_symbol_name(&symbol.name)
-    }
-
     pub(crate) fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
         if let Some(ref re) = self.re {
+            // On ASCII input, `(?i)a.*b.*` looks for a case-insensitive subsequence.
+            // Use the regex for Unicode case folding and for strings where `.` could
+            // encounter a newline.
+            if self.original.is_ascii() {
+                if self.original.len() > symbol_name.len() {
+                    return false;
+                }
+
+                if symbol_name.is_ascii() {
+                    let mut name = symbol_name.bytes();
+                    if !self
+                        .original
+                        .bytes()
+                        .all(|q| name.any(|b| b.eq_ignore_ascii_case(&q)))
+                    {
+                        return false;
+                    }
+                    if !symbol_name.contains('\n') {
+                        return true;
+                    }
+                }
+            }
             re.is_match(symbol_name)
         } else if self.original_is_exact {
             symbol_name == self.original
@@ -154,8 +172,10 @@ impl FlatSymbols {
         &self,
         query: &QueryPattern,
     ) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
-        self.iter()
-            .filter(|(_, symbol)| query.is_match_symbol(symbol))
+        self.symbols
+            .iter_enumerated()
+            .filter(|(_, symbol)| query.is_match_symbol_name(&symbol.name))
+            .map(|(id, symbol)| (id, symbol.into()))
     }
 
     /// Turns this flat sequence of symbols into a hierarchy of symbols.
@@ -1687,6 +1707,10 @@ mod tests {
         assert!(matches("ABC", "WAXBYCZ"));
         assert!(matches("aBc", "wAXbyCZ"));
 
+        assert!(matches("a.b", "A.xB"));
+        assert!(matches("ab", "a\nab"));
+        assert!(matches("s", "ſ"));
+        assert!(matches("ſ", "s"));
         assert!(matches("δ", "Δ"));
         assert!(matches("δΘπ", "ΔθΠ"));
     }
@@ -1694,6 +1718,9 @@ mod tests {
     #[test]
     fn various_no() {
         assert!(!matches("a", ""));
+        assert!(!matches("aa", "ab"));
+        assert!(!matches("a.b", "axb"));
+        assert!(!matches("ab", "a\nb"));
         assert!(!matches("abc", "bac"));
         assert!(!matches("abcd", "abc"));
         assert!(!matches("δΘπ", "θΔΠ"));
