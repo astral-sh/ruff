@@ -159,6 +159,13 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         }
     }
 
+    if type_vars
+        .iter()
+        .any(|type_var| type_var.has_unpacked_keywords)
+    {
+        return;
+    }
+
     // Deduplicate type vars that appear in multiple parameter annotations
     let mut seen = FxHashSet::default();
     type_vars.retain(|tv| seen.insert(tv.name));
