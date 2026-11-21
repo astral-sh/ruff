@@ -251,7 +251,7 @@ impl<'a> FoldingRangeVisitor<'a> {
     }
 
     fn is_multiline(&self, range: TextRange) -> bool {
-        self.source[range].contains('\n') || self.source[range].contains('\r')
+        self.source.contains_line_break(range)
     }
 
     /// Compute folding ranges for consecutive import statements.
@@ -587,6 +587,12 @@ impl<'a> FoldingRangeVisitor<'a> {
 impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         if !self.intersects_range_filter(node.range()) {
+            return TraversalSignal::Skip;
+        }
+
+        // No child of a single-line statement can span multiple lines. Import
+        // groups are handled by `visit_body` before we visit their statements.
+        if node.is_statement() && !self.is_multiline(node.range()) {
             return TraversalSignal::Skip;
         }
 
