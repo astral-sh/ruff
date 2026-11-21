@@ -20,6 +20,7 @@ use crate::{
         Specialization, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
         UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
         binding_type,
+        constraints::{ConstraintProvenance, ConstraintSet, ConstraintSetBuilder},
         cyclic::TypeIdentity,
         definition_expression_type,
         generics::{enclosing_binding_contexts, walk_specialization_types},
@@ -1277,6 +1278,39 @@ impl<'db> BoundTypeVarInstance<'db> {
         self.identity(db) == other.identity(db)
     }
 
+    /// Create a variable for the returned callable, bounded by this one.
+    /// Specializing the original variable then specializes the new bound.
+    pub(super) fn defer(self, db: &'db dyn Db) -> Option<Self> {
+        if !matches!(
+            self.kind(db),
+            TypeVarKind::LegacyTypeVar | TypeVarKind::Pep695TypeVar
+        ) || self.typevar(db).is_constrained(db)
+            || self.default_type(db).is_some()
+        {
+            return None;
+        }
+        let BindingContext::Definition(definition) = self.binding_context(db) else {
+            return None;
+        };
+        let context = BindingContext::Deferred(definition);
+        let ty = TypeVarInstance::new(
+            db,
+            self.typevar(db).identity(db).with_name_suffix(db, "return"),
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(self)).into()),
+            self.typevar(db).explicit_variance(db),
+            None,
+        );
+        Some(Self::new(db, ty, context, None, self.freshness(db)))
+    }
+
+    pub(super) fn deferred_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let BindingContext::Deferred(definition) = self.binding_context(db) else {
+            return None;
+        };
+        self.typevar(db)
+            .upper_bound(db, &ProgramEnvironment::from_definition(definition))
+    }
+
     /// Create a new PEP 695 type variable that can be used in signatures
     /// of synthetic generic functions.
     pub(crate) fn synthetic(
@@ -1409,7 +1443,9 @@ impl<'db> BoundTypeVarInstance<'db> {
                         variance => variance,
                     }
                 }),
-                BindingContext::Synthetic(_) => TypeVarVariance::Invariant,
+                BindingContext::Deferred(_) | BindingContext::Synthetic(_) => {
+                    TypeVarVariance::Invariant
+                }
             },
         }
     }
@@ -1442,6 +1478,31 @@ impl<'db> BoundTypeVarInstance<'db> {
                 })
             };
 
+        let retained = || {
+            let Some(bound) = self.deferred_bound(db) else {
+                return Type::TypeVar(self);
+            };
+            // The bound may contain variables from an enclosing scope.
+            visitor.visit(db, Type::TypeVar(self), type_mapping, || {
+                let mut upper = bound.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    TypeContext::default(),
+                    visitor,
+                );
+                // S <: T <: str still implies S <: str when T is unsolved.
+                if upper.is_unknown()
+                    && let Type::TypeVar(parent) = bound
+                    && let Some(declared) = parent.typevar(db).upper_bound(db, visitor.env)
+                {
+                    upper = declared;
+                }
+                let variable = self.map_bound_or_constraints(db, |_| {
+                    Some(TypeVarBoundOrConstraints::UpperBound(upper))
+                });
+                Type::TypeVar(variable)
+            })
+        };
         let possibly_apply_to_self = |specialization: &ApplySpecialization<'a, 'db>| {
             if self.typevar(db).is_self(db)
                 && specialization.specialize_self_domain()
@@ -1453,7 +1514,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                     visitor.env,
                 ))
             } else {
-                Type::TypeVar(self)
+                retained()
             }
         };
 
@@ -1499,7 +1560,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 if binding.should_bind(db, self) {
                     binding.self_type()
                 } else {
-                    Type::TypeVar(self)
+                    retained()
                 }
             }
             TypeMapping::ReplaceSelf {
@@ -1514,7 +1575,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                         self.binding_context(db),
                     ))
                 } else {
-                    Type::TypeVar(self)
+                    retained()
                 }
             }
             TypeMapping::FreshenBoundTypeVars {
@@ -1880,6 +1941,8 @@ fn lazy_default_cycle_recover<'db>(
 /// Where a type variable is bound and usable.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum BindingContext<'db> {
+    /// A variable rebound to a returned callable with an upper bound from its factory.
+    Deferred(Definition<'db>),
     /// The definition of the generic class, function, or type alias that binds this typevar.
     Definition(Definition<'db>),
     /// The typevar is synthesized internally, and is not associated with a particular definition
@@ -1897,14 +1960,16 @@ impl<'db> From<Definition<'db>> for BindingContext<'db> {
 impl<'db> BindingContext<'db> {
     pub(crate) fn definition(self) -> Option<Definition<'db>> {
         match self {
-            BindingContext::Definition(definition) => Some(definition),
+            BindingContext::Definition(definition) | BindingContext::Deferred(definition) => {
+                Some(definition)
+            }
             BindingContext::Synthetic(_) => None,
         }
     }
 
     fn program(self, db: &'db dyn Db) -> Program<'db> {
         match self {
-            Self::Definition(definition) => definition.program(db),
+            Self::Definition(definition) | Self::Deferred(definition) => definition.program(db),
             Self::Synthetic(program) => program,
         }
     }
@@ -2200,6 +2265,25 @@ impl<'db> TypeVarSet<'db> {
             TypeVarSet::None => Either::Left(std::iter::empty()),
             TypeVarSet::Some(inner) => Either::Right(inner.typevars(db).values().copied()),
         }
+    }
+
+    /// The preceding call supplies the upper bound as declared evidence.
+    /// It provides a fallback for an empty list and permits a more specific element type.
+    pub(super) fn deferred_constraints<'c>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let provenance = ConstraintProvenance::DECLARED;
+        self.iter(db)
+            .filter_map(|var| {
+                let bound = var.deferred_bound(db)?;
+                Some(ConstraintSet::constrain_typevar_upper_bound(
+                    db, env, builder, provenance, var, bound,
+                ))
+            })
+            .reduce(|left, right| left.and(db, builder, || right))
     }
 
     // Keep this around for debugging purposes

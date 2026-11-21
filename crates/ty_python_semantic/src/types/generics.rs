@@ -25,7 +25,9 @@ use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor};
+use crate::types::signatures::{
+    Parameters, ReturnCallableTypeVarScope, Signature, SignatureRelationVisitor,
+};
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
@@ -2812,13 +2814,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         constraints: &'c ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
     ) -> Self {
+        let inferable = generic_context.inferable_typevars(db);
+        let pending = inferable
+            .deferred_constraints(db, env, constraints)
+            .unwrap_or_else(|| ConstraintSet::from_bool(constraints, true));
         Self {
             db,
             env,
             constraints,
             generic_context,
-            inferable: generic_context.inferable_typevars(db),
-            pending: ConstraintSet::from_bool(constraints, true),
+            inferable,
+            pending,
             types: LegacyTypeMappings::Available(FxHashMap::default()),
         }
     }
@@ -4022,6 +4028,58 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
         }
         Ok(())
+    }
+
+    pub(super) fn infer_call_argument(
+        &mut self,
+        outer: &Signature<'db>,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> Result<(), SpecializationError<'db>> {
+        let db = self.db;
+        let actual = outer
+            .instantiate_callback(db, self.env, formal, actual)
+            .unwrap_or(actual);
+
+        // Comparing the entire callable preserves its local variables in constraints
+        // on the prefix and return type. The forwarded P must bind every such variable
+        // through the parameters it captures, or a variable could escape its scope.
+        if let Some(parameter) = formal.single_callable_signature(db)
+            && let Some((prefix @ [_, ..], captured)) =
+                parameter.parameters().as_paramspec_with_prefix()
+            && let Some(returned) = outer.return_ty.single_callable_signature(db)
+            && let Some((_, forwarded)) = returned.parameters().as_paramspec_with_prefix()
+            && captured == forwarded
+            && self.generic_context.contains(db, captured.identity(db))
+            && let Some(callables) = actual.try_upcast_to_callable(db, self.env)
+            && let Ok(signature) = callables.signatures(db).exactly_one()
+            && let Some(locals) = signature.generic_context
+            && locals.variables(db).all(|local| {
+                // Validation currently rejects a tuple pack shared by the
+                // specialized prefix and P (astral-sh/ty#4029).
+                !local.is_typevartuple(db)
+                    && signature.parameters().iter().skip(prefix.len()).any(|p| {
+                        any_over_type_expanding_aliases(
+                            db,
+                            self.env,
+                            p.annotated_type(),
+                            |ty| matches!(ty, Type::TypeVar(var) if var.is_same_typevar_as(db, local)),
+                        )
+                    })
+            })
+        {
+            let when = self.constraint_for_relation(formal, actual, TypeVarVariance::Covariant);
+            // Retaining the binders requires that the relation holds for every specialization
+            // of the callback after solving the call's variables. A concrete prefix or return
+            // type may require selecting a particular specialization of the callback itself.
+            if when
+                .reduce_inferable(db, self.env, self.constraints, self.inferable)
+                .is_trivially_always_satisfied()
+            {
+                return self.infer_from_constraint_set(when);
+            }
+        }
+        self.infer(formal, actual)
     }
 
     /// Infer type mappings for the specialization based on a given type and its declared type.
