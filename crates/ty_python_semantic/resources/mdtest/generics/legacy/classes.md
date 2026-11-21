@@ -2250,6 +2250,29 @@ reveal_type(generic_context(into_regular_callable(A)))
 reveal_type(A(x=1))  # revealed: A[int]
 ```
 
+### Self fields in generic dataclasses
+
+A dataclass constructor infers the class type parameter alongside the `Self` used in its fields.
+
+```py
+from dataclasses import dataclass
+from typing_extensions import Generic, Self, TypeVar
+
+T = TypeVar("T")
+
+@dataclass
+class Node(Generic[T]):
+    value: T
+    parent: Self | None = None
+
+class IntNode(Node[int]): ...
+
+reveal_type(Node(1, Node(2)))  # revealed: Node[int]
+reveal_type(IntNode(1, IntNode(2)))  # revealed: IntNode
+IntNode("wrong")  # error: [invalid-argument-type]
+reveal_type(IntNode(1, Node(2)))  # revealed: IntNode
+```
+
 ### Inherited dataclass converters
 
 A subclass specializes an inherited converter's input type for its synthesized methods and attribute
@@ -2282,7 +2305,7 @@ class Base(Generic[T]):
 @model
 class Child(Base[str]): ...
 
-reveal_type(Child.__init__)  # revealed: (self: Child, value: str) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, /, value: str) -> None
 child = Child("a")
 reveal_type(child.value)  # revealed: str
 Child(1)  # error: [invalid-argument-type]
@@ -2290,7 +2313,7 @@ Child(1)  # error: [invalid-argument-type]
 child.value = "b"  # ok
 child.value = 1  # error: [invalid-assignment]
 
-reveal_type(Child.__replace__)  # revealed: (self: Child, *, value: str = ...) -> Child
+reveal_type(Child.__replace__)  # revealed: (self: Child, /, *, value: str = ...) -> Child
 child.__replace__(value="b")  # ok
 child.__replace__(value=1)  # error: [invalid-argument-type]
 ```
@@ -2304,7 +2327,7 @@ class Nested(Base[list[U]]): ...
 @model
 class Indirect(Nested[str]): ...
 
-reveal_type(Indirect.__init__)  # revealed: (self: Indirect, value: list[str]) -> None
+reveal_type(Indirect.__init__)  # revealed: (self: Indirect, /, value: list[str]) -> None
 indirect = Indirect(["a"])
 Indirect([1])  # error: [invalid-argument-type]
 indirect.value = ["b"]  # ok
