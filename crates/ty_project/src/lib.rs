@@ -41,6 +41,7 @@ pub use uv::{
 };
 
 pub mod baseline;
+pub mod coverage;
 mod db;
 mod files;
 pub mod glob;

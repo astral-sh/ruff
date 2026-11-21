@@ -1,0 +1,409 @@
+//! Line-level type coverage, as reported by `ty check --html-report`.
+//!
+//! This follows mypy's line-precision reports (`mypy --html-report`). Every expression, parameter,
+//! and import is classified by its inferred type, and each line takes the least precise
+//! classification of the nodes that start on it. Lines on which no node starts, such as blank lines,
+//! comments, and the continuation lines of a multi-line expression, are [`Empty`].
+//!
+//! [`Empty`]: LineCoverage::Empty
+
+use std::fmt::Write as _;
+
+use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
+use ruff_db::source::{SourceText, line_index, source_text};
+use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
+use ruff_python_ast::{self as ast};
+use ruff_source_file::LineIndex;
+use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::types::visitor::any_over_type;
+use crate::types::{ProgramEnvironment, Type};
+use crate::{Db, HasType, SemanticModel};
+
+/// The coverage classification of a single line.
+///
+/// Variants are ordered from most to least precise (after [`Empty`](Self::Empty)), so that the
+/// classification of a line is the maximum over the nodes that start on it.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum LineCoverage {
+    /// No node starts on this line.
+    #[default]
+    Empty,
+    /// Every type on this line is fully known.
+    Precise,
+    /// A type on this line contains a dynamic type, for example `list[Unknown]`.
+    Imprecise,
+    /// A type on this line is itself dynamic, for example `Unknown` or `Any`.
+    Dynamic,
+}
+
+/// The coverage of a single line.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Line {
+    pub coverage: LineCoverage,
+    /// A note for each imprecise or dynamic node that starts on this line, naming the node and its
+    /// type, for example ``"`y.foo`: Unknown"``.
+    pub notes: Vec<String>,
+}
+
+/// Returns the coverage of each line in `file`, indexed by zero-based line number.
+pub fn line_coverage(db: &dyn Db, file: File) -> Vec<Line> {
+    let line_index = line_index(db, file);
+    let source = source_text(db, file);
+    let file = db.program_file(file);
+    let model = SemanticModel::new(db, file);
+
+    let mut visitor = CoverageVisitor {
+        lines: vec![Line::default(); line_index.line_count()],
+        env: model.program_environment(),
+        model,
+        line_index,
+        source,
+    };
+
+    let ast = parsed_module(db, file.python_file(db)).load(db);
+    visitor.visit_body(ast.suite());
+    visitor.lines
+}
+
+struct CoverageVisitor<'db> {
+    model: SemanticModel<'db>,
+    env: ProgramEnvironment<'db>,
+    line_index: LineIndex,
+    source: SourceText,
+    lines: Vec<Line>,
+}
+
+impl<'db> CoverageVisitor<'db> {
+    /// Returns the line that contains `offset`.
+    fn line_mut(&mut self, offset: TextSize) -> Option<&mut Line> {
+        let line_number = self.line_index.line_index(offset).to_zero_indexed();
+        self.lines.get_mut(line_number)
+    }
+
+    /// Records the type of the node at `range` on the line where the node starts.
+    ///
+    /// Nodes without a type, such as expressions in unreachable code, are not recorded.
+    fn record(&mut self, ty: Option<Type<'db>>, range: TextRange) {
+        if let Some(ty) = ty {
+            let coverage = classify(self.model.db(), &self.env, ty);
+            self.record_coverage(coverage, ty, range);
+        }
+    }
+
+    /// Records `coverage` for the node at `range`, whose type is `ty`, on the line where the node
+    /// starts.
+    fn record_coverage(&mut self, coverage: LineCoverage, ty: Type<'db>, range: TextRange) {
+        let note = (coverage > LineCoverage::Precise).then(|| self.note(ty, range));
+        let Some(line) = self.line_mut(range.start()) else {
+            return;
+        };
+
+        line.coverage = line.coverage.max(coverage);
+        line.notes.extend(note);
+    }
+
+    /// Describes the node at `range` and its type for the line's hover text.
+    fn note(&self, ty: Type<'db>, range: TextRange) -> String {
+        // Show only the first line of a multi-line node, and shorten long nodes.
+        let text = self.source.as_str()[range]
+            .lines()
+            .next()
+            .unwrap_or_default();
+        let mut note = String::from("`");
+        if text.chars().count() > 40 {
+            note.extend(text.chars().take(39));
+            note.push('…');
+        } else {
+            note.push_str(text);
+        }
+        let _ = write!(note, "`: {}", ty.display(self.model.db(), &self.env));
+        note
+    }
+}
+
+fn classify<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> LineCoverage {
+    if ty.is_dynamic() {
+        return LineCoverage::Dynamic;
+    }
+
+    if any_over_type(db, env, ty, true, |ty| ty.is_dynamic()) {
+        LineCoverage::Imprecise
+    } else {
+        LineCoverage::Precise
+    }
+}
+
+impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
+    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
+        match stmt {
+            ast::Stmt::FunctionDef(function) => {
+                self.record(function.inferred_type(&self.model), function.name.range());
+            }
+            ast::Stmt::ClassDef(class) => {
+                self.record(class.inferred_type(&self.model), class.name.range());
+            }
+            _ => {}
+        }
+
+        source_order::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &ast::Expr) {
+        self.record(expr.inferred_type(&self.model), expr.range());
+        source_order::walk_expr(self, expr);
+    }
+
+    fn visit_parameter(&mut self, parameter: &ast::Parameter) {
+        self.record(parameter.inferred_type(&self.model), parameter.name.range());
+        source_order::walk_parameter(self, parameter);
+    }
+
+    fn visit_alias(&mut self, alias: &ast::Alias) {
+        self.record(alias.inferred_type(&self.model), alias.range());
+        source_order::walk_alias(self, alias);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::Write as _;
+
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_python_trivia::textwrap::dedent;
+
+    use super::{LineCoverage, line_coverage};
+    use crate::db::tests::setup_db;
+
+    /// Renders each source line prefixed with a marker for its classification.
+    fn annotated(source: &str) -> String {
+        annotated_with_modules(&[], source)
+    }
+
+    /// Like [`annotated`], with other modules that `source` can import.
+    fn annotated_with_modules(modules: &[(&str, &str)], source: &str) -> String {
+        let mut db = setup_db();
+        for (path, module_source) in modules {
+            db.write_file(path, dedent(module_source).as_ref()).unwrap();
+        }
+        let source = dedent(source);
+        db.write_file("test.py", source.as_ref()).unwrap();
+        let file = system_path_to_file(&db, "test.py").unwrap();
+
+        let lines = line_coverage(&db, file);
+        let mut output = String::new();
+        for (line, coverage) in source.lines().zip(lines) {
+            let marker = match coverage.coverage {
+                LineCoverage::Empty => ' ',
+                LineCoverage::Precise => 'P',
+                LineCoverage::Imprecise => 'I',
+                LineCoverage::Dynamic => 'D',
+            };
+            write!(output, "{marker} | {line}").unwrap();
+            if !coverage.notes.is_empty() {
+                write!(output, "  # {}", coverage.notes.join(", ")).unwrap();
+            }
+            output.push('\n');
+        }
+        output
+    }
+
+    #[test]
+    fn async_protocols_and_aliases() {
+        insta::assert_snapshot!(annotated(
+            r#"
+            from typing import Any, Iterable
+
+            async def fetch() -> int:
+                return 1
+
+            async def main() -> None:
+                coroutine = fetch()
+                result = await coroutine
+
+            def chunks() -> Iterable[bytes]:
+                return [b""]
+
+            type Json = dict[str, Any]
+
+            def parse() -> Json:
+                return {}
+
+            data = parse()
+            "#
+        ), @r#"
+          | 
+        P | from typing import Any, Iterable
+          | 
+        P | async def fetch() -> int:
+        P |     return 1
+          | 
+        P | async def main() -> None:
+        I |     coroutine = fetch()  # `coroutine`: CoroutineType[Any, Any, int], `fetch()`: CoroutineType[Any, Any, int]
+        I |     result = await coroutine  # `coroutine`: CoroutineType[Any, Any, int]
+          | 
+        P | def chunks() -> Iterable[bytes]:
+        P |     return [b""]
+          | 
+        D | type Json = dict[str, Any]  # `Json`: TypeAliasType, `dict[str, Any]`: dict[str, Any], `str, Any`: tuple[str, Any], `Any`: Any
+          | 
+        I | def parse() -> Json:  # `Json`: Json
+        I |     return {}  # `{}`: dict[str, Any]
+          | 
+        I | data = parse()  # `data`: Json, `parse()`: Json
+        "#);
+    }
+
+    #[test]
+    fn annotations_and_imports() {
+        insta::assert_snapshot!(annotated_with_modules(
+            &[("/src/aliases.py", "from typing import Any\n\nJson = dict[str, Any]\n")],
+            r#"
+            from typing import Any
+            from aliases import Json
+            from does_not_exist import Missing
+
+            def send(message: dict[str, Any]) -> None:
+                pass
+
+            def load(raw: str) -> Json:
+                return {}
+
+            def first(values: list[int]) -> list[int]:
+                return values[1:]
+            "#
+        ), @"
+          | 
+        P | from typing import Any
+        I | from aliases import Json  # `Json`: <class 'dict[str, Any]'>
+        D | from does_not_exist import Missing  # `Missing`: Unknown
+          | 
+        D | def send(message: dict[str, Any]) -> None:  # `message`: dict[str, Any], `dict[str, Any]`: dict[str, Any], `str, Any`: tuple[str, Any], `Any`: Any
+          |     pass
+          | 
+        I | def load(raw: str) -> Json:  # `Json`: dict[str, Any]
+        I |     return {}  # `{}`: dict[str, Any]
+          | 
+        P | def first(values: list[int]) -> list[int]:
+        I |     return values[1:]  # `1:`: slice[Literal[1], None, None]
+        ");
+    }
+
+    #[test]
+    fn multi_line_signatures() {
+        insta::assert_snapshot!(annotated(
+            r#"
+            from typing import Any
+
+            def request(
+                method: str,
+                data: dict[str, Any] | None = None,
+                timeout=5.0,
+                default=len("x"),
+            ) -> None:
+                pass
+            "#
+        ), @r#"
+          | 
+        P | from typing import Any
+          | 
+        P | def request(
+        P |     method: str,
+        D |     data: dict[str, Any] | None = None,  # `data`: dict[str, Any] | None, `dict[str, Any] | None`: dict[str, Any] | None, `dict[str, Any]`: dict[str, Any], `str, Any`: tuple[str, Any], `Any`: Any
+        I |     timeout=5.0,  # `timeout`: Unknown | float*
+        I |     default=len("x"),  # `default`: Unknown | Literal[1]
+        P | ) -> None:
+          |     pass
+        "#);
+    }
+
+    #[test]
+    fn container_literals_and_callables() {
+        insta::assert_snapshot!(annotated(
+            r#"
+            import functools
+            from typing import Any, Callable
+
+            def handler(event: Any) -> int:
+                return 1
+
+            config: dict[str, Any] = {
+                "retries": 3,
+            }
+            pairs = [(1, 2), (3, 4)]
+            squares = [n * n for n in range(3)]
+            handlers = [handler]
+            bound = functools.partial(handler)
+            callback: Callable[[Any], int] = handler
+            result = callback(1)
+            "#
+        ), @r#"
+          | 
+        P | import functools
+        P | from typing import Any, Callable
+          | 
+        D | def handler(event: Any) -> int:  # `event`: Any, `Any`: Any
+        P |     return 1
+          | 
+        D | config: dict[str, Any] = {  # `config`: dict[str, Any], `dict[str, Any]`: dict[str, Any], `str, Any`: tuple[str, Any], `Any`: Any, `{`: dict[str, Any]
+        P |     "retries": 3,
+          | }
+        P | pairs = [(1, 2), (3, 4)]
+        P | squares = [n * n for n in range(3)]
+        I | handlers = [handler]  # `handlers`: list[(event: Any) -> int], `[handler]`: list[(event: Any) -> int]
+        I | bound = functools.partial(handler)  # `bound`: partial[(event: Any) -> int], `functools.partial(handler)`: partial[(event: Any) -> int]
+        D | callback: Callable[[Any], int] = handler  # `Callable[[Any], int]`: (Any, /) -> int, `[Any], int`: (Any, /) -> int, `[Any]`: (Any, /) -> int, `Any`: Any
+        P | result = callback(1)
+        "#);
+    }
+
+    #[test]
+    fn classifies_lines() {
+        insta::assert_snapshot!(annotated(
+            r#"
+            """Docstring."""
+            import does_not_exist
+            from typing import Any
+
+            def annotated(x: int) -> list[int]:
+                return [x]
+
+            def unannotated(y):
+                return y
+
+            def explicit_any(z: Any) -> list[Any]:
+                return [z]
+
+            a = annotated(1)
+            b = unannotated(1)
+            c = explicit_any(1)
+            d = annotated(
+                1,
+            )
+            "#
+        ), @r#"
+          | 
+        P | """Docstring."""
+        D | import does_not_exist  # `does_not_exist`: Unknown
+        P | from typing import Any
+          | 
+        P | def annotated(x: int) -> list[int]:
+        P |     return [x]
+          | 
+        D | def unannotated(y):  # `y`: Unknown
+        D |     return y  # `y`: Unknown
+          | 
+        D | def explicit_any(z: Any) -> list[Any]:  # `z`: Any, `Any`: Any, `list[Any]`: list[Any], `Any`: Any
+        D |     return [z]  # `[z]`: list[Any], `z`: Any
+          | 
+        P | a = annotated(1)
+        D | b = unannotated(1)  # `b`: Unknown, `unannotated(1)`: Unknown
+        I | c = explicit_any(1)  # `c`: list[Any], `explicit_any(1)`: list[Any]
+        P | d = annotated(
+        P |     1,
+          | )
+        "#);
+    }
+}

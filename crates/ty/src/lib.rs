@@ -138,6 +138,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
 
+    let html_report = args
+        .html_report
+        .as_ref()
+        .map(|path| SystemPath::absolute(path, &cwd));
+
     let mode = if args.fix {
         MainLoopMode::Fix(FixMode::ApplyFixes)
     } else if args.add_ignore {
@@ -145,7 +150,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     } else if args.update_baseline {
         MainLoopMode::UpdateBaseline
     } else {
-        MainLoopMode::Check
+        MainLoopMode::Check { html_report }
     };
 
     let system = OsSystem::new(&cwd);
@@ -214,7 +219,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     // unnecessary Salsa dependencies. Watch mode updates inputs incrementally, fix modes apply
     // source-text overrides, and memory reports measure the database without this optimization, so
     // they must keep the inputs mutable.
-    if !watch && matches!(mode, MainLoopMode::Check) && memory_report.is_none() {
+    if !watch && matches!(mode, MainLoopMode::Check { .. }) && memory_report.is_none() {
         db.freeze();
     }
 
@@ -438,14 +443,35 @@ impl MainLoop {
                         retain_visible_diagnostics(&mut result);
                     }
 
-                    let result = match self.mode {
-                        MainLoopMode::Check => {
+                    let result = match &self.mode {
+                        MainLoopMode::Check { html_report } => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
                             if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("json") {
                                 return Ok(ExitStatus::Success);
                             }
 
                             self.write_diagnostics(db, &result, None)?;
+
+                            if let Some(output_dir) = html_report
+                                && let Some(total) = ty_project::coverage::write_html_report(
+                                    db,
+                                    output_dir,
+                                    &self.cancellation_token,
+                                )?
+                                && db
+                                    .project()
+                                    .settings(db)
+                                    .terminal()
+                                    .output_format
+                                    .is_human_readable()
+                            {
+                                writeln!(
+                                    self.printer.stream_for_requested_summary(),
+                                    "Wrote coverage report to {output_dir}/index.html \
+                                    ({:.2}% imprecise)",
+                                    total.imprecision() * 100.0,
+                                )?;
+                            }
 
                             if self.cancellation_token.is_cancelled() {
                                 Err(Canceled)
@@ -715,9 +741,12 @@ impl MainLoop {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 enum MainLoopMode {
-    Check,
+    Check {
+        /// The directory to write the HTML coverage report to after each check, if any.
+        html_report: Option<SystemPathBuf>,
+    },
     Fix(FixMode),
     UpdateBaseline,
 }

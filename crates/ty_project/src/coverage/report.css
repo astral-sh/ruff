@@ -1,0 +1,247 @@
+/*
+ * Styles for the HTML coverage report (`ty check --html-report`).
+ *
+ * The colors come from ty's documentation. The report is dark by default and follows the
+ * browser's preference for a light color scheme.
+ */
+:root {
+  --bg: #261230; /* galaxy */
+  --panel: #30173d; /* space */
+  --text: #f4f4f1; /* starlight */
+  --text-dim: #cdcbfb; /* nebula */
+  --accent: #d7ff64; /* radiate */
+  --border: rgba(205, 203, 251, 0.15);
+  --precise: 70, 235, 116; /* aurora */
+  --imprecise: 255, 172, 47; /* sun */
+  --dynamic: 222, 95, 233; /* cosmic */
+  --empty: 111, 93, 111; /* comet */
+  --fill-alpha: 0.3;
+  --sans: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --panel: #fbf2fc; /* lunar */
+    --text: #261230; /* galaxy */
+    --text-dim: #6f5d6f; /* comet */
+    --accent: #6340ac; /* flare */
+    --border: rgba(38, 18, 48, 0.15);
+    --fill-alpha: 0.35;
+    color-scheme: light;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 1.5rem max(1rem, 3vw);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.6rem;
+}
+
+.subtitle {
+  margin: 0 0 1.5rem;
+  color: var(--text-dim);
+}
+
+/* Index page */
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table.summary {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+table.summary th,
+table.summary td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+}
+
+table.summary th {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+table.summary th:first-child,
+table.summary td:first-child {
+  text-align: left;
+}
+
+table.summary td:first-child {
+  font-family: var(--mono);
+  font-size: 0.875rem;
+}
+
+table.summary tbody tr:hover {
+  background: var(--panel);
+}
+
+/* A bar split into the share of precise, imprecise, dynamic, and empty lines. */
+.bar {
+  display: flex;
+  width: 10rem;
+  height: 0.6rem;
+  overflow: hidden;
+  border-radius: 0.3rem;
+  background: rgba(var(--empty), 0.4);
+}
+
+.bar.total {
+  width: min(32rem, 100%);
+  height: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.bar .precise {
+  background: rgb(var(--precise));
+}
+
+.bar .imprecise {
+  background: rgb(var(--imprecise));
+}
+
+.bar .dynamic {
+  background: rgb(var(--dynamic));
+}
+
+/* File pages */
+
+header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.5rem;
+  margin: -1.5rem calc(-1 * max(1rem, 3vw)) 1rem;
+  padding: 0.75rem max(1rem, 3vw);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+header .subtitle {
+  margin: 0;
+}
+
+header h1 {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 1.1rem;
+}
+
+.legend {
+  display: flex;
+  gap: 1rem;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+}
+
+.legend span::before {
+  content: "";
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-right: 0.35rem;
+  border-radius: 0.15rem;
+  vertical-align: -0.05rem;
+}
+
+.legend .precise::before {
+  background: rgb(var(--precise));
+}
+
+.legend .imprecise::before {
+  background: rgb(var(--imprecise));
+}
+
+.legend .dynamic::before {
+  background: rgb(var(--dynamic));
+}
+
+.source {
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.lines {
+  width: max-content;
+  min-width: 100%;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 6ch auto;
+  /* Keep a linked line clear of the sticky header. */
+  scroll-margin-top: 5rem;
+}
+
+.line > a {
+  padding-right: 0.75rem;
+  border-right: 3px solid transparent;
+  color: var(--text-dim);
+  text-align: right;
+  user-select: none;
+}
+
+.line > code {
+  padding-left: 0.75rem;
+  font-family: inherit;
+  white-space: pre;
+}
+
+.line:target > code {
+  outline: 1px solid var(--accent);
+}
+
+.line.precise > a {
+  border-right-color: rgb(var(--precise));
+}
+
+.line.precise > code {
+  background: rgba(var(--precise), var(--fill-alpha));
+}
+
+.line.imprecise > a {
+  border-right-color: rgb(var(--imprecise));
+}
+
+.line.imprecise > code {
+  background: rgba(var(--imprecise), var(--fill-alpha));
+}
+
+.line.dynamic > a {
+  border-right-color: rgb(var(--dynamic));
+}
+
+.line.dynamic > code {
+  background: rgba(var(--dynamic), var(--fill-alpha));
+}
