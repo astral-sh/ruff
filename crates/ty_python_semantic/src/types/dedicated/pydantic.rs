@@ -29,8 +29,8 @@ use crate::types::special_form::SpecialFormType;
 use crate::types::{
     ClassBase, ClassType, DataclassTransformerParams, FunctionType, KnownClass, KnownFunction,
     KnownInstanceType, KnownUnion, MemberLookupPolicy, Parameter, Parameters, Signature,
-    Specialization, StaticClassLiteral, Type, TypeAliasType, UnionType, definition_expression_type,
-    definition_expression_type_in_scope,
+    Specialization, StaticClassLiteral, StringLiteralType, Type, TypeAliasType, UnionType,
+    definition_expression_type, definition_expression_type_in_scope,
 };
 
 /// Pydantic treats underscore-prefixed annotations as private instance attributes.
@@ -1027,12 +1027,12 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
 pub(in crate::types) fn constructor_parameter_type<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
+    validated_fields: &FxHashSet<&str>,
     field_name: &Name,
     field_type: Type<'db>,
     strict: bool,
 ) -> Type<'db> {
-    let validated_fields = fields_with_raw_input_validators(db, class);
-    if validated_fields.contains(field_name) || validated_fields.contains("*") {
+    if validated_fields.contains(field_name.as_str()) || validated_fields.contains("*") {
         return Type::any();
     }
 
@@ -1053,11 +1053,13 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
 /// A before validator can transform arbitrary values before Pydantic validates them against the
 /// declared field type, while a plain validator bypasses that validation entirely. We therefore
 /// cannot derive a useful input type from the field annotation alone.
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-fn fields_with_raw_input_validators<'db>(
+///
+/// Borrow the targets for the duration of constructor synthesis. Validators can name fields
+/// absent from the model, so retaining a copy in each subclass can be expensive.
+pub(in crate::types) fn fields_with_raw_input_validators<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
-) -> FxHashSet<Name> {
+) -> FxHashSet<&'db str> {
     let mut fields = FxHashSet::default();
 
     // Pydantic inherits validators unless a subclass defines a symbol with the same method name.
@@ -1091,29 +1093,32 @@ fn fields_with_raw_input_validators<'db>(
                         .evaluate(db, predicates, declaration.reachability_constraint)
                         .is_always_false()
                 {
-                    fields.extend(targets);
+                    fields.extend(targets.iter().map(|target| target.value(db)));
                 }
             }
         }
     }
 
-    fields.shrink_to_fit();
     fields
 }
 
 /// Collect the field names from a method's `before` and `plain` validators.
-fn raw_input_validator_targets<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Vec<Name> {
-    let mut fields = Vec::new();
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn raw_input_validator_targets<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Box<[StringLiteralType<'db>]> {
     let DefinitionKind::Function(function) = definition.kind(db) else {
-        return fields;
+        return Box::default();
     };
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let function_node = function.node(&module);
     if function_node.decorator_list.is_empty() {
-        return fields;
+        return Box::default();
     }
     let decorators = function_known_decorators(db, definition);
 
+    let mut fields = Vec::new();
     for decorator in &function_node.decorator_list {
         let Some(call) = decorator.expression.as_call_expr() else {
             continue;
@@ -1137,12 +1142,14 @@ fn raw_input_validator_targets<'db>(db: &'db dyn Db, definition: Definition<'db>
             continue;
         }
 
-        fields.extend(call.arguments.args.iter().filter_map(|field| {
-            let field = decorators.expression_type(field)?.as_string_literal()?;
-            Some(Name::new(field.value(db)))
-        }));
+        fields.extend(
+            call.arguments
+                .args
+                .iter()
+                .filter_map(|field| decorators.expression_type(field)?.as_string_literal()),
+        );
     }
-    fields
+    fields.into_boxed_slice()
 }
 
 /// Return the documented Python input type accepted by Pydantic for `field_type` in lax mode.

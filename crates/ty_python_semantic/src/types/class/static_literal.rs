@@ -9,7 +9,7 @@ use ruff_db::{
 use ruff_python_ast as ast;
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
-use std::cell::RefCell;
+use std::cell::{LazyCell, RefCell};
 
 use super::implicit_attributes::implicit_attribute_names;
 use crate::{
@@ -1955,6 +1955,8 @@ impl<'db> StaticClassLiteral<'db> {
                 pydantic::extend_settings_constructor_parameters(db, self, &mut parameters);
             }
 
+            let validated_fields =
+                LazyCell::new(|| pydantic::fields_with_raw_input_validators(db, self));
             for (field_name, field) in self.fields(db, specialization, field_policy) {
                 let (init, mut default_ty, kw_only, alias, converter, strict) = match &field.kind {
                     FieldKind::NamedTuple { default_ty } => (
@@ -2067,7 +2069,12 @@ impl<'db> StaticClassLiteral<'db> {
                 {
                     let strict = metadata.field_is_strict(db, strict);
                     field_ty = pydantic::constructor_parameter_type(
-                        db, self, field_name, field_ty, strict,
+                        db,
+                        self,
+                        &validated_fields,
+                        field_name,
+                        field_ty,
+                        strict,
                     );
                 }
 
