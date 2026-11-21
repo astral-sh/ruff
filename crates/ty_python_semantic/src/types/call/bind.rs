@@ -7974,29 +7974,53 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     // TODO: Remove this workaround once call binding can infer a `TypeVarTuple` from `*args` and
     // callable argument checking preserves correlations across overloads.
+    #[expect(clippy::unnecessary_wraps, reason = "Salsa returns None during cycles")]
     fn should_defer_typevartuple_callable_check(
         &self,
         declared_type: Type<'db>,
         expected_type: Type<'db>,
         argument_type: Type<'db>,
     ) -> bool {
-        let db = self.db;
-        let Some(declared_callables) = declared_type.try_upcast_to_callable(db, self.env) else {
-            return false;
-        };
-        let parameters_contain_typevartuple = declared_callables.iter().any(|callable| {
-            callable.signatures(db).iter().any(|signature| {
-                signature.parameters().iter().any(|parameter| {
-                    any_over_type(db, self.env, parameter.annotated_type(), false, |ty| {
-                        matches!(
-                            ty,
-                            Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                        )
+        // A parameter can reject many different arguments. Whether its callable
+        // signatures mention a TypeVarTuple depends only on the declared type.
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            declared: Type<'db>,
+        ) -> Option<bool> {
+            Some(parameters_contain_typevartuple(
+                db,
+                &ProgramEnvironment::from_program(program),
+                declared,
+            ))
+        }
+
+        fn parameters_contain_typevartuple<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            declared: Type<'db>,
+        ) -> bool {
+            let Some(callables) = declared.try_upcast_to_callable(db, env) else {
+                return false;
+            };
+            callables.iter().any(|callable| {
+                callable.signatures(db).iter().any(|signature| {
+                    signature.parameters().iter().any(|parameter| {
+                        any_over_type(db, env, parameter.annotated_type(), false, |ty| {
+                            matches!(ty, Type::TypeVar(typevar) if typevar.is_typevartuple(db))
+                        })
                     })
                 })
             })
-        });
-        if !parameters_contain_typevartuple {
+        }
+
+        let db = self.db;
+        // Cycle participants can see provisional signatures. Check them directly
+        // rather than reusing a provisional answer.
+        if !cached(db, self.env.program(db), declared_type)
+            .unwrap_or_else(|| parameters_contain_typevartuple(db, self.env, declared_type))
+        {
             return false;
         }
 
