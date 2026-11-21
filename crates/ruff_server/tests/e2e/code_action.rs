@@ -1,4 +1,5 @@
 use anyhow::Result;
+use indoc::indoc;
 use insta::assert_json_snapshot;
 use lsp_types::{
     Code, CodeAction, CodeActionKind, CodeActionResolveRequest, CodeActionResponse,
@@ -27,6 +28,50 @@ fn no_code_actions_for_markdown() -> Result<()> {
 
     assert_json_snapshot!(actions, @"[]");
 
+    Ok(())
+}
+
+#[test]
+fn script_cannot_enable_unsafe_fixes() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "ruff.toml",
+            indoc! {r#"
+                preview = true
+                unsafe-fixes = false
+            "#},
+        )?
+        .build();
+    server.open_text_document(
+        "script.py",
+        indoc! {r#"
+            # /// script
+            # [tool.ruff]
+            # unsafe-fixes = true
+            # lint.select = ['T201']
+            # ///
+            print('side effect')
+        "#},
+        1,
+    );
+    let actions = server
+        .code_action_request("script.py", vec![])
+        .unwrap_or_default();
+    let actions = serde_json::to_value(actions)?;
+    let action = actions
+        .as_array()
+        .and_then(|actions| {
+            actions
+                .iter()
+                .find(|action| action["kind"] == "source.fixAll.ruff")
+        })
+        .ok_or_else(|| anyhow::anyhow!("expected a Fix All action"))?;
+    assert!(action["edit"]["changes"].as_object().is_none_or(|changes| {
+        changes
+            .values()
+            .all(|edits| edits.as_array().is_some_and(Vec::is_empty))
+    }));
     Ok(())
 }
 

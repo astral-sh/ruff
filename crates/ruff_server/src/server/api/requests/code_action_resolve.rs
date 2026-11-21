@@ -51,6 +51,11 @@ impl super::BackgroundRequestHandler for CodeActionResolve {
 
         let query = snapshot.query();
 
+        if query.settings().script_error().is_some() {
+            action.edit = None;
+            return Ok(action);
+        }
+
         let code_actions = SupportedCodeAction::from_kind(
             action
                 .kind

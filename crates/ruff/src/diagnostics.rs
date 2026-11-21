@@ -296,7 +296,7 @@ pub(crate) fn lint_path(
 
     let script_configuration = overrides.script_configuration();
     let metadata = if script_metadata_enabled {
-        script_metadata(Some(path), source_kind.source_code())
+        script_metadata(Some(path), source_kind.source_code(), script_configuration)
     } else {
         Ok(None)
     };

@@ -3675,6 +3675,7 @@ dependencies = [
  "dunce",
  "gen-lsp-types",
  "ignore",
+ "indoc",
  "insta",
  "jiff",
  "jod-thread",

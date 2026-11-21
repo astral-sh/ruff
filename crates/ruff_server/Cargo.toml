@@ -49,6 +49,7 @@ tracing-subscriber = { workspace = true }
 libc = { workspace = true }
 
 [dev-dependencies]
+indoc = { workspace = true }
 insta = { workspace = true, features = ["filters", "json"] }
 ruff_linter = { workspace = true, features = ["test-rules"] }
 dunce = { workspace = true }
