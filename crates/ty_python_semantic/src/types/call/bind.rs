@@ -7934,11 +7934,25 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // We still update the actual type of the parameter in this binding to match the argument,
         // even if the argument type is not assignable to the expected parameter type.
         //
-        // For a broad variadic sink such as `*args: object` or `**kwargs: object`, preserving a
-        // union of every individual argument type does not improve call checking or special-case
-        // return inference. Keep the already-declared top type instead of repeatedly growing a
-        // large union.
-        if (parameter.is_variadic() || parameter.is_keyword_variadic()) && expected_ty.is_object() {
+        // Generic inference and argument checking use the individual arguments. For an
+        // ordinary function the combined variadic type doesn't affect the return type,
+        // so keep the expected type as we do for variadics accepting `object`.
+        // A dataclass transform can use it to recognize a class passed through `*args`.
+        // Leave overloads alone because any of them could carry the transform.
+        if (parameter.is_variadic() || parameter.is_keyword_variadic())
+            && (expected_ty.is_object()
+                || self
+                    .signature_type
+                    .as_function_literal()
+                    .is_some_and(|function| {
+                        let ([], Some(definition)) = function.overloads_and_implementation(db)
+                        else {
+                            return false;
+                        };
+                        definition.known(db).is_none()
+                            && definition.dataclass_transformer_params(db).is_none()
+                    }))
+        {
             self.parameter_tys[parameter_index].get_or_insert(expected_ty);
             return;
         }
