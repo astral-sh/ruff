@@ -6668,6 +6668,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             };
 
+        let from_ast = matches!(ast_arguments, ArgumentsIter::FromAst(_));
         for (argument_index, ast_argument) in ast_arguments.enumerate() {
             // Splatted arguments are inferred before parameter matching to
             // determine their length.
@@ -6739,11 +6740,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // as inner expressions are repeatedly inferred with the same type context.
                     let teardown_expression_cache = self.setup_expression_cache();
 
+                    // A name bound to an instance needs neither class specialization nor
+                    // literal promotion. Only a TypeForm context can reinterpret the name.
+                    // Synthesized arguments can have stateful inference callbacks.
+                    let reuse_instance = from_ast
+                        && ast_argument.is_name_expr()
+                        && argument_tcx.iter().flatten().all(|ctx| {
+                            ctx.type_context()
+                                .expected_type()
+                                .is_none_or(|target| !self.is_type_form_context(target))
+                        });
+                    let mut name_type = None;
                     for argument_tcx in argument_tcx {
                         let inference_cache_key =
                             argument_tcx.map(ArgumentTypeContext::inference_cache_key);
-                        if let Some(inferred_ty) =
-                            inferred_by_cache_key.get(&inference_cache_key).copied()
+                        if let Some(inferred_ty) = name_type
+                            .or_else(|| inferred_by_cache_key.get(&inference_cache_key).copied())
                         {
                             // Even when the inference cache key is identical, this overload may later
                             // look up the inferred type through a different original `ParamSpec`
@@ -6773,7 +6785,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             argument_types,
                         );
 
-                        inferred_by_cache_key.insert(inference_cache_key, inferred_ty);
+                        if reuse_instance
+                            && matches!(inferred_ty, Type::NominalInstance(_) | Type::TypeAlias(_))
+                        {
+                            name_type = Some(inferred_ty);
+                        } else {
+                            inferred_by_cache_key.insert(inference_cache_key, inferred_ty);
+                        }
                         self.union_expected_types(&speculative_builder.expected_types);
                     }
 

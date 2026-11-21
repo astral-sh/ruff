@@ -5,6 +5,19 @@ use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::{CycleDetector, KnownClass, Type, TypeContext, TypeFormType};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Whether an expected type can reinterpret a value as a type expression.
+    pub(super) fn is_type_form_context(&self, target: Type<'db>) -> bool {
+        let db = self.db();
+        match target.resolve_type_alias(db) {
+            Type::TypeForm(_) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| matches!(element.resolve_type_alias(db), Type::TypeForm(_))),
+            _ => false,
+        }
+    }
+
     /// In a `TypeForm` context, keep the ordinary value interpretation if it is
     /// already acceptable.
     ///
@@ -20,20 +33,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
-        let non_type_form_fallback = match target.resolve_type_alias(db) {
-            Type::TypeForm(_) => None,
-            Type::Union(union)
-                if union
-                    .elements(self.db())
-                    .iter()
-                    .any(|element| matches!(element.resolve_type_alias(db), Type::TypeForm(_))) =>
-            {
-                Some(target.filter_union(db, env, |element| {
-                    !matches!(element.resolve_type_alias(db), Type::TypeForm(_))
-                }))
-            }
-            _ => return None,
-        };
+        if !self.is_type_form_context(target) {
+            return None;
+        }
+        let non_type_form_fallback = target.resolve_type_alias(db).is_union().then(|| {
+            target.filter_union(db, env, |element| {
+                !matches!(element.resolve_type_alias(db), Type::TypeForm(_))
+            })
+        });
 
         // Suppress contextual `TypeForm` evaluation only if ordinary inference already
         // produces a type-form value or satisfies the non-`TypeForm` arm of the union.

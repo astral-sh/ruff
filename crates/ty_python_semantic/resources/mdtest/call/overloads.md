@@ -142,6 +142,26 @@ reveal_type(select_text)  # revealed: partial[(value: str) -> str]
 select_text(1)  # error: [invalid-argument-type]
 ```
 
+### Instance and class names as arguments
+
+The type of `number` or `text` is the same for both overloads, but the expected return type of
+`make` can specialize `list` differently for each overload.
+
+```py
+from typing import Callable, overload
+
+@overload
+def build(value: int, make: Callable[[], list[int]]) -> list[int]: ...
+@overload
+def build(value: str, make: Callable[[], list[str]]) -> list[str]: ...
+def build(value: object, make: object) -> object:
+    raise NotImplementedError
+
+def check(number: int, text: str):
+    reveal_type(build(number, list))  # revealed: list[int]
+    reveal_type(build(text, list))  # revealed: list[str]
+```
+
 ### Type context when no overload matches
 
 Both overloads reject the value, but only the first also rejects the key. The second overload
