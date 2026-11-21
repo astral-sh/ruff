@@ -8,10 +8,20 @@ use super::{
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, Program, ProgramEnvironment};
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct ProjectionKey<'db> {
+    program: Program<'db>,
+    node: super::NodeId,
+    source_order: Option<super::SourceOrderId>,
+    inferable: TypeVarSet<'db>,
+    budget: SolutionBudget,
+    diagnostics: ReportDiagnostics,
+}
 
 /// Limits for one projection, including preprocessing, path collection, and its result.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct SolutionBudget {
     /// Satisfied paths collected before per-variable solution selection can reject them.
     pub(crate) paths: usize,
@@ -175,15 +185,39 @@ impl<'db> ConstraintSet<'db, '_> {
         report_diagnostics: ReportDiagnostics,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
-        let path_bounds = CandidateSolutions::compute_bounded(
-            db,
-            env,
-            self,
+        let collect = || {
+            CandidateSolutions::compute_bounded(
+                db,
+                env,
+                self,
+                inferable,
+                budget,
+                CandidateSearch::All(report_diagnostics),
+            )
+        };
+        if self.node.is_terminal() {
+            return collect()?.solve_with_budget(db, budget, choose);
+        }
+
+        // For a single argument, preliminary inference, the call-wide solve and
+        // diagnostic recovery can all project the same constraints. Only reuse
+        // the raw paths: each solve has its own selector and type-term budget.
+        let key = ProjectionKey {
+            program: env.program(db),
+            node: self.node,
+            source_order: self.source_order,
             inferable,
             budget,
-            CandidateSearch::All(report_diagnostics),
-        )?;
-        path_bounds.solve_with_budget(db, budget, choose)
+            diagnostics: report_diagnostics,
+        };
+        let last = self.builder.storage.borrow_mut().last_projection.take();
+        let paths = match last {
+            Some((previous, paths)) if previous == key => paths,
+            _ => collect()?,
+        };
+        let result = paths.solve_with_budget(db, budget, choose);
+        self.builder.storage.borrow_mut().last_projection = Some((key, paths));
+        result
     }
 
     /// Folds complete, correlated solutions without first allocating every solved path.
