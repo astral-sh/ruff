@@ -1264,7 +1264,7 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
+        let should_simplify_full = !ty.is_alias_like();
 
         let mut ty_negated: Option<Type> = None;
         let mut reductions = UnionReductions::default();
@@ -1311,21 +1311,6 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if Self::is_incomparable_for_union(db, ty, element_type) {
-                continue;
-            }
-
-            // `object` already contains every possible union element.
-            if !self.cycle_recovery && element_type == Type::object() {
-                return;
-            }
-
-            if !self.cycle_recovery
-                && should_preserve_hashable_union(db, &self.env, ty, element_type)
-            {
-                continue;
-            }
-
             // The empty and non-empty range refinements are disjoint, but together they cover
             // the ordinary `range` instance type.
             if let (
@@ -1341,10 +1326,28 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
+            // During cycle recovery we only reduce literal groups, remove duplicates, and
+            // merge complementary ranges. General simplifications can depend on the cycle.
+            if self.cycle_recovery {
+                continue;
+            }
+
+            if Self::is_incomparable_for_union(db, ty, element_type) {
+                continue;
+            }
+
+            // `object` already contains every possible union element.
+            if element_type == Type::object() {
+                return;
+            }
+
+            if should_preserve_hashable_union(db, &self.env, ty, element_type) {
+                continue;
+            }
+
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
-            if !self.cycle_recovery
-                && let Some(merged_type) =
-                    merge_truthiness_guarded_pair(db, &self.env, ty, element_type)
+            if let Some(merged_type) =
+                merge_truthiness_guarded_pair(db, &self.env, ty, element_type)
             {
                 reductions.to_remove.push(i);
                 // A nominal core can replace the first element in place; no earlier elements
@@ -1360,11 +1363,10 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if !self.cycle_recovery
-                && element_type
-                    .as_literal_value_kind()
-                    .zip(bool_pair(ty))
-                    .is_some_and(|(element, pair)| element == pair)
+            if element_type
+                .as_literal_value_kind()
+                .zip(bool_pair(ty))
+                .is_some_and(|(element, pair)| element == pair)
             {
                 self.add_in_place_impl(KnownClass::Bool.to_instance(db, &self.env), seen_aliases);
                 return;
@@ -1468,9 +1470,9 @@ impl<'db> UnionBuilder<'db> {
                     self.collapse_to_object();
                     return;
                 }
-            } else if !self.cycle_recovery
-                && let (alias @ Type::Recursive(_), Type::Intersection(negated))
-                | (Type::Intersection(negated), alias @ Type::Recursive(_)) = (ty, element_type)
+            } else if let (alias @ Type::Recursive(_), Type::Intersection(negated))
+            | (Type::Intersection(negated), alias @ Type::Recursive(_)) =
+                (ty, element_type)
                 && negated.is_simple_negation(db)
                 && negated.negative(db).contains(&alias)
                 && !alias.has_unguarded_alias_cycle(db)
