@@ -223,6 +223,24 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
     }
 }
 
+/// Whether the unspecialized MRO rules out `target` as a proper base of `source`.
+///
+/// Specialization changes the arguments of a base, not its class identity. If the
+/// MRO is invalid or incomplete, leave the decision to the full relation.
+fn excludes_ancestor<'db>(
+    db: &'db dyn Db,
+    source: super::StaticClassLiteral<'db>,
+    target: super::StaticClassLiteral<'db>,
+) -> bool {
+    source.try_mro_ancestors(db, None).is_ok_and(|bases| {
+        bases.iter().all(|base| match base {
+            ClassBase::Class(class) => class.class_literal(db) != ClassLiteral::Static(target),
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => false,
+            ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => true,
+        })
+    })
+}
+
 impl<'db> NominalInstanceType<'db> {
     fn from_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         Self(NominalInstanceInner::NonTuple(
@@ -273,21 +291,7 @@ impl<'db> NominalInstanceType<'db> {
             return false;
         }
 
-        // Specialization changes the arguments of a base, never its class identity.
-        // C3 already compares origins when merging the MRO. If the unspecialized
-        // MRO is invalid or incomplete, leave the decision to the full relation.
-        let excludes = |source: super::StaticClassLiteral<'db>, target| {
-            source.try_mro_ancestors(db, None).is_ok_and(|bases| {
-                bases.iter().all(|base| match base {
-                    ClassBase::Class(class) => {
-                        class.class_literal(db) != ClassLiteral::Static(target)
-                    }
-                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => false,
-                    ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => true,
-                })
-            })
-        };
-        excludes(left, right) && excludes(right, left)
+        excludes_ancestor(db, left, right) && excludes_ancestor(db, right, left)
     }
 
     /// Returns the class literal for this instance.
@@ -1428,6 +1432,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 NominalInstanceInner::ExactTuple(source_tuple),
                 NominalInstanceInner::ExactTuple(target_tuple),
             ) => self.check_tuple_type_pair(db, source_tuple, target_tuple),
+            (NominalInstanceInner::ExactTuple(tuple), NominalInstanceInner::NonTuple(class))
+                if let Some(target) = class.class(db).class_literal(db).as_static()
+                    && let Some(source) = KnownClass::Tuple.try_to_class_literal(
+                        db,
+                        &ProgramEnvironment::from_program(tuple.program(db)),
+                    )
+                    && source != target
+                    && excludes_ancestor(db, source, target) =>
+            {
+                self.never()
+            }
             _ => {
                 let env = self.env;
                 self.check_class_pair(db, source.class(db, env), target.class(db, env))
