@@ -257,7 +257,7 @@ fn text_size_to_lsp_position(
     source_location_to_position(&source_location)
 }
 
-fn text_range_to_lsp_range(
+pub(crate) fn text_range_to_lsp_range(
     range: TextRange,
     text: &str,
     index: &LineIndex,
