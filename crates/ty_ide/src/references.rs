@@ -98,7 +98,7 @@ pub(crate) fn references(
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
     let model = SemanticModel::new(db, file);
-    let target_text = goto_target.to_string()?.into_owned();
+    let target_text = goto_target.to_string()?;
 
     let target_definitions = goto_target
         .definitions(&model, mode.to_import_alias_resolution())?
@@ -124,7 +124,8 @@ pub(crate) fn references(
     });
 
     let search = LocalReferenceSearch {
-        target_text,
+        target_text: &target_text,
+        matcher: NameMatcher::new(&target_text),
         target_definitions,
         import_alias_resolution,
         fixture_resolution,
@@ -184,13 +185,12 @@ fn references_for_search(
                 .collect()
         };
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
-        let matcher = NameMatcher::new(search.target_text.as_str());
         let other_references = files
             .into_par_iter()
             .with_min_len(minimum_job_len)
             .map_with_db(db, |db, other_file| {
                 let source = ruff_db::source::source_text(db, other_file);
-                if !matcher.may_match(&source) {
+                if !search.matcher.may_match(&source) {
                     return Vec::new();
                 }
 
@@ -413,7 +413,8 @@ impl<'db> FixtureReferenceTarget<'db> {
         mode: ReferencesMode,
     ) -> Option<Vec<ReferenceTarget>> {
         let search = LocalReferenceSearch {
-            target_text: self.name.to_string(),
+            target_text: &self.name,
+            matcher: NameMatcher::new(&self.name),
             target_definitions: Definitions::new(Vec::new()),
             import_alias_resolution: ImportAliasResolution::PreserveAliases,
             fixture_resolution: Some(self.resolution),
@@ -459,7 +460,8 @@ impl<'db> FixtureReferenceTarget<'db> {
 }
 
 struct LocalReferenceSearch<'db> {
-    target_text: String,
+    target_text: &'db str,
+    matcher: NameMatcher<'db>,
     target_definitions: Definitions<'db>,
     import_alias_resolution: ImportAliasResolution,
     fixture_resolution: Option<FixtureReferenceResolution<'db>>,
@@ -680,8 +682,13 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 // the matching slot string too.
                 self.check_slots_string_literal(string_expr);
 
-                // Highlight the sub-AST of a string annotation
-                if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
+                // Checking whether a string is an annotation can require inferring its entire
+                // scope. First look for the name in the literal: ty only parses annotations
+                // whose decoded value matches the source between the quotes.
+                if let Some(literal) = string_expr.as_single_part_string()
+                    && self.search.matcher.may_match(literal.as_str())
+                    && let Some((sub_ast, sub_model)) =
+                        self.model.enter_string_annotation(string_expr)
                 {
                     let mut sub_finder = LocalReferencesFinder {
                         model: &sub_model,
@@ -862,7 +869,7 @@ impl<'a> LocalReferencesFinder<'a> {
                 let resolution = fixture_reference_resolution_for_definition(
                     self.model.db(),
                     definition,
-                    &self.search.target_text,
+                    self.search.target_text,
                 );
                 !resolution.roots.is_disjoint(&fixture_resolution.roots)
             })
