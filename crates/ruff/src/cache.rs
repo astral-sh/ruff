@@ -22,11 +22,18 @@ use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
+use ruff_workspace::script::ScriptMetadata;
 
 /// [`Path`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePath = Path;
 /// [`PathBuf`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePathBuf = PathBuf;
+
+/// A later invocation may apply declarations that are ignored by `--isolated` or `--config`.
+/// Skip writes for these files so a cache hit cannot bypass reading their configuration.
+pub(crate) fn is_cacheable(metadata: &ScriptMetadata) -> bool {
+    metadata.requires_python.is_none() && metadata.ruff_options().is_none()
+}
 
 #[derive(CacheKey)]
 pub(crate) struct FileCacheKey {
@@ -34,10 +41,15 @@ pub(crate) struct FileCacheKey {
     file_last_modified: FileTime,
     /// Permissions of the file before the (cached) check.
     file_permissions_mode: u32,
+    /// Files with nested configurations can share a package cache with a different preview mode.
+    script_metadata_enabled: bool,
 }
 
 impl FileCacheKey {
-    pub(crate) fn from_path(path: &Path) -> io::Result<FileCacheKey> {
+    pub(crate) fn from_path(
+        path: &Path,
+        script_metadata_enabled: bool,
+    ) -> io::Result<FileCacheKey> {
         // Construct a cache key for the file
         let metadata = path.metadata()?;
 
@@ -52,6 +64,7 @@ impl FileCacheKey {
         Ok(FileCacheKey {
             file_last_modified: FileTime::from_last_modification_time(&metadata),
             file_permissions_mode: permissions,
+            script_metadata_enabled,
         })
     }
 }
@@ -508,6 +521,7 @@ mod tests {
 
     use anyhow::Result;
     use filetime::{FileTime, set_file_mtime};
+    use indoc::indoc;
     use itertools::Itertools;
     use ruff_python_ast::SourceType;
     use test_case::test_case;
@@ -516,7 +530,7 @@ mod tests {
     use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::flags;
-    use ruff_linter::settings::types::UnsafeFixes;
+    use ruff_linter::settings::types::{PreviewMode, UnsafeFixes};
     use ruff_python_ast::PySourceType;
     use ruff_python_ast::PythonVersion;
     use ruff_workspace::configuration::{Configuration, RuleSelection};
@@ -648,6 +662,57 @@ mod tests {
             expected_diagnostics, got_diagnostics,
             "left == {expected_diagnostics:#?}, right == {got_diagnostics:#?}",
         );
+    }
+
+    #[test]
+    fn cache_skips_only_files_with_script_configuration() -> Result<()> {
+        let mut test = TestCache::new("cache_skips_only_files_with_script_configuration");
+        test.project.settings.preview = PreviewMode::Enabled;
+        let cache = test.open();
+        let check = |name: &str, source: &str| -> Result<()> {
+            test.write_source_file(name, source.as_bytes());
+            assert!(test.lint_file_with_cache(name, &cache)?.inner.is_empty());
+            test.format_file_with_cache(name, &cache).unwrap();
+            Ok(())
+        };
+        check(
+            "version.py",
+            indoc! {r#"
+                # /// script
+                # requires-python = "<3.12"
+                # ///
+                x = 1
+            "#},
+        )?;
+        check(
+            "inline.py",
+            indoc! {r#"
+                # /// script
+                # [tool.ruff]
+                # ///
+                x = 1
+            "#},
+        )?;
+        check(
+            "dependencies.py",
+            indoc! {r#"
+                # /// script
+                # dependencies = []
+                # ///
+                x = 1
+            "#},
+        )?;
+        check("ordinary.py", "")?;
+
+        cache.persist()?;
+        let files = test.open().package.files;
+        assert!(!files.contains_key(Path::new("version.py")));
+        assert!(!files.contains_key(Path::new("inline.py")));
+        assert!(files[Path::new("dependencies.py")].linted());
+        assert!(files[Path::new("dependencies.py")].data.formatted);
+        assert!(files[Path::new("ordinary.py")].linted());
+        assert!(files[Path::new("ordinary.py")].data.formatted);
+        Ok(())
     }
 
     #[test]
@@ -961,7 +1026,7 @@ mod tests {
 
         let Some(file_cache) = cache.get(
             Path::new("source.py"),
-            &FileCacheKey::from_path(&test_cache.package_root.join("source.py")).unwrap(),
+            &FileCacheKey::from_path(&test_cache.package_root.join("source.py"), false).unwrap(),
         ) else {
             panic!("Cache entry for `source.py` is missing.");
         };
@@ -1011,7 +1076,7 @@ mod tests {
 
         let Some(file_cache) = cache.get(
             Path::new("source.py"),
-            &FileCacheKey::from_path(&source_path).unwrap(),
+            &FileCacheKey::from_path(&source_path, false).unwrap(),
         ) else {
             panic!("Cache entry for `source.py` is missing.");
         };

@@ -74,15 +74,19 @@ pub fn script(
 
 /// The inline metadata that can affect Ruff settings.
 #[derive(Deserialize)]
-struct ScriptMetadata {
+pub struct ScriptMetadata {
     #[serde(rename = "requires-python")]
-    requires_python: Option<VersionSpecifiers>,
+    pub requires_python: Option<VersionSpecifiers>,
     tool: Option<Box<Tools>>,
 }
 
 impl ScriptMetadata {
+    pub fn ruff_options(&self) -> Option<&Options> {
+        self.tool.as_ref()?.ruff.as_ref()
+    }
+
     /// Resolve settings from parsed metadata, reusing the project settings when possible.
-    fn resolve(
+    pub fn resolve(
         self,
         project: &Project,
         overrides: &dyn ConfigurationTransformer,
@@ -131,7 +135,7 @@ impl ScriptMetadata {
 }
 
 /// Read the declarations that affect Ruff, returning `None` if there is no script tag.
-fn script_metadata(
+pub fn script_metadata(
     path: Option<&Path>,
     source: &str,
 ) -> Result<Option<ScriptMetadata>, ScriptSettingsError> {
