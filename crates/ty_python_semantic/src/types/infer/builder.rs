@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::cell::{OnceCell, RefCell};
+use std::cell::{LazyCell, OnceCell, RefCell};
 use std::collections::{HashSet, hash_map};
 use std::convert::Infallible;
 use std::rc::Rc;
@@ -8133,25 +8133,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
 
-        // Extract the type variable `T` from `list[T]` in typeshed.
-        let elt_tys = |collection_class: KnownClass| {
-            let collection_alias = collection_class
-                .try_to_class_literal(db, env)?
-                .identity_specialization(db)
-                .into_generic_alias()?;
-
-            let generic_context = collection_alias
-                .specialization(self.db())
-                .generic_context(self.db());
-
-            Some((
-                collection_alias,
-                generic_context,
-                generic_context.variables(self.db()),
-            ))
-        };
-
-        let Some((collection_alias, generic_context, elt_tys)) = elt_tys(collection_class) else {
+        let Some((class, generic_context)) = collection_class
+            .try_to_class_literal(db, env)
+            .and_then(|class| Some((class, class.generic_context(db)?)))
+        else {
             // Infer the element types without type context, and fallback to `Unknown` for
             // custom typesheds.
             for elts in elts {
@@ -8164,9 +8149,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
+        let elt_tys = generic_context.variables(db);
         let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(db);
-        let identity_instance = Type::instance(db, env, ClassType::Generic(collection_alias));
+        let identity_instance =
+            LazyCell::new(|| Type::instance(db, env, class.identity_specialization(db)));
         let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
 
         // Remove any union elements of that are unrelated to the collection type.
@@ -8363,13 +8350,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             if compatible {
-                let class_type = collection_alias.origin(self.db()).apply_specialization(
-                    db,
-                    |generic_context| {
-                        generic_context
-                            .specialize_recursive(db, specialization.into_iter().map(Some))
-                    },
-                );
+                let class_type = class.apply_specialization(db, |generic_context| {
+                    generic_context.specialize_recursive(db, specialization.into_iter().map(Some))
+                });
                 return Type::from(class_type).to_instance_approximation(db, env);
             }
 
@@ -8437,16 +8420,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .as_divergent()
                 {
                     // Infer `collection[Divergent]` for the initial cycle result.
-                    let divergent_instance = collection_alias
-                        .origin(self.db())
-                        .apply_specialization(db, |generic_context| {
-                            generic_context
-                                .repeat_specialization(self.db(), Type::Divergent(divergent))
-                        });
+                    let divergent_instance = class.apply_specialization(db, |generic_context| {
+                        generic_context.repeat_specialization(self.db(), Type::Divergent(divergent))
+                    });
 
                     builder
                         .infer(
-                            identity_instance,
+                            *identity_instance,
                             Type::instance(db, env, divergent_instance),
                         )
                         .ok()?;
@@ -8458,7 +8438,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        builder.infer(identity_instance, *constraint).ok()?;
+                        builder.infer(*identity_instance, *constraint).ok()?;
                     }
                 }
             }
@@ -8594,22 +8574,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let class_type = collection_alias
-            .origin(self.db())
-            .apply_specialization(db, |_| {
-                builder.build_merged_with(|current_typevar, bounds| {
-                    let lower = bounds?.inference_lower()?;
+        let class_type = class.apply_specialization(db, |_| {
+            builder.build_merged_with(|current_typevar, bounds| {
+                let lower = bounds?.inference_lower()?;
 
-                    let lower = lower.promote_collection_element_type(
-                        db,
-                        env,
-                        tuple_size_promotion_constraints.allow(current_typevar.identity(self.db())),
-                        tcx.expected_type().is_none(),
-                    );
+                let lower = lower.promote_collection_element_type(
+                    db,
+                    env,
+                    tuple_size_promotion_constraints.allow(current_typevar.identity(self.db())),
+                    tcx.expected_type().is_none(),
+                );
 
-                    Some(lower)
-                })
-            });
+                Some(lower)
+            })
+        });
 
         Type::from(class_type).to_instance_approximation(db, env)
     }
