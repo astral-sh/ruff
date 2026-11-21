@@ -40,6 +40,38 @@ from exporter import *
 reveal_type(X)  # revealed: bool
 ```
 
+### Assigning to a declared name
+
+The import must satisfy the declaration even if the name is never read.
+
+`exporter.py`:
+
+```py
+x = "hello"
+```
+
+`importer.py`:
+
+```py
+x: int
+from exporter import *  # error: [invalid-assignment]
+```
+
+### Assigning to an implicit module global
+
+`exporter.py`:
+
+```py
+__name__: int = 1  # error: [invalid-declaration]
+__all__ = ["__name__"]
+```
+
+`importer.py`:
+
+```py
+from exporter import *  # error: [invalid-assignment]
+```
+
 ### Overridden by a later definition
 
 `exporter.py`:
