@@ -211,12 +211,12 @@ impl<'db> ConstraintSet<'db, '_> {
             diagnostics: report_diagnostics,
         };
         let last = self.builder.storage.borrow_mut().last_projection.take();
-        let paths = match last {
-            Some((previous, paths)) if previous == key => paths,
-            _ => collect()?,
+        let projection = match last {
+            Some(previous) if previous.0 == key => previous,
+            _ => Box::new((key, collect()?)),
         };
-        let result = paths.solve_with_budget(db, budget, choose);
-        self.builder.storage.borrow_mut().last_projection = Some((key, paths));
+        let result = projection.1.solve_with_budget(db, budget, choose);
+        self.builder.storage.borrow_mut().last_projection = Some(projection);
         result
     }
 
