@@ -55,15 +55,15 @@ select = ["missing-return-type-undocumented-public-function"]
 ```
 
 ```snapshot
-error[RUF202]: Rule selector `missing-return-type-undocumented-public-function` redirects to `missing-return-type-public-function` in `lint.select`
+error[RUF202]: Rule selector `missing-return-type-undocumented-public-function` redirects to `missing-return-annotation-for-public-function` in `lint.select`
  --> src/ruff.toml:3:12
   |
 3 | select = ["missing-return-type-undocumented-public-function"]
   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-help: Replace with `missing-return-type-public-function`
+help: Replace with `missing-return-annotation-for-public-function`
   |
 2 | # snapshot: renamed-rule
   - select = ["missing-return-type-undocumented-public-function"]
-3 + select = ["missing-return-type-public-function"]
+3 + select = ["missing-return-annotation-for-public-function"]
   |
 ```

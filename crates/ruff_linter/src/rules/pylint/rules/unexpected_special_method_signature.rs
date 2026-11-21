@@ -153,7 +153,7 @@ pub(crate) fn unexpected_special_method_signature(
         return;
     }
 
-    // Method has no parameter, will be caught by no-method-argument (E0211/N805).
+    // Method has no parameter, will be caught by method-without-parameters (E0211/N805).
     if parameters.args.is_empty() && parameters.vararg.is_none() {
         return;
     }

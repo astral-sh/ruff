@@ -48,14 +48,14 @@ impl fmt::Display for VarKind {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.245", category = Category::Style)]
-pub(crate) struct UnprefixedTypeParam {
+pub(crate) struct UnprefixedTypeParameterInStub {
     kind: VarKind,
 }
 
-impl Violation for UnprefixedTypeParam {
+impl Violation for UnprefixedTypeParameterInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnprefixedTypeParam { kind } = self;
+        let UnprefixedTypeParameterInStub { kind } = self;
         format!("Name of private `{kind}` must start with `_`")
     }
 }
@@ -108,5 +108,5 @@ pub(crate) fn prefix_type_params(checker: &Checker, value: &Expr, targets: &[Exp
         return;
     };
 
-    checker.report_diagnostic(UnprefixedTypeParam { kind }, value.range());
+    checker.report_diagnostic(UnprefixedTypeParameterInStub { kind }, value.range());
 }

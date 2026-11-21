@@ -1346,7 +1346,7 @@ impl Flake8BooleanTrapOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BugbearOptions {
     /// Additional callable functions to consider "immutable" when evaluating, e.g., the
-    /// `function-call-in-default-argument` rule (`B008`) or `function-call-in-dataclass-defaults`
+    /// `function-call-in-parameter-default` rule (`B008`) or `function-call-in-dataclass-field-default`
     /// rule (`RUF009`).
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `fastapi.Query`, rather than

@@ -363,10 +363,10 @@ impl Rule {
             | Rule::TooFewSpacesBeforeInlineComment
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
-            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
+            | Rule::UnexpectedSpacesAroundArgumentOrParameterEquals
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
-            | Rule::WhitespaceBeforeParameters
+            | Rule::WhitespaceBeforeOpenBracket
             | Rule::WhitespaceBeforePunctuation => LintSource::LogicalLines,
             _ => LintSource::Ast,
         }

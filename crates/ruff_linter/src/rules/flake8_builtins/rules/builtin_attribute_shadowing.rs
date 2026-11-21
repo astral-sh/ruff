@@ -58,16 +58,16 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// - `lint.flake8-builtins.ignorelist`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.48", category = Category::Pedantic)]
-pub(crate) struct BuiltinAttributeShadowing {
+pub(crate) struct AttributeShadowsBuiltin {
     kind: Kind,
     name: String,
     row: SourceRow,
 }
 
-impl Violation for BuiltinAttributeShadowing {
+impl Violation for AttributeShadowsBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinAttributeShadowing { kind, name, row } = self;
+        let AttributeShadowsBuiltin { kind, name, row } = self;
         match kind {
             Kind::Attribute => {
                 format!("Python builtin is shadowed by class attribute `{name}` from {row}")
@@ -140,7 +140,7 @@ pub(crate) fn builtin_attribute_shadowing(
                 .filter(|reference| consider_reference(reference.scope_id()))
             {
                 checker.report_diagnostic(
-                    BuiltinAttributeShadowing {
+                    AttributeShadowsBuiltin {
                         kind,
                         name: name.to_string(),
                         row: checker.compute_source_row(binding.start()),

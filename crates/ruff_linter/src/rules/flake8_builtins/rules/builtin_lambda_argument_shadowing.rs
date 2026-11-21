@@ -8,10 +8,10 @@ use crate::codes::Category;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
-/// Checks for lambda arguments that use the same names as Python builtins.
+/// Checks for lambda parameters that use the same names as Python builtins.
 ///
 /// ## Why is this bad?
-/// Reusing a builtin name for the name of a lambda argument increases the
+/// Reusing a builtin name for the name of a lambda parameter increases the
 /// difficulty of reading and maintaining the code and can cause
 /// non-obvious errors. Readers may mistake the variable for the
 /// builtin, and vice versa.
@@ -23,15 +23,15 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// - `lint.flake8-builtins.ignorelist`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.9.0", category = Category::Pedantic)]
-pub(crate) struct BuiltinLambdaArgumentShadowing {
+pub(crate) struct LambdaParameterShadowsBuiltin {
     name: String,
 }
 
-impl Violation for BuiltinLambdaArgumentShadowing {
+impl Violation for LambdaParameterShadowsBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinLambdaArgumentShadowing { name } = self;
-        format!("Lambda argument `{name}` is shadowing a Python builtin")
+        let LambdaParameterShadowsBuiltin { name } = self;
+        format!("Lambda parameter `{name}` is shadowing a Python builtin")
     }
 }
 
@@ -49,7 +49,7 @@ pub(crate) fn builtin_lambda_argument_shadowing(checker: &Checker, lambda: &Expr
             checker.target_version(),
         ) {
             checker.report_diagnostic(
-                BuiltinLambdaArgumentShadowing {
+                LambdaParameterShadowsBuiltin {
                     name: name.to_string(),
                 },
                 name.range(),

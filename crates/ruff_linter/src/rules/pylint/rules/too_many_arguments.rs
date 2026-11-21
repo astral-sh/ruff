@@ -9,9 +9,9 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for function definitions that include too many arguments.
+/// Checks for function definitions that include too many parameters.
 ///
-/// By default, this rule allows up to five arguments, as configured by the
+/// By default, this rule allows up to five parameters, as configured by the
 /// [`lint.pylint.max-args`] option.
 ///
 /// This rule exempts methods decorated with [`@typing.override`][override].
@@ -22,12 +22,12 @@ use crate::codes::Category;
 /// signals to Ruff that the method is intended to override a superclass
 /// method and that a type checker will enforce that it does so; Ruff
 /// therefore knows that it should not enforce rules about methods having
-/// too many arguments.
+/// too many parameters.
 ///
 /// ## Why is this bad?
-/// Functions with many arguments are harder to understand, maintain, and call.
-/// Consider refactoring functions with many arguments into smaller functions
-/// with fewer arguments, or using objects to group related arguments.
+/// Functions with many parameters are harder to understand, maintain, and call.
+/// Consider refactoring functions with many parameters into smaller functions
+/// with fewer parameters, or using objects to group related values.
 ///
 /// ## Example
 /// ```python
@@ -59,16 +59,16 @@ use crate::codes::Category;
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.238", category = Category::Pedantic)]
-pub(crate) struct TooManyArguments {
+pub(crate) struct TooManyParameters {
     c_args: usize,
     max_args: usize,
 }
 
-impl Violation for TooManyArguments {
+impl Violation for TooManyParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyArguments { c_args, max_args } = self;
-        format!("Too many arguments in function definition ({c_args} > {max_args})")
+        let TooManyParameters { c_args, max_args } = self;
+        format!("Too many parameters in function definition ({c_args} > {max_args})")
     }
 }
 
@@ -124,7 +124,7 @@ pub(crate) fn too_many_arguments(checker: &Checker, function_def: &ast::StmtFunc
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        TooManyArguments {
+        TooManyParameters {
             c_args: num_arguments,
             max_args: checker.settings().pylint.max_args,
         },

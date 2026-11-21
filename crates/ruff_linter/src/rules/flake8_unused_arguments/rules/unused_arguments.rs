@@ -12,10 +12,10 @@ use crate::codes::Category;
 use crate::registry::Rule;
 
 /// ## What it does
-/// Checks for the presence of unused arguments in function definitions.
+/// Checks for the presence of unused parameters in function definitions.
 ///
 /// ## Why is this bad?
-/// An argument that is defined but not used is likely a mistake, and should
+/// A parameter that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
@@ -38,23 +38,23 @@ use crate::registry::Rule;
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168", category = Category::Pedantic)]
-pub(crate) struct UnusedFunctionArgument {
+pub(crate) struct UnusedFunctionParameter {
     name: String,
 }
 
-impl Violation for UnusedFunctionArgument {
+impl Violation for UnusedFunctionParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedFunctionArgument { name } = self;
-        format!("Unused function argument: `{name}`")
+        let UnusedFunctionParameter { name } = self;
+        format!("Unused function parameter: `{name}`")
     }
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in instance method definitions.
+/// Checks for the presence of unused parameters in instance method definitions.
 ///
 /// ## Why is this bad?
-/// An argument that is defined but not used is likely a mistake, and should
+/// A parameter that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
@@ -69,7 +69,7 @@ impl Violation for UnusedFunctionArgument {
 /// overriding method with `@override` signals to Ruff that the method is
 /// intended to override a superclass method and that a type checker will
 /// enforce that it does so; Ruff therefore knows that it should not enforce
-/// rules about unused arguments on such methods.
+/// rules about unused parameters on such methods.
 ///
 /// ## Example
 /// ```python
@@ -91,23 +91,23 @@ impl Violation for UnusedFunctionArgument {
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168", category = Category::Pedantic)]
-pub(crate) struct UnusedMethodArgument {
+pub(crate) struct UnusedMethodParameter {
     name: String,
 }
 
-impl Violation for UnusedMethodArgument {
+impl Violation for UnusedMethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedMethodArgument { name } = self;
-        format!("Unused method argument: `{name}`")
+        let UnusedMethodParameter { name } = self;
+        format!("Unused method parameter: `{name}`")
     }
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in class method definitions.
+/// Checks for the presence of unused parameters in class method definitions.
 ///
 /// ## Why is this bad?
-/// An argument that is defined but not used is likely a mistake, and should
+/// A parameter that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
@@ -122,7 +122,7 @@ impl Violation for UnusedMethodArgument {
 /// overriding method with `@override` signals to Ruff that the method is
 /// intended to override a superclass method and that a type checker will
 /// enforce that it does so; Ruff therefore knows that it should not enforce
-/// rules about unused arguments on such methods.
+/// rules about unused parameters on such methods.
 ///
 /// ## Example
 /// ```python
@@ -146,23 +146,23 @@ impl Violation for UnusedMethodArgument {
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168", category = Category::Pedantic)]
-pub(crate) struct UnusedClassMethodArgument {
+pub(crate) struct UnusedClassMethodParameter {
     name: String,
 }
 
-impl Violation for UnusedClassMethodArgument {
+impl Violation for UnusedClassMethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedClassMethodArgument { name } = self;
-        format!("Unused class method argument: `{name}`")
+        let UnusedClassMethodParameter { name } = self;
+        format!("Unused class method parameter: `{name}`")
     }
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in static method definitions.
+/// Checks for the presence of unused parameters in static method definitions.
 ///
 /// ## Why is this bad?
-/// An argument that is defined but not used is likely a mistake, and should
+/// A parameter that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
@@ -177,7 +177,7 @@ impl Violation for UnusedClassMethodArgument {
 /// overriding method with `@override` signals to Ruff that the method is
 /// intended to override a superclass method, and that a type checker will
 /// enforce that it does so; Ruff therefore knows that it should not enforce
-/// rules about unused arguments on such methods.
+/// rules about unused parameters on such methods.
 ///
 /// ## Example
 /// ```python
@@ -201,24 +201,24 @@ impl Violation for UnusedClassMethodArgument {
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168", category = Category::Pedantic)]
-pub(crate) struct UnusedStaticMethodArgument {
+pub(crate) struct UnusedStaticMethodParameter {
     name: String,
 }
 
-impl Violation for UnusedStaticMethodArgument {
+impl Violation for UnusedStaticMethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedStaticMethodArgument { name } = self;
-        format!("Unused static method argument: `{name}`")
+        let UnusedStaticMethodParameter { name } = self;
+        format!("Unused static method parameter: `{name}`")
     }
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in lambda expression
+/// Checks for the presence of unused parameters in lambda expression
 /// definitions.
 ///
 /// ## Why is this bad?
-/// An argument that is defined but not used is likely a mistake, and should
+/// A parameter that is defined but not used is likely a mistake, and should
 /// be removed to avoid confusion.
 ///
 /// If a variable is intentionally defined-but-not-used, it should be
@@ -241,15 +241,15 @@ impl Violation for UnusedStaticMethodArgument {
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.168", category = Category::Pedantic)]
-pub(crate) struct UnusedLambdaArgument {
+pub(crate) struct UnusedLambdaParameter {
     name: String,
 }
 
-impl Violation for UnusedLambdaArgument {
+impl Violation for UnusedLambdaParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedLambdaArgument { name } = self;
-        format!("Unused lambda argument: `{name}`")
+        let UnusedLambdaParameter { name } = self;
+        format!("Unused lambda parameter: `{name}`")
     }
 }
 
@@ -266,26 +266,26 @@ enum Argumentable {
 impl Argumentable {
     fn check_for(self, checker: &Checker, name: String, range: TextRange) {
         let mut diagnostic = match self {
-            Self::Function => checker.report_diagnostic(UnusedFunctionArgument { name }, range),
-            Self::Method => checker.report_diagnostic(UnusedMethodArgument { name }, range),
+            Self::Function => checker.report_diagnostic(UnusedFunctionParameter { name }, range),
+            Self::Method => checker.report_diagnostic(UnusedMethodParameter { name }, range),
             Self::ClassMethod => {
-                checker.report_diagnostic(UnusedClassMethodArgument { name }, range)
+                checker.report_diagnostic(UnusedClassMethodParameter { name }, range)
             }
             Self::StaticMethod => {
-                checker.report_diagnostic(UnusedStaticMethodArgument { name }, range)
+                checker.report_diagnostic(UnusedStaticMethodParameter { name }, range)
             }
-            Self::Lambda => checker.report_diagnostic(UnusedLambdaArgument { name }, range),
+            Self::Lambda => checker.report_diagnostic(UnusedLambdaParameter { name }, range),
         };
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
     }
 
     const fn rule_code(self) -> Rule {
         match self {
-            Self::Function => Rule::UnusedFunctionArgument,
-            Self::Method => Rule::UnusedMethodArgument,
-            Self::ClassMethod => Rule::UnusedClassMethodArgument,
-            Self::StaticMethod => Rule::UnusedStaticMethodArgument,
-            Self::Lambda => Rule::UnusedLambdaArgument,
+            Self::Function => Rule::UnusedFunctionParameter,
+            Self::Method => Rule::UnusedMethodParameter,
+            Self::ClassMethod => Rule::UnusedClassMethodParameter,
+            Self::StaticMethod => Rule::UnusedStaticMethodParameter,
+            Self::Lambda => Rule::UnusedLambdaParameter,
         }
     }
 }

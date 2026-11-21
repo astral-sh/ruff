@@ -169,7 +169,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::GlobalStatement) {
                 pylint::rules::global_statement(checker, name);
             }
-            if checker.is_rule_enabled(Rule::LRUCacheWithoutParameters) {
+            if checker.is_rule_enabled(Rule::LRUCacheWithoutArguments) {
                 if checker.target_version() >= PythonVersion::PY38 {
                     pyupgrade::rules::lru_cache_without_parameters(checker, decorator_list);
                 }
@@ -185,7 +185,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::CachedInstanceMethod) {
                 flake8_bugbear::rules::cached_instance_method(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::MutableArgumentDefault) {
+            if checker.is_rule_enabled(Rule::MutableParameterDefault) {
                 flake8_bugbear::rules::mutable_argument_default(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::ReturnInGenerator) {
@@ -236,10 +236,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::PropertyWithParameters) {
                 pylint::rules::property_with_parameters(checker, stmt, decorator_list, parameters);
             }
-            if checker.is_rule_enabled(Rule::TooManyArguments) {
+            if checker.is_rule_enabled(Rule::TooManyParameters) {
                 pylint::rules::too_many_arguments(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::TooManyPositionalArguments) {
+            if checker.is_rule_enabled(Rule::TooManyPositionalParameters) {
                 pylint::rules::too_many_positional_arguments(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::TooManyReturnStatements) {
@@ -289,7 +289,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
 
             if checker.any_rule_enabled(&[
                 Rule::PytestIncorrectMarkParenthesesStyle,
-                Rule::PytestUseFixturesWithoutParameters,
+                Rule::PytestUseFixturesWithoutArguments,
             ]) {
                 flake8_pytest_style::rules::marks(checker, decorator_list);
             }
@@ -322,7 +322,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
             if !checker.semantic.current_scope().kind.is_class() {
-                if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
+                if checker.is_rule_enabled(Rule::VariableShadowsBuiltin) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
             }
@@ -348,7 +348,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::PostInitDefault) {
                 ruff::rules::post_init_default(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::PytestParameterWithDefaultArgument) {
+            if checker.is_rule_enabled(Rule::PytestParameterWithDefaultValue) {
                 flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::AirflowTaskBranchAsShortCircuit) {
@@ -486,7 +486,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.is_rule_enabled(Rule::PassStatementStubBody) {
                     flake8_pyi::rules::pass_statement_stub_body(checker, body);
                 }
-                if checker.is_rule_enabled(Rule::PassInClassBody) {
+                if checker.is_rule_enabled(Rule::PassInStubClassBody) {
                     flake8_pyi::rules::pass_in_class_body(checker, class_def);
                 }
             }
@@ -508,7 +508,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
-            if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
+            if checker.is_rule_enabled(Rule::VariableShadowsBuiltin) {
                 flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
             }
             if checker.is_rule_enabled(Rule::DuplicateBases) {
@@ -705,7 +705,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         alias.asname.as_deref(),
                     );
                 }
-                if checker.is_rule_enabled(Rule::BuiltinImportShadowing) {
+                if checker.is_rule_enabled(Rule::ImportShadowsBuiltin) {
                     flake8_builtins::rules::builtin_import_shadowing(checker, alias);
                 }
             }
@@ -914,7 +914,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         }
                     }
                 }
-                if checker.is_rule_enabled(Rule::BuiltinImportShadowing) {
+                if checker.is_rule_enabled(Rule::ImportShadowsBuiltin) {
                     flake8_builtins::rules::builtin_import_shadowing(checker, alias);
                 }
             }
@@ -1068,9 +1068,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.source_type.is_stub() {
                 if checker.any_rule_enabled(&[
-                    Rule::UnrecognizedVersionInfoCheck,
-                    Rule::PatchVersionComparison,
-                    Rule::WrongTupleLengthVersionComparison,
+                    Rule::UnrecognizedVersionInfoCheckInStub,
+                    Rule::PatchVersionComparisonInStub,
+                    Rule::WrongTupleLengthVersionComparisonInStub,
                 ]) {
                     if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
                         for value in values {
@@ -1081,8 +1081,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
                 if checker.any_rule_enabled(&[
-                    Rule::UnrecognizedPlatformCheck,
-                    Rule::UnrecognizedPlatformName,
+                    Rule::UnrecognizedPlatformCheckInStub,
+                    Rule::UnrecognizedPlatformNameInStub,
                 ]) {
                     if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
                         for value in values {
@@ -1186,7 +1186,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::AssertWithPrintMessage) {
                 ruff::rules::assert_with_print_message(checker, assert_stmt);
             }
-            if checker.is_rule_enabled(Rule::InvalidAssertMessageLiteralArgument) {
+            if checker.is_rule_enabled(Rule::InvalidAssertMessageLiteral) {
                 ruff::rules::invalid_assert_message_literal_argument(checker, assert_stmt);
             }
         }
@@ -1194,7 +1194,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
-            if checker.is_rule_enabled(Rule::AssertRaisesException) {
+            if checker.is_rule_enabled(Rule::AssertRaisesOverlyBroadException) {
                 flake8_bugbear::rules::assert_raises_exception(checker, items);
             }
             if checker.is_rule_enabled(Rule::PytestRaisesWithMultipleStatements) {
@@ -1492,7 +1492,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.source_type.is_stub() {
                 if checker.any_rule_enabled(&[
-                    Rule::UnprefixedTypeParam,
+                    Rule::UnprefixedTypeParameterInStub,
                     Rule::AssignmentDefaultInStub,
                     Rule::UnannotatedAssignmentInStub,
                     Rule::ComplexAssignmentInStub,
@@ -1504,7 +1504,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         .current_scopes()
                         .any(|scope| scope.kind.is_function())
                     {
-                        if checker.is_rule_enabled(Rule::UnprefixedTypeParam) {
+                        if checker.is_rule_enabled(Rule::UnprefixedTypeParameterInStub) {
                             flake8_pyi::rules::prefix_type_params(checker, value, targets);
                         }
                         if checker.is_rule_enabled(Rule::AssignmentDefaultInStub) {

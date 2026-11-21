@@ -10,12 +10,12 @@ use crate::codes::Category;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
-/// Checks for function arguments that use the same names as builtins.
+/// Checks for function parameters that use the same names as builtins.
 ///
 /// ## Why is this bad?
-/// Reusing a builtin name for the name of an argument increases the
+/// Reusing a builtin name for the name of a parameter increases the
 /// difficulty of reading and maintaining the code, and can cause
-/// non-obvious errors, as readers may mistake the argument for the
+/// non-obvious errors, as readers may mistake the parameter for the
 /// builtin and vice versa.
 ///
 /// Function definitions decorated with [`@override`][override] or
@@ -56,15 +56,15 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// [overload]: https://docs.python.org/3/library/typing.html#typing.overload
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.48", category = Category::Pedantic)]
-pub(crate) struct BuiltinArgumentShadowing {
+pub(crate) struct ParameterShadowsBuiltin {
     name: String,
 }
 
-impl Violation for BuiltinArgumentShadowing {
+impl Violation for ParameterShadowsBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinArgumentShadowing { name } = self;
-        format!("Function argument `{name}` is shadowing a Python builtin")
+        let ParameterShadowsBuiltin { name } = self;
+        format!("Function parameter `{name}` is shadowing a Python builtin")
     }
 }
 
@@ -99,7 +99,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
         }
 
         checker.report_diagnostic(
-            BuiltinArgumentShadowing {
+            ParameterShadowsBuiltin {
                 name: parameter.name.to_string(),
             },
             parameter.name.range(),

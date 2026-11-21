@@ -9,10 +9,8 @@ use crate::codes::Category;
 use crate::registry::Rule;
 
 /// ## What it does
-/// Check for unrecognized `sys.platform` checks. Platform checks should be
+/// Checks for unrecognized `sys.platform` checks in stubs. Platform checks should be
 /// simple string comparisons.
-///
-/// **Note**: this rule is only enabled in `.pyi` stub files.
 ///
 /// ## Why is this bad?
 /// Some `sys.platform` checks are too complex for type checkers to
@@ -48,9 +46,9 @@ use crate::registry::Rule;
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.246", category = Category::Suspicious)]
-pub(crate) struct UnrecognizedPlatformCheck;
+pub(crate) struct UnrecognizedPlatformCheckInStub;
 
-impl Violation for UnrecognizedPlatformCheck {
+impl Violation for UnrecognizedPlatformCheckInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Unrecognized `sys.platform` check".to_string()
@@ -58,9 +56,7 @@ impl Violation for UnrecognizedPlatformCheck {
 }
 
 /// ## What it does
-/// Check for unrecognized platform names in `sys.platform` checks.
-///
-/// **Note**: this rule is only enabled in `.pyi` stub files.
+/// Checks for unrecognized platform names in `sys.platform` checks in stubs.
 ///
 /// ## Why is this bad?
 /// If a `sys.platform` check compares to a platform name outside of a
@@ -87,14 +83,14 @@ impl Violation for UnrecognizedPlatformCheck {
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.246", category = Category::Suspicious)]
-pub(crate) struct UnrecognizedPlatformName {
+pub(crate) struct UnrecognizedPlatformNameInStub {
     platform: String,
 }
 
-impl Violation for UnrecognizedPlatformName {
+impl Violation for UnrecognizedPlatformNameInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnrecognizedPlatformName { platform } = self;
+        let UnrecognizedPlatformNameInStub { platform } = self;
         format!("Unrecognized platform `{platform}`")
     }
 }
@@ -118,17 +114,17 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
 
     // "in" might also make sense but we don't currently have one.
     if !matches!(op, CmpOp::Eq | CmpOp::NotEq) {
-        checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheck, test.range());
+        checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheckInStub, test.range());
         return;
     }
 
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = right {
         // Other values are possible but we don't need them right now.
         // This protects against typos.
-        if checker.is_rule_enabled(Rule::UnrecognizedPlatformName) {
+        if checker.is_rule_enabled(Rule::UnrecognizedPlatformNameInStub) {
             if !matches!(value.to_str(), "linux" | "win32" | "cygwin" | "darwin") {
                 checker.report_diagnostic(
-                    UnrecognizedPlatformName {
+                    UnrecognizedPlatformNameInStub {
                         platform: value.to_string(),
                     },
                     right.range(),
@@ -136,6 +132,6 @@ pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
             }
         }
     } else {
-        checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheck, test.range());
+        checker.report_diagnostic_if_enabled(UnrecognizedPlatformCheckInStub, test.range());
     }
 }

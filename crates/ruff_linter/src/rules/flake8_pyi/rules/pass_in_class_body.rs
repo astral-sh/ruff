@@ -29,9 +29,9 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.260", category = Category::Correctness)]
-pub(crate) struct PassInClassBody;
+pub(crate) struct PassInStubClassBody;
 
-impl AlwaysFixableViolation for PassInClassBody {
+impl AlwaysFixableViolation for PassInStubClassBody {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Class body must not contain `pass`".to_string()
@@ -54,7 +54,7 @@ pub(crate) fn pass_in_class_body(checker: &Checker, class_def: &ast::StmtClassDe
             continue;
         }
 
-        let mut diagnostic = checker.report_diagnostic(PassInClassBody, stmt.range());
+        let mut diagnostic = checker.report_diagnostic(PassInStubClassBody, stmt.range());
         let edit = fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer());
         diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
             checker.semantic().current_statement_id(),

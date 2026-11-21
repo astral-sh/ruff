@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for invalid use of literals in assert message arguments.
+/// Checks for non-string literals used as the message of an `assert` statement.
 ///
 /// ## Why is this bad?
 /// An assert message which is a non-string literal was likely intended
@@ -28,9 +28,9 @@ use crate::codes::Category;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.10.0", category = Category::Suspicious)]
-pub(crate) struct InvalidAssertMessageLiteralArgument;
+pub(crate) struct InvalidAssertMessageLiteral;
 
-impl Violation for InvalidAssertMessageLiteralArgument {
+impl Violation for InvalidAssertMessageLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Non-string literal used as assert message".to_string()
@@ -54,5 +54,5 @@ pub(crate) fn invalid_assert_message_literal_argument(checker: &Checker, stmt: &
         return;
     }
 
-    checker.report_diagnostic(InvalidAssertMessageLiteralArgument, message.range());
+    checker.report_diagnostic(InvalidAssertMessageLiteral, message.range());
 }

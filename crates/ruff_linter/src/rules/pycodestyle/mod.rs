@@ -194,9 +194,9 @@ mod tests {
     #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
-    #[test_case(Rule::WhitespaceBeforeParameters, Path::new("E21.py"))]
+    #[test_case(Rule::WhitespaceBeforeOpenBracket, Path::new("E21.py"))]
     #[test_case(
-        Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+        Rule::UnexpectedSpacesAroundArgumentOrParameterEquals,
         Path::new("E25.py")
     )]
     #[test_case(Rule::MissingWhitespaceAroundParameterEquals, Path::new("E25.py"))]

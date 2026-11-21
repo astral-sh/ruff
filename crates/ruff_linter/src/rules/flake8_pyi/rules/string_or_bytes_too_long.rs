@@ -38,9 +38,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.271", category = Category::Pedantic)]
-pub(crate) struct StringOrBytesTooLong;
+pub(crate) struct StringOrBytesTooLongInStub;
 
-impl AlwaysFixableViolation for StringOrBytesTooLong {
+impl AlwaysFixableViolation for StringOrBytesTooLongInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         "String and bytes literals longer than 50 characters are not permitted".to_string()
@@ -88,7 +88,7 @@ pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(StringOrBytesTooLong, string.range());
+    let mut diagnostic = checker.report_diagnostic(StringOrBytesTooLongInStub, string.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         string.range(),
