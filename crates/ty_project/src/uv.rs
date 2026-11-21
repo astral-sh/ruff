@@ -58,11 +58,6 @@ impl UseUv {
             _ => Some(Self::Off),
         }
     }
-
-    /// Whether uv should be used for workspace discovery.
-    pub const fn workspace_discovery_enabled(self) -> bool {
-        matches!(self, Self::On)
-    }
 }
 
 impl Combine for UseUv {
