@@ -300,6 +300,23 @@ def _(
     reveal_type(i2)  # revealed: P & Q
 ```
 
+Excluding the same class from unrelated alternatives keeps both. In `Q & Child`, `Child` satisfies
+the `P` bound in `P & Q` even though it comes second.
+
+```py
+class R: ...
+class Child(P): ...
+
+def _(
+    distinct: Intersection[P, Not[R]] | Intersection[Q, Not[R]],
+    narrower_last: Intersection[P, Q] | Intersection[Q, Child],
+    narrower_first: Intersection[Q, Child] | Intersection[P, Q],
+):
+    reveal_type(distinct)  # revealed: (P & ~R) | (Q & ~R)
+    reveal_type(narrower_last)  # revealed: P & Q
+    reveal_type(narrower_first)  # revealed: P & Q
+```
+
 Recombining the truthy and falsy parts of `int` also subsumes the earlier `bool` operand.
 
 ```py

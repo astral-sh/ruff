@@ -142,6 +142,24 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 }
 
+/// Whether the first positive element of `target` requires a class that `source` cannot supply.
+///
+/// When all the positives are nominal, at least one source class must supply each
+/// target bound. Look at just one target bound to keep this check linear.
+fn has_unrelated_nominal_bound<'db>(
+    db: &'db dyn Db,
+    source: IntersectionType<'db>,
+    target: IntersectionType<'db>,
+) -> bool {
+    let Some(Type::NominalInstance(bound)) = target.iter_positive(db).next() else {
+        return false;
+    };
+    source.positive_elements_or_object(db).all(|ty| {
+        ty.as_nominal_instance()
+            .is_some_and(|instance| bound.has_unrelated_class(db, instance))
+    })
+}
+
 /// Fold `(T & ~A) | (T & ~B)` to `T` when `A` and `B` are disjoint.
 ///
 /// The common part can itself contain exclusions. For example,
@@ -1340,6 +1358,19 @@ impl<'db> UnionBuilder<'db> {
                 if let (Type::NominalInstance(left), Type::NominalInstance(right)) =
                     (ty, element_type)
                     && left.has_unrelated_class(db, right)
+                {
+                    continue;
+                }
+
+                // Narrowing a union of classes can add the same exclusions to every
+                // alternative. Neither side can restore a shared exclusion. If each
+                // also requires a nominal bound the other lacks, neither subsumes the
+                // other and together they cannot cover `object`.
+                if let (Type::Intersection(left), Type::Intersection(right)) = (ty, element_type)
+                    && left.negative(db) == right.negative(db)
+                    && left.iter_negative(db).all(Type::is_nominal_instance)
+                    && has_unrelated_nominal_bound(db, left, right)
+                    && has_unrelated_nominal_bound(db, right, left)
                 {
                     continue;
                 }
