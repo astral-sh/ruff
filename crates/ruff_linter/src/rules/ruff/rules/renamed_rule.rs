@@ -8,7 +8,8 @@ use crate::codes::Category;
 
 /// ## What it does
 ///
-/// Checks Ruff configuration files for redirected rule names, codes, and prefixes.
+/// Checks Ruff configuration files and inline script metadata for redirected rule names, codes,
+/// and prefixes.
 ///
 /// ## Why is this bad?
 ///
