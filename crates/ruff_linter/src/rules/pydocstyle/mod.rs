@@ -59,6 +59,7 @@ mod tests {
     #[test_case(Rule::UnderIndentedDocstringLine, Path::new("D.py"))]
     #[test_case(Rule::EmptyDocstring, Path::new("D.py"))]
     #[test_case(Rule::EmptyDocstringSection, Path::new("sections.py"))]
+    #[test_case(Rule::DuplicateDocstringSection, Path::new("D422.py"))]
     #[test_case(Rule::NonImperativeMood, Path::new("D401.py"))]
     #[test_case(Rule::MissingBlankLineAfterDocstringSection, Path::new("D410.py"))]
     #[test_case(Rule::IncorrectBlankLineAfterClassDocstring, Path::new("D.py"))]
