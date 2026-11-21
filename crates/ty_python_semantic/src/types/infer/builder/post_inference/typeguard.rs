@@ -1,12 +1,12 @@
 use ruff_python_ast as ast;
 
+use super::function::CheckedFunction;
 use crate::DisplaySettings;
 use crate::types::Type;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     DISJOINT_TYPE_IS_NARROWING, INVALID_TYPE_GUARD_DEFINITION, SUSPICIOUS_TYPE_IS_NARROWING,
 };
-use crate::types::function::OverloadLiteral;
 
 /// Check that all type guard function definitions have at least one positional parameter
 /// (in addition to `self`/`cls` for methods), and for `TypeIs`, that the narrowed type is
@@ -14,7 +14,7 @@ use crate::types::function::OverloadLiteral;
 pub(crate) fn check_type_guard_definition<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
-    checked_return: Option<(OverloadLiteral<'db>, Type<'db>)>,
+    checked_function: Option<CheckedFunction<'db>>,
     node: &ast::StmtFunctionDef,
 ) {
     let Type::FunctionLiteral(function) = ty else {
@@ -32,10 +32,10 @@ pub(crate) fn check_type_guard_definition<'db>(
     // an annotated guard with `Unknown` in the cached signature. In either case,
     // check the definition's signature directly. Wrapping an async return in a
     // coroutine can hide a type guard, but it cannot produce one.
-    if let Some((checked, return_ty)) = checked_return
-        && checked == overload
-        && !return_ty.is_unknown()
-        && !matches!(return_ty, Type::TypeIs(_) | Type::TypeGuard(_))
+    if let Some(checked) = checked_function
+        && checked.overload == overload
+        && !checked.return_ty.is_unknown()
+        && !matches!(checked.return_ty, Type::TypeIs(_) | Type::TypeGuard(_))
     {
         return;
     }
