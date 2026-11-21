@@ -270,6 +270,40 @@ fn benchmark_constructor_literal_alias(criterion: &mut Criterion) {
     }
 }
 
+/// Bokeh calls `super().__init__()` on a receiver with a large union of literals (ty#5063).
+/// We specialize the overloads before filtering by arity. Two ways to partition the literals
+/// between `A` and `B` already rule out a unique receiver specialization.
+fn benchmark_overloaded_constructor_receiver(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from typing import Literal, overload
+
+        type Pattern = Literal["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]
+
+        class Either[T]:
+            value: T
+
+            @overload
+            def __init__[A, B](self: "Either[A | B]", value: A) -> None: ...
+            @overload
+            def __init__(self) -> None: ...
+            def __init__(self, *args: object) -> None: ...
+
+        class HatchPattern(Either[Pattern]):
+            def __init__(self) -> None:
+                super().__init__()
+    "#;
+
+    criterion.bench_function("ty_micro[overloaded_constructor_receiver]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// These constructors used to hang because recursive substitution kept reordering union
 /// members in their inferred type arguments (ty#5057).
 fn benchmark_constructor_union_specialization(criterion: &mut Criterion) {
@@ -931,6 +965,114 @@ fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     });
 }
 
+/// Each overload brings its own `T` into the scope of `P`. Interning the growing set of
+/// binders after each overload retains a quadratic number of entries. Passing `first` keeps
+/// the final argument check from comparing the whole overload set against itself.
+fn benchmark_paramspec_capture_many_overloads(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from("from typing import Callable, Literal, overload\n\n");
+    for tag in 0..256 {
+        writeln!(
+            &mut code,
+            "@overload\ndef select[T](tag: Literal[{tag}], value: T) -> T: ..."
+        )
+        .ok();
+    }
+    code.push_str(
+        "\
+def select(tag: int, value: object) -> object:
+    return value
+
+def register[**P](f: Callable[P, object], g: Callable[P, object]) -> None: ...
+
+def first(tag: Literal[0], value: int) -> int:
+    return value
+
+register(first, select)
+",
+    );
+
+    criterion.bench_function("ty_micro[paramspec_capture_many_overloads]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// An overloaded `__call__` can refer to the protocol itself in each receiver annotation. Checking
+/// the receiver can therefore encounter the same overloads again.
+fn benchmark_overloaded_protocol_receivers(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from __future__ import annotations
+
+        from collections.abc import Callable
+        from os import PathLike
+        from typing import Generic, ParamSpec, Protocol, TypeVar, overload
+
+        V = TypeVar("V", covariant=True)
+        A = TypeVar("A", contravariant=True)
+        P = ParamSpec("P")
+        T = TypeVar("T")
+        C = TypeVar("C", bound=type)
+
+        class Wrapper(Protocol, Generic[V, A]):
+            @overload
+            def __call__(
+                self: Wrapper[Callable[P, T], A], f: Callable[P, T], arg: A, /
+            ) -> Callable[P, T]: ...
+            @overload
+            def __call__(
+                self: Wrapper[classmethod[C, P, T], A], f: classmethod[C, P, T], arg: A, /
+            ) -> classmethod[C, P, T]: ...
+            @overload
+            def __call__(
+                self: Wrapper[staticmethod[P, T], A], f: staticmethod[P, T], arg: A, /
+            ) -> staticmethod[P, T]: ...
+            def __call__(self, f, arg, /): ...
+
+        def check(wrapper: Wrapper[object, str | PathLike[str]], f: Callable[P, T]) -> Callable[P, T]:
+            return wrapper(f, "arg")
+    "#;
+
+    criterion.bench_function("ty_micro[overloaded_protocol_receivers]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Inferring the element type of this list checks whether a recursive alias and the type variables
+/// from `product` can satisfy both endpoints of an inference bound.
+fn benchmark_recursive_alias_product(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from collections.abc import Hashable, Sequence
+        from itertools import product
+        from typing import Union
+
+        Label = Union[Hashable, tuple["Label", ...]]
+
+        def check(values: tuple[Sequence[Label], ...]):
+            return list(product(*values))
+    "#;
+
+    criterion.bench_function("ty_micro[recursive_alias_product]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Repeated unions share source-order subtrees even after the TDD stops growing. Persisting each
 /// result must not expand those shared subtrees into exponentially many copies.
 fn benchmark_shared_source_order_compaction(criterion: &mut Criterion) {
@@ -964,6 +1106,7 @@ criterion_group!(
     benchmark_bottom_and_top_signature_comparisons,
     benchmark_factored_upper_bounds,
     benchmark_constructor_literal_alias,
+    benchmark_overloaded_constructor_receiver,
     benchmark_constructor_union_specialization,
     benchmark_counterexample_behind_implied_bound,
     benchmark_many_upper_bound_callbacks,
@@ -979,6 +1122,9 @@ criterion_group!(
     benchmark_many_invariant_typevars,
     benchmark_mixed_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
+    benchmark_paramspec_capture_many_overloads,
+    benchmark_overloaded_protocol_receivers,
+    benchmark_recursive_alias_product,
     benchmark_shared_source_order_compaction,
 );
 criterion_main!(constraint_set);

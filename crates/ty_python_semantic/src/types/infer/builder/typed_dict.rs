@@ -11,6 +11,7 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISMATCHED_TYPEDDICT_NAME, MISSING_ARGUMENT,
     TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT, report_mismatched_type_name,
 };
+use crate::types::generics::resolve_typevar_reference;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
     TypedDictOpenness, TypedDictSchema, UnpackedTypedDictCache, collect_guaranteed_keyword_keys,
@@ -578,9 +579,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
         let class_literal = class.class_literal(db);
+        let scope = self.scope().file_scope_id(db);
+        let has_unresolved_typevar = |ty| {
+            any_over_type_expanding_aliases(db, env, ty, |nested| {
+                nested.as_typevar().is_some_and(|variable| {
+                    resolve_typevar_reference(db, self.index, scope, variable.typevar(db))
+                        .is_none_or(|bound| !bound.is_same_typevar_as(db, variable))
+                })
+            })
+        };
 
         // An inner `Node(value=1)` must retain `Node[Unknown]` when its enclosing
-        // `Node(child=...)` cannot infer through the recursive field.
+        // `Node(child=...)` cannot infer through the recursive field. A caller's type variable
+        // in `Box[T]` can instead constrain the inferred type argument while staying fixed.
         let has_gradual_class_context = class_literal
             .as_static()
             .zip(call_expression_tcx.expected_type())
@@ -592,7 +603,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             specialization
                                 .types(db)
                                 .iter()
-                                .any(|ty| ty.is_unknown() || ty.has_typevar(db, env))
+                                .any(|&ty| ty.is_unknown() || has_unresolved_typevar(ty))
                         })
                 })
             });

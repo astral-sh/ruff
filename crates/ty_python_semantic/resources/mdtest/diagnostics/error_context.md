@@ -962,9 +962,8 @@ help: A subclass of `Empty` could validly add a new field of an arbitrary type, 
 
 ## Generic `TypedDict` field conflicts in overload diagnostics
 
-A generic `TypedDict` relation can be unsatisfiable without being the `never` terminal. Capturing
-its type variable from an enclosing function keeps the overload non-generic while retaining the
-conflicting constraints. The resulting diagnostic should explain which field introduced them.
+A non-generic overload can refer to a type variable from its enclosing function. That variable is
+fixed when checking the overload, so the diagnostic explains why the first field is incompatible.
 
 ```py
 from typing import Generic, TypeVar, TypedDict, overload
@@ -1000,15 +999,15 @@ error[inconsistent-overload-implementation]: Implementation does not accept all 
 info: Implementation signature `(value: Pair[T@outer] | str) -> None` is not assignable to overload signature `(value: Fixed) -> None`
 info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[T@outer] | str`
 info: └── type `Fixed` is not assignable to any element of the union `Pair[T@outer] | str`
-info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `T@outer` expected by TypedDict `Pair`
+info:     ├── field "first" on TypedDict `Fixed` has type `int` which is not assignable to type `T@outer` expected by TypedDict `Pair`
 info:     └── ... omitted 1 union element without additional context
 ```
 
-## Stop checking callable parameters after incompatible generic constraints
+## Stop checking callable parameters after an incompatibility
 
-Once earlier parameters produce an unsatisfiable nonterminal constraint set, continuing to a later
-parameter must not replace the diagnostic context that explains the original incompatibility. The
-type variable belongs to the enclosing function, so the overload itself remains non-generic.
+An incompatibility in a later parameter does not replace the diagnostic context from the first
+incompatible parameter. The type variable belongs to the enclosing function, so the overload itself
+remains non-generic.
 
 ```py
 from typing import Generic, TypeVar, TypedDict, overload
@@ -1044,7 +1043,7 @@ error[inconsistent-overload-implementation]: Implementation does not accept all 
 info: Implementation signature `(value: Pair[T@outer] | str, later: str) -> None` is not assignable to overload signature `(value: Fixed, later: int) -> None`
 info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[T@outer] | str`
 info: └── type `Fixed` is not assignable to any element of the union `Pair[T@outer] | str`
-info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `T@outer` expected by TypedDict `Pair`
+info:     ├── field "first" on TypedDict `Fixed` has type `int` which is not assignable to type `T@outer` expected by TypedDict `Pair`
 info:     └── ... omitted 1 union element without additional context
 ```
 
@@ -1356,8 +1355,8 @@ info:     └── parameter `y` has an incompatible type: `str` is not assigna
 ## Recursive protocol diagnostic context
 
 A value-constrained type parameter makes the recursive `child` override valid for each permitted
-specialization. The explicit receiver on `Outer.expose` preserves unresolved type variables while
-diagnostic context is collected, including the incompatible recursive member and its return type.
+specialization. When checking `Outer[int]`, the diagnostic follows the return type of `expose` to
+the incompatible `value` method. Its return type is the caller's `T`, which need not be `int`.
 
 ```py
 from __future__ import annotations
@@ -1390,12 +1389,12 @@ error[invalid-assignment]: Object of type `Concrete[T@diagnose]` is not assignab
    |              ----------   ^^^^^ Incompatible value of type `Concrete[T@diagnose]`
    |              |
    |              Declared type
-info: type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
-info: └── protocol member `child` is incompatible
-info:     └── incompatible return types: `Concrete[str]` is not assignable to `Chain[int]`
-info:         └── type `Concrete[str]` is not assignable to protocol `Chain[int]`
+info: type `Concrete[T@diagnose]` is not assignable to protocol `Outer[int]`
+info: └── protocol member `expose` is incompatible
+info:     └── incompatible return types: `Concrete[T@diagnose]` is not assignable to `Chain[int]`
+info:         └── type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
 info:             └── protocol member `value` is incompatible
-info:                 └── incompatible return types: `str` is not assignable to `int`
+info:                 └── incompatible return types: `T@diagnose` is not assignable to `int`
 ```
 
 ## Recursive protocols in a union after overload comparison

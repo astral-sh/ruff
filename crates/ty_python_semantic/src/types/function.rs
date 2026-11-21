@@ -79,7 +79,6 @@ use crate::types::known_instance::DeprecatedInstance;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
-use crate::types::typevar::TypeVarNonce;
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -1797,8 +1796,7 @@ impl<'db> FunctionType<'db> {
         let method_renaming = overload.generic_context.and_then(|context| {
             let definition = self.definition(db);
             let fresh = context.variables(db).filter(|var| {
-                var.freshness(db) != TypeVarNonce::NONE
-                    && var.binding_context(db).definition() == Some(definition)
+                var.is_fresh(db) && var.binding_context(db).definition() == Some(definition)
             });
             let env = ProgramEnvironment::from_definition(definition);
             let declared = GenericContext::try_from_typevar_instances(

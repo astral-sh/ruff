@@ -7,7 +7,7 @@ use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::Parameter;
-use crate::types::typevar::TypeVarNonceGenerator;
+use crate::types::typevar::{TypeVarFreshening, TypeVarNonceGenerator};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
     TypeMapping, UnionType,
@@ -124,7 +124,7 @@ impl<'db> ConstructorBinding<'db> {
         let delta = nonce_generator.next().value();
         let type_mapping = TypeMapping::FreshenBoundTypeVars {
             generic_context,
-            delta,
+            freshening: TypeVarFreshening::Offset(delta),
         };
         let fresh_instance_type =
             instance_type.apply_type_mapping(db, env, &type_mapping, TypeContext::default());
@@ -144,7 +144,7 @@ impl<'db> ConstructorBinding<'db> {
     ) {
         let type_mapping = TypeMapping::FreshenBoundTypeVars {
             generic_context,
-            delta,
+            freshening: TypeVarFreshening::Offset(delta),
         };
 
         // Keep the source-level instance on `ConstructorBinding`; the final return type applies
@@ -175,7 +175,7 @@ impl<'db> ConstructorBinding<'db> {
                 db,
                 &TypeMapping::FreshenBoundTypeVars {
                     generic_context: signature_context,
-                    delta,
+                    freshening: TypeVarFreshening::Offset(delta),
                 },
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::new(env),

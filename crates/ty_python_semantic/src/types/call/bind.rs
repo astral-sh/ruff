@@ -67,6 +67,7 @@ use crate::types::infer::{TypeContextKind, original_class_type};
 use crate::types::known_instance::{
     FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
 };
+use crate::types::relation::TypeVarEvaluation;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication,
@@ -74,7 +75,9 @@ use crate::types::signatures::{
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::walk_type_alias_arguments;
 use crate::types::typed_dict::TypedDictOpenness;
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarSet};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarFreshening, TypeVarKind, TypeVarNonceGenerator, TypeVarSet,
+};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
@@ -228,7 +231,7 @@ fn freshen_generic_contexts_in_type<'db>(
                 env,
                 &TypeMapping::FreshenBoundTypeVars {
                     generic_context,
-                    delta: nonce_generator.next().value(),
+                    freshening: TypeVarFreshening::Offset(nonce_generator.next().value()),
                 },
                 TypeContext::default(),
             )
@@ -2301,6 +2304,7 @@ impl<'db> Bindings<'db> {
                                             env,
                                             ty_b,
                                             constraints,
+                                            TypeVarSet::All,
                                         )
                                     } else {
                                         ty_a.when_subtype_of(
@@ -2351,6 +2355,7 @@ impl<'db> Bindings<'db> {
                                         env,
                                         ty_b,
                                         constraints,
+                                        TypeVarSet::All,
                                     )
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
@@ -2999,6 +3004,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 lower,
                             )
@@ -3028,6 +3034,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 upper,
                             )
@@ -3057,6 +3064,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 value,
                             )
@@ -3089,6 +3097,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 lower,
                                 upper,
@@ -3206,9 +3215,15 @@ impl<'db> Bindings<'db> {
                         let result = constraints.into_owned(|constraints| {
                             let set = constraints.load(db, env, tracked.constraints(db));
                             if matches!(method, KnownBoundMethodType::ConstraintSetExists(_)) {
-                                set.reduce_inferable(db, env, constraints, typevars)
+                                set.reduce_inferable(
+                                    db,
+                                    env,
+                                    constraints,
+                                    typevars,
+                                    TypeVarSet::All,
+                                )
                             } else {
-                                set.for_all(db, env, constraints, typevars)
+                                set.for_all(db, env, constraints, typevars, TypeVarSet::All)
                             }
                         });
                         let tracked = InternedConstraintSet::new(db, result);
@@ -6981,8 +6996,13 @@ impl<'db> CallInference<'_, 'db> {
                 ConstraintProvenance::DECLARED
             };
             let return_constraints = return_ty
-                .when_constraint_set_assignable_to_owned_with_provenance(
-                    db, self.env, tcx, provenance,
+                .when_constraint_set_assignable_to_owned_with_evaluation(
+                    db,
+                    self.env,
+                    tcx,
+                    self.inferable_typevars,
+                    TypeVarEvaluation::Lazy,
+                    provenance,
                 );
             builder.record_constraint_set(constraints.load(db, self.env, &return_constraints));
             (return_ty, tcx)
@@ -8666,12 +8686,11 @@ pub(crate) fn inferable_typevar_occurrences<'db>(
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             if let Type::TypeVar(typevar) = ty {
-                let identity = if typevar.is_paramspec(db) {
-                    typevar.without_paramspec_attr(db).identity(db)
-                } else {
-                    typevar.identity(db)
-                };
-                if identity.is_inferable(db, self.inferable) {
+                if typevar
+                    .identity(db)
+                    .binder()
+                    .is_inferable(db, self.inferable)
+                {
                     self.count.set(self.count.get() + 1);
                 }
                 return;

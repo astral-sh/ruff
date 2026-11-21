@@ -568,12 +568,8 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarIdentity<'db>,
     ) -> bool {
-        let bound_typevar = if bound_typevar.is_paramspec(db) {
-            bound_typevar.without_paramspec_attr(db)
-        } else {
-            bound_typevar
-        };
-        self.variables_inner(db).contains_key(&bound_typevar)
+        self.variables_inner(db)
+            .contains_key(&bound_typevar.binder())
     }
     /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type
     /// variables.
@@ -1988,9 +1984,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // type's materialization range, while assignability uses the type itself for both
             // bounds.
             (None, None, _) => {
-                if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                if self.typevar_evaluation.is_lazy()
                     && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
                         (source_type, target_type)
+                    && typevar.is_inferable(db, self.inferable)
                     && !ty.is_type_var()
                     && (
                         // Preserve union distribution before constructing constraints. Storing the
@@ -2001,26 +1998,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 {
                     let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
                     let env = self.env;
-                    if self.relation.is_subtyping() {
-                        ConstraintSet::constrain_typevar(
-                            db,
-                            env,
-                            self.constraints,
-                            self.provenance,
-                            typevar,
+                    let (lower, upper) = if self.relation.is_subtyping() {
+                        (
                             ty.top_materialization(db, env),
                             ty.bottom_materialization(db, env),
                         )
                     } else {
-                        ConstraintSet::constrain_typevar_equivalence_bound(
-                            db,
-                            env,
-                            self.constraints,
-                            self.provenance,
-                            typevar,
-                            ty,
-                        )
-                    }
+                        (ty, ty)
+                    };
+                    ConstraintSet::constrain_typevar(
+                        db,
+                        env,
+                        self.constraints,
+                        self.provenance,
+                        self.inferable,
+                        typevar,
+                        lower,
+                        upper,
+                    )
                 } else {
                     self.check_type_pair(db, target_type, source_type).and(
                         db,
@@ -2260,6 +2255,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                             .for_new_materialization_root()
                     };
                     checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+                    checker.inferable = TypeVarSet::All;
                     checker.materialization_visitor = &materialization_visitor;
                     let result = self
                         .check_relation_with_context(db, checker, |checker| {
@@ -2939,6 +2935,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> TypeVarInference<'db> {
         let db = self.db;
         for (formal, actual) in argument_relations {
+            // Once a relation exceeds the budget, later arguments can't restore the mapping.
+            if matches!(self.types, LegacyTypeMappings::BudgetExceeded) {
+                break;
+            }
             let when = self.constraint_for_relation(formal, actual, TypeVarVariance::Covariant);
             let analysis = self.analyze_constraint_set(when);
             if matches!(&analysis, ConstraintSetAnalysis::Unsatisfiable(failures) if failures.is_empty())
@@ -3154,10 +3154,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // constraints; combined with `_KT@dict = Hashable`, PathAssignments/SequentMap traversal
         // derives cross-typevar facts such as `TypedDictSchema <= _VT@dict <= Hashable`.
         //
-        // A naive fast path that skipped `remove_noninferable` when no constraint would be removed
-        // was not enough: `solutions_with` still performed the expensive path traversal, and the
-        // skipped projection changed precision in LiteralString tests. See the
-        // `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
+        // See the `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
         let mut inference = match project(self, choose) {
             Ok(SolutionProjection::Unsatisfiable) => return Err(()),
             Ok(SolutionProjection::Unconstrained) => {
@@ -3344,18 +3341,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         ty: Type<'db>,
     ) -> bool {
         let db = self.db;
-        let target_context = target.binding_context(db);
-        let target_freshness = target.freshness(db);
+        let target = target.identity(db);
         ty.as_typevar().is_some_and(|typevar| {
             // Relationships across binding contexts can intentionally remap one generic context
             // onto another, as with constructor `self` annotations. Relationships across fresh
             // occurrences preserve an outer generic value through a recursive call. Synthetic
             // contexts do not identify a single source-level binding, so they are not safe to
             // project either.
-            !matches!(target_context, BindingContext::Synthetic(_))
+            !matches!(target.binding_context(db), BindingContext::Synthetic(_))
                 && typevar.is_inferable(db, self.inferable)
-                && typevar.binding_context(db) == target_context
-                && typevar.freshness(db) == target_freshness
+                && typevar.identity(db).shares_binding(target)
         })
     }
 
@@ -3590,6 +3585,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.env,
                 self.constraints,
                 ConstraintProvenance::INFERRED,
+                self.inferable,
                 bound_typevar,
                 ty,
             ),
@@ -3598,6 +3594,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.env,
                 self.constraints,
                 ConstraintProvenance::INFERRED,
+                self.inferable,
                 bound_typevar,
                 ty,
             ),
@@ -3606,6 +3603,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.env,
                 self.constraints,
                 ConstraintProvenance::INFERRED,
+                self.inferable,
                 bound_typevar,
                 ty,
             ),
@@ -3737,7 +3735,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             db,
             self.constraints,
             |(source, target)| {
-                let when = source.when_constraint_set_assignable_to_owned(db, self.env, target);
+                let when = source.when_constraint_set_assignable_to_owned(
+                    db,
+                    self.env,
+                    target,
+                    self.inferable,
+                );
                 self.constraints.load(db, self.env, &when)
             },
         )
@@ -3906,18 +3909,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // when a `TypedDict` preserves more precise correlations between its keys and values.
         let spec = &[KnownClass::Str.to_instance(db, env), Type::object()];
         let mapping = KnownClass::Mapping.to_specialized_instance(db, env, spec);
-        let mapping_when = mapping.when_constraint_set_assignable_to_owned(db, env, formal);
-        let mapping_when = self.constraints.load(db, env, &mapping_when);
+        let when_assignable_to_formal = |ty: Type<'db>| {
+            let when = ty.when_constraint_set_assignable_to_owned(db, env, formal, self.inferable);
+            self.constraints.load(db, env, &when)
+        };
+        let mapping_when = when_assignable_to_formal(mapping);
         // Logically equivalent constraints can still infer different solutions, such as `Any`
         // instead of `object`; preserve the original constraints when gradual evidence differs
         // or either solution collection exceeds its budget.
         let mapping_solutions = mapping_when.solutions(db, env, self.inferable).ok()?;
         if !typed_dicts.into_iter().all(|element| {
-            let element_when = self.constraints.load(
-                db,
-                env,
-                &element.when_constraint_set_assignable_to_owned(db, env, formal),
-            );
+            let element_when = when_assignable_to_formal(element);
             element_when.is_equivalent_to(db, env, mapping_when, self.inferable)
                 && element_when
                     .solutions(db, env, self.inferable)
@@ -3931,13 +3933,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         Some(mapping_when.and(db, self.constraints, || {
             other_types
                 .into_iter()
-                .when_all(db, self.constraints, |element| {
-                    self.constraints.load(
-                        db,
-                        env,
-                        &element.when_constraint_set_assignable_to_owned(db, env, formal),
-                    )
-                })
+                .when_all(db, self.constraints, when_assignable_to_formal)
         }))
     }
 
@@ -3965,14 +3961,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
         for actual_callable in &actual_callables {
             if formal_is_single_paramspec {
-                let when = actual_callable
-                    .signatures(db)
-                    .when_constraint_set_assignable_to(
-                        db,
-                        self.env,
-                        formal_signature,
-                        self.constraints,
-                    );
+                let when = formal_signature.when_constraint_set_assignable_from(
+                    db,
+                    self.env,
+                    &actual_callable.signatures(db).overloads,
+                    self.constraints,
+                    self.inferable,
+                );
                 self.infer_from_constraint_set(when)?;
             } else {
                 // An overloaded actual callable is compatible if at least one overload matches.
@@ -3985,11 +3980,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let mut accepted =
                     SmallVec::<[(ConstraintSet<'db, 'c>, ConstraintSetAnalysis<'db>); 1]>::new();
                 for actual_signature in &actual_callable.signatures(db).overloads {
-                    let when = actual_signature.when_constraint_set_assignable_to_signatures(
+                    let when = formal_signature.when_constraint_set_assignable_from(
                         db,
                         &env,
-                        formal_signature,
+                        std::slice::from_ref(actual_signature),
                         constraints,
+                        self.inferable,
                     );
                     let analysis = self.analyze_constraint_set(when);
                     match analysis {
@@ -4855,11 +4851,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                         db,
                                         self.env,
                                         Type::ProtocolInstance(target),
+                                        self.inferable,
                                     )
                             } else {
                                 Cow::Borrowed(
                                     source.when_non_recursive_members_assignable_to_owned(
-                                        db, target,
+                                        db,
+                                        target,
+                                        self.inferable,
                                     )?,
                                 )
                             };
@@ -5156,6 +5155,7 @@ mod tests {
                         &env,
                         constraints,
                         ConstraintProvenance::INFERRED,
+                        TypeVarSet::All,
                         typevar,
                         ty,
                     )
@@ -5339,6 +5339,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             t,
             int,
         ));
@@ -5396,6 +5397,7 @@ mod tests {
                 &env,
                 &constraints,
                 ConstraintProvenance::INFERRED,
+                TypeVarSet::All,
                 t,
                 ty,
             ));
@@ -5437,6 +5439,7 @@ mod tests {
                 &env,
                 &constraints,
                 ConstraintProvenance::INFERRED,
+                TypeVarSet::All,
                 t,
                 ty,
             )
@@ -5503,6 +5506,7 @@ mod tests {
                 &env,
                 &constraints,
                 ConstraintProvenance::INFERRED,
+                TypeVarSet::All,
                 t,
                 ty,
             )
@@ -5579,6 +5583,7 @@ mod tests {
                 &env,
                 &constraints,
                 ConstraintProvenance::INFERRED,
+                TypeVarSet::All,
                 t,
                 ty,
             )
@@ -5728,6 +5733,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             t,
             int,
             int,
@@ -5901,6 +5907,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             typevar,
             int,
         );
@@ -5948,6 +5955,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             typevar,
             ty,
         );
@@ -5995,6 +6003,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             typevar,
             str,
         );
@@ -6003,6 +6012,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             typevar,
             str,
         );
@@ -6011,6 +6021,7 @@ mod tests {
             &env,
             &constraints,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             typevar,
             int,
         );
