@@ -98,6 +98,14 @@ info[mismatched-sentinel-name]: The name passed to `sentinel` does not match the
    |
 66 | MISMATCHED = Sentinel("OTHER")  # snapshot
    |                       ^^^^^^^ Expected "MISMATCHED", got "OTHER"
+help: Use `"MISMATCHED"` as the name
+   |
+65 |
+   - MISMATCHED = Sentinel("OTHER")  # snapshot
+66 + MISMATCHED = Sentinel("MISMATCHED")  # snapshot
+67 | MISMATCHED_WITH_POSITIONAL_REPR = Sentinel("OTHER", "other")  # error: [mismatched-sentinel-name]
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 Sentinel objects are always truthy, expose the standard sentinel metadata attributes, and are
@@ -113,7 +121,8 @@ class MissingSubclass(MISSING):  # error: [invalid-base]
     pass
 ```
 
-Sentinels declared in class scope can also be used in type expressions:
+A sentinel declared in a class can use the attribute name alone or prefix it with the names of all
+enclosing classes. If the supplied name contains a dot, the fix uses the full class path.
 
 ```py
 class C:
@@ -125,10 +134,30 @@ class C:
     class Nested:
         MARKER = Sentinel("C.Nested.MARKER")  # ok
         UNQUALIFIED = Sentinel("UNQUALIFIED")  # ok
-        PARTIALLY_QUALIFIED = Sentinel("Nested.PARTIALLY_QUALIFIED")  # error: [mismatched-sentinel-name]
+        PARTIALLY_QUALIFIED = Sentinel("Nested.PARTIALLY_QUALIFIED")  # snapshot: mismatched-sentinel-name
         WRONG_CLASS = Sentinel("Other.Nested.WRONG_CLASS")  # error: [mismatched-sentinel-name]
         WRONG_NAME = Sentinel("C.Nested.OTHER")  # error: [mismatched-sentinel-name]
+```
 
+```snapshot
+info[mismatched-sentinel-name]: The name passed to `sentinel` does not match the variable it is assigned to
+  --> src/mdtest_snippet.py:86:40
+   |
+86 |         PARTIALLY_QUALIFIED = Sentinel("Nested.PARTIALLY_QUALIFIED")  # snapshot: mismatched-sentinel-name
+   |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected "C.Nested.PARTIALLY_QUALIFIED", got "Nested.PARTIALLY_QUALIFIED"
+help: Use `"C.Nested.PARTIALLY_QUALIFIED"` as the name
+   |
+85 |         UNQUALIFIED = Sentinel("UNQUALIFIED")  # ok
+   -         PARTIALLY_QUALIFIED = Sentinel("Nested.PARTIALLY_QUALIFIED")  # snapshot: mismatched-sentinel-name
+86 +         PARTIALLY_QUALIFIED = Sentinel("C.Nested.PARTIALLY_QUALIFIED")  # snapshot: mismatched-sentinel-name
+87 |         WRONG_CLASS = Sentinel("Other.Nested.WRONG_CLASS")  # error: [mismatched-sentinel-name]
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+Sentinels declared in class scope can also be used in type expressions:
+
+```py
 def accepts_marker(x: C.MARKER) -> None: ...
 
 accepts_marker(C.MARKER)
@@ -268,6 +297,14 @@ info[mismatched-sentinel-name]: The name passed to `sentinel` does not match the
    |
 61 | MISMATCHED = sentinel("OTHER")  # snapshot
    |                       ^^^^^^^ Expected "MISMATCHED", got "OTHER"
+help: Use `"MISMATCHED"` as the name
+   |
+60 |
+   - MISMATCHED = sentinel("OTHER")  # snapshot
+61 + MISMATCHED = sentinel("MISMATCHED")  # snapshot
+62 | MISMATCHED_WITH_POSITIONAL_REPR = sentinel("OTHER", "other")  # error: [mismatched-sentinel-name]
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 Sentinel objects are always truthy, expose the standard sentinel metadata attributes, and are

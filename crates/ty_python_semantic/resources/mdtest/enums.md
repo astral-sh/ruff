@@ -2840,6 +2840,14 @@ info[mismatched-enum-name]: The name passed to `Enum` must match the variable it
   |
 8 | Mismatch = Enum("WrongName", "A B")
   |                 ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
+help: Use `"Mismatch"` as the name
+  |
+7 | # snapshot: mismatched-enum-name
+  - Mismatch = Enum("WrongName", "A B")
+8 + Mismatch = Enum("Mismatch", "A B")
+9 | # error: [mismatched-enum-name]
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 A name passed through a variable is still checked if its inferred type is a string literal:

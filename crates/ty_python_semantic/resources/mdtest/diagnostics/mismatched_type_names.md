@@ -14,7 +14,8 @@ python-version = "3.12"
 ```py
 from typing import Literal, NewType, ParamSpec, TypeAliasType, TypedDict, TypeVar, TypeVarTuple
 
-type TypeVarName = Literal["T"]
+# The first string literal sets the quote style for the autofix below.
+type TypeVarName = Literal['T']  # fmt: skip
 type ParamSpecName = Literal["P"]
 type TypeVarTupleName = Literal["Ts"]
 type NewTypeName = Literal["UserId"]
@@ -41,8 +42,25 @@ def define_types(
     reveal_type(Ts.__name__)  # revealed: Literal["Ts"]
     reveal_type(Number.__name__)  # revealed: Literal["Number"]
 
-    U = TypeVar(type_var)  # error: [mismatched-typevar-name] "Expected "U", got "T""
+    U = TypeVar(type_var)  # snapshot: mismatched-typevar-name
+
     reveal_type(U.__name__)  # revealed: Literal["T"]
+```
+
+```snapshot
+warning[mismatched-typevar-name]: The name passed to `TypeVar` must match the variable it is assigned to
+  --> src/mdtest_snippet.py:31:17
+   |
+31 |     U = TypeVar(type_var)  # snapshot: mismatched-typevar-name
+   |                 ^^^^^^^^ Expected "U", got "T"
+help: Use `'U'` as the name
+   |
+30 |
+   -     U = TypeVar(type_var)  # snapshot: mismatched-typevar-name
+31 +     U = TypeVar('U')  # snapshot: mismatched-typevar-name
+32 |
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Type parameters named at runtime
@@ -56,8 +74,31 @@ from typing_extensions import ParamSpec, TypeVar, TypeVarTuple
 
 def runtime_name(name: str) -> str:
     return name
+```
 
-T = TypeVar(runtime_name("T"))  # error: [mismatched-typevar-name]
+ty marks the fix as unsafe when it replaces a function call, since the call may have side effects.
+
+```py
+T = TypeVar(runtime_name("T"))  # snapshot: mismatched-typevar-name
+```
+
+```snapshot
+warning[mismatched-typevar-name]: The name passed to `TypeVar` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:6:13
+  |
+6 | T = TypeVar(runtime_name("T"))  # snapshot: mismatched-typevar-name
+  |             ^^^^^^^^^^^^^^^^^ Cannot verify that a value of type `str` matches "T"
+help: Use `"T"` as the name
+  |
+5 |     return name
+  - T = TypeVar(runtime_name("T"))  # snapshot: mismatched-typevar-name
+6 + T = TypeVar("T")  # snapshot: mismatched-typevar-name
+7 | P = ParamSpec(name=runtime_name("P"))  # error: [mismatched-paramspec-name]
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+```py
 P = ParamSpec(name=runtime_name("P"))  # error: [mismatched-paramspec-name]
 Ts = TypeVarTuple(runtime_name("Ts"))  # error: [mismatched-typevartuple-name]
 
@@ -75,6 +116,59 @@ def keep_tuple(values: tuple[*Ts]) -> tuple[*Ts]:
     return values
 ```
 
+## Names in nested scopes
+
+ty marks the fix as unsafe for definitions inside a class or function. For a type returned by a
+factory function, pickle may need the module-level name the caller assigns to it. For the class
+attribute below, pickle needs the qualified name `"C.Id"` to find the type from the module.
+
+```py
+from typing import NewType
+
+class C:
+    Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+```
+
+```snapshot
+warning[mismatched-newtype-name]: The name passed to `NewType` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:4:18
+  |
+4 |     Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+  |                  ^^^^^^ Expected "Id", got "C.Id"
+help: Use `"Id"` as the name
+  |
+3 | class C:
+  -     Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+4 +     Id = NewType("Id", int)  # snapshot: mismatched-newtype-name
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+In a stub, changing the name has no effect on pickling, so the same fix is safe.
+
+`models.pyi`:
+
+```pyi
+from typing import NewType
+
+class C:
+    Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+```
+
+```snapshot
+warning[mismatched-newtype-name]: The name passed to `NewType` must match the variable it is assigned to
+ --> src/models.pyi:4:18
+  |
+4 |     Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+  |                  ^^^^^^ Expected "Id", got "C.Id"
+help: Use `"Id"` as the name
+  |
+3 | class C:
+  -     Id = NewType("C.Id", int)  # snapshot: mismatched-newtype-name
+4 +     Id = NewType("Id", int)  # snapshot: mismatched-newtype-name
+  |
+```
+
 ## Non-string arguments
 
 The factories reject name arguments with non-string types.
@@ -88,4 +182,32 @@ Movie = TypedDict(42, {"title": str})  # error: [invalid-argument-type]
 P = ParamSpec(42)  # error: [invalid-paramspec]
 T = TypeVar(42)  # error: [invalid-legacy-type-variable]
 Ts = TypeVarTuple(42)  # error: [invalid-legacy-type-variable]
+```
+
+## Fixing names split across string literals
+
+ty replaces adjacent string literals with a single literal containing the variable name. The
+replacement keeps the first literal's prefix. ty marks the fix as unsafe for all implicitly
+concatenated strings because the replacement can remove comments between the literals.
+
+```py
+from typing import TypeVar
+
+# snapshot: mismatched-typevar-name
+T = TypeVar(name=r"T" "Value")
+```
+
+```snapshot
+warning[mismatched-typevar-name]: The name passed to `TypeVar` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:4:18
+  |
+4 | T = TypeVar(name=r"T" "Value")
+  |                  ^^^^^^^^^^^^ Expected "T", got "TValue"
+help: Use `r"T"` as the name
+  |
+3 | # snapshot: mismatched-typevar-name
+  - T = TypeVar(name=r"T" "Value")
+4 + T = TypeVar(name=r"T")
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```

@@ -155,6 +155,13 @@ warning[mismatched-typeddict-name]: The name passed to `TypedDict` must match th
    |
 14 | BadTypedDict3 = TypedDict("WrongName", {"name": str})
    |                           ^^^^^^^^^^^ Expected "BadTypedDict3", got "WrongName"
+help: Use `"BadTypedDict3"` as the name
+   |
+13 | # error: [mismatched-typeddict-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
+   - BadTypedDict3 = TypedDict("WrongName", {"name": str})
+14 + BadTypedDict3 = TypedDict("BadTypedDict3", {"name": str})
+15 | reveal_type(BadTypedDict3)  # revealed: <class 'WrongName'>
+   |
 
 ```
 
@@ -164,6 +171,14 @@ warning[mismatched-typeddict-name]: The name passed to `TypedDict` must match th
    |
 19 |     Y = TypedDict(x, {})
    |                   ^ Cannot verify that a value of type `str` matches "Y"
+help: Use `"Y"` as the name
+   |
+18 |     # error: [mismatched-typeddict-name] "The name passed to `TypedDict` must match the variable it is assigned to: Cannot verify that a value of type `str` matches "Y""
+   -     Y = TypedDict(x, {})
+19 +     Y = TypedDict("Y", {})
+20 |
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 ```
 

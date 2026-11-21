@@ -1,4 +1,5 @@
 use compact_str::ToCompactString;
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
@@ -424,8 +425,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 name_arg,
                 base_class.name(env.python_version(db)),
                 &assigned_name,
-                Some(actual_name),
-                name_type,
+                Ok(actual_name),
+                Some(Applicability::Unsafe),
             );
         }
 
