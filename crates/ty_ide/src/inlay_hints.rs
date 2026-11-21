@@ -13,7 +13,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
 use ty_python_core::ProgramFile;
-use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
+use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer};
 use ty_python_semantic::types::ide_support::{
     inlay_hint_call_argument_details, inlay_hint_return_type,
 };
@@ -769,10 +769,8 @@ struct DynamicallyImportedMember {
 
 struct DynamicImporter<'a, 'db> {
     importer: &'a Importer<'db>,
-    /// The node used to compute members in scope (lazily).
+    /// The node at which to resolve name conflicts for this hint.
     scope_node: AnyNodeRef<'a>,
-    scope_offset: TextSize,
-    members: Option<MembersInScope<'db>>,
     /// Deduplicate imports within this hint, preserving their order. Each hint must
     /// include its own imports because hints can be applied independently.
     dynamic_imports: FxIndexMap<DynamicallyImportedMember, ImportAction>,
@@ -783,8 +781,6 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
         Self {
             importer,
             scope_node,
-            scope_offset: scope_node.range().start(),
-            members: None,
             dynamic_imports: FxIndexMap::default(),
         }
     }
@@ -800,11 +796,9 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
         symbol_name: &str,
         label_text: &str,
     ) -> Option<String> {
-        // Ensure members are computed before borrowing other fields.
-        let members = self.members.get_or_insert_with(|| {
-            self.importer
-                .members_in_scope_at(self.scope_node, self.scope_offset)
-        });
+        let members = self
+            .importer
+            .members_for_import(self.scope_node, module_name, symbol_name);
 
         // Check if the label is like `foo.A`
         let mut is_possibly_qualified_name = label_text.contains('.');
@@ -832,7 +826,7 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
                 ImportRequest::import_from(module_name, symbol_name)
             };
 
-            self.importer.import(request, members)
+            self.importer.import(request, &members)
         });
 
         qualified_symbol_text(action).map(str::to_string)
