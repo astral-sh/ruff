@@ -45,15 +45,15 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// affected annotations may be reasonable.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.283", category = Category::Pedantic)]
-pub(crate) struct RedundantLiteralUnion {
+pub(crate) struct LiteralUnionWithSupertype {
     literal: SourceCodeSnippet,
     builtin_type: ExprType,
 }
 
-impl Violation for RedundantLiteralUnion {
+impl Violation for LiteralUnionWithSupertype {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedundantLiteralUnion {
+        let LiteralUnionWithSupertype {
             literal,
             builtin_type,
         } = self;
@@ -99,7 +99,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
 
         if builtin_types_in_union.contains(&literal_type) {
             checker.report_diagnostic(
-                RedundantLiteralUnion {
+                LiteralUnionWithSupertype {
                     literal: SourceCodeSnippet::from_str(
                         checker.locator().slice(typing_literal_expr),
                     ),

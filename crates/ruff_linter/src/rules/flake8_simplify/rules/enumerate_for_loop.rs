@@ -45,14 +45,14 @@ use crate::checkers::ast::Checker;
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.2.0", category = Category::Complexity)]
-pub(crate) struct EnumerateForLoop {
+pub(crate) struct ManualLoopCounter {
     index: String,
 }
 
-impl Violation for EnumerateForLoop {
+impl Violation for ManualLoopCounter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let EnumerateForLoop { index } = self;
+        let ManualLoopCounter { index } = self;
         format!("Use `enumerate()` for index variable `{index}` in `for` loop")
     }
 }
@@ -158,7 +158,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: &ast::StmtFor) {
             }
 
             checker.report_diagnostic(
-                EnumerateForLoop {
+                ManualLoopCounter {
                     index: index.id.to_string(),
                 },
                 stmt.range(),

@@ -39,25 +39,19 @@ impl Violation for FutureAnnotationsInStub {
 
 /// PYI044
 pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
-    let StmtImportFrom {
-        range,
-        module: Some(module_name),
-        names,
-        ..
-    } = target
-    else {
-        return;
-    };
-
-    if module_name != "__future__" {
+    if !target.is_future_import(checker.parser_version()) {
         return;
     }
 
-    if names.iter().all(|alias| &*alias.name != "annotations") {
+    if target
+        .names
+        .iter()
+        .all(|alias| &*alias.name != "annotations")
+    {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, *range);
+    let mut diagnostic = checker.report_diagnostic(FutureAnnotationsInStub, target.range);
 
     let stmt = checker.semantic().current_statement();
 

@@ -86,7 +86,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
  71 |     # error: [override-of-final-method]
  72 |     def foo(): ...
  73 |     @property
- 74 |     # error: [invalid-property-type-override]
+ 74 |     # error: [incompatible-property-override]
  75 |     # error: [override-of-final-method]
  76 |     def my_property1(self) -> str: ...
  77 |     # TODO: we should emit a Liskov violation here too
@@ -332,7 +332,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```
-error[invalid-property-type-override]: Invalid override of attribute `my_property1`
+error[incompatible-property-override]: Invalid override of attribute `my_property1`
   --> src/mdtest_snippet.pyi:76:9
    |
 76 |     def my_property1(self) -> str: ...

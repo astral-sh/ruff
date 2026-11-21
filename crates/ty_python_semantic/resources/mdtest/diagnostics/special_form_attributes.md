@@ -16,10 +16,10 @@ class Foo:
         def __init__(self):
             self.y: Final = LiteralString
 
-X.foo  # error: [unresolved-attribute]
-X.aaaaooooooo  # error: [unresolved-attribute]
-Foo.X.startswith  # error: [unresolved-attribute]
-Foo.Bar().y.startswith  # error: [unresolved-attribute]
+X.foo  # error: [missing-attribute]
+X.aaaaooooooo  # error: [missing-attribute]
+Foo.X.startswith  # error: [missing-attribute]
+Foo.Bar().y.startswith  # error: [missing-attribute]
 
 # `Foo().b` resolves `Self` to `Foo`, so `.a` is valid.
 Foo().b.a

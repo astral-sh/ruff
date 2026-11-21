@@ -20,7 +20,7 @@ use crate::rules::pep8_naming::helpers;
 /// Import aliases should thus follow the same naming style as the member
 /// being imported.
 ///
-/// Note that this rule is distinct from `camelcase-imported-as-constant`
+/// Note that this rule is distinct from `camel-case-imported-as-constant`
 /// to accommodate selective enforcement.
 ///
 /// Also note that import aliases following an import convention according to the
@@ -44,15 +44,15 @@ use crate::rules::pep8_naming::helpers;
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.82", category = Category::Pedantic)]
-pub(crate) struct CamelcaseImportedAsAcronym {
+pub(crate) struct CamelCaseImportedAsAcronym {
     name: String,
     asname: String,
 }
 
-impl Violation for CamelcaseImportedAsAcronym {
+impl Violation for CamelCaseImportedAsAcronym {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CamelcaseImportedAsAcronym { name, asname } = self;
+        let CamelCaseImportedAsAcronym { name, asname } = self;
         format!("CamelCase `{name}` imported as acronym `{asname}`")
     }
 }
@@ -83,7 +83,7 @@ pub(crate) fn camelcase_imported_as_acronym(
         }
 
         let mut diagnostic = checker.report_diagnostic(
-            CamelcaseImportedAsAcronym {
+            CamelCaseImportedAsAcronym {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },

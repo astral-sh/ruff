@@ -9,6 +9,7 @@ pub use locator::Locator;
 pub use noqa::{SuppressionKind, generate_suppression_edits};
 #[cfg(feature = "clap")]
 pub use registry::clap_completion::RuleParser;
+pub use rule_redirects::RULE_NAME_REDIRECTS;
 #[cfg(feature = "clap")]
 pub use rule_selector::clap_completion::UnresolvedRuleSelectorParser;
 pub use rule_selector::{RuleSelector, UnresolvedRuleSelector};
@@ -78,7 +79,7 @@ mod tests {
             """
 "#;
         let source_type = SourceType::Python(PySourceType::Python);
-        let rule = Rule::OverIndentation;
+        let rule = Rule::OverIndentedDocstringLine;
 
         let source_kind = SourceKind::from_source_code(code.to_string(), source_type)
             .expect("Source code should be valid")

@@ -1,4 +1,5 @@
 use ruff_python_ast::Expr;
+use ruff_python_ast::name::QualifiedName;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
@@ -61,16 +62,12 @@ impl Violation for NumpyLegacyRandom {
 }
 
 /// NPY002
-pub(crate) fn legacy_random(checker: &Checker, expr: &Expr) {
+pub(crate) fn legacy_random(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }
 
-    let Some(method_name) = checker.semantic().resolve_qualified_name(expr) else {
-        return;
-    };
-
-    let ["numpy", "random", method_name] = method_name.segments() else {
+    let ["numpy", "random", method_name] = qualified_name.segments() else {
         return;
     };
 

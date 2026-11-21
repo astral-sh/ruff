@@ -47,7 +47,7 @@ pub(super) fn in_dunder_method(
         return false;
     };
 
-    if !matches!(
+    matches!(
         function_type::classify(
             name,
             decorator_list,
@@ -57,10 +57,7 @@ pub(super) fn in_dunder_method(
             &settings.pep8_naming.staticmethod_decorators,
         ),
         function_type::FunctionType::Method
-    ) {
-        return false;
-    }
-    true
+    )
 }
 
 /// Visitor to track reads from an iterable in a loop.
@@ -90,6 +87,9 @@ impl<'a> SequenceIndexVisitor<'a> {
     }
 
     pub(crate) fn into_accesses(self) -> Vec<TextRange> {
+        if self.modified {
+            return Vec::new();
+        }
         self.accesses
     }
 }
@@ -115,6 +115,9 @@ impl SequenceIndexVisitor<'_> {
                     }
                 }
                 false
+            }
+            Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+                elts.iter().any(|elt| self.is_assignment(elt))
             }
             _ => false,
         }

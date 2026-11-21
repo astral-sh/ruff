@@ -120,11 +120,11 @@ class Article(models.Model):
 article = Article(view_count=1)
 
 # TODO: Should not be an error, and the type should be `int`.
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(article.view_count)  # revealed: Unknown
 
 # The original field name is not available as an attribute.
-# TODO: Should be an unresolved-attribute error.
+# TODO: Should be an missing-attribute error.
 article.views
 
 # This is correct:
@@ -178,7 +178,7 @@ def _(book: Book):
     reveal_type(book.pk)  # revealed: str
 
     # This is an error now, `id` is not created when a custom primary key is defined.
-    book.id  # error: [unresolved-attribute]
+    book.id  # error: [missing-attribute]
 ```
 
 Subclassing a model with a custom primary key inherits the primary key behavior and does not
@@ -190,7 +190,7 @@ class Ebook(Book):
 
 def _(ebook: Ebook):
     reveal_type(ebook.isbn)  # revealed: str
-    ebook.id  # error: [unresolved-attribute]
+    ebook.id  # error: [missing-attribute]
 ```
 
 ### Explicit `id` field
@@ -211,6 +211,60 @@ def _(book: Book, ebook: Ebook):
     reveal_type(ebook.id)  # revealed: str
 ```
 
+### ForeignKey and OneToOneField as primary keys
+
+When a `OneToOneField` or `ForeignKey` is the primary key, `pk` has the value type of the related
+model's primary key. In the following example, `Book.id` is a UUID field, so `Ebook.pk` and
+`Review.pk` have type `UUID`, while their `book` attributes have type `Book`.
+
+```py
+from django.db import models
+
+class Book(models.Model):
+    id = models.UUIDField(primary_key=True)
+    isbn = models.CharField(max_length=13, unique=True)
+
+class Ebook(models.Model):
+    book = models.OneToOneField(Book, on_delete=models.CASCADE, primary_key=True)
+
+class Review(models.Model):
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, primary_key=True)
+
+def _(ebook: Ebook, review: Review):
+    reveal_type(ebook.book)  # revealed: Book
+    reveal_type(ebook.book_id)  # revealed: UUID
+    reveal_type(ebook.pk)  # revealed: UUID
+    ebook.id  # error: [missing-attribute]
+
+    reveal_type(review.book)  # revealed: Book
+    reveal_type(review.book_id)  # revealed: UUID
+    reveal_type(review.pk)  # revealed: UUID
+    review.id  # error: [missing-attribute]
+```
+
+With `to_field`, both `pk` and `<field>_id` have the referenced field's value type, even when it
+differs from the related model's primary key. Here, `to_field="isbn"` makes `pk` and `book_id` have
+type `str`, while `Book.pk` still has type `UUID`.
+
+```py
+class EbookByIsbn(models.Model):
+    book = models.OneToOneField(Book, to_field="isbn", on_delete=models.CASCADE, primary_key=True)
+
+class ReviewByIsbn(models.Model):
+    book = models.ForeignKey(Book, to_field="isbn", on_delete=models.CASCADE, primary_key=True)
+
+def _(book: Book, ebook: EbookByIsbn, review: ReviewByIsbn):
+    reveal_type(book.pk)  # revealed: UUID
+
+    reveal_type(ebook.book)  # revealed: Book
+    reveal_type(ebook.book_id)  # revealed: str
+    reveal_type(ebook.pk)  # revealed: str
+
+    reveal_type(review.book)  # revealed: Book
+    reveal_type(review.book_id)  # revealed: str
+    reveal_type(review.pk)  # revealed: str
+```
+
 ## Foreign key IDs
 
 ### Automatic primary key
@@ -226,7 +280,7 @@ class Author(models.Model):
 
 class Book(models.Model):
     author = models.ForeignKey(Author, on_delete=models.CASCADE)
-    editor = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, related_name="edited_books")
+    editor = models.ForeignKey(to=Author, on_delete=models.SET_NULL, null=True, related_name="edited_books")
 
 def _(book: Book):
     reveal_type(book.author)  # revealed: Author
@@ -234,6 +288,9 @@ def _(book: Book):
 
     reveal_type(book.editor)  # revealed: Author | None
     reveal_type(book.editor_id)  # revealed: int | None
+
+    book.editor = None
+    book.author = None  # error: [invalid-assignment]
 ```
 
 A `ForeignKey` adds a reverse accessor to the related model. By default, its name is the lowercase
@@ -242,11 +299,11 @@ source model name followed by `_set`. The `related_name` parameter overrides thi
 ```py
 def _(author: Author):
     # TODO: Should not be an error, and the type should be `QuerySet[Book]`.
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     reveal_type(author.book_set.all())  # revealed: Unknown
 
     # TODO: Should not be an error, and the type should be `QuerySet[Book]`.
-    # error: [unresolved-attribute]
+    # error: [missing-attribute]
     reveal_type(author.edited_books.all())  # revealed: Unknown
 ```
 
@@ -257,7 +314,7 @@ class Review(models.Model):
     reviewer = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="+")
 
 def _(author: Author):
-    author.review_set  # error: [unresolved-attribute]
+    author.review_set  # error: [missing-attribute]
 ```
 
 ### Custom primary key
@@ -331,7 +388,7 @@ An explicit `name` determines the names of generated methods, overriding the ass
 reveal_type(article.get_access_display())  # revealed: str
 
 # A `get_<field>_display()` method for the original field name is not available.
-article.get_visibility_display()  # error: [unresolved-attribute]
+article.get_visibility_display()  # error: [missing-attribute]
 ```
 
 ## Date navigation
@@ -353,8 +410,8 @@ def _(article: Article):
     reveal_type(article.get_previous_by_published())  # revealed: Article
 
     # Date fields with `null=True` do not generate these methods.
-    article.get_next_by_reviewed()  # error: [unresolved-attribute]
-    article.get_previous_by_reviewed()  # error: [unresolved-attribute]
+    article.get_next_by_reviewed()  # error: [missing-attribute]
+    article.get_previous_by_reviewed()  # error: [missing-attribute]
 ```
 
 `DateTimeField` also generates these methods:
@@ -384,6 +441,152 @@ def _(article: NewsArticle):
     reveal_type(article.get_previous_by_published())  # revealed: NewsArticle
     reveal_type(Article.get_next_by_published(article))  # revealed: NewsArticle
     reveal_type(Article.get_previous_by_published(article))  # revealed: NewsArticle
+```
+
+## Abstract models
+
+### Basic
+
+An abstract model provides reusable fields without creating its own database table. Its concrete
+subclasses receive an integer primary key unless they declare or inherit an explicit primary key.
+
+```py
+from django.db import models
+
+class AbstractBook(models.Model):
+    title = models.CharField(max_length=200)
+
+    class Meta:
+        abstract = True
+
+class Ebook(AbstractBook):
+    file_size = models.IntegerField()
+
+class Book(AbstractBook):
+    isbn = models.CharField(max_length=13, primary_key=True)
+
+def _(abstract: AbstractBook, ebook: Ebook, book: Book):
+    # Abstract models do not have an automatic primary key.
+    abstract.id  # error: [missing-attribute]
+
+    # Concrete models without an explicit primary key have an automatic integer key.
+    reveal_type(ebook.id)  # revealed: int
+    reveal_type(ebook.pk)  # revealed: int
+    reveal_type(ebook.title)  # revealed: str
+    reveal_type(ebook.file_size)  # revealed: int
+
+    # The explicit ISBN primary key prevents an automatic `id`.
+    book.id  # error: [missing-attribute]
+    reveal_type(book.pk)  # revealed: str
+    reveal_type(book.title)  # revealed: str
+    reveal_type(book.isbn)  # revealed: str
+```
+
+### Annotated abstract setting
+
+A bare annotation for `Meta.abstract` does not make a model abstract.
+
+```py
+from django.db import models
+
+class Book(models.Model):
+    class Meta:
+        abstract: bool
+
+def _(book: Book):
+    reveal_type(book.id)  # revealed: int
+    reveal_type(book.pk)  # revealed: int
+```
+
+When an assignment follows the annotation, its value determines whether the model is abstract.
+
+```py
+class AbstractBook(models.Model):
+    class Meta:
+        abstract: bool
+        abstract = True
+
+def _(abstract: AbstractBook):
+    abstract.id  # error: [missing-attribute]
+```
+
+### Inherited Meta configuration
+
+Django resets an abstract model's `Meta.abstract` to `False`. A child that subclasses this `Meta` is
+concrete unless it explicitly sets `abstract = True` again.
+
+```py
+from django.db import models
+
+class AbstractBook(models.Model):
+    class Meta:
+        abstract = True
+
+class NotAbstract(AbstractBook):
+    class Meta(AbstractBook.Meta):
+        ordering = ["id"]
+
+class Abstract(AbstractBook):
+    class Meta(AbstractBook.Meta):
+        abstract = True
+
+def _(not_abstract: NotAbstract, abstract: Abstract):
+    # concrete models have an automatic primary key
+    not_abstract.id
+
+    # abstract models do not:
+    abstract.id  # error: [missing-attribute]
+```
+
+Configuration inherited from an ordinary class retains its `abstract` setting.
+
+```py
+class Options:
+    abstract = True
+
+class InheritedAbstract(models.Model):
+    class Meta(Options):
+        pass
+
+def _(abstract: InheritedAbstract):
+    abstract.id  # error: [missing-attribute]
+```
+
+### Multiple inheritance
+
+An abstract base without a primary key does not shadow an inherited `id`, regardless of the base
+class order. Regression test for <https://github.com/astral-sh/ty/issues/4822>.
+
+```py
+from uuid import uuid4
+from django.db import models
+
+class AbstractHasTitle(models.Model):
+    title = models.CharField(max_length=200)
+
+    class Meta:
+        abstract = True
+
+class AbstractHasId(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4)
+
+    class Meta:
+        abstract = True
+
+class Book1(AbstractHasTitle, AbstractHasId):
+    pass
+
+class Book2(AbstractHasId, AbstractHasTitle):
+    pass
+
+def _(book1: Book1, book2: Book2):
+    reveal_type(book1.id)  # revealed: UUID
+    reveal_type(book1.pk)  # revealed: UUID
+    reveal_type(book1.title)  # revealed: str
+
+    reveal_type(book2.id)  # revealed: UUID
+    reveal_type(book2.pk)  # revealed: UUID
+    reveal_type(book2.title)  # revealed: str
 ```
 
 [django-types]: https://github.com/sbdchd/django-types

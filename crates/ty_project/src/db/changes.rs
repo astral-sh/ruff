@@ -11,7 +11,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::system_module_search_paths;
 use ty_python_core::program::FallibleStrategy;
-use ty_python_semantic::PythonEnvironment;
+use ty_python_semantic::{PythonEnvironment, VirtualEnvironmentCandidates};
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
@@ -42,6 +42,9 @@ impl ChangeResult {
     /// Callers must defer environment synchronization until those changes are saved:
     /// uv reads the file from disk, not the editor buffer.
     pub fn scripts_to_synchronize(&self, db: &dyn Db) -> Vec<File> {
+        if db.project().metadata(db).script_uv_override() == Some(false) {
+            return Vec::new();
+        }
         match &self.changed_files {
             ChangedFiles::Unindexed => Vec::new(),
             ChangedFiles::Known(changed_files) => {
@@ -97,15 +100,24 @@ impl ProjectDatabase {
         let metadata = project.metadata(self);
         let configuration_paths = ConfigurationPaths::from_metadata(metadata);
         // The initial uv metadata request may have failed before a workspace could be discovered.
-        let uv_enabled = metadata.use_uv().workspace_discovery_enabled();
-        let virtual_environment = project
+        let uv_workspace_discovery_enabled = metadata.uv_workspace_discovery_enabled();
+        let resolved_environment = project
             .program_settings(self)
-            .virtual_environment()
-            .map(SystemPath::to_path_buf);
-        let python_path = metadata.configured_python_path(self.system()).or_else(|| {
-            PythonEnvironment::virtual_environment_candidate(Some(&project_root), self.system())
-                .map(|(path, _)| SystemPath::absolute(path, self.system().current_directory()))
-        });
+            .last_usable_python_environment()
+            .map(|environment| environment.sys_prefix().to_path_buf());
+        let system = self.system();
+        let python_paths = if let Some(path) = metadata.configured_python_path(system) {
+            [Some(path), None]
+        } else {
+            let absolute = |path| SystemPath::absolute(path, system.current_directory());
+            match PythonEnvironment::virtual_environment_candidates(Some(&project_root), system) {
+                VirtualEnvironmentCandidates::VirtualEnvVar(path) => [Some(absolute(path)), None],
+                VirtualEnvironmentCandidates::NoVirtualEnvVar {
+                    conda_prefix,
+                    project_venv,
+                } => [conda_prefix.map(absolute), project_venv],
+            }
+        };
         let program = self.project().program(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -149,16 +161,13 @@ impl ProjectDatabase {
             let change = change.as_ref();
             tracing::debug!("Handling file watcher change event: {:?}", change);
 
-            let environment_changed = affects_python_environment(
-                change,
-                virtual_environment.as_deref(),
-                python_path.as_deref(),
-            );
+            let environment_changed =
+                affects_python_environment(change, resolved_environment.as_deref(), &python_paths);
             refresh_program_settings |= environment_changed;
 
             // Recreating an environment can change uv's reported interpreter and installed
             // module ownership without changing the lockfile.
-            if uv_enabled
+            if uv_workspace_discovery_enabled
                 && !reload_project
                 && (environment_changed || affects_uv_metadata(self, change))
             {
@@ -363,7 +372,7 @@ impl ProjectDatabase {
                 .find(|path| self.system().is_directory(path))
                 .unwrap_or(&project_root);
             let metadata = project.metadata(self);
-            if metadata.use_uv().workspace_discovery_enabled() {
+            if metadata.uv_workspace_discovery_enabled() {
                 result.project_sync_path = Some(path.to_path_buf());
             } else {
                 // We're not refreshing uv metadata, so use the existing workspace.
@@ -509,11 +518,14 @@ fn is_ignore_file(path: &SystemPath) -> bool {
     matches!(path.file_name(), Some(".gitignore" | ".ignore"))
 }
 
+/// Returns whether a filesystem event should trigger Python environment discovery.
+///
 /// `pyvenv.cfg` records the environment's Python version and whether imports include system
 /// site-packages. Recreating an environment can change both without changing ty's configuration.
 ///
-/// `python_path` is the configured environment or interpreter path,
-/// or a virtual environment path (e.g. `VIRTUAL_ENV` or the project's `.venv`).
+/// Compare events with the configured or candidate paths and with the last resolved prefix.
+/// When a Conda prefix is deleted, for example, discovery may already select the project's
+/// `.venv` by the time the deletion is reported.
 ///
 /// uv writes `pyvenv.cfg` before creating `site-packages`. If these events arrive in separate
 /// batches, creating `site-packages` must retry resolution. A watcher may only report the creation
@@ -526,13 +538,17 @@ fn is_ignore_file(path: &SystemPath) -> bool {
 /// environment when any ancestor path of a valid virtual environment location is created or deleted.
 fn affects_python_environment(
     change: &ChangeEvent,
-    virtual_environment: Option<&SystemPath>,
-    python_path: Option<&SystemPath>,
+    resolved_environment: Option<&SystemPath>,
+    python_paths: &[Option<SystemPathBuf>],
 ) -> bool {
-    let may_be_environment_root = |path: &SystemPath| {
-        virtual_environment == Some(path)
-            || python_path.is_some_and(|python_path| python_path.starts_with(path))
+    let contains_python_path = |path: &SystemPath| {
+        python_paths
+            .iter()
+            .flatten()
+            .any(|python_path| python_path.starts_with(path))
     };
+    let may_be_environment_root =
+        |path: &SystemPath| resolved_environment == Some(path) || contains_python_path(path);
 
     match change {
         ChangeEvent::Created { path, .. }
@@ -544,8 +560,9 @@ fn affects_python_environment(
         }
         // The configured path can be an interpreter file as well as an environment directory.
         ChangeEvent::Created { path, .. } | ChangeEvent::Deleted { path, .. }
-            if python_path.is_some_and(|python_path| python_path.starts_with(path))
-                || virtual_environment.is_some_and(|environment| environment.starts_with(path)) =>
+            if contains_python_path(path)
+                || resolved_environment
+                    .is_some_and(|environment| environment.starts_with(path)) =>
         {
             true
         }

@@ -36,6 +36,30 @@ def f(x: f):
 reveal_type(f)  # revealed: def f(x: Unknown) -> Unknown
 ```
 
+## A `TypeVar` name depends on its own `__name__`
+
+The name passed to `TypeVar` comes from `T.__name__` in another module. Inferring `T.__name__` leads
+back to the name argument, so ty falls back to `str` for the attribute.
+
+`parameter.py`:
+
+```py
+from typing import TypeVar
+from typing_extensions import reveal_type
+from names import name
+
+T = TypeVar(name)  # error: [mismatched-typevar-name]
+reveal_type(T.__name__)  # revealed: str
+```
+
+`names.py`:
+
+```py
+from parameter import T
+
+name = T.__name__
+```
+
 ## Unpacking a recursively growing tuple
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3838>.
@@ -74,6 +98,30 @@ def alternate(flag: bool):
     while flag:
         value = ("a", "b") if len(value) == 1 else (1,)
     reveal_type(value)  # revealed: tuple[Literal[1]] | tuple[Literal["a"], Literal["b"]]
+```
+
+## Unpacking a value with a growing type argument
+
+Each time through the loop, the first unpacked value has another callable nested in its type.
+Inference falls back to `Unknown` for that value. The initial `Box[int]` also reaches the read after
+the loop.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from collections.abc import Callable
+
+class Box[T]:
+    next: tuple[Box[Callable[[], T]], bool]
+
+def read(more: bool):
+    value = Box[int]()
+    while more:
+        value, more = value.next
+    reveal_type(value)  # revealed: Box[int] | Unknown
 ```
 
 ## Generic `NamedTuple` with recursive fields
@@ -125,7 +173,7 @@ class B(Protocol):
 x = 5
 
 while isinstance(x, B):
-    x = B()  # error: [call-non-callable]
+    x = B()  # error: [abstract-class-instantiation]
 
 type(x)
 x = 2
@@ -138,7 +186,7 @@ if bool:
     x = 5
 
 while isinstance(x, B):
-    x = B()  # error: [call-non-callable]
+    x = B()  # error: [abstract-class-instantiation]
 
 class A: ...
 ```
@@ -266,13 +314,13 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Divergent)
+        # revealed: (positional=...) -> Unknown | ((positional=...) -> Divergent)
         reveal_type(self.a)
 
         # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
         reveal_type(self.b)
 
-        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Divergent)
+        # revealed: (positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Divergent)
         reveal_type(self.c)
 
         # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
@@ -499,7 +547,7 @@ except Exception:
 
     result = make
 finally:
-    from unknown_module import member as result  # error: [unresolved-import]
+    from unknown_module import member as result  # error: [import-not-found]
 ```
 
 ## Decorated methods with implicit class attributes
@@ -526,7 +574,7 @@ class B:
 
     @d()
     def m2(self, p):
-        self.__slots__  # error: [unresolved-attribute]
+        self.__slots__  # error: [missing-attribute]
 ```
 
 ## Function annotation and dynamic `NamedTuple` / `NewType`
@@ -726,4 +774,24 @@ from types import new_class
 value = 0
 while value:
     value = new_class("C", (value,))
+```
+
+## Generic call constraining a list initializer
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A list passed to a generic function retains the type inferred from its elements, even when the
+call's return type supplies an incompatible context for that list.
+
+```py
+def keep[U](values: list[U]) -> list[U]:
+    return values
+
+def make[T](arg: T) -> list[T]:
+    values = [42]
+    reveal_type(values)  # revealed: list[int]
+    return keep(values)  # error: [invalid-explicit-return]
 ```

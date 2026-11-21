@@ -24,9 +24,9 @@ use crate::codes::Category;
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.116", category = Category::Security)]
-pub(crate) struct ExecBuiltin;
+pub(crate) struct Exec;
 
-impl Violation for ExecBuiltin {
+impl Violation for Exec {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Use of `exec` detected".to_string()
@@ -36,6 +36,6 @@ impl Violation for ExecBuiltin {
 /// S102
 pub(crate) fn exec_used(checker: &Checker, func: &Expr) {
     if checker.semantic().match_builtin_expr(func, "exec") {
-        checker.report_diagnostic(ExecBuiltin, func.range());
+        checker.report_diagnostic(Exec, func.range());
     }
 }

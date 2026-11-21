@@ -700,3 +700,14 @@ def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](
 
     return (y, z)
 ```
+
+## Truthiness checks on a tuple of classes
+
+A truthiness check on the tuple preserves its element type for a subsequent `issubclass()` check.
+
+```py
+def narrow(exc: type[BaseException], classes: tuple[type[ValueError], ...]):
+    assert classes
+    if issubclass(exc, classes):
+        reveal_type(exc)  # revealed: type[ValueError]
+```

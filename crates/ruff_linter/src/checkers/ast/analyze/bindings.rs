@@ -66,7 +66,7 @@ pub(crate) fn bindings(checker: &Checker) {
                     .try_set_fix(|| {
                         pyflakes::fixes::remove_exception_handler_assignment(
                             binding,
-                            checker.locator,
+                            checker.source_tokens(),
                         )
                         .map(Fix::safe_edit)
                     });

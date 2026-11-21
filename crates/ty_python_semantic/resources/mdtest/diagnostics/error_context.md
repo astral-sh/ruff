@@ -6,9 +6,9 @@ python-version = "3.13"
 ```
 
 A lot of ty's diagnostics are emitted as a direct result of a type-to-type assignability check
-(`invalid-assignment`, `invalid-argument-type` or `invalid-method-override`). Types can be complex,
-and so we can often help users understand the incompatibility by focusing on the relevant parts of
-the two types that are being compared.
+(`invalid-assignment`, `invalid-argument-type` or `incompatible-method-override`). Types can be
+complex, and so we can often help users understand the incompatibility by focusing on the relevant
+parts of the two types that are being compared.
 
 ## Basic
 
@@ -223,16 +223,16 @@ type Sixteen[T] = Quad[Quad[T]]
 type Nested[T] = Sixteen[Sixteen[Sixteen[Sixteen[Sixteen[T]]]]]
 
 def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
-    return source  # snapshot: invalid-return-type
+    return source  # snapshot: invalid-explicit-return
 ```
 
 ```snapshot
-error[invalid-return-type]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
  --> src/mdtest_snippet.py:7:12
   |
 6 | def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
   |                                               -------------------------- Expected `tuple[Nested[object], str]` because of return type
-7 |     return source  # snapshot: invalid-return-type
+7 |     return source  # snapshot: invalid-explicit-return
   |            ^^^^^^ expected `tuple[Nested[object], str]`, found `tuple[Nested[int], int]`
 info: the second tuple element is not compatible: `int` is not assignable to `str`
 ```
@@ -249,16 +249,16 @@ class Receiver:
         return 0
 
 def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
-    return receiver.method  # snapshot: invalid-return-type
+    return receiver.method  # snapshot: invalid-explicit-return
 ```
 
 ```snapshot
-error[invalid-return-type]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:15:12
    |
 14 | def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
    |                                           --------------------------------- Expected `(Nested[int], str, /) -> int` because of return type
-15 |     return receiver.method  # snapshot: invalid-return-type
+15 |     return receiver.method  # snapshot: invalid-explicit-return
    |            ^^^^^^^^^^^^^^^ expected `(Nested[int], str, /) -> int`, found `bound method Receiver.method[S](x: Nested[S], y: int) -> int`
 info: the second parameter has an incompatible type: `str` is not assignable to `int`
 ```
@@ -626,7 +626,7 @@ class Child1(Parent):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
  --> src/mdtest_snippet.py:7:9
   |
 7 |     def method(self, x: bytes) -> bool:
@@ -654,7 +654,7 @@ class ChildYX(ParentXY):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.py:15:9
    |
 15 |     def method(self, *, y: int, x: bytes) -> bool:
@@ -678,7 +678,7 @@ class Child2(Parent):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.py:19:9
    |
 19 |     def method(self, x: str) -> None:
@@ -702,7 +702,7 @@ class Child3(Parent):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[lost-keyword-for-regular-parameter]: Override of method `method` disallows keyword arguments allowed by the method on the base class
   --> src/mdtest_snippet.py:23:9
    |
 23 |     def method(self, y: str):
@@ -915,7 +915,7 @@ def f(d: D) -> Mapping[str, int]:
 ```
 
 ```snapshot
-error[invalid-return-type]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:40:12
    |
 39 | def f(d: D) -> Mapping[str, int]:
@@ -944,7 +944,7 @@ def _(value: Empty) -> Mapping[str, int] | Mapping[str, str]:
 ```
 
 ```snapshot
-error[invalid-return-type]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
  --> src/mdtest_snippet.py:8:12
   |
 7 | def _(value: Empty) -> Mapping[str, int] | Mapping[str, str]:
@@ -981,17 +981,17 @@ class Fixed(TypedDict):
 
 def outer(value: T) -> None:
     @overload
-    def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed) -> None: ...  # snapshot: inconsistent-overload-implementation
     @overload
     def inner(value: str) -> None: ...
     def inner(value: Pair[T] | str) -> None: ...
 ```
 
 ```snapshot
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
+15 |     def inner(value: Fixed) -> None: ...  # snapshot: inconsistent-overload-implementation
    |         ^^^^^
 16 |     @overload
 17 |     def inner(value: str) -> None: ...
@@ -1025,17 +1025,17 @@ class Fixed(TypedDict):
 
 def outer(value: T) -> None:
     @overload
-    def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed, later: int) -> None: ...  # snapshot: inconsistent-overload-implementation
     @overload
     def inner(value: str, later: str) -> None: ...
     def inner(value: Pair[T] | str, later: str) -> None: ...
 ```
 
 ```snapshot
-error[invalid-overload]: Implementation does not accept all arguments of this overload
+error[inconsistent-overload-implementation]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+15 |     def inner(value: Fixed, later: int) -> None: ...  # snapshot: inconsistent-overload-implementation
    |         ^^^^^
 16 |     @overload
 17 |     def inner(value: str, later: str) -> None: ...
@@ -1422,16 +1422,16 @@ class Source[T](HasPacket[T], Protocol):
     def __call__(self, x: str) -> Source[tuple[T]]: ...
 
 def check(source: Source[bytes]) -> Callable[[int], Source[str]] | HasPacket[str]:
-    return source  # snapshot: invalid-return-type
+    return source  # snapshot: invalid-explicit-return
 ```
 
 ```snapshot
-error[invalid-return-type]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
   --> src/mdtest_snippet.py:18:12
    |
 17 | def check(source: Source[bytes]) -> Callable[[int], Source[str]] | HasPacket[str]:
    |                                     --------------------------------------------- Expected `((int, /) -> Source[str]) | HasPacket[str]` because of return type
-18 |     return source  # snapshot: invalid-return-type
+18 |     return source  # snapshot: invalid-explicit-return
    |            ^^^^^^ expected `((int, /) -> Source[str]) | HasPacket[str]`, found `Source[bytes]`
 info: type `Source[bytes]` is not assignable to any element of the union `((int, /) -> Source[str]) | HasPacket[str]`
 info: ├── type `Source[bytes]` has inferred callable type `Overload[(x: int) -> Source[bytes], (x: str) -> Source[tuple[bytes]]]`
@@ -2073,20 +2073,20 @@ def _(source: tuple[bool, bool]):
 
 ## Error context in other scenarios
 
-### In `invalid-return-type` diagnostics
+### In `invalid-explicit-return` diagnostics
 
 ```py
 def f() -> tuple[int, str]:
-    return 1, b""  # snapshot: invalid-return-type
+    return 1, b""  # snapshot: invalid-explicit-return
 ```
 
 ```snapshot
-error[invalid-return-type]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
  --> src/mdtest_snippet.py:2:12
   |
 1 | def f() -> tuple[int, str]:
   |            --------------- Expected `tuple[int, str]` because of return type
-2 |     return 1, b""  # snapshot: invalid-return-type
+2 |     return 1, b""  # snapshot: invalid-explicit-return
   |            ^^^^^^ expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 ```

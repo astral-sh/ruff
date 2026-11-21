@@ -69,6 +69,10 @@ pub(crate) trait TypeVisitor<'db> {
         walk_callable_type(db, callable, self);
     }
 
+    fn visit_signature(&self, db: &'db dyn Db, signature: &super::Signature<'db>) {
+        super::walk_signature(db, signature, self);
+    }
+
     fn visit_property_instance_type(&self, db: &'db dyn Db, property: PropertyInstanceType<'db>) {
         walk_property_instance_type(db, property, self);
     }
@@ -137,6 +141,16 @@ pub(crate) trait TypeVisitor<'db> {
         walk_known_instance_type(db, known_instance, self);
     }
 
+    /// Visit an alias used as a value, such as `Box[T]` in `values = [Box[T]]`.
+    /// Its specialization arguments are available without evaluating its lazy `__value__`.
+    fn visit_type_alias_object(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        if self.should_visit_lazy_type_attributes() {
+            self.visit_type_alias_type(db, alias);
+        } else {
+            self.notify_skipped_lazy_type_attributes();
+        }
+    }
+
     fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
         walk_type_alias_type(db, type_alias, self);
     }
@@ -162,7 +176,7 @@ pub(crate) trait TypeVisitor<'db> {
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::SalsaValue)]
 pub(super) enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
@@ -737,6 +751,10 @@ pub(super) fn may_contain_typevar_from<'db>(
             walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
         }
 
+        fn visit_type_alias_object(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            walk_type_alias_arguments(db, alias, self);
+        }
+
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
             self.visit_guarded(
                 db,
@@ -1020,6 +1038,15 @@ where
                     }
                     return;
                 }
+            }
+            // An ordinary nominal instance visits only its class. Class literals have no
+            // children, and generic aliases have their own recursion guard. An exact tuple
+            // visits its elements directly, so it still needs the guard on the instance.
+            if let Type::NominalInstance(instance) = ty
+                && !instance.is_exact_tuple()
+            {
+                walk_nominal_instance_type(db, instance, self);
+                return;
             }
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }

@@ -16,14 +16,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
  1 | from typing import overload
  2 | 
  3 | @overload
- 4 | # error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
+ 4 | # error: [missing-overload-implementation] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
  5 | def func(x: int) -> int: ...
  6 | @overload
  7 | def func(x: str) -> str: ...
  8 | 
  9 | class Foo:
 10 |     @overload
-11 |     # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
+11 |     # error: [missing-overload-implementation] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
 12 |     def method(self, x: int) -> int: ...
 13 |     @overload
 14 |     def method(self, x: str) -> str: ...
@@ -32,12 +32,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error[invalid-overload]: Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function
+error[missing-overload-implementation]: Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function
  --> src/mdtest_snippet.py:5:5
   |
 5 | def func(x: int) -> int: ...
   |     ^^^^
-info: Attempting to call `func` will raise `TypeError` at runtime
+info: Attempting to call `func` will raise `NotImplementedError` at runtime
 info: Overloaded functions without implementations are only permitted:
 info:  - in stub files
 info:  - in `if TYPE_CHECKING` blocks
@@ -48,12 +48,12 @@ info: See https://docs.python.org/3/library/typing.html#typing.overload for more
 ```
 
 ```
-error[invalid-overload]: Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function
+error[missing-overload-implementation]: Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function
   --> src/mdtest_snippet.py:12:9
    |
 12 |     def method(self, x: int) -> int: ...
    |         ^^^^^^
-info: Attempting to call `method` will raise `TypeError` at runtime
+info: Attempting to call `method` will raise `NotImplementedError` at runtime
 info: Overloaded functions without implementations are only permitted:
 info:  - in stub files
 info:  - in `if TYPE_CHECKING` blocks

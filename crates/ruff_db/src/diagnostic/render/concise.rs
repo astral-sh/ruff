@@ -92,6 +92,7 @@ impl Renderer for ConciseRenderer<'_> {
                 }
             } else {
                 let (severity, severity_style) = match diag.severity() {
+                    Severity::Hint => ("hint", stylesheet.info),
                     Severity::Info => ("info", stylesheet.info),
                     Severity::Warning => ("warning", stylesheet.warning),
                     Severity::Error => ("error", stylesheet.error),
@@ -114,7 +115,7 @@ impl Renderer for ConciseRenderer<'_> {
             }
             if self.config.show_fix_status {
                 // Do not display an indicator for inapplicable fixes
-                if diag.has_applicable_fix(self.config.fix_applicability()) {
+                if diag.has_applicable_fix(self.config.fix_applicability) {
                     write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
                 }
             }

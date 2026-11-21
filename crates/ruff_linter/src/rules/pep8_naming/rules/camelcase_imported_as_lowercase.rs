@@ -38,15 +38,15 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.82", category = Category::Pedantic)]
-pub(crate) struct CamelcaseImportedAsLowercase {
+pub(crate) struct CamelCaseImportedAsLowercase {
     name: String,
     asname: String,
 }
 
-impl Violation for CamelcaseImportedAsLowercase {
+impl Violation for CamelCaseImportedAsLowercase {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CamelcaseImportedAsLowercase { name, asname } = self;
+        let CamelCaseImportedAsLowercase { name, asname } = self;
         format!("Camelcase `{name}` imported as lowercase `{asname}`")
     }
 }
@@ -66,7 +66,7 @@ pub(crate) fn camelcase_imported_as_lowercase(
             return;
         }
         let mut diagnostic = checker.report_diagnostic(
-            CamelcaseImportedAsLowercase {
+            CamelCaseImportedAsLowercase {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },

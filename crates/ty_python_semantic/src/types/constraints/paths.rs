@@ -14,10 +14,10 @@ use ruff_index::{IndexVec, newtype_index};
 use crate::types::constraints::sequents::{
     GroupedSequents, InternedSequentConstraint, Sequent, SequentGroup, SequentMap,
 };
-use crate::types::constraints::variables::AtomicConstraint;
 use crate::types::constraints::variables::AtomicConstraint::{
     ConcreteEquivalence, ConcreteLower, ConcreteUpper, TypeVarEquivalence, TypeVarRange,
 };
+use crate::types::constraints::variables::{AtomicConstraint, UnspecializedTypeVarPolicy};
 use crate::types::constraints::{
     Assignment, AtomicConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor, SourceOrderId,
     TypeVarId,
@@ -100,6 +100,14 @@ pub(crate) struct PathAssignments {
     /// the most additional progress (more remaining fuel for this derivation chain, less overall
     /// fuel consumed).
     new_assignments: FxIndexMap<Assignment<AtomicConstraintId>, AssignmentFuel>,
+}
+
+/// Branch-local state restored after visiting an edge.
+pub(super) struct PathSnapshot {
+    assignments: usize,
+    substituted_constraints: usize,
+    fuel_undo: usize,
+    remaining_overall_fuel: u16,
 }
 
 /// The total amount of fuel that we are willing to spend for this path traversal. This was
@@ -327,6 +335,7 @@ impl PathAssignments {
                     env,
                     storage,
                     constraint.when_true(),
+                    UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
@@ -352,6 +361,7 @@ impl PathAssignments {
                     env,
                     storage,
                     constraint.when_unconstrained(),
+                    UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
@@ -377,6 +387,7 @@ impl PathAssignments {
                     env,
                     storage,
                     constraint.when_false(),
+                    UnspecializedTypeVarPolicy::Ignore,
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
@@ -409,6 +420,63 @@ impl PathAssignments {
         }
     }
 
+    /// Add an assignment and propagate its consequences. On conflict, the caller
+    /// must discard the path or roll back the edge before adding another assignment.
+    pub(super) fn assume<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        assignment: Assignment<AtomicConstraintId>,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
+    ) -> bool {
+        debug_assert!(self.assignment_queue.is_empty());
+        self.assignment_queue
+            .push_back((assignment, AssignmentFuel::origin()));
+        self.drain_assignment_queue(
+            db,
+            env,
+            storage,
+            assignment.constraint(),
+            unspecialized_type_var_policy,
+        )
+        .is_ok()
+    }
+
+    pub(super) fn snapshot(&self) -> PathSnapshot {
+        PathSnapshot {
+            assignments: self.assignments.len(),
+            substituted_constraints: self.substituted_constraints.len(),
+            fuel_undo: self.fuel_undo.len(),
+            remaining_overall_fuel: self.remaining_overall_fuel,
+        }
+    }
+
+    pub(super) fn truncate(&mut self, snapshot: &PathSnapshot) {
+        self.assignment_queue.clear();
+        self.pending_substitutions.clear();
+        // A branch can replenish an assignment more than once. Restore in reverse order while
+        // every referenced assignment still exists.
+        for (index, previous_fuel) in self.fuel_undo.drain(snapshot.fuel_undo..).rev() {
+            self.assignments[index].1 = previous_fuel;
+        }
+        for assignment in self.assignments[snapshot.assignments..].keys() {
+            match *assignment {
+                Assignment::Positive(constraint) => {
+                    self.positive_assignment_indices[constraint] = None;
+                }
+                Assignment::Negative(constraint) => {
+                    self.negative_assignment_indices[constraint] = None;
+                }
+                Assignment::Unconstrained(_) => {}
+            }
+        }
+        self.assignments.truncate(snapshot.assignments);
+        self.substituted_constraints
+            .truncate(snapshot.substituted_constraints);
+        self.remaining_overall_fuel = snapshot.remaining_overall_fuel;
+    }
+
     /// Walks one of the outgoing edges of an internal BDD node. `assignment` describes the
     /// constraint that the BDD node checks, and whether we are following the `if_true` or
     /// `if_false` edge.
@@ -437,15 +505,11 @@ impl PathAssignments {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         assignment: Assignment<AtomicConstraintId>,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         f: impl FnOnce(&mut ConstraintSetStorage<'db>, &mut Self, Range<usize>, bool) -> R,
     ) -> R {
-        // Record a snapshot of the assignments that we already knew held — both so that we can
-        // pass along the range of which assignments are new, and so that we can reset back to this
-        // point before returning.
-        let start = self.assignments.len();
-        let substituted_constraints_start = self.substituted_constraints.len();
-        let fuel_undo_start = self.fuel_undo.len();
-        let previous_remaining_overall_fuel = self.remaining_overall_fuel;
+        let snapshot = self.snapshot();
+        let start = snapshot.assignments;
 
         // Add the new assignment and anything we can derive from it.
         tracing::trace!(
@@ -459,13 +523,8 @@ impl PathAssignments {
             edge = %assignment.into_inner().display(db, env, storage),
             "walk edge",
         );
-        debug_assert!(self.assignment_queue.is_empty());
-        self.assignment_queue
-            .push_back((assignment, AssignmentFuel::origin()));
-        let source_constraint = assignment.constraint();
-        let found_conflict = self
-            .drain_assignment_queue(db, env, storage, source_constraint)
-            .is_err();
+        let found_conflict =
+            !self.assume(db, env, storage, assignment, unspecialized_type_var_policy);
         if !found_conflict {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
@@ -486,30 +545,7 @@ impl PathAssignments {
         let end = self.assignments.len();
         let result = f(storage, self, start..end, found_conflict);
 
-        // Reset back to where we were before following this edge, so that the caller can reuse a
-        // single instance for the entire BDD traversal.
-        self.assignment_queue.clear();
-        self.pending_substitutions.clear();
-        // A branch can replenish an assignment more than once. Restore in reverse order while
-        // every referenced assignment still exists.
-        for (index, previous_fuel) in self.fuel_undo.drain(fuel_undo_start..).rev() {
-            self.assignments[index].1 = previous_fuel;
-        }
-        for assignment in self.assignments[start..].keys() {
-            match *assignment {
-                Assignment::Positive(constraint) => {
-                    self.positive_assignment_indices[constraint] = None;
-                }
-                Assignment::Negative(constraint) => {
-                    self.negative_assignment_indices[constraint] = None;
-                }
-                Assignment::Unconstrained(_) => {}
-            }
-        }
-        self.assignments.truncate(start);
-        self.substituted_constraints
-            .truncate(substituted_constraints_start);
-        self.remaining_overall_fuel = previous_remaining_overall_fuel;
+        self.truncate(&snapshot);
         result
     }
 
@@ -833,6 +869,7 @@ impl PathAssignments {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_constraint: AtomicConstraintId,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
     ) -> Result<(), PathAssignmentConflict> {
         while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
             self.add_assignment(db, env, storage, assignment, source_constraint, fuel)?;
@@ -841,12 +878,22 @@ impl PathAssignments {
         // evidence until the replacement actually holds, including when another derivation
         // supplied it. Process in discovery order to avoid replacing both sides of a cycle.
         for (original, replacement) in self.pending_substitutions.drain(..) {
-            if self
+            if !self
                 .positive_assignment_indices
                 .get(replacement)
                 .is_some_and(Option::is_some)
-                && !self.substituted_constraints.contains(&replacement)
+                || self.substituted_constraints.contains(&replacement)
             {
+                continue;
+            }
+
+            let replacement = storage.atomic_constraint_data(replacement);
+            if replacement.provides_candidate_bound(
+                db,
+                env,
+                replacement.as_concrete().map(|(_, bound)| bound),
+                unspecialized_type_var_policy,
+            ) {
                 self.substituted_constraints.insert(original);
             }
         }
@@ -1145,7 +1192,7 @@ impl PathAssignments {
         fuel_cost: u16,
     ) {
         let constraint = storage.atomic_constraint_data(post);
-        if constraint.is_reflexive_typevar_relation(db) {
+        if constraint.is_trivial_self_relation(db) {
             return;
         }
         let Some(ante1_fuel) = self.max_remaining_fuel_for(ante1.when_true()) else {
@@ -1175,7 +1222,7 @@ impl PathAssignments {
         fuel_cost: u16,
     ) {
         let constraint = storage.atomic_constraint_data(post);
-        if constraint.is_reflexive_typevar_relation(db) {
+        if constraint.is_trivial_self_relation(db) {
             return;
         }
         let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
@@ -1223,7 +1270,7 @@ mod tests {
             db,
             &env,
             builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             bound_typevar,
             ty,
         )
@@ -1252,7 +1299,7 @@ mod tests {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             KnownClass::Bool.to_instance(db, &env),
         );
@@ -1260,7 +1307,7 @@ mod tests {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             KnownClass::Int.to_instance(db, &env),
         );
@@ -1328,6 +1375,7 @@ mod tests {
             set.node,
             inferable,
             set.source_order,
+            UnspecializedTypeVarPolicy::Ignore,
         );
 
         // Both limits interrupt an edge with path-local assignments: the visit limit stops

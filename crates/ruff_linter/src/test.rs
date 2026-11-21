@@ -10,7 +10,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::render::{FullRenderer, Renderer};
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Span};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DummyFileResolver, Span};
 use ruff_notebook::Notebook;
 #[cfg(test)]
 use ruff_notebook::NotebookError;
@@ -445,7 +445,10 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
         .chain(parsed.errors().iter().map(|parse_error| {
             Diagnostic::invalid_syntax(source_code.clone(), &parse_error.error, parse_error)
         }))
-        .sorted_by(Diagnostic::ruff_start_ordering)
+        .sorted_by(|a, b| {
+            a.rendering_sort_key(&DummyFileResolver)
+                .cmp(&b.rendering_sort_key(&DummyFileResolver))
+        })
         .collect();
     (messages, transformed)
 }

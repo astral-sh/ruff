@@ -28,11 +28,11 @@ enum Kind {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.258", category = Category::Correctness)]
-pub(crate) struct AssertOnStringLiteral {
+pub(crate) struct AssertStringLiteral {
     kind: Kind,
 }
 
-impl Violation for AssertOnStringLiteral {
+impl Violation for AssertStringLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.kind {
@@ -52,7 +52,7 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
     match test {
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             checker.report_diagnostic(
-                AssertOnStringLiteral {
+                AssertStringLiteral {
                     kind: if value.is_empty() {
                         Kind::Empty
                     } else {
@@ -64,7 +64,7 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
         }
         Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
             checker.report_diagnostic(
-                AssertOnStringLiteral {
+                AssertStringLiteral {
                     kind: if value.is_empty() {
                         Kind::Empty
                     } else {
@@ -102,7 +102,7 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
             } else {
                 Kind::Unknown
             };
-            checker.report_diagnostic(AssertOnStringLiteral { kind }, test.range());
+            checker.report_diagnostic(AssertStringLiteral { kind }, test.range());
         }
         _ => {}
     }

@@ -407,3 +407,35 @@ help: Use `Self` as return type
 255 |
     |
 note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+PYI034 [*] `__enter__` methods in classes like `ParenthesizedSelfAnnotation` usually return `self` at runtime
+   --> PYI034.pyi:287:9
+    |
+286 | class ParenthesizedSelfAnnotation:
+287 |     def __enter__(self: (ParenthesizedSelfAnnotation)) -> ParenthesizedSelfAnnotation: ...
+    |         ^^^^^^^^^
+288 |     def __iadd__(self: ((ParenthesizedSelfAnnotation)), other: int) -> ParenthesizedSelfAnnotation: ...
+    |
+help: Use `Self` as return type
+    |
+286 | class ParenthesizedSelfAnnotation:
+    -     def __enter__(self: (ParenthesizedSelfAnnotation)) -> ParenthesizedSelfAnnotation: ...
+287 +     def __enter__(self) -> typing.Self: ...
+288 |     def __iadd__(self: ((ParenthesizedSelfAnnotation)), other: int) -> ParenthesizedSelfAnnotation: ...
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PYI034 [*] `__iadd__` methods in classes like `ParenthesizedSelfAnnotation` usually return `self` at runtime
+   --> PYI034.pyi:288:9
+    |
+286 | class ParenthesizedSelfAnnotation:
+287 |     def __enter__(self: (ParenthesizedSelfAnnotation)) -> ParenthesizedSelfAnnotation: ...
+288 |     def __iadd__(self: ((ParenthesizedSelfAnnotation)), other: int) -> ParenthesizedSelfAnnotation: ...
+    |         ^^^^^^^^
+help: Use `Self` as return type
+    |
+287 |     def __enter__(self: (ParenthesizedSelfAnnotation)) -> ParenthesizedSelfAnnotation: ...
+    -     def __iadd__(self: ((ParenthesizedSelfAnnotation)), other: int) -> ParenthesizedSelfAnnotation: ...
+288 +     def __iadd__(self, other: int) -> typing.Self: ...
+    |
+note: This is an unsafe fix and may change runtime behavior

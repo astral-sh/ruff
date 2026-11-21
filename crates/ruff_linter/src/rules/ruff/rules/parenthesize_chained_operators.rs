@@ -36,9 +36,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.8.0", category = Category::Pedantic)]
-pub(crate) struct ParenthesizeChainedOperators;
+pub(crate) struct UnclearBooleanPrecedence;
 
-impl AlwaysFixableViolation for ParenthesizeChainedOperators {
+impl AlwaysFixableViolation for UnclearBooleanPrecedence {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Parenthesize `a and b` expressions when chaining `and` and `or` together, \
@@ -84,7 +84,7 @@ pub(crate) fn parenthesize_chained_logical_operators(checker: &Checker, expr: &a
                     let new_source = format!("({})", locator.slice(source_range));
                     let edit = Edit::range_replacement(new_source, source_range);
                     checker
-                        .report_diagnostic(ParenthesizeChainedOperators, source_range)
+                        .report_diagnostic(UnclearBooleanPrecedence, source_range)
                         .set_fix(Fix::safe_edit(edit));
                 }
             }

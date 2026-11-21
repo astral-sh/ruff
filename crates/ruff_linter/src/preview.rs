@@ -51,6 +51,11 @@ pub(crate) const fn is_legacy_type_comment_in_non_stub_enabled(settings: &Linter
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/15635
+pub(crate) const fn is_fix_runtime_string_union_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 /// <https://github.com/astral-sh/ruff/pull/19303>
 pub(crate) const fn is_fix_f_string_logging_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -299,6 +304,11 @@ pub(crate) const fn is_expanded_import_conventions_enabled(preview: PreviewMode)
 
 // https://github.com/astral-sh/ruff/pull/23535
 pub(crate) const fn is_file_level_invalid_rule_code_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/issues/26282
+pub(crate) const fn is_redirected_suppression_code_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 

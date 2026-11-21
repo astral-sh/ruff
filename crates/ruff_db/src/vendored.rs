@@ -141,6 +141,7 @@ impl VendoredFileSystem {
             .into_owned();
 
         self.inner.0.file_names().filter_map(move |name| {
+            let name = name.expect("vendored paths are valid UTF-8");
             // Any entry that doesn't have the `path` (with a
             // trailing slash) as a prefix cannot possibly be in
             // the directory referenced by `path`.
@@ -168,7 +169,7 @@ impl VendoredFileSystem {
             }
 
             Some(DirectoryEntry {
-                path: VendoredPathBuf::from(name),
+                path: VendoredPathBuf::from(name.as_ref()),
                 file_type,
             })
         })
@@ -192,7 +193,11 @@ impl fmt::Debug for VendoredFileSystem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
             let mut archive = self.archive_reader();
-            let mut paths: Vec<String> = archive.0.file_names().map(String::from).collect();
+            let mut paths: Vec<String> = archive
+                .0
+                .file_names()
+                .map(|name| name.expect("vendored paths are valid UTF-8").into_owned())
+                .collect();
             paths.sort();
             let debug_info: BTreeMap<String, ZipFileDebugInfo> = paths
                 .iter()
@@ -364,14 +369,17 @@ impl VendoredZipArchive {
     }
 
     fn index_for_path(&self, path: &NormalizedVendoredPath) -> Option<usize> {
-        self.0.index_for_name(path.as_str())
+        // Vendored archives store entry names as UTF-8, so a byte lookup is enough.
+        // `index_for_name` scans decoded entry names on a miss to support CP437.
+        self.0.index_for_name_raw(path.as_bytes())
     }
 
     fn lookup_path(
         &mut self,
         path: &NormalizedVendoredPath,
     ) -> Result<ZipFile<'_, io::Cursor<ArchiveData>>> {
-        Ok(self.0.by_name(path.as_str())?)
+        let index = self.index_for_path(path).ok_or(ZipError::FileNotFound)?;
+        Ok(self.0.by_index(index)?)
     }
 
     fn metadata_for_path(&mut self, path: &NormalizedVendoredPath) -> Result<Metadata> {
@@ -400,8 +408,8 @@ impl NormalizedVendoredPath<'_> {
         Self(Cow::Owned(data))
     }
 
-    fn as_str(&self) -> &str {
-        &self.0
+    fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
     }
 }
 

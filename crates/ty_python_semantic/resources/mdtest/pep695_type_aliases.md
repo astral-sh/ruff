@@ -111,18 +111,30 @@ type OptionalInt = int | None
 x: OptionalInt = "1"
 ```
 
-Attribute-assignment diagnostics retain the declared alias name, including aliases within a union:
+Attribute-assignment diagnostics retain the declared alias name, including aliases within a union.
+When a literal is redundant after expanding the alias, the diagnostic still shows both operands in
+their declared order.
 
 ```py
+from typing import Literal
+
 class C:
     value: OptionalInt = None
     combined: OptionalInt | bytes = None
+    literal_first: Literal[1] | OptionalInt = None
+    alias_first: OptionalInt | Literal[1] = None
 
 def assign(c: C) -> None:
     # error: [invalid-assignment] "attribute `value` of type `OptionalInt`"
     c.value = "incorrect"
     # error: [invalid-assignment] "attribute `combined` of type `OptionalInt | bytes`"
     c.combined = "incorrect"
+    reveal_type(c.literal_first)  # revealed: int | None
+    reveal_type(c.alias_first)  # revealed: int | None
+    # error: [invalid-assignment] "attribute `literal_first` of type `Literal[1] | OptionalInt`"
+    c.literal_first = "incorrect"
+    # error: [invalid-assignment] "attribute `alias_first` of type `OptionalInt | Literal[1]`"
+    c.alias_first = "incorrect"
 ```
 
 ## No type qualifiers
@@ -242,6 +254,23 @@ def _(flag: bool):
             reveal_type(x)  # revealed: int | str
 ```
 
+A generic alias can refer both to its own type parameters and to names in the enclosing class. The
+class binding takes precedence over a module binding with the same name:
+
+```py
+from typing import assert_type
+
+Inner = bytes
+
+class Outer:
+    type Pair[T] = tuple[T, Inner]
+
+    class Inner: ...
+
+def _(pair: Outer.Pair[int]):
+    assert_type(pair, tuple[int, Outer.Inner])
+```
+
 ## Generic type aliases
 
 ```py
@@ -281,6 +310,33 @@ except Exception:
 
 def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
+```
+
+## Generic aliases in bound method receivers
+
+Checking a call to `set.clear` does not require expanding the set's element type. Expanding
+`Payload` would visit the same nested tuple many times.
+
+```py
+type Fan[T] = tuple[T, T, T, T, T, T, T, T]
+type Layer[T] = Fan[Fan[Fan[Fan[T]]]]
+type Payload = Layer[Layer[Layer[int]]]
+
+def clear(values: set[Payload]) -> None:
+    values.clear()  # ok
+```
+
+## Iterables of type alias objects
+
+Checking an iterable of alias objects does not require evaluating their values, even when an alias's
+metadata iterates over the same collection.
+
+```py
+from typing import Annotated
+
+type Alias = Annotated[int, list(iter(aliases))]
+aliases = [Alias]
+aliases.extend([Alias])  # no diagnostic
 ```
 
 ## Unpacking tuple aliases
@@ -374,10 +430,10 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
-## Loop-carried augmented unions
+## Loop-carried unions
 
-PEP 604 unions created by augmented assignment should converge when the previous loop iteration
-already contains the same type alias:
+Once the union contains both aliases, appending or prepending one of them in the next iteration
+preserves the inferred type.
 
 ```py
 def f(condition: bool):
@@ -388,6 +444,7 @@ def f(condition: bool):
     while condition:
         type Right = str
         alias |= Right
+        alias = Left | alias
         reveal_type(alias)  # revealed: <types.UnionType special-form 'int | str'>
 
     reveal_type(alias)  # revealed: TypeAliasType | <types.UnionType special-form 'int | str'>
@@ -395,6 +452,18 @@ def f(condition: bool):
     # it would be okay to emit an `invalid-type-form` error here
     def inner(x: alias):
         reveal_type(x)  # revealed: int | str
+```
+
+An alias can refer to the same union that the loop extends. Adding the alias preserves the type the
+union denotes.
+
+```py
+type Alias = union
+union = int
+for _ in range(2):
+    union |= Alias
+
+reveal_type(union)  # revealed: <types.UnionType special-form 'int'>
 ```
 
 ## Multiple layers of union aliases
@@ -659,6 +728,21 @@ def non_generic(value: NonGenericAlias[int]) -> None:
     reveal_type(value)  # revealed: Unknown
 ```
 
+### Defaulted `ParamSpec` after a variadic pack
+
+A parameter list following a variadic pack can be omitted when the `ParamSpec` has a default.
+
+```py
+from typing_extensions import Callable, ParamSpec, TypeAliasType, TypeVarTuple, Unpack, assert_type
+
+Ts = TypeVarTuple("Ts")
+P = ParamSpec("P", default=[bool])
+Callback = TypeAliasType("Callback", Callable[P, tuple[Unpack[Ts]]], type_params=(Ts, P))
+
+def f(callback: Callback[int, str]) -> None:
+    assert_type(callback, Callable[[bool], tuple[int, str]])
+```
+
 ### Invalid type parameters
 
 ```py
@@ -761,15 +845,32 @@ def variadic_outer[*Ts]() -> None:
     VariadicAlias = TypeAliasType("VariadicAlias", tuple[*Ts], type_params=(Ts,))
 ```
 
-### Generic alias from `typing`
+### Aliases from `typing`
 
 ```toml
 [environment]
 python-version = "3.12"
 ```
 
+The standard-library constructor accepts both `name` and `value` by keyword. A quoted `value` is a
+type expression.
+
 ```py
-from typing import TypeAliasType, TypeVar
+from typing import TypeAliasType
+
+Count = TypeAliasType("Count", value=int)
+Text = TypeAliasType(value="str", name="Text")
+
+def check_keywords(count: Count, text: Text) -> None:
+    reveal_type(count)  # revealed: int
+    reveal_type(text)  # revealed: str
+    count = text  # error: [invalid-assignment]
+```
+
+A generic alias declares its type variables with `type_params`.
+
+```py
+from typing import TypeVar
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -837,13 +938,16 @@ python-version = "3.15"
 ```py
 from typing import TypeAliasType
 
-Qualified = TypeAliasType("Qualified", int, qualname="Qualified")  # no diagnostic
+Qualified = TypeAliasType("Qualified", int, qualname="Qualified")  # ok
 Invalid = TypeAliasType("Invalid", int, qualname=1)  # error: [invalid-argument-type]
 ```
 
 ### Error cases
 
-#### Name is not a string literal
+#### Name supplied at runtime
+
+The name comparison needs the value of the first argument. The type alias still resolves to its
+value type when the name argument has type `str`.
 
 ```py
 from typing_extensions import TypeAliasType
@@ -851,8 +955,30 @@ from typing_extensions import TypeAliasType
 def get_name() -> str:
     return "IntOrStr"
 
-# error: [invalid-type-alias-type] "The first argument to `TypeAliasType` must be a string literal"
-IntOrStr = TypeAliasType(get_name(), int | str)
+IntOrStr = TypeAliasType(get_name(), int | str)  # error: [mismatched-type-alias-name]
+reveal_type(IntOrStr.__name__)  # revealed: str
+
+def f(value: IntOrStr) -> None:
+    reveal_type(value)  # revealed: int | str
+```
+
+Diagnostics can refer to the alias by its assigned name.
+
+```py
+def as_int_or_str(value: bytes) -> IntOrStr:
+    # snapshot: invalid-explicit-return
+    return value
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+  --> src/mdtest_snippet.py:13:12
+   |
+11 | def as_int_or_str(value: bytes) -> IntOrStr:
+   |                                    -------- Expected `IntOrStr` because of return type
+12 |     # snapshot: invalid-explicit-return
+13 |     return value
+   |            ^^^^^ expected `IntOrStr`, found `bytes`
 ```
 
 #### Name does not match variable
@@ -861,24 +987,41 @@ IntOrStr = TypeAliasType(get_name(), int | str)
 from typing import Union
 from typing_extensions import TypeAliasType
 
-# error: [mismatched-type-name] "The name passed to `TypeAliasType` must match the variable it is assigned to: Expected "IntOrStr", got "WrongName""
+# snapshot: mismatched-type-alias-name
 IntOrStr = TypeAliasType("WrongName", Union[int, str])
 reveal_type(IntOrStr)  # revealed: TypeAliasType
 ```
 
-#### Invalid keyword arguments
+```snapshot
+warning[mismatched-type-alias-name]: The name passed to `TypeAliasType` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:5:26
+  |
+5 | IntOrStr = TypeAliasType("WrongName", Union[int, str])
+  |                          ^^^^^^^^^^^ Expected "IntOrStr", got "WrongName"
+```
+
+#### Invalid constructor arguments
 
 ```py
 from typing_extensions import TypeAliasType
 
+# error: [invalid-type-alias-type] "`TypeAliasType` requires both a `name` and a `value` argument"
+Missing = TypeAliasType(name="Missing", type_params=())
+
+# error: [invalid-type-alias-type] "Expected at most 2 positional arguments to `TypeAliasType`, got 3"
+Extra = TypeAliasType("Extra", int, ())
+
 Invalid = TypeAliasType("Invalid", int, bogus=True)  # error: [unknown-argument]
-Duplicate = TypeAliasType("Duplicate", int, name="Duplicate")  # error: [parameter-already-assigned]
+Duplicate = TypeAliasType("Duplicate", int, name="Other")  # error: [parameter-already-assigned]
+reveal_type(Duplicate.__name__)  # revealed: Literal["Duplicate"]
+DuplicateValue = TypeAliasType("DuplicateValue", int, value=str)  # error: [parameter-already-assigned]
 Unpacked = TypeAliasType("Unpacked", int, **{"bogus": True})  # error: [unknown-argument]
 NonStringKey = TypeAliasType("NonStringKey", int, **{1: 42})  # error: [invalid-argument-type]
 Unsupported = TypeAliasType("Unsupported", int, qualname="Unsupported")  # error: [unknown-argument]
 
-def f(value: Invalid) -> None:
+def f(value: Invalid, duplicate: DuplicateValue) -> None:
     reveal_type(value)  # revealed: int
+    reveal_type(duplicate)  # revealed: int
 ```
 
 #### Not a simple variable assignment
@@ -1704,7 +1847,7 @@ from typing import Callable
 type Callback = Callable[..., Callback]
 
 def copy_callbacks(value: dict[str, Callback]):
-    copied: dict[str, Callback] = dict(value)  # no diagnostic
+    copied: dict[str, Callback] = dict(value)  # ok
 ```
 
 This also applies when the callable is one alternative of a recursive union.
@@ -1713,7 +1856,7 @@ This also applies when the callable is one alternative of a recursive union.
 type Value = float | None | Callable[..., Value]
 
 def copy_values(value: dict[str, Value]):
-    copied: dict[str, Value] = dict(value)  # no diagnostic
+    copied: dict[str, Value] = dict(value)  # ok
 ```
 
 ### Cyclic defaults
@@ -1855,6 +1998,25 @@ def f(x: Not[A], y: Not[list[tuple[Any, A]]]):
     assert_type(identity(y), Not[A])
 ```
 
+### Negated recursive unions
+
+Negating a recursive union is equivalent to intersecting the negations of its members, including
+when the alias contains gradual types.
+
+```py
+from typing import Any, assert_type
+from ty_extensions import Intersection, Not
+
+type A = int | list[tuple[Any, A]]
+
+def identity[T](x: T) -> T:
+    return x
+
+def f(x: Not[A], y: Intersection[Not[int], Not[list[tuple[Any, A]]]]):
+    assert_type(identity(x), Intersection[Not[int], Not[list[tuple[Any, A]]]])
+    assert_type(identity(y), Not[A])
+```
+
 ### Recursive invariant
 
 ```py
@@ -1876,7 +2038,7 @@ type RecursiveT = int | tuple[RecursiveT, ...]
 
 def foo(a: int, b: int) -> RecursiveT:
     some_intermediate_var = (a, b)
-    # error: [invalid-return-type] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
     return list(some_intermediate_var)
 ```
 

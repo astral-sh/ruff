@@ -43,9 +43,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.253", category = Category::Pedantic)]
-pub(crate) struct TypedArgumentDefaultInStub;
+pub(crate) struct ComplexDefaultForAnnotatedParameterInStub;
 
-impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
+impl AlwaysFixableViolation for ComplexDefaultForAnnotatedParameterInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Only simple default values allowed for typed arguments".to_string()
@@ -90,9 +90,9 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.253", category = Category::Pedantic)]
-pub(crate) struct ArgumentDefaultInStub;
+pub(crate) struct ComplexDefaultForUnannotatedParameterInStub;
 
-impl AlwaysFixableViolation for ArgumentDefaultInStub {
+impl AlwaysFixableViolation for ComplexDefaultForUnannotatedParameterInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Only simple default values allowed for arguments".to_string()
@@ -203,7 +203,7 @@ impl Violation for UnassignedSpecialVariableInStub {
 }
 
 /// ## What it does
-/// Checks for type alias definitions that are not annotated with
+/// Checks for type alias definitions in stub files that are not annotated with
 /// `typing.TypeAlias`.
 ///
 /// ## Why is this bad?
@@ -237,16 +237,16 @@ impl Violation for UnassignedSpecialVariableInStub {
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.279", category = Category::Style)]
-pub(crate) struct TypeAliasWithoutAnnotation {
+pub(crate) struct UnannotatedTypeAliasInStub {
     module: TypingModule,
     name: String,
     value: String,
 }
 
-impl AlwaysFixableViolation for TypeAliasWithoutAnnotation {
+impl AlwaysFixableViolation for UnannotatedTypeAliasInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeAliasWithoutAnnotation {
+        let UnannotatedTypeAliasInStub {
             module,
             name,
             value,
@@ -523,8 +523,8 @@ pub(crate) fn typed_argument_simple_defaults(checker: &Checker, parameters: &Par
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic =
-                    checker.report_diagnostic(TypedArgumentDefaultInStub, default.range());
+                let mut diagnostic = checker
+                    .report_diagnostic(ComplexDefaultForAnnotatedParameterInStub, default.range());
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
@@ -548,8 +548,10 @@ pub(crate) fn argument_simple_defaults(checker: &Checker, parameters: &Parameter
                 checker.locator(),
                 checker.semantic(),
             ) {
-                let mut diagnostic =
-                    checker.report_diagnostic(ArgumentDefaultInStub, default.range());
+                let mut diagnostic = checker.report_diagnostic(
+                    ComplexDefaultForUnannotatedParameterInStub,
+                    default.range(),
+                );
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     "...".to_string(),
@@ -699,7 +701,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
     };
 
     let mut diagnostic = checker.report_diagnostic(
-        TypeAliasWithoutAnnotation {
+        UnannotatedTypeAliasInStub {
             module,
             name: id.to_string(),
             value: checker.generator().expr(value),

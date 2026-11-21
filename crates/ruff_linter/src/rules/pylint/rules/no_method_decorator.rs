@@ -35,9 +35,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.1.7", category = Category::Style)]
-pub(crate) struct NoClassmethodDecorator;
+pub(crate) struct NonDecoratorClassmethod;
 
-impl AlwaysFixableViolation for NoClassmethodDecorator {
+impl AlwaysFixableViolation for NonDecoratorClassmethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Class method defined without decorator".to_string()
@@ -72,9 +72,9 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.1.7", category = Category::Style)]
-pub(crate) struct NoStaticmethodDecorator;
+pub(crate) struct NonDecoratorStaticmethod;
 
-impl AlwaysFixableViolation for NoStaticmethodDecorator {
+impl AlwaysFixableViolation for NonDecoratorStaticmethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Static method defined without decorator".to_string()
@@ -175,9 +175,11 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
 
             let range = TextRange::new(stmt.range().start(), stmt.range().start());
             let mut diagnostic = match method_type {
-                MethodType::Classmethod => checker.report_diagnostic(NoClassmethodDecorator, range),
+                MethodType::Classmethod => {
+                    checker.report_diagnostic(NonDecoratorClassmethod, range)
+                }
                 MethodType::Staticmethod => {
-                    checker.report_diagnostic(NoStaticmethodDecorator, range)
+                    checker.report_diagnostic(NonDecoratorStaticmethod, range)
                 }
             };
 

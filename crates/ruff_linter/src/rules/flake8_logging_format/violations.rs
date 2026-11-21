@@ -321,6 +321,15 @@ impl Violation for LoggingStringConcat {
 /// logging.info("%s - Something happened", user)
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is always marked as unsafe because formatting an object in an f-string
+/// evaluates its `__format__` method, whereas `%s` formatting evaluates its
+/// `__str__` method. If an object implements both methods with different behaviors,
+/// converting from an f-string to `%s` formatting can alter the logged message.
+///
+/// Additionally, if the message or the parentheses around it contain comments,
+/// the comments will be deleted.
+///
 /// ## Options
 /// - `lint.logger-objects`
 ///
@@ -518,9 +527,9 @@ impl Violation for LoggingExtraAttrClash {
 /// - [Python documentation: `error`](https://docs.python.org/3/library/logging.html#logging.Logger.error)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.236", category = Category::Complexity)]
-pub(crate) struct LoggingExcInfo;
+pub(crate) struct LoggingErrorWithExcInfo;
 
-impl Violation for LoggingExcInfo {
+impl Violation for LoggingErrorWithExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"

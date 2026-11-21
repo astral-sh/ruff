@@ -199,4 +199,5 @@ help: Use the loop variable directly
 84 |     for index, column_name in enumerate(column_names):
    -         _ = data[column_names[index]]  # PLR1736
 85 +         _ = data[column_name]  # PLR1736
+86 |
    |

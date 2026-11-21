@@ -19,6 +19,7 @@ fix = false
 fix_only = false
 output_format = full
 output_prefer_rule_codes = false
+preview = disabled
 show_fixes = false
 unsafe_fixes = hint
 
@@ -91,10 +92,10 @@ linter.rules.enabled = [
 	io-error (E902),
 	unused-import (F401),
 	import-shadowed-by-loop-var (F402),
-	undefined-local-with-import-star (F403),
+	star-import (F403),
 	late-future-import (F404),
-	undefined-local-with-import-star-usage (F405),
-	undefined-local-with-nested-import-star-usage (F406),
+	possibly-undefined-name-with-star-import (F405),
+	non-module-level-star-import (F406),
 	future-feature-not-defined (F407),
 	percent-format-invalid-format (F501),
 	percent-format-expected-mapping (F502),
@@ -156,10 +157,10 @@ linter.rules.should_fix = [
 	io-error (E902),
 	unused-import (F401),
 	import-shadowed-by-loop-var (F402),
-	undefined-local-with-import-star (F403),
+	star-import (F403),
 	late-future-import (F404),
-	undefined-local-with-import-star-usage (F405),
-	undefined-local-with-nested-import-star-usage (F406),
+	possibly-undefined-name-with-star-import (F405),
+	non-module-level-star-import (F406),
 	future-feature-not-defined (F407),
 	percent-format-invalid-format (F501),
 	percent-format-expected-mapping (F502),

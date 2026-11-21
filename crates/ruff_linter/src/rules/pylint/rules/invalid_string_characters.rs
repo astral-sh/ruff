@@ -29,9 +29,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterBackspace;
+pub(crate) struct UnescapedBackspaceCharacter;
 
-impl Violation for InvalidCharacterBackspace {
+impl Violation for UnescapedBackspaceCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -65,9 +65,9 @@ impl Violation for InvalidCharacterBackspace {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterSub;
+pub(crate) struct UnescapedSubstituteCharacter;
 
-impl Violation for InvalidCharacterSub {
+impl Violation for UnescapedSubstituteCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -101,9 +101,9 @@ impl Violation for InvalidCharacterSub {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterEsc;
+pub(crate) struct UnescapedEscapeCharacter;
 
-impl Violation for InvalidCharacterEsc {
+impl Violation for UnescapedEscapeCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -137,9 +137,9 @@ impl Violation for InvalidCharacterEsc {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterNul;
+pub(crate) struct UnescapedNullCharacter;
 
-impl Violation for InvalidCharacterNul {
+impl Violation for UnescapedNullCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -172,9 +172,9 @@ impl Violation for InvalidCharacterNul {
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
-pub(crate) struct InvalidCharacterZeroWidthSpace;
+pub(crate) struct UnescapedZeroWidthSpaceCharacter;
 
-impl Violation for InvalidCharacterZeroWidthSpace {
+impl Violation for UnescapedZeroWidthSpaceCharacter {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -185,6 +185,20 @@ impl Violation for InvalidCharacterZeroWidthSpace {
     fn fix_title(&self) -> Option<String> {
         Some("Replace with escape sequence".to_string())
     }
+}
+
+/// Helper that allows us to exit early before embarking on expensive walks
+/// of all tokens for various pylint rules.
+///
+/// Interpolation depth matters for fixes, so we avoid walking every token
+/// unless the source contains a character one of these rules could report.
+pub(crate) fn contains_invalid_string_character(source: &str) -> bool {
+    let bytes = source.as_bytes();
+    // Search for NUL (0), backspace (0x08), substitute (0x1a), escape (0x1b),
+    // and the UTF-8 encoding of zero-width space (U+200B).
+    memchr::memchr3(0, 0x08, 0x1a, bytes).is_some()
+        || memchr::memchr(0x1b, bytes).is_some()
+        || memchr::memmem::find(bytes, "\u{200b}".as_bytes()).is_some()
 }
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
@@ -220,23 +234,23 @@ pub(crate) fn invalid_string_characters(
         let (replacement, diagnostic) = match c {
             '\x08' => (
                 "\\b",
-                context.report_diagnostic_if_enabled(InvalidCharacterBackspace, range),
+                context.report_diagnostic_if_enabled(UnescapedBackspaceCharacter, range),
             ),
             '\x1a' => (
                 "\\x1a",
-                context.report_diagnostic_if_enabled(InvalidCharacterSub, range),
+                context.report_diagnostic_if_enabled(UnescapedSubstituteCharacter, range),
             ),
             '\x1b' => (
                 "\\x1b",
-                context.report_diagnostic_if_enabled(InvalidCharacterEsc, range),
+                context.report_diagnostic_if_enabled(UnescapedEscapeCharacter, range),
             ),
             '\0' => (
                 "\\0",
-                context.report_diagnostic_if_enabled(InvalidCharacterNul, range),
+                context.report_diagnostic_if_enabled(UnescapedNullCharacter, range),
             ),
             '\u{200b}' => (
                 "\\u200b",
-                context.report_diagnostic_if_enabled(InvalidCharacterZeroWidthSpace, range),
+                context.report_diagnostic_if_enabled(UnescapedZeroWidthSpaceCharacter, range),
             ),
             _ => {
                 continue;

@@ -1,4 +1,4 @@
-use itertools::Either;
+use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{DeferredExpressionState, TypeInferenceBuilder};
+use super::{DeferredExpressionState, InferenceRegion, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
 use crate::types::diagnostic::{
     self, CYCLIC_TYPE_ALIAS_DEFINITION, EXPERIMENTAL_SYNTAX, INVALID_INIT_TYPE_VARIABLE,
@@ -18,7 +18,6 @@ use crate::types::diagnostic::{
     report_invalid_concatenate_last_arg, report_missing_type_arguments,
     report_unsupported_binary_operation,
 };
-use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::legacy_type_alias::non_alias_assignment;
 use crate::types::infer::{
     CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, TypeExpressionFlags,
@@ -40,6 +39,13 @@ use crate::types::{
     UnionType, any_over_type, binding_type, todo_type,
 };
 use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
+
+/// The type an annotation denotes and, when valid in the enclosing `|`'s context, its runtime value.
+/// For example, `bool | int` denotes `int` but evaluates to a union object.
+struct InferredUnionOperand<'db> {
+    annotation: Type<'db>,
+    runtime_value: Option<Type<'db>>,
+}
 
 enum LegacyTypeAliasReference<'db> {
     Alias(Type<'db>, Option<GenericContext<'db>>),
@@ -193,6 +199,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression.
     pub(super) fn infer_type_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let ty = self.with_type_expression_context(|builder| {
+            builder.infer_type_expression_no_store(expression)
+        });
+        self.store_expression_type(expression, ty);
+        ty
+    }
+
+    fn with_type_expression_context<R>(&mut self, infer: impl FnOnce(&mut Self) -> R) -> R {
         let previous_deferred_state = self.deferred_state;
         let was_in_type_expression = self
             .inference_flags()
@@ -214,7 +228,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.replace_deferred_state(DeferredExpressionState::Deferred);
         }
 
-        let ty = self.infer_type_expression_no_store(expression);
+        let result = infer(self);
         self.deferred_state = previous_deferred_state;
         self.context.inference_flags.set(
             InferenceFlags::IN_NESTED_TYPE_EXPRESSION,
@@ -224,8 +238,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             InferenceFlags::IN_TYPE_EXPRESSION,
             previously_in_type_expression,
         );
-        self.store_expression_type(expression, ty);
-        ty
+        result
     }
 
     /// Similar to [`infer_type_expression`], but accepts a [`DeferredExpressionState`].
@@ -413,17 +426,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    fn should_check_runtime_errors(&self, expression: impl Ranged) -> bool {
+        !self.deferred_state.is_deferred()
+            && !self.in_stub()
+            && !self.is_in_type_checking_block(self.scope(), expression)
+    }
+
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let ignore_runtime_errors = |builder: &Self| {
-            builder.deferred_state.is_deferred()
-                || builder.in_stub()
-                || builder.is_in_type_checking_block(builder.scope(), expression)
-        };
         let ignore_experimental_runtime_errors = |builder: &Self| {
-            ignore_runtime_errors(builder)
+            !builder.should_check_runtime_errors(expression)
                 || matches!(builder.scope.scope(db).kind(), ScopeKind::TypeAlias)
         };
 
@@ -529,148 +543,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::BinOp(binary) => {
                 match binary.op {
                     // PEP-604 unions are okay, e.g., `int | str`
+                    ast::Operator::BitOr if self.should_check_runtime_errors(binary) => {
+                        self.infer_eager_union_type_expression(binary, false)
+                            .annotation
+                    }
                     ast::Operator::BitOr => {
-                        let left_ty = self.infer_type_expression(&binary.left);
-                        let right_ty = self.infer_type_expression(&binary.right);
-
-                        // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
-                        if !ignore_runtime_errors(self) {
-                            let mut speculative_builder = self.speculate_without_diagnostics();
-                            // If the left-hand side of the union is itself a PEP-604 union,
-                            // we'll already have checked whether it can be used with `|` in a previous inference step
-                            // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
-                            // avoid duplicate diagnostics; just assume that the l.h.s. is a `UnionType` instance
-                            // in that case.
-                            let left_type_value = speculative_builder
-                                .infer_expression(&binary.left, TypeContext::default());
-                            let right_type_value = speculative_builder
-                                .infer_expression(&binary.right, TypeContext::default());
-
-                            let dunder_fails = Type::try_call_bin_op(
-                                db,
-                                env,
-                                left_type_value,
-                                ast::Operator::BitOr,
-                                right_type_value,
-                            )
-                            .is_err();
-
-                            // As well as trying the normal dunder lookup,
-                            // we also check for the case where one of the operands is a class-literal type
-                            // or generic-alias type and the other is a string literal. The normal dunder lookup
-                            // fails to catch this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
-                            // ABCMeta and _ProtocolMeta inherit these operators unchanged. The typeshed
-                            // protocol fallback does not establish a custom operator either.
-                            let should_emit_error = if dunder_fails {
-                                true
-                            } else {
-                                let literal = match (left_type_value, right_type_value) {
-                                    (Type::ClassLiteral(class), Type::LiteralValue(literal))
-                                    | (Type::LiteralValue(literal), Type::ClassLiteral(class))
-                                        if matches!(
-                                            class
-                                                .inferred_metaclass(db)
-                                                .for_inheritance(db, env)
-                                                .to_class_type(db)
-                                                .and_then(|metaclass| metaclass.known(db)),
-                                            Some(
-                                                KnownClass::Type
-                                                    | KnownClass::ABCMeta
-                                                    | KnownClass::ProtocolMeta
-                                            )
-                                        ) =>
-                                    {
-                                        Some(literal)
-                                    }
-                                    (Type::GenericAlias(_), Type::LiteralValue(literal))
-                                    | (Type::LiteralValue(literal), Type::GenericAlias(_)) => {
-                                        Some(literal)
-                                    }
-                                    _ => None,
-                                };
-                                literal.is_some_and(|literal| !literal.is_enum())
-                            };
-
-                            if should_emit_error
-                                && let Some(builder) =
-                                    self.context.report_lint(&UNSUPPORTED_OPERATOR, binary)
-                            {
-                                let mut diagnostic =
-                                    builder.into_diagnostic("Unsupported `|` operation");
-
-                                if left_type_value.is_equivalent_to(db, env, right_type_value) {
-                                    diagnostic.set_primary_annotation_message(format_args!(
-                                        "Both operands have type `{}`",
-                                        left_type_value.display(db, env)
-                                    ));
-                                    diagnostic.set_concise_message(format_args!(
-                                        "Operator `|` is unsupported between \
-                                        two objects of type `{}`",
-                                        left_type_value.display(db, env)
-                                    ));
-                                } else {
-                                    for (operand, ty) in [
-                                        (&*binary.left, left_type_value),
-                                        (&*binary.right, right_type_value),
-                                    ] {
-                                        diagnostic.annotate(
-                                            self.context.secondary(operand).message(format_args!(
-                                                "Has type `{}`",
-                                                ty.display(db, env)
-                                            )),
-                                        );
-                                    }
-                                    diagnostic.set_concise_message(format_args!(
-                                        "Operator `|` is unsupported between \
-                                        objects of type `{}` and `{}`",
-                                        left_type_value.display(db, env),
-                                        right_type_value.display(db, env)
-                                    ));
-                                }
-
-                                match self.scope.scope(self.db()).kind() {
-                                    ScopeKind::TypeAlias => diagnostic.info(
-                                        "A type alias scope is lazy but will be \
-                                        executed at runtime if the `__value__` property is \
-                                        accessed",
-                                    ),
-                                    ScopeKind::TypeParams => diagnostic.info(
-                                        "Type parameter scopes are lazy but may be \
-                                        executed at runtime if the `__bound__`, `__value__`
-                                        or `__constraints__` property of a type parameter is \
-                                        accessed",
-                                    ),
-                                    _ => {
-                                        let python_version =
-                                            self.program_environment().python_version(db);
-
-                                        if python_version < PythonVersion::PY314 {
-                                            diagnostic.info(format_args!(
-                                                "All {}s are evaluated at \
-                                                runtime by default on Python <3.14",
-                                                self.type_expression_context()
-                                            ));
-                                            add_inferred_python_version_hint_to_diagnostic(
-                                                db,
-                                                self.file(),
-                                                &mut diagnostic,
-                                                "inferring types",
-                                            );
-                                            if binary.left.is_string_literal_expr()
-                                                || binary.right.is_string_literal_expr()
-                                            {
-                                                diagnostic.help(
-                                                    "Put quotes around the whole union \
-                                                    rather than just certain elements",
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        UnionType::from_elements_leave_aliases(db, env, [left_ty, right_ty])
+                        let left = self.infer_type_expression(&binary.left);
+                        let right = self.infer_type_expression(&binary.right);
+                        UnionType::from_two_elements_leave_aliases(db, env, left, right)
                     }
                     ast::Operator::BitAnd => {
                         if let Some(builder) =
@@ -1374,6 +1254,210 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    fn infer_eager_union_operand(&mut self, expr: &ast::Expr) -> InferredUnionOperand<'db> {
+        // Overload resolution can share expression inference that also needs diagnostics.
+        if self.expression_cache.is_some() || self.cycle_recovery.is_some() {
+            return InferredUnionOperand {
+                annotation: self.infer_type_expression(expr),
+                runtime_value: None,
+            };
+        }
+
+        let parent_flags = self.inference_flags();
+        let operand = self.with_type_expression_context(|builder| match expr {
+            ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+                // Entering a nested type expression can change how type arguments are interpreted.
+                builder.infer_eager_union_type_expression(
+                    binary,
+                    builder.inference_flags() == parent_flags,
+                )
+            }
+            ast::Expr::Name(name) if name.ctx.is_load() => {
+                // A bare name has the same runtime value under either set of flags.
+                let (value, definition) = builder.infer_type_expression_reference(expr);
+                InferredUnionOperand {
+                    annotation: builder
+                        .infer_name_or_attribute_type_expression(value, definition, expr),
+                    runtime_value: Some(value),
+                }
+            }
+            _ => {
+                let annotation = builder.infer_type_expression_no_store(expr);
+                InferredUnionOperand {
+                    annotation,
+                    runtime_value: expr.is_none_literal_expr().then_some(annotation),
+                }
+            }
+        });
+        self.store_expression_type(expr, operand.annotation);
+        operand
+    }
+
+    fn infer_eager_union_type_expression(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        need_runtime_value: bool,
+    ) -> InferredUnionOperand<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+        let left = self.infer_eager_union_operand(&binary.left);
+        let right = self.infer_eager_union_operand(&binary.right);
+        let mut speculative = self.speculate_without_diagnostics();
+        let mut operand_value = |expr: &ast::Expr, value: Option<Type<'db>>| {
+            value
+                .filter(|_| speculative.cycle_recovery.is_none())
+                .unwrap_or_else(|| speculative.infer_expression(expr, TypeContext::default()))
+        };
+        let left_value = operand_value(&binary.left, left.runtime_value);
+        let right_value = operand_value(&binary.right, right.runtime_value);
+        self.check_union_operator(binary, left_value, right_value);
+
+        // Ordinary value inference can use the TypedDict on one side of `|` to infer
+        // a dictionary literal on the other, even when the annotation is invalid.
+        let runtime_value = if need_runtime_value
+            && speculative.cycle_recovery.is_none()
+            && !binary.left.is_dict_expr()
+            && !binary.right.is_dict_expr()
+        {
+            let value =
+                speculative.infer_binary_expression_from_types(binary, left_value, right_value);
+            speculative.cycle_recovery.is_none().then_some(value)
+        } else {
+            None
+        };
+        InferredUnionOperand {
+            annotation: UnionType::from_two_elements_leave_aliases(
+                db,
+                env,
+                left.annotation,
+                right.annotation,
+            ),
+            runtime_value,
+        }
+    }
+
+    fn check_union_operator(
+        &self,
+        binary: &ast::ExprBinOp,
+        left_type_value: Type<'db>,
+        right_type_value: Type<'db>,
+    ) {
+        let db = self.db();
+        let env = self.program_environment();
+        let dunder_fails = Type::try_call_bin_op(
+            db,
+            env,
+            left_type_value,
+            ast::Operator::BitOr,
+            right_type_value,
+        )
+        .is_err();
+
+        // As well as trying the normal dunder lookup,
+        // we also check for the case where one of the operands is a class-literal type
+        // or generic-alias type and the other is a string literal. The normal dunder lookup
+        // fails to catch this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
+        // ABCMeta and _ProtocolMeta inherit these operators unchanged. The typeshed
+        // protocol fallback does not establish a custom operator either.
+        let should_emit_error = if dunder_fails {
+            true
+        } else {
+            let literal = match (left_type_value, right_type_value) {
+                (Type::ClassLiteral(class), Type::LiteralValue(literal))
+                | (Type::LiteralValue(literal), Type::ClassLiteral(class))
+                    if matches!(
+                        class
+                            .inferred_metaclass(db)
+                            .for_inheritance(db, env)
+                            .to_class_type(db)
+                            .and_then(|metaclass| metaclass.known(db)),
+                        Some(KnownClass::Type | KnownClass::ABCMeta | KnownClass::ProtocolMeta)
+                    ) =>
+                {
+                    Some(literal)
+                }
+                (Type::GenericAlias(_), Type::LiteralValue(literal))
+                | (Type::LiteralValue(literal), Type::GenericAlias(_)) => Some(literal),
+                _ => None,
+            };
+            literal.is_some_and(|literal| !literal.is_enum())
+        };
+
+        if should_emit_error
+            && let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, binary)
+        {
+            let mut diagnostic = builder.into_diagnostic("Unsupported `|` operation");
+
+            if left_type_value.is_equivalent_to(db, env, right_type_value) {
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Both operands have type `{}`",
+                    left_type_value.display(db, env)
+                ));
+                diagnostic.set_concise_message(format_args!(
+                    "Operator `|` is unsupported between \
+                    two objects of type `{}`",
+                    left_type_value.display(db, env)
+                ));
+            } else {
+                for (operand, ty) in [
+                    (&*binary.left, left_type_value),
+                    (&*binary.right, right_type_value),
+                ] {
+                    diagnostic.annotate(
+                        self.context
+                            .secondary(operand)
+                            .message(format_args!("Has type `{}`", ty.display(db, env))),
+                    );
+                }
+                diagnostic.set_concise_message(format_args!(
+                    "Operator `|` is unsupported between \
+                    objects of type `{}` and `{}`",
+                    left_type_value.display(db, env),
+                    right_type_value.display(db, env)
+                ));
+            }
+
+            match self.scope.scope(self.db()).kind() {
+                ScopeKind::TypeAlias => diagnostic.info(
+                    "A type alias scope is lazy but will be \
+                    executed at runtime if the `__value__` property is \
+                    accessed",
+                ),
+                ScopeKind::TypeParams => diagnostic.info(
+                    "Type parameter scopes are lazy but may be \
+                    executed at runtime if the `__bound__`, `__value__`
+                    or `__constraints__` property of a type parameter is \
+                    accessed",
+                ),
+                _ => {
+                    let python_version = self.program_environment().python_version(db);
+
+                    if python_version < PythonVersion::PY314 {
+                        diagnostic.info(format_args!(
+                            "All {}s are evaluated at \
+                            runtime by default on Python <3.14",
+                            self.type_expression_context()
+                        ));
+                        add_inferred_python_version_hint_to_diagnostic(
+                            db,
+                            self.file(),
+                            &mut diagnostic,
+                            "inferring types",
+                        );
+                        if binary.left.is_string_literal_expr()
+                            || binary.right.is_string_literal_expr()
+                        {
+                            diagnostic.help(
+                                "Put quotes around the whole union \
+                                rather than just certain elements",
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn infer_starred_type_expression(&mut self, starred: &ast::ExprStarred) -> Type<'db> {
         let db = self.db();
         let ast::ExprStarred {
@@ -1425,12 +1509,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
+        let db = self.db();
         let alias_reference =
             self.legacy_type_alias_reference(value_ty, definition, &subscript.value);
         if let LegacyTypeAliasReference::Alias(alias, parameters) = alias_reference
             && (parameters.is_some() || !alias.is_dynamic())
         {
-            let db = self.db();
             return self.infer_explicit_callable_specialization(
                 subscript,
                 alias,
@@ -1450,13 +1534,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             return Type::unknown();
         }
+        // In annotations, the builtin classes `type` and `tuple` share their subscript
+        // handlers with `typing.Type` and `typing.Tuple`. Use the special forms as
+        // dispatch keys so each equivalent pair of bindings is checked once.
+        let annotation_operand =
+            |ty: Type<'db>| match ty.as_class_literal().and_then(|class| class.known(db)) {
+                Some(KnownClass::Type) => Type::SpecialForm(SpecialFormType::Type),
+                Some(KnownClass::Tuple) => Type::SpecialForm(SpecialFormType::Tuple),
+                _ => ty,
+            };
         match value_ty {
-            Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
-                Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
-                Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
-                _ => self.infer_subscript_type_expression(subscript, value_ty),
-            },
-            _ => self.infer_subscript_type_expression(subscript, value_ty),
+            Type::Union(union) => {
+                // Deduplicate by dispatch key. Rebuilding the union could discard a valid
+                // operand based on the runtime type of its special form.
+                let operands = union
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .map(annotation_operand)
+                    .unique();
+                self.infer_union_subscript_type_expression(subscript, union, operands)
+            }
+            _ => self.infer_subscript_type_expression(subscript, annotation_operand(value_ty)),
         }
     }
 
@@ -2251,25 +2350,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // For stringified TypeAlias; remove once properly supported
                 todo_type!("string literal subscripted in type expression")
             }
-            Type::Union(union) => {
-                let db = self.db();
-                let mut union_builder = UnionBuilder::new(db, env)
-                    .or_recursively_defined(union.recursively_defined(db));
-
-                for (index, element) in union.elements(db).iter().enumerate() {
-                    let mut speculative_builder = self.speculate();
-                    let subscript_ty =
-                        speculative_builder.infer_subscript_type_expression(subscript, *element);
-                    if index == 0 {
-                        self.extend(speculative_builder);
-                    } else {
-                        self.context.extend(&speculative_builder.context.finish());
-                    }
-                    union_builder = union_builder.add(subscript_ty);
-                }
-
-                union_builder.build()
-            }
+            Type::Union(union) => self.infer_union_subscript_type_expression(
+                subscript,
+                union,
+                union.elements(db).iter().copied(),
+            ),
             _ => {
                 if !self.in_string_annotation() {
                     self.infer_expression(slice, TypeContext::default());
@@ -2284,6 +2369,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
         }
+    }
+
+    fn infer_union_subscript_type_expression(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        union: UnionType<'db>,
+        operands: impl Iterator<Item = Type<'db>>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let mut union_builder = UnionBuilder::new(db, self.program_environment())
+            .or_recursively_defined(union.recursively_defined(db));
+
+        for (index, operand) in operands.enumerate() {
+            let mut speculative_builder = self.speculate();
+            let subscript_ty =
+                speculative_builder.infer_subscript_type_expression(subscript, operand);
+            if index == 0 {
+                self.extend(speculative_builder);
+            } else {
+                self.context.extend(&speculative_builder.context.finish());
+            }
+            union_builder = union_builder.add(subscript_ty);
+        }
+
+        union_builder.build()
     }
 
     fn infer_parameterized_legacy_typing_alias(
@@ -2463,9 +2573,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::Annotated => self
                 .parse_subscription_of_annotated_special_form(
                     subscript,
-                    AnnotatedExprContext::TypeExpression,
+                    Self::infer_type_expression,
                 )
-                .map_or(Type::unknown(), |inferred| inferred.inner_type()),
+                .unwrap_or_else(Type::unknown),
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
                 Ok(ty) => ty,
                 Err(nodes) => {
@@ -2484,7 +2594,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
-                UnionType::from_elements_leave_aliases(db, env, [param_type, Type::none(db, env)])
+                UnionType::from_two_elements_leave_aliases(db, env, param_type, Type::none(db, env))
             }
             SpecialFormType::Union => {
                 // TODO: Support the union of a `TypeVarTuple`'s elements. Until then, reject
@@ -2977,11 +3087,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 // Preserve valid unpack targets so that `Unpack[...]` follows the same
                 // argument-binding path as an equivalent starred annotation.
-                if inner_ty.exact_tuple_instance_spec(self.db()).is_some()
-                    || matches!(
-                        inner_ty,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
-                    )
+                if inner_ty.exact_tuple_instance_spec(db).is_some()
+                    || inner_ty.is_typevartuple_or_instance(db)
                 {
                     inner_ty
                 } else {
@@ -3571,22 +3678,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return ty;
         }
 
-        if !self
-            .inference_flags()
-            .contains(InferenceFlags::CHECK_UNBOUND_TYPEVARS)
+        let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty else {
+            return ty;
+        };
+        // In a PEP 695 pack default, an earlier parameter of the same generic can still
+        // appear as its declaration object. A parameter declared elsewhere is out of scope.
+        let unbound_in_pack_default = match self.region {
+            InferenceRegion::Deferred(default)
+                if matches!(default.kind(db), DefinitionKind::TypeVarTuple(_)) =>
+            {
+                typevar
+                    .definition(db)
+                    .is_some_and(|definition| definition.scope(db) != self.scope())
+            }
+            _ => false,
+        };
+        if !unbound_in_pack_default
+            && !self
+                .inference_flags()
+                .contains(InferenceFlags::CHECK_UNBOUND_TYPEVARS)
         {
             return ty;
         }
-        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty {
-            if let Some(builder) = self.context.report_lint(&UNBOUND_TYPE_VARIABLE, expression) {
-                builder.into_diagnostic(format_args!(
-                    "Type variable `{name}` is not bound to any outer generic context",
-                    name = typevar.name(self.db())
-                ));
-            }
-            Type::unknown()
-        } else {
-            ty
+        if let Some(builder) = self.context.report_lint(&UNBOUND_TYPE_VARIABLE, expression) {
+            builder.into_diagnostic(format_args!(
+                "Type variable `{name}` is not bound to any outer generic context",
+                name = typevar.name(db)
+            ));
         }
+        Type::unknown()
     }
 }

@@ -107,7 +107,7 @@ still understand it as a union type, just with an unknown element.
 
 ```py
 from typing import TypeAlias
-from nonexistent import unknown_type  # error: [unresolved-import]
+from nonexistent import unknown_type  # error: [import-not-found]
 
 MyAlias: TypeAlias = int | unknown_type | str
 
@@ -581,7 +581,7 @@ Even: TypeAlias = T | list["Odd[T]"]
 Odd: TypeAlias = T | tuple["Even[T]"]
 
 def invalid_even() -> Even[int]:
-    return [("bad",)]  # error: [invalid-return-type]
+    return [("bad",)]  # error: [invalid-explicit-return]
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)
@@ -678,6 +678,26 @@ B: TypeAlias = "list[tuple[Any, B]]"
 
 def f(x: B | Not[B]):
     reveal_type(x)  # revealed: B | ~B
+```
+
+## Negated recursive unions
+
+Negating a recursive union is equivalent to intersecting the negations of its members, including
+when the alias contains gradual types.
+
+```py
+from typing import Any, TypeAlias, TypeVar, assert_type
+from ty_extensions import Intersection, Not
+
+A: TypeAlias = "int | list[tuple[Any, A]]"
+T = TypeVar("T")
+
+def identity(x: T) -> T:
+    return x
+
+def f(x: Not[A], y: Intersection[Not[int], Not[list[tuple[Any, A]]]]):
+    assert_type(identity(x), Intersection[Not[int], Not[list[tuple[Any, A]]]])
+    assert_type(identity(y), Not[A])
 ```
 
 ## Specializing non-generic recursive aliases
@@ -1150,7 +1170,7 @@ class C:
 
     def invalid_attribute(self) -> Self:
         self.attribute: TypeAlias = Self
-        return self.attribute  # error: [invalid-return-type]
+        return self.attribute  # error: [invalid-explicit-return]
 
 C().takes(1)
 ```
@@ -1174,7 +1194,7 @@ def inspect(value: Forwarded[int]):
         reveal_type(tail[0])  # revealed: int
 
 def invalid() -> Forwarded[int]:
-    return (1, ("bad", None))  # error: [invalid-return-type]
+    return (1, ("bad", None))  # error: [invalid-explicit-return]
 ```
 
 An unsubscripted reference fixes the default throughout the recursive type:
@@ -1189,7 +1209,7 @@ def inspect_default(value: DefaultNode):
         reveal_type(tail[0])  # revealed: str
 
 def invalid_default() -> DefaultNode:
-    return ("root", (1, None))  # error: [invalid-return-type]
+    return ("root", (1, None))  # error: [invalid-explicit-return]
 ```
 
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow

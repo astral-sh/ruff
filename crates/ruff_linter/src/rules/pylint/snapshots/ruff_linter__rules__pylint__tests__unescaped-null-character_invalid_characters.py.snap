@@ -1,0 +1,83 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLE2514 [*] Invalid unescaped character NUL, use "\0" instead
+  --> invalid_characters.py:37:5
+   |
+36 | nul = '''
+37 | nul ␀'''
+   |     ^
+38 | nul = f'''
+39 | nul ␀'''
+   |
+help: Replace with escape sequence
+   |
+36 | nul = '''
+   - nul ␀'''
+37 + nul \0'''
+38 | nul = f'''
+   |
+
+PLE2514 [*] Invalid unescaped character NUL, use "\0" instead
+  --> invalid_characters.py:39:5
+   |
+37 | nul ␀'''
+38 | nul = f'''
+39 | nul ␀'''
+   |     ^
+40 |
+41 | nul_ok = '\0'
+   |
+help: Replace with escape sequence
+   |
+38 | nul = f'''
+   - nul ␀'''
+39 + nul \0'''
+40 |
+   |
+
+PLE2514 Invalid unescaped character NUL, use "\0" instead
+  --> invalid_characters.py:64:14
+   |
+63 | # https://github.com/astral-sh/ruff/issues/13294
+64 | print(r"""␈␚␛␀​
+   |              ^
+65 | """)
+66 | print(fr"""␈␚␛␀​
+   |
+help: Replace with escape sequence
+
+PLE2514 Invalid unescaped character NUL, use "\0" instead
+  --> invalid_characters.py:66:15
+   |
+64 | print(r"""␈␚␛␀​
+65 | """)
+66 | print(fr"""␈␚␛␀​
+   |               ^
+67 | """)
+68 | print(Rf"""␈␚␛␀​
+   |
+help: Replace with escape sequence
+
+PLE2514 Invalid unescaped character NUL, use "\0" instead
+  --> invalid_characters.py:68:15
+   |
+66 | print(fr"""␈␚␛␀​
+67 | """)
+68 | print(Rf"""␈␚␛␀​
+   |               ^
+69 | """)
+   |
+help: Replace with escape sequence
+
+PLE2514 Invalid unescaped character NUL, use "\0" instead
+  --> invalid_characters.py:76:9
+   |
+74 | esc = "\␛"
+75 | zwsp = "\​"
+76 | nul = "\␀"
+   |         ^
+77 |
+78 | # tstrings
+   |
+help: Replace with escape sequence

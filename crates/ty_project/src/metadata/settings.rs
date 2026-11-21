@@ -1,13 +1,15 @@
 use std::sync::Arc;
 
 use ruff_db::files::File;
-use ruff_db::system::SystemPath;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_combine::Combine;
 use ty_python_semantic::AnalysisSettings;
 use ty_python_semantic::lint::RuleSelection;
 
-use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
-use crate::script::Script;
+use crate::metadata::options::{
+    AnalysisOptionsContext, InnerOverrideOptions, Options, OutputFormat,
+};
+use crate::script::inline_script_options;
 use crate::{Db, glob::IncludeExcludeFilter};
 
 /// The resolved [`super::Options`] for the project.
@@ -25,6 +27,7 @@ use crate::{Db, glob::IncludeExcludeFilter};
 /// Settings that are part of [`ty_python_core::program::ProgramSettings`] are not included here.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct Settings {
+    pub(super) baseline: Option<SystemPathBuf>,
     pub(super) rules: Arc<RuleSelection>,
     pub(super) terminal: TerminalSettings,
     pub(super) src: SrcSettings,
@@ -39,6 +42,10 @@ pub struct Settings {
 }
 
 impl Settings {
+    pub fn baseline(&self) -> Option<&SystemPath> {
+        self.baseline.as_deref()
+    }
+
     fn rules(&self) -> &RuleSelection {
         &self.rules
     }
@@ -126,12 +133,10 @@ impl Override {
 /// Resolves the settings for a given file.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
-    if let Some(script) = Script::for_file(db, file) {
-        let settings = script.settings(db);
-        return FileSettings::File(Arc::new(OverrideSettings {
-            rules: settings.rules().clone(),
-            analysis: settings.analysis().clone(),
-        }));
+    if let Some(options) = inline_script_options(db, file)
+        && crate::is_project_file(db, file)
+    {
+        return FileSettings::File(Arc::new(OverrideSettings::from_script_options(db, options)));
     }
 
     let project = db.project();
@@ -220,10 +225,9 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
     let rules = merged.rules.unwrap_or_default();
     let analysis = merged.analysis.unwrap_or_default();
 
-    // It's okay to ignore the errors here because the rules are eagerly validated
-    // during `overrides.to_settings()`.
-    let rules = rules.to_rule_selection(db, &mut Vec::new());
-    let analysis = analysis.to_settings(db, &mut Vec::new());
+    let rules = rules.to_rule_selection(db);
+    // The analysis options were already validated when building the individual overrides.
+    let analysis = analysis.to_settings(db, AnalysisOptionsContext::Override, &mut Vec::new());
 
     FileSettings::File(Arc::new(OverrideSettings { rules, analysis }))
 }
@@ -258,4 +262,37 @@ impl FileSettings {
 pub struct OverrideSettings {
     pub(super) rules: RuleSelection,
     pub(super) analysis: AnalysisSettings,
+}
+
+impl OverrideSettings {
+    /// Resolves rules and analysis settings using the script's inline `[tool.ty]` table
+    /// in place of the project configuration. In descending order of precedence, the layers
+    /// are CLI or LSP options, the inline table, user configuration, and fallback options.
+    fn from_script_options(db: &dyn Db, options: &Options) -> Self {
+        let mut rules = None;
+        let mut analysis = None;
+        for layer in db
+            .project()
+            .metadata(db)
+            .options_in_precedence_order(options, None)
+        {
+            rules.combine_with(layer.rules.clone());
+            analysis.combine_with(layer.analysis.clone());
+        }
+
+        let rules = rules.unwrap_or_default().to_rule_selection(db);
+        let mut diagnostics = Vec::new();
+        let analysis = analysis.unwrap_or_default().to_settings(
+            db,
+            AnalysisOptionsContext::TopLevel,
+            &mut diagnostics,
+        );
+        // Script resolution reports the error. Editor features use default analysis settings.
+        let analysis = if diagnostics.is_empty() {
+            analysis
+        } else {
+            AnalysisSettings::default()
+        };
+        Self { rules, analysis }
+    }
 }

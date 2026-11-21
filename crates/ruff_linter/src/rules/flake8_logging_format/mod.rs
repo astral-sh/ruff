@@ -42,7 +42,7 @@ mod tests {
                     Rule::LoggingFString,
                     Rule::LoggingWarn,
                     Rule::LoggingExtraAttrClash,
-                    Rule::LoggingExcInfo,
+                    Rule::LoggingErrorWithExcInfo,
                     Rule::LoggingRedundantExcInfo,
                 ])
             },

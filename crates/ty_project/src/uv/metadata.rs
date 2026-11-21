@@ -1,10 +1,13 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use char_str::CharStr;
 use pep440_rs::Version;
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
+};
+use ruff_db::system::{System, SystemPath, SystemPathBuf, WhichError};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -48,7 +51,8 @@ impl UvMetadata {
     ) -> Result<Self, UvMetadataError> {
         let metadata: WorkspaceMetadata = {
             let _interner = string_interner::InternerGuard::new();
-            serde_json::from_slice(metadata).map_err(UvMetadataError::InvalidMetadata)?
+            serde_json::from_slice(metadata)
+                .map_err(|error| UvMetadataError::InvalidMetadata(Arc::new(error)))?
         };
 
         let workspace_root = existing_directory(metadata.workspace_root, "workspace root", system)?;
@@ -94,16 +98,27 @@ pub(crate) struct WorkspaceMember {
     id: CharStr,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub(crate) enum UvMetadataError {
-    #[error("uv {version} is too old; upgrade `{executable}` to uv {minimum_version} or newer", minimum_version = Version::new(MINIMUM_UV_VERSION))]
+    #[error("Found uv {version}, but uv {minimum_version} or newer is required", minimum_version = Version::new(MINIMUM_UV_VERSION))]
     UnsupportedVersion {
         executable: String,
         version: Version,
     },
 
-    #[error("Failed to invoke `uv workspace metadata`: {0}")]
-    Invocation(#[source] std::io::Error),
+    #[error("{}", uv_lookup_message(*.0))]
+    Lookup(#[from] WhichError),
+
+    #[error("Failed to run `uv workspace metadata`: {0}")]
+    Initialization(#[source] Arc<std::io::Error>),
+
+    #[error("failed to run `{executable}`: {error}")]
+    Invocation {
+        executable: String,
+        from_env: bool,
+        #[source]
+        error: Arc<std::io::Error>,
+    },
 
     #[error("`uv workspace metadata` failed with `{status}`: {stderr}")]
     CommandFailed {
@@ -112,7 +127,7 @@ pub(crate) enum UvMetadataError {
     },
 
     #[error("invalid `uv workspace metadata` JSON: {0}")]
-    InvalidMetadata(serde_json::Error),
+    InvalidMetadata(Arc<serde_json::Error>),
 
     #[error("non-Unicode {description} returned by `uv workspace metadata`: `{path}`", path = path.display())]
     NonUnicodePath {
@@ -128,29 +143,74 @@ pub(crate) enum UvMetadataError {
 }
 
 impl UvMetadataError {
-    pub(crate) fn to_diagnostic(&self, severity: Severity) -> Diagnostic {
+    pub(super) fn to_diagnostic(&self, severity: Severity, headline: &str) -> Diagnostic {
+        let mut diagnostic = Diagnostic::new(DiagnosticId::ProjectManager, severity, headline);
         match self {
-            Self::CommandFailed { status, stderr } => {
-                let mut diagnostic = Diagnostic::new(
-                    DiagnosticId::UvMetadata,
-                    severity,
-                    format_args!("`uv workspace metadata` failed with `{status}`"),
-                );
-                let stderr = stderr.trim();
-                let stderr = stderr.strip_prefix("error:").unwrap_or(stderr).trim_start();
-                // Concise output omits subdiagnostics, so use uv's first stderr line as a
-                // summary. This is a heuristic: uv's errors are unstructured, and the first
-                // line may need context from later lines. Full output retains the whole message.
-                if let Some(summary) = stderr.lines().next() {
-                    diagnostic
-                        .set_concise_message(format_args!("Failed to load uv metadata: {summary}"));
-                    diagnostic.info(stderr);
-                }
-                diagnostic
+            Self::Lookup(_) => {
+                diagnostic.set_headline_message(format_args!("{headline}: {self}"));
+                diagnostic.info("To install uv, see https://docs.astral.sh/uv/");
             }
-            _ => Diagnostic::new(DiagnosticId::UvMetadata, severity, self.to_string()),
+            Self::Invocation { from_env, .. } => {
+                diagnostic.set_headline_message(format_args!("{headline}: {self}"));
+                if *from_env {
+                    diagnostic
+                        .info("The uv executable was specified by the `UV` environment variable");
+                }
+            }
+            Self::UnsupportedVersion { executable, .. } => {
+                let minimum = Version::new(MINIMUM_UV_VERSION);
+                diagnostic.set_headline_message(format_args!("{headline}: {self}"));
+                diagnostic.help(format_args!(
+                    "Upgrade `{executable}` to uv {minimum} or newer"
+                ));
+            }
+            Self::CommandFailed { status, stderr } => {
+                let failure = match status.code() {
+                    Some(code) => format!("`uv workspace metadata` exited with status {code}"),
+                    None => format!("`uv workspace metadata` failed with {status}"),
+                };
+                // Concise output uses uv's first error line as a summary. Keep the original
+                // stderr in full output so multiline explanations and code frames stay intact.
+                let stderr = stderr.trim_end();
+                let summary = uv_error_summary(stderr).unwrap_or(&failure);
+                diagnostic.set_concise_message(format_args!("{headline}: {summary}"));
+                if !stderr.is_empty() {
+                    // The subdiagnostic supplies uv's leading `error: ` label.
+                    let message = stderr.strip_prefix("error: ").unwrap_or(stderr);
+                    diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Error, message));
+                }
+                diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Error, failure));
+            }
+            _ => {
+                diagnostic.set_concise_message(format_args!("{headline}: {self}"));
+                diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Error, self));
+            }
         }
+        diagnostic
     }
+}
+
+impl From<std::io::Error> for UvMetadataError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Initialization(Arc::new(error))
+    }
+}
+
+fn uv_lookup_message(error: WhichError) -> String {
+    match error {
+        WhichError::CannotFindBinaryPath => "could not find `uv` on `PATH`".to_owned(),
+        error => error.to_string(),
+    }
+}
+
+fn uv_error_summary(stderr: &str) -> Option<&str> {
+    let stderr = stderr.trim_start();
+    stderr
+        .strip_prefix("error:")
+        .unwrap_or(stderr)
+        .trim_start()
+        .lines()
+        .next()
 }
 
 fn existing_directory(

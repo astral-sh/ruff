@@ -22,7 +22,7 @@ impl Renderer for GithubRenderer<'_> {
     fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         for diagnostic in diagnostics {
             let severity = match diagnostic.severity() {
-                Severity::Info => "notice",
+                Severity::Hint | Severity::Info => "notice",
                 Severity::Warning => "warning",
                 Severity::Error | Severity::Fatal => "error",
             };

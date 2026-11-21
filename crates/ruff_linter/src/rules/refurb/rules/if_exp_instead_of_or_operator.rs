@@ -44,9 +44,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// `foo() or bar()`.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.15.0", category = Category::Complexity)]
-pub(crate) struct IfExpInsteadOfOrOperator;
+pub(crate) struct IfExprWithBodyAsCondition;
 
-impl Violation for IfExpInsteadOfOrOperator {
+impl Violation for IfExprWithBodyAsCondition {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
@@ -73,7 +73,7 @@ pub(crate) fn if_exp_instead_of_or_operator(checker: &Checker, if_expr: &ast::Ex
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(IfExpInsteadOfOrOperator, *range);
+    let mut diagnostic = checker.report_diagnostic(IfExprWithBodyAsCondition, *range);
 
     let has_comments = checker.comment_ranges().intersects(*range);
 

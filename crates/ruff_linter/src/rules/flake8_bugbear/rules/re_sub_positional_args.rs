@@ -1,5 +1,6 @@
 use std::fmt;
 
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -58,22 +59,20 @@ impl Violation for ReSubPositionalArgs {
 }
 
 /// B034
-pub(crate) fn re_sub_positional_args(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn re_sub_positional_args(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
     if !checker.semantic().seen_module(Modules::RE) {
         return;
     }
 
-    let Some(method) = checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .and_then(|qualified_name| match qualified_name.segments() {
-            ["re", "sub"] => Some(Method::Sub),
-            ["re", "subn"] => Some(Method::Subn),
-            ["re", "split"] => Some(Method::Split),
-            _ => None,
-        })
-    else {
-        return;
+    let method = match qualified_name.segments() {
+        ["re", "sub"] => Method::Sub,
+        ["re", "subn"] => Method::Subn,
+        ["re", "split"] => Method::Split,
+        _ => return,
     };
 
     if call.arguments.args.len() > method.num_args() {

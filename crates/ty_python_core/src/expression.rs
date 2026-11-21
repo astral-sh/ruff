@@ -78,7 +78,7 @@ use salsa;
 /// Condition context does not propagate through calls or assignment expressions: in
 /// `if f(x and False)`, the call's result controls the branch, but its argument is evaluated in
 /// value context.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub enum ExpressionContext {
     /// Produce the expression's result object for the enclosing code to use.
     Value,
@@ -91,6 +91,11 @@ pub enum ExpressionContext {
 pub enum ExpressionKind {
     /// An ordinary value expression, such as `1` in `self.x: int = 1`.
     Normal,
+    /// A predicate evaluated in value or condition context.
+    Predicate {
+        context: ExpressionContext,
+        in_loop: bool,
+    },
     /// The callable part of a call, such as `list[T]` in `list[T]()`.
     ///
     /// Type variables used to specialize the callable must already be bound. A constructor call

@@ -79,13 +79,8 @@ pub(crate) fn no_signature(checker: &Checker, docstring: &Docstring) {
             }
 
             // The function name must be followed by an open parenthesis.
-            let followed_by_open_parenthesis =
-                first_line[index + function.name.len()..].starts_with('(');
-            if !followed_by_open_parenthesis {
-                return false;
-            }
 
-            true
+            first_line[index + function.name.len()..].starts_with('(')
         })
     {
         checker.report_diagnostic(SignatureInDocstring, docstring.range());

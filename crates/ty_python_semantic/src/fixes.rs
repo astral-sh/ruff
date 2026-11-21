@@ -130,17 +130,29 @@ where
             continue;
         };
 
+        // Match the path formatting used by `UnifiedFile::relative_path`.
+        let display_path = path
+            .strip_prefix(db.system().current_directory())
+            .unwrap_or(path);
+
+        if !diagnostics
+            .iter()
+            .any(|diagnostic| fix_mode.is_fixable(diagnostic))
+        {
+            tracing::debug!("Skipping file `{display_path}` without applicable fixes.");
+            continue;
+        }
+
         let python_file = db.program_file(file).python_file(db);
         let parsed = parsed_module(db, python_file);
         if parsed.load(db).has_syntax_errors() {
-            tracing::warn!("Skipping file `{path}` with syntax errors");
+            tracing::warn!("Skipping file `{display_path}` with syntax errors");
             continue;
         }
 
         let fixes = fix_mode.fixes(db, python_file, diagnostics);
 
         if fixes.is_empty() {
-            tracing::debug!("Skipping file `{path}` without applicable fixes.");
             continue;
         }
 
@@ -170,7 +182,7 @@ where
             } = apply_fixes(&staged_source, fixes);
 
             let fixed_source = staged_source.with_text(source, &source_map);
-            source_texts.set_unstaged(db, file.file, fixed_source.clone());
+            source_texts.set_unstaged(db, file.file, fixed_source);
 
             unstaged_fixes.push((file, applied_fixes));
         }
@@ -278,9 +290,10 @@ where
 
     // Stitch the remaining diagnostics back together.
     diagnostics.extend(by_file.into_values().flatten());
+    let resolver: &dyn ruff_db::Db = db;
     diagnostics.sort_by(|left, right| {
-        left.rendering_sort_key(db)
-            .cmp(&right.rendering_sort_key(db))
+        left.rendering_sort_key(&resolver)
+            .cmp(&right.rendering_sort_key(&resolver))
     });
 
     Ok(FixAllResults {
@@ -363,12 +376,20 @@ enum FixMode {
 
 impl FixMode {
     fn is_fixable(self, diagnostic: &Diagnostic) -> bool {
+        // The baseline demotes matching lint diagnostics to hints. Rechecking a file after an edit
+        // can return those hints again, so skip them here to keep `--fix` and `--add-ignore` from
+        // editing code for diagnostics the baseline already suppresses.
+        if diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint() {
+            return false;
+        }
+
         let Some(primary_span) = diagnostic.primary_span() else {
             return false;
         };
 
         match self {
             FixMode::Suppress => {
+                // Don't suppress unused ignore comments.
                 primary_span.range().is_some()
                     && diagnostic
                         .id()
@@ -385,17 +406,15 @@ impl FixMode {
         file: PythonFile<'_>,
         file_diagnostics: &[Diagnostic],
     ) -> Vec<ApplicableFix> {
+        let fixable_diagnostics = file_diagnostics
+            .iter()
+            .filter(|diagnostic| self.is_fixable(diagnostic));
+
         match self {
             FixMode::Suppress => {
-                let suppressable_diagnostics: Vec<_> = file_diagnostics
-                    .iter()
+                let suppressable_diagnostics: Vec<_> = fixable_diagnostics
                     .filter_map(|diagnostic| {
                         let lint_id = diagnostic.id().as_lint()?;
-
-                        // Don't suppress unused ignore comments.
-                        if is_unused_ignore_comment_lint(lint_id) {
-                            return None;
-                        }
 
                         // We can't suppress diagnostics without a corresponding file or range.
                         let span = diagnostic.primary_span()?;
@@ -418,9 +437,7 @@ impl FixMode {
                     )
                     .collect()
             }
-            FixMode::ApplyFixes(applicability) => file_diagnostics
-                .iter()
-                .filter(|diagnostic| diagnostic.has_applicable_fix(applicability))
+            FixMode::ApplyFixes(_) => fixable_diagnostics
                 .filter_map(|diagnostic| {
                     diagnostic.fix().cloned().map(|fix| ApplicableFix {
                         fix,
@@ -873,7 +890,7 @@ mod tests {
 
         ```py
         import sys
-        a = b + 10 + sys.veeersion  # ty: ignore[unresolved-attribute, unresolved-reference]
+        a = b + 10 + sys.veeersion  # ty: ignore[missing-attribute, unresolved-reference]
         ```
         ");
     }
@@ -1101,7 +1118,7 @@ class B(A):
             def test(
                 self,
                 b: str
-            ) -> A.b:  # ty: ignore[invalid-method-override, unresolved-attribute]
+            ) -> A.b:  # ty: ignore[incompatible-method-override, missing-attribute]
                 pass
         ```
         "#);
@@ -1134,10 +1151,10 @@ class B(A):
 
 
         class B(A):
-            def test(  # ty:ignore[unresolved-reference, invalid-method-override]
+            def test(  # ty:ignore[unresolved-reference, incompatible-method-override]
                 self,
                 b: str
-            ) -> A.b:  # ty: ignore[unresolved-attribute]
+            ) -> A.b:  # ty: ignore[missing-attribute]
                 pass
         ```
 
@@ -1147,7 +1164,7 @@ class B(A):
          --> test.py:7:28
           |
         6 | class B(A):
-        7 |     def test(  # ty:ignore[unresolved-reference, invalid-method-override]
+        7 |     def test(  # ty:ignore[unresolved-reference, incompatible-method-override]
           |                            ^^^^^^^^^^^^^^^^^^^^
         8 |         self,
         9 |         b: str
@@ -1155,8 +1172,8 @@ class B(A):
         help: Remove the unused suppression code
           |
         6 | class B(A):
-          -     def test(  # ty:ignore[unresolved-reference, invalid-method-override]
-        7 +     def test(  # ty:ignore[invalid-method-override]
+          -     def test(  # ty:ignore[unresolved-reference, incompatible-method-override]
+        7 +     def test(  # ty:ignore[incompatible-method-override]
         8 |         self,
           |
         "#);

@@ -1124,15 +1124,10 @@ fn check_airflow_plugin_extension(
 ) {
     if matches!(name, "executors" | "operators" | "sensors" | "hooks") {
         if class_def.bases().iter().any(|class_base| {
-            checker
-                .semantic()
-                .resolve_qualified_name(class_base)
-                .is_some_and(|qualified_name| {
-                    matches!(
-                        qualified_name.segments(),
-                        ["airflow", "plugins_manager", "AirflowPlugin"]
-                    )
-                })
+            checker.semantic().matches_qualified_name(
+                class_base,
+                &["airflow", "plugins_manager", "AirflowPlugin"],
+            )
         }) {
             checker.report_diagnostic(
                 Airflow3Removal {
@@ -1360,16 +1355,10 @@ fn is_removed_context_key_attribute(
 /// ```
 fn check_apply_defaults_decorator(checker: &Checker, function_def: &StmtFunctionDef) {
     for decorator in &function_def.decorator_list {
-        if checker
-            .semantic()
-            .resolve_qualified_name(map_callable(&decorator.expression))
-            .is_some_and(|qualified_name| {
-                matches!(
-                    qualified_name.segments(),
-                    ["airflow", "utils", "decorators", "apply_defaults"]
-                )
-            })
-        {
+        if checker.semantic().matches_qualified_name(
+            map_callable(&decorator.expression),
+            &["airflow", "utils", "decorators", "apply_defaults"],
+        ) {
             let mut diagnostic = checker.report_diagnostic(
                 Airflow3Removal {
                     deprecated: "apply_defaults".to_string(),

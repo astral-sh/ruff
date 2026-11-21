@@ -26,6 +26,7 @@ pub use full::FullRenderer;
 pub use github::GithubRenderer;
 #[cfg(feature = "serde")]
 pub use gitlab::GitlabRenderer;
+pub use grouped::GroupedRenderer;
 #[cfg(feature = "serde")]
 pub use json::JsonRenderer;
 #[cfg(feature = "serde")]
@@ -44,6 +45,7 @@ mod full;
 mod github;
 #[cfg(feature = "serde")]
 mod gitlab;
+mod grouped;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -73,6 +75,35 @@ pub trait Renderer {
         diagnostics: &[Diagnostic],
     ) -> std::io::Result<()> {
         write!(writer, "{}", self.display(diagnostics))
+    }
+}
+
+#[cfg(any(feature = "serde", feature = "junit"))]
+struct FmtAdapter<'a> {
+    fmt: &'a mut dyn std::fmt::Write,
+}
+
+#[cfg(any(feature = "serde", feature = "junit"))]
+impl std::io::Write for FmtAdapter<'_> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.fmt
+            .write_str(std::str::from_utf8(buf).map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Invalid UTF-8 in diagnostic output",
+                )
+            })?)
+            .map_err(std::io::Error::other)?;
+
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> std::io::Result<()> {
+        self.fmt.write_fmt(args).map_err(std::io::Error::other)
     }
 }
 
@@ -185,8 +216,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             documentation_url: diag.documentation_url().map(ToString::to_string),
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: config.show_fix_status
-                && diag.has_applicable_fix(config.fix_applicability()),
+            is_fixable: config.show_fix_status && diag.has_applicable_fix(config.fix_applicability),
             header_offset: diag.inner.header_offset,
         }
     }
@@ -676,11 +706,12 @@ impl<'r> RenderableAnnotation<'r> {
     /// lifetime parameter here refers to the lifetime of the resolver that
     /// created the given `ResolvedAnnotation`.
     fn new(snippet_start: TextSize, ann: &'_ ResolvedAnnotation<'r>) -> RenderableAnnotation<'r> {
-        // This should only ever saturate if a BOM is present _and_ the annotation range points
-        // before the BOM (i.e. at offset 0). In Ruff this typically results from the use of
-        // `TextRange::default()` for a diagnostic range instead of a range relative to file
-        // contents.
-        let range = ann.range.checked_sub(snippet_start).unwrap_or(ann.range);
+        // An annotation can start at byte zero even when a leading BOM was stripped from the
+        // snippet. Clamp each endpoint separately so the annotation still covers any visible text.
+        let range = TextRange::new(
+            ann.range.start().saturating_sub(snippet_start),
+            ann.range.end().saturating_sub(snippet_start),
+        );
         RenderableAnnotation {
             range,
             message: ann.message,
@@ -2434,6 +2465,23 @@ watermelon
     }
 
     #[test]
+    fn diagnostic_order_with_missing_locations() {
+        let mut env = TestEnvironment::new();
+        env.add("fruits", FRUITS);
+
+        let fileless = Diagnostic::new(DiagnosticId::Io, Severity::Hint, "Missing directory");
+        let mut whole_file =
+            Diagnostic::new(DiagnosticId::Io, Severity::Warning, "Check this file");
+        whole_file.annotate(Annotation::primary(env.path("fruits")));
+        let at_zero = env.err().primary("fruits", "1:0", "1:0", "").build();
+        let at_one = env.err().primary("fruits", "1:1", "1:1", "").build();
+
+        let mut diagnostics = [&at_one, &whole_file, &at_zero, &fileless];
+        diagnostics.sort_by_key(|diagnostic| diagnostic.rendering_sort_key(&env.db));
+        assert_eq!(diagnostics, [&fileless, &at_zero, &whole_file, &at_one]);
+    }
+
+    #[test]
     fn diagnostics_with_equal_locations_sort_by_concise_message() {
         let mut env = TestEnvironment::new();
         env.add("fruits", FRUITS);
@@ -2465,6 +2513,7 @@ watermelon
         #[default]
         Full,
         Concise,
+        Grouped,
         Azure,
         Github,
         Pylint,
@@ -2671,6 +2720,9 @@ watermelon
                 }
                 DiagnosticFormat::Concise => {
                     ConciseRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Grouped => {
+                    GroupedRenderer::new(&self.db, &self.config).render(f, diagnostics)
                 }
                 DiagnosticFormat::Azure => {
                     AzureRenderer::new(&self.db, &self.config).render(f, diagnostics)

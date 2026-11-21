@@ -85,9 +85,8 @@ def rule_name_to_code(executable: Path) -> dict[str, str | None]:
     return {rule["name"]: rule["code"] for rule in rules}
 
 
-def normalize_rule_selectors(
-    config: dict[str, Any], rule_names: dict[str, str | None]
-) -> None:
+def normalize_rule_selectors(config: dict[str, Any], executable: Path) -> None:
+    rule_names = rule_name_to_code(executable)
     selector_lists: list[list[Any]] = []
 
     for section in (config, config.get("lint")):
@@ -105,6 +104,43 @@ def normalize_rule_selectors(
                     for selectors in per_file_ignores.values()
                     if isinstance(selectors, list)
                 )
+
+    unknown_names = sorted(
+        {
+            selector
+            for selectors in selector_lists
+            for selector in selectors
+            if isinstance(selector, str)
+            and selector.islower()
+            and selector not in rule_names
+        }
+    )
+    if unknown_names:
+        # Resolve only unrecognized rule names so code and prefix redirects in
+        # the project's configuration still exercise both Ruff versions.
+        fixed = check_output(
+            [
+                executable,
+                "check",
+                "--isolated",
+                "--no-cache",
+                "--preview",
+                "--select",
+                "RUF202",
+                "--fix-only",
+                "--silent",
+                "--stdin-filename",
+                "ruff.toml",
+                "-",
+            ],
+            input=tomli_w.dumps({"lint": {"select": unknown_names}}),
+            encoding="utf8",
+        )
+        replacements = tomli.loads(fixed)["lint"]["select"]
+        rule_names = rule_names | {
+            old: rule_names.get(new, old)
+            for old, new in zip(unknown_names, replacements, strict=True)
+        }
 
     for selectors in selector_lists:
         normalized = []
@@ -152,7 +188,7 @@ class ConfigOverrides(Serializable):
         self,
         dirpath: Path,
         preview: bool,
-        rule_names: dict[str, str | None],
+        ruff_executable: Path,
     ) -> None:
         """
         Temporarily patch the Ruff configuration file in the given directory.
@@ -219,7 +255,7 @@ class ConfigOverrides(Serializable):
             ruff_config = toml
             for name in base:
                 ruff_config = ruff_config[name]
-            normalize_rule_selectors(ruff_config, rule_names)
+            normalize_rule_selectors(ruff_config, ruff_executable)
 
         tomli_w.dump(toml, path.open("wb"))
 

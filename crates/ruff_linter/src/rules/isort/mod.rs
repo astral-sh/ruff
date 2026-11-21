@@ -311,7 +311,7 @@ mod tests {
     use rustc_hash::{FxHashMap, FxHashSet};
     use test_case::test_case;
 
-    use ruff_python_ast::{PySourceType, SourceType};
+    use ruff_python_ast::{PySourceType, PythonVersion, SourceType};
     use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
 
     use crate::assert_diagnostics;
@@ -860,6 +860,7 @@ mod tests {
     #[test_case(Path::new("existing_import.py"))]
     #[test_case(Path::new("multiline_docstring.py"))]
     #[test_case(Path::new("off.py"))]
+    #[test_case(Path::new("relative_future_import.py"))]
     #[test_case(Path::new("whitespace.py"))]
     fn required_import(path: &Path) -> Result<()> {
         let snapshot = format!("required_import_{}", path.to_string_lossy());
@@ -881,6 +882,35 @@ mod tests {
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test_case(PythonVersion::PY312; "py312")]
+    #[test_case(PythonVersion::PY313; "py313")]
+    fn required_relative_future_import_in_stub(target_version: PythonVersion) {
+        let source = SourceKind::Python {
+            code: "x: int\n".to_string(),
+            is_stub: true,
+        };
+        let settings = LinterSettings {
+            isort: super::settings::Settings {
+                required_imports: BTreeSet::from([NameImport::ImportFrom(MemberNameImport {
+                    level: 1,
+                    ..MemberNameImport::member("__future__".to_string(), "annotations".to_string())
+                })]),
+                ..super::settings::Settings::default()
+            },
+            ..LinterSettings::for_rules([
+                Rule::MissingRequiredImport,
+                Rule::FutureAnnotationsInStub,
+            ])
+            .with_target_version(target_version)
+        };
+
+        let (_, fixed) = test_contents(&source, Path::new("test.pyi"), &settings);
+        insta::assert_snapshot!(
+            format!("required_relative_future_import_in_stub_{target_version}"),
+            fixed.source_code()
+        );
     }
 
     #[test_case(Path::new("comment.py"))]

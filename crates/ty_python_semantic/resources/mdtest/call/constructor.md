@@ -84,7 +84,7 @@ class LambdaNew:
     __new__ = lambda cls: object.__new__(cls)
 
 reveal_type(LambdaNew())  # revealed: LambdaNew
-LambdaNew().missing_attribute  # error: [unresolved-attribute]
+LambdaNew().missing_attribute  # error: [missing-attribute]
 ```
 
 ## `__new__` with an invalid decorator and unresolved return annotation
@@ -102,7 +102,7 @@ from typing_extensions import deprecated
 
 class C:
     @deprecated  # error: [invalid-argument-type] "LiteralString"
-    def __new__() -> T:  # error: [empty-body] "TypeVar"
+    def __new__() -> T:  # error: [invalid-implicit-return-in-function-with-stub-body] "TypeVar"
         pass
 
 C()
@@ -536,9 +536,8 @@ class Mapper(Generic[R]):
 
 values: Any
 
-# TODO: Preserve correlated overload solutions so dynamic values do not infer an extra
-# `frozenset` layer or an element type of `Never`.
-reveal_type(Mapper(callback, values))  # revealed: Mapper[frozenset[frozenset[Never]]]
+# TODO: Preserve correlated overload solutions when inferring the callback's return type.
+reveal_type(Mapper(callback, values))  # revealed: Mapper[Unknown]
 
 def wrap(function: Callable[P, R]) -> Callable[P, R]: ...
 
@@ -547,7 +546,7 @@ class Wrapped(Generic[R]):
     def __new__(cls, callback: Callable[[T], R], values: list[T]) -> Self: ...
 
 # TODO: Preserve the callback's correlated overload solutions through the decorator.
-reveal_type(Wrapped(callback, values))  # revealed: Wrapped[frozenset[frozenset[Never]]]
+reveal_type(Wrapped(callback, values))  # revealed: Wrapped[Unknown]
 ```
 
 A decorator can preserve `cls` explicitly with `Concatenate`, re-expressing the receiver with its
@@ -702,11 +701,11 @@ def _(flag: bool) -> None:
     class Foo:
         __new__ = Callable()
 
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo(1))  # revealed: Foo
     # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
     # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo())  # revealed: Foo
 ```
 
@@ -1680,6 +1679,30 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+## Reconstructing a generic receiver through a union parameter
+
+A mapping matches the constructor's mapping protocol; its keys do not also have to be key-value
+pairs. Reconstructing the receiver preserves `Self` and the enclosing key type.
+
+```py
+from collections.abc import Iterable, Mapping
+from typing import Generic, Protocol, TypeVar
+from typing_extensions import Self
+
+K = TypeVar("K")
+
+class Maplike(Protocol[K]):
+    def keys(self) -> Iterable[K]: ...
+    def __getitem__(self, key: K, /) -> int: ...
+
+class Container(Generic[K]):
+    def __init__(self, value: Maplike[K] | Iterable[tuple[K, int]]) -> None: ...
+    def copy(self, other: Mapping[K, int]) -> Self:
+        result = self.__class__(other)
+        reveal_type(result)  # revealed: Self@copy
+        return result
+```
+
 ## Generic constructor inference from overloaded `__init__` self types
 
 ```py
@@ -1794,6 +1817,18 @@ reveal_type(C("a"))  # revealed: C[str | None]
 reveal_type(C(1))  # revealed: C[int | None]
 ```
 
+## Variadic receiver annotations
+
+A variadic parameter can accept both the receiver and the explicit constructor arguments.
+
+```py
+class Plain:
+    def __init__(*args: *tuple[object, ...]) -> None: ...
+
+Plain()  # ok
+Plain(1, "a")  # ok
+```
+
 ## Union `self` annotations with variadic constructor parameters
 
 The `object` argument selects the `Any` constraint, even when the constructor also infers a
@@ -1845,6 +1880,15 @@ class Class7(Generic[T1, T2]):
 
 reveal_type(Class7(0, ""))  # revealed: Class7[str, int]
 reveal_type(Class7[str, int](0, ""))  # revealed: Class7[str, int]
+```
+
+The tuple's second element still needs specialization when its common element type is `object`.
+
+```py
+class Box(Generic[T1]):
+    def __init__(self: "Box[type[tuple[object, V1]]]", x: V1) -> None: ...
+
+reveal_type(Box(1))  # revealed: Box[type[tuple[object, Literal[1]]]]
 ```
 
 ## Constructor calls through `type[T]` with a bound TypeVar
@@ -2189,11 +2233,11 @@ def _(flag: bool) -> None:
     class Foo:
         __init__ = Callable()
 
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo(1))  # revealed: Foo
     # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
     # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo())  # revealed: Foo
 ```
 

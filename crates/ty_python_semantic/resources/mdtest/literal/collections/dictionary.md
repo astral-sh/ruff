@@ -97,7 +97,7 @@ Letter = Literal["A", "B", "C"]
 Word = Literal["Alpha", "Beta", "Charlie"]
 
 def expand_letter(letter: Letter) -> Word:
-    return {"A": "Alpha", "B": "Beta", "C": "Charlie"}[letter]  # no diagnostic
+    return {"A": "Alpha", "B": "Beta", "C": "Charlie"}[letter]  # ok
 ```
 
 The key need not itself have a literal type:
@@ -113,7 +113,7 @@ Nested mutable values still permit mutation:
 ```py
 values = {"a": [1]}["a"]
 reveal_type(values)  # revealed: list[int]
-values.append(2)  # no diagnostic
+values.append(2)  # ok
 ```
 
 A dictionary stored in a variable still permits later mutation and promotes its value type:
@@ -123,7 +123,7 @@ def _(key: str):
     values = {"a": 1, "b": 2}
     reveal_type(values)  # revealed: dict[str, int]
     reveal_type(values[key])  # revealed: int
-    values["c"] = 3  # no diagnostic
+    values["c"] = 3  # ok
 ```
 
 ## Dictionary escaping through a bound view method
@@ -135,7 +135,7 @@ permit mutation:
 method = {"a": 1}.values
 dictionary = method.__self__
 reveal_type(dictionary)  # revealed: dict[str, int]
-dictionary["b"] = 2  # no diagnostic
+dictionary["b"] = 2  # ok
 reveal_type(method())  # revealed: dict_values[str, int]
 ```
 

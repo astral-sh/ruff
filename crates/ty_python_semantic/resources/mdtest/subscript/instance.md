@@ -23,11 +23,11 @@ error[not-subscriptable]: Cannot subscript object of type `NotSubscriptable` wit
 class NotSubscriptable:
     __getitem__ = None
 
-# TODO: this would be more user-friendly if the `call-non-callable` diagnostic was
+# TODO: this would be more user-friendly if the `not-callable` diagnostic was
 # transformed into a `not-subscriptable` diagnostic with a subdiagnostic explaining
 # that this was because `__getitem__` was possibly not callable
 #
-# error: [call-non-callable] "Method `__getitem__` of type `None | Unknown` may not be callable on object of type `NotSubscriptable`"
+# error: [not-callable] "Method `__getitem__` of type `None | Unknown` may not be callable on object of type `NotSubscriptable`"
 a = NotSubscriptable()[0]
 ```
 
