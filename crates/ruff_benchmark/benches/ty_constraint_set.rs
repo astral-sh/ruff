@@ -270,6 +270,40 @@ fn benchmark_constructor_literal_alias(criterion: &mut Criterion) {
     }
 }
 
+/// Bokeh calls `super().__init__()` on a receiver with a large union of literals (ty#5063).
+/// We specialize the overloads before filtering by arity. Two ways to partition the literals
+/// between `A` and `B` already rule out a unique receiver specialization.
+fn benchmark_overloaded_constructor_receiver(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from typing import Literal, overload
+
+        type Pattern = Literal["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]
+
+        class Either[T]:
+            value: T
+
+            @overload
+            def __init__[A, B](self: "Either[A | B]", value: A) -> None: ...
+            @overload
+            def __init__(self) -> None: ...
+            def __init__(self, *args: object) -> None: ...
+
+        class HatchPattern(Either[Pattern]):
+            def __init__(self) -> None:
+                super().__init__()
+    "#;
+
+    criterion.bench_function("ty_micro[overloaded_constructor_receiver]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// These constructors used to hang because recursive substitution kept reordering union
 /// members in their inferred type arguments (ty#5057).
 fn benchmark_constructor_union_specialization(criterion: &mut Criterion) {
@@ -1035,6 +1069,7 @@ criterion_group!(
     benchmark_bottom_and_top_signature_comparisons,
     benchmark_factored_upper_bounds,
     benchmark_constructor_literal_alias,
+    benchmark_overloaded_constructor_receiver,
     benchmark_constructor_union_specialization,
     benchmark_counterexample_behind_implied_bound,
     benchmark_many_upper_bound_callbacks,

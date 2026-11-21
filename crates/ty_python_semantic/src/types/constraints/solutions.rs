@@ -80,7 +80,8 @@ pub(super) struct SolutionWalker<'db, L> {
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
     limits: L,
-    find_first_valid: bool,
+    /// Number of valid candidates still needed, if the caller can stop early.
+    remaining_valid: Option<usize>,
     /// How many rejected paths can be rechecked within the traversal budget.
     remaining_failed_paths: Option<usize>,
 
@@ -146,7 +147,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             inferable,
             inferable_support,
             limits,
-            find_first_valid: false,
+            remaining_valid: None,
             remaining_failed_paths: None,
             declared_constraint_solutions: FxHashMap::default(),
             explored_nodes: FxHashSet::default(),
@@ -159,7 +160,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     }
 
     pub(super) fn with_search(mut self, search: CandidateSearch) -> Self {
-        self.find_first_valid = matches!(search, CandidateSearch::FirstValid);
+        self.remaining_valid = match search {
+            CandidateSearch::All(_) => None,
+            CandidateSearch::FirstValid(limit) => Some(limit),
+        };
         self
     }
 
@@ -377,13 +381,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         node: NodeId,
         validations: Option<&Validations<'db>>,
     ) -> ControlFlow<L::Break> {
-        // Validation can retract tentative candidates while choosing a declared
-        // constraint. Only stop between nodes, once the whole terminal is validated.
-        if self.find_first_valid
-            && self.pending.last().is_some_and(|pending| {
-                matches!(pending.candidate.validity, SolutionValidity::Valid)
-            })
-        {
+        if self.remaining_valid == Some(0) {
             return ControlFlow::Continue(());
         }
         self.limits.visit_node()?;
@@ -460,6 +458,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         path: &mut PathAssignments,
         validations: Option<&Validations<'db>>,
     ) -> ControlFlow<L::Break> {
+        let initially_pending = self.pending.len();
         let satisfied = Cell::new(false);
         self.validate_satisfied_path(
             db,
@@ -475,6 +474,12 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             },
         )
         .map_break(Break::expect_limits)?;
+
+        // Validation can retract tentative candidates while choosing a declared constraint.
+        // Count the valid candidates it kept before appending any failures for diagnostics.
+        if let Some(remaining) = &mut self.remaining_valid {
+            *remaining = remaining.saturating_sub(self.pending.len() - initially_pending);
+        }
 
         // If this path is not satisfied, we want to identify which particular upper
         // bounds or constraints were violated. To do that, we have to re-check this

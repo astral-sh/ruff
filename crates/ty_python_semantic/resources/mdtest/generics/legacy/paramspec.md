@@ -2736,6 +2736,31 @@ reveal_type(callback.call("value", "text"))  # revealed: Literal["value"]
 callback.call(1, 2)  # error: [invalid-argument-type]
 ```
 
+### Alternative parameter lists inferred from a class method receiver
+
+The callbacks in `Pair` take incompatible arguments, so no single `P` matches both in the last union
+arm. The first two arms each match a different callback. Binding `call` keeps both parameter lists
+available.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+Callback = Callable[P, None]
+
+class Pair(tuple[Callback[[]], Callback[[int]]]):
+    @classmethod
+    def call(
+        cls: type[tuple[Callback[P], T] | tuple[T, Callback[P]] | tuple[Callback[P], Callback[P]]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None: ...
+
+no_args: Callback[[]] = Pair.call  # ok
+one_arg: Callback[[int]] = Pair.call  # ok
+```
+
 ### Capturing both constructor signatures
 
 A class callback loses the required initializer argument when `__new__` accepts arbitrary arguments.
