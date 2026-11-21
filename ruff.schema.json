@@ -4953,7 +4953,7 @@
         "invalid-pathlib-with-suffix",
         "invalid-print-syntax",
         "invalid-pyproject-toml",
-        "invalid-rule-code",
+        "invalid-rule-selector-in-suppression-comment",
         "invalid-str-return-type",
         "invalid-suppression-comment",
         "invalid-todo-capitalization",

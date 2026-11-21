@@ -1231,7 +1231,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         (Ruff, "100") => rules::ruff::rules::UnusedSuppressionComment,
         (Ruff, "101") => rules::ruff::rules::RenamedRuleInSuppressionComment,
-        (Ruff, "102") => rules::ruff::rules::InvalidRuleCode,
+        (Ruff, "102") => rules::ruff::rules::InvalidRuleSelectorInSuppressionComment,
         (Ruff, "103") => rules::ruff::rules::InvalidSuppressionComment,
         (Ruff, "104") => rules::ruff::rules::UnmatchedSuppressionComment,
         (Ruff, "105") => rules::ruff::rules::NoqaComments,
