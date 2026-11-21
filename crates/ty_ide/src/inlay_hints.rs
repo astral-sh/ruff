@@ -488,7 +488,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         navigation_target: Option<NavigationTarget>,
         mode: ArgumentHintMode,
     ) {
-        if !self.settings.call_argument_names || name.starts_with('_') {
+        if name.starts_with('_') {
             return;
         }
 
@@ -585,8 +585,12 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
-                let details = inlay_hint_call_argument_details(self.db, &self.model, call)
-                    .unwrap_or_default();
+                let details =
+                    if self.settings.call_argument_names && !call.arguments.args.is_empty() {
+                        inlay_hint_call_argument_details(self.db, &self.model, call)
+                    } else {
+                        None
+                    };
 
                 self.visit_expr(&call.func);
 
@@ -595,8 +599,9 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 let mut positional_index = 0;
                 for arg_or_keyword in call.arguments.iter_source_order() {
                     if let ArgOrKeyword::Arg(argument) = arg_or_keyword {
-                        if let Some((name, parameter_label_offset)) =
-                            details.argument_names.get(&positional_index)
+                        if let Some(details) = &details
+                            && let Some((name, parameter_label_offset)) =
+                                details.argument_names.get(&positional_index)
                             && !arg_matches_name(argument, name)
                         {
                             // A keyword cannot precede a plain positional argument. `args` also
