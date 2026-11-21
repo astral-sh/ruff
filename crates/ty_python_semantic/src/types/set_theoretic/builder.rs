@@ -1191,6 +1191,23 @@ impl<'db> UnionBuilder<'db> {
             (Type::ClassLiteral(_), Type::ClassLiteral(_))
             | (Type::ModuleLiteral(_), Type::ModuleLiteral(_)) => true,
             (Type::Intersection(left), Type::Intersection(right)) => {
+                // Distributing `Any & Literal["a", "b"]` produces one intersection
+                // per value. Neither the dynamic type nor a different literal can
+                // satisfy the other intersection's literal bound.
+                let gradual_literal = |ty: IntersectionType<'db>| {
+                    let ((Type::Dynamic(_), Type::LiteralValue(literal))
+                    | (Type::LiteralValue(literal), Type::Dynamic(_))) =
+                        ty.iter_positive(db).collect_tuple()?
+                    else {
+                        return None;
+                    };
+                    (!literal.is_literal_string() && ty.negative(db).is_empty())
+                        .then_some(literal.kind())
+                };
+                if let Some(left) = gradual_literal(left) {
+                    return gradual_literal(right).is_some_and(|right| left != right);
+                }
+
                 let class_guard = |ty: IntersectionType<'db>| {
                     let Ok(Type::ClassLiteral(_)) = ty.iter_positive(db).exactly_one() else {
                         return None;
