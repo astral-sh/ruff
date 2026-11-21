@@ -11,8 +11,8 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 
 use crate::Db;
-use crate::types::dict::dict_literal_key_value_types;
 use crate::types::infer::{ExpressionInference, FrozenMap};
+use crate::types::iteration::iterable_element_type;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{
     ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
@@ -104,26 +104,22 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
             UnpackKind::Iterable { mode } => {
                 let env = self.context.program_environment();
-                if !mode.is_async()
-                    && let ast::Expr::Dict(dict) = value_expr
-                    && let Some((keys, _)) = dict_literal_key_value_types(db, env, dict, |expr| {
-                        value_inference.expression_type(expr)
-                    })
-                {
-                    keys
-                } else {
-                    value_type
-                        .try_iterate_with_mode(db, env, mode)
-                        .map(|tuple| tuple.homogeneous_element_type(db, env))
-                        .unwrap_or_else(|err| {
-                            err.report_diagnostic(
-                                &self.context,
-                                value_type,
-                                value.as_any_node_ref(self.db(), self.module()),
-                            );
-                            err.fallback_element_type(db, env)
-                        })
-                }
+                iterable_element_type(
+                    db,
+                    env,
+                    value_type,
+                    value_expr,
+                    |expr| value_inference.expression_type(expr),
+                    mode,
+                )
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(
+                        &self.context,
+                        value_type,
+                        value.as_any_node_ref(self.db(), self.module()),
+                    );
+                    err.fallback_element_type(db, env)
+                })
             }
             UnpackKind::ContextManager { mode } => {
                 let env = self.context.program_environment();
@@ -646,17 +642,18 @@ fn literal_sequence_elements(
     // `a, *rest = (items := [1, "two"])` has the same elements as the list itself.
     let expression = expression.expression_value();
     let values = sequence_elts(expression)?;
-    let promote = promote || (expression.is_tuple_expr() && tuple_literal_needs_promotion(values));
+    let promote =
+        promote || (expression.is_tuple_expr() && literal_sequence_needs_promotion(values));
     Some((values, promote))
 }
 
-/// Applies the tuple precision limit after expanding literal elements. For `(*[1, 2], 3)`,
+/// Applies the literal precision limit after expanding sequence elements. For `(*[1, 2], 3)`,
 /// all three positions count, even though the outer tuple has only two AST elements.
 /// Other starred iterables count as one item because their elements are not recovered from
 /// literal syntax. Stop counting as soon as the limit is exceeded.
-pub(super) fn tuple_literal_needs_promotion(values: &[ast::Expr]) -> bool {
-    /// Limit literal precision in large tuple expressions to avoid pathological inference costs.
-    const MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE: usize = 64;
+pub(super) fn literal_sequence_needs_promotion(values: &[ast::Expr]) -> bool {
+    /// Limit literal precision in large sequence expressions to avoid pathological inference costs.
+    const MAX_SEQUENCE_LENGTH_FOR_LITERAL_INFERENCE: usize = 64;
 
     fn remaining_budget(values: &[ast::Expr], remaining: usize) -> Option<usize> {
         values.iter().try_fold(remaining, |remaining, value| {
@@ -670,7 +667,7 @@ pub(super) fn tuple_literal_needs_promotion(values: &[ast::Expr]) -> bool {
         })
     }
 
-    remaining_budget(values, MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE).is_none()
+    remaining_budget(values, MAX_SEQUENCE_LENGTH_FOR_LITERAL_INFERENCE).is_none()
 }
 
 /// Builds a literal's sequence shape from already-inferred elements and iterable shapes.
@@ -717,7 +714,7 @@ fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
 }
 
 /// Extract the element slice from a list or tuple expression.
-fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
+pub(super) fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
     match expr {
         ast::Expr::List(list) => Some(&list.elts),
         ast::Expr::Tuple(tuple) => Some(&tuple.elts),
