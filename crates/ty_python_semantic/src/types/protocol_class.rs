@@ -3829,7 +3829,7 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     ty: Type<'db>,
     protocol: ProtocolInstanceType<'db>,
 ) -> bool {
-    let target_interface = protocol.interface(db);
+    let target_interface = protocol.interface_for_member_names(db);
 
     match ty {
         Type::ProtocolInstance(source_protocol) => {

@@ -3087,6 +3087,55 @@ def from_values(values: list[int]) -> Tree[int]:
     return Box(values).value
 ```
 
+## Generic protocols equivalent to `object`
+
+Every object has a `__repr__` method, but not every object returns a particular string or has a
+`tag` attribute.
+
+```py
+from typing import Literal, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
+
+class Repr[T: str](Protocol):
+    def __repr__(self) -> T: ...
+
+static_assert(is_equivalent_to(Repr[str], object))
+static_assert(not is_equivalent_to(Repr[Literal["ok"]], object))
+
+class Tagged[T: str](Repr[T], Protocol):
+    tag: str
+
+static_assert(not is_equivalent_to(Tagged[str], object))
+```
+
+A protocol with a `tag` attribute inherits `object.__repr__`. Its return type satisfies
+`Tagged[str]` but not `Tagged[Literal["ok"]]`.
+
+```py
+class HasTag(Protocol):
+    tag: str
+
+static_assert(is_subtype_of(HasTag, Tagged[str]))
+static_assert(not is_subtype_of(HasTag, Tagged[Literal["ok"]]))
+```
+
+## Recursive protocol in a union return type
+
+`Nested[T]` requires `__getitem__`, so it is not equivalent to `object`. Both alternatives of the
+return type survive when we specialize the protocol.
+
+```py
+from typing import Protocol
+
+class Nested[T](Protocol):
+    def __getitem__(self, index: int) -> "T | Nested[T]": ...
+
+def check(a: Nested[int], b: Nested[str]):
+    reveal_type(a[0])  # revealed: int | Nested[int]
+    reveal_type(b[0])  # revealed: str | Nested[str]
+```
+
 ## Multiple inherited recursive protocol methods
 
 A subclass with several inherited recursive methods satisfies the matching protocol specialization.

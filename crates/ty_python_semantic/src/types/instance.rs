@@ -1936,7 +1936,7 @@ impl<'db> ProtocolInstanceType<'db> {
             protocol: ProtocolInstanceType<'db>,
             _: (),
         ) -> bool {
-            let interface = protocol.interface(db);
+            let interface = protocol.interface_for_member_names(db);
 
             // Neither hashability nor instance-dictionary storage is guaranteed for every object.
             // Subclasses can replace `object.__hash__` with `None`, while slotted instances can
@@ -2093,6 +2093,27 @@ impl<'db> ProtocolInstanceType<'db> {
 
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterfaceView<'db> {
         self.inner.interface(db)
+    }
+
+    /// Use the unspecialized interface when only required member names matter.
+    ///
+    /// All specializations require the same names. If a name is missing, we can
+    /// reject the protocol without specializing the types of any of its members.
+    pub(super) fn interface_for_member_names(self, db: &'db dyn Db) -> ProtocolInterfaceView<'db> {
+        if let Some(alias) = self
+            .class_origin(db)
+            .and_then(|class| class.into_generic_alias())
+            && let Some(origin) = alias.origin(db).into_protocol_class(db)
+        {
+            let interface = Self::from_class(origin).interface(db);
+            // While resolving a cycle, the unspecialized interface may still be
+            // provisionally empty. Don't mistake it for a protocol with no requirements.
+            if interface.member_count(db) > 0 {
+                return interface;
+            }
+        }
+
+        self.interface(db)
     }
 
     /// Returns constraints inferred from the nonrecursive requirements of `target`.
