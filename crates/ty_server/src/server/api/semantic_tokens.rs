@@ -2,6 +2,7 @@ use lsp_types::SemanticToken;
 use ruff_db::source::{line_index, source_text};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
+use salsa::Database as _;
 use ty_ide::{SemanticTokenModifier, SemanticTokenType, semantic_tokens};
 use ty_project::{ProjectDatabase, SemanticDb as _};
 
@@ -34,6 +35,7 @@ pub(crate) fn generate_semantic_tokens(
             };
             range.local_range()
         } else {
+            db.unwind_if_revision_cancelled();
             text_range_to_lsp_range(token.range(), &source, &line_index, encoding)
         };
 
