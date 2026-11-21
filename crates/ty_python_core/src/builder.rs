@@ -4399,6 +4399,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.pop_assignment();
 
                     self.try_register_narrowing_alias(target, Some(&node.value));
+                } else if let [target @ ast::Expr::Subscript(_)] = node.targets.as_slice()
+                    && node.value.is_literal_expr()
+                {
+                    // Literals introduce no bindings, and there is no second target to share
+                    // the value with. Attribute assignments still need a standalone value
+                    // for implicit attribute inference.
+                    self.push_assignment(Unpackable::Assign(node).as_current_assignment(None));
+                    self.visit_expr(target);
+                    self.pop_assignment();
                 } else {
                     let value = self.add_standalone_assigned_expression(&node.value, node);
 

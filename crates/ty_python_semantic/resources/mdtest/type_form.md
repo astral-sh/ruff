@@ -477,6 +477,21 @@ def construct_alias[T](form: Alias[T]) -> T:
 reveal_type(construct_alias(int))  # revealed: int
 ```
 
+## Quoted type variables in subscript assignments
+
+Unlike a type alias, an assignment to a subscript does not bind a free type variable.
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeForm
+
+T = TypeVar("T")
+
+forms: dict[str, TypeForm[object]] = {}
+forms["item"] = "T"
+reveal_type(forms["item"])  # revealed: TypeForm[TypeVar]
+```
+
 ## Overload resolution
 
 Overload matching interprets a type expression using each `TypeForm` parameter context.
