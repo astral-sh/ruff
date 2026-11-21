@@ -258,7 +258,11 @@ impl<'db> Completions<'db> {
         env: &ProgramEnvironment<'db>,
         completion: SemanticCompletion<'db>,
     ) -> bool {
-        self.add(CompletionBuilder::from_semantic_completion(
+        // Constructing the builder looks up the definition and its docstring.
+        if !self.query.is_match(completion.name.as_str()) {
+            return false;
+        }
+        self.add_skip_query(CompletionBuilder::from_semantic_completion(
             db, env, completion,
         ))
     }
