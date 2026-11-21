@@ -136,8 +136,8 @@ impl<'db> UnionType<'db> {
         }
     }
 
-    /// Combine the types of reachable bindings or declarations for a place.
-    pub(crate) fn from_binding_types(
+    /// Normalize the types of a place across bindings, declarations, or narrowing alternatives.
+    pub(crate) fn normalize_place_types(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         types: &[Type<'db>],

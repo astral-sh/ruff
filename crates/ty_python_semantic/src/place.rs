@@ -2129,7 +2129,7 @@ impl<'db> PublicTypeBuilder<'db> {
 
     fn build(mut self) -> Type<'db> {
         self.drain_queue();
-        UnionType::from_binding_types(self.db, &self.env, &self.elements)
+        UnionType::normalize_place_types(self.db, &self.env, &self.elements)
     }
 }
 
