@@ -80,13 +80,8 @@ pub(crate) struct PathAssignments {
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
     discovered: FxIndexMap<AtomicConstraintId, bool>,
-    /// Constraint pairs that we have already checked and added to `sequents`.
-    elaborated_pairs: FxHashSet<(AtomicConstraintId, AtomicConstraintId)>,
-
-    /// Consequents grouped by the discovery call that introduced their sequents.
-    single_replay_consequents: FxHashMap<AtomicConstraintId, Vec<AtomicConstraintId>>,
-    pair_replay_consequents:
-        FxHashMap<(AtomicConstraintId, AtomicConstraintId), Vec<AtomicConstraintId>>,
+    /// Only projection needs to replay discoveries in source order.
+    replay: Option<ProjectionReplay>,
 
     /// Type variables that only involve concrete constraints and so do not participate in sequent
     /// discovery.
@@ -100,6 +95,14 @@ pub(crate) struct PathAssignments {
     /// the most additional progress (more remaining fuel for this derivation chain, less overall
     /// fuel consumed).
     new_assignments: FxIndexMap<Assignment<AtomicConstraintId>, AssignmentFuel>,
+}
+
+/// Each discovery appends a contiguous range of sequents. These indices remain valid
+/// across branches because the walk never removes or reorders sequents.
+#[derive(Debug, Default)]
+struct ProjectionReplay {
+    singles: FxHashMap<AtomicConstraintId, Range<usize>>,
+    pairs: FxHashMap<(AtomicConstraintId, AtomicConstraintId), Range<usize>>,
 }
 
 /// Branch-local state restored after visiting an edge.
@@ -204,9 +207,7 @@ impl Default for PathAssignments {
             fuel_undo: Vec::default(),
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             discovered: FxIndexMap::default(),
-            elaborated_pairs: FxHashSet::default(),
-            single_replay_consequents: FxHashMap::default(),
-            pair_replay_consequents: FxHashMap::default(),
+            replay: None,
             independent_typevars: FxHashSet::default(),
             assignment_queue: VecDeque::default(),
             new_assignments: FxIndexMap::default(),
@@ -215,6 +216,12 @@ impl Default for PathAssignments {
 }
 
 impl PathAssignments {
+    /// Records the discoveries needed by [`Self::projection_source_order`].
+    pub(super) fn record_projection_order(&mut self) {
+        debug_assert!(self.sequents.is_empty());
+        self.replay = Some(ProjectionReplay::default());
+    }
+
     /// Orders projected facts by replaying the rules already discovered during this walk.
     ///
     /// Projection emits derived facts in TDD branch order. Retaining that order can prevent
@@ -232,6 +239,21 @@ impl PathAssignments {
         if emitted.is_empty() {
             return None;
         }
+        let replay = self
+            .replay
+            .as_ref()
+            .expect("projection records discoveries");
+        let consequents = |range: &Range<usize>| {
+            self.sequents[range.clone()]
+                .iter()
+                .filter_map(|sequent| match sequent {
+                    Sequent::SingleImplication { post, .. }
+                    | Sequent::PairImplication { post, .. } => Some(*post),
+                    _ => None,
+                })
+                .filter(|constraint| self.discovered.contains_key(constraint))
+        };
+
         let mut ordered = storage.calculate_source_orders(original_source_order);
         ordered.retain(|constraint| self.discovered.contains_key(constraint));
         let mut index = 0;
@@ -239,32 +261,19 @@ impl PathAssignments {
         while !emitted.is_subset(&ordered)
             && let Some(constraint) = ordered.get_index(index).copied()
         {
-            if self.discovered.get(&constraint) == Some(&true) {
-                if let Some(consequents) = self.single_replay_consequents.get(&constraint) {
-                    ordered.extend(
-                        consequents
-                            .iter()
-                            .copied()
-                            .filter(|constraint| self.discovered.contains_key(constraint)),
-                    );
-                }
+            if let Some(range) = replay.singles.get(&constraint) {
+                ordered.extend(consequents(range));
             }
             for earlier_index in 0..index {
                 let earlier = ordered[earlier_index];
                 // Pair rules are not commutative. Replay the orientation used by this walk,
                 // which can differ from the order in which the replay reaches its inputs.
-                let pair = [(earlier, constraint), (constraint, earlier)]
-                    .into_iter()
-                    .find(|pair| self.elaborated_pairs.contains(pair));
-                if let Some(consequents) =
-                    pair.and_then(|pair| self.pair_replay_consequents.get(&pair))
+                if let Some(range) = replay
+                    .pairs
+                    .get(&(earlier, constraint))
+                    .or_else(|| replay.pairs.get(&(constraint, earlier)))
                 {
-                    ordered.extend(
-                        consequents
-                            .iter()
-                            .copied()
-                            .filter(|constraint| self.discovered.contains_key(constraint)),
-                    );
+                    ordered.extend(consequents(range));
                 }
             }
             index += 1;
@@ -297,9 +306,7 @@ impl PathAssignments {
             negative_assignment_indices: IndexVec::default(),
             fuel_undo: Vec::default(),
             discovered,
-            elaborated_pairs: FxHashSet::default(),
-            single_replay_consequents: FxHashMap::default(),
-            pair_replay_consequents: FxHashMap::default(),
+            replay: None,
             independent_typevars,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
@@ -771,9 +778,8 @@ impl PathAssignments {
         constraint: AtomicConstraintId,
     ) {
         // If we've already processed this constraint, we can skip it.
-        let (constraint_index, existing) = self.discovered.insert_full(constraint, true);
-        let already_processed = existing.is_some_and(|existing| existing);
-        if already_processed {
+        let (constraint_index, previous) = self.discovered.insert_full(constraint, true);
+        if previous == Some(true) {
             return;
         }
 
@@ -781,29 +787,23 @@ impl PathAssignments {
         if let Some(map) = SequentMap::for_constraint(db, env, constraint_data) {
             let added = self.add_sequents(db, env, storage, map);
 
-            // `projection_source_order` depends on knowing the order that sequents were discovered for
-            // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
-            // access to that in ConstraintSetStorage, so we need to maintain a local view of that
-            // information here.
-            self.single_replay_consequents.insert(
-                constraint,
-                self.sequents[added]
-                    .iter()
-                    .filter_map(|sequent| match sequent {
-                        Sequent::SingleImplication { post, .. }
-                        | Sequent::PairImplication { post, .. } => Some(*post),
-                        _ => None,
-                    })
-                    .collect(),
-            );
+            if let Some(replay) = &mut self.replay
+                && !added.is_empty()
+            {
+                replay.singles.insert(constraint, added);
+            }
         }
 
+        // Only constraints from the original diagram start out unprocessed. Each processed
+        // constraint already considered every original constraint, even across branches.
+        // Newly appended constraints must still pair with all earlier discoveries.
+        let initially_present = previous.is_some();
         for existing_index in 0..self.discovered.len() {
-            let (existing, _) = self
+            let (existing, processed) = self
                 .discovered
                 .get_index(existing_index)
                 .expect("element should be present");
-            if *existing == constraint {
+            if *existing == constraint || (initially_present && *processed) {
                 continue;
             }
 
@@ -834,32 +834,16 @@ impl PathAssignments {
             } else {
                 (constraint, constraint_data, *existing, existing_data)
             };
-            if self.elaborated_pairs.contains(&(a, b)) {
-                // We've already elaborated this pair of constraints.
-                continue;
-            }
-
             let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data) else {
                 continue;
             };
-            self.elaborated_pairs.insert((a, b));
             let added = self.add_sequents(db, env, storage, map);
 
-            // `projection_source_order` depends on knowing the order that sequents were discovered for
-            // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
-            // access to that in ConstraintSetStorage, so we need to maintain a local view of that
-            // information here.
-            self.pair_replay_consequents.insert(
-                (a, b),
-                self.sequents[added]
-                    .iter()
-                    .filter_map(|sequent| match sequent {
-                        Sequent::SingleImplication { post, .. }
-                        | Sequent::PairImplication { post, .. } => Some(*post),
-                        _ => None,
-                    })
-                    .collect(),
-            );
+            if let Some(replay) = &mut self.replay
+                && !added.is_empty()
+            {
+                replay.pairs.insert((a, b), added);
+            }
         }
     }
 

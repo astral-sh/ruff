@@ -4847,6 +4847,7 @@ impl InteriorNode {
         }
 
         let mut path = self.path_assignments(db, env, storage, source_order);
+        path.record_projection_order();
         let mut visitor = AbstractVisitor {
             should_remove,
             limits,
