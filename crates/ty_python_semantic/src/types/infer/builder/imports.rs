@@ -8,7 +8,10 @@ use ty_module_resolver::{
 use crate::{
     TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     dependency::{DependencyProjectKind, missing_direct_dependency},
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin},
+    place::{
+        DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin,
+        implicit_globals::module_type_symbols,
+    },
     reachability::evaluate_reachability_with_cache,
     types::{
         DeclaredType, ModuleLiteralType, Type,
@@ -17,11 +20,11 @@ use crate::{
             POSSIBLY_MISSING_IMPORT, hint_if_stdlib_attribute_exists_on_other_versions,
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
-        infer::TypeInferenceBuilder,
+        infer::{InferenceRegion, TypeInferenceBuilder},
         infer_definition_types,
     },
 };
-use ty_python_core::definition::Definition;
+use ty_python_core::{ProgramFile, definition::Definition, global_scope, place_table};
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Binds an imported value without declaring its type, while preserving inherited `Final`
@@ -338,10 +341,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let import_range = import.module.as_ref().map_or(import.range(), Ranged::range);
 
         for alias in names {
+            // A wildcard import can report an invalid assignment to a declared name or
+            // an invalid call to the exporting module's `__getattr__`. Otherwise, we only
+            // need the binding if a later lookup asks for it.
+            let definitions = self.index.definitions(alias);
+            let implicit_globals = if &alias.name == "*"
+                && !definitions.is_empty()
+                && matches!(self.region, InferenceRegion::Scope(..))
+                && let Some(file) = module.and_then(|module| module.file(db))
+                && let file = ProgramFile::new(db, file, self.program_environment().program(db))
+                && place_table(db, global_scope(db, file))
+                    .symbol_id("__getattr__")
+                    .is_none()
+            {
+                Some(module_type_symbols(db, self.program_environment()))
+            } else {
+                None
+            };
             let mut checked_dependency = false;
-            for definition in self.index.definitions(alias) {
+            for definition in definitions {
                 if let Some(star_import) = definition.kind(db).as_star_import() {
-                    let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
+                    let scope = self.scope().file_scope_id(db);
+                    let symbol = self
+                        .index
+                        .place_table(scope)
+                        .symbol(star_import.symbol_id());
+                    if let Some(implicit_globals) = implicit_globals
+                        && !symbol.is_declared()
+                        && !implicit_globals.contains(symbol.name())
+                    {
+                        continue;
+                    }
+                    let use_def = self.index.use_def_map(scope);
                     if let Some(binding) = use_def
                         .reachable_symbol_bindings(star_import.symbol_id())
                         .find(|binding| {

@@ -2584,7 +2584,7 @@ pub(crate) mod implicit_globals {
             .collect()
     }
 
-    fn module_type_symbols<'db>(
+    pub(crate) fn module_type_symbols<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> &'db [ast::name::Name] {
