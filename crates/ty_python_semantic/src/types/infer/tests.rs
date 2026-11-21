@@ -610,6 +610,125 @@ fn loop_predicate_tracks_changes_to_bool_method() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn loop_with_growing_union_of_classes() -> anyhow::Result<()> {
+    // Each iteration discovers one more class without adding any constructor nesting.
+    let mut source = String::from("from typing import reveal_type\n");
+    for index in 0..206 {
+        let next = (index + 1).min(205);
+        writeln!(source, "class C{index}:\n    next: C{next}")?;
+    }
+    source.push_str(
+        r#"
+def run(more: bool):
+    item = C0()
+    while more:
+        item = item.next
+    reveal_type(item)
+"#,
+    );
+    let db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY314)
+        .with_file("src/chain.py", &source)
+        .build()?;
+    assert_revealed_type(&db, "src/chain.py", "C0 | Unknown");
+    Ok(())
+}
+
+/// Compare diagnostics from fresh databases with either `C.x` or `C.y` read first.
+fn check_attribute_read_orders(
+    model: &str,
+    read_x: &str,
+) -> anyhow::Result<Vec<(&'static str, String)>> {
+    let check = |order: [&str; 2]| -> anyhow::Result<_> {
+        let mut db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY314)
+            .with_file(
+                "src/y.py",
+                "from model import C\ndef read(c: C): return c.y\n",
+            )
+            .build()?;
+        db.write_dedented("src/model.py", model)?;
+        db.write_dedented("src/x.py", read_x)?;
+        let mut diagnostics = Vec::new();
+        for path in order {
+            let file = system_path_to_file(&db, path)?;
+            for diagnostic in check_types(&db, program_file(&db, file)) {
+                diagnostics.push((
+                    diagnostic.id().as_str(),
+                    diagnostic.concise_message().to_string(),
+                ));
+            }
+        }
+        Ok(diagnostics)
+    };
+
+    let diagnostics = check(["src/x.py", "src/y.py"])?;
+    assert_eq!(diagnostics, check(["src/y.py", "src/x.py"])?);
+    Ok(diagnostics)
+}
+
+#[test]
+fn finite_attribute_cycle_preserves_deep_arguments() -> anyhow::Result<()> {
+    let diagnostics = check_attribute_read_orders(
+        r#"
+        class A[T]:
+            next: B[T]
+        class B[T]:
+            next: B[T]
+
+        class C:
+            def __init__(self, value: A[list[list[list[list[list[int] | bytes] | bytes] | bytes] | bytes]]):
+                self.x = value
+            def update(self, other: C):
+                self.x = other.y.next
+                self.y = other.x.next
+        "#,
+        r#"
+        from typing import assert_type
+        from model import A, B, C
+
+        type Deep = list[list[list[list[list[int] | bytes] | bytes] | bytes] | bytes]
+
+        def read(c: C):
+            assert_type(c.x, A[Deep] | B[Deep])
+            assert_type(c.y, B[Deep])
+        "#,
+    )?;
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    Ok(())
+}
+
+#[test]
+fn growing_attribute_types_are_independent_of_file_order() -> anyhow::Result<()> {
+    let diagnostics = check_attribute_read_orders(
+        r#"
+        class Box[T]:
+            next: Box[tuple[T]]
+
+        class C:
+            def __init__(self):
+                self.x = Box[int]()
+            def update(self, other: C):
+                self.x = other.y.next
+                self.y = other.x.next
+        "#,
+        r#"
+        from typing import reveal_type
+        from model import C
+
+        def read(c: C):
+            reveal_type((c.x, c.y))
+            c.x.missing
+        "#,
+    )?;
+    assert_matches!(
+        diagnostics.as_slice(),
+        [("revealed-type", _), ("missing-attribute", _)]
+    );
+    Ok(())
+}
+
 /// Comparison truthiness widens consistently in expression, statement, and definition inference
 /// when an override is present in only one iteration.
 ///

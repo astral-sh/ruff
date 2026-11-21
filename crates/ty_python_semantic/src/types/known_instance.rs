@@ -614,7 +614,8 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
                 | TypeMapping::RescopeReturnCallables(_)
-                | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
+                | TypeMapping::ApplyRecursiveSubstitution(_)
+                | TypeMapping::WidenRecursiveInference(_) => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {
                 Type::KnownInstance(KnownInstanceType::UnionType(
@@ -672,6 +673,13 @@ impl<'db> KnownInstanceType<'db> {
                 )))
             }
 
+            KnownInstanceType::TypeAliasType(alias)
+                if matches!(type_mapping, TypeMapping::WidenRecursiveInference(_)) =>
+            {
+                Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                    alias.map_stored_specialization(db, type_mapping, visitor),
+                ))
+            }
             KnownInstanceType::SubscriptedProtocol(_)
             | KnownInstanceType::SubscriptedGeneric(_)
             | KnownInstanceType::TypeAliasType(_)
