@@ -253,6 +253,23 @@ fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
     }
 }
 
+/// Both containers in Sentry's JSON type refer forward to the same outer union.
+fn benchmark_recursive_json_union(criterion: &mut Criterion) {
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[recursive_json_union]",
+        r#"
+from typing import Dict, List, Union
+
+JSONScalar = Union[None, bool, int, float, str]
+JSONDict = Dict[str, "JSONish"]
+JSONList = List["JSONish"]
+JSONContainer = Union[JSONDict, JSONList]
+JSONish = Union[JSONScalar, JSONContainer]
+"#,
+    );
+}
+
 /// Dense recursive definitions should not accumulate obsolete cycle-recovery results.
 fn benchmark_dense_recursive_alias_definitions(criterion: &mut Criterion) {
     let aliases = 8;
@@ -2979,6 +2996,7 @@ criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
     benchmark_mutually_recursive_aliases,
+    benchmark_recursive_json_union,
     benchmark_dense_recursive_alias_definitions,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,

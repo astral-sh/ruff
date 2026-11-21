@@ -584,6 +584,7 @@ python-version = "3.13"
 ```
 
 ```py
+from typing import TypeAlias, Union
 from typing_extensions import deprecated
 
 @deprecated("Use Replacement")
@@ -602,6 +603,15 @@ def specialized(value: Old[int]) -> None:  # error: [deprecated] "Use Replacemen
 
 def specialized_alias(value: Alias[int]) -> None:  # error: [deprecated] "Use Replacement"
     pass
+
+ExplicitAlias: TypeAlias = Old  # error: [deprecated] "Use Replacement"
+
+def quoted(value: list["ExplicitAlias"]) -> None:  # error: [deprecated] "Use Replacement"
+    pass
+
+Single = Union[Old]  # error: [deprecated] "Use Replacement"
+
+value: list["Single"]  # error: [deprecated] "Use Replacement"
 ```
 
 ## Dunders
