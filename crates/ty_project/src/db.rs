@@ -51,7 +51,14 @@ fn program_file(db: &dyn Db, file: File) -> ProgramFile<'_> {
         return project_program.program_file(db, file);
     };
 
-    if project.is_file_included(db, path).is_included() {
+    // Even if this file is excluded, `program_for_dependency` prefers the project's
+    // search paths over any script's. Skip the glob checks for files under a source root.
+    if project_program
+        .search_paths(db)
+        .first_party_roots()
+        .any(|root| path.starts_with(root))
+        || project.is_file_included(db, path).is_included()
+    {
         return project_program.program_file(db, file);
     }
 
