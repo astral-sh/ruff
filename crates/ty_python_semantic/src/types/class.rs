@@ -449,12 +449,13 @@ impl<'db> GenericAlias<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.origin(db),
-            self.specialization(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-        ))
+        let original = self.specialization(db);
+        let normalized = original.recursive_type_normalized_impl(db, env, div, nested)?;
+        if normalized == original {
+            Some(self)
+        } else {
+            Some(Self::new(db, self.origin(db), normalized))
+        }
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
