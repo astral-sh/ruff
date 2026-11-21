@@ -4239,6 +4239,132 @@ def specialized(box: Box[Callable[..., Any]]) -> None:
     box.cls.whatever
 ```
 
+## Object metadata writes on TypeVars bounded by `object`
+
+Typeshed annotates some metadata attributes (`__module__`, `__doc__`, `__annotations__`) as if they
+were normal writable instance attributes (e.g. `__module__: str`), but `object` itself does not
+provide any instance attribute storage and does not allow writes to these attributes. So an implicit
+or explicit `object` bound does not guarantee that these are writable, even after narrowing by
+truthiness. A more precise bound with instance storage does permit these writes.
+
+```py
+from typing import NewType
+
+class Writable: ...
+
+def implicit[T](obj: T):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+    if obj:
+        obj.__module__ = "custom"  # error: [invalid-assignment]
+    else:
+        obj.__module__ = "custom"  # error: [invalid-assignment]
+
+def explicit[T: object](obj: T):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+def constrained[T: (object, Writable)](obj: T):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+WrappedObject = NewType("WrappedObject", object)
+
+def union_bound[T: WrappedObject | Writable](obj: T):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+def writable[T: Writable](obj: T):
+    obj.__module__ = "custom"  # no diagnostic
+```
+
+## Class-object writes after narrowing
+
+Narrowing a type variable to a class object permits replacing its initializer, including when the
+type variable is bounded by `Callable`. The initializer still requires a callable value.
+
+```py
+from collections.abc import Callable
+
+def narrowed[T](obj: T) -> None:
+    if isinstance(obj, type):
+        reveal_type(obj.__init__)  # revealed: def __init__(self) -> None
+        obj.__init__ = obj.__init__  # ok
+        obj.__init__ = None  # error: [invalid-assignment]
+
+def narrowed_callable[F: Callable[..., object]](obj: F) -> None:
+    if isinstance(obj, type):
+        reveal_type(obj.__init__)  # revealed: def __init__(self) -> None
+        obj.__init__ = obj.__init__  # ok
+        obj.__init__ = None  # error: [invalid-assignment]
+
+def class_object[T](cls: type[T]) -> None:
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = None  # error: [invalid-assignment]
+```
+
+A metaclass bound already establishes that the receiver is a class object:
+
+```py
+class Meta(type): ...
+
+def metaclass_bound[M: Meta](cls: M) -> None:
+    reveal_type(cls.__init__)  # revealed: def __init__(self) -> None
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = None  # error: [invalid-assignment]
+```
+
+An `Any` bound does not erase the known class metadata after narrowing:
+
+```py
+from typing import Any
+
+def dynamic_bound[T: Any](cls: T) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: Any & str
+        return cls.__name__
+    return str(cls)
+
+class Known: ...
+
+def union_bound_name[T: Any | type[Known]](cls: T) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: str
+        return cls.__name__
+    return str(cls)
+
+def constrained_name[T: (Any, type[Known])](cls: T) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: str
+        return cls.__name__
+    return str(cls)
+```
+
+Dynamic type arguments inside a known generic class remain dynamic:
+
+```py
+class Box[T]:
+    @classmethod
+    def value(cls) -> T:
+        raise NotImplementedError
+
+def generic_argument(cls: type[Box[Any]]) -> None:
+    if isinstance(cls, Meta):
+        reveal_type(cls.value())  # revealed: Any
+```
+
+## Attribute access after excluding a union-bound alternative
+
+An excluded member of a type variable's bound does not supply a class namespace merely because its
+narrowed receiver is `Never`. A successful `hasattr` check establishes an `object` attribute.
+
+```py
+class Command: ...
+
+def check[T: int | Command](value: T) -> None:
+    if isinstance(value, Command):
+        pass
+    elif hasattr(value, "checks"):
+        reveal_type(value.checks)  # revealed: object
+        value.checks.append(None)  # error: [missing-attribute]
+```
+
 ## Attribute access on TypeVars bounded by `type[...]`
 
 Regression test for <https://github.com/astral-sh/ty/issues/3782>.

@@ -1183,6 +1183,20 @@ class Subclass(C):
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
 
+A class object is an instance of its metaclass, so it cannot overwrite a `ClassVar` declared on that
+metaclass:
+
+```py
+class Meta(type):
+    value: ClassVar[int] = 1
+
+def set_value(cls: Meta) -> None:
+    reveal_type(cls.value)  # revealed: int
+    cls.value = 2  # error: [invalid-attribute-access]
+
+Meta.value = 2  # ok
+```
+
 A `Final` class variable with no explicit type argument keeps its literal type.
 
 ```py
@@ -1774,6 +1788,70 @@ DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
 DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
 ```
 
+## Replacing initializers through class-object types
+
+`type` and `type[object]` describe class objects. Replacing their initializer uses the class's
+initializer contract, rather than the metaclass constructor that creates the class.
+
+```py
+def reset(cls: type) -> None:
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = object.__init__  # ok
+    cls.__init__ = None  # error: [invalid-assignment]
+
+def reset_object(cls: type[object]) -> None:
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = object.__init__  # ok
+    cls.__init__ = None  # error: [invalid-assignment]
+```
+
+The same distinction applies when the metaclass is known. Its constructor accepts the class name,
+bases, and namespace; those parameters do not describe how instances of the class are initialized.
+
+```py
+class Meta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None: ...
+
+def reset_custom(cls: Meta) -> None:
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = object.__init__  # ok
+    cls.__init__ = Meta.__init__  # error: [invalid-assignment]
+```
+
+Narrowing the metaclass preserves the initializer of a known instance class:
+
+```py
+class Known:
+    def __init__(self, value: int) -> None: ...
+
+def reset_known(cls: type[Known]) -> None:
+    if isinstance(cls, Meta):
+        reveal_type(cls.__init__)  # revealed: def __init__(self, value: int) -> None
+        cls.__init__ = cls.__init__  # ok
+        cls.__init__ = Meta.__init__  # error: [invalid-assignment]
+```
+
+## Metadata on narrowed dynamic class objects
+
+Narrowing a dynamic value to a class preserves the known metadata type. The dynamic part of the
+intersection does not supply a class namespace that shadows the metaclass's declarations.
+
+```py
+from typing import Any
+
+def class_name(cls: Any) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: Any & str
+        return cls.__name__
+    return str(cls)
+
+def unknown_class_name(cls) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: Unknown & str
+        return cls.__name__
+    return str(cls)
+```
+
 ## Shadowing static methods on instances
 
 ### Nominal instances
@@ -1912,6 +1990,15 @@ class Meta1:
 class C1(metaclass=Meta1): ...
 
 reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
+```
+
+The built-in metaclass exposes a read-only class namespace. Its `Final` declaration takes precedence
+over the writable instance dictionary declared on `object`:
+
+```py
+def class_namespace(cls: type) -> None:
+    reveal_type(cls.__dict__)  # revealed: MappingProxyType[str, Any]
+    cls.__dict__ = cls.__dict__  # error: [invalid-assignment] "Cannot assign to final attribute `__dict__`"
 ```
 
 A dynamically-created metaclass can define methods with the same names as methods in the class it
@@ -2182,7 +2269,25 @@ def read_generated(value: TGenerated) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
-This also lets a generic metaclass method rely on a protocol describing the classes it accepts:
+An inherited `Self` annotation in metaclass instance storage refers to the class object, not an
+instance constructed by that class:
+
+```py
+from typing_extensions import Self
+
+class PeerStorage:
+    peer: Self
+
+class PeerMeta(PeerStorage, type): ...
+
+def reset_peer(cls: PeerMeta) -> None:
+    reveal_type(cls.peer)  # revealed: PeerMeta
+    cls.peer = cls  # ok
+    cls.peer = object()  # error: [invalid-assignment]
+```
+
+Metaclass instance storage also lets a generic method rely on a protocol describing the classes it
+accepts:
 
 ```py
 from typing import Iterator, Protocol, TypeVar
@@ -4678,6 +4783,89 @@ obj = object()
 obj.non_existing = 1  # error: [missing-attribute]
 ```
 
+Typeshed annotates some metadata attributes (`__module__`, `__doc__`, `__annotations__`) as if they
+were normal writable instance attributes (e.g. `__module__: str`), but `object` itself does not
+provide any instance attribute storage and does not allow writes to these attributes. We therefore
+reject assignments to these attributes on values typed as `object`, even when the assigned value
+matches the annotation:
+
+```py
+def set_module(obj: object):
+    obj.__module__ = "custom"  # error: [invalid-assignment] "Cannot assign to attribute `__module__` on type `object`"
+```
+
+A subclass can expose this metadata as a read-only property. Passing it to a function that accepts
+`object` is valid; the invalid operation is the write inside the function.
+
+```py
+class ReadOnly:
+    @property
+    def __module__(self) -> str:  # no diagnostic
+        return "custom"
+
+set_module(ReadOnly())  # no diagnostic
+```
+
+The `__class__` attribute has an explicit property setter in typeshed. Writes to it are checked
+against that setter's `type[Self]` parameter:
+
+```py
+def set_class(obj: object):
+    obj.__class__ = object  # no diagnostic
+```
+
+Ordinary subclasses provide instance dictionaries, so they can still write inherited metadata. Class
+attributes remain writable as well:
+
+```py
+class Writable: ...
+
+def set_writable_metadata(obj: Writable):
+    obj.__module__ = "custom"  # no diagnostic
+    obj.__class__ = Writable  # no diagnostic
+
+Writable.__module__ = "custom"  # no diagnostic
+```
+
+`NewType` preserves the storage limitations of its underlying type:
+
+```py
+from typing import NewType
+
+WrappedObject = NewType("WrappedObject", object)
+
+def set_wrapped_module(obj: WrappedObject):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+```
+
+### Setting metadata attributes on `Callable`
+
+`Callable` does not guarantee writable metadata either: a callable object can expose `__module__` as
+a read-only property.
+
+```py
+from typing import Callable
+
+def set_module(obj: Callable[[], None]):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+class ReadOnlyCallable:
+    def __call__(self) -> None: ...
+    @property
+    def __module__(self) -> str:  # no diagnostic
+        return "custom"
+
+set_module(ReadOnlyCallable())  # no diagnostic
+```
+
+Function objects do provide writable metadata:
+
+```py
+def function() -> None: ...
+
+function.__module__ = "custom"  # no diagnostic
+```
+
 ### Setting attributes on `Never` / `Any`
 
 Setting attributes on `Never` itself should be allowed (even though it has a `__setattr__` attribute
@@ -4891,6 +5079,15 @@ Frozen.new = 1  # error: [invalid-assignment] "Cannot assign to unresolved attri
 
 # TODO: terminal setters should also prevent writes to declared attributes.
 Frozen.existing = 2
+```
+
+Through a metaclass instance annotation, the terminal setter blocks both new attributes and
+replacements of inherited attributes:
+
+```py
+def set_frozen(cls: FrozenMeta) -> None:
+    cls.new = 1  # error: [invalid-assignment]
+    cls.__init__ = object.__init__  # error: [invalid-assignment]
 ```
 
 A class without a custom metaclass still produces an error for an unknown attribute:

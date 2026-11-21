@@ -2985,6 +2985,154 @@ def specialized(box: Box[Callable[..., Any]]) -> None:
     box.cls.whatever
 ```
 
+## Object metadata writes on TypeVars bounded by `object`
+
+Typeshed annotates some metadata attributes (`__module__`, `__doc__`, `__annotations__`) as if they
+were normal writable instance attributes (e.g. `__module__: str`), but `object` itself does not
+provide any instance attribute storage and does not allow writes to these attributes. So an implicit
+or explicit `object` bound does not guarantee that these are writable, even after narrowing by
+truthiness. A more precise bound with instance storage does permit these writes.
+
+```py
+from typing import NewType, TypeVar
+
+class Writable: ...
+
+T = TypeVar("T")
+O = TypeVar("O", bound=object)
+C = TypeVar("C", object, Writable)
+
+def implicit(obj: T):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+    if obj:
+        obj.__module__ = "custom"  # error: [invalid-assignment]
+    else:
+        obj.__module__ = "custom"  # error: [invalid-assignment]
+
+def explicit(obj: O):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+def constrained(obj: C):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+WrappedObject = NewType("WrappedObject", object)
+U = TypeVar("U", bound=WrappedObject | Writable)
+
+def union_bound(obj: U):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+W = TypeVar("W", bound=Writable)
+
+def writable(obj: W):
+    obj.__module__ = "custom"  # no diagnostic
+```
+
+## Class-object writes after narrowing
+
+Narrowing a type variable to a class object permits replacing its initializer, including when the
+type variable is bounded by `Callable`. The initializer still requires a callable value.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+F = TypeVar("F", bound=Callable[..., object])
+
+def narrowed(obj: T) -> None:
+    if isinstance(obj, type):
+        reveal_type(obj.__init__)  # revealed: def __init__(self) -> None
+        obj.__init__ = obj.__init__  # ok
+        obj.__init__ = None  # error: [invalid-assignment]
+
+def narrowed_callable(obj: F) -> None:
+    if isinstance(obj, type):
+        reveal_type(obj.__init__)  # revealed: def __init__(self) -> None
+        obj.__init__ = obj.__init__  # ok
+        obj.__init__ = None  # error: [invalid-assignment]
+
+def class_object(cls: type[T]) -> None:
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = None  # error: [invalid-assignment]
+```
+
+A metaclass bound already establishes that the receiver is a class object:
+
+```py
+class Meta(type): ...
+
+M = TypeVar("M", bound=Meta)
+
+def metaclass_bound(cls: M) -> None:
+    reveal_type(cls.__init__)  # revealed: def __init__(self) -> None
+    cls.__init__ = cls.__init__  # ok
+    cls.__init__ = None  # error: [invalid-assignment]
+```
+
+An `Any` bound does not erase the known class metadata after narrowing:
+
+```py
+from typing import Any, Generic
+
+DynamicT = TypeVar("DynamicT", bound=Any)
+
+def dynamic_bound(cls: DynamicT) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: Any & str
+        return cls.__name__
+    return str(cls)
+
+class Known: ...
+
+UnionT = TypeVar("UnionT", bound=Any | type[Known])
+ConstrainedT = TypeVar("ConstrainedT", Any, type[Known])
+
+def union_bound_name(cls: UnionT) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: str
+        return cls.__name__
+    return str(cls)
+
+def constrained_name(cls: ConstrainedT) -> str:
+    if isinstance(cls, type):
+        reveal_type(cls.__name__)  # revealed: str
+        return cls.__name__
+    return str(cls)
+```
+
+Dynamic type arguments inside a known generic class remain dynamic:
+
+```py
+class Box(Generic[T]):
+    @classmethod
+    def value(cls) -> T:
+        raise NotImplementedError
+
+def generic_argument(cls: type[Box[Any]]) -> None:
+    if isinstance(cls, Meta):
+        reveal_type(cls.value())  # revealed: Any
+```
+
+## Attribute access after excluding a union-bound alternative
+
+An excluded member of a type variable's bound does not supply a class namespace merely because its
+narrowed receiver is `Never`. A successful `hasattr` check establishes an `object` attribute.
+
+```py
+from typing import TypeVar
+
+class Command: ...
+
+T = TypeVar("T", bound=int | Command)
+
+def check(value: T) -> None:
+    if isinstance(value, Command):
+        pass
+    elif hasattr(value, "checks"):
+        reveal_type(value.checks)  # revealed: object
+        value.checks.append(None)  # error: [missing-attribute]
+```
+
 ## Attribute access on TypeVars bounded by `type[...]`
 
 Regression test for <https://github.com/astral-sh/ty/issues/3782>.
