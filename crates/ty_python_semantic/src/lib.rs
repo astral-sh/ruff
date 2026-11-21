@@ -53,6 +53,7 @@ pub use types::{
     pytest_global_plugin_files, pytest_registered_plugin_files, pytest_tests_in_file,
 };
 
+pub mod coverage;
 mod db;
 pub mod dependency;
 mod dunder_all;
