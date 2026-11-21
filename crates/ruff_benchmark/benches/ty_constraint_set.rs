@@ -328,6 +328,44 @@ fn benchmark_constructor_union_specialization(criterion: &mut Criterion) {
     }
 }
 
+/// In Bokeh's `SITickFormatter.prefix`, the outer call supplies the expected type for `Either`.
+/// Many nodes in the resulting diagram test the same constraint, even with fewer SI prefixes.
+/// <https://github.com/astral-sh/ty/issues/5063#bokeh-nested-constructor>
+fn benchmark_nested_constructor_literal_union(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from typing import Literal
+
+        type Auto = Literal["auto"]
+        type Prefixes = Literal["Z", "E", "P", "T", "G", "M", "k", "m", "µ", "n", "p", "f", "a", "z"]
+
+        class Property[G, S]:
+            get: G
+            set: S
+
+        class Either[G, S](Property[G, S]):
+            def __init__[G1, S1, G2, S2](
+                self: "Either[G1 | G2, S1 | S2]",
+                first: Property[G1, S1],
+                second: Property[G2, S2],
+            ) -> None: ...
+
+        def nullable[G, S](value: Property[G, S]) -> None: ...
+
+        def check(auto: Property[Auto, Auto], prefixes: Property[Prefixes, Prefixes]) -> None:
+            nullable(Either(auto, prefixes))
+    "#;
+
+    criterion.bench_function("ty_micro[nested_constructor_literal_union]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Rejecting `T <= int` contradicts `T <= bool`. Trying to disprove the expression on that
 /// branch can exhaust every combination of unrelated choices for `V`.
 fn benchmark_counterexample_behind_implied_bound(criterion: &mut Criterion) {
@@ -965,6 +1003,7 @@ criterion_group!(
     benchmark_factored_upper_bounds,
     benchmark_constructor_literal_alias,
     benchmark_constructor_union_specialization,
+    benchmark_nested_constructor_literal_union,
     benchmark_counterexample_behind_implied_bound,
     benchmark_many_upper_bound_callbacks,
     benchmark_incompatible_lower_bound_alternatives,
