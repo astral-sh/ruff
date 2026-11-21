@@ -5257,7 +5257,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Perform loud inference without type context, as there may be multiple
                 // equally applicable type contexts for each union member.
-                infer_value_ty.infer_loud(self, TypeContext::default());
+                let value_ty = infer_value_ty.infer_loud(self, TypeContext::default());
 
                 let mut operation_failed = false;
                 let Ok(result_ty) = state.try_map_union(db, env, union, |elem_type, state| {
@@ -5265,7 +5265,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         assignment,
                         elem_type,
                         value_expr,
-                        &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
+                        &mut |builder, tcx| {
+                            if tcx == TypeContext::default() {
+                                value_ty
+                            } else {
+                                infer_value_ty.infer_silent(builder, tcx)
+                            }
+                        },
                         state,
                     ) {
                         Ok(ty) => ty,

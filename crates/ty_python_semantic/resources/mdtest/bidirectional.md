@@ -3684,6 +3684,14 @@ def _(x: X):
 def _(x: X | Bar):
     x |= reveal_type({"bar": [1]})  # revealed: dict[str, list[int]]
 
+class Fallback:
+    def __or__(self, other: dict[str, list[int]]):
+        return self
+
+def _(x: X | Fallback):
+    # Only the in-place method provides a contextual type for the dictionary.
+    x |= reveal_type({"bar": [1]})  # revealed: dict[str, list[int]]
+
 class Y:
     def __ior__(self, other: Bar):
         return self
