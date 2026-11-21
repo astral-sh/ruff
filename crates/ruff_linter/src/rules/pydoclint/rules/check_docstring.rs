@@ -24,6 +24,9 @@ use crate::rules::pydocstyle::settings::Convention;
 /// Checks for function docstrings that include parameters which are not
 /// in the function signature.
 ///
+/// In NumPy-style docstrings, an underlined section heading ends the parameter
+/// list, even if the heading is not a standard NumPy section name.
+///
 /// ## Why is this bad?
 /// If a docstring documents a parameter which is not in the function signature,
 /// it can be misleading to users and/or a sign of incomplete documentation or
@@ -680,14 +683,14 @@ fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<Parame
 /// ```
 fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<ParameterEntry<'_>> {
     let mut entries: Vec<ParameterEntry> = Vec::new();
-    let mut lines = content.lines();
+    let mut lines = content.lines().peekable();
     let Some(dashes) = lines.next() else {
         return entries;
     };
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
 
     let mut current_pos = content.full_line_end(dashes.text_len());
-    for potential in lines {
+    while let Some(potential) = lines.next() {
         let line_start = current_pos;
         current_pos = content.full_line_end(line_start);
 
@@ -697,6 +700,18 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
                 .next()
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
+                // Unknown underlined sections also end the parameter list.
+                if lines
+                    .peek()
+                    .and_then(|line| line.strip_prefix(indentation))
+                    .map(str::trim_end)
+                    .is_some_and(|line| {
+                        !line.is_empty() && line.chars().all(|char| matches!(char, '-' | '='))
+                    })
+                {
+                    break;
+                }
+
                 if let Some(before_colon) = entry.split(':').next() {
                     let param_line = before_colon.trim_end();
 
