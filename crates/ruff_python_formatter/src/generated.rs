@@ -2766,6 +2766,34 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ParameterWithDefault {
     }
 }
 
+impl FormatRule<ast::DictItem, PyFormatContext<'_>> for crate::other::dict_item::FormatDictItem {
+    #[inline]
+    fn fmt(&self, node: &ast::DictItem, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::DictItem>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::DictItem {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::DictItem,
+        crate::other::dict_item::FormatDictItem,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(self, crate::other::dict_item::FormatDictItem::default())
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::DictItem {
+    type Format = FormatOwnedWithRule<
+        ast::DictItem,
+        crate::other::dict_item::FormatDictItem,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(self, crate::other::dict_item::FormatDictItem::default())
+    }
+}
+
 impl FormatRule<ast::Keyword, PyFormatContext<'_>> for crate::other::keyword::FormatKeyword {
     #[inline]
     fn fmt(&self, node: &ast::Keyword, f: &mut PyFormatter) -> FormatResult<()> {

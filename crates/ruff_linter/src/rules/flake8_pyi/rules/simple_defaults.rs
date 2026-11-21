@@ -321,7 +321,7 @@ fn is_valid_default_value_with_annotation(
         Expr::Dict(dict) => {
             return allow_container
                 && dict.len() <= 10
-                && dict.iter().all(|ast::DictItem { key, value }| {
+                && dict.iter().all(|ast::DictItem { key, value, .. }| {
                     key.as_ref().is_some_and(|key| {
                         is_valid_default_value_with_annotation(key, false, locator, semantic)
                     }) && is_valid_default_value_with_annotation(value, false, locator, semantic)

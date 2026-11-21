@@ -242,7 +242,7 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
         let mut arguments: Vec<String> = vec![];
         let mut seen: Vec<&str> = vec![];
         let mut indent = None;
-        for ast::DictItem { key, value } in items {
+        for ast::DictItem { key, value, .. } in items {
             if let Some(key) = key {
                 if let Expr::StringLiteral(ast::ExprStringLiteral {
                     value: key_string, ..
