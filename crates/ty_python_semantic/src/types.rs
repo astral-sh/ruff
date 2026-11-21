@@ -645,10 +645,10 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             ty,
             func,
             |active| {
-                // A recursive alias can expand to an active callable before its
-                // materialization is known. Let the alias's guard close the cycle:
-                // returning the unchanged callable would leave that alias gradual.
-                if matches!(ty, Type::Callable(_)) {
+                // A recursive alias can expand to an active callable or union before
+                // its materialization is known. Let the alias's guard close the
+                // cycle so the other parts of the expansion are materialized.
+                if matches!(ty, Type::Callable(_) | Type::Union(_)) {
                     None
                 } else {
                     self.materialization_dependencies
@@ -10155,7 +10155,11 @@ impl<'db> Type<'db> {
         }
 
         let map = || self.map_type(db, type_mapping, tcx, visitor);
-        if matches!(self, Type::Callable(_) | Type::FunctionLiteral(_)) {
+        // Inferred types can share entire unions across multiple alternatives.
+        // Materialize each shared union once per direction.
+        if matches!(self, Type::Callable(_) | Type::FunctionLiteral(_))
+            || (self.is_union() && matches!(type_mapping, TypeMapping::Materialize(_)))
+        {
             visitor.visit(db, self, type_mapping, map)
         } else {
             map()
