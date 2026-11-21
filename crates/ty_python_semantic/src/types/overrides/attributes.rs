@@ -60,7 +60,7 @@ enum MemberContract<'db, A> {
 }
 
 /// The declaration selected from one owner, before binding descriptor access or `Self`.
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct UnboundAttribute<'db> {
     literal: StaticClassLiteral<'db>,
     ty: Type<'db>,
@@ -988,15 +988,25 @@ fn conflicting_parent_member<'db>(
     clippy::needless_pass_by_value,
     reason = "Salsa requires owned query keys, and lint expectations cannot observe diagnostics from the generated function"
 )]
-#[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-fn inherited_attribute<'db>(
+#[salsa::tracked(returns(clone), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+fn cached_inherited_attribute<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
-    owner: ClassType<'db>,
+    owner: ClassLiteral<'db>,
     name: Name,
 ) -> Option<UnboundAttribute<'db>> {
     let env = ProgramEnvironment::from_program(program);
-    match unbound_member_contract(db, &env, owner, &name, AttributeContractKind::Inherited)? {
+    lookup_inherited_attribute(db, &env, ClassType::NonGeneric(owner), &name)
+}
+
+/// Inferred defaults do not impose an inherited attribute contract.
+fn lookup_inherited_attribute<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    owner: ClassType<'db>,
+    name: &Name,
+) -> Option<UnboundAttribute<'db>> {
+    match unbound_member_contract(db, env, owner, name, AttributeContractKind::Inherited)? {
         MemberContract::Attribute(attribute) => Some(attribute),
         MemberContract::Inferred(_) => None,
     }
@@ -1030,15 +1040,21 @@ pub(super) fn check_inherited_conflict<'db>(
     let kind = AttributeContractKind::Inherited;
     // Most inherited names occur on just one base. Only look up the selected declaration
     // once we know another base supplies a contract for the same name.
-    let declaration =
-        LazyCell::new(|| inherited_attribute(db, env.program(db), owner, name.clone()));
+    let inherited_attribute = |owner| match owner {
+        ClassType::NonGeneric(literal) => {
+            cached_inherited_attribute(db, env.program(db), literal, name.clone())
+        }
+        // Each subclass can specialize the same base differently. Caching even misses
+        // would retain an entry per subclass for every shared name.
+        ClassType::Generic(_) => lookup_inherited_attribute(db, env, owner, name),
+    };
+    let declaration = LazyCell::new(|| inherited_attribute(owner));
     let source = OnceCell::new();
     for target_owner in contracts {
-        let Some(target) = inherited_attribute(db, env.program(db), target_owner, name.clone())
-        else {
+        let Some(target) = inherited_attribute(target_owner) else {
             continue;
         };
-        let Some(declaration) = *declaration else {
+        let Some(declaration) = &*declaration else {
             return;
         };
         // `attribute_violation` accepts two methods regardless of their read and write types,
@@ -1060,7 +1076,7 @@ pub(super) fn check_inherited_conflict<'db>(
         {
             continue;
         }
-        let Some(target) = bind_attribute(db, env, target_owner, receiver, name, target) else {
+        let Some(target) = bind_attribute(db, env, target_owner, receiver, name, &target) else {
             continue;
         };
         let Some(source) =
