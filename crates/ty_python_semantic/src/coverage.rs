@@ -216,8 +216,17 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
         source_order::walk_parameter(self, parameter);
     }
 
+    /// Like mypy, we classify an import by whether it resolves, not by the type of what it imports.
+    /// For example, importing a type alias `Json = dict[str, Any]` is precise.
     fn visit_alias(&mut self, alias: &ast::Alias) {
-        self.record(alias.inferred_type(&self.model), alias.range());
+        if let Some(ty) = alias.inferred_type(&self.model) {
+            let coverage = if ty.is_dynamic() {
+                LineCoverage::Dynamic
+            } else {
+                LineCoverage::Precise
+            };
+            self.record_coverage(coverage, ty, alias.range(), alias.start());
+        }
         source_order::walk_alias(self, alias);
     }
 }
@@ -333,7 +342,7 @@ mod tests {
         ), @"
           | 
         P | from typing import Any
-        I | from aliases import Json  # `Json`: <class 'dict[str, Any]'>
+        P | from aliases import Json
         D | from does_not_exist import Missing  # `Missing`: Unknown
           | 
         I | def send(message: dict[str, Any]) -> None:  # `message`: dict[str, Any], `dict[str, Any]`: dict[str, Any]
