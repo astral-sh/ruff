@@ -6,6 +6,7 @@ use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     DISJOINT_TYPE_IS_NARROWING, INVALID_TYPE_GUARD_DEFINITION, SUSPICIOUS_TYPE_IS_NARROWING,
 };
+use crate::types::function::OverloadLiteral;
 
 /// Check that all type guard function definitions have at least one positional parameter
 /// (in addition to `self`/`cls` for methods), and for `TypeIs`, that the narrowed type is
@@ -13,6 +14,7 @@ use crate::types::diagnostic::{
 pub(crate) fn check_type_guard_definition<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
+    checked_return: Option<(OverloadLiteral<'db>, Type<'db>)>,
     node: &ast::StmtFunctionDef,
 ) {
     let Type::FunctionLiteral(function) = ty else {
@@ -23,6 +25,15 @@ pub(crate) fn check_type_guard_definition<'db>(
     let env = context.program_environment();
 
     let overload = function.literal(db).last_definition;
+    // A decorator may have replaced the function. Only reuse the return type
+    // if we checked this definition. Wrapping an async return in a coroutine
+    // can hide a type guard, but it cannot produce one.
+    if let Some((checked, return_ty)) = checked_return
+        && checked == overload
+        && !matches!(return_ty, Type::TypeIs(_) | Type::TypeGuard(_))
+    {
+        return;
+    }
     let signature = overload.signature(db);
     let return_ty = signature.return_ty;
 

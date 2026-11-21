@@ -1271,7 +1271,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             definition,
                             &function.node(self.module()).decorator_list,
                         );
-                        post_inference::function::check_function_definition(
+                        let checked_return = post_inference::function::check_function_definition(
                             &self.context,
                             definition,
                             &|expr| self.file_expression_type(expr),
@@ -1288,6 +1288,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         post_inference::typeguard::check_type_guard_definition(
                             &self.context,
                             ty,
+                            checked_return,
                             function.node(self.module()),
                         );
                     }

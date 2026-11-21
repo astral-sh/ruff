@@ -30,22 +30,19 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_python_core::definition::Definition;
 
+/// Check the function definition, retaining its return type for type guard validation.
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
     definition: Definition<'db>,
     file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
-) {
+) -> Option<(OverloadLiteral<'db>, Type<'db>)> {
     let db = context.db();
 
-    let Some(function_type) =
-        infer_definition_types(context.db(), definition).function_type(definition)
-    else {
-        return;
-    };
+    let function_type = infer_definition_types(db, definition).function_type(definition)?;
 
     let last_definition = function_type.literal(db).last_definition;
     if last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK) {
-        return;
+        return None;
     }
     // The checks below read parameter kinds and the public generic context. A function's
     // ordinary callable signature already has both, including for async functions whose
@@ -68,6 +65,7 @@ pub(crate) fn check_function_definition<'db>(
     check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
     check_legacy_typevar_defaults(context, last_definition, signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, signature, file_expression_type);
+    Some((last_definition, signature.return_ty))
 }
 
 /// Check that a nominal class's exposed methods respect its declared type-parameter variance.
