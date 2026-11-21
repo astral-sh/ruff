@@ -24,7 +24,7 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::constraints::{
     CandidateSolutions, ConstraintProvenance, ConstraintSet, ConstraintSetBuilder,
-    IteratorConstraintsExtension, Solutions,
+    IteratorConstraintsExtension,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -1726,17 +1726,12 @@ impl<'db> Signature<'db> {
                 constraints.load_with_provenance(db, env, &when, ConstraintProvenance::INFERRED)
             });
 
-        match when.solutions(db, env, inferable) {
-            Ok(Solutions::Unsatisfiable(_)) => return None,
-            Ok(Solutions::Unconstrained) | Err(_) => {
-                return Some(CallableSignature::single(self.clone()));
-            }
+        match when.solution_count_up_to(db, env, inferable, 2) {
+            Some(0) => return None,
+            Some(1) => {}
             // Each receiver path can leave a different type variable unconstrained. Preserve the
             // original relation instead of combining those independent solutions.
-            Ok(Solutions::Constrained(solutions)) if solutions.as_slice().len() > 1 => {
-                return Some(CallableSignature::single(self.clone()));
-            }
-            Ok(Solutions::Constrained(_)) => {}
+            _ => return Some(CallableSignature::single(self.clone())),
         }
 
         let Some(generic_context) = self.generic_context else {

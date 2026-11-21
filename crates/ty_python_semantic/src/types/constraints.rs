@@ -604,38 +604,52 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         // Comparing invariant arguments like `Literal["a", "b", ...]` and `T | U`
         // can produce a distinct specialization for every partition of the literals
         // between T and U. A single valid solution establishes overlap.
+        self.solution_count_up_to(db, env, inferable, 1) == Some(0)
+    }
+
+    /// Counts paths accepted by the default selector, up to `limit`.
+    /// Returns `None` if the set is unconstrained or the projection exceeds its budget.
+    pub(super) fn solution_count_up_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        limit: usize,
+    ) -> Option<usize> {
+        let count = |solutions| match solutions {
+            Solutions::Unconstrained => None,
+            Solutions::Unsatisfiable(_) => Some(0),
+            Solutions::Constrained(paths) => Some(paths.as_slice().len().min(limit)),
+        };
         let budget = SolutionBudget::default();
-        let Ok(candidates) = CandidateSolutions::compute_bounded(
+        let candidates = CandidateSolutions::compute_bounded(
             db,
             env,
             self,
             inferable,
             budget,
-            CandidateSearch::FirstValid,
-        ) else {
-            return false;
-        };
+            CandidateSearch::FirstValid(limit),
+        )
+        .ok()?;
         let result = candidates.solve_with_budget(db, budget, |_variance, bounds| {
             CandidateSolutions::default_solve(db, env, self.builder, bounds)
         });
-        if !matches!(result, Ok(Solutions::Unsatisfiable(_))) {
-            return false;
-        }
+        let selected = result.ok().and_then(count);
 
-        // Selection can reject a candidate after the walker has validated its declared
-        // domains. If such a candidate stopped the walk, check all paths before
-        // concluding that the arguments are disjoint.
-        if let CandidateSolutions::Constrained(paths) = &candidates
+        // Selection can reject candidates after the walker has validated their declared
+        // domains. If the walk reached its limit, we only know the count when selection
+        // confirms that many solutions. Otherwise check all paths with the usual budget.
+        if selected != Some(limit)
+            && let CandidateSolutions::Constrained(paths) = &candidates
             && paths
                 .iter()
-                .any(|path| matches!(path.validity, SolutionValidity::Valid))
+                .filter(|path| matches!(path.validity, SolutionValidity::Valid))
+                .count()
+                >= limit
         {
-            return matches!(
-                self.solutions(db, env, inferable),
-                Ok(Solutions::Unsatisfiable(_))
-            );
+            return count(self.solutions(db, env, inferable).ok()?);
         }
-        true
+        selected
     }
 
     /// Returns whether this constraint set is the `never` terminal.
@@ -3988,8 +4002,8 @@ impl SolutionLimits for BoundedSolutionLimits {
 enum CandidateSearch {
     /// Collect the complete family of candidate solutions.
     All(ReportDiagnostics),
-    /// Collect candidates through the first terminal that produces a valid candidate.
-    FirstValid,
+    /// Stop after a terminal brings the number of valid candidates to this limit.
+    FirstValid(usize),
 }
 
 impl<'db> CandidateSolutions<'db> {
@@ -4078,7 +4092,7 @@ impl<'db> CandidateSolutions<'db> {
             unspecialized_type_var_policy,
             match search {
                 CandidateSearch::All(report_diagnostics) => report_diagnostics,
-                CandidateSearch::FirstValid => ReportDiagnostics::Yes,
+                CandidateSearch::FirstValid(_) => ReportDiagnostics::Yes,
             },
         )? {
             return ControlFlow::Continue(path_bounds);
