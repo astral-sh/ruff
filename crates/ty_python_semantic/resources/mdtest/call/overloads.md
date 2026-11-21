@@ -1979,6 +1979,26 @@ def f(a: Foo, b: list[str], c: list[LiteralString], e):
     reveal_type(a.join(e))  # revealed: Unknown
 ```
 
+### A protocol that accepts `object`
+
+The top materialization of `Any` is `object`. Since `object` is assignable to `Hashable`, the first
+overload covers the argument even though some subclasses of `object` are unhashable.
+
+```py
+from collections.abc import Hashable
+from typing import Any, overload
+
+@overload
+def f(x: Hashable) -> int: ...
+@overload
+def f(x: list[int]) -> str: ...
+def f(x: object) -> int | str:
+    return 0
+
+def _(x: Any):
+    reveal_type(f(x))  # revealed: int
+```
+
 ### Multiple arguments
 
 `overloaded.pyi`:
