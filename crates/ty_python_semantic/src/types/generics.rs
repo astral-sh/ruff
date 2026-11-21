@@ -3034,6 +3034,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> TypeVarInference<'db> {
         let db = self.db;
         for (formal, actual) in argument_relations {
+            // Once a relation exceeds the budget, later arguments can't restore the mapping.
+            if matches!(self.types, LegacyTypeMappings::BudgetExceeded) {
+                break;
+            }
             let when = self.constraint_for_relation(formal, actual, TypeVarVariance::Covariant);
             let analysis = self.analyze_constraint_set(when);
             if matches!(&analysis, ConstraintSetAnalysis::Unsatisfiable(failures) if failures.is_empty())
