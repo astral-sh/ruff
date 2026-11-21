@@ -1163,8 +1163,11 @@ impl<'db> UnionBuilder<'db> {
     /// A `false` result leaves the decision to the general relation checks.
     ///
     /// Distinct class and module literals identify different objects. Applying the same truthiness
-    /// guard to two class literals preserves that distinction. Methods bound to distinct
-    /// singleton literals also remain distinct because `__self__` exposes their captured receiver:
+    /// guard to two class literals preserves that distinction.
+    ///
+    /// Bound methods expose the underlying function as `__func__`, so distinct function
+    /// literals keep their methods distinct even when the signatures are identical. Similarly,
+    /// `__self__` distinguishes methods bound to different singleton literals:
     ///
     /// ```python
     /// from typing import Literal, LiteralString, reveal_type
@@ -1202,6 +1205,11 @@ impl<'db> UnionBuilder<'db> {
             (Type::Dynamic(_), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::Dynamic(_))
                 if !instance.is_object() =>
+            {
+                true
+            }
+            (Type::BoundMethod(left), Type::BoundMethod(right))
+                if left.has_distinct_function(db, right) =>
             {
                 true
             }
