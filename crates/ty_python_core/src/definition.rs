@@ -21,7 +21,7 @@ use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::use_def::BindingWithConstraintsIterator;
-use crate::{Db, Program, SemanticIndex};
+use crate::{Db, Program, SemanticIndex, place_table};
 
 /// A definition of a place.
 ///
@@ -117,38 +117,19 @@ impl<'db> Definition<'db> {
         FileRange::new(self.file(db), self.kind(db).target_range(module))
     }
 
-    /// Returns the name of the item being defined, if applicable.
+    /// Returns the name bound or declared in this scope, including the local name of an import.
+    /// Member targets such as `obj.x` and internal definitions have no such name.
     pub fn name(self, db: &'db dyn Db) -> Option<String> {
-        let module = parsed_module(db, self.python_file(db)).load(db);
-        let kind = self.kind(db);
-        match kind {
-            DefinitionKind::Function(def) => {
-                let node = def.node(&module);
-                Some(node.name.as_str().to_string())
-            }
-            DefinitionKind::Class(def) => {
-                let node = def.node(&module);
-                Some(node.name.as_str().to_string())
-            }
-            DefinitionKind::TypeAlias(def) => {
-                let node = def.node(&module);
-                Some(
-                    node.name
-                        .as_name_expr()
-                        .expect("type alias name should be a NameExpr")
-                        .id
-                        .as_str()
-                        .to_string(),
-                )
-            }
-            DefinitionKind::Assignment(assignment) => {
-                let target_node = assignment.target.node(&module);
-                target_node
-                    .as_name_expr()
-                    .map(|name_expr| name_expr.id.as_str().to_string())
-            }
-            _ => None,
+        if !self.kind(db).is_user_visible() {
+            return None;
         }
+        let symbol = self.place(db).as_symbol()?;
+        Some(
+            place_table(db, self.scope(db))
+                .symbol(symbol)
+                .name()
+                .to_string(),
+        )
     }
 
     /// Extract a docstring from this definition, if applicable.
