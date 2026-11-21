@@ -150,15 +150,15 @@ impl OwnedConstraintSetBuilder {
 
         let nodes = storage
             .nodes
-            .into_iter()
+            .iter()
             .zip(&self.used_nodes)
-            .filter_map(|(node, used)| used.then_some(node))
+            .filter_map(|(node, used)| used.then_some(node.data))
             .collect();
         let node_supports = storage
-            .node_supports
+            .nodes
             .into_iter()
             .zip(&self.used_nodes)
-            .filter_map(|(support, used)| used.then_some(support))
+            .filter_map(|(node, used)| used.then_some(node.support))
             .collect();
         let node_indices = RankBitBox::from_bits(self.used_nodes);
 

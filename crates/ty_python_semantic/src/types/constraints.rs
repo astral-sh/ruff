@@ -1116,11 +1116,14 @@ struct ConstraintSetStorage<'db> {
     typevars: IndexVec<TypeVarId, BoundTypeVarInstance<'db>>,
 
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
-    nodes: IndexVec<NodeId, InteriorNodeData>,
+    nodes: IndexVec<NodeId, BuilderNode>,
 
     supports: IndexVec<SupportId, Support>,
     constraint_supports: IndexVec<ConstraintId, SupportId>,
-    node_supports: IndexVec<NodeId, SupportId>,
+
+    /// The fewest atoms that must be true to satisfy each node, computed lazily for coverage
+    /// checks in builders without compacted storage.
+    min_positive_atoms: IndexVec<NodeId, u8>,
 
     /// Encodes an ordering on the constraints in a constraint set, which is based on the order
     /// that the constraints (or more accurately, the Python expressions they're derived from)
@@ -1421,11 +1424,47 @@ impl<'db> ConstraintSetStorage<'db> {
         support |= self.node_support(data.if_false);
         let support = self.intern_support(support);
 
-        let id = self.nodes.push(data);
-        self.node_supports.push(support);
+        let id = self.nodes.push(BuilderNode { data, support });
         let id = self.adjusted_node_id(id);
         self.node_cache.insert(data, id);
         id
+    }
+
+    /// Tries to prove that `left` needs fewer true atoms than `right`.
+    ///
+    /// On any accepting path, setting just the atoms on guarded true edges to true satisfies
+    /// the diagram. Ordering ensures that no atom appears twice on the path. If the minimum
+    /// for `left` is smaller, such an assignment witnesses that `right` cannot cover `left`.
+    fn requires_fewer_positive_atoms(&mut self, left: NodeId, right: NodeId) -> bool {
+        if self.compacted.is_some() || left.is_terminal() || right.is_terminal() {
+            return false;
+        }
+
+        // Children precede parents in the local arena. Extend the table up to the nodes we
+        // need, bounding the work per comparison. Saturation preserves the ordering whenever
+        // the two counts differ after truncation.
+        let minima = &mut self.min_positive_atoms;
+        let end = left.index().max(right.index()) + 1;
+        for node in self
+            .nodes
+            .iter()
+            .take(end)
+            .skip(minima.len())
+            .take(COVERAGE_BUDGET)
+        {
+            let minimum = |branch| match branch {
+                ALWAYS_TRUE => 0,
+                ALWAYS_FALSE => u8::MAX,
+                _ => minima[branch],
+            };
+            let node = node.data;
+            let count = minimum(node.if_true)
+                .saturating_add(1)
+                .min(minimum(node.if_uncertain))
+                .min(minimum(node.if_false));
+            minima.push(count);
+        }
+        minima.len() >= end && minima[left] < minima[right]
     }
 
     fn typevar_id(&mut self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
@@ -1484,9 +1523,9 @@ impl<'db> ConstraintSetStorage<'db> {
                 let compacted_index = compacted.retained_node_index(node);
                 return compacted.nodes[compacted_index];
             }
-            return self.nodes[NodeId::from_usize(index - split)];
+            return self.nodes[NodeId::from_usize(index - split)].data;
         }
-        self.nodes[node]
+        self.nodes[node].data
     }
 
     fn intern_source_order(&mut self, data: SourceOrder) -> SourceOrderId {
@@ -1636,9 +1675,9 @@ impl<'db> ConstraintSetStorage<'db> {
                 let compacted_index = compacted.retained_node_index(node);
                 return Some(compacted.node_supports[compacted_index]);
             }
-            return Some(self.node_supports[NodeId::from_usize(index - split)]);
+            return Some(self.nodes[NodeId::from_usize(index - split)].support);
         }
-        Some(self.node_supports[node])
+        Some(self.nodes[node].support)
     }
 
     fn node_support(&self, node: NodeId) -> Option<&Support> {
@@ -2223,6 +2262,8 @@ const ALWAYS_TRUE: NodeId = NodeId(0xffff_ffff);
 /// A special ID that is used for an "always false" / "never visible" constraint.
 const ALWAYS_FALSE: NodeId = NodeId(0xffff_fffe);
 
+const COVERAGE_BUDGET: usize = 64;
+
 const SMALLEST_TERMINAL: NodeId = ALWAYS_FALSE;
 
 enum Node {
@@ -2277,10 +2318,15 @@ impl NodeId {
         }
 
         // A guarded branch covered by the uncertain branch adds no satisfying assignments.
-        // Keep the proof bounded and non-allocating: speculative intersections here can trigger
+        // Keep the proof bounded and avoid building new nodes. Speculative intersections can trigger
         // further coverage checks and expand a compact disjunction exponentially.
-        if if_uncertain != ALWAYS_FALSE {
-            let mut remaining_visits = 64;
+        // When the false guard is empty, skipping a failed proof for the true guard cannot
+        // affect the second proof through their shared visit budget.
+        if if_uncertain != ALWAYS_FALSE
+            && !(if_false == ALWAYS_FALSE
+                && storage.requires_fewer_positive_atoms(if_true, if_uncertain))
+        {
+            let mut remaining_visits = COVERAGE_BUDGET;
             if if_true.is_covered_by(storage, if_uncertain, &mut remaining_visits) {
                 if_true = ALWAYS_FALSE;
             }
@@ -3144,6 +3190,13 @@ struct InteriorNodeData {
     if_true: NodeId,
     if_uncertain: NodeId,
     if_false: NodeId,
+}
+
+/// An interior node and its type variable support in a builder's local arena.
+#[derive(Debug)]
+struct BuilderNode {
+    data: InteriorNodeData,
+    support: SupportId,
 }
 
 /// Accumulates validity and evidence bounds for a single typevar on one TDD path.
