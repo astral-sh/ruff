@@ -16,10 +16,10 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, ClassLiteral, CycleDetector, DynamicType,
         GenericAlias, GenericContext, InstanceProjection, IntersectionType, KnownClass,
-        KnownInstanceType, MaterializationKind, Parameter, Parameters, RecursiveType, Signature,
-        Specialization, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
-        UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
-        binding_type,
+        KnownInstanceType, MaterializationKind, Parameter, Parameters, ProtocolInstanceType,
+        RecursiveType, Signature, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
+        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
+        any_over_type_including_alias_arguments, binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
         generics::{enclosing_binding_contexts, walk_specialization_types},
@@ -2513,6 +2513,13 @@ pub(super) fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeVarBoundOrConstraints<'db> {
+    pub(super) fn protocol_upper_bound(self, db: &'db dyn Db) -> Option<ProtocolInstanceType<'db>> {
+        let Self::UpperBound(bound) = self else {
+            return None;
+        };
+        bound.resolve_type_alias(db).as_protocol_instance()
+    }
+
     fn materialize_impl(
         self,
         db: &'db dyn Db,
