@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006 [*] Do not use mutable data structures for argument defaults
+ --> B006_11.py:6:30
+  |
+5 |     # Should trigger B006 - nested function using mutable from outer scope
+6 |     def inner_function(items=my_list):
+  |                              ^^^^^^^
+7 |         return items
+  |
+help: Replace with `None`; initialize within function
+3  |     my_list = [1, 2, 3]  # Assignment in outer function
+4  |     
+5  |     # Should trigger B006 - nested function using mutable from outer scope
+   -     def inner_function(items=my_list):
+6  +     def inner_function(items=None):
+7  +         if items is None:
+8  +             items = my_list
+9  |         return items
+10 |     
+11 |     return inner_function
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_11.py:33:32
+   |
+32 | # Should trigger B006 - module-level assignment used as default
+33 | def func_with_module_var(items=module_list):
+   |                                ^^^^^^^^^^^
+34 |     return items
+   |
+help: Replace with `None`; initialize within function
+30 | module_list = [1, 2, 3]  # Module-level assignment
+31 | 
+32 | # Should trigger B006 - module-level assignment used as default
+   - def func_with_module_var(items=module_list):
+33 + def func_with_module_var(items=None):
+34 +     if items is None:
+35 +         items = module_list
+36 |     return items
+37 | 
+38 | 
+note: This is an unsafe fix and may change runtime behavior
