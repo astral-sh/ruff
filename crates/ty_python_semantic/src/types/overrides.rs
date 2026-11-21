@@ -599,6 +599,7 @@ fn visit_shared_inherited_names<'db>(
         return;
     };
     let listed = inherited_member_candidates(db, literal);
+    let code_generator = LazyCell::new(|| CodeGeneratorKind::from_class(db, literal.into()));
     let table = place_table(db, literal.body_scope(db));
     let specialization = specialization.map(|s| s.tuple_runtime_element_specialization(db));
     candidates
@@ -608,11 +609,20 @@ fn visit_shared_inherited_names<'db>(
             if listed.contains_key(*name) {
                 return true;
             }
+            // Checking for a shared name doesn't require building a constructor signature.
+            if *name == "__init__"
+                && table.symbol_id(name).is_none()
+                && code_generator.is_some_and(|kind| {
+                    kind.synthesizes_constructor_signature_from_fields(db, literal)
+                })
+            {
+                return true;
+            }
             // The inventory includes every slot and receiver attribute. If the class body
             // has no symbol either, a non-dunder can only come from member synthesis.
             if !is_dunder(name) && table.symbol_id(name).is_none() {
                 return literal
-                    .own_synthesized_member(db, env, specialization, None, name)
+                    .own_generated_member(db, env, specialization, None, name, || *code_generator)
                     .is_some();
             }
             !other.own_class_member(db, env, None, name).is_undefined()

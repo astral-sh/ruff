@@ -383,13 +383,13 @@ impl<'db> CodeGeneratorKind<'db> {
     ///
     /// C(value=42)
     /// ```
-    fn synthesizes_constructor_signature_from_fields(
+    pub(super) fn synthesizes_constructor_signature_from_fields(
         self,
         db: &'db dyn Db,
         class: StaticClassLiteral<'db>,
     ) -> bool {
         match self {
-            Self::DataclassLike(_) => true,
+            Self::DataclassLike(_) => class.has_dataclass_param(db, self, DataclassFlags::INIT),
             Self::Pydantic(_) => pydantic::synthesizes_constructor_signature_from_fields(db, class),
             Self::NamedTuple | Self::TypedDict => false,
         }
