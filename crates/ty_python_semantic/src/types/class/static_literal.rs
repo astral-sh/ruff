@@ -1957,11 +1957,14 @@ impl<'db> StaticClassLiteral<'db> {
 
             let fields = self.fields(db, specialization, field_policy);
             let validated_fields = LazyCell::new(|| {
-                pydantic::fields_with_raw_input_validators(
-                    db,
-                    self,
-                    fields.keys().cloned().collect(),
-                )
+                let names = fields
+                    .iter()
+                    .filter(|(_, field)| {
+                        matches!(field.kind, FieldKind::Pydantic { init: true, .. })
+                    })
+                    .map(|(name, _)| name.clone())
+                    .collect();
+                pydantic::fields_with_raw_input_validators(db, self, names)
             });
             for (field_name, field) in fields {
                 let (init, mut default_ty, kw_only, alias, converter, strict) = match &field.kind {

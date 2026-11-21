@@ -1063,8 +1063,7 @@ pub(in crate::types) fn fields_with_raw_input_validators<'db>(
     class: StaticClassLiteral<'db>,
     field_names: Box<[Name]>,
 ) -> FxHashSet<Name> {
-    let mut candidates: FxHashSet<_> = field_names.into_iter().collect();
-    candidates.insert(Name::new("*"));
+    let mut remaining: FxHashSet<_> = field_names.into_iter().collect();
     let mut fields = FxHashSet::default();
 
     // Pydantic inherits validators unless a subclass defines a symbol with the same method name.
@@ -1092,28 +1091,37 @@ pub(in crate::types) fn fields_with_raw_input_validators<'db>(
                 let Some(definition) = declaration.declaration.definition() else {
                     continue;
                 };
-                let targets = raw_input_validator_targets(db, definition, &candidates);
+                let targets = raw_input_validator_targets(db, definition, &remaining);
                 if !targets.is_empty()
                     && !constraints
                         .evaluate(db, predicates, declaration.reachability_constraint)
                         .is_always_false()
                 {
-                    fields.extend(targets);
+                    for target in targets {
+                        if target == "*" {
+                            return FxHashSet::from_iter([Name::new("*")]);
+                        }
+                        if let Some(name) = remaining.take(target) {
+                            fields.insert(name);
+                        }
+                    }
+                    if remaining.is_empty() {
+                        return fields;
+                    }
                 }
             }
         }
     }
 
-    fields.shrink_to_fit();
     fields
 }
 
-/// Collect the field names from a method's `before` and `plain` validators.
+/// Collect targets of a method's `before` and `plain` validators that can still widen a field.
 fn raw_input_validator_targets<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    candidates: &FxHashSet<Name>,
-) -> Vec<Name> {
+    remaining: &FxHashSet<Name>,
+) -> Vec<&'db str> {
     let DefinitionKind::Function(function) = definition.kind(db) else {
         return Vec::new();
     };
@@ -1153,7 +1161,7 @@ fn raw_input_validator_targets<'db>(
                 .expression_type(field)?
                 .as_string_literal()?
                 .value(db);
-            candidates.get(name).cloned()
+            (name == "*" || remaining.contains(name)).then_some(name)
         }));
     }
     fields
