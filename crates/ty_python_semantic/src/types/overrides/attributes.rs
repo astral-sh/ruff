@@ -60,6 +60,7 @@ enum MemberContract<'db, A> {
 }
 
 /// The declaration selected from one owner, before binding descriptor access or `Self`.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct UnboundAttribute<'db> {
     literal: StaticClassLiteral<'db>,
     ty: Type<'db>,
@@ -981,6 +982,26 @@ fn conflicting_parent_member<'db>(
         .then_some(owner)
 }
 
+/// Look up the declaration shared by subclasses that inherit the same name from `owner`.
+/// Descriptor access and `Self` still need to be bound to each subclass separately.
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Salsa requires owned query keys, and lint expectations cannot observe diagnostics from the generated function"
+)]
+#[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+fn inherited_attribute<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    owner: ClassType<'db>,
+    name: Name,
+) -> Option<UnboundAttribute<'db>> {
+    let env = ProgramEnvironment::from_program(program);
+    match unbound_member_contract(db, &env, owner, &name, AttributeContractKind::Inherited)? {
+        MemberContract::Attribute(attribute) => Some(attribute),
+        MemberContract::Inferred(_) => None,
+    }
+}
+
 /// Check the selected attribute against every inherited declaration of that name.
 ///
 /// Explicit overrides are checked separately. All inherited generic specializations remain
@@ -1009,15 +1030,15 @@ pub(super) fn check_inherited_conflict<'db>(
     let kind = AttributeContractKind::Inherited;
     // Most inherited names occur on just one base. Only look up the selected declaration
     // once we know another base supplies a contract for the same name.
-    let declaration = LazyCell::new(|| unbound_member_contract(db, env, owner, name, kind));
+    let declaration =
+        LazyCell::new(|| inherited_attribute(db, env.program(db), owner, name.clone()));
     let source = OnceCell::new();
     for target_owner in contracts {
-        let Some(MemberContract::Attribute(target)) =
-            unbound_member_contract(db, env, target_owner, name, kind)
+        let Some(target) = inherited_attribute(db, env.program(db), target_owner, name.clone())
         else {
             continue;
         };
-        let Some(MemberContract::Attribute(declaration)) = &*declaration else {
+        let Some(declaration) = *declaration else {
             return;
         };
         // `attribute_violation` accepts two methods regardless of their read and write types,
@@ -1039,7 +1060,7 @@ pub(super) fn check_inherited_conflict<'db>(
         {
             continue;
         }
-        let Some(target) = bind_attribute(db, env, target_owner, receiver, name, &target) else {
+        let Some(target) = bind_attribute(db, env, target_owner, receiver, name, target) else {
             continue;
         };
         let Some(source) =
