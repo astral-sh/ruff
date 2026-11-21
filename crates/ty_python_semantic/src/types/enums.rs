@@ -1163,6 +1163,9 @@ pub(crate) fn enum_metadata<'db>(
                             // Some types are specifically disallowed for enum members.
                             return None;
                         }
+                        // Unlike enum members, literal ints, bools, strings and bytes
+                        // cannot define `__get__` and therefore cannot be descriptors.
+                        Type::LiteralValue(literal) if !literal.is_enum() => Some(ty),
                         Type::NominalInstance(instance) => match instance.known_class(db) {
                             // enum.nonmember
                             Some(KnownClass::Nonmember) => return None,
