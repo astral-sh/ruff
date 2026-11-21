@@ -170,6 +170,17 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     pub(super) fn resolve_name(mut self, name: &ModuleName) -> Option<ResolvedNames<'db>> {
         let mut components = name.components();
         let last = components.next_back()?;
+        // Dotted imports can resume the same parent search as module enumeration.
+        // Snapshots recursively load their ancestors, so keep very deep imports iterative.
+        const MAX_SNAPSHOT_DEPTH: usize = 16;
+        if let Position::Root(paths @ RootSearchPaths::Configured) = &self.position
+            && let Some(parent) = name.parent()
+            && parent.components().nth(MAX_SNAPSHOT_DEPTH).is_none()
+            // A snapshot would force the full search even if an extra path supplies a stub.
+            && !paths.iter(self.context).next().is_some_and(SearchPath::is_extra)
+        {
+            return Self::at_module_name_prefix(self.context, &parent, paths)?.resolve_child(last);
+        }
         for component in components {
             self = self.advance(component)?;
         }
