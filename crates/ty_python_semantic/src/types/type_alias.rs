@@ -22,7 +22,6 @@ use crate::{
 };
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
-    scope::ScopeId,
     semantic_index,
 };
 
@@ -198,7 +197,7 @@ pub struct PEP695TypeAliasType<'db> {
     pub name: Name,
 
     #[returns(copy)]
-    rhs_scope: ScopeId<'db>,
+    definition: Definition<'db>,
 
     #[returns(copy)]
     pub(super) specialization: Option<Specialization<'db>>,
@@ -221,18 +220,12 @@ fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> PEP695TypeAliasType<'db> {
-    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let scope = self.rhs_scope(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        semantic_index(db, scope.program_file(db)).expect_single_definition(type_alias_stmt_node)
-    }
-
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
-            let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
@@ -247,19 +240,17 @@ impl<'db> PEP695TypeAliasType<'db> {
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
-            let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
-        let scope = self.rhs_scope(db);
-        let program_file = scope.program_file(db);
-        let python_file = program_file.python_file(db);
-        let module = parsed_module(db, python_file).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
-
+        let DefinitionKind::TypeAlias(type_alias_stmt_node) = definition.kind(db) else {
+            return Type::unknown();
+        };
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
@@ -281,7 +272,7 @@ impl<'db> PEP695TypeAliasType<'db> {
                 PEP695TypeAliasType::new(
                     db,
                     self.name(db),
-                    self.rhs_scope(db),
+                    self.definition(db),
                     Some(specialization),
                     self.materialization_kind(db),
                 )
@@ -291,21 +282,14 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        let scope = self.rhs_scope(db);
-        let program_file = scope.program_file(db);
-        let python_file = program_file.python_file(db);
-        let parsed = parsed_module(db, python_file).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-
-        type_alias_stmt_node
-            .node(&parsed)
-            .type_params
-            .as_ref()
-            .and_then(|type_params| {
-                let index = semantic_index(db, program_file);
-                let definition = index.expect_single_definition(type_alias_stmt_node);
-                GenericContext::from_type_params(db, index, definition, type_params)
-            })
+        let definition = self.definition(db);
+        let DefinitionKind::TypeAlias(type_alias_stmt_node) = definition.kind(db) else {
+            return None;
+        };
+        let parsed = parsed_module(db, definition.python_file(db)).load(db);
+        let type_params = type_alias_stmt_node.node(&parsed).type_params.as_ref()?;
+        let index = semantic_index(db, definition.program_file(db));
+        GenericContext::from_type_params(db, index, definition, type_params)
     }
 }
 
@@ -646,12 +630,7 @@ impl<'db> TypeAliasType<'db> {
         let Some(materialization_kind) = self.materialization_kind(db) else {
             return value_type;
         };
-        let env = match alias {
-            TypeAliasType::PEP695(alias) => ProgramEnvironment::from_scope(alias.rhs_scope(db)),
-            TypeAliasType::ManualPEP695(alias) => {
-                ProgramEnvironment::from_definition(alias.definition(db))
-            }
-        };
+        let env = ProgramEnvironment::from_definition(alias.definition(db));
         value_type.materialize(
             db,
             materialization_kind,
@@ -696,7 +675,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 db,
                 alias.name(db),
-                alias.rhs_scope(db),
+                alias.definition(db),
                 None,
                 None,
             )),
@@ -733,7 +712,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 db,
                 alias.name(db),
-                alias.rhs_scope(db),
+                alias.definition(db),
                 alias.specialization(db),
                 materialization_kind,
             )),
@@ -896,7 +875,7 @@ impl<'db> TypeAliasType<'db> {
             Self::PEP695(alias) => Self::PEP695(PEP695TypeAliasType::new(
                 db,
                 alias.name(db),
-                alias.rhs_scope(db),
+                alias.definition(db),
                 Some(mapped),
                 alias.materialization_kind(db),
             )),
