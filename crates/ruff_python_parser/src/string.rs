@@ -380,19 +380,23 @@ impl<'src> StringParser<'src> {
             ));
         }
 
-        if self.flags.is_raw_string() {
-            // For raw strings, no escaping is necessary.
+        let bytes = self.source.as_bytes();
+        let mut next_escape = if self.flags.is_raw_string() {
+            None
+        } else {
+            memchr::memchr(b'\\', bytes)
+        };
+        if next_escape.is_none() {
             return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.as_bytes().into(),
+                value: bytes.into(),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
             }));
         }
 
-        let bytes = self.source.as_bytes();
         let mut value = Vec::with_capacity(bytes.len());
-        while let Some(offset) = memchr::memchr(b'\\', &bytes[self.cursor..]) {
+        while let Some(offset) = next_escape {
             let escape = self.cursor + offset;
             value.extend_from_slice(&bytes[self.cursor..escape]);
             self.cursor = escape;
@@ -410,6 +414,7 @@ impl<'src> StringParser<'src> {
                     }
                 }
             }
+            next_escape = memchr::memchr(b'\\', &bytes[self.cursor..]);
         }
         value.extend_from_slice(&bytes[self.cursor..]);
 
