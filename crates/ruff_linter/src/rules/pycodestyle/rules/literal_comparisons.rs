@@ -1,5 +1,5 @@
 use ruff_python_ast::token::{Tokens, parenthesized_range};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{self, generate_comparison};
@@ -9,12 +9,22 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::{Category, Rule};
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum EqCmpOp {
     Eq,
     NotEq,
+}
+
+/// The kind of singleton involved in a flagged comparison.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BadComparison {
+    /// A comparison to `None` (E711), which can always be rewritten to `is`/`is not`.
+    None,
+    /// A comparison to `True` or `False` (E712), which must never be rewritten to
+    /// `is`/`is not` (see <https://github.com/astral-sh/ruff/issues/4560>).
+    Boolean,
 }
 
 impl EqCmpOp {
@@ -114,9 +124,15 @@ impl AlwaysFixableViolation for NoneComparison {
 /// ## Fix safety
 ///
 /// This rule's fix is marked as unsafe, as it may alter runtime behavior when
-/// used with libraries that override the `==`/`__eq__` or `!=`/`__ne__` operators.
-/// In these cases, `is`/`is not` may not be equivalent to `==`/`!=`. For more
+/// used with libraries that override the `==`/`__eq__` or `!=`/`__ne__` operators
+/// (e.g., NumPy arrays, pandas objects, or SQLAlchemy columns), for which an
+/// equality comparison is not equivalent to a truthiness check. For more
 /// information, see [this issue].
+///
+/// This rule never rewrites a comparison to `True`/`False` into an `is`/`is not`
+/// comparison, as that changes the meaning of the comparison for such types. As a
+/// result, chained comparisons (e.g., `x == True != False`) are reported, but no
+/// fix is offered for them.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 /// [this issue]: https://github.com/astral-sh/ruff/issues/4560
@@ -128,7 +144,9 @@ pub(crate) struct TrueFalseComparison {
     cond: Option<SourceCodeSnippet>,
 }
 
-impl AlwaysFixableViolation for TrueFalseComparison {
+impl Violation for TrueFalseComparison {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let TrueFalseComparison { value, op, cond } = self;
@@ -154,17 +172,17 @@ impl AlwaysFixableViolation for TrueFalseComparison {
         }
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let TrueFalseComparison { value, op, cond } = self;
-        let Some(cond) = cond.as_ref().and_then(|cond| cond.full_display()) else {
-            return "Replace comparison".to_string();
-        };
-        match (value, op) {
+        // Chained comparisons (e.g., `x == True != False`) have no `cond` and are
+        // not fixable: they must not be rewritten to `is`/`is not`.
+        let cond = cond.as_ref().and_then(|cond| cond.full_display())?;
+        Some(match (value, op) {
             (true, EqCmpOp::Eq) => format!("Replace with `{cond}`"),
             (true, EqCmpOp::NotEq) => format!("Replace with `not {cond}`"),
             (false, EqCmpOp::Eq) => format!("Replace with `not {cond}`"),
             (false, EqCmpOp::NotEq) => format!("Replace with `{cond}`"),
-        }
+        })
     }
 }
 
@@ -210,6 +228,9 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     // then replace the entire expression at the end with one "real" fix, to
     // avoid conflicts.
     let mut bad_ops: FxHashMap<usize, CmpOp> = FxHashMap::default();
+    // The indices of operators that compare against `True`/`False` (E712). These
+    // must never be rewritten to `is`/`is not`.
+    let mut boolean_ops: FxHashSet<usize> = FxHashSet::default();
     let mut diagnostics = vec![];
 
     // Check `left`.
@@ -227,13 +248,13 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                         let diagnostic =
                             checker.report_diagnostic(NoneComparison(op), comparator.range());
                         bad_ops.insert(0, CmpOp::Is);
-                        diagnostics.push(diagnostic);
+                        diagnostics.push((BadComparison::None, diagnostic));
                     }
                     EqCmpOp::NotEq => {
                         let diagnostic =
                             checker.report_diagnostic(NoneComparison(op), comparator.range());
                         bad_ops.insert(0, CmpOp::IsNot);
-                        diagnostics.push(diagnostic);
+                        diagnostics.push((BadComparison::None, diagnostic));
                     }
                 }
             }
@@ -256,7 +277,8 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                 compare.range(),
                             );
                             bad_ops.insert(0, CmpOp::Is);
-                            diagnostics.push(diagnostic);
+                            boolean_ops.insert(0);
+                            diagnostics.push((BadComparison::Boolean, diagnostic));
                         }
                         EqCmpOp::NotEq => {
                             let cond = if compare.ops.len() == 1 {
@@ -273,7 +295,8 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                 compare.range(),
                             );
                             bad_ops.insert(0, CmpOp::IsNot);
-                            diagnostics.push(diagnostic);
+                            boolean_ops.insert(0);
+                            diagnostics.push((BadComparison::Boolean, diagnostic));
                         }
                     }
                 }
@@ -295,13 +318,13 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                         let diagnostic =
                             checker.report_diagnostic(NoneComparison(op), next.range());
                         bad_ops.insert(index, CmpOp::Is);
-                        diagnostics.push(diagnostic);
+                        diagnostics.push((BadComparison::None, diagnostic));
                     }
                     EqCmpOp::NotEq => {
                         let diagnostic =
                             checker.report_diagnostic(NoneComparison(op), next.range());
                         bad_ops.insert(index, CmpOp::IsNot);
-                        diagnostics.push(diagnostic);
+                        diagnostics.push((BadComparison::None, diagnostic));
                     }
                 }
             }
@@ -336,7 +359,8 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                 compare.range(),
                             );
                             bad_ops.insert(index, CmpOp::Is);
-                            diagnostics.push(diagnostic);
+                            boolean_ops.insert(index);
+                            diagnostics.push((BadComparison::Boolean, diagnostic));
                         }
                         EqCmpOp::NotEq => {
                             let cond = if compare.ops.len() == 1 {
@@ -355,7 +379,8 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                 compare.range(),
                             );
                             bad_ops.insert(index, CmpOp::IsNot);
-                            diagnostics.push(diagnostic);
+                            boolean_ops.insert(index);
+                            diagnostics.push((BadComparison::Boolean, diagnostic));
                         }
                     }
                 }
@@ -368,39 +393,70 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     // TODO(charlie): Respect `noqa` directives. If one of the operators has a
     // `noqa`, but another doesn't, both will be removed here.
     if !bad_ops.is_empty() {
-        let ops = compare
-            .ops
-            .iter()
-            .enumerate()
-            .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
-            .copied()
-            .collect::<Vec<_>>();
-
         let tokens = checker.tokens();
         let source = checker.source();
 
-        let content = match (&*compare.ops, comparators) {
-            ([op], [comparator]) => {
-                if let Some(kind) = is_redundant_boolean_comparison(*op, left) {
-                    let needs_wrap = left.range().start() != compare.range().start();
-                    generate_redundant_comparison(
-                        compare, tokens, source, comparator, kind, needs_wrap,
-                    )
-                } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
-                    let needs_wrap = comparator.range().end() != compare.range().end();
-                    generate_redundant_comparison(compare, tokens, source, left, kind, needs_wrap)
-                } else {
-                    generate_comparison(left, &ops, comparators, compare.into(), tokens, source)
+        if let ([op], [comparator]) = (&*compare.ops, comparators) {
+            // A single comparison: replace the entire expression with one fix.
+            let ops = compare
+                .ops
+                .iter()
+                .enumerate()
+                .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
+                .copied()
+                .collect::<Vec<_>>();
+
+            let content = if let Some(kind) = is_redundant_boolean_comparison(*op, left) {
+                let needs_wrap = left.range().start() != compare.range().start();
+                generate_redundant_comparison(compare, tokens, source, comparator, kind, needs_wrap)
+            } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
+                let needs_wrap = comparator.range().end() != compare.range().end();
+                generate_redundant_comparison(compare, tokens, source, left, kind, needs_wrap)
+            } else {
+                generate_comparison(left, &ops, comparators, compare.into(), tokens, source)
+            };
+
+            for (_, diagnostic) in &mut diagnostics {
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    content.clone(),
+                    compare.range(),
+                )));
+            }
+        } else {
+            // A chained comparison (e.g., `x == True != False`). Comparisons to
+            // `True`/`False` (E712) must not be rewritten to `is`/`is not`, as that
+            // changes the meaning of the comparison for types that overload `__eq__`
+            // (e.g., NumPy arrays, pandas objects, or SQLAlchemy columns; see
+            // https://github.com/astral-sh/ruff/issues/4560), and a chained comparison
+            // cannot be rewritten as a truthiness check. Only comparisons to `None`
+            // (E711) are fixed, by rewriting just those operators to `is`/`is not`.
+            let none_ops = compare
+                .ops
+                .iter()
+                .enumerate()
+                .map(|(idx, op)| match bad_ops.get(&idx) {
+                    Some(replacement) if !boolean_ops.contains(&idx) => replacement,
+                    _ => op,
+                })
+                .copied()
+                .collect::<Vec<_>>();
+
+            for (kind, diagnostic) in &mut diagnostics {
+                if *kind == BadComparison::None {
+                    let content = generate_comparison(
+                        left,
+                        &none_ops,
+                        comparators,
+                        compare.into(),
+                        tokens,
+                        source,
+                    );
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                        content,
+                        compare.range(),
+                    )));
                 }
             }
-            _ => generate_comparison(left, &ops, comparators, compare.into(), tokens, source),
-        };
-
-        for diagnostic in &mut diagnostics {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                content.clone(),
-                compare.range(),
-            )));
         }
     }
 }

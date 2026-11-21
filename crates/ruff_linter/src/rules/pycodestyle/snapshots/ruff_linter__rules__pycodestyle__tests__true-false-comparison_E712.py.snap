@@ -170,7 +170,7 @@ help: Replace with `TrueElement`
    |
 note: This is an unsafe fix and may change runtime behavior
 
-E712 [*] Avoid equality comparisons to `True` or `False`
+E712 Avoid equality comparisons to `True` or `False`
   --> E712.py:25:4
    |
 23 |     pass
@@ -179,16 +179,8 @@ E712 [*] Avoid equality comparisons to `True` or `False`
    |    ^^^^^^^^^^^^^^^^^^^^
 26 |     pass
    |
-help: Replace comparison
-   |
-24 |
-   - if res == True != False:
-25 + if res is True is not False:
-26 |     pass
-   |
-note: This is an unsafe fix and may change runtime behavior
 
-E712 [*] Avoid equality comparisons to `True` or `False`
+E712 Avoid equality comparisons to `True` or `False`
   --> E712.py:25:4
    |
 23 |     pass
@@ -197,14 +189,6 @@ E712 [*] Avoid equality comparisons to `True` or `False`
    |    ^^^^^^^^^^^^^^^^^^^^
 26 |     pass
    |
-help: Replace comparison
-   |
-24 |
-   - if res == True != False:
-25 + if res is True is not False:
-26 |     pass
-   |
-note: This is an unsafe fix and may change runtime behavior
 
 E712 [*] Avoid equality comparisons to `True`; use `TrueElement:` for truth checks
   --> E712.py:28:3
@@ -258,3 +242,75 @@ help: Replace with `True`
 59 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
+
+E712 Avoid equality comparisons to `True` or `False`
+  --> E712.py:66:4
+   |
+64 | # `x == True` is not equivalent to `x is True`, so no fix is offered.
+65 | #: E712 (no fix)
+66 | if arr == True != False:
+   |    ^^^^^^^^^^^^^^^^^^^^
+67 |     pass
+   |
+
+E712 Avoid equality comparisons to `True` or `False`
+  --> E712.py:66:4
+   |
+64 | # `x == True` is not equivalent to `x is True`, so no fix is offered.
+65 | #: E712 (no fix)
+66 | if arr == True != False:
+   |    ^^^^^^^^^^^^^^^^^^^^
+67 |     pass
+   |
+
+E712 Avoid equality comparisons to `True` or `False`
+  --> E712.py:70:4
+   |
+69 | #: E712 (no fix)
+70 | if arr != True == False:
+   |    ^^^^^^^^^^^^^^^^^^^^
+71 |     pass
+   |
+
+E712 Avoid equality comparisons to `True` or `False`
+  --> E712.py:70:4
+   |
+69 | #: E712 (no fix)
+70 | if arr != True == False:
+   |    ^^^^^^^^^^^^^^^^^^^^
+71 |     pass
+   |
+
+E712 Avoid equality comparisons to `True` or `False`
+  --> E712.py:74:4
+   |
+73 | #: E712 (no fix)
+74 | if True == arr != False:
+   |    ^^^^^^^^^^^^^^^^^^^^
+75 |     pass
+   |
+
+E712 Avoid equality comparisons to `True` or `False`
+  --> E712.py:74:4
+   |
+73 | #: E712 (no fix)
+74 | if True == arr != False:
+   |    ^^^^^^^^^^^^^^^^^^^^
+75 |     pass
+   |
+
+E712 Avoid equality comparisons to `True` or `False`
+  --> E712.py:78:4
+   |
+77 | #: E712 (no fix)
+78 | if arr == True < 10:
+   |    ^^^^^^^^^^^^^^^^
+79 |     pass
+   |
+
+E712 Avoid equality comparisons to `True` or `False`
+  --> E712.py:82:10
+   |
+81 | #: E712 (no fix)
+82 | result = arr == True != other
+   |          ^^^^^^^^^^^^^^^^^^^^
