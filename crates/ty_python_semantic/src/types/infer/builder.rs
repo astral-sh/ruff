@@ -7663,28 +7663,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
-        if let TupleInferenceMode::FixedElements = mode
+        let inferred = if let TupleInferenceMode::FixedElements = mode
             && let Some(spec) = candidate.exact_tuple_instance_spec(db)
             && let Tuple::Fixed(expected) = spec.as_ref()
         {
             if expected.len() != tuple.elts.len() {
                 return None;
             }
+            let mut trivial = true;
             let mut elements = Vec::with_capacity(expected.len());
-            for (elt, expected_ty) in tuple.elts.iter().zip(expected.iter_all_elements()) {
+            for (index, (elt, expected_ty)) in tuple
+                .elts
+                .iter()
+                .zip(expected.iter_all_elements())
+                .enumerate()
+            {
                 let ty = self.infer_expression(elt, tcx.with_expected_type(Some(expected_ty)));
-                if !ty.is_assignable_to(db, env, expected_ty) {
+                elements.push(ty);
+                if trivial && ty.is_trivially_assignable_to(db, expected_ty) {
+                    continue;
+                }
+                trivial = false;
+                // The whole-tuple check below already checks the last element.
+                if index + 1 < expected.len() && !ty.is_assignable_to(db, env, expected_ty) {
                     return None;
                 }
-                elements.push(ty);
             }
-            // Fixed-length tuples are assignable position by position. Checking the tuple
-            // again would create a separate query for every distinct combination of literals.
-            return Some(Type::heterogeneous_tuple(db, env, elements));
-        }
-
-        let inferred =
-            self.infer_tuple_expression_impl(tuple, tcx.with_expected_type(Some(candidate)));
+            let inferred = Type::heterogeneous_tuple(db, env, elements);
+            // Avoid a query per distinct tuple of literals. Nontrivial relations
+            // can share recursion state across positions in the whole-tuple check.
+            if trivial {
+                return Some(inferred);
+            }
+            inferred
+        } else {
+            self.infer_tuple_expression_impl(tuple, tcx.with_expected_type(Some(candidate)))
+        };
         inferred
             .is_assignable_to(db, env, candidate)
             .then_some(inferred)
