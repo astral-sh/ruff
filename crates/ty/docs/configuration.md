@@ -1247,8 +1247,9 @@ to re-include `dist` use `exclude = ["!dist"]`
 
 ### `exclude-scripts`
 
-Whether to exclude files containing PEP 723 inline script metadata unless they are
-explicitly passed on the command line.
+Whether to exclude files containing PEP 723 inline script metadata.
+
+ty checks scripts passed explicitly on the command line unless you use `--force-exclude`.
 
 **Default value**: `false`
 

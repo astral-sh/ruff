@@ -143,14 +143,24 @@ impl IncludeResult {
     pub fn is_included(self) -> bool {
         matches!(self, Self::Included { .. })
     }
+}
 
+pub(crate) struct FileMatch {
+    pub(crate) inclusion: IncludeResult,
+    pub(crate) is_explicit: bool,
+}
+
+impl FileMatch {
     /// Returns `true` if an included file should be indexed.
-    pub(crate) fn should_index_file(self, system: &dyn System, path: &SystemPath) -> bool {
-        let Self::Included { literal_match } = self else {
+    pub(crate) fn should_index_file(&self, system: &dyn System, path: &SystemPath) -> bool {
+        let IncludeResult::Included { literal_match } = self.inclusion else {
             return false;
         };
 
-        literal_match == Some(true)
+        // A file named on the CLI or matched by a literal `src.include` pattern can contain
+        // Python even without a recognized extension.
+        self.is_explicit
+            || literal_match == Some(true)
             || path
                 .extension()
                 .and_then(PySourceType::try_from_extension)

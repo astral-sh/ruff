@@ -1142,8 +1142,9 @@ pub struct SrcOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
 
-    /// Whether to exclude files containing PEP 723 inline script metadata unless they are
-    /// explicitly passed on the command line.
+    /// Whether to exclude files containing PEP 723 inline script metadata.
+    ///
+    /// ty checks scripts passed explicitly on the command line unless you use `--force-exclude`.
     #[option(
         default = r#"false"#,
         value_type = r#"bool"#,

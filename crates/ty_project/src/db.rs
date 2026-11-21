@@ -1030,6 +1030,33 @@ mod tests {
     }
 
     #[test]
+    fn force_exclude_tracks_edits_to_explicit_extensionless_scripts() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let fs = system.memory_file_system().clone();
+        let root = SystemPathBuf::from("/project");
+        let path = root.join("script");
+        fs.write_file_all(root.join("ty.toml"), "[src]\nexclude-scripts = true\n")?;
+        fs.write_file_all(&path, "")?;
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        let project = db.project();
+        project.set_included_paths(&mut db, vec![path.clone()]);
+        project.set_force_exclude(&mut db, true);
+        let file = system_path_to_file(&db, &path)?;
+        assert!(project.files(&db).contains(file));
+
+        fs.write_file_all(&path, "# /// script\n# dependencies = []\n# ///\n")?;
+        db.apply_changes(&[ChangeEvent::file_content_changed(path.clone())]);
+        assert!(!project.files(&db).contains(file));
+
+        fs.write_file_all(&path, "")?;
+        db.apply_changes(&[ChangeEvent::file_content_changed(path)]);
+        assert!(project.files(&db).contains(file));
+
+        Ok(())
+    }
+
+    #[test]
     fn changed_script_metadata_updates_import_resolution() -> anyhow::Result<()> {
         let system = TestSystem::default();
         let fs = system.memory_file_system().clone();
