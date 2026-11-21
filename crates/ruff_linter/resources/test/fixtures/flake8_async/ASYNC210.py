@@ -1,6 +1,7 @@
 import urllib
 import requests
 import httpx
+import httpx2
 import urllib3
 
 
@@ -17,11 +18,19 @@ async def foo():
 
 
 async def foo():
+    httpx2.get()  # ASYNC210
+
+
+async def foo():
     requests.post()  # ASYNC210
 
 
 async def foo():
     httpx.post()  # ASYNC210
+
+
+async def foo():
+    httpx2.post()  # ASYNC210
 
 
 async def foo():
@@ -47,6 +56,14 @@ async def foo():
     httpx.delete("")  # ASYNC210
     httpx.foo()  # Ok
 
+    httpx2.options("")  # ASYNC210
+    httpx2.head("")  # ASYNC210
+    httpx2.post("")  # ASYNC210
+    httpx2.put("")  # ASYNC210
+    httpx2.patch("")  # ASYNC210
+    httpx2.delete("")  # ASYNC210
+    httpx2.foo()  # Ok
+
     urllib3.request()  # ASYNC210
     urllib3.request(...)  # ASYNC210
 
@@ -57,7 +74,6 @@ async def foo():
 
 
 async def bar():
-
     def request():
         pass
 

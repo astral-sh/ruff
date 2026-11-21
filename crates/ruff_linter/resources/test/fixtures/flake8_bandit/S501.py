@@ -1,4 +1,5 @@
 import httpx
+import httpx2
 import requests
 
 requests.get('https://gmail.com', timeout=30, verify=True)
@@ -40,3 +41,26 @@ httpx.Client()
 httpx.Client(verify=False)
 httpx.AsyncClient()
 httpx.AsyncClient(verify=False)
+
+httpx2.request('GET', 'https://gmail.com', verify=True)
+httpx2.request('GET', 'https://gmail.com', verify=False)
+httpx2.get('https://gmail.com', verify=True)
+httpx2.get('https://gmail.com', verify=False)
+httpx2.options('https://gmail.com', verify=True)
+httpx2.options('https://gmail.com', verify=False)
+httpx2.head('https://gmail.com', verify=True)
+httpx2.head('https://gmail.com', verify=False)
+httpx2.post('https://gmail.com', verify=True)
+httpx2.post('https://gmail.com', verify=False)
+httpx2.put('https://gmail.com', verify=True)
+httpx2.put('https://gmail.com', verify=False)
+httpx2.patch('https://gmail.com', verify=True)
+httpx2.patch('https://gmail.com', verify=False)
+httpx2.delete('https://gmail.com', verify=True)
+httpx2.delete('https://gmail.com', verify=False)
+httpx2.stream('https://gmail.com', verify=True)
+httpx2.stream('https://gmail.com', verify=False)
+httpx2.Client()
+httpx2.Client(verify=False)
+httpx2.AsyncClient()
+httpx2.AsyncClient(verify=False)

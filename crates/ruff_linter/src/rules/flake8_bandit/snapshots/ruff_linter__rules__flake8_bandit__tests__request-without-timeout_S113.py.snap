@@ -2,260 +2,367 @@
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
 S113 Probable use of `requests` call without timeout
-  --> S113.py:46:1
+  --> S113.py:81:1
    |
-45 | # Errors
-46 | requests.get('https://gmail.com')
+80 | # Errors
+81 | requests.get('https://gmail.com')
    | ^^^^^^^^^^^^
-47 | requests.get('https://gmail.com', timeout=None)
-48 | requests.post('https://gmail.com')
+82 | requests.get('https://gmail.com', timeout=None)
+83 | requests.post('https://gmail.com')
    |
 
 S113 Probable use of `requests` call with timeout set to `None`
-  --> S113.py:47:35
+  --> S113.py:82:35
    |
-45 | # Errors
-46 | requests.get('https://gmail.com')
-47 | requests.get('https://gmail.com', timeout=None)
+80 | # Errors
+81 | requests.get('https://gmail.com')
+82 | requests.get('https://gmail.com', timeout=None)
    |                                   ^^^^^^^^^^^^
-48 | requests.post('https://gmail.com')
-49 | requests.post('https://gmail.com', timeout=None)
+83 | requests.post('https://gmail.com')
+84 | requests.post('https://gmail.com', timeout=None)
    |
 
 S113 Probable use of `requests` call without timeout
-  --> S113.py:48:1
+  --> S113.py:83:1
    |
-46 | requests.get('https://gmail.com')
-47 | requests.get('https://gmail.com', timeout=None)
-48 | requests.post('https://gmail.com')
+81 | requests.get('https://gmail.com')
+82 | requests.get('https://gmail.com', timeout=None)
+83 | requests.post('https://gmail.com')
    | ^^^^^^^^^^^^^
-49 | requests.post('https://gmail.com', timeout=None)
-50 | requests.put('https://gmail.com')
+84 | requests.post('https://gmail.com', timeout=None)
+85 | requests.put('https://gmail.com')
    |
 
 S113 Probable use of `requests` call with timeout set to `None`
-  --> S113.py:49:36
+  --> S113.py:84:36
    |
-47 | requests.get('https://gmail.com', timeout=None)
-48 | requests.post('https://gmail.com')
-49 | requests.post('https://gmail.com', timeout=None)
+82 | requests.get('https://gmail.com', timeout=None)
+83 | requests.post('https://gmail.com')
+84 | requests.post('https://gmail.com', timeout=None)
    |                                    ^^^^^^^^^^^^
-50 | requests.put('https://gmail.com')
-51 | requests.put('https://gmail.com', timeout=None)
+85 | requests.put('https://gmail.com')
+86 | requests.put('https://gmail.com', timeout=None)
    |
 
 S113 Probable use of `requests` call without timeout
-  --> S113.py:50:1
+  --> S113.py:85:1
    |
-48 | requests.post('https://gmail.com')
-49 | requests.post('https://gmail.com', timeout=None)
-50 | requests.put('https://gmail.com')
+83 | requests.post('https://gmail.com')
+84 | requests.post('https://gmail.com', timeout=None)
+85 | requests.put('https://gmail.com')
    | ^^^^^^^^^^^^
-51 | requests.put('https://gmail.com', timeout=None)
-52 | requests.delete('https://gmail.com')
+86 | requests.put('https://gmail.com', timeout=None)
+87 | requests.delete('https://gmail.com')
    |
 
 S113 Probable use of `requests` call with timeout set to `None`
-  --> S113.py:51:35
+  --> S113.py:86:35
    |
-49 | requests.post('https://gmail.com', timeout=None)
-50 | requests.put('https://gmail.com')
-51 | requests.put('https://gmail.com', timeout=None)
+84 | requests.post('https://gmail.com', timeout=None)
+85 | requests.put('https://gmail.com')
+86 | requests.put('https://gmail.com', timeout=None)
    |                                   ^^^^^^^^^^^^
-52 | requests.delete('https://gmail.com')
-53 | requests.delete('https://gmail.com', timeout=None)
+87 | requests.delete('https://gmail.com')
+88 | requests.delete('https://gmail.com', timeout=None)
    |
 
 S113 Probable use of `requests` call without timeout
-  --> S113.py:52:1
+  --> S113.py:87:1
    |
-50 | requests.put('https://gmail.com')
-51 | requests.put('https://gmail.com', timeout=None)
-52 | requests.delete('https://gmail.com')
+85 | requests.put('https://gmail.com')
+86 | requests.put('https://gmail.com', timeout=None)
+87 | requests.delete('https://gmail.com')
    | ^^^^^^^^^^^^^^^
-53 | requests.delete('https://gmail.com', timeout=None)
-54 | requests.patch('https://gmail.com')
+88 | requests.delete('https://gmail.com', timeout=None)
+89 | requests.patch('https://gmail.com')
    |
 
 S113 Probable use of `requests` call with timeout set to `None`
-  --> S113.py:53:38
+  --> S113.py:88:38
    |
-51 | requests.put('https://gmail.com', timeout=None)
-52 | requests.delete('https://gmail.com')
-53 | requests.delete('https://gmail.com', timeout=None)
+86 | requests.put('https://gmail.com', timeout=None)
+87 | requests.delete('https://gmail.com')
+88 | requests.delete('https://gmail.com', timeout=None)
    |                                      ^^^^^^^^^^^^
-54 | requests.patch('https://gmail.com')
-55 | requests.patch('https://gmail.com', timeout=None)
+89 | requests.patch('https://gmail.com')
+90 | requests.patch('https://gmail.com', timeout=None)
    |
 
 S113 Probable use of `requests` call without timeout
-  --> S113.py:54:1
+  --> S113.py:89:1
    |
-52 | requests.delete('https://gmail.com')
-53 | requests.delete('https://gmail.com', timeout=None)
-54 | requests.patch('https://gmail.com')
+87 | requests.delete('https://gmail.com')
+88 | requests.delete('https://gmail.com', timeout=None)
+89 | requests.patch('https://gmail.com')
    | ^^^^^^^^^^^^^^
-55 | requests.patch('https://gmail.com', timeout=None)
-56 | requests.options('https://gmail.com')
+90 | requests.patch('https://gmail.com', timeout=None)
+91 | requests.options('https://gmail.com')
    |
 
 S113 Probable use of `requests` call with timeout set to `None`
-  --> S113.py:55:37
+  --> S113.py:90:37
    |
-53 | requests.delete('https://gmail.com', timeout=None)
-54 | requests.patch('https://gmail.com')
-55 | requests.patch('https://gmail.com', timeout=None)
+88 | requests.delete('https://gmail.com', timeout=None)
+89 | requests.patch('https://gmail.com')
+90 | requests.patch('https://gmail.com', timeout=None)
    |                                     ^^^^^^^^^^^^
-56 | requests.options('https://gmail.com')
-57 | requests.options('https://gmail.com', timeout=None)
+91 | requests.options('https://gmail.com')
+92 | requests.options('https://gmail.com', timeout=None)
    |
 
 S113 Probable use of `requests` call without timeout
-  --> S113.py:56:1
+  --> S113.py:91:1
    |
-54 | requests.patch('https://gmail.com')
-55 | requests.patch('https://gmail.com', timeout=None)
-56 | requests.options('https://gmail.com')
+89 | requests.patch('https://gmail.com')
+90 | requests.patch('https://gmail.com', timeout=None)
+91 | requests.options('https://gmail.com')
    | ^^^^^^^^^^^^^^^^
-57 | requests.options('https://gmail.com', timeout=None)
-58 | requests.head('https://gmail.com')
+92 | requests.options('https://gmail.com', timeout=None)
+93 | requests.head('https://gmail.com')
    |
 
 S113 Probable use of `requests` call with timeout set to `None`
-  --> S113.py:57:39
+  --> S113.py:92:39
    |
-55 | requests.patch('https://gmail.com', timeout=None)
-56 | requests.options('https://gmail.com')
-57 | requests.options('https://gmail.com', timeout=None)
+90 | requests.patch('https://gmail.com', timeout=None)
+91 | requests.options('https://gmail.com')
+92 | requests.options('https://gmail.com', timeout=None)
    |                                       ^^^^^^^^^^^^
-58 | requests.head('https://gmail.com')
-59 | requests.head('https://gmail.com', timeout=None)
+93 | requests.head('https://gmail.com')
+94 | requests.head('https://gmail.com', timeout=None)
    |
 
 S113 Probable use of `requests` call without timeout
-  --> S113.py:58:1
+  --> S113.py:93:1
    |
-56 | requests.options('https://gmail.com')
-57 | requests.options('https://gmail.com', timeout=None)
-58 | requests.head('https://gmail.com')
+91 | requests.options('https://gmail.com')
+92 | requests.options('https://gmail.com', timeout=None)
+93 | requests.head('https://gmail.com')
    | ^^^^^^^^^^^^^
-59 | requests.head('https://gmail.com', timeout=None)
+94 | requests.head('https://gmail.com', timeout=None)
    |
 
 S113 Probable use of `requests` call with timeout set to `None`
-  --> S113.py:59:36
+  --> S113.py:94:36
    |
-57 | requests.options('https://gmail.com', timeout=None)
-58 | requests.head('https://gmail.com')
-59 | requests.head('https://gmail.com', timeout=None)
+92 | requests.options('https://gmail.com', timeout=None)
+93 | requests.head('https://gmail.com')
+94 | requests.head('https://gmail.com', timeout=None)
    |                                    ^^^^^^^^^^^^
-60 |
-61 | httpx.get('https://gmail.com', timeout=None)
+95 |
+96 | httpx.get('https://gmail.com', timeout=None)
    |
 
 S113 Probable use of `httpx` call with timeout set to `None`
-  --> S113.py:61:32
+  --> S113.py:96:32
    |
-59 | requests.head('https://gmail.com', timeout=None)
-60 |
-61 | httpx.get('https://gmail.com', timeout=None)
+94 | requests.head('https://gmail.com', timeout=None)
+95 |
+96 | httpx.get('https://gmail.com', timeout=None)
    |                                ^^^^^^^^^^^^
-62 | httpx.post('https://gmail.com', timeout=None)
-63 | httpx.put('https://gmail.com', timeout=None)
+97 | httpx.post('https://gmail.com', timeout=None)
+98 | httpx.put('https://gmail.com', timeout=None)
    |
 
 S113 Probable use of `httpx` call with timeout set to `None`
-  --> S113.py:62:33
+  --> S113.py:97:33
    |
-61 | httpx.get('https://gmail.com', timeout=None)
-62 | httpx.post('https://gmail.com', timeout=None)
+96 | httpx.get('https://gmail.com', timeout=None)
+97 | httpx.post('https://gmail.com', timeout=None)
    |                                 ^^^^^^^^^^^^
-63 | httpx.put('https://gmail.com', timeout=None)
-64 | httpx.delete('https://gmail.com', timeout=None)
+98 | httpx.put('https://gmail.com', timeout=None)
+99 | httpx.delete('https://gmail.com', timeout=None)
    |
 
 S113 Probable use of `httpx` call with timeout set to `None`
-  --> S113.py:63:32
-   |
-61 | httpx.get('https://gmail.com', timeout=None)
-62 | httpx.post('https://gmail.com', timeout=None)
-63 | httpx.put('https://gmail.com', timeout=None)
-   |                                ^^^^^^^^^^^^
-64 | httpx.delete('https://gmail.com', timeout=None)
-65 | httpx.patch('https://gmail.com', timeout=None)
-   |
+   --> S113.py:98:32
+    |
+ 96 | httpx.get('https://gmail.com', timeout=None)
+ 97 | httpx.post('https://gmail.com', timeout=None)
+ 98 | httpx.put('https://gmail.com', timeout=None)
+    |                                ^^^^^^^^^^^^
+ 99 | httpx.delete('https://gmail.com', timeout=None)
+100 | httpx.patch('https://gmail.com', timeout=None)
+    |
 
 S113 Probable use of `httpx` call with timeout set to `None`
-  --> S113.py:64:35
-   |
-62 | httpx.post('https://gmail.com', timeout=None)
-63 | httpx.put('https://gmail.com', timeout=None)
-64 | httpx.delete('https://gmail.com', timeout=None)
-   |                                   ^^^^^^^^^^^^
-65 | httpx.patch('https://gmail.com', timeout=None)
-66 | httpx.options('https://gmail.com', timeout=None)
-   |
+   --> S113.py:99:35
+    |
+ 97 | httpx.post('https://gmail.com', timeout=None)
+ 98 | httpx.put('https://gmail.com', timeout=None)
+ 99 | httpx.delete('https://gmail.com', timeout=None)
+    |                                   ^^^^^^^^^^^^
+100 | httpx.patch('https://gmail.com', timeout=None)
+101 | httpx.options('https://gmail.com', timeout=None)
+    |
 
 S113 Probable use of `httpx` call with timeout set to `None`
-  --> S113.py:65:34
-   |
-63 | httpx.put('https://gmail.com', timeout=None)
-64 | httpx.delete('https://gmail.com', timeout=None)
-65 | httpx.patch('https://gmail.com', timeout=None)
-   |                                  ^^^^^^^^^^^^
-66 | httpx.options('https://gmail.com', timeout=None)
-67 | httpx.head('https://gmail.com', timeout=None)
-   |
+   --> S113.py:100:34
+    |
+ 98 | httpx.put('https://gmail.com', timeout=None)
+ 99 | httpx.delete('https://gmail.com', timeout=None)
+100 | httpx.patch('https://gmail.com', timeout=None)
+    |                                  ^^^^^^^^^^^^
+101 | httpx.options('https://gmail.com', timeout=None)
+102 | httpx.head('https://gmail.com', timeout=None)
+    |
 
 S113 Probable use of `httpx` call with timeout set to `None`
-  --> S113.py:66:36
-   |
-64 | httpx.delete('https://gmail.com', timeout=None)
-65 | httpx.patch('https://gmail.com', timeout=None)
-66 | httpx.options('https://gmail.com', timeout=None)
-   |                                    ^^^^^^^^^^^^
-67 | httpx.head('https://gmail.com', timeout=None)
-68 | httpx.Client(timeout=None)
-   |
+   --> S113.py:101:36
+    |
+ 99 | httpx.delete('https://gmail.com', timeout=None)
+100 | httpx.patch('https://gmail.com', timeout=None)
+101 | httpx.options('https://gmail.com', timeout=None)
+    |                                    ^^^^^^^^^^^^
+102 | httpx.head('https://gmail.com', timeout=None)
+103 | httpx.Client(timeout=None)
+    |
 
 S113 Probable use of `httpx` call with timeout set to `None`
-  --> S113.py:67:33
-   |
-65 | httpx.patch('https://gmail.com', timeout=None)
-66 | httpx.options('https://gmail.com', timeout=None)
-67 | httpx.head('https://gmail.com', timeout=None)
-   |                                 ^^^^^^^^^^^^
-68 | httpx.Client(timeout=None)
-69 | httpx.AsyncClient(timeout=None)
-   |
+   --> S113.py:102:33
+    |
+100 | httpx.patch('https://gmail.com', timeout=None)
+101 | httpx.options('https://gmail.com', timeout=None)
+102 | httpx.head('https://gmail.com', timeout=None)
+    |                                 ^^^^^^^^^^^^
+103 | httpx.Client(timeout=None)
+104 | httpx.AsyncClient(timeout=None)
+    |
 
 S113 Probable use of `httpx` call with timeout set to `None`
-  --> S113.py:68:14
-   |
-66 | httpx.options('https://gmail.com', timeout=None)
-67 | httpx.head('https://gmail.com', timeout=None)
-68 | httpx.Client(timeout=None)
-   |              ^^^^^^^^^^^^
-69 | httpx.AsyncClient(timeout=None)
-   |
+   --> S113.py:103:14
+    |
+101 | httpx.options('https://gmail.com', timeout=None)
+102 | httpx.head('https://gmail.com', timeout=None)
+103 | httpx.Client(timeout=None)
+    |              ^^^^^^^^^^^^
+104 | httpx.AsyncClient(timeout=None)
+    |
 
 S113 Probable use of `httpx` call with timeout set to `None`
-  --> S113.py:69:19
-   |
-67 | httpx.head('https://gmail.com', timeout=None)
-68 | httpx.Client(timeout=None)
-69 | httpx.AsyncClient(timeout=None)
-   |                   ^^^^^^^^^^^^
-70 |
-71 | with httpx.Client(timeout=None) as client:
-   |
+   --> S113.py:104:19
+    |
+102 | httpx.head('https://gmail.com', timeout=None)
+103 | httpx.Client(timeout=None)
+104 | httpx.AsyncClient(timeout=None)
+    |                   ^^^^^^^^^^^^
+105 |
+106 | with httpx.Client(timeout=None) as client:
+    |
 
 S113 Probable use of `httpx` call with timeout set to `None`
-  --> S113.py:71:19
-   |
-69 | httpx.AsyncClient(timeout=None)
-70 |
-71 | with httpx.Client(timeout=None) as client:
-   |                   ^^^^^^^^^^^^
-72 |     client.get('https://gmail.com')
-   |
+   --> S113.py:106:19
+    |
+104 | httpx.AsyncClient(timeout=None)
+105 |
+106 | with httpx.Client(timeout=None) as client:
+    |                   ^^^^^^^^^^^^
+107 |     client.get('https://gmail.com')
+    |
+
+S113 Probable use of `httpx2` call with timeout set to `None`
+   --> S113.py:109:33
+    |
+107 |     client.get('https://gmail.com')
+108 |
+109 | httpx2.get('https://gmail.com', timeout=None)
+    |                                 ^^^^^^^^^^^^
+110 | httpx2.post('https://gmail.com', timeout=None)
+111 | httpx2.put('https://gmail.com', timeout=None)
+    |
+
+S113 Probable use of `httpx2` call with timeout set to `None`
+   --> S113.py:110:34
+    |
+109 | httpx2.get('https://gmail.com', timeout=None)
+110 | httpx2.post('https://gmail.com', timeout=None)
+    |                                  ^^^^^^^^^^^^
+111 | httpx2.put('https://gmail.com', timeout=None)
+112 | httpx2.delete('https://gmail.com', timeout=None)
+    |
+
+S113 Probable use of `httpx2` call with timeout set to `None`
+   --> S113.py:111:33
+    |
+109 | httpx2.get('https://gmail.com', timeout=None)
+110 | httpx2.post('https://gmail.com', timeout=None)
+111 | httpx2.put('https://gmail.com', timeout=None)
+    |                                 ^^^^^^^^^^^^
+112 | httpx2.delete('https://gmail.com', timeout=None)
+113 | httpx2.patch('https://gmail.com', timeout=None)
+    |
+
+S113 Probable use of `httpx2` call with timeout set to `None`
+   --> S113.py:112:36
+    |
+110 | httpx2.post('https://gmail.com', timeout=None)
+111 | httpx2.put('https://gmail.com', timeout=None)
+112 | httpx2.delete('https://gmail.com', timeout=None)
+    |                                    ^^^^^^^^^^^^
+113 | httpx2.patch('https://gmail.com', timeout=None)
+114 | httpx2.options('https://gmail.com', timeout=None)
+    |
+
+S113 Probable use of `httpx2` call with timeout set to `None`
+   --> S113.py:113:35
+    |
+111 | httpx2.put('https://gmail.com', timeout=None)
+112 | httpx2.delete('https://gmail.com', timeout=None)
+113 | httpx2.patch('https://gmail.com', timeout=None)
+    |                                   ^^^^^^^^^^^^
+114 | httpx2.options('https://gmail.com', timeout=None)
+115 | httpx2.head('https://gmail.com', timeout=None)
+    |
+
+S113 Probable use of `httpx2` call with timeout set to `None`
+   --> S113.py:114:37
+    |
+112 | httpx2.delete('https://gmail.com', timeout=None)
+113 | httpx2.patch('https://gmail.com', timeout=None)
+114 | httpx2.options('https://gmail.com', timeout=None)
+    |                                     ^^^^^^^^^^^^
+115 | httpx2.head('https://gmail.com', timeout=None)
+116 | httpx2.Client(timeout=None)
+    |
+
+S113 Probable use of `httpx2` call with timeout set to `None`
+   --> S113.py:115:34
+    |
+113 | httpx2.patch('https://gmail.com', timeout=None)
+114 | httpx2.options('https://gmail.com', timeout=None)
+115 | httpx2.head('https://gmail.com', timeout=None)
+    |                                  ^^^^^^^^^^^^
+116 | httpx2.Client(timeout=None)
+117 | httpx2.AsyncClient(timeout=None)
+    |
+
+S113 Probable use of `httpx2` call with timeout set to `None`
+   --> S113.py:116:15
+    |
+114 | httpx2.options('https://gmail.com', timeout=None)
+115 | httpx2.head('https://gmail.com', timeout=None)
+116 | httpx2.Client(timeout=None)
+    |               ^^^^^^^^^^^^
+117 | httpx2.AsyncClient(timeout=None)
+    |
+
+S113 Probable use of `httpx2` call with timeout set to `None`
+   --> S113.py:117:20
+    |
+115 | httpx2.head('https://gmail.com', timeout=None)
+116 | httpx2.Client(timeout=None)
+117 | httpx2.AsyncClient(timeout=None)
+    |                    ^^^^^^^^^^^^
+118 |
+119 | with httpx2.Client(timeout=None) as client:
+    |
+
+S113 Probable use of `httpx2` call with timeout set to `None`
+   --> S113.py:119:20
+    |
+117 | httpx2.AsyncClient(timeout=None)
+118 |
+119 | with httpx2.Client(timeout=None) as client:
+    |                    ^^^^^^^^^^^^
+120 |     client.get('https://gmail.com')
+    |

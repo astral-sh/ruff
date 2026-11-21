@@ -1,4 +1,5 @@
 import httpx
+import httpx2
 import requests
 
 # OK
@@ -42,6 +43,40 @@ async def bar():
 with httpx.Client() as client:
     client.get('https://gmail.com')
 
+
+httpx2.get('https://gmail.com', timeout=5)
+httpx2.post('https://gmail.com', timeout=5)
+httpx2.put('https://gmail.com', timeout=5)
+httpx2.delete('https://gmail.com', timeout=5)
+httpx2.patch('https://gmail.com', timeout=5)
+httpx2.options('https://gmail.com', timeout=5)
+httpx2.head('https://gmail.com', timeout=5)
+httpx2.Client(timeout=5)
+httpx2.AsyncClient(timeout=5)
+with httpx2.Client(timeout=5) as client:
+    client.get('https://gmail.com')
+
+async def foo():
+    async with httpx2.AsyncClient(timeout=5) as client:
+        await client.get('https://gmail.com')
+
+httpx2.get('https://gmail.com')
+httpx2.post('https://gmail.com')
+httpx2.put('https://gmail.com')
+httpx2.delete('https://gmail.com')
+httpx2.patch('https://gmail.com')
+httpx2.options('https://gmail.com')
+httpx2.head('https://gmail.com')
+httpx2.Client()
+httpx2.AsyncClient()
+
+async def bar():
+    async with httpx2.AsyncClient() as client:
+        await client.get('https://gmail.com')
+
+with httpx2.Client() as client:
+    client.get('https://gmail.com')
+
 # Errors
 requests.get('https://gmail.com')
 requests.get('https://gmail.com', timeout=None)
@@ -69,4 +104,17 @@ httpx.Client(timeout=None)
 httpx.AsyncClient(timeout=None)
 
 with httpx.Client(timeout=None) as client:
+    client.get('https://gmail.com')
+
+httpx2.get('https://gmail.com', timeout=None)
+httpx2.post('https://gmail.com', timeout=None)
+httpx2.put('https://gmail.com', timeout=None)
+httpx2.delete('https://gmail.com', timeout=None)
+httpx2.patch('https://gmail.com', timeout=None)
+httpx2.options('https://gmail.com', timeout=None)
+httpx2.head('https://gmail.com', timeout=None)
+httpx2.Client(timeout=None)
+httpx2.AsyncClient(timeout=None)
+
+with httpx2.Client(timeout=None) as client:
     client.get('https://gmail.com')
