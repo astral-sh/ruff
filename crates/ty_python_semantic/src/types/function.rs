@@ -89,6 +89,7 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
+use ty_python_core::ast_node_ref::AstNodeRef;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{FileScopeId, ProgramFile, SemanticIndex, semantic_index};
@@ -258,6 +259,14 @@ pub(crate) fn is_implicit_staticmethod(function_name: &str) -> bool {
 /// Whether a function should implicitly be treated as a classmethod based on its name.
 pub(crate) fn is_implicit_classmethod(function_name: &str) -> bool {
     matches!(function_name, "__init_subclass__" | "__class_getitem__")
+}
+
+/// Look up the function that owns this body scope without querying the semantic index again.
+fn function_node_ref<'db>(
+    index: &'db SemanticIndex<'db>,
+    body: FileScopeId,
+) -> &'db AstNodeRef<ast::StmtFunctionDef> {
+    index.scope(body).node().expect_function()
 }
 
 /// Representation of a function definition in the AST: either a non-generic function, or a generic
@@ -462,7 +471,8 @@ impl<'db> OverloadLiteral<'db> {
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
         let index = semantic_index(db, body_scope.program_file(db));
-        index.expect_single_definition(body_scope.node(db).expect_function())
+        let node = function_node_ref(index, body_scope.file_scope_id(db));
+        index.expect_single_definition(node)
     }
 
     /// Overload sets ending at different declarations share their earlier links.
@@ -472,19 +482,28 @@ impl<'db> OverloadLiteral<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn previous_overload_in_chain(self, db: &'db dyn Db) -> Option<OverloadLiteral<'db>> {
-        Some(self.previous_overload(db)?.last_definition)
+        let scope = self.body_scope(db);
+        let file = scope.program_file(db);
+        let module = parsed_module(db, file.python_file(db)).load(db);
+        let index = semantic_index(db, file);
+        let node = function_node_ref(index, scope.file_scope_id(db)).node(&module);
+        self.previous_overload(db, index, node, index.expect_single_definition(node))
     }
 
-    /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
-    /// previous overload.
-    fn previous_overload(self, db: &'db dyn Db) -> Option<FunctionLiteral<'db>> {
+    /// Find the previous overload using the declaration already available during inference.
+    /// Keeping the binding out of the literal's identity lets importers reuse the function
+    /// when an edit renumbers places in the enclosing scope.
+    fn previous_overload(
+        self,
+        db: &'db dyn Db,
+        index: &SemanticIndex<'db>,
+        node: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+    ) -> Option<OverloadLiteral<'db>> {
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
-        let scope = self.definition(db).scope(db);
-        let module = parsed_module(db, self.python_file(db)).load(db);
-        let index = semantic_index(db, scope.program_file(db));
+        let scope = definition.scope(db);
         let local_scope = scope.file_scope_id(db);
-        let node = self.body_scope(db).node(db).expect_function().node(&module);
         // A loop can reach this same def from a previous iteration. An undecorated
         // def cannot be its own overload, and there is no other local binding.
         if node.decorator_list.is_empty()
@@ -497,7 +516,7 @@ impl<'db> OverloadLiteral<'db> {
             return None;
         }
         let use_def = index.use_def_map(local_scope);
-        let use_id = node.name.scoped_use_id(db, self.program_file(db));
+        let use_id = node.name.scoped_use_id(db, scope.program_file(db));
 
         let env = ProgramEnvironment::from_scope(scope);
         let Place::Defined(DefinedPlace {
@@ -534,7 +553,7 @@ impl<'db> OverloadLiteral<'db> {
             return None;
         }
 
-        Some(previous_literal)
+        Some(previous_overload)
     }
 
     /// Typed internally-visible signature for this function.
@@ -550,7 +569,7 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
-        let program_file = self.program_file(db);
+        let program_file = scope.program_file(db);
         let python_file = program_file.python_file(db);
         let mut signature = if self.is_overload(db) {
             self.public_overload_signature(db).clone()
@@ -558,9 +577,9 @@ impl<'db> OverloadLiteral<'db> {
             self.raw_signature(db, ReturnCallableTypeVarScope::Public)
         };
         let module = parsed_module(db, python_file).load(db);
-        let function_node = scope.node(db).expect_function().node(&module);
         let index = semantic_index(db, program_file);
         let file_scope_id = scope.file_scope_id(db);
+        let function_node = function_node_ref(index, file_scope_id).node(&module);
         let is_generator = file_scope_id.is_generator_function(index);
 
         if function_node.is_async && !is_generator {
@@ -671,21 +690,21 @@ impl<'db> OverloadLiteral<'db> {
                 .is_some_and(|class| class.is_protocol(db))
         }
 
-        let env = &ProgramEnvironment::from_scope(self.body_scope(db));
         let scope = self.body_scope(db);
-        let program_file = self.program_file(db);
+        let env = &ProgramEnvironment::from_scope(scope);
+        let program_file = scope.program_file(db);
         let python_file = program_file.python_file(db);
         let module = parsed_module(db, python_file).load(db);
-        let function_stmt_node = scope.node(db).expect_function().node(&module);
-        let definition = self.definition(db);
         let index = semantic_index(db, program_file);
+        let file_scope_id = scope.file_scope_id(db);
+        let function_stmt_node = function_node_ref(index, file_scope_id).node(&module);
+        let definition = index.expect_single_definition(function_stmt_node);
         let pep695_ctx = function_stmt_node
             .type_params
             .as_ref()
             .and_then(|type_params| {
                 GenericContext::from_type_params(db, index, definition, type_params)
             });
-        let file_scope_id = scope.file_scope_id(db);
 
         let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
             db,
@@ -851,11 +870,19 @@ pub struct FunctionLiteral<'db> {
 }
 
 impl<'db> FunctionLiteral<'db> {
-    pub(super) fn new(db: &'db dyn Db, last_definition: OverloadLiteral<'db>) -> Self {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        last_definition: OverloadLiteral<'db>,
+        index: &SemanticIndex<'db>,
+        node: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+    ) -> Self {
         Self {
             last_definition,
             overloaded: last_definition.is_overload(db)
-                || last_definition.previous_overload(db).is_some(),
+                || last_definition
+                    .previous_overload(db, index, node, definition)
+                    .is_some(),
         }
     }
 
@@ -1066,7 +1093,7 @@ impl<'db> FunctionLiteral<'db> {
         if self.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
             return Some(AbstractMethodKind::Explicit);
         }
-        if self.definition(db).file(db).is_stub(db) {
+        if self.last_definition.file(db).is_stub(db) {
             return None;
         }
         if !enclosing_class.is_protocol(db) {
@@ -1118,7 +1145,7 @@ impl<'db> FunctionLiteral<'db> {
     /// Methods defined in stub files are never considered to have trivial bodies,
     /// since stubs use `...` as a placeholder regardless of the runtime implementation.
     fn has_trivial_body(self, db: &'db dyn Db) -> bool {
-        !self.definition(db).file(db).is_stub(db)
+        !self.last_definition.file(db).is_stub(db)
             && matches!(
                 self.body_kind(db),
                 FunctionBodyKind::Stub | FunctionBodyKind::AlwaysRaisesNotImplementedError
@@ -1629,7 +1656,7 @@ impl<'db> FunctionType<'db> {
         self.literal(db).implementation_deprecated(db)
     }
 
-    /// Returns the [`Definition`] of the implementation or first overload of this function.
+    /// Returns the [`Definition`] of the implementation or last overload of this function.
     ///
     /// ## Warning
     ///
