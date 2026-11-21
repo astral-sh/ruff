@@ -19,7 +19,7 @@ use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::types::visitor::any_over_type_outside_signatures;
-use crate::types::{ProgramEnvironment, Type};
+use crate::types::{KnownClass, ProgramEnvironment, Type};
 use crate::{Db, HasType, SemanticModel};
 
 /// The coverage classification of a single line.
@@ -155,6 +155,15 @@ fn classify<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) 
     // other callables for the same reason.)
     if matches!(ty, Type::ClassLiteral(_)) {
         return LineCoverage::Precise;
+    }
+
+    // ty infers `CoroutineType[Any, Any, T]` for a call to an `async def` function. Since ty adds
+    // those `Any`s itself, we classify the coroutine by its result type `T`, much as mypy treats
+    // `Any`s it creates for special forms as precise.
+    if let Some(specialization) = ty.known_specialization(db, env, KnownClass::CoroutineType)
+        && let [_, _, result] = specialization.types(db)
+    {
+        return classify(db, env, *result).min(LineCoverage::Imprecise);
     }
 
     // Like mypy, we don't consider a callable imprecise because its signature mentions a dynamic
@@ -341,8 +350,8 @@ mod tests {
         P |     return 1
           | 
         P | async def main() -> None:
-        I |     coroutine = fetch()  # `coroutine`: CoroutineType[Any, Any, int], `fetch()`: CoroutineType[Any, Any, int]
-        I |     result = await coroutine  # `coroutine`: CoroutineType[Any, Any, int]
+        P |     coroutine = fetch()
+        P |     result = await coroutine
           | 
         P | def chunks() -> Iterable[bytes]:
         P |     return [b""]

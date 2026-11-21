@@ -2844,7 +2844,7 @@ impl<'db> Type<'db> {
     }
 
     /// If the type is a specialized instance of the given `KnownClass`, returns the specialization.
-    fn known_specialization(
+    pub(crate) fn known_specialization(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
