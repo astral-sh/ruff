@@ -11939,9 +11939,10 @@ impl<'db> TypeMapping<'_, 'db> {
         }
     }
 
-    /// Returns a new `TypeMapping` that should be applied in contravariant positions.
-    fn flip(&self) -> Self {
-        match self {
+    /// Return the mapping for contravariant positions, borrowing the original when
+    /// the transformation is independent of variance.
+    fn flip(&self) -> Cow<'_, Self> {
+        Cow::Owned(match self {
             TypeMapping::Materialize(materialization_kind) => {
                 TypeMapping::Materialize(materialization_kind.flip())
             }
@@ -11962,8 +11963,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
-            | TypeMapping::RescopeReturnCallables(_) => self.clone(),
-        }
+            | TypeMapping::RescopeReturnCallables(_) => return Cow::Borrowed(self),
+        })
     }
 
     /// Whether this mapping rewrites type structure without semantic normalization.
