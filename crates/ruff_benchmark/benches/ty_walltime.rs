@@ -128,11 +128,25 @@ static FREQTRADE: Benchmark = Benchmark::new(RealWorldProject {
     python_version: SupportedPythonVersion::Py311,
 });
 
-static NUMPY: Benchmark = Benchmark::new(RealWorldProject {
+static NUMPY_TESTS: Benchmark = Benchmark::new(RealWorldProject {
     name: "numpy",
     repository: "https://github.com/numpy/numpy",
     commit: "b92fa9da0b7b2bc650d9298085876fc8db28df5e",
-    paths: &["numpy"],
+    paths: &[
+        "numpy/_core/tests",
+        "numpy/_pyinstaller/tests",
+        "numpy/f2py/tests",
+        "numpy/fft/tests",
+        "numpy/lib/tests",
+        "numpy/linalg/tests",
+        "numpy/ma/tests",
+        "numpy/matrixlib/tests",
+        "numpy/polynomial/tests",
+        "numpy/random/tests",
+        "numpy/testing/tests",
+        "numpy/tests",
+        "numpy/typing/tests",
+    ],
     // ty uses its vendored typeshed stub for `typing_extensions`, so we omit the package here.
     dependencies: &["hypothesis", "packaging", "pytest"],
     max_dep_date: TY_ECOSYSTEM_PIN,
@@ -253,9 +267,8 @@ fn colour_science(bencher: Bencher) {
 }
 
 #[bench(sample_size = 1, sample_count = 2)]
-fn numpy(bencher: Bencher) {
-    // Checking NumPy and its tests on a single thread takes too long for CI.
-    run_multithreaded(bencher, &NUMPY);
+fn numpy_tests(bencher: Bencher) {
+    run_single_threaded(bencher, &NUMPY_TESTS);
 }
 
 #[bench(sample_size = 1, sample_count = 2)]
