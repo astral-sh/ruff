@@ -1402,6 +1402,56 @@ def _[F: type[C]](callback: F):
     x3: Callable[[int], str] = callback  # error: [invalid-assignment]
 ```
 
+## Comparing recursive generic protocol methods
+
+`Left.combine` only accepts `Left`, and `Right` has no `extra` method. Both protocols therefore
+remain in the union accepted by `Right.combine`.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Left[T](Protocol):
+    def extra(self) -> int: ...
+    def combine[U](self, other: Left[U]) -> T: ...
+
+class Right[T](Protocol):
+    def combine[U](self, other: Left[U] | Right[U]) -> T:
+        reveal_type(other)  # revealed: Left[U@combine] | Right[U@combine]
+        raise NotImplementedError
+```
+
+A method can also accept an intersection with its own protocol.
+
+```py
+from ty_extensions import Intersection
+
+class Both[T](Protocol):
+    def combine[U](self, other: Intersection[Left[U], Both[U]]) -> T:
+        other.extra()  # ok
+        raise NotImplementedError
+```
+
+## Comparing inherited recursive generic protocol methods
+
+`Left` and `Right` inherit the same generic method, but `Left.combine` returns a list and
+`Right.combine` returns a set. Both protocols therefore remain in the method's parameter union.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Combines[T](Protocol):
+    def combine[U](self, other: Left[U] | Right[U]) -> T:
+        reveal_type(other)  # revealed: Left[U@combine] | Right[U@combine]
+        raise NotImplementedError
+
+class Left[T](Combines[list[T]], Protocol): ...
+class Right[T](Combines[set[T]], Protocol): ...
+```
+
 ## Recursive callable types
 
 Callable inference falls back to an error when a `__call__` signature involves unbounded recursion:

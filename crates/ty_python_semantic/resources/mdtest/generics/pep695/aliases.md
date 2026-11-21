@@ -610,6 +610,22 @@ def f(x: A):
     assert_type(x[0], WithIterable[A])
 ```
 
+## Inferring a leaf type in a recursive call
+
+The bound on `T` makes tuples branches of the tree. A recursive call infers its own leaf type from
+the value inside the tuples.
+
+```py
+type Tree[T] = tuple[Tree[T] | T]
+
+def leaf[T: int | str](tree: Tree[T] | T) -> T:
+    def check(value: T) -> None:
+        reveal_type(leaf(((value,),)))  # revealed: T@leaf
+        reveal_type(leaf(((1,),)))  # revealed: Literal[1]
+
+    raise NotImplementedError
+```
+
 ## Boolean aliases after substitution
 
 Subtracting `True` from `bool` leaves only `False`. Using aliases for the arguments to `Minus` does
@@ -908,6 +924,19 @@ class PairBox[T]:
         # revealed: PairBox[str]
         reveal_type(PairBox(("text", 1)))
         PairBox((value, "wrong"))  # error: [invalid-argument-type]
+```
+
+Both constructor parameters use the same specialization of `Choice`, which captures the class
+parameter. In the second parameter, `tuple[int | str | bytes]` already covers the expanded
+`tuple[int | str]`.
+
+```py
+class Choices[T: int]:
+    type Choice[U] = T | U
+
+    def __init__(self, first: Choice[int | str], rest: tuple[Choice[int | str]] | tuple[int | str | bytes]) -> None: ...
+    def check(self) -> None:
+        Choices(1, None)  # error: [invalid-argument-type] "Expected `tuple[int | str | bytes]`, found `None`"
 ```
 
 ## Default type parameter after `TypeVarTuple`
