@@ -1330,7 +1330,7 @@ impl<'db> UnionBuilder<'db> {
             if should_simplify_full && !element_type.is_alias_like() {
                 if let (Type::NominalInstance(left), Type::NominalInstance(right)) =
                     (ty, element_type)
-                    && left.has_unrelated_class(db, right)
+                    && left.is_incomparable_for_union(db, right)
                 {
                     continue;
                 }
