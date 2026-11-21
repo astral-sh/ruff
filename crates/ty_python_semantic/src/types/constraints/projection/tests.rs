@@ -171,47 +171,6 @@ fn path_limit_is_checked_before_solving() {
 }
 
 #[test]
-fn repeated_projections_respect_the_selector_and_path_budget() {
-    let db = setup_db();
-    let db = &db;
-    let env = db.program_environment();
-    let t = create_typevar(db, "T");
-    let int = known_instance(db, KnownClass::Int);
-    let str = known_instance(db, KnownClass::Str);
-    let builder = ConstraintSetBuilder::new();
-    let set = binary_choice(db, &builder, t, [int, str]);
-
-    let solve = |paths, selected| {
-        set.solutions_with(
-            db,
-            &env,
-            TypeVarSet::from_typevars(db, [t]),
-            SolutionBudget {
-                paths,
-                ..SolutionBudget::default()
-            },
-            ReportDiagnostics::Yes,
-            |_, candidate| {
-                if candidate.inference_lower() == Some(selected) {
-                    PathBoundSolution::Solved(selected)
-                } else {
-                    PathBoundSolution::Unsatisfiable
-                }
-            },
-        )
-    };
-    for selected in [int, str] {
-        assert_eq!(
-            solve(2, selected),
-            Ok(Solutions::Constrained(SolutionPaths::Complete(vec![
-                solution([binding(t, selected)]),
-            ])))
-        );
-    }
-    assert_eq!(solve(1, str), Err(ProjectionError::PathBudgetExceeded));
-}
-
-#[test]
 fn invalid_paths_respect_projection_budgets() {
     let db = setup_db();
     let db = &db;

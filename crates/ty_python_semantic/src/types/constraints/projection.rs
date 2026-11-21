@@ -10,6 +10,10 @@ use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
 use crate::{Db, Program, ProgramEnvironment};
 
+/// Identifies a bounded projection within a single constraint set builder.
+///
+/// The same diagram can yield different candidate paths depending on the source order
+/// of its constraints, so the node ID alone does not identify the projection.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct ProjectionKey<'db> {
     program: Program<'db>,
