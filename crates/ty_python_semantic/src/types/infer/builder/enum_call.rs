@@ -17,17 +17,12 @@ use crate::{
             PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
             report_mismatched_type_name,
         },
+        enums::EnumAutoHistory,
         infer::TypeInferenceBuilder,
         infer::builder::dynamic_class::report_mro_error_kind,
         subclass_of::SubclassOfType,
     },
 };
-
-#[derive(Copy, Clone, Debug)]
-enum EnumStart {
-    Literal(i64),
-    DynamicInt,
-}
 
 /// Result of parsing the `names` argument of a functional enum call.
 enum EnumMembersArgParseResult<'db> {
@@ -43,6 +38,30 @@ enum EnumMembersArgParseResult<'db> {
 struct KnownEnumMembers<'db> {
     members: Vec<(Name, Type<'db>)>,
     value_form: EnumMemberValueForm,
+}
+
+impl<'db> KnownEnumMembers<'db> {
+    /// In explicit pair and mapping forms, `auto()` uses the preceding member values.
+    /// The functional API's `start` argument applies only to generated-name forms.
+    fn from_explicit(
+        context: &InferContext<'db, '_>,
+        base_class: KnownClass,
+        mut members: Vec<(Name, Type<'db>)>,
+    ) -> Self {
+        let db = context.db();
+        let env = context.program_environment();
+        let mut history = EnumAutoHistory::default();
+        for (name, value) in &mut members {
+            if value.is_instance_of(db, KnownClass::Auto) {
+                *value = history.next_value(db, env, base_class, name.as_str());
+            }
+            history = history.with_value(db, env, *value);
+        }
+        Self {
+            members,
+            value_form: EnumMemberValueForm::Explicit,
+        }
+    }
 }
 
 /// Distinguishes whether member values are auto-generated from names or provided explicitly.
@@ -113,19 +132,9 @@ enum SequenceEnumMemberForm {
 
 /// Find enum base class of the given type.
 pub(crate) fn enum_functional_call_base<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<KnownClass> {
-    let ClassLiteral::Static(cls) = ty.as_class_literal()? else {
-        return None;
-    };
-    cls.known(db).filter(|k| {
-        matches!(
-            k,
-            KnownClass::Enum
-                | KnownClass::StrEnum
-                | KnownClass::IntEnum
-                | KnownClass::Flag
-                | KnownClass::IntFlag
-        )
-    })
+    ty.as_class_literal()?
+        .known(db)
+        .filter(|known| known.is_builtin_enum_base())
 }
 
 fn enum_functional_call_keyword_is_valid(name: &str, python_version: PythonVersion) -> bool {
@@ -162,87 +171,25 @@ fn enum_names_type<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<
     )
 }
 
-/// Compute the first auto-assigned value for functional enum forms that only specify names.
-///
-/// `StrEnum` ignores `start` and uses the lowercased member name. Other enum kinds use the
-/// literal `start` value when available, and widen to `int` when `start` is a non-literal int.
-fn first_enum_auto_value<'db>(
-    context: &InferContext<'db, '_>,
-    base_class: KnownClass,
-    name: &str,
-    start: EnumStart,
-) -> Type<'db> {
-    let db = context.db();
-    let env = context.program_environment();
-    match base_class {
-        KnownClass::StrEnum => Type::string_literal(db, &*name.to_lowercase()),
-        _ => match start {
-            EnumStart::Literal(start) => Type::int_literal(start),
-            EnumStart::DynamicInt => KnownClass::Int.to_instance(db, env),
-        },
-    }
-}
-
-/// Compute the next auto-assigned value based on the previous member's value.
-///
-/// Used for dict-form and tuple/list-form functional enums where `auto()` values
-/// are derived from the predecessor rather than positional index.
-/// - `StrEnum`: lowercased member name
-/// - `Flag`/`IntFlag`: next highest power of two
-/// - Others: `last_value + 1`
-fn next_auto_value<'db>(
-    context: &InferContext<'db, '_>,
-    base_class: KnownClass,
-    name: &str,
-    last_int_value: Option<i64>,
-) -> Type<'db> {
-    let db = context.db();
-    let env = context.program_environment();
-    match base_class {
-        KnownClass::StrEnum => Type::string_literal(db, &*name.to_lowercase()),
-        _ => {
-            let Some(last) = last_int_value else {
-                return KnownClass::Int.to_instance(db, env);
-            };
-            match base_class {
-                KnownClass::Flag | KnownClass::IntFlag => {
-                    // next power of two after highest bit in the last value
-                    if last <= 0 {
-                        Type::int_literal(1)
-                    } else {
-                        let shift = last.cast_unsigned().bit_width();
-                        1_u64
-                            .checked_shl(shift)
-                            .and_then(|value| i64::try_from(value).ok())
-                            .map(Type::int_literal)
-                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env))
-                    }
-                }
-                _ => last
-                    .checked_add(1)
-                    .map(Type::int_literal)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(db, env)),
-            }
-        }
-    }
-}
-
 fn enum_members_from_names<'db>(
     context: &InferContext<'db, '_>,
     names: Vec<Name>,
-    start: EnumStart,
+    start: Type<'db>,
     base_class: KnownClass,
 ) -> Vec<(Name, Type<'db>)> {
+    let db = context.db();
+    let env = context.program_environment();
     let mut members = Vec::with_capacity(names.len());
-    let mut last_int_value = None;
+    let mut history = EnumAutoHistory::default();
 
     for (index, name) in names.into_iter().enumerate() {
-        let value = if index == 0 {
-            first_enum_auto_value(context, base_class, name.as_str(), start)
+        // StrEnum generates every value from the member name, including the first.
+        let value = if index == 0 && base_class != KnownClass::StrEnum {
+            start
         } else {
-            next_auto_value(context, base_class, name.as_str(), last_int_value)
+            history.next_value(db, env, base_class, name.as_str())
         };
-        last_int_value = value.as_int_literal();
+        history = history.with_value(db, env, value);
         members.push((name, value));
     }
 
@@ -391,7 +338,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return Some(base_class.to_instance(db, env));
         };
 
-        let start = start_kw.map_or(EnumStart::Literal(1), |kw| {
+        let start = start_kw.map_or(Type::int_literal(1), |kw| {
             self.infer_enum_start_argument(&kw.value)
         });
         let (mixin_type, valid_mixin_type) = type_kw.map_or((None, true), |kw| {
@@ -486,16 +433,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         Some(name_literal.value(db))
     }
 
-    fn infer_enum_start_argument(&mut self, value: &ast::Expr) -> EnumStart {
+    fn infer_enum_start_argument(&mut self, value: &ast::Expr) -> Type<'db> {
         let db = self.db();
         let ty = self.expression_type(value);
         if let Some(literal) = ty.as_int_literal() {
-            return EnumStart::Literal(literal);
+            return Type::int_literal(literal);
         }
 
         let env = self.program_environment();
-        if ty.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
-            return EnumStart::DynamicInt;
+        let int = KnownClass::Int.to_instance(db, env);
+        if ty.is_assignable_to(db, env, int) {
+            return int;
         }
 
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, value) {
@@ -505,7 +453,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        EnumStart::Literal(1)
+        Type::int_literal(1)
     }
 
     fn infer_enum_mixin_argument(
@@ -564,7 +512,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn infer_enum_spec(
         &mut self,
         names_arg: &ast::Expr,
-        start: EnumStart,
+        start: Type<'db>,
         base_class: KnownClass,
         mixin_type: Option<Type<'db>>,
         has_invalid_arguments: bool,
@@ -646,7 +594,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn parse_enum_members_arg(
         &mut self,
         names_arg: &ast::Expr,
-        start: EnumStart,
+        start: Type<'db>,
         base_class: KnownClass,
     ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
@@ -690,10 +638,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn parse_enum_members_from_sequence(
         &mut self,
         elts: &[ast::Expr],
-        start: EnumStart,
+        start: Type<'db>,
         base_class: KnownClass,
     ) -> EnumMembersArgParseResult<'db> {
-        let db = self.db();
         let mut names = Vec::with_capacity(elts.len());
         let mut explicit_members = Vec::with_capacity(elts.len());
         let mut form = None;
@@ -740,43 +687,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return EnumMembersArgParseResult::Unknown;
         }
 
-        if matches!(form, Some(SequenceEnumMemberForm::Names)) {
+        if !matches!(form, Some(SequenceEnumMemberForm::Pairs)) {
             return EnumMembersArgParseResult::Known(KnownEnumMembers {
                 members: enum_members_from_names(&self.context, names, start, base_class),
                 value_form: EnumMemberValueForm::Generated,
             });
         }
-        if form.is_none() {
-            return EnumMembersArgParseResult::Known(KnownEnumMembers {
-                members: vec![],
-                value_form: EnumMemberValueForm::Generated,
-            });
-        }
 
-        let mut members = Vec::with_capacity(elts.len());
-        // Explicit-value forms match static enums: `start` is ignored and a leading `auto()`
-        // still begins from the default seed of `1`.
-        let mut last_int_value = Some(0);
-        for (name, value) in explicit_members {
-            let value = if value.is_instance_of(db, KnownClass::Auto) {
-                next_auto_value(&self.context, base_class, name.as_str(), last_int_value)
-            } else {
-                value
-            };
-            last_int_value = value.as_int_like_literal();
-            members.push((name, value));
-        }
-        EnumMembersArgParseResult::Known(KnownEnumMembers {
-            members,
-            value_form: EnumMemberValueForm::Explicit,
-        })
+        EnumMembersArgParseResult::Known(KnownEnumMembers::from_explicit(
+            &self.context,
+            base_class,
+            explicit_members,
+        ))
     }
 
     /// Parse enum members from a dict literal like `{"RED": 1, "GREEN": 2}`.
-    ///
-    /// When `auto()` is used in a dict, CPython derives the next value from the
-    /// previous member's value (not from `start + index`). For example,
-    /// `Enum("E", {"A": 10, "B": auto()})` gives `B.value == 11`.
     fn parse_enum_members_from_dict(
         &mut self,
         dict: &ast::ExprDict,
@@ -784,7 +709,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
         let mut members = Vec::with_capacity(dict.items.len());
-        let mut last_int_value = Some(0);
         let mut has_opaque_keys = false;
         let env = self.program_environment();
         for item in &dict.items {
@@ -802,22 +726,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return EnumMembersArgParseResult::Invalid;
             };
             let name = Name::new(string_lit.value(db));
-            let raw_value = self.expression_type(&item.value);
-            let value = if raw_value.is_instance_of(db, KnownClass::Auto) {
-                next_auto_value(&self.context, base_class, name.as_str(), last_int_value)
-            } else {
-                raw_value
-            };
-            last_int_value = value.as_int_like_literal();
+            let value = self.expression_type(&item.value);
             members.push((name, value));
         }
         if has_opaque_keys {
             EnumMembersArgParseResult::Unknown
         } else {
-            EnumMembersArgParseResult::Known(KnownEnumMembers {
+            EnumMembersArgParseResult::Known(KnownEnumMembers::from_explicit(
+                &self.context,
+                base_class,
                 members,
-                value_form: EnumMemberValueForm::Explicit,
-            })
+            ))
         }
     }
 
