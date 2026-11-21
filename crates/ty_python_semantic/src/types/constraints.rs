@@ -4125,20 +4125,49 @@ impl<'db> CandidateSolutions<'db> {
         })
     }
 
+    /// Whether there is a single valid path that fixes every constrained type variable exactly.
+    pub(super) fn is_exact(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        if let Self::Constrained(paths) = self
+            && let [path] = paths.as_ref()
+            && matches!(path.validity, SolutionValidity::Valid)
+        {
+            path.typevars
+                .iter()
+                .all(|ty| ty.as_exact(db, env).is_some())
+        } else {
+            false
+        }
+    }
+
     pub(crate) fn solve_for_argument_context(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &ConstraintSetBuilder<'db>,
-    ) -> Solutions<'db> {
-        self.solve_with(|_variance, path_bound| {
+    ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
+        let solutions = self.solve_with(|_variance, path_bound| {
             match Self::preliminary_solve(db, env, builder, path_bound) {
                 PathBoundSolution::Solved(ty) if ty.is_provisional_marker() => {
                     PathBoundSolution::Unsolved
                 }
                 solution => solution,
             }
-        })
+        });
+        let mut hints = FxHashMap::default();
+        if let Solutions::Constrained(solutions) = solutions {
+            for solution in solutions.into_vec() {
+                for binding in solution.solved_typevars {
+                    hints
+                        .entry(binding.bound_typevar.identity(db))
+                        .and_modify(|existing| {
+                            *existing =
+                                UnionType::from_two_elements(db, env, *existing, binding.solution);
+                        })
+                        .or_insert(binding.solution);
+                }
+            }
+        }
+        hints
     }
 
     /// Widen the inferred arguments for the next pass only when one viable path permits

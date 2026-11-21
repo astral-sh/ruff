@@ -110,27 +110,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        self.infer_collection_literal(
+        // If literal inference fails, ordinary constructor checking will infer the arguments
+        // again. Commit the speculative results only when this shortcut handles the call.
+        let mut speculative_builder = self.speculate();
+        if let Some(ty) = speculative_builder.infer_collection_literal(
             KnownClass::Dict,
             collection_expr,
             &items,
             &mut infer_elt_ty,
             call_expression_tcx,
-        )
-        .or_else(|| {
-            // Empty calls still need constructor validation and have no inferred values to preserve.
-            if arguments.is_empty() {
-                return None;
-            }
+        ) {
+            self.extend(speculative_builder);
+            return Some(ty);
+        }
 
-            // Without generic definitions, collection inference still checks all values. Return
-            // `Unknown` in that case to avoid inferring them again. Specialization failures need
-            // ordinary call checking to report argument errors.
-            KnownClass::Dict
+        // Empty calls and failed specializations need ordinary constructor validation.
+        if arguments.is_empty()
+            || KnownClass::Dict
                 .try_to_class_literal(db, self.program_environment())
                 .and_then(|class| class.generic_context(db))
-                .is_none()
-                .then(Type::unknown)
-        })
+                .is_some()
+        {
+            return None;
+        }
+
+        // Without generic definitions, collection inference still checks all values.
+        self.extend(speculative_builder);
+        Some(Type::unknown())
     }
 }

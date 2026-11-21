@@ -498,7 +498,7 @@ reveal_type(x3)  # revealed: dict[str, int]
 
 def dynamic_mapping() -> Any: ...
 
-x4: dict[str, int] = reveal_type({**dynamic_mapping()})  # revealed: dict[str | Any, int | Any]
+x4: dict[str, int] = reveal_type({**dynamic_mapping()})  # revealed: dict[str, int]
 
 # error: [invalid-argument-type] "Argument expression after ** must be a mapping type"
 x5: dict[str, int] = {**42}
@@ -1340,11 +1340,11 @@ x2: TD | None = first([{"x": 0}, {"x": 1}])
 reveal_type(x2)  # revealed: TD
 
 # TODO: We could provide `TypedDict` key diagnostics here.
-# error: [invalid-assignment] "Object of type `TD | dict[str, int]` is not assignable to `TD`"
+# error: [invalid-assignment] "Object of type `dict[str, int] | TD` is not assignable to `TD`"
 x3: TD = first([{"y": 0}, {"x": 1}])
 
 # TODO: We could provide `TypedDict` key diagnostics here.
-# error: [invalid-assignment] "Object of type `TD | None | dict[str, int]` is not assignable to `TD | None`"
+# error: [invalid-assignment] "Object of type `dict[str, int] | TD` is not assignable to `TD | None`"
 x4: TD | None = first([{"y": 0}, {"x": 1}])
 
 # `ObjectCallback` is redundant in this union, so expanding the aliases collapses the narrowing
@@ -1726,19 +1726,16 @@ from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any, Callable, Iterable, Literal, MutableSequence, overload, Sequence
 
-# TODO: This should be `list[Any]`.
-# revealed: list[int]
+# revealed: list[Any]
 x1: Sequence[Any] = reveal_type([1, 2, 3])
 
 # revealed: list[Any]
 x2: MutableSequence[Any] = reveal_type([1, 2, 3])
 
-# TODO: This should be `list[Any]`.
-# revealed: list[int]
+# revealed: list[Any]
 x3: Iterable[Any] = reveal_type([1, 2, 3])
 
-# TODO: This should be `list[list[Any]]`.
-# revealed: list[list[int]]
+# revealed: list[list[Any]]
 x4: Iterable[Iterable[Any]] = reveal_type([[1, 2, 3]])
 
 # revealed: list[Iterable[Any]]
@@ -1747,19 +1744,16 @@ x5: list[Iterable[Any]] = reveal_type([[1, 2, 3]])
 # revealed: list[list[Any]]
 x6: Iterable[list[Any]] = reveal_type([[1, 2, 3]])
 
-# TODO: This should be `list[Any]`.
-# revealed: list[int]
+# revealed: list[Any]
 x7: Sequence[Any] = reveal_type([i for i in [1, 2, 3]])
 
 # revealed: list[Any]
 x8: MutableSequence[Any] = reveal_type([i for i in [1, 2, 3]])
 
-# TODO: This should be `list[Any]`.
-# revealed: list[int]
+# revealed: list[Any]
 x9: Iterable[Any] = reveal_type([i for i in [1, 2, 3]])
 
-# TODO: This should be `list[list[Any]]`.
-# revealed: list[list[int]]
+# revealed: list[list[Any]]
 x10: Iterable[Iterable[Any]] = reveal_type([[i] for i in [1, 2, 3]])
 
 # revealed: list[Iterable[Any]]
@@ -1769,19 +1763,16 @@ x11: list[Iterable[Any]] = reveal_type([[i] for i in [1, 2, 3]])
 x12: Iterable[list[Any]] = reveal_type([[i] for i in [1, 2, 3]])
 
 def _(dynamic: Any):
-    # TODO: This should be `list[int]`.
-    # revealed: list[Any]
+    # revealed: list[int]
     x1: Sequence[int] = reveal_type([dynamic])
 
     # revealed: list[int]
     x2: MutableSequence[int] = reveal_type([dynamic])
 
-    # TODO: This should be `list[int]`.
-    # revealed: list[Any]
+    # revealed: list[int]
     x3: Iterable[int] = reveal_type([dynamic])
 
-    # TODO: This should be `list[list[int]]`.
-    # revealed: list[list[Any]]
+    # revealed: list[list[int]]
     x4: Iterable[Iterable[int]] = reveal_type([[dynamic]])
 
     # revealed: list[Iterable[int]]
@@ -2806,10 +2797,10 @@ def collection_literal_first(values: list[str], flag: bool) -> None:
     reveal_type([] if flag else values)  # revealed: list[str]
 
 def non_empty_dict_fallback(values: dict[Key, int] | None) -> None:
-    reveal_type(values or {"foo": 0})  # revealed: dict[Literal["foo", "bar"], int]
+    reveal_type(values or {"foo": 0})  # revealed: dict[Key, int]
 
 def non_empty_set_fallback(values: set[Key] | None) -> None:
-    reveal_type(values or {"foo"})  # revealed: set[Literal["foo", "bar"]]
+    reveal_type(values or {"foo"})  # revealed: set[Key]
 
 class TextContent: ...
 class TagContent: ...
@@ -2831,9 +2822,9 @@ def generic_type_context(values: list[int | str] | None) -> None:
     reveal_type(preserve_generic(values or []))  # revealed: list[int | str]
     reveal_type(preserve_partially_specialized(values or []))  # revealed: list[Unknown | int]
 
-def widened_non_empty_fallback(values: list[int] | None) -> None:
+def incompatible_non_empty_fallback(values: list[int] | None) -> None:
     result = values or ["x"]
-    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | str]
+    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[str]
 
 def incompatible_collection_kind(values: set[str] | None) -> None:
     reveal_type(values or [1])  # revealed: (set[str] & ~AlwaysFalsy) | list[int]
@@ -3132,6 +3123,8 @@ def list_pair[T](x: list[T], y: list[T]) -> T:
 
 def pair[T](x: T, y: T) -> T:
     return x
+
+pair_with_list("x", reveal_type([1]))  # revealed: list[str | int]
 
 def _(a: A, b: list[A]):
     x1: A = pair_with_list(a, [{"a": 1, "b": 2}])

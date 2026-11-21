@@ -3777,11 +3777,7 @@ impl<'db> Type<'db> {
         allow_tuple_size_promotion: bool,
         unconstrained: bool,
     ) -> Type<'db> {
-        let ty = if unconstrained {
-            self.promote(db, env)
-        } else {
-            self
-        };
+        let ty = self.promote(db, env);
         let ty = if allow_tuple_size_promotion {
             ty.promote_tuple_size_in_union(db, env)
         } else {

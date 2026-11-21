@@ -103,11 +103,47 @@ c: tuple[str | int, str] = ([], "foo")
 ## Incorrect collection literal assignments are complained about
 
 ```py
-# error: [invalid-assignment] "Object of type `list[str | int]` is not assignable to `list[str]`"
+from collections.abc import Mapping
+
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `list[str]`"
 a: list[str] = [1, 2, 3]
 
 # error: [invalid-assignment] "Object of type `set[int | str]` is not assignable to `set[int]`"
 b: set[int] = {1, 2, "3"}
+
+# error: [invalid-assignment] "Object of type `dict[int, int]` is not assignable to `dict[str, object]`"
+bad_key: dict[str, object] = {1: 2}
+
+# error: [invalid-assignment] "Object of type `dict[int, int]` is not assignable to `Mapping[str, object]`"
+bad_mapping_key: Mapping[str, object] = {1: 2}
+```
+
+The collection's element type cannot be chosen by specializing a type variable from an outer scope:
+
+```py
+from collections.abc import Sequence
+from typing import TypeVar
+
+T = TypeVar("T", bound=str)
+
+def _(value: T):
+    items: Sequence[int] = [value]  # error: [invalid-assignment]
+```
+
+A list of constructors uses the declared callable type if every constructor is compatible:
+
+```py
+from collections.abc import Callable
+
+class Item: ...
+
+class RequiresArgument(Item):
+    def __init__(self, value: int) -> None: ...
+
+factories: list[Callable[..., Item]] = reveal_type([Item])  # revealed: list[(...) -> Item]
+
+def _(factory: type[Item]):
+    invalid: list[Callable[[], Item]] = [factory, RequiresArgument]  # error: [invalid-assignment]
 ```
 
 ## Mutually assignable annotated assignments use the declared type

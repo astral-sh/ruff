@@ -305,14 +305,14 @@ segments: Sequence[tuple[int, int] | tuple[int, int, int]] = [(1, 2), (3, 4, 5)]
 reveal_type(segments)  # revealed: list[tuple[int, int] | tuple[int, int, int]]
 ```
 
-Promotion still occurs when a covariant collection type context provides a gradual element type.
+A covariant collection type context can instead supply a gradual element type.
 
 ```py
 from typing import Any
 from collections.abc import Mapping
 
 segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
-reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
+reveal_type(segments)  # revealed: dict[str, Any]
 ```
 
 ## Non-tuple elements do not block tuple-size promotion
@@ -743,6 +743,15 @@ reveal_type(x23)  # revealed: (Literal[1], /) -> bool
 
 x24: Callable[[Literal[1]], bool] | None = maybe_make_callable(1)
 reveal_type(x24)  # revealed: ((Literal[1], /) -> bool) | None
+```
+
+Preserving a literal in one element does not prevent promotion of another:
+
+```py
+def _(flag: bool):
+    tag = "yes" if flag else "no"
+    xs: Sequence[Literal["yes", "no"] | int] = [tag, 1]
+    reveal_type(xs)  # revealed: list[Literal["yes", "no"] | int]
 ```
 
 ## Literal annotations see through subtyping

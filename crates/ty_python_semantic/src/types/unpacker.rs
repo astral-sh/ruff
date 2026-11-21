@@ -13,7 +13,7 @@ use ruff_text_size::Ranged;
 use crate::Db;
 use crate::types::dict::dict_literal_key_value_types;
 use crate::types::infer::{ExpressionInference, FrozenMap};
-use crate::types::tuple::promotion::TupleSizePromotionConstraints;
+use crate::types::tuple::promotion::allows_tuple_size_promotion;
 use crate::types::tuple::{
     ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
     VariableLengthTuple,
@@ -600,8 +600,7 @@ pub(super) fn collected_list_type<'db, 'ast>(
     let mut allow_tuple_size_promotion = true;
     for (ty, expression) in values {
         let ty = ty.promote(db, env);
-        allow_tuple_size_promotion &=
-            TupleSizePromotionConstraints::allows_expression(db, env, expression, ty);
+        allow_tuple_size_promotion &= allows_tuple_size_promotion(db, env, expression, ty);
         elements.add_in_place(ty);
     }
     // `first, *rest = (1,)` constructs an empty list, just as `rest = []` does.
