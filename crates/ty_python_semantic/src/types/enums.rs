@@ -1128,6 +1128,7 @@ pub(crate) fn enum_metadata<'db>(
         metaclass_may_transform_values,
     };
 
+    let vendored_stdlib = env.program(db).custom_stdlib_search_path(db).is_none();
     let mut aliases = FxHashMap::default();
 
     let mut members = use_def_map
@@ -1163,9 +1164,11 @@ pub(crate) fn enum_metadata<'db>(
                             // Some types are specifically disallowed for enum members.
                             return None;
                         }
-                        // Unlike enum members, literal ints, bools, strings and bytes
-                        // cannot define `__get__` and therefore cannot be descriptors.
-                        Type::LiteralValue(literal) if !literal.is_enum() => Some(ty),
+                        // In the bundled stubs, int, bool, str and bytes have no `__get__`.
+                        // Enum members and types from custom stubs can be descriptors.
+                        Type::LiteralValue(literal) if vendored_stdlib && !literal.is_enum() => {
+                            Some(ty)
+                        }
                         Type::NominalInstance(instance) => match instance.known_class(db) {
                             // enum.nonmember
                             Some(KnownClass::Nonmember) => return None,
