@@ -4421,11 +4421,15 @@ impl<'db> CandidateSolutions<'db> {
         // candidate. Otherwise, prefer the inferred candidate.
         let candidates = match (inferred, declared) {
             (Some(inferred), Some(declared))
-                if prefer_declared
-                    && inferred.is_assignable_to(db, env, declared)
-                    && declared.is_assignable_to(db, env, inferred) =>
+                if prefer_declared && inferred.is_assignable_to(db, env, declared) =>
             {
-                [Some(declared), Some(inferred)]
+                if declared.is_assignable_to(db, env, inferred) {
+                    [Some(declared), Some(inferred)]
+                } else {
+                    // If the inferred solution is incompatible, prefer the declared lower bound
+                    // over the combined solution.
+                    [Some(inferred), path_bound.declared_lower]
+                }
             }
             (Some(inferred), _) => [Some(inferred), None],
             (None, declared) => [declared, None],

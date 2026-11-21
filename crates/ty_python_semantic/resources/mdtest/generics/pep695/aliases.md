@@ -674,8 +674,8 @@ def test[X: int](items: list[X]) -> list[X]:
     # The annotation MaybeList[str | int] expands to `list[str | int] | str | int`.
     # Bidirectional inference should infer list[str | int] from the list() call.
     a: MaybeList[str | int] = list(items)
-    # The revealed type is list[int | str] because that's what list() returns.
-    reveal_type(a)  # revealed: list[int | str]
+    # The revealed type is list[str | int] because that's what list() returns.
+    reveal_type(a)  # revealed: list[str | int]
     return items
 ```
 
