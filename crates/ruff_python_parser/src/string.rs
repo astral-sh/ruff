@@ -380,55 +380,43 @@ impl<'src> StringParser<'src> {
             ));
         }
 
-        if self.flags.is_raw_string() {
-            // For raw strings, no escaping is necessary.
+        let bytes = self.source.as_bytes();
+        let mut next_escape = if self.flags.is_raw_string() {
+            None
+        } else {
+            memchr::memchr(b'\\', bytes)
+        };
+        if next_escape.is_none() {
             return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.as_bytes().into(),
+                value: bytes.into(),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
             }));
         }
 
-        let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
-            // If the string doesn't contain any escape sequences, return the owned string.
-            return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.as_bytes().into(),
-                range: self.range,
-                flags: self.flags.into(),
-                node_index: AtomicNodeIndex::NONE,
-            }));
-        };
+        let mut value = Vec::with_capacity(bytes.len());
+        while let Some(offset) = next_escape {
+            let escape = self.cursor + offset;
+            value.extend_from_slice(&bytes[self.cursor..escape]);
+            self.cursor = escape;
 
-        // If the string contains escape sequences, we need to parse them.
-        let mut value = Vec::with_capacity(self.source.len());
-        loop {
-            // Add the characters before the escape sequence to the string.
-            let before_with_slash = self.skip_bytes(escape + 1);
-            let before = &before_with_slash[..before_with_slash.len() - 1];
-            value.extend_from_slice(before.as_bytes());
-
-            // Add the escaped character to the string.
-            match self.parse_escaped_char()? {
-                None => {}
-                Some(EscapedChar::Literal(c)) => value.push(c as u8),
-                Some(EscapedChar::Escape(c)) => {
-                    value.push(b'\\');
-                    value.push(c as u8);
+            // Binary data often contains long runs of adjacent escapes. Only
+            // search for the next backslash when there's literal text to copy.
+            while self.peek_byte() == Some(b'\\') {
+                self.cursor += 1;
+                match self.parse_escaped_char()? {
+                    None => {}
+                    Some(EscapedChar::Literal(c)) => value.push(c as u8),
+                    Some(EscapedChar::Escape(c)) => {
+                        value.push(b'\\');
+                        value.push(c as u8);
+                    }
                 }
             }
-
-            let Some(next_escape) = memchr::memchr(b'\\', &self.source.as_bytes()[self.cursor..])
-            else {
-                // Add the rest of the string to the value.
-                let rest = &self.source[self.cursor..];
-                value.extend_from_slice(rest.as_bytes());
-                break;
-            };
-
-            // Update the position of the next escape sequence.
-            escape = next_escape;
+            next_escape = memchr::memchr(b'\\', &bytes[self.cursor..]);
         }
+        value.extend_from_slice(&bytes[self.cursor..]);
 
         Ok(StringType::Bytes(ast::BytesLiteral {
             value: value.into_boxed_slice(),
