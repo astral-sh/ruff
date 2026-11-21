@@ -17,7 +17,6 @@ use crate::ProgramFile;
 use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::expression::Expression;
-use crate::global_scope;
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
@@ -343,6 +342,19 @@ impl<'db> PatternPredicate<'db> {
     }
 }
 
+/// The scope and source module shared by all the predicates for a single `*` import.
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct StarImportContext<'db> {
+    #[returns(copy)]
+    pub scope: ScopeId<'db>,
+
+    #[returns(copy)]
+    pub referenced_file: ProgramFile<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for StarImportContext<'_> {}
+
 /// A "placeholder predicate" that is used to model the fact that the boundness of a (possible)
 /// definition or declaration caused by a `*` import cannot be fully determined until type-
 /// inference time. This is essentially the same as a standard reachability constraint, so we reuse
@@ -383,36 +395,11 @@ impl<'db> PatternPredicate<'db> {
 /// - If it resolves to a possibly bound symbol, then the predicate resolves to [`Truthiness::Ambiguous`]
 ///
 /// [Truthiness]: [crate::types::Truthiness]
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct StarImportPlaceholderPredicate<'db> {
-    #[returns(copy)]
-    pub importing_file: ProgramFile<'db>,
-
-    /// Each symbol imported by a `*` import has a separate predicate associated with it:
-    /// this field identifies which symbol that is.
-    ///
-    /// Note that a [`ScopedPlaceId`] is only meaningful if you also know the scope
-    /// it is relative to. For this specific struct, however, there's no need to store a
-    /// separate field to hold the ID of the scope. `StarImportPredicate`s are only created
-    /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
-    /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
-    /// to the global scope of the importing file.
-    #[returns(copy)]
+    pub import: StarImportContext<'db>,
+    /// The imported symbol in the importing scope.
     pub symbol_id: ScopedSymbolId,
-
-    #[returns(copy)]
-    pub referenced_file: ProgramFile<'db>,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for StarImportPlaceholderPredicate<'_> {}
-
-impl<'db> StarImportPlaceholderPredicate<'db> {
-    pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        // See doc-comment above [`StarImportPlaceholderPredicate::symbol_id`]:
-        // valid `*`-import definitions can only take place in the global scope.
-        global_scope(db, self.importing_file(db))
-    }
 }
 
 impl<'db> From<StarImportPlaceholderPredicate<'db>> for PredicateOrLiteral<'db> {
