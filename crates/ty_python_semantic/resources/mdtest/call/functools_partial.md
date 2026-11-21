@@ -2291,3 +2291,51 @@ p = partial(f)
 # error: [missing-attribute]
 p.__name__ = "renamed"
 ```
+
+## Partial application with expanded positional arguments
+
+### Keyword overrides must work for every positional union member
+
+```py
+from functools import partial
+from typing import overload
+
+@overload
+def f(x: int, y: int) -> None: ...
+@overload
+def f(x: str, y: int) -> None: ...
+@overload
+def f(x: int, y: None) -> None: ...
+def f(x, y): ...
+def check(a: int | str, b: str | int):
+    partial(f, a, y=0)()
+    partial(f, 1, y=0)(y=None)
+    partial(f, a, y=0)(y=None)  # error: [invalid-argument-type]
+    partial(f, b, y=0)(y=None)  # error: [invalid-argument-type]
+```
+
+### A rejected overload cannot force a ParamSpec fallback
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+from typing import Callable, overload, reveal_type
+
+type Consumer[**P] = Callable[[Callable[P, None]], None]
+
+@overload
+def f[**P](x: int, cb: Consumer[P], /, *args: P.args, **kwargs: P.kwargs) -> int: ...
+@overload
+def f(x: str, cb: object, /) -> str: ...
+def f(x, cb, /, *args, **kwargs):
+    return x
+
+def check(cb: Consumer[[int]] | Consumer[[str]]):
+    p = partial(f, "", cb)
+    reveal_type(p)  # revealed: partial[() -> str]
+    p(None)  # error: [too-many-positional-arguments]
+```
