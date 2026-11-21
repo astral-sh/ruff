@@ -61,6 +61,7 @@ pub fn line_coverage(db: &dyn Db, file: File) -> Vec<Line> {
         model,
         line_index,
         source,
+        signature_start: None,
     };
 
     let ast = parsed_module(db, file.python_file(db)).load(db);
@@ -74,6 +75,10 @@ struct CoverageVisitor<'db> {
     line_index: LineIndex,
     source: SourceText,
     lines: Vec<Line>,
+    /// While visiting the parameters and return annotation of a function, the start of the
+    /// function's name. Like mypy, we record the types in a function's signature on the line of its
+    /// `def`, so that a signature counts once even when it spans several lines.
+    signature_start: Option<TextSize>,
 }
 
 impl<'db> CoverageVisitor<'db> {
@@ -89,15 +94,31 @@ impl<'db> CoverageVisitor<'db> {
     fn record(&mut self, ty: Option<Type<'db>>, range: TextRange) {
         if let Some(ty) = ty {
             let coverage = classify(self.model.db(), &self.env, ty);
-            self.record_coverage(coverage, ty, range);
+            self.record_coverage(coverage, ty, range, range.start());
         }
     }
 
-    /// Records `coverage` for the node at `range`, whose type is `ty`, on the line where the node
-    /// starts.
-    fn record_coverage(&mut self, coverage: LineCoverage, ty: Type<'db>, range: TextRange) {
+    /// Records the type of a parameter or annotation at `range`, on the line of the enclosing
+    /// function's `def` if the node is part of a function signature.
+    fn record_in_signature(&mut self, ty: Option<Type<'db>>, range: TextRange) {
+        if let Some(ty) = ty {
+            let coverage = classify(self.model.db(), &self.env, ty);
+            let line_offset = self.signature_start.unwrap_or(range.start());
+            self.record_coverage(coverage, ty, range, line_offset);
+        }
+    }
+
+    /// Records `coverage` for the node at `range`, whose type is `ty`, on the line that contains
+    /// `line_offset`.
+    fn record_coverage(
+        &mut self,
+        coverage: LineCoverage,
+        ty: Type<'db>,
+        range: TextRange,
+        line_offset: TextSize,
+    ) {
         let note = (coverage > LineCoverage::Precise).then(|| self.note(ty, range));
-        let Some(line) = self.line_mut(range.start()) else {
+        let Some(line) = self.line_mut(line_offset) else {
             return;
         };
 
@@ -143,6 +164,23 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
             stmt if is_docstring_stmt(stmt) => return,
             ast::Stmt::FunctionDef(function) => {
                 self.record(function.inferred_type(&self.model), function.name.range());
+
+                for decorator in &function.decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = &function.type_params {
+                    self.visit_type_params(type_params);
+                }
+
+                let enclosing_signature = self.signature_start.replace(function.name.start());
+                self.visit_parameters(&function.parameters);
+                if let Some(returns) = &function.returns {
+                    self.visit_annotation(returns);
+                }
+                self.signature_start = enclosing_signature;
+
+                self.visit_body(&function.body);
+                return;
             }
             ast::Stmt::ClassDef(class) => {
                 self.record(class.inferred_type(&self.model), class.name.range());
@@ -170,11 +208,11 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
     /// imprecise. Visiting the annotation's sub-expressions would classify the `Any` inside it as
     /// dynamic, even though no value on the line has a dynamic type.
     fn visit_annotation(&mut self, expr: &ast::Expr) {
-        self.record(expr.inferred_type(&self.model), expr.range());
+        self.record_in_signature(expr.inferred_type(&self.model), expr.range());
     }
 
     fn visit_parameter(&mut self, parameter: &ast::Parameter) {
-        self.record(parameter.inferred_type(&self.model), parameter.name.range());
+        self.record_in_signature(parameter.inferred_type(&self.model), parameter.name.range());
         source_order::walk_parameter(self, parameter);
     }
 
@@ -327,12 +365,12 @@ mod tests {
           | 
         P | from typing import Any
           | 
-        P | def request(
-        P |     method: str,
-        I |     data: dict[str, Any] | None = None,  # `data`: dict[str, Any] | None, `dict[str, Any] | None`: dict[str, Any] | None
-        I |     timeout=5.0,  # `timeout`: Unknown | float*
-        I |     default=len("x"),  # `default`: Unknown | Literal[1]
-        P | ) -> None:
+        I | def request(  # `data`: dict[str, Any] | None, `dict[str, Any] | None`: dict[str, Any] | None, `timeout`: Unknown | float*, `default`: Unknown | Literal[1]
+          |     method: str,
+        P |     data: dict[str, Any] | None = None,
+        P |     timeout=5.0,
+        P |     default=len("x"),
+          | ) -> None:
           |     pass
         "#);
     }
