@@ -717,6 +717,23 @@ impl<'db> UnionType<'db> {
         }
     }
 
+    /// Reuse cycle recovery for unions shared by multiple type arguments.
+    /// For example, both arms of `list[U] | set[U]` normalize `U` as a nested type.
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+    pub(super) fn normalize_nested_union(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        div: Type<'db>,
+    ) -> Option<Type<'db>> {
+        self.recursive_type_normalized_impl(
+            db,
+            &ProgramEnvironment::from_program(program),
+            div,
+            true,
+        )
+    }
+
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,

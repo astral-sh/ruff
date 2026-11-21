@@ -563,6 +563,13 @@ fn divergent_type() {
         "list[Divergent]"
     );
 
+    // The same nested union stays intact when recovering from a different cycle.
+    let other = Type::divergent(salsa::plumbing::Id::from_bits(2));
+    assert_eq!(
+        nested_rec.recursive_type_normalized_impl(db, &env, other, false),
+        Some(nested_rec)
+    );
+
     let recursive_tuple = Type::heterogeneous_tuple(
         db,
         &env,
