@@ -375,7 +375,7 @@ impl get_size2::GetSize for StarImportContext<'_> {}
 /// from exporter import *
 /// ```
 ///
-/// Since we cannot know whether or not <condition> is true at semantic-index time, we record
+/// Since we cannot know whether `<condition>` is true at semantic-index time, we record
 /// a definition for `A` in `importer.py` as a result of the `from exporter import *` statement,
 /// but place a predicate on it to record the fact that we don't yet know whether this definition
 /// will be visible from all control-flow paths or not. Essentially, we model `importer.py` as
@@ -385,16 +385,11 @@ impl get_size2::GetSize for StarImportContext<'_> {}
 /// A = 1
 ///
 /// if <star_import_placeholder_predicate>:
-///     from a import A
+///     from exporter import A
 /// ```
 ///
-/// At type-check time, the placeholder predicate for the `A` definition is evaluated by attempting
-/// to resolve the `A` symbol in `exporter.py`'s global namespace:
-/// - If it resolves to a definitely bound symbol, then the predicate resolves to [`Truthiness::AlwaysTrue`]
-/// - If it resolves to an unbound symbol, then the predicate resolves to [`Truthiness::AlwaysFalse`]
-/// - If it resolves to a possibly bound symbol, then the predicate resolves to [`Truthiness::Ambiguous`]
-///
-/// [Truthiness]: [crate::types::Truthiness]
+/// At type-check time, the predicate is true if `A` is definitely bound in
+/// `exporter.py`, false if it's unbound, and ambiguous if it's possibly bound.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct StarImportPlaceholderPredicate<'db> {
     pub import: StarImportContext<'db>,
