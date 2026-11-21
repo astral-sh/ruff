@@ -2918,6 +2918,7 @@ class Foo:
         # error: [unresolved-reference] "Name `x` used when not defined"
         print(x)
 
+    # error: [invalid-argument-type] "Argument to class `classmethod` is incorrect"
     @classmethod
     def class_method(*, cls):
         # error: [unresolved-reference] "Name `x` used when not defined"
