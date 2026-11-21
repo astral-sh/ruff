@@ -20,16 +20,21 @@ pub(crate) fn check_type_guard_definition<'db>(
     let Type::FunctionLiteral(function) = ty else {
         return;
     };
+    let Some(returns_expr) = node.returns.as_deref() else {
+        return;
+    };
 
     let db = context.db();
     let env = context.program_environment();
 
     let overload = function.literal(db).last_definition;
-    // A decorator may have replaced the function. Only reuse the return type
-    // if we checked this definition. Wrapping an async return in a coroutine
-    // can hide a type guard, but it cannot produce one.
+    // A decorator may have replaced the function, and cycle recovery can replace
+    // an annotated guard with `Unknown` in the cached signature. In either case,
+    // check the definition's signature directly. Wrapping an async return in a
+    // coroutine can hide a type guard, but it cannot produce one.
     if let Some((checked, return_ty)) = checked_return
         && checked == overload
+        && !return_ty.is_unknown()
         && !matches!(return_ty, Type::TypeIs(_) | Type::TypeGuard(_))
     {
         return;
@@ -42,11 +47,6 @@ pub(crate) fn check_type_guard_definition<'db>(
         Type::TypeIs(type_is) => ("TypeIs", Some(type_is.return_type(db))),
         Type::TypeGuard(_) => ("TypeGuard", None),
         _ => return,
-    };
-
-    // The return type annotation must exist since we matched `TypeIs`/`TypeGuard`.
-    let Some(returns_expr) = node.returns.as_deref() else {
-        return;
     };
 
     // Check if this is a non-static method (first parameter is implicit `self`/`cls`).
