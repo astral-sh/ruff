@@ -9,7 +9,7 @@ use crate::{
     Db, ProgramEnvironment,
     types::{
         ClassLiteral, KnownClass, Type, TypeContext, UnionType,
-        class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
+        class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec, FunctionalEnumMember},
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
@@ -17,6 +17,7 @@ use crate::{
             PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
             report_mismatched_type_name,
         },
+        enums::{enum_metaclass_overrides, enum_metadata},
         infer::TypeInferenceBuilder,
         infer::builder::dynamic_class::report_mro_error_kind,
         subclass_of::SubclassOfType,
@@ -41,7 +42,7 @@ enum EnumMembersArgParseResult<'db> {
 
 /// Known members parsed from a functional enum `names` argument.
 struct KnownEnumMembers<'db> {
-    members: Vec<(Name, Type<'db>)>,
+    members: Vec<FunctionalEnumMember<'db>>,
     value_form: EnumMemberValueForm,
 }
 
@@ -111,21 +112,41 @@ enum SequenceEnumMemberForm {
     Pairs,
 }
 
-/// Find enum base class of the given type.
-pub(crate) fn enum_functional_call_base<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<KnownClass> {
-    let ClassLiteral::Static(cls) = ty.as_class_literal()? else {
-        return None;
+/// Return the first standard-library enum base in the MRO if ty should apply
+/// functional enum inference to this call.
+fn enum_functional_call_base<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    arguments: &ast::Arguments,
+) -> Option<KnownClass> {
+    if let Some(known) = class.known(db) {
+        // Route incomplete calls to the standard-library factories through functional
+        // inference too, so we can diagnose a missing `names` argument.
+        return known.is_stdlib_enum_base().then_some(known);
+    }
+
+    arguments.find_argument_value("names", 1)?;
+
+    let stdlib_base = class
+        .iter_mro(db)
+        .filter_map(|base| base.into_class()?.known(db))
+        .find(|known| known.is_stdlib_enum_base())?;
+
+    // `EnumType.__call__` looks up a member by value once the enum has members.
+    // A functional enum's member list can also be empty when its members are unknown.
+    let is_empty = match class {
+        ClassLiteral::DynamicEnum(base) => {
+            let spec = base.spec(db);
+            spec.has_known_members(db) && spec.members(db).is_empty()
+        }
+        ClassLiteral::Static(_) => enum_metadata(db, class).is_none(),
+        _ => return None,
     };
-    cls.known(db).filter(|k| {
-        matches!(
-            k,
-            KnownClass::Enum
-                | KnownClass::StrEnum
-                | KnownClass::IntEnum
-                | KnownClass::Flag
-                | KnownClass::IntFlag
-        )
-    })
+
+    // A custom metaclass can override `__call__` or the `_create_` method
+    // to which `EnumType.__call__` delegates class creation.
+    (is_empty && !enum_metaclass_overrides(db, class, &["__call__", "_create_"]))
+        .then_some(stdlib_base)
 }
 
 fn enum_functional_call_keyword_is_valid(name: &str, python_version: PythonVersion) -> bool {
@@ -227,12 +248,33 @@ fn next_auto_value<'db>(
     }
 }
 
+/// Resolve a member from a (name, value) pair, including a possible `auto()` value.
+fn enum_member_from_pair<'db>(
+    context: &InferContext<'db, '_>,
+    base_class: KnownClass,
+    name: Name,
+    value: Type<'db>,
+    last_int_value: Option<i64>,
+) -> FunctionalEnumMember<'db> {
+    let is_auto = value.is_instance_of(context.db(), KnownClass::Auto);
+    let value = if is_auto {
+        next_auto_value(context, base_class, name.as_str(), last_int_value)
+    } else {
+        value
+    };
+    FunctionalEnumMember {
+        name,
+        value,
+        is_auto,
+    }
+}
+
 fn enum_members_from_names<'db>(
     context: &InferContext<'db, '_>,
     names: Vec<Name>,
     start: EnumStart,
     base_class: KnownClass,
-) -> Vec<(Name, Type<'db>)> {
+) -> Vec<FunctionalEnumMember<'db>> {
     let mut members = Vec::with_capacity(names.len());
     let mut last_int_value = None;
 
@@ -243,7 +285,11 @@ fn enum_members_from_names<'db>(
             next_auto_value(context, base_class, name.as_str(), last_int_value)
         };
         last_int_value = value.as_int_literal();
-        members.push((name, value));
+        members.push(FunctionalEnumMember {
+            name,
+            value,
+            is_auto: true,
+        });
     }
 
     members
@@ -259,8 +305,8 @@ fn enum_members_from_names<'db>(
 fn apply_generated_type_mixin_member_values<'db>(
     context: &InferContext<'db, '_>,
     mixin_type: Type<'_>,
-    members: Vec<(Name, Type<'db>)>,
-) -> Option<Vec<(Name, Type<'db>)>> {
+    members: Vec<FunctionalEnumMember<'db>>,
+) -> Option<Vec<FunctionalEnumMember<'db>>> {
     let db = context.db();
     let Type::ClassLiteral(ClassLiteral::Static(class)) = mixin_type else {
         return None;
@@ -275,7 +321,8 @@ fn apply_generated_type_mixin_member_values<'db>(
     let env = context.program_environment();
     members
         .into_iter()
-        .map(|(name, value)| {
+        .map(|member| {
+            let value = member.value;
             if !value.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
                 return None;
             }
@@ -287,19 +334,21 @@ fn apply_generated_type_mixin_member_values<'db>(
             } else {
                 mixin_class.to_instance(db, env)
             };
-            Some((name, value))
+            Some(FunctionalEnumMember { value, ..member })
         })
         .collect()
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    pub(crate) fn infer_enum_call_expression(
+    pub(super) fn infer_enum_call_expression(
         &mut self,
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
-        base_class: KnownClass,
+        callable_type: Type<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
+        let base_class = callable_type.as_class_literal()?;
+        let stdlib_base = enum_functional_call_base(db, base_class, &call_expr.arguments)?;
         let ast::Arguments {
             args,
             keywords,
@@ -318,7 +367,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 builder.into_diagnostic(format_args!(
                     "Argument `{name}` does not match any known parameter of function `{base_name}`",
-                    base_name = base_class.name(env.python_version(db)),
+                    base_name = base_class.name(db),
                 ));
             }
         }
@@ -338,7 +387,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             builder.into_diagnostic(format_args!(
                 "Multiple values provided for parameter `value` of `{base_name}()`",
-                base_name = base_class.name(self.program_environment().python_version(db)),
+                base_name = base_class.name(db),
             ));
         }
         if args.len() >= 2
@@ -349,7 +398,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             builder.into_diagnostic(format_args!(
                 "Multiple values provided for parameter `names` of `{base_name}()`",
-                base_name = base_class.name(self.program_environment().python_version(db)),
+                base_name = base_class.name(db),
             ));
         }
 
@@ -380,15 +429,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_enum_mixin_argument(&keyword.value, base_class);
             }
 
-            let python_version = self.program_environment().python_version(db);
             if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, call_expr) {
                 builder.into_diagnostic(format_args!(
                     "Missing required argument `names` to `{base_name}()`",
-                    base_name = base_class.name(python_version),
+                    base_name = base_class.name(db),
                 ));
             }
 
-            return Some(base_class.to_instance(db, env));
+            return Some(base_class.to_non_generic_instance(db, env));
         };
 
         let start = start_kw.map_or(EnumStart::Literal(1), |kw| {
@@ -409,7 +457,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             builder.into_diagnostic(format_args!(
                 "Too many positional arguments to function `{base_name}`: expected 2, got {}",
                 args.len(),
-                base_name = base_class.name(self.program_environment().python_version(db)),
+                base_name = base_class.name(db),
             ));
         }
 
@@ -422,7 +470,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 &self.context,
                 &MISMATCHED_ENUM_NAME,
                 name_arg,
-                base_class.name(env.python_version(db)),
+                base_class.name(db),
                 &assigned_name,
                 Some(actual_name),
                 name_type,
@@ -433,6 +481,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             names_arg,
             start,
             base_class,
+            stdlib_base,
             mixin_type,
             has_too_many_positional || has_positional_keyword_conflict || !valid_mixin_type,
         );
@@ -440,7 +489,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Non-literal names use the ordinary `type[EnumSubclass]` overload result
         // instead of synthesizing a `DynamicEnumLiteral`.
         let Some(name) = name else {
-            return SubclassOfType::try_from_type(db, env, base_class.to_class_literal(db, env));
+            return Some(SubclassOfType::from(
+                db,
+                env,
+                base_class.default_specialization(db),
+            ));
         };
 
         let anchor = self.create_dynamic_enum_anchor(call_expr, definition, spec);
@@ -462,7 +515,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         name_arg: &ast::Expr,
         name_type: Type<'db>,
-        base_class: KnownClass,
+        base_class: ClassLiteral<'db>,
     ) -> Option<&'db str> {
         let db = self.db();
 
@@ -473,7 +526,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid argument to parameter `value` of `{base_name}()`",
-                    base_name = base_class.name(env.python_version(db))
+                    base_name = base_class.name(db)
                 ));
                 diagnostic.set_primary_annotation_message(format_args!(
                     "Expected `str`, found `{}`",
@@ -511,7 +564,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn infer_enum_mixin_argument(
         &mut self,
         value: &ast::Expr,
-        base_class: KnownClass,
+        base_class: ClassLiteral<'db>,
     ) -> (Option<Type<'db>>, bool) {
         let db = self.db();
         let ty = self.expression_type(value);
@@ -530,9 +583,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let Some(mixin_class) = ty.to_class_type(db) else {
                 return (Some(ty), true);
             };
-            let Some(enum_base) = base_class.to_class_literal(db, env).to_class_type(db) else {
-                return (Some(ty), true);
-            };
+            let enum_base = base_class.default_specialization(db);
             let constraints = ConstraintSetBuilder::new();
             if !mixin_class.could_coexist_in_mro_with(db, env, enum_base, &constraints)
                 && let Some(builder) = self.context.report_lint(&INVALID_BASE, value)
@@ -540,7 +591,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 builder.into_diagnostic(format_args!(
                     "Class `{}` cannot be used as an enum mixin with `{}`",
                     mixin_class.name(db),
-                    base_class.name(self.program_environment().python_version(db)),
+                    base_class.name(db),
                 ));
                 return (None, false);
             }
@@ -565,7 +616,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         names_arg: &ast::Expr,
         start: EnumStart,
-        base_class: KnownClass,
+        base_class: ClassLiteral<'db>,
+        stdlib_base: KnownClass,
         mixin_type: Option<Type<'db>>,
         has_invalid_arguments: bool,
     ) -> EnumSpec<'db> {
@@ -573,13 +625,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let (members, has_known_members) = if has_invalid_arguments {
             (vec![], false)
         } else {
-            match self.parse_enum_members_arg(names_arg, start, base_class) {
+            // Compute the standard generated values here. We apply a user-defined
+            // `_generate_next_value_` when resolving member metadata, since its return
+            // annotation can refer to the class we are creating.
+            match self.parse_enum_members_arg(names_arg, start, stdlib_base) {
                 EnumMembersArgParseResult::Known(known_members) => {
                     let mut seen = FxHashSet::default();
                     if known_members
                         .members
                         .iter()
-                        .any(|(name, _)| !seen.insert(name.clone()))
+                        .any(|member| !seen.insert(member.name.clone()))
                     {
                         // Duplicate member names raise at runtime, so degrade to an unknown
                         // member set and let normal call binding surface the rest.
@@ -693,7 +748,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         start: EnumStart,
         base_class: KnownClass,
     ) -> EnumMembersArgParseResult<'db> {
-        let db = self.db();
         let mut names = Vec::with_capacity(elts.len());
         let mut explicit_members = Vec::with_capacity(elts.len());
         let mut form = None;
@@ -758,13 +812,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // still begins from the default seed of `1`.
         let mut last_int_value = Some(0);
         for (name, value) in explicit_members {
-            let value = if value.is_instance_of(db, KnownClass::Auto) {
-                next_auto_value(&self.context, base_class, name.as_str(), last_int_value)
-            } else {
-                value
-            };
-            last_int_value = value.as_int_like_literal();
-            members.push((name, value));
+            let member =
+                enum_member_from_pair(&self.context, base_class, name, value, last_int_value);
+            last_int_value = member.value.as_int_like_literal();
+            members.push(member);
         }
         EnumMembersArgParseResult::Known(KnownEnumMembers {
             members,
@@ -803,13 +854,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             let name = Name::new(string_lit.value(db));
             let raw_value = self.expression_type(&item.value);
-            let value = if raw_value.is_instance_of(db, KnownClass::Auto) {
-                next_auto_value(&self.context, base_class, name.as_str(), last_int_value)
-            } else {
-                raw_value
-            };
-            last_int_value = value.as_int_like_literal();
-            members.push((name, value));
+            let member =
+                enum_member_from_pair(&self.context, base_class, name, raw_value, last_int_value);
+            last_int_value = member.value.as_int_like_literal();
+            members.push(member);
         }
         if has_opaque_keys {
             EnumMembersArgParseResult::Unknown
@@ -884,10 +932,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn report_invalid_enum_names_argument(
         &mut self,
         names_arg: &ast::Expr,
-        base_class: KnownClass,
+        base_class: ClassLiteral<'db>,
     ) {
         let db = self.db();
-        let base_name = base_class.name(self.program_environment().python_version(db));
+        let base_name = base_class.name(db);
         let names_ty = self.expression_type(names_arg);
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, names_arg) {
             let env = self.program_environment();
