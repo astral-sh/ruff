@@ -1100,6 +1100,9 @@ struct ConstraintSetStorage<'db> {
     /// are stored in the dense local arenas below.
     compacted: Option<Arc<OwnedConstraintSetInner<'db>>>,
 
+    /// Raw paths from the last bounded projection in this builder, before solution selection.
+    last_projection: Option<Box<(projection::ProjectionKey<'db>, CandidateSolutions<'db>)>>,
+
     /// Constraints are the variables of our BDD. They are interned to give them a space-efficient
     /// identity. Constraints are added to this arena as they are encountered when constructing
     /// constraint sets. The ordering within the arena defines the BDD variable ordering in our BDD
