@@ -1262,8 +1262,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         };
         // A caller's constrained U can be the solution for T for every choice of U.
         // For example, U: (int, str) satisfies T: (int, str, bytes), even though neither
-        // T = int nor T = str works for every U. Check T = U against the other bounds
-        // on this path before trying individual declared constraints.
+        // T = int nor T = str works for every U.
         let mut witnesses = SmallVec::<[_; 2]>::new();
         if self.inferable != TypeVarSet::All {
             let bounds = path.positive_constraints().filter_map(|(id, _)| {
@@ -1282,12 +1281,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             }
         }
         for witness in witnesses {
-            let equality = ConcreteEquivalenceBound::new(
-                ConstraintProvenance::VALIDITY,
-                bound_typevar,
-                witness,
-            );
-            let equality = storage.intern_atomic_constraint(db, env, equality.into());
             let satisfied = Cell::new(false);
             let check_candidate: &ProcessSatisfied<'_, 'db, L, Break<L::Break>> =
                 &|this, storage, path| {
@@ -1300,6 +1293,46 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                     }
                     ControlFlow::Continue(())
                 };
+
+            // With a lower bound L, prefer a declared choice C over a fixed U if
+            // L <= C <= U for every specialization. If L is U itself, it is already
+            // the narrowest possible solution.
+            //
+            // TODO: Rank viable fixed typevars and declared choices together in
+            // `preferred_constraint`. Stop at the first valid candidate only when
+            // it is preferred over all remaining candidates.
+            if let Some(lower) = evidence.evidence_lower
+                && lower != witness
+                && let Some(preferred) =
+                    constrained_typevar.preferred_constraint(db, env, true, |idx| {
+                        let declared = &constrained_typevar.declared_constraints[idx];
+                        declared.constraints.is_some()
+                            && lower.is_subtype_of(db, env, declared.constrained_ty)
+                            && declared.constrained_ty.is_subtype_of(db, env, witness)
+                    })
+            {
+                self.validate_single_declared_constraint(
+                    db,
+                    env,
+                    storage,
+                    path,
+                    bound_typevar,
+                    &evidence,
+                    &constrained_typevar.declared_constraints[preferred],
+                    constrained,
+                    check_candidate,
+                )?;
+                if satisfied.get() {
+                    return ControlFlow::Continue(());
+                }
+            }
+
+            let equality = ConcreteEquivalenceBound::new(
+                ConstraintProvenance::VALIDITY,
+                bound_typevar,
+                witness,
+            );
+            let equality = storage.intern_atomic_constraint(db, env, equality.into());
             self.visit_constraints_and_then(
                 db,
                 env,

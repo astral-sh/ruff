@@ -6014,6 +6014,23 @@ def check_bounds[Lower: (bool, int), Upper: (int, object)](low: Lower, high: Upp
     reveal_type(apply(low, accept))  # revealed: Lower@check_bounds
 ```
 
+Both choices of `Upper` let the callback accept a `bool`, so we infer `bool` for `Result`.
+
+```py
+def check_bool[Upper: (int, object)](flag: bool, accept: Callable[[Upper], None]) -> bool:
+    result = apply(flag, accept)
+    reveal_type(result)  # revealed: bool
+    reveal_type(apply(True, accept))  # revealed: bool
+    return result
+```
+
+When `V` is bounded by `int`, the narrowest declared choice that covers every `V` is `int`.
+
+```py
+def check_bounded[V: int, Upper: (int, object)](value: V, accept: Callable[[Upper], None]) -> None:
+    reveal_type(apply(value, accept))  # revealed: int
+```
+
 A fixed constrained typevar and a gradual argument can provide separate bounds for another
 constrained typevar. Both bounds are non-concrete, so we preserve their combined family solution
 rather than adding the individual constraints `A` and `B` to it.
@@ -6053,6 +6070,38 @@ def f[T: (int, str)](x: T) -> T:
 
 def g[S: (bool, str)](x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
+```
+
+## Inferring a constrained type variable from a common subclass and a callback
+
+`Both` fits all three constraints on `T`. The callback may accept only `A` or only `B`, so no single
+declared choice works for every specialization of `U`. Taking `T = U` satisfies both arguments.
+
+```py
+from typing import Callable
+
+class A: ...
+class B: ...
+class Both(A, B): ...
+
+def apply[T: (A, B, object)](x: T, accept: Callable[[T], None]) -> T:
+    accept(x)
+    return x
+
+def check[U: (A, B)](x: Both, accept: Callable[[U], None]) -> U:
+    result = apply(x, accept)
+    reveal_type(result)  # revealed: U@check
+    return result
+```
+
+When `Wide` is either `A` or `object`, the callback always accepts an `A`. Choosing `B` or `object`
+for `T` would fail when `Wide` is `A`.
+
+```py
+def check_wide[Wide: (A, object)](x: Both, accept: Callable[[Wide], None]) -> A:
+    result = apply(x, accept)
+    reveal_type(result)  # revealed: A
+    return result
 ```
 
 ## Inferring a constrained typevar from a bounded typevar
