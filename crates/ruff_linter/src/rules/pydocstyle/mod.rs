@@ -24,32 +24,47 @@ mod tests {
     #[test_case(Rule::MissingBlankLineAfterLastDocstringSection, Path::new("D413.py"))]
     #[test_case(Rule::IncorrectBlankLineAfterDocstringSummary, Path::new("D.py"))]
     #[test_case(Rule::MissingBlankLineBeforeDocstringSection, Path::new("sections.py"))]
-    #[test_case(Rule::NonCapitalizedSectionName, Path::new("sections.py"))]
-    #[test_case(Rule::MissingDashedUnderlineAfterSection, Path::new("sections.py"))]
+    #[test_case(
+        Rule::IncorrectlyCapitalizedDocstringSectionName,
+        Path::new("sections.py")
+    )]
+    #[test_case(Rule::MissingDocstringSectionUnderline, Path::new("sections.py"))]
     #[test_case(Rule::UndocumentedParameter, Path::new("canonical_google_examples.py"))]
     #[test_case(Rule::UndocumentedParameter, Path::new("canonical_numpy_examples.py"))]
     #[test_case(Rule::UndocumentedParameter, Path::new("sections.py"))]
-    #[test_case(Rule::MissingTrailingPeriod, Path::new("D.py"))]
-    #[test_case(Rule::MissingTrailingPeriod, Path::new("D400.py"))]
-    #[test_case(Rule::MissingTrailingPeriod, Path::new("D400_415.py"))]
-    #[test_case(Rule::MissingTerminalPunctuation, Path::new("D.py"))]
-    #[test_case(Rule::MissingTerminalPunctuation, Path::new("D400_415.py"))]
-    #[test_case(Rule::FirstWordUncapitalized, Path::new("D.py"))]
-    #[test_case(Rule::FirstWordUncapitalized, Path::new("D403.py"))]
+    #[test_case(Rule::DocstringSummaryWithoutPeriod, Path::new("D.py"))]
+    #[test_case(Rule::DocstringSummaryWithoutPeriod, Path::new("D400.py"))]
+    #[test_case(Rule::DocstringSummaryWithoutPeriod, Path::new("D400_415.py"))]
+    #[test_case(Rule::DocstringSummaryWithoutTerminalPunctuation, Path::new("D.py"))]
+    #[test_case(
+        Rule::DocstringSummaryWithoutTerminalPunctuation,
+        Path::new("D400_415.py")
+    )]
+    #[test_case(Rule::DocstringStartsWithLowercaseLetter, Path::new("D.py"))]
+    #[test_case(Rule::DocstringStartsWithLowercaseLetter, Path::new("D403.py"))]
     #[test_case(Rule::UnnecessaryMultilineDocstring, Path::new("D.py"))]
     #[test_case(Rule::DocstringTabIndentation, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedMagicMethod, Path::new("D.py"))]
     #[test_case(Rule::MultilineDocstringSummaryOnSeparateLine, Path::new("D.py"))]
     #[test_case(Rule::MultilineDocstringSummaryOnFirstLine, Path::new("D.py"))]
-    #[test_case(Rule::MissingNewLineAfterLastDocstringParagraph, Path::new("D.py"))]
-    #[test_case(Rule::MissingNewLineAfterSectionName, Path::new("sections.py"))]
+    #[test_case(Rule::MissingNewlineAfterLastDocstringParagraph, Path::new("D.py"))]
+    #[test_case(
+        Rule::MissingNewlineAfterDocstringSectionName,
+        Path::new("sections.py")
+    )]
     #[test_case(Rule::BlankLineAfterFunctionDocstring, Path::new("D.py"))]
     #[test_case(Rule::UnnecessaryMultilineDocstring, Path::new("D200.py"))]
     #[test_case(Rule::BlankLineAfterFunctionDocstring, Path::new("D202.py"))]
     #[test_case(Rule::BlankLineBeforeClassDocstring, Path::new("D.py"))]
     #[test_case(Rule::BlankLineBeforeFunctionDocstring, Path::new("D.py"))]
-    #[test_case(Rule::BlankLinesBetweenHeaderAndContent, Path::new("sections.py"))]
-    #[test_case(Rule::BlankLinesBetweenHeaderAndContent, Path::new("sphinx.py"))]
+    #[test_case(
+        Rule::ExtraBlankLineBeforeDocstringSectionContent,
+        Path::new("sections.py")
+    )]
+    #[test_case(
+        Rule::ExtraBlankLineBeforeDocstringSectionContent,
+        Path::new("sphinx.py")
+    )]
     #[test_case(Rule::OverIndentedDocstringLine, Path::new("D.py"))]
     #[test_case(Rule::OverIndentedDocstringLine, Path::new("D208.py"))]
     #[test_case(Rule::SignatureInDocstring, Path::new("D.py"))]
@@ -59,7 +74,7 @@ mod tests {
     #[test_case(Rule::UnderIndentedDocstringLine, Path::new("D.py"))]
     #[test_case(Rule::EmptyDocstring, Path::new("D.py"))]
     #[test_case(Rule::EmptyDocstringSection, Path::new("sections.py"))]
-    #[test_case(Rule::NonImperativeMood, Path::new("D401.py"))]
+    #[test_case(Rule::NonImperativeDocstringSummary, Path::new("D401.py"))]
     #[test_case(Rule::MissingBlankLineAfterDocstringSection, Path::new("D410.py"))]
     #[test_case(Rule::IncorrectBlankLineAfterClassDocstring, Path::new("D.py"))]
     #[test_case(Rule::IncorrectBlankLineBeforeClassDocstring, Path::new("D.py"))]
@@ -85,11 +100,14 @@ mod tests {
     #[test_case(Rule::UndocumentedPublicNestedClass, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedPublicPackage, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedPublicPackage, Path::new("D104/__init__.py"))]
-    #[test_case(Rule::MissingSectionNameColon, Path::new("D.py"))]
+    #[test_case(Rule::DocstringSectionNameWithoutColon, Path::new("D.py"))]
     #[test_case(Rule::OverIndentedDocstringSection, Path::new("sections.py"))]
     #[test_case(Rule::OverIndentedDocstringSection, Path::new("D214_module.py"))]
     #[test_case(Rule::OverIndentedDocstringSection, Path::new("sphinx_directive.py"))]
-    #[test_case(Rule::NonCapitalizedSectionName, Path::new("sphinx_directive.py"))]
+    #[test_case(
+        Rule::IncorrectlyCapitalizedDocstringSectionName,
+        Path::new("sphinx_directive.py")
+    )]
     #[test_case(
         Rule::MissingBlankLineAfterLastDocstringSection,
         Path::new("sphinx_directive.py")
@@ -99,7 +117,10 @@ mod tests {
         Rule::BlankLineBeforeDocstringSectionUnderline,
         Path::new("sections.py")
     )]
-    #[test_case(Rule::MismatchedSectionUnderlineLength, Path::new("sections.py"))]
+    #[test_case(
+        Rule::IncorrectDocstringSectionUnderlineLength,
+        Path::new("sections.py")
+    )]
     #[test_case(Rule::OverIndentedDocstringSectionUnderline, Path::new("sections.py"))]
     #[test_case(Rule::OverloadWithDocstring, Path::new("D.py"))]
     #[test_case(Rule::OverloadWithDocstring, Path::new("D418.pyi"))]
@@ -227,7 +248,7 @@ mod tests {
                     convention: Some(convention),
                     ..Settings::default()
                 },
-                ..settings::LinterSettings::for_rule(Rule::IncorrectSectionOrder)
+                ..settings::LinterSettings::for_rule(Rule::IncorrectDocstringSectionOrder)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -239,8 +260,8 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pydocstyle/D209_D400.py"),
             &settings::LinterSettings::for_rules([
-                Rule::MissingNewLineAfterLastDocstringParagraph,
-                Rule::MissingTrailingPeriod,
+                Rule::MissingNewlineAfterLastDocstringParagraph,
+                Rule::DocstringSummaryWithoutPeriod,
             ]),
         )?;
         assert_diagnostics!(diagnostics);
