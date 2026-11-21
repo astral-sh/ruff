@@ -185,6 +185,14 @@ impl<'db> BoundMethodType<'db> {
         self.func(db).as_function_literal()
     }
 
+    /// Whether the methods wrap functions with different identities.
+    pub(super) fn has_distinct_function(self, db: &'db dyn Db, other: Self) -> bool {
+        matches!(
+            (self.function(db), other.function(db)),
+            (Some(left), Some(right)) if left.literal(db) != right.literal(db)
+        )
+    }
+
     pub(super) fn with_func(self, db: &'db dyn Db, func: Type<'db>) -> Self {
         Self::new_internal(
             db,
@@ -337,10 +345,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // The receiver exposed by `__self__` is an already-captured value, so it is covariant.
         // However, `Self` can also appear in the remaining parameters, where binding the
         // receiver must still preserve ordinary callable contravariance.
-        if let (Some(source_function), Some(target_function)) =
-            (source.function(db), target.function(db))
-            && source_function.literal(db) != target_function.literal(db)
-        {
+        if source.has_distinct_function(db, target) {
             return self.never();
         }
 

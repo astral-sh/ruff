@@ -321,6 +321,27 @@ def _(
     reveal_type(intersection_internal.f())  # revealed: G1[Self@f] & G2[Self@f]
 ```
 
+### Bound methods with identical signatures
+
+Two methods on the same receiver can expose different functions through `__func__`. When a subclass
+inherits the same function, the method bound to the base can cover both receivers.
+
+```py
+class A:
+    def f(self) -> int:
+        return 1
+
+    def g(self) -> int:
+        return 2
+
+class B(A): ...
+
+def select(a: A, b: B, flag: bool):
+    method = a.f if flag else a.g
+    reveal_type(method.__func__)  # revealed: (def f(self) -> int) | (def g(self) -> int)
+    reveal_type(a.f if flag else b.f)  # revealed: bound method A.f() -> int
+```
+
 ### Method defined on a single element
 
 #### Instance methods
