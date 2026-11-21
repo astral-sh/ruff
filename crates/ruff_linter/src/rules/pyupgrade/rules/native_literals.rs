@@ -143,19 +143,19 @@ impl fmt::Display for LiteralType {
 /// - [Python documentation: `complex`](https://docs.python.org/3/library/functions.html#complex)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.193", category = Category::Style)]
-pub(crate) struct NativeLiterals {
+pub(crate) struct UnnecessaryLiteralConstructor {
     literal_type: LiteralType,
 }
 
-impl AlwaysFixableViolation for NativeLiterals {
+impl AlwaysFixableViolation for UnnecessaryLiteralConstructor {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NativeLiterals { literal_type } = self;
+        let UnnecessaryLiteralConstructor { literal_type } = self;
         format!("Unnecessary `{literal_type}` call (rewrite as a literal)")
     }
 
     fn fix_title(&self) -> String {
-        let NativeLiterals { literal_type } = self;
+        let UnnecessaryLiteralConstructor { literal_type } = self;
         match literal_type {
             LiteralType::Str => "Replace with string literal".to_string(),
             LiteralType::Bytes => "Replace with bytes literal".to_string(),
@@ -234,8 +234,8 @@ pub(crate) fn native_literals(
 
     match call_arg {
         None => {
-            let mut diagnostic =
-                checker.report_diagnostic(NativeLiterals { literal_type }, call.range());
+            let mut diagnostic = checker
+                .report_diagnostic(UnnecessaryLiteralConstructor { literal_type }, call.range());
 
             let expr = literal_type.as_zero_value_expr(checker);
             let mut content = checker.generator().expr(&expr);
@@ -339,7 +339,7 @@ pub(crate) fn native_literals(
             let fix = Fix::applicable_edit(edit, applicability);
 
             checker
-                .report_diagnostic(NativeLiterals { literal_type }, call.range())
+                .report_diagnostic(UnnecessaryLiteralConstructor { literal_type }, call.range())
                 .set_fix(fix);
         }
     }

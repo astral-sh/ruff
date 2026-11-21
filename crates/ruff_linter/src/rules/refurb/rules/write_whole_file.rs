@@ -43,13 +43,13 @@ use crate::{FixAvailability, Locator, Violation};
 /// - [Python documentation: `Path.write_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_text)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.3.6", category = Category::Pedantic)]
-pub(crate) struct WriteWholeFile<'a> {
+pub(crate) struct ManualPathWrite<'a> {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
     argument: OpenArgument<'a>,
 }
 
-impl Violation for WriteWholeFile<'_> {
+impl Violation for ManualPathWrite<'_> {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -145,7 +145,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                     let suggestion = make_suggestion(&open, content, self.checker.locator());
 
                     let mut diagnostic = self.checker.report_diagnostic(
-                        WriteWholeFile {
+                        ManualPathWrite {
                             filename: SourceCodeSnippet::from_str(filename_display),
                             suggestion: SourceCodeSnippet::from_str(&suggestion),
                             argument: open.argument,

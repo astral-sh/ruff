@@ -277,6 +277,44 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         "if-expr-with-twisted-arms",
         Rule::IfExprWithNegatedElseAsCondition,
     ),
+    ("trio-sync-call", Rule::TrioCallNotAwaited),
+    (
+        "blocking-path-method-in-async-function",
+        Rule::BlockingPathCallInAsyncFunction,
+    ),
+    (
+        "strip-with-multi-characters",
+        Rule::StripWithDuplicateCharacters,
+    ),
+    ("static-join-to-f-string", Rule::UnnecessaryStrJoin),
+    ("read-whole-file", Rule::ManualPathRead),
+    ("write-whole-file", Rule::ManualPathWrite),
+    ("f-string-number-format", Rule::SlicedIntegerBaseConversion),
+    ("math-constant", Rule::HardcodedMathConstant),
+    ("invalid-envvar-value", Rule::InvalidGetenvKey),
+    ("legacy-form-pytest-raises", Rule::PytestLegacyCallableForm),
+    (
+        "hardcoded-sql-expression",
+        Rule::SuspiciousSqlStringConstruction,
+    ),
+    (
+        "open-file-with-context-handler",
+        Rule::OpenFileWithoutContextManager,
+    ),
+    ("native-literals", Rule::UnnecessaryLiteralConstructor),
+    (
+        "replace-universal-newlines",
+        Rule::SubprocessRunWithUniversalNewlines,
+    ),
+    (
+        "replace-stdout-stderr",
+        Rule::SubprocessRunWithPipedStdoutAndStderr,
+    ),
+    (
+        "format-literals",
+        Rule::UnnecessaryPositionalStrFormatIndices,
+    ),
+    ("f-string", Rule::StrFormat),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

@@ -1213,7 +1213,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::RedefinedForOrWithTarget) {
                 pylint::rules::redefined_loop_name(checker, stmt);
             }
-            if checker.any_rule_enabled(&[Rule::ReadWholeFile, Rule::WriteWholeFile]) {
+            if checker.any_rule_enabled(&[Rule::ManualPathRead, Rule::ManualPathWrite]) {
                 checker
                     .analyze
                     .with_statements

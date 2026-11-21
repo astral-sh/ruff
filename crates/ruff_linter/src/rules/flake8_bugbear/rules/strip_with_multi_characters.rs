@@ -56,12 +56,12 @@ use crate::rules::pylint::rules::StripKind;
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.106", category = Category::Correctness)]
-pub(crate) struct StripWithMultiCharacters {
+pub(crate) struct StripWithDuplicateCharacters {
     /// The method name is only reflected in the message in preview mode.
     strip: Option<StripKind>,
 }
 
-impl Violation for StripWithMultiCharacters {
+impl Violation for StripWithDuplicateCharacters {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { strip } = self;
@@ -97,6 +97,6 @@ pub(crate) fn strip_with_multi_characters(
         } else {
             (None, expr.range())
         };
-        checker.report_diagnostic(StripWithMultiCharacters { strip }, range);
+        checker.report_diagnostic(StripWithDuplicateCharacters { strip }, range);
     }
 }
