@@ -162,6 +162,7 @@ mod iteration;
 mod known_instance;
 pub mod list_members;
 mod literal;
+mod mapping;
 mod match_pattern;
 mod member;
 mod method;
@@ -557,6 +558,8 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
+    /// Whether deferred mappings are being replayed before simplifying a closed unfolding.
+    recursive_unfolding: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -576,6 +579,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             env,
             recursion_context: None,
             materialize_typevar_bounds_and_defaults: true,
+            recursive_unfolding: false,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
             bottom_materialization: OnceCell::default(),
@@ -716,6 +720,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             materialization_equivalence,
             recursion_context: self.recursion_context,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
+            recursive_unfolding: self.recursive_unfolding,
             ..Self::new(self.env)
         }
     }
@@ -10041,13 +10046,15 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
-        // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
-        // and specialized generics). For all other types, return early.
+        // Singleton promotion traverses nominal instances and recursive aliases, but stops
+        // at unions and other non-nominal types.
         if matches!(
             type_mapping,
             TypeMapping::Promote(_, PromotionKind::SingletonsOnly)
-        ) && !matches!(self, Type::NominalInstance(_))
-        {
+        ) && !matches!(
+            self,
+            Type::NominalInstance(_) | Type::Recursive(_) | Type::RecursiveVar(_)
+        ) {
             return self;
         }
 
@@ -10183,7 +10190,7 @@ impl<'db> Type<'db> {
                 recursive.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
             Type::RecursiveVar(reference) => {
-                reference.apply_type_mapping_impl(db, type_mapping, visitor)
+                reference.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 
             Type::FunctionLiteral(function) => {
@@ -11633,7 +11640,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PromotionMode {
     On,
     Off,
@@ -11648,7 +11655,7 @@ impl PromotionMode {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
