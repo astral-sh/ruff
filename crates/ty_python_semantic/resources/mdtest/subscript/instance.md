@@ -175,6 +175,10 @@ class NoSetitem: ...
 
 a = NoSetitem()
 a[0] = 0  # error: "Cannot assign to a subscript on an object of type `NoSetitem`"
+
+def write(out: object) -> None:
+    if out is not None:
+        out[0] = 1  # error: [invalid-assignment]
 ```
 
 ## `__setitem__` not callable
