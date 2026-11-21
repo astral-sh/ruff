@@ -2659,6 +2659,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         };
 
+        let ty = ty.resolve_type_alias(db);
+
         if let Some(tuple_spec) = ty.tuple_instance_spec(db, env) {
             infer_from_tuple(&tuple_spec)
         } else if ty.is_assignable_to(db, env, type_base_exception) {
@@ -2680,14 +2682,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ) {
             // A tuple can retain its element types in a positive intersection member after
             // narrowing, for example `tuple[type[ValueError], ...] & ~AlwaysFalsy`.
-            let caught = ty
-                .resolve_type_alias(db)
-                .as_intersection()
-                .and_then(|intersection| {
-                    intersection.bounded_filter_map_positive(db, env, |member| {
-                        infer_from_tuple(member.tuple_instance_spec(db, env)?.as_ref())
-                    })
-                });
+            let caught = ty.as_intersection().and_then(|intersection| {
+                intersection.bounded_filter_map_positive(db, env, |member| {
+                    infer_from_tuple(member.tuple_instance_spec(db, env)?.as_ref())
+                })
+            });
             Some(caught.unwrap_or_else(|| KnownClass::BaseException.to_instance(db, env)))
         } else {
             None

@@ -91,9 +91,9 @@ def catch(classes: tuple[type[ValueError], ...] | tuple[type[RuntimeError], ...]
         reveal_type(exc)  # revealed: ValueError | RuntimeError
 ```
 
-## Type alias for a narrowed tuple of exception classes
+## Aliases for exception classes and tuples
 
-The caught type comes from the tuple described by the alias.
+The caught type comes from the exception classes and tuple elements described by the alias.
 
 ```toml
 [environment]
@@ -103,13 +103,25 @@ python-version = "3.12"
 ```py
 from ty_extensions import AlwaysFalsy, Intersection, Not
 
+type Errors = tuple[type[ValueError], ...]
 type NonemptyErrors = Intersection[tuple[type[ValueError], ...], Not[AlwaysFalsy]]
+type MixedErrors = type[ValueError] | tuple[type[RuntimeError], ...]
 
-def catch(classes: NonemptyErrors):
+def catch(classes: NonemptyErrors, plain: Errors, mixed: MixedErrors):
     try:
         help()
     except classes as exc:
         reveal_type(exc)  # revealed: ValueError
+
+    try:
+        help()
+    except plain as exc:
+        reveal_type(exc)  # revealed: ValueError
+
+    try:
+        help()
+    except mixed as exc:
+        reveal_type(exc)  # revealed: ValueError | RuntimeError
 ```
 
 ## Negated dynamic type aliases
