@@ -58,7 +58,10 @@ use crate::types::call::bind::{
     ArgumentContextCache, ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
     inferable_typevar_occurrences, requires_overload_evaluation,
 };
-use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::call::{
+    Binding, Bindings, CallArguments, CallError, CallErrorKind, unary_dunder_method,
+    unary_operator_result,
+};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
@@ -11770,15 +11773,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         let op = unary.op;
         let fallback_unary_expression_type = || {
-            let unary_dunder_method = match op {
-                ast::UnaryOp::Invert => "__invert__",
-                ast::UnaryOp::UAdd => "__pos__",
-                ast::UnaryOp::USub => "__neg__",
-                ast::UnaryOp::Not => {
-                    unreachable!("Not operator is handled in its own case");
-                }
-            };
+            if receiver.is_none()
+                && let Some(outcome) = unary_operator_result(db, env.program(db), operand_type, op)
+            {
+                self.report_deprecated_functions(
+                    unary,
+                    outcome.deprecated_functions.iter().copied(),
+                );
+                return outcome.return_type;
+            }
 
+            let unary_dunder_method = unary_dunder_method(op);
             match operand_type.try_call_unary_dunder(db, env, unary_dunder_method, receiver) {
                 Ok(outcome) => {
                     self.report_deprecated_functions(unary, outcome.deprecated_functions);
@@ -11881,12 +11886,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
                 Type::TypeVar(tvar),
             ) => {
-                let unary_dunder_method = match op {
-                    ast::UnaryOp::Invert => "__invert__",
-                    ast::UnaryOp::UAdd => "__pos__",
-                    ast::UnaryOp::USub => "__neg__",
-                    ast::UnaryOp::Not => unreachable!(),
-                };
+                let unary_dunder_method = unary_dunder_method(op);
 
                 match tvar.typevar(self.db()).bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
