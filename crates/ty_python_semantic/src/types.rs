@@ -136,6 +136,7 @@ use ty_python_core::{ProgramFile, Truthiness, place_table, semantic_index, use_d
 
 mod abstract_methods;
 mod annotation_target;
+mod assignment;
 mod attribute_write;
 mod bool;
 mod bound_super;

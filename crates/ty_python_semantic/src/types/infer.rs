@@ -1983,6 +1983,8 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
+    /// Unpacked literals for which the target's `TypedDict` reported a more specific error.
+    invalid_unpacked_typed_dicts: Box<[ExpressionNodeKey]>,
     /// Aliases whose type-expression diagnostics are needed by this region.
     legacy_aliases: Box<[Definition<'db>]>,
 
@@ -2044,6 +2046,12 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
+    pub(super) fn rejected_unpacked_typed_dict(&self, value: &ast::Expr) -> bool {
+        self.extra
+            .as_ref()
+            .is_some_and(|extra| extra.invalid_unpacked_typed_dicts.contains(&value.into()))
+    }
+
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {

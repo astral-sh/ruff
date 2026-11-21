@@ -36,7 +36,7 @@ use crate::types::unpacker::{starred_assignment_values, unpacked_assignment_valu
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard,
     SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance, binding_type,
-    protocol_class::ProtocolClass,
+    infer_expression_types, protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, SemanticModel, declare_lint};
@@ -2408,7 +2408,18 @@ pub(super) fn report_invalid_assignment<'db>(
     let value_node = assignment_value_node(context, definition_kind);
     let original_value_node = definition_kind.value(context.module()).or(value_node);
 
-    if let Some(value_node) = original_value_node
+    if let DefinitionKind::Assignment(assignment) = definition_kind
+        && let Some(unpack) = assignment.unpack()
+    {
+        // A dictionary elsewhere on the RHS can have its own type context. Only suppress this
+        // assignment error when the literal was validated against this unpack target.
+        if let Some(value @ ast::Expr::Dict(_)) = value_node
+            && infer_expression_types(db, unpack.value(db).expression(), TypeContext::default())
+                .rejected_unpacked_typed_dict(value)
+        {
+            return;
+        }
+    } else if let Some(value_node) = original_value_node
         && is_invalid_typed_dict_literal(
             db,
             context.program_environment(),
