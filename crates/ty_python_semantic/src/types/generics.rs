@@ -4044,7 +4044,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let db = self.db;
         let union = formal.resolve_type_alias(db);
         let has_nested_union = Cell::new(false);
-        let instances = RefCell::new(SmallVec::<[Type<'db>; 4]>::new());
+        let instances = RefCell::new(FxOrderSet::default());
 
         // Only a base that appears in the formal type can contribute inherited gradual
         // evidence. Collect instances while checking for recursion, but look up their
@@ -4055,7 +4055,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 Type::Recursive(_) => return true,
                 Type::Union(_) if ty != union => has_nested_union.set(true),
                 Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
-                    instances.borrow_mut().push(ty);
+                    instances.borrow_mut().insert(ty);
                 }
                 _ => {}
             }
@@ -4121,7 +4121,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
     fn has_nested_gradual_evidence(
         &self,
-        instances: &[Type<'db>],
+        instances: &FxOrderSet<Type<'db>>,
         actual: Type<'db>,
         seen_classes: &RefCell<FxHashSet<ClassType<'db>>>,
         active_classes: &ActiveRecursionDetector<ClassLiteral<'db>>,
