@@ -4003,6 +4003,7 @@ impl<'db> Type<'db> {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
+            Type::Union(union) if nested => union.normalize_nested_union(db, env.program(db), div),
             Type::Union(union) => union.recursive_type_normalized_impl(db, env, div, nested),
             Type::Intersection(intersection) => intersection
                 .recursive_type_normalized_impl(db, env, div, nested)
