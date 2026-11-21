@@ -1473,9 +1473,10 @@ impl<'db> Specialization<'db> {
         }
 
         let mut new_materialization_kind = self.materialization_kind(db);
+        let flipped = type_mapping.flip();
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::preference(tcx.get(i).copied());
-            if type_mapping.is_structural() {
+            if matches!(flipped, Cow::Borrowed(_)) {
                 return ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
             }
             match (typevar.variance(db), type_mapping) {
@@ -1510,7 +1511,7 @@ impl<'db> Specialization<'db> {
                 (variance, _) if variance.is_covariant() => {
                     ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }
-                _ => ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
+                _ => ty.apply_type_mapping_impl(db, &flipped, tcx, visitor),
             }
         });
 
