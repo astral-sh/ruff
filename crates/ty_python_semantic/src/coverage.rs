@@ -18,7 +18,7 @@ use ruff_python_ast::{self as ast};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::any_over_type_through_aliases;
 use crate::types::{ProgramEnvironment, Type};
 use crate::{Db, HasType, SemanticModel};
 
@@ -150,7 +150,7 @@ fn classify<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) 
         return LineCoverage::Dynamic;
     }
 
-    if any_over_type(db, env, ty, true, |ty| ty.is_dynamic()) {
+    if any_over_type_through_aliases(db, env, ty, |ty| ty.is_dynamic()) {
         LineCoverage::Imprecise
     } else {
         LineCoverage::Precise
@@ -375,7 +375,7 @@ mod tests {
           |     return {}
           | 
         P | def first(values: list[int]) -> list[int]:
-        I |     return values[1:]  # `1:`: slice[Literal[1], None, None]
+        P |     return values[1:]
         ");
     }
 
