@@ -8,7 +8,7 @@ use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 use crate::types::{Type, TypeContext, infer_expression_types};
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::static_dunder_all::static_dunder_all;
-use ty_python_core::{ProgramFile, SemanticIndex, Truthiness, semantic_index};
+use ty_python_core::{ProgramFile, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
@@ -22,8 +22,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: ProgramFile<'_>) -> Option<FxH
     let _span = tracing::trace_span!("dunder_all_names", file=?source_file.path(db)).entered();
 
     let module = parsed_module(db, file.python_file(db)).load(db);
-    let index = semantic_index(db, file);
-    let mut collector = DunderAllNamesCollector::new(db, file, index);
+    let mut collector = DunderAllNamesCollector::new(db, file);
     collector.visit_body(module.suite());
     collector.into_names()
 }
@@ -33,9 +32,6 @@ struct DunderAllNamesCollector<'db> {
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
     file: ProgramFile<'db>,
-
-    /// The semantic index for the module.
-    index: &'db SemanticIndex<'db>,
 
     /// The origin of the `__all__` variable in the current module, [`None`] if it is not defined.
     origin: Option<DunderAllOrigin>,
@@ -49,12 +45,11 @@ struct DunderAllNamesCollector<'db> {
 }
 
 impl<'db> DunderAllNamesCollector<'db> {
-    fn new(db: &'db dyn Db, file: ProgramFile<'db>, index: &'db SemanticIndex<'db>) -> Self {
+    fn new(db: &'db dyn Db, file: ProgramFile<'db>) -> Self {
         Self {
             db,
             env: ProgramEnvironment::from_file(file),
             file,
-            index,
             origin: None,
             invalid: false,
             names: FxHashSet::default(),
@@ -184,8 +179,8 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
     fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
         let db = self.db;
-        infer_expression_types(db, self.index.expression(expr), TypeContext::default())
-            .expression_type(expr)
+        let expression = semantic_index(db, self.file).expression(expr);
+        infer_expression_types(db, expression, TypeContext::default()).expression_type(expr)
     }
 
     /// Evaluate the given expression and return its truthiness.
