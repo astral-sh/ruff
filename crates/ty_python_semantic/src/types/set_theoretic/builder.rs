@@ -55,7 +55,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
@@ -454,32 +454,9 @@ impl<'db> Type<'db> {
     }
 }
 
-/// An ordinary union member. A builder that preserves aliases may need to search
-/// the same member for nested aliases before comparing it with each other member.
-#[derive(Clone, Debug)]
-struct UnionMember<'db> {
-    ty: Type<'db>,
-    contains_alias: Option<bool>,
-}
-
-impl<'db> UnionMember<'db> {
-    fn new(ty: Type<'db>) -> Self {
-        Self {
-            ty,
-            contains_alias: None,
-        }
-    }
-
-    fn contains_alias(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        *self
-            .contains_alias
-            .get_or_insert_with(|| any_over_type(db, env, self.ty, false, Type::is_alias_like))
-    }
-}
-
 #[derive(Clone, Debug)]
 enum UnionElement<'db> {
-    Type(UnionMember<'db>),
+    Type(Type<'db>),
     // A map from integer literals to their promotability.
     //
     // Note that an unpromotable literal takes higher precedence than the identical literal
@@ -512,9 +489,9 @@ impl<'db> UnionElement<'db> {
         other_type: Type<'db>,
         cycle_recovery: bool,
         unpack_aliases: bool,
-    ) -> ReduceResult<'_, 'db> {
+    ) -> ReduceResult<'db> {
         if let UnionElement::Type(existing) = self {
-            return ReduceResult::Type(existing);
+            return ReduceResult::Type(*existing);
         }
 
         if cycle_recovery {
@@ -657,7 +634,7 @@ impl<'db> UnionElement<'db> {
     }
 }
 
-enum ReduceResult<'a, 'db> {
+enum ReduceResult<'db> {
     /// Reduction of this `UnionElement` is complete; keep it in the union if the nested
     /// boolean is true, eliminate it from the union if false.
     KeepIf(bool),
@@ -665,8 +642,9 @@ enum ReduceResult<'a, 'db> {
     CollapseToObject,
     /// The new element is a subtype of an existing part of the `UnionElement`, ignore it.
     Ignore,
-    /// Compare an ordinary member with the incoming type.
-    Type(&'a mut UnionMember<'db>),
+    /// The given `Type` can stand-in for the entire `UnionElement` for further union
+    /// simplification checks.
+    Type(Type<'db>),
 }
 
 /// If the value ​​is defined recursively, widening is performed from fewer literal elements,
@@ -681,6 +659,9 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
 #[derive(Clone)]
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
+    /// A wide union can revisit the same nested aliases in many comparisons. Box the
+    /// cache so builders that never need it pay for only one pointer.
+    contains_alias: Option<Box<FxHashMap<Type<'db>, bool>>>,
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
     unpack_aliases: bool,
@@ -759,6 +740,7 @@ impl<'db> UnionBuilder<'db> {
             db,
             env: env.clone(),
             elements: vec![],
+            contains_alias: None,
             unpack_aliases: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
@@ -791,8 +773,7 @@ impl<'db> UnionBuilder<'db> {
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(&mut self) {
         self.elements.clear();
-        self.elements
-            .push(UnionElement::Type(UnionMember::new(Type::object())));
+        self.elements.push(UnionElement::Type(Type::object()));
     }
 
     fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
@@ -907,14 +888,14 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(UnionMember { ty: existing, .. })
+                                UnionElement::Type(existing)
                                     if cycle_recovery
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(UnionMember { ty: existing, .. })
+                                UnionElement::Type(existing)
                                     if can_compare_with_literals(*existing) =>
                                 {
                                     // e.g. `existing` could be `Literal[""] & Any`,
@@ -964,14 +945,14 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(UnionMember { ty: existing, .. })
+                                UnionElement::Type(existing)
                                     if cycle_recovery
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(UnionMember { ty: existing, .. })
+                                UnionElement::Type(existing)
                                     if can_compare_with_literals(*existing) =>
                                 {
                                     if ty.is_redundant_with(db, &self.env, *existing) {
@@ -1023,14 +1004,14 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(UnionMember { ty: existing, .. })
+                                UnionElement::Type(existing)
                                     if cycle_recovery
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(UnionMember { ty: existing, .. })
+                                UnionElement::Type(existing)
                                     if can_compare_with_literals(*existing) =>
                                 {
                                     if ty.is_redundant_with(db, &self.env, *existing) {
@@ -1102,14 +1083,14 @@ impl<'db> UnionBuilder<'db> {
                                     found = Some(literals);
                                     continue;
                                 }
-                                UnionElement::Type(UnionMember { ty: existing, .. })
+                                UnionElement::Type(existing)
                                     if cycle_recovery
                                         && literal.fallback_instance(db, &self.env)
                                             == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(UnionMember { ty: existing, .. })
+                                UnionElement::Type(existing)
                                     if can_compare_with_literals(*existing) =>
                                 {
                                     if ty.is_redundant_with(db, &self.env, *existing) {
@@ -1234,7 +1215,8 @@ impl<'db> UnionBuilder<'db> {
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let db = self.db;
-        let mut incoming = UnionMember::new(ty);
+        let wide = self.elements.len() >= super::WIDE_UNION;
+        let mut ty = ty;
         let bool_pair = |ty: Type<'db>| {
             if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
                 Some(LiteralValueTypeKind::Bool(!b))
@@ -1252,8 +1234,7 @@ impl<'db> UnionBuilder<'db> {
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let ty = incoming.ty;
-            let existing = match element.try_reduce(
+            let element_type = match element.try_reduce(
                 db,
                 &self.env,
                 ty,
@@ -1275,8 +1256,6 @@ impl<'db> UnionBuilder<'db> {
                     return;
                 }
             };
-
-            let element_type = existing.ty;
 
             // Comparing `TypedDict`s for redundancy requires iterating over their fields, which is
             // problematic if some of those fields point to recursive `Union`s. Compare their
@@ -1318,7 +1297,7 @@ impl<'db> UnionBuilder<'db> {
                 && left != right
             {
                 to_remove.push(i);
-                incoming = UnionMember::new(KnownClass::Range.to_instance(db, &self.env));
+                ty = KnownClass::Range.to_instance(db, &self.env);
                 continue;
             }
 
@@ -1331,7 +1310,7 @@ impl<'db> UnionBuilder<'db> {
                 // A nominal core can replace the first element in place; no earlier elements
                 // need to be reconsidered.
                 if i == 0 && merged_type.is_nominal_instance() && !merged_type.is_object() {
-                    incoming = UnionMember::new(merged_type);
+                    ty = merged_type;
                     continue;
                 }
                 for index in to_remove.into_iter().rev() {
@@ -1364,8 +1343,19 @@ impl<'db> UnionBuilder<'db> {
                 // Preserving aliases also excludes comparisons that expand aliases nested in
                 // type arguments. A recursive alias can rebuild this union during specialization.
                 if !self.unpack_aliases
-                    && (incoming.contains_alias(db, &self.env)
-                        || existing.contains_alias(db, &self.env))
+                    && [ty, element_type].into_iter().any(|ty| {
+                        let search =
+                            || any_over_type(db, &self.env, ty, false, Type::is_alias_like);
+                        if wide {
+                            *self
+                                .contains_alias
+                                .get_or_insert_default()
+                                .entry(ty)
+                                .or_insert_with(search)
+                        } else {
+                            search()
+                        }
+                    })
                 {
                     continue;
                 }
@@ -1460,13 +1450,13 @@ impl<'db> UnionBuilder<'db> {
 
         let mut to_remove = to_remove.into_iter();
         if let Some(first) = to_remove.next() {
-            self.elements[first] = UnionElement::Type(incoming);
+            self.elements[first] = UnionElement::Type(ty);
             // We iterate in descending order to keep remaining indices valid after `swap_remove`.
             for index in to_remove.rev() {
                 self.elements.swap_remove(index);
             }
         } else {
-            self.elements.push(UnionElement::Type(incoming));
+            self.elements.push(UnionElement::Type(ty));
         }
     }
 
@@ -1517,7 +1507,7 @@ impl<'db> UnionBuilder<'db> {
                         )
                     }));
                 }
-                UnionElement::Type(member) => types.push(member.ty),
+                UnionElement::Type(ty) => types.push(ty),
             }
         }
 
