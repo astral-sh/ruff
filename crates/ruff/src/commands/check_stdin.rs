@@ -4,6 +4,7 @@ use anyhow::Result;
 use ruff_linter::message::RenderContext;
 use ruff_linter::settings::flags;
 use ruff_workspace::resolver::{Resolver, RootProject, match_exclusion, project_file_at_path};
+use ruff_workspace::script::script;
 
 use crate::args::ConfigArguments;
 use crate::diagnostics::{Diagnostics, lint_stdin};
@@ -40,10 +41,26 @@ pub(crate) fn check_stdin(
     }
     let stdin = read_from_stdin()?;
     let settings = resolver.root_settings();
+    let source_type =
+        filename.map_or_default(|path| settings.linter.extension.get_source_type(path));
+    let project = &root_project.project;
+    let script = script(
+        project,
+        overrides,
+        overrides.script_configuration(),
+        filename,
+        source_type,
+        &stdin,
+    )?;
+    let linter = match &script {
+        Some(script) => &script.settings.linter,
+        None => &settings.linter,
+    };
     let mut diagnostics = lint_stdin(
         filename,
+        source_type,
         stdin,
-        &settings.linter,
+        linter,
         noqa,
         fix_mode,
         settings.unsafe_fixes,
