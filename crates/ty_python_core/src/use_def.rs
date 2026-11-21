@@ -817,6 +817,9 @@ pub struct UseDefMap<'db> {
     /// Used to suppress diagnostics in unreachable code.
     range_reachability: Box<[(TextRange, RangeInfo)]>,
 
+    /// Whether both endpoints of the retained ranges are in source order.
+    ordered_ranges: bool,
+
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations and
     /// imported qualifiers.
@@ -919,6 +922,7 @@ impl StubParameterLayout {
         parameters: Vec<StubParameter<'db>>,
         builder: &mut UseDefMapBuilder<'db>,
     ) -> UseDefMap<'db> {
+        let (range_reachability, ordered_ranges) = builder.finish_ranges();
         UseDefMap {
             all_definitions: RetainedDefinitions {
                 states: parameters
@@ -929,7 +933,8 @@ impl StubParameterLayout {
             constraint_tables: None,
             interned_bindings: Arc::clone(&self.bindings),
             interned_declarations: Arc::clone(&self.declarations),
-            range_reachability: builder.finish_ranges(),
+            range_reachability,
+            ordered_ranges,
             definitions_by_definition: FrozenMap::default(),
             symbol_states: self.symbols.clone(),
             extra: None,
@@ -1066,6 +1071,26 @@ impl<'db> UseDefMap<'db> {
         self.range_reachability
             .iter()
             .map(|&(range, RangeInfo { reachability, .. })| (range, reachability))
+    }
+
+    /// Returns the constraints on ranges that fully contain `range`, in evaluation order.
+    pub fn reachability_for_range(
+        &self,
+        range: TextRange,
+    ) -> impl Iterator<Item = ScopedReachabilityConstraintId> + '_ {
+        let mut entries = &*self.range_reachability;
+        // Straight-line code can have a separate range after every call. If both endpoints
+        // are ordered, skip ranges that end too early or start too late. Nested expressions
+        // and evaluation out of source order can require searching the entire scope.
+        if self.ordered_ranges {
+            let first = entries.partition_point(|(entry, _)| entry.end() < range.end());
+            entries = &entries[first..];
+            let end = entries.partition_point(|(entry, _)| entry.start() <= range.start());
+            entries = &entries[..end];
+        }
+        entries.iter().filter_map(move |(entry, info)| {
+            entry.contains_range(range).then_some(info.reachability)
+        })
     }
 
     pub fn end_of_scope_reachability(&self) -> ScopedReachabilityConstraintId {
@@ -3356,14 +3381,16 @@ impl<'db> UseDefMapBuilder<'db> {
 
     /// Drops the default ranges that served as barriers between non-contiguous ranges
     /// with the same reachability while building the map.
-    fn finish_ranges(&mut self) -> Box<[(TextRange, RangeInfo)]> {
+    fn finish_ranges(&mut self) -> (Box<[(TextRange, RangeInfo)]>, bool) {
         let mut ranges = std::mem::take(&mut self.range_reachability);
         ranges.retain(|(_, info)| *info != RangeInfo::default());
-        ranges.into_boxed_slice()
+        let ordered =
+            ranges.is_sorted_by(|(a, _), (b, _)| a.start() <= b.start() && a.end() <= b.end());
+        (ranges.into_boxed_slice(), ordered)
     }
 
     pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
-        let range_reachability = self.finish_ranges();
+        let (range_reachability, ordered_ranges) = self.finish_ranges();
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
@@ -3526,6 +3553,7 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_bindings: Arc::new(interned_bindings),
             interned_declarations: Arc::new(interned_declarations),
             range_reachability,
+            ordered_ranges,
             symbol_states,
             definitions_by_definition,
             extra,
