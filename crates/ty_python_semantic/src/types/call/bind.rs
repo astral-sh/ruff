@@ -67,6 +67,7 @@ use crate::types::infer::{TypeContextKind, original_class_type};
 use crate::types::known_instance::{
     FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
 };
+use crate::types::protocol_class::has_all_protocol_members_defined;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication,
@@ -3638,9 +3639,56 @@ impl<'db> OverloadFilter<'db> {
         cached(db, self).unwrap_or_else(|| self.compute_covering_prefix_len(db))
     }
 
+    /// Does the first participating argument rule out every prefix tested in step 5?
+    ///
+    /// A dynamic argument's top materialization is `object`. If the corresponding parameters
+    /// only admit narrower nominal types or protocols requiring members `object` lacks,
+    /// no union of these parameters can cover that argument. Other types, such as
+    /// intersections with negations, may cover `object` collectively.
+    fn first_slot_rules_out_coverage(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        let candidates = self.candidates(db);
+        // Only the first slot is guaranteed to stay aligned when empty unions are
+        // omitted from the tuples. Even the last candidate can supply a variadic argument.
+        if !candidates.iter().all(|candidate| {
+            candidate.slots.first().is_some_and(|slot| {
+                slot.variadic_argument.is_none() && slot.argument.is_non_divergent_dynamic()
+            })
+        }) {
+            return false;
+        }
+
+        // The last parameter is never part of a tested prefix.
+        let mut pending: SmallVec<[_; 4]> = candidates[..candidates.len() - 1]
+            .iter()
+            .map(|candidate| candidate.slots[0].parameter)
+            .collect();
+        let mut seen = FxHashSet::default();
+        while let Some(ty) = pending.pop() {
+            match ty {
+                Type::NominalInstance(instance) if !instance.is_object() => {}
+                Type::ProtocolInstance(protocol)
+                    if !protocol.is_equivalent_to_object(db)
+                        && !has_all_protocol_members_defined(db, env, Type::object(), protocol) => {
+                }
+                Type::Union(union) => pending.extend_from_slice(union.elements(db)),
+                Type::TypeAlias(alias) if !alias.is_recursive(db) => {
+                    if seen.insert(alias) {
+                        pending.push(alias.value_type(db));
+                    }
+                }
+                _ => return false,
+            }
+        }
+        true
+    }
+
     fn compute_covering_prefix_len(self, db: &'db dyn Db) -> usize {
         let env = &ProgramEnvironment::from_program(self.program(db));
         let candidates = self.candidates(db);
+        if self.first_slot_rules_out_coverage(db, env) {
+            return candidates.len();
+        }
+
         let max_slot_count = candidates
             .iter()
             .map(|candidate| candidate.slots.len())
