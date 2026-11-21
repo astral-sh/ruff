@@ -531,21 +531,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let body_scope = self
             .index
-            .node_scope(NodeWithScopeRef::Function(function))
-            .to_scope_id(db, self.program_file());
+            .scope_id(self.index.node_scope(NodeWithScopeRef::Function(function)));
 
         let overload_literal = OverloadLiteral::new(
             db,
             &name.id,
             known_function,
             body_scope,
-            definition,
             function_decorators,
             None,
             dataclass_transformer_params,
             function.returns.is_some(),
         );
-        let function_literal = FunctionLiteral::new(db, overload_literal);
+        let function_literal =
+            FunctionLiteral::new(db, overload_literal, self.index, function, definition);
         let function_type = FunctionType::new(db, function_literal, None);
         let is_decorated_overload_implementation =
             has_transforming_decorators && function_literal.has_separate_implementation(db);

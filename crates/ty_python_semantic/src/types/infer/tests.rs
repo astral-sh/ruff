@@ -1338,6 +1338,31 @@ fn redundant_elif_fix_preserves_line_endings_and_checks_cleanly() -> anyhow::Res
 }
 
 #[test]
+fn inserting_a_binding_before_a_function_preserves_importer_inference() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let function = "def callback() -> int: return 1\n";
+    db.write_file("/src/api.py", function)?;
+    db.write_dedented(
+        "/src/main.py",
+        "
+        from api import callback
+
+        def get_callback():
+            return callback
+        ",
+    )?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+    // The new binding changes the callback's place ID, but not its body scope.
+    db.write_file("/src/api.py", format!("import os\n{function}"))?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
+    Ok(())
+}
+
+#[test]
 fn overload_signatures_track_imported_annotations() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_dedented(
