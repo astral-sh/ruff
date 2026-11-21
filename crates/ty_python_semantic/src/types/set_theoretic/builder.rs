@@ -58,48 +58,21 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
-/// Extract `(core, guard)` from truthiness-guarded intersections.
-///
-/// e.g.
-/// - `A & ~AlwaysTruthy` -> `Some((A, ~AlwaysTruthy))`
-/// - `A & ~AlwaysFalsy` -> `Some((A, ~AlwaysFalsy))`
-/// - `A` -> `None`
-/// - `A & ~AlwaysTruthy & ~AlwaysFalsy` -> `None` (not a single-guard shape)
-///
-/// This only recognizes the "single truthiness guard" forms used by truthiness narrowing.
-fn split_truthiness_guarded_intersection<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-) -> Option<(Type<'db>, Type<'db>)> {
+/// The truthiness excluded by a single guard, e.g. `AlwaysFalsy` in `A & ~AlwaysFalsy`.
+/// Intersections that exclude both truthy and falsy values have no single guard.
+fn excluded_truthiness<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
     let Type::Intersection(intersection) = ty else {
         return None;
     };
-    let falsy = Type::AlwaysTruthy.negate(db, env);
-    let truthy = Type::AlwaysFalsy.negate(db, env);
-
     let negative = intersection.negative(db);
-    let has_not_truthy = negative.contains(&Type::AlwaysTruthy);
-    let has_not_falsy = negative.contains(&Type::AlwaysFalsy);
-    let guard = match (has_not_truthy, has_not_falsy) {
-        (true, false) => falsy,
-        (false, true) => truthy,
-        _ => return None,
-    };
-
-    let mut core = IntersectionBuilder::new(db, env);
-    for positive in intersection.positive(db) {
-        core.add_positive_in_place(*positive);
+    match (
+        negative.contains(&Type::AlwaysTruthy),
+        negative.contains(&Type::AlwaysFalsy),
+    ) {
+        (true, false) => Some(Type::AlwaysTruthy),
+        (false, true) => Some(Type::AlwaysFalsy),
+        _ => None,
     }
-    for negative in negative {
-        if (guard == falsy && *negative == Type::AlwaysTruthy)
-            || (guard == truthy && *negative == Type::AlwaysFalsy)
-        {
-            continue;
-        }
-        core.add_negative_in_place(*negative);
-    }
-    Some((core.build(), guard))
 }
 
 /// Try to merge a complementary guarded pair into an unguarded core.
@@ -122,19 +95,23 @@ fn merge_truthiness_guarded_pair<'db>(
     left: Type<'db>,
     right: Type<'db>,
 ) -> Option<Type<'db>> {
-    let (left_core, left_guard) = split_truthiness_guarded_intersection(db, env, left)?;
-    let (right_core, right_guard) = split_truthiness_guarded_intersection(db, env, right)?;
-    if left_guard == right_guard {
+    let left_excluded = excluded_truthiness(db, left)?;
+    let right_excluded = excluded_truthiness(db, right)?;
+    if left_excluded == right_excluded {
         return None;
     }
 
+    let left_core = remove_covered_exclusions(db, env, left, |ty| ty == left_excluded)?;
+    let right_core = remove_covered_exclusions(db, env, right, |ty| ty == right_excluded)?;
     if left_core.is_equivalent_to(db, env, right_core) {
         return Some(left_core);
     }
 
     let candidate = UnionType::from_elements(db, env, [left_core, right_core]);
-    let left_reconstructed = IntersectionType::from_two_elements(db, env, candidate, left_guard);
-    let right_reconstructed = IntersectionType::from_two_elements(db, env, candidate, right_guard);
+    let left_reconstructed =
+        IntersectionType::from_two_elements(db, env, candidate, left_excluded.negate(db, env));
+    let right_reconstructed =
+        IntersectionType::from_two_elements(db, env, candidate, right_excluded.negate(db, env));
     if left_reconstructed == left && right_reconstructed == right {
         Some(candidate)
     } else {
