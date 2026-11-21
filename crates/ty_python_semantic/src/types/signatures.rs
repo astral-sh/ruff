@@ -38,7 +38,7 @@ use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
-use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
+use crate::types::typed_dict::unpacked_typed_dict_from_kwargs_annotation;
 use crate::types::typevar::{TypeVarInstance, TypeVarSet, freshening_delta};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -4984,8 +4984,11 @@ impl<'db> Parameters<'db> {
             .expect("keyword variadic parameter always has a name")
             .clone();
 
+        // The schema already has unique keys. Only parameters preceding `**kwargs`
+        // can shadow a field.
+        let preceding = value.len();
         for (name, field) in unpacked_typed_dict.items(db) {
-            if value
+            if value[..preceding]
                 .iter()
                 .any(|existing| existing.callable_by_name(name.as_str()))
             {
@@ -6235,12 +6238,8 @@ impl<'db> Parameter<'db> {
         let has_unpacked_variadic_annotation = matches!(&kind, ParameterKind::Variadic { .. })
             && annotation_flags.contains(TypeExpressionFlags::UNPACK);
         let is_unpacked_typed_dict_kwargs = matches!(&kind, ParameterKind::KeywordVariadic { .. })
-            && extract_unpacked_typed_dict_keys_from_kwargs_annotation(
-                db,
-                annotated_type,
-                annotation_flags,
-            )
-            .is_some();
+            && unpacked_typed_dict_from_kwargs_annotation(db, annotated_type, annotation_flags)
+                .is_some();
         let annotation_kind = if is_unpacked_typed_dict_kwargs {
             ParameterAnnotationKind::UnpackedTypedDictKwargs
         } else if has_starred_annotation || has_unpacked_variadic_annotation {
