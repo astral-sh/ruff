@@ -4036,25 +4036,47 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         )
     }
 
-    /// Conservatively checks whether union matching may discard gradual evidence.
+    /// Checks whether recursion or gradual evidence requires matching union members separately.
     ///
     /// The formal type limits which gradual types we look for in the actual type; we do not
     /// match corresponding positions to determine whether that evidence reaches a type variable.
-    fn has_gradual_union_evidence(&self, formal: Type<'db>, actual: Type<'db>) -> bool {
+    fn requires_memberwise_union_inference(&self, formal: Type<'db>, actual: Type<'db>) -> bool {
         let db = self.db;
-        let formal = formal.resolve_type_alias(db);
+        let union = formal.resolve_type_alias(db);
+        let has_nested_union = Cell::new(false);
+        let instances = RefCell::new(SmallVec::<[Type<'db>; 4]>::new());
+
+        // Only a base that appears in the formal type can contribute inherited gradual
+        // evidence. Collect instances while checking for recursion, but look up their
+        // classes only if we encounter a generic base of the argument. For example,
+        // looking up the class of a tuple requires specializing it with its element types.
+        let recursive = any_over_type_expanding_aliases(db, self.env, formal, |ty| {
+            match ty {
+                Type::Recursive(_) => return true,
+                Type::Union(_) if ty != union => has_nested_union.set(true),
+                Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
+                    instances.borrow_mut().push(ty);
+                }
+                _ => {}
+            }
+            false
+        });
+        if recursive {
+            return true;
+        }
+
         // `Box[Any] <= Box[T | None] | int` loses the nested `Any` before reaching `T`, too.
         // Keep this compatibility case until relations preserve gradual evidence. A plain
         // `Box[T] | int` can infer `Any` directly, and a concrete `dict[str, Any]` arm must not
         // prevent inference from other members of an argument union.
-        if any_over_type_expanding_aliases(db, self.env, formal, |nested| {
-            nested != formal && nested.is_union()
-        }) && self.has_nested_gradual_evidence(
-            formal,
-            actual,
-            &RefCell::default(),
-            &ActiveRecursionDetector::default(),
-        ) {
+        if has_nested_union.get()
+            && self.has_nested_gradual_evidence(
+                &instances.into_inner(),
+                actual,
+                &RefCell::default(),
+                &ActiveRecursionDetector::default(),
+            )
+        {
             return true;
         }
 
@@ -4099,12 +4121,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
     fn has_nested_gradual_evidence(
         &self,
-        formal: Type<'db>,
+        instances: &[Type<'db>],
         actual: Type<'db>,
         seen_classes: &RefCell<FxHashSet<ClassType<'db>>>,
         active_classes: &ActiveRecursionDetector<ClassLiteral<'db>>,
     ) -> bool {
         let db = self.db;
+        let in_formal = |origin| {
+            instances.iter().any(|ty| {
+                ty.nominal_class(db, self.env)
+                    .is_some_and(|class| class.class_literal(db) == origin)
+            })
+        };
         any_over_type_expanding_aliases(db, self.env, actual, |nested| match nested {
             Type::Dynamic(_) => true,
             Type::NominalInstance(instance) => {
@@ -4124,31 +4152,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         class.iter_mro(db).skip(1).any(|base| match base {
                             ClassBase::Any | ClassBase::Dynamic(_) => true,
                             ClassBase::Class(ClassType::Generic(base))
-                                if any_over_type_expanding_aliases(
-                                    db,
-                                    self.env,
-                                    formal,
-                                    |ty| {
-                                        let origin = ClassLiteral::Static(base.origin(db));
-                                        match ty {
-                                            Type::NominalInstance(instance) => {
-                                                instance.class_literal(db, self.env) == origin
-                                            }
-                                            Type::ProtocolInstance(protocol) => {
-                                                protocol.class_origin(db).is_some_and(|class| {
-                                                    class.class_literal(db) == origin
-                                                })
-                                            }
-                                            _ => false,
-                                        }
-                                    },
-                                ) =>
+                                if in_formal(ClassLiteral::Static(base.origin(db))) =>
                             {
                                 // Only bases present in the formal type can supply this evidence:
                                 // `str` inheriting `Container[Any]` does not make it gradual here.
                                 base.specialization(db).types(db).iter().any(|&ty| {
                                     self.has_nested_gradual_evidence(
-                                        formal,
+                                        instances,
                                         ty,
                                         seen_classes,
                                         active_classes,
@@ -4218,10 +4228,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // variables in types such as `Tree[T] = T | tuple[Tree[T]]`.
         if formal.resolve_type_alias(db).is_union()
             && !has_variadic
-            && !any_over_type_expanding_aliases(db, self.env, formal, |nested| {
-                matches!(nested, Type::Recursive(_))
-            })
-            && !self.has_gradual_union_evidence(formal, actual)
+            && !self.requires_memberwise_union_inference(formal, actual)
         {
             let when = self.constraint_for_relation(formal, actual, polarity);
             return self.infer_from_constraint_set(when);

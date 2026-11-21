@@ -3566,6 +3566,17 @@ reveal_type(nested_unbox(Box[AnyBox]()))  # revealed: Any
 reveal_type(nested_unbox(WrappedBox()))  # revealed: Any
 ```
 
+The same holds when the parameter names the generic base through a type alias:
+
+```py
+type OptionalBox[T] = Box[T | None]
+
+def unbox_alias[T = str](value: OptionalBox[T] | int) -> T:
+    raise NotImplementedError
+
+reveal_type(unbox_alias(AnyBox()))  # revealed: Any
+```
+
 Recursively specialized bases still allow a finite result: extracting the element type does not
 require expanding that element's own bases indefinitely.
 
