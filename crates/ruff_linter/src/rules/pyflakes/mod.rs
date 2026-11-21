@@ -11,12 +11,12 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::{Diagnostic, DummyFileResolver};
     use ruff_python_parser::ParseOptions;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
-    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_trivia::textwrap::dedent;
@@ -31,7 +31,9 @@ mod tests {
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
-    use crate::{Locator, assert_diagnostics, assert_diagnostics_diff, directives};
+    use crate::{
+        Applicability, Fix, Locator, assert_diagnostics, assert_diagnostics_diff, directives,
+    };
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"))]
@@ -61,11 +63,11 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_34.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
-    #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
+    #[test_case(Rule::StarImport, Path::new("F403.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404_0.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404_1.py"))]
-    #[test_case(Rule::UndefinedLocalWithImportStarUsage, Path::new("F405.py"))]
-    #[test_case(Rule::UndefinedLocalWithNestedImportStarUsage, Path::new("F406.py"))]
+    #[test_case(Rule::PossiblyUndefinedNameWithStarImport, Path::new("F405.py"))]
+    #[test_case(Rule::NonModuleLevelStarImport, Path::new("F406.py"))]
     #[test_case(Rule::FutureFeatureNotDefined, Path::new("F407.py"))]
     #[test_case(Rule::PercentFormatInvalidFormat, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatExpectedMapping, Path::new("F502.py"))]
@@ -1023,7 +1025,10 @@ mod tests {
             target_version,
             &suppressions,
         );
-        messages.sort_by(Diagnostic::ruff_start_ordering);
+        messages.sort_by(|a, b| {
+            a.rendering_sort_key(&DummyFileResolver)
+                .cmp(&b.rendering_sort_key(&DummyFileResolver))
+        });
         let actual = messages
             .iter()
             .filter(|msg| !msg.is_invalid_syntax())
@@ -1286,10 +1291,7 @@ mod tests {
         // Can't find undefined names with import *.
         flakes(
             "from fu import *; bar",
-            &[
-                Rule::UndefinedLocalWithImportStar,
-                Rule::UndefinedLocalWithImportStarUsage,
-            ],
+            &[Rule::StarImport, Rule::PossiblyUndefinedNameWithStarImport],
         );
     }
 
@@ -2704,7 +2706,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         ",
-            &[Rule::UnusedVariable, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
         );
     }
 
@@ -3258,6 +3260,93 @@ lambda: fu
         );
     }
 
+    #[test_case(PythonVersion::PY312, &[Rule::LateFutureImport]; "py312")]
+    #[test_case(PythonVersion::PY313, &[]; "py313")]
+    fn relative_future_import_position(target_version: PythonVersion, expected: &[Rule]) {
+        let diagnostics = test_snippet(
+            "
+            x = 5
+            from .__future__ import division
+            ",
+            &LinterSettings::for_rule(Rule::LateFutureImport).with_target_version(target_version),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            expected
+                .iter()
+                .map(|rule| rule.name().as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test_case(PythonVersion::PY312, &[Rule::FutureFeatureNotDefined]; "py312")]
+    #[test_case(PythonVersion::PY313, &[]; "py313")]
+    fn relative_future_import_feature(target_version: PythonVersion, expected: &[Rule]) {
+        let diagnostics = test_snippet(
+            "from .__future__ import unknown_feature",
+            &LinterSettings::for_rule(Rule::FutureFeatureNotDefined)
+                .with_target_version(target_version),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            expected
+                .iter()
+                .map(|rule| rule.name().as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn relative_future_import_star() {
+        let diagnostics = test_snippet(
+            "from .__future__ import *",
+            &LinterSettings::for_rule(Rule::StarImport).with_target_version(PythonVersion::PY313),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            [Rule::StarImport.name().as_str()]
+        );
+    }
+
+    #[test]
+    fn unused_relative_future_import_py313() {
+        let diagnostics = test_snippet(
+            "from .__future__ import annotations",
+            &LinterSettings::for_rule(Rule::UnusedImport).with_target_version(PythonVersion::PY313),
+        );
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(|diagnostic| (diagnostic.name(), diagnostic.fix().map(Fix::applicability)))
+                .collect::<Vec<_>>(),
+            [(
+                Rule::UnusedImport.name().as_str(),
+                Some(Applicability::Safe)
+            )]
+        );
+    }
+
+    #[test]
+    fn unused_relative_future_import_py312() {
+        let diagnostics = test_snippet(
+            "from .__future__ import annotations",
+            &LinterSettings::for_rule(Rule::UnusedImport).with_target_version(PythonVersion::PY312),
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn unused_relative_future_import_without_target_version() {
+        let diagnostics = test_snippet(
+            "from .__future__ import division",
+            &LinterSettings::for_rule(Rule::UnusedImport),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            [Rule::UnusedImport.name().as_str()]
+        );
+    }
+
     #[test]
     fn ignored_in_function() {
         // An C{__all__} definition does not suppress unused import warnings in a
@@ -3433,10 +3522,10 @@ lambda: fu
         csc(1)
         ",
             &[
-                Rule::UndefinedLocalWithImportStar,
-                Rule::UndefinedLocalWithImportStarUsage,
-                Rule::UndefinedLocalWithImportStarUsage,
-                Rule::UndefinedLocalWithImportStarUsage,
+                Rule::StarImport,
+                Rule::PossiblyUndefinedNameWithStarImport,
+                Rule::PossiblyUndefinedNameWithStarImport,
+                Rule::PossiblyUndefinedNameWithStarImport,
             ],
         );
     }
@@ -3451,7 +3540,7 @@ lambda: fu
         a = 1
         __all__ = ['a']
         ",
-            &[Rule::UndefinedLocalWithImportStar, Rule::UnusedImport],
+            &[Rule::StarImport, Rule::UnusedImport],
         );
     }
 

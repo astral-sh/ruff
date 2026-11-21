@@ -1,11 +1,18 @@
-# ruff: file-ignore[docstring-in-stub]
-"""Experimental ty APIs intended to be exposed to end users."""
+"""ty-extensions is a module that provides experimental typing features supported by ty.
 
-import collections.abc
-import sys
-from typing import Any, ClassVar, Protocol, _SpecialForm
+ty bundles the typing stubs for this module, which means that you can use them without
+installing anything. However, if you rely on runtime evaluation of type annotations,
+you should add the [`ty-extensions` package](https://pypi.org/project/ty-extensions/)
+as a dependency in your project:
 
-from typing_extensions import LiteralString, Self  # ruff: ignore[deprecated-import]
+```bash
+uv add ty-extensions
+```
+"""
+
+from typing import _SpecialForm
+
+from typing_extensions import LiteralString
 
 from ._internal import TypeOf as _TypeOf
 
@@ -13,7 +20,16 @@ from ._internal import TypeOf as _TypeOf
 # Special operations
 # ------------------
 
-def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
+def static_assert(condition: object, msg: LiteralString | None = None) -> None:
+    """Make sure that a certain condition holds at type-check time.
+
+    Example:
+
+    ```python
+    static_assert(sys.version_info[:2] >= (3, 13), "Python 3.13 or higher is required")
+    ```
+
+    At runtime, a false condition raises `AssertionError` (even with Python optimization enabled)."""
 
 # -------------
 # Special forms
@@ -24,8 +40,9 @@ Not: _SpecialForm
 `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
 
 In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
-negation types. Note that either spelling will fail in runtime contexts or in cases where an
-annotation expression could be evaluated.
+negation types. While the experimental syntax will raise an exception in runtime contexts or in
+cases where an annotation expression could be evaluated, however, `Not[]` can be used in arbitrary
+contexts if the `ty-extensions` package is installed.
 """
 
 Intersection: _SpecialForm
@@ -49,8 +66,29 @@ s: Intersection[P, Q] = S()
 ```
 
 In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax
-when displaying intersection types. Note that either spelling will fail in runtime contexts or in
-cases where an annotation expression could be evaluated.
+when displaying intersection types. While the experimental syntax will raise an exception in
+runtime contexts or in cases where an annotation expression could be evaluated, however,
+`Intersection[]` can be used in arbitrary contexts if the `ty-extensions` package is installed.
+
+Nested intersections are flattened at runtime, and duplicate operands are removed using
+runtime equality, keeping the first occurrence of each. A named alias created using the
+`type` statement is always kept as an operand. Intersections are unordered types, so
+nongeneric intersections always compare equal at runtime when they have the same
+operands:
+
+```pycon
+>>> from ty_extensions import Intersection
+>>> Intersection[Intersection[str, int], str]
+ty_extensions.Intersection[str, int]
+>>> type Alias = Intersection[str, int]  # Python 3.12+
+>>> Intersection[Alias, str]
+ty_extensions.Intersection[Alias, str]
+>>> Intersection[int, str] == Intersection[str, int]
+True
+>>> hash(Intersection[int, str]) == hash(Intersection[str, int])
+True
+
+```
 """
 
 Top: _SpecialForm
@@ -127,12 +165,12 @@ context.
 literal strings, integers and bytestrings. It can also be inhabited by instances of classes
 with `__bool__` methods returning `Literal[True]`.
 
-In practice, most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`, since
-their boolean evaluation may be uncertain or depend on runtime state. For example, although
-an instance of *exactly* `object` is always truthy, a variable annotated as having type
-`object` could also be an instance of an arbitrary subclass of `object` that is always falsy.
-This means that the boolean evaluation of a variable inferred as `object` is uncertain, so
-`object` is not a subtype of `AlwaysTruthy`.
+In practice, most Python objects inhabit neither `AlwaysTruthy` nor `AlwaysFalsy`, since their
+boolean evaluation may be uncertain or depend on runtime state. For example, although an
+instance of *exactly* `object` is always truthy, a variable annotated as having type `object`
+could also be an instance of an arbitrary subclass of `object` that is always falsy. This means
+that the boolean evaluation of a variable inferred as `object` is uncertain, so `object` is
+not a subtype of `AlwaysTruthy`.
 """
 
 AlwaysFalsy: _SpecialForm
@@ -148,41 +186,24 @@ In practice, however, most Python objects inhabit neither `AlwaysTruthy` nor `Al
 since their boolean evaluation may be uncertain or depend on runtime state.
 """
 
-# ty treats annotations of `float` to mean `float | int`, and annotations of `complex`
-# to mean `complex | float | int`. This is to support a typing-system special case [1].
-# We therefore provide `JustFloat` and `JustComplex` to represent the "bare" `float` and
-# `complex` types, respectively.
-#
-# [1]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 type JustFloat = _TypeOf[1.0]
+"""
+`JustFloat` represents an instance of the class `float`. This can be used to circumvent
+the [type-system special case] that lets `float` annotations accept values of
+type `int` as well.
+
+At runtime, `JustFloat` is an alias for the built-in `float` class.
+
+[type-system special case]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+"""
+
 type JustComplex = _TypeOf[1.0j]
+"""
+`JustComplex` represents an instance of the class `complex`. This can be used to circumvent
+the [type-system special case] that lets `complex` annotations accept values of
+type `float` or `int` as well.
 
-class NamedTupleLike(Protocol):
-    """
-    A protocol describing an interface that should be satisfied by all named tuples
-    created using `typing.NamedTuple` or `collections.namedtuple`.
-    """
+At runtime, `JustComplex` is an alias for the built-in `complex` class.
 
-    # _fields is defined as `tuple[Any, ...]` rather than `tuple[str, ...]` so
-    # that instances of actual `NamedTuple` classes with more precise `_fields`
-    # types are considered assignable to this protocol (protocol attribute members
-    # are invariant, and `tuple[str, str]` is not invariantly assignable to
-    # `tuple[str, ...]`).
-    _fields: ClassVar[tuple[Any, ...]]
-    _field_defaults: ClassVar[dict[str, Any]]
-    @classmethod
-    def _make(cls: type[Self], iterable: collections.abc.Iterable[Any]) -> Self: ...
-    def _asdict(self, /) -> dict[str, Any]: ...
-
-    # Positional arguments aren't actually accepted by these methods at runtime,
-    # but adding the `*args` parameters means that all `NamedTuple` classes
-    # are understood as assignable to this protocol due to the special case
-    # outlined in https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable:
-    #
-    # > If the input signature in a function definition includes both a
-    # > `*args` and `**kwargs` parameter and both are typed as `Any`
-    # > (explicitly or implicitly because it has no annotation), a type
-    # > checker should treat this as the equivalent of `...`.
-    def _replace(self, *args, **kwargs) -> Self: ...
-    if sys.version_info >= (3, 13):
-        def __replace__(self, *args, **kwargs) -> Self: ...
+[type-system special case]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+"""

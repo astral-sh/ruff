@@ -54,21 +54,21 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `typing.NamedTuple`](https://docs.python.org/3/library/typing.html#typing.NamedTuple)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155", category = Category::Style)]
-pub(crate) struct ConvertNamedTupleFunctionalToClass {
+pub(crate) struct FunctionalNamedTuple {
     name: String,
 }
 
-impl Violation for ConvertNamedTupleFunctionalToClass {
+impl Violation for FunctionalNamedTuple {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertNamedTupleFunctionalToClass { name } = self;
+        let FunctionalNamedTuple { name } = self;
         format!("Convert `{name}` from `NamedTuple` functional to class syntax")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ConvertNamedTupleFunctionalToClass { name } = self;
+        let FunctionalNamedTuple { name } = self;
 
         Some(format!("Convert `{name}` to class syntax"))
     }
@@ -119,7 +119,7 @@ pub(crate) fn convert_named_tuple_functional_to_class(
     };
 
     let mut diagnostic = checker.report_diagnostic(
-        ConvertNamedTupleFunctionalToClass {
+        FunctionalNamedTuple {
             name: typename.to_string(),
         },
         stmt.range(),

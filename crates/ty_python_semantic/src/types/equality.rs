@@ -10,12 +10,12 @@ use std::ops::ControlFlow;
 use rustc_hash::FxHashMap;
 use ty_python_core::definition::Definition;
 
-use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers};
+use crate::{AnalysisSettings, Db, Program, ProgramEnvironment, place::PlaceAndQualifiers};
 
 use super::{
     CallArguments, EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, SubclassOfInner, Truthiness, Type,
+    TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
     bool::BoolError,
     cyclic::ActiveRecursionDetector,
     enums::{enum_member_literals, enum_metadata},
@@ -899,6 +899,35 @@ fn evaluate_structural_comparison<'db>(
                 && has_known_identity_comparison_semantics(db, env, right, operator) =>
         {
             operator.result_from_equality(left == right)
+        }
+        // A bare generic class can be the runtime class of any of its specializations.
+        // Comparing a specialized constructor with its origin must preserve its type arguments.
+        (Type::SubclassOf(subclass), Type::ClassLiteral(class))
+        | (Type::ClassLiteral(class), Type::SubclassOf(subclass))
+            if class.generic_context(db).is_some()
+                && let SubclassOfInner::Class(base) = subclass.subclass_of()
+                && base.is_generic() =>
+        {
+            ComparisonResult::Ambiguous
+        }
+        (Type::ClassLiteral(_), Type::SubclassOf(_) | Type::NominalInstance(_))
+        | (Type::SubclassOf(_) | Type::NominalInstance(_), Type::ClassLiteral(_))
+            if [left, right].into_iter().all(|ty| {
+                evaluator.comparison_semantics(ty, operator)
+                    == Some(KnownComparisonSemantics::Object)
+            }) =>
+        {
+            if left.is_disjoint_from(db, env, right) {
+                operator.result_from_equality(false)
+            } else if matches!(right, Type::ClassLiteral(_)) {
+                ComparisonResult::CanNarrow(right.negate_if(
+                    db,
+                    env,
+                    !operator.condition_expects_equality(branch),
+                ))
+            } else {
+                ComparisonResult::Ambiguous
+            }
         }
 
         (Type::NominalInstance(left_instance), Type::NominalInstance(right_instance)) => {
@@ -1898,6 +1927,26 @@ impl KnownComparisonSemantics {
     ) -> Option<Self> {
         match ty {
             Type::LiteralValue(literal) => Self::of_literal(db, env, literal.kind(), operator),
+            Type::ClassLiteral(class)
+                if let metaclass @ Type::ClassLiteral(_) = class.metaclass(db) =>
+            {
+                class_comparison_semantics(db, env.program(db), metaclass, operator)
+            }
+            // A subclass of C may use a subclass of C's metaclass. In strict mode we can
+            // rely on its comparison method only if the metaclass itself is final.
+            Type::SubclassOf(subclass)
+                if let SubclassOfInner::Class(class) = subclass.subclass_of()
+                    && let Type::ClassLiteral(metaclass) =
+                        class.inferred_metaclass(db).for_inheritance(db, env)
+                    && (soundness_policy.allow_unsafe_equality || metaclass.is_final(db)) =>
+            {
+                class_comparison_semantics(
+                    db,
+                    env.program(db),
+                    Type::ClassLiteral(metaclass),
+                    operator,
+                )
+            }
             Type::TypedDict(_) => Some(Self::Dict),
             Type::EnumComplement(complement) => Self::of_instance(
                 db,
@@ -1977,51 +2026,67 @@ impl KnownComparisonSemantics {
         operator: ComparisonOperator,
     ) -> Option<Self> {
         instance.nominal_class(db, env)?;
-        let class = instance.to_meta_type(db, env);
-        let dunder = lookup_dunder(db, env, class, operator.dunder());
-
-        if dunder.place.is_undefined() {
-            if operator == ComparisonOperator::Inequality {
-                let equality = lookup_dunder(db, env, class, "__eq__");
-                // `tuple.__ne__` delegates to its builtin equality implementation.
-                let tuple_equality = lookup_dunder(
-                    db,
-                    env,
-                    KnownClass::Tuple.to_class_literal(db, env),
-                    "__eq__",
-                );
-                if same_member_implementation(db, equality, tuple_equality) {
-                    return Some(Self::Tuple);
-                }
-                if !equality.place.is_undefined() {
-                    return None;
-                }
-            }
-            return Some(Self::Object);
-        }
-
-        for (known_class, semantics) in [
-            (KnownClass::Int, Self::Int),
-            (KnownClass::Str, Self::Str),
-            (KnownClass::Bytes, Self::Bytes),
-            (KnownClass::Tuple, Self::Tuple),
-            (KnownClass::Dict, Self::Dict),
-        ] {
-            if same_member_implementation(
-                db,
-                dunder,
-                lookup_dunder(
-                    db,
-                    env,
-                    known_class.to_class_literal(db, env),
-                    operator.dunder(),
-                ),
-            ) {
-                return Some(semantics);
-            }
-        }
-        None
+        class_comparison_semantics(
+            db,
+            env.program(db),
+            instance.to_meta_type(db, env),
+            operator,
+        )
     }
+}
+
+/// Classify the implementation once per class so every enum member can reuse it.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+fn class_comparison_semantics<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    class: Type<'db>,
+    operator: ComparisonOperator,
+) -> Option<KnownComparisonSemantics> {
+    let env = &ProgramEnvironment::from_program(program);
+    let dunder = lookup_dunder(db, env, class, operator.dunder())?;
+
+    if dunder.place.is_undefined() {
+        if operator == ComparisonOperator::Inequality {
+            let equality = lookup_dunder(db, env, class, "__eq__")?;
+            // `tuple.__ne__` delegates to its builtin equality implementation.
+            let tuple_equality = lookup_dunder(
+                db,
+                env,
+                KnownClass::Tuple.to_class_literal(db, env),
+                "__eq__",
+            )?;
+            if same_member_implementation(db, equality, tuple_equality) {
+                return Some(KnownComparisonSemantics::Tuple);
+            }
+            if !equality.place.is_undefined() {
+                return None;
+            }
+        }
+        return Some(KnownComparisonSemantics::Object);
+    }
+
+    for (known_class, semantics) in [
+        (KnownClass::Int, KnownComparisonSemantics::Int),
+        (KnownClass::Str, KnownComparisonSemantics::Str),
+        (KnownClass::Bytes, KnownComparisonSemantics::Bytes),
+        (KnownClass::Tuple, KnownComparisonSemantics::Tuple),
+        (KnownClass::Dict, KnownComparisonSemantics::Dict),
+    ] {
+        if same_member_implementation(
+            db,
+            dunder,
+            lookup_dunder(
+                db,
+                env,
+                known_class.to_class_literal(db, env),
+                operator.dunder(),
+            )?,
+        ) {
+            return Some(semantics);
+        }
+    }
+    None
 }
 
 /// Return whether equality on `ty` is reflexive and therefore rules out shared identity when false.
@@ -2053,14 +2118,6 @@ fn has_known_identity_comparison_semantics<'db>(
 ) -> bool {
     match ty {
         Type::FunctionLiteral(_) | Type::ModuleLiteral(_) => true,
-        Type::ClassLiteral(class) => {
-            KnownComparisonSemantics::of_instance(
-                db,
-                env,
-                class.metaclass_instance_type(db, env),
-                operator,
-            ) == Some(KnownComparisonSemantics::Object)
-        }
         _ => {
             ty.is_singleton(db, env)
                 && KnownComparisonSemantics::of_type(db, env, ty, operator)
@@ -2091,14 +2148,14 @@ fn same_member_implementation(
     }
 }
 
-/// Look up a comparison method without falling back to `object`.
+/// Look up a comparison method in the class's MRO, excluding `object`'s identity fallback.
 fn lookup_dunder<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     name: &'static str,
-) -> PlaceAndQualifiers<'db> {
-    ty.member_lookup_with_policy(db, env, name, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK)
+) -> Option<PlaceAndQualifiers<'db>> {
+    ty.find_name_in_mro_with_policy(db, env, name, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK)
 }
 
 /// Return the comparison result for two literals when their runtime values determine it.

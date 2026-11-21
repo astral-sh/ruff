@@ -6,7 +6,7 @@ use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
-use crate::types::{KnownClass, KnownInstanceType, check_types};
+use crate::types::{KnownClass, KnownInstanceType, TypeAndQualifiers, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;

@@ -36,6 +36,30 @@ def f(x: f):
 reveal_type(f)  # revealed: def f(x: Unknown) -> Unknown
 ```
 
+## A `TypeVar` name depends on its own `__name__`
+
+The name passed to `TypeVar` comes from `T.__name__` in another module. Inferring `T.__name__` leads
+back to the name argument, so ty falls back to `str` for the attribute.
+
+`parameter.py`:
+
+```py
+from typing import TypeVar
+from typing_extensions import reveal_type
+from names import name
+
+T = TypeVar(name)  # error: [mismatched-typevar-name]
+reveal_type(T.__name__)  # revealed: str
+```
+
+`names.py`:
+
+```py
+from parameter import T
+
+name = T.__name__
+```
+
 ## Unpacking a recursively growing tuple
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3838>.
@@ -769,5 +793,5 @@ def keep[U](values: list[U]) -> list[U]:
 def make[T](arg: T) -> list[T]:
     values = [42]
     reveal_type(values)  # revealed: list[int]
-    return keep(values)  # error: [invalid-return-type]
+    return keep(values)  # error: [invalid-explicit-return]
 ```

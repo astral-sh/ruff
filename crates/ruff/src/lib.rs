@@ -213,11 +213,11 @@ pub fn run_command(
 
 fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
     let (cli, config_arguments) = args.partition(global_options)?;
-    let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+    let root_settings = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        commands::format_stdin::format_stdin(&cli, &config_arguments, &pyproject_config)
+        commands::format_stdin::format_stdin(&cli, &config_arguments, &root_settings)
     } else {
-        commands::format::format(cli, &config_arguments, &pyproject_config)
+        commands::format::format(cli, &config_arguments, &root_settings)
     }
 }
 
@@ -239,7 +239,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+    let root_settings = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
 
     let mut writer: Box<dyn Write> = match cli.output_file {
         Some(path) if !cli.watch => {
@@ -260,19 +260,14 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     if cli.show_settings {
         commands::show_settings::show_settings(
             &files,
-            &pyproject_config,
+            &root_settings,
             &config_arguments,
             &mut writer,
         )?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(
-            &files,
-            &pyproject_config,
-            &config_arguments,
-            &mut writer,
-        )?;
+        commands::show_files::show_files(&files, &root_settings, &config_arguments, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
 
@@ -285,7 +280,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         output_format,
         show_fixes,
         ..
-    } = pyproject_config.settings;
+    } = root_settings.resolved.settings;
 
     // Fix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
@@ -344,7 +339,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
         let modifications = commands::add_noqa::add_noqa(
             &files,
-            &pyproject_config,
+            &root_settings,
             &config_arguments,
             reason_opt,
             suppression_kind,
@@ -374,8 +369,8 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // the settings should already be combined with the CLI overrides at this point
     // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
     //   is resolved.
-    let preview = pyproject_config.settings.linter.preview;
-    let prefer_rule_codes = pyproject_config.settings.output_prefer_rule_codes;
+    let preview = root_settings.resolved.settings.linter.preview;
+    let prefer_rule_codes = root_settings.resolved.settings.output_prefer_rule_codes;
 
     if cli.watch {
         // Configure the file watcher.
@@ -384,7 +379,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         for file in &files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
-        if let Some(file) = pyproject_config.path.as_ref() {
+        if let Some(file) = root_settings.resolved.config_path() {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
 
@@ -394,7 +389,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
         let diagnostics = commands::check::check(
             &files,
-            &pyproject_config,
+            &root_settings,
             &config_arguments,
             cache.into(),
             noqa.into(),
@@ -405,7 +400,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
-        let mut pyproject_config = pyproject_config;
+        let mut root_settings = root_settings;
 
         loop {
             let Some(change_kind) = change_detected(&rx.recv()??) else {
@@ -413,15 +408,14 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             };
 
             if matches!(change_kind, ChangeKind::Configuration) {
-                pyproject_config =
-                    resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+                root_settings = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
             }
             Printer::clear_screen()?;
             printer.write_to_user("File change detected...\n");
 
             let diagnostics = commands::check::check(
                 &files,
-                &pyproject_config,
+                &root_settings,
                 &config_arguments,
                 cache.into(),
                 noqa.into(),
@@ -435,7 +429,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let diagnostics = if is_stdin {
         commands::check_stdin::check_stdin(
             cli.stdin_filename.map(fs::normalize_path).as_deref(),
-            &pyproject_config,
+            &root_settings,
             &config_arguments,
             noqa.into(),
             fix_mode,
@@ -443,7 +437,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     } else {
         commands::check::check(
             &files,
-            &pyproject_config,
+            &root_settings,
             &config_arguments,
             cache.into(),
             noqa.into(),
@@ -480,10 +474,9 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             .unwrap_or(Severity::Info);
         if max_severity.is_fatal() {
             // When a panic/fatal error is reported, prompt the user to open an issue on github.
-            // Diagnostics with severity `fatal` will be sorted to the bottom, and printing the
-            // message here instead of attaching it to the diagnostic ensures that we only print
-            // it once instead of repeating it for each diagnostic. Prints to stderr to prevent
-            // the message from being captured by tools parsing the normal output.
+            // Printing the message here instead of attaching it to the diagnostic ensures that we
+            // only print it once instead of repeating it for each diagnostic. Prints to stderr to
+            // prevent the message from being captured by tools parsing the normal output.
             let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
 
 https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D

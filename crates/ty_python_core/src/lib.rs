@@ -1189,6 +1189,9 @@ mod tests {
             ParameterDefinitionNodeKind,
         },
         program::Program,
+        use_def::{
+            FutureDefinitions, ImportedQualifierAction, PreviousDefinitions, UseDefMapBuilder,
+        },
     };
 
     impl UseDefMap<'_> {
@@ -1585,6 +1588,60 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             kwargs_binding.kind(&db),
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(_))
         );
+    }
+
+    #[test]
+    fn stub_parameter_bindings_belong_to_their_own_function() {
+        let TestCase { db, file } = test_case(
+            "def first(a, /, *rest: int, b: str, **options): ...\n\
+             def second(c, /, *values: float, d: bytes, **kwargs): pass",
+        );
+        let file = program_file(&db, file);
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        for stmt in module.suite() {
+            let ast::Stmt::FunctionDef(function) = stmt else {
+                panic!("expected a function");
+            };
+            let scope = index.node_scope(NodeWithScopeRef::Function(function));
+            let table = index.place_table(scope);
+            let use_def = index.use_def_map(scope);
+            let mut reference = Box::new(UseDefMapBuilder::new(ScopeKind::Function));
+            for (_, definition, used) in use_def.definitions_with_usage() {
+                assert!(!used);
+                let place = definition.place(&db);
+                reference.add_place(place);
+                let category = definition.kind(&db).category(false, &module);
+                if category.is_declaration() {
+                    reference.record_combined_definition(place, definition, category);
+                } else {
+                    reference.record_binding(
+                        place,
+                        definition,
+                        PreviousDefinitions::AreShadowed,
+                        FutureDefinitions::ShadowThisOne,
+                        ImportedQualifierAction::Preserve,
+                    );
+                }
+            }
+            assert_eq!(use_def, &reference.finish());
+            for parameter in &function.parameters {
+                let definition = index.expect_single_definition(parameter);
+                let symbol = table.symbol_id(parameter.name()).unwrap();
+                assert_eq!(use_def.first_public_binding(symbol), Some(definition));
+                assert_eq!(
+                    use_def.first_public_declaration(symbol),
+                    parameter.annotation().map(|_| definition),
+                );
+                assert_eq!(
+                    use_def
+                        .reachable_symbol_bindings(symbol)
+                        .filter_map(|binding| binding.binding.definition())
+                        .collect::<Vec<_>>(),
+                    [definition],
+                );
+            }
+        }
     }
 
     #[test]

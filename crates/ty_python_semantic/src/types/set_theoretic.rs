@@ -66,7 +66,9 @@ impl<'db> OrderedUnionInput<'db> {
                 .build()
         }
 
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        // A provisional redundancy check can drop a union member on one iteration and retain it
+        // on the next. Build the union in the caller when normalization participates in a cycle.
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn normalized<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Option<Type<'db>> {
             Some(build(db, input))
         }
@@ -158,6 +160,24 @@ impl<'db> UnionType<'db> {
         }
 
         union_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
+    }
+
+    /// Normalize a pair without unpacking aliases. Repeated annotations often share the
+    /// same operand types even when their enclosing function signatures differ.
+    pub(crate) fn from_two_elements_leave_aliases(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> Type<'db> {
+        OrderedUnionInput::new(
+            db,
+            env.program(db),
+            [left, right].as_slice(),
+            false,
+            RecursivelyDefined::No,
+        )
+        .normalize(db)
     }
 
     /// Create a union from a list of elements without unpacking type aliases.

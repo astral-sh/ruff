@@ -86,6 +86,7 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::convert::Infallible;
@@ -103,17 +104,12 @@ use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
-use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::type_alias::TypeAliasType;
-use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarInstance, TypeVarSet,
-};
-use crate::types::variance::VarianceInferable;
+use crate::types::generics::Specialization;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarSet};
 use crate::types::visitor::{
-    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
-    walk_non_atomic_type, walk_type_with_recursion_guard,
+    NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases, walk_non_atomic_type,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
@@ -598,10 +594,41 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             TypeVarSet::from_typevars(db, support.iter().map(|id| storage.typevar_data(id)))
         };
 
-        matches!(
-            self.solutions(db, env, inferable),
-            Ok(Solutions::Unsatisfiable(_))
-        )
+        // Comparing invariant arguments like `Literal["a", "b", ...]` and `T | U`
+        // can produce a distinct specialization for every partition of the literals
+        // between T and U. A single valid solution establishes overlap.
+        let budget = SolutionBudget::default();
+        let Ok(candidates) = CandidateSolutions::compute_bounded(
+            db,
+            env,
+            self,
+            inferable,
+            budget,
+            CandidateSearch::FirstValid,
+        ) else {
+            return false;
+        };
+        let result = candidates.solve_with_budget(db, budget, |_variance, bounds| {
+            CandidateSolutions::default_solve(db, env, self.builder, bounds)
+        });
+        if !matches!(result, Ok(Solutions::Unsatisfiable(_))) {
+            return false;
+        }
+
+        // Selection can reject a candidate after the walker has validated its declared
+        // domains. If such a candidate stopped the walk, check all paths before
+        // concluding that the arguments are disjoint.
+        if let CandidateSolutions::Constrained(paths) = &candidates
+            && paths
+                .iter()
+                .any(|path| matches!(path.validity, SolutionValidity::Valid))
+        {
+            return matches!(
+                self.solutions(db, env, inferable),
+                Ok(Solutions::Unsatisfiable(_))
+            );
+        }
+        true
     }
 
     /// Returns whether this constraint set is the `never` terminal.
@@ -1073,6 +1100,9 @@ struct ConstraintSetStorage<'db> {
     /// are stored in the dense local arenas below.
     compacted: Option<Arc<OwnedConstraintSetInner<'db>>>,
 
+    /// Raw paths from the last bounded projection in this builder, before solution selection.
+    last_projection: Option<Box<(projection::ProjectionKey<'db>, CandidateSolutions<'db>)>>,
+
     /// Constraints are the variables of our BDD. They are interned to give them a space-efficient
     /// identity. Constraints are added to this arena as they are encountered when constructing
     /// constraint sets. The ordering within the arena defines the BDD variable ordering in our BDD
@@ -1089,11 +1119,14 @@ struct ConstraintSetStorage<'db> {
     typevars: IndexVec<TypeVarId, BoundTypeVarInstance<'db>>,
 
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
-    nodes: IndexVec<NodeId, InteriorNodeData>,
+    nodes: IndexVec<NodeId, BuilderNode>,
 
     supports: IndexVec<SupportId, Support>,
     constraint_supports: IndexVec<ConstraintId, SupportId>,
-    node_supports: IndexVec<NodeId, SupportId>,
+
+    /// The fewest atoms that must be true to satisfy each node, computed lazily for coverage
+    /// checks in builders without compacted storage.
+    min_positive_atoms: IndexVec<NodeId, u8>,
 
     /// Encodes an ordering on the constraints in a constraint set, which is based on the order
     /// that the constraints (or more accurately, the Python expressions they're derived from)
@@ -1203,6 +1236,15 @@ impl<'db> ConstraintSetStorage<'db> {
         id
     }
 
+    /// Number of type variables interned in this storage, including its compacted prefix.
+    fn typevar_count(&self) -> usize {
+        let compacted = self
+            .compacted
+            .as_ref()
+            .map_or(0, |inner| inner.typevars.len());
+        compacted + self.typevars.len()
+    }
+
     fn adjusted_typevar_id(&self, id: TypeVarId) -> TypeVarId {
         if let Some(compacted) = &self.compacted {
             return id + compacted.typevars.len();
@@ -1295,7 +1337,7 @@ impl<'db> ConstraintSetStorage<'db> {
         id
     }
 
-    /// Interns all of the typevars mentioned in a type in a stable order.
+    /// Interns the free type variables in a constraint bound in a stable order.
     fn intern_mentioned_typevars_in_type(
         &mut self,
         db: &'db dyn Db,
@@ -1303,78 +1345,11 @@ impl<'db> ConstraintSetStorage<'db> {
         ty: Type<'db>,
         support: &mut Support,
     ) {
-        struct InternMentionedTypevars<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
-            storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
-            support: RefCell<&'a mut Support>,
-            recursion_guard: TypeCollector<'db>,
+        let (typevars, skipped_lazy) = ty.free_typevars(db, env);
+        *support |= &Support::from_typevar_set(db, self, typevars);
+        if skipped_lazy {
+            support.mark_incomplete();
         }
-
-        impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn notify_skipped_lazy_type_attributes(&self) {
-                self.support.borrow_mut().mark_incomplete();
-            }
-
-            fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
-                // Declaration bounds, constraints, and defaults are not occurrences in the
-                // constraint itself and must not contribute to its support.
-            }
-
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                for ty in alias.specialization(db).types(db) {
-                    self.visit_type(db, *ty);
-                }
-            }
-
-            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-                self.notify_skipped_lazy_type_attributes();
-                let Some(specialization) = alias.specialization(db) else {
-                    return;
-                };
-                let parameters = specialization.generic_context(db).variables(db);
-                let origin = alias.unspecialized(db);
-                for (parameter, &argument) in parameters.zip(specialization.types(db)) {
-                    // With `type Constant[T] = int`, the value of T has no effect on the bound.
-                    let variance = origin.variance_of(db, self.env, parameter.identity(db));
-                    if variance.evaluate(db) != TypeVarVariance::Bivariant {
-                        self.visit_type(db, argument);
-                    }
-                }
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                if let Type::TypeVar(bound_typevar) = ty {
-                    let mut storage = self.storage.borrow_mut();
-                    let typevar = storage.intern_typevar(db, bound_typevar);
-                    let mut support = self.support.borrow_mut();
-                    support.insert(typevar);
-                    // Walking `Callable[P, R]` visits P.args and P.kwargs separately. The bound
-                    // also depends on P itself, so solving or quantifying P must update it.
-                    if bound_typevar.paramspec_attr(db).is_some() {
-                        support.insert(
-                            storage.intern_typevar(db, bound_typevar.without_paramspec_attr(db)),
-                        );
-                    }
-                }
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        InternMentionedTypevars {
-            env,
-            storage: RefCell::new(self),
-            support: RefCell::new(support),
-            recursion_guard: TypeCollector::default(),
-        }
-        .visit_type(db, ty);
     }
 
     /// Interns all of the typevars mentioned in a constraint in a stable order.
@@ -1452,11 +1427,47 @@ impl<'db> ConstraintSetStorage<'db> {
         support |= self.node_support(data.if_false);
         let support = self.intern_support(support);
 
-        let id = self.nodes.push(data);
-        self.node_supports.push(support);
+        let id = self.nodes.push(BuilderNode { data, support });
         let id = self.adjusted_node_id(id);
         self.node_cache.insert(data, id);
         id
+    }
+
+    /// Tries to prove that `left` needs fewer true atoms than `right`.
+    ///
+    /// On any accepting path, setting just the atoms on guarded true edges to true satisfies
+    /// the diagram. Ordering ensures that no atom appears twice on the path. If the minimum
+    /// for `left` is smaller, such an assignment witnesses that `right` cannot cover `left`.
+    fn requires_fewer_positive_atoms(&mut self, left: NodeId, right: NodeId) -> bool {
+        if self.compacted.is_some() || left.is_terminal() || right.is_terminal() {
+            return false;
+        }
+
+        // Children precede parents in the local arena. Extend the table up to the nodes we
+        // need, bounding the work per comparison. Saturation preserves the ordering whenever
+        // the two counts differ after truncation.
+        let minima = &mut self.min_positive_atoms;
+        let end = left.index().max(right.index()) + 1;
+        for node in self
+            .nodes
+            .iter()
+            .take(end)
+            .skip(minima.len())
+            .take(COVERAGE_BUDGET)
+        {
+            let minimum = |branch| match branch {
+                ALWAYS_TRUE => 0,
+                ALWAYS_FALSE => u8::MAX,
+                _ => minima[branch],
+            };
+            let node = node.data;
+            let count = minimum(node.if_true)
+                .saturating_add(1)
+                .min(minimum(node.if_uncertain))
+                .min(minimum(node.if_false));
+            minima.push(count);
+        }
+        minima.len() >= end && minima[left] < minima[right]
     }
 
     fn typevar_id(&mut self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
@@ -1515,9 +1526,9 @@ impl<'db> ConstraintSetStorage<'db> {
                 let compacted_index = compacted.retained_node_index(node);
                 return compacted.nodes[compacted_index];
             }
-            return self.nodes[NodeId::from_usize(index - split)];
+            return self.nodes[NodeId::from_usize(index - split)].data;
         }
-        self.nodes[node]
+        self.nodes[node].data
     }
 
     fn intern_source_order(&mut self, data: SourceOrder) -> SourceOrderId {
@@ -1667,9 +1678,9 @@ impl<'db> ConstraintSetStorage<'db> {
                 let compacted_index = compacted.retained_node_index(node);
                 return Some(compacted.node_supports[compacted_index]);
             }
-            return Some(self.node_supports[NodeId::from_usize(index - split)]);
+            return Some(self.nodes[NodeId::from_usize(index - split)].support);
         }
-        Some(self.node_supports[node])
+        Some(self.nodes[node].support)
     }
 
     fn node_support(&self, node: NodeId) -> Option<&Support> {
@@ -2254,6 +2265,8 @@ const ALWAYS_TRUE: NodeId = NodeId(0xffff_ffff);
 /// A special ID that is used for an "always false" / "never visible" constraint.
 const ALWAYS_FALSE: NodeId = NodeId(0xffff_fffe);
 
+const COVERAGE_BUDGET: usize = 64;
+
 const SMALLEST_TERMINAL: NodeId = ALWAYS_FALSE;
 
 enum Node {
@@ -2308,10 +2321,15 @@ impl NodeId {
         }
 
         // A guarded branch covered by the uncertain branch adds no satisfying assignments.
-        // Keep the proof bounded and non-allocating: speculative intersections here can trigger
+        // Keep the proof bounded and avoid building new nodes. Speculative intersections can trigger
         // further coverage checks and expand a compact disjunction exponentially.
-        if if_uncertain != ALWAYS_FALSE {
-            let mut remaining_visits = 64;
+        // When the false guard is empty, skipping a failed proof for the true guard cannot
+        // affect the second proof through their shared visit budget.
+        if if_uncertain != ALWAYS_FALSE
+            && !(if_false == ALWAYS_FALSE
+                && storage.requires_fewer_positive_atoms(if_true, if_uncertain))
+        {
+            let mut remaining_visits = COVERAGE_BUDGET;
             if if_true.is_covered_by(storage, if_uncertain, &mut remaining_visits) {
                 if_true = ALWAYS_FALSE;
             }
@@ -2521,6 +2539,26 @@ impl NodeId {
         }
     }
 
+    /// Look for a counterexample by falsifying each atom. When the false branch
+    /// has no disjunct of its own, only the uncertain branch can still be true.
+    /// Stop if following an edge would require combining branches.
+    fn all_negative_path_to_false(
+        self,
+        storage: &ConstraintSetStorage<'_>,
+    ) -> Option<SmallVec<[AtomicConstraintId; 4]>> {
+        let mut atoms = SmallVec::new();
+        let mut node = self;
+        while let Node::Interior(_) = node.node() {
+            let interior = storage.interior_node_data(node);
+            if interior.if_false != ALWAYS_FALSE {
+                return None;
+            }
+            atoms.push(interior.constraint.as_atomic(storage)?);
+            node = interior.if_uncertain;
+        }
+        (node == ALWAYS_FALSE).then_some(atoms)
+    }
+
     /// Returns whether this BDD represent the constant function `true`.
     fn is_always_satisfied<'db>(
         self,
@@ -2554,10 +2592,22 @@ impl NodeId {
             Node::AlwaysTrue => ControlFlow::Continue(true),
             Node::AlwaysFalse => ControlFlow::Continue(false),
             Node::Interior(interior) => {
+                // Bounded callers account for each visit in the exact traversal.
+                let try_all_negative_path = limits.traversal_budget().is_none();
                 let source_orders = storage.calculate_source_orders(source_order);
                 let mut walker =
                     SolutionWalker::new(db, storage, source_orders, inferable, limits, self);
                 let mut path = interior.path_assignments(db, env, storage, source_order);
+                if try_all_negative_path
+                    && let Some(atoms) = self.all_negative_path_to_false(storage)
+                {
+                    let snapshot = path.snapshot();
+                    if walker.has_all_negative_counterexample(db, env, storage, &mut path, &atoms) {
+                        return ControlFlow::Continue(false);
+                    }
+                    // Keep discovered rules for the fallback, as when backtracking to a sibling.
+                    path.truncate(&snapshot);
+                }
                 walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
             }
         }
@@ -3145,6 +3195,13 @@ struct InteriorNodeData {
     if_false: NodeId,
 }
 
+/// An interior node and its type variable support in a builder's local arena.
+#[derive(Debug)]
+struct BuilderNode {
+    data: InteriorNodeData,
+    support: SupportId,
+}
+
 /// Accumulates validity and evidence bounds for a single typevar on one TDD path.
 ///
 /// Separate lower-bound unions preserve inference evidence even when a wider validity restriction
@@ -3493,6 +3550,26 @@ impl<'db> CandidateTypeVarSolution<'db> {
         PathBoundSolution::Solved(candidate)
     }
 
+    /// The assignability relations that place a candidate between its lower and upper bounds.
+    fn candidate_relations(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        candidate: Type<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> impl Iterator<Item = (Type<'db>, Type<'db>)> {
+        let specialize =
+            move |bound: Type<'db>| bound.apply_optional_specialization(db, specialization);
+        let lower = (!self.bound_typevar.is_paramspec(db))
+            .then(|| self.effective_lower(db, env, EvidenceSource::All))
+            .map(|bound| (specialize(bound), candidate));
+        let uppers = self
+            .upper
+            .iter_clauses(EvidenceSource::All)
+            .map(move |bound| (candidate, specialize(bound)));
+        lower.into_iter().chain(uppers)
+    }
+
     /// Checks whether a given candidate solution satisfies this path.
     pub(super) fn accepts_candidate(
         &self,
@@ -3502,20 +3579,10 @@ impl<'db> CandidateTypeVarSolution<'db> {
         candidate: Type<'db>,
     ) -> bool {
         let inferable = self.inferable;
-        let lower = self.effective_lower(db, env, EvidenceSource::All);
-        let when_lower = if self.bound_typevar.is_paramspec(db) {
-            ConstraintSet::always(builder)
-        } else {
-            lower.when_assignable_to(db, env, candidate, builder, inferable)
-        };
-
-        !when_lower
-            .and(db, builder, || {
-                self.upper
-                    .iter_clauses(EvidenceSource::All)
-                    .when_all(db, builder, |upper| {
-                        candidate.when_assignable_to(db, env, upper, builder, inferable)
-                    })
+        !self
+            .candidate_relations(db, env, candidate, None)
+            .when_all(db, builder, |(lower, upper)| {
+                lower.when_assignable_to(db, env, upper, builder, inferable)
             })
             .is_never_satisfied(db, env, inferable)
     }
@@ -3739,6 +3806,30 @@ pub(crate) struct CandidateSolution<'db> {
     validity: SolutionValidity<'db>,
 }
 
+impl<'db> CandidateSolution<'db> {
+    /// Variables whose bounds fail with all sibling arguments fixed to this specialization.
+    fn incompatible_typevars(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: Specialization<'db>,
+    ) -> impl Iterator<Item = BoundTypeVarInstance<'db>> {
+        self.typevars.iter().filter_map(move |bounds| {
+            let variable = bounds.bound_typevar;
+            let fits = arguments.get(db, variable).is_some_and(|ty| {
+                bounds
+                    .candidate_relations(db, env, ty, Some(arguments))
+                    .all(|(lower, upper)| {
+                        !lower.has_provisional_marker(db, env)
+                            && !upper.has_provisional_marker(db, env)
+                            && lower.is_assignable_to(db, env, upper)
+                    })
+            });
+            (!fits).then_some(variable)
+        })
+    }
+}
+
 /// Whether or not to report diagnostics when the constraint solver encounters unsatisfied bounds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReportDiagnostics {
@@ -3804,6 +3895,14 @@ impl SolutionLimits for BoundedSolutionLimits {
     }
 }
 
+#[derive(Clone, Copy)]
+enum CandidateSearch {
+    /// Collect the complete family of candidate solutions.
+    All(ReportDiagnostics),
+    /// Collect candidates through the first terminal that produces a valid candidate.
+    FirstValid,
+}
+
 impl<'db> CandidateSolutions<'db> {
     /// Computes sorted BDD paths and accumulates per-typevar lower/upper bounds for each path.
     ///
@@ -3827,12 +3926,12 @@ impl<'db> CandidateSolutions<'db> {
             source_order,
             UnboundedSolutionLimits,
             unspecialized_type_var_policy,
-            ReportDiagnostics::Yes,
+            CandidateSearch::All(ReportDiagnostics::Yes),
         );
         result
     }
 
-    /// Computes complete path bounds within limits shared by preprocessing and collection.
+    /// Computes path bounds within limits shared by preprocessing and collection.
     ///
     /// Visits include the concrete-conjunction fast path and both BDD walks. The path limit
     /// counts materialized constrained paths; an unconstrained or unsatisfiable result needs no
@@ -3843,7 +3942,7 @@ impl<'db> CandidateSolutions<'db> {
         set: ConstraintSet<'db, '_>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
-        report_diagnostics: ReportDiagnostics,
+        search: CandidateSearch,
     ) -> Result<Self, ProjectionError> {
         let limits = BoundedSolutionLimits {
             remaining_paths: budget.paths,
@@ -3858,7 +3957,7 @@ impl<'db> CandidateSolutions<'db> {
             set.source_order,
             limits,
             UnspecializedTypeVarPolicy::Ignore,
-            report_diagnostics,
+            search,
         ) {
             ControlFlow::Continue(result) => Ok(result),
             ControlFlow::Break(error) => Err(error),
@@ -3875,7 +3974,7 @@ impl<'db> CandidateSolutions<'db> {
         source_order: Option<SourceOrderId>,
         mut limits: L,
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
-        report_diagnostics: ReportDiagnostics,
+        search: CandidateSearch,
     ) -> ControlFlow<L::Break, Self> {
         let source_orders = storage.calculate_source_orders(source_order);
         if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
@@ -3887,13 +3986,17 @@ impl<'db> CandidateSolutions<'db> {
             inferable,
             &mut limits,
             unspecialized_type_var_policy,
-            report_diagnostics,
+            match search {
+                CandidateSearch::All(report_diagnostics) => report_diagnostics,
+                CandidateSearch::FirstValid => ReportDiagnostics::Yes,
+            },
         )? {
             return ControlFlow::Continue(path_bounds);
         }
 
         let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, limits, node)
-            .with_unspecialized_type_var_policy(unspecialized_type_var_policy);
+            .with_unspecialized_type_var_policy(unspecialized_type_var_policy)
+            .with_search(search);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
@@ -4094,6 +4197,75 @@ impl<'db> CandidateSolutions<'db> {
         })
     }
 
+    /// Widen the inferred arguments for the next pass only when one viable path permits
+    /// all the chosen promotions. If one path requires `T` to stay narrow and another
+    /// requires `U` to stay narrow, both can still permit widening a third variable.
+    pub(super) fn promote_for_argument_context(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        original: Specialization<'db>,
+        widest: Specialization<'db>,
+    ) -> Specialization<'db> {
+        let paths = match self {
+            Self::Unconstrained => return widest,
+            Self::Unsatisfiable => return original,
+            Self::Constrained(paths) => paths,
+        };
+        let context = original.generic_context(db);
+        if original == widest
+            || paths.len().saturating_mul(context.len(db)) > SolutionBudget::default().type_terms
+        {
+            return original;
+        }
+
+        let accepts = |path: &CandidateSolution<'db>, arguments| {
+            path.incompatible_typevars(db, env, arguments)
+                .next()
+                .is_none()
+        };
+        let viable = paths
+            .iter()
+            .filter(|path| matches!(path.validity, SolutionValidity::Valid));
+        let mut combined = Cow::Borrowed(original.types(db));
+        let mut common = Cow::Borrowed(widest.types(db));
+        'paths: for path in viable.clone() {
+            // Start with all promotions so related variables (e.g. `T = U`) can widen together.
+            let mut selected = Cow::Borrowed(widest.types(db));
+            for variable in path.incompatible_typevars(db, env, widest) {
+                let Some(index) = context.variable_index(db, variable.identity(db)) else {
+                    continue 'paths;
+                };
+                selected.to_mut()[index] = original.types(db)[index];
+            }
+            let Cow::Owned(types) = selected else {
+                return widest;
+            };
+            let selected = context.specialize(db, types);
+            // Restoring one variable can invalidate a dependent variable's promotion.
+            if selected == original || !accepts(path, selected) {
+                continue;
+            }
+            for (index, &ty) in selected.types(db).iter().enumerate() {
+                if ty == original.types(db)[index] {
+                    common.to_mut()[index] = ty;
+                } else {
+                    combined.to_mut()[index] = ty;
+                }
+            }
+        }
+
+        // If the proposals conflict, try just the promotions they share. Dropping a promotion
+        // can invalidate a dependent bound, so this combination also needs a complete path.
+        for types in [combined, common] {
+            let candidate = context.specialize(db, types);
+            if candidate == original || viable.clone().any(|path| accepts(path, candidate)) {
+                return candidate;
+            }
+        }
+        original
+    }
+
     /// Solves each path by applying a per-typevar solver function, collecting retained solutions.
     ///
     /// A genuinely unsolved variable does not invalidate a path. Budget exhaustion also retains
@@ -4201,6 +4373,16 @@ impl<'db> CandidateSolutions<'db> {
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &CandidateTypeVarSolution<'db>,
     ) -> PathBoundSolution<'db> {
+        Self::solve_with_preference(db, env, builder, path_bound, true)
+    }
+
+    pub(crate) fn solve_with_preference(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+        path_bound: &CandidateTypeVarSolution<'db>,
+        prefer_declared: bool,
+    ) -> PathBoundSolution<'db> {
         let default_solution =
             Self::solve_from_evidence(db, env, builder, path_bound, EvidenceSource::All);
         let PathBoundSolution::Solved(restricted) = default_solution else {
@@ -4242,7 +4424,8 @@ impl<'db> CandidateSolutions<'db> {
         // candidate. Otherwise, prefer the inferred candidate.
         let candidates = match (inferred, declared) {
             (Some(inferred), Some(declared))
-                if inferred.is_assignable_to(db, env, declared)
+                if prefer_declared
+                    && inferred.is_assignable_to(db, env, declared)
                     && declared.is_assignable_to(db, env, inferred) =>
             {
                 [Some(declared), Some(inferred)]
@@ -4738,24 +4921,21 @@ impl InteriorNode {
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
-        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
+        let source_orders = storage.calculate_source_orders(source_order);
+        // Distinct nodes can test the same constraint, and the source order can include
+        // constraints that were simplified out of the diagram. Record each reachable
+        // constraint once at its source position. `PathAssignments` needs this order
+        // when constructing non-commutative sequent pairs.
+        let mut constraints: SmallVec<[_; 8]> = SmallVec::from_elem(None, source_orders.len());
         self.node()
             .for_each_unique_constraint(storage, &mut |constraint| {
                 if let Some(constraint) = constraint.as_atomic(storage) {
-                    constraints.push(constraint);
+                    let index = source_orders
+                        .get_index_of(&constraint)
+                        .expect("every BDD constraint should have a source-order entry");
+                    constraints[index] = Some(constraint);
                 }
             });
-        let source_orders = storage.calculate_source_orders(source_order);
-        // `PathAssignments` seeds its insertion-ordered discovered-constraint map from this list,
-        // and uses that order when constructing non-commutative sequent pairs. Do not replace this
-        // with TDD traversal order: doing so can change inference and lose gradual constraints.
-        // Every constraint in the TDD must appear in the sidecar. If an operation introduces new
-        // constraints, it must preserve their source orders rather than invent an order here.
-        constraints.sort_by_key(|constraint| {
-            source_orders
-                .get_index_of(constraint)
-                .expect("every BDD constraint should have a source-order entry")
-        });
 
         let bound_is_concrete = |bound: Type<'db>| {
             !bound.has_typevar(db, env)
@@ -4765,8 +4945,8 @@ impl InteriorNode {
 
         let mut independent_typevars = FxHashSet::default();
         let mut dependent_typevars = FxHashSet::default();
-        for constraint_id in &constraints {
-            let constraint = storage.atomic_constraint_data(*constraint_id);
+        for &constraint_id in constraints.iter().flatten() {
+            let constraint = storage.atomic_constraint_data(constraint_id);
             if let Some((typevar, bound)) = constraint.as_concrete()
                 && bound_is_concrete(bound)
             {
@@ -4783,7 +4963,7 @@ impl InteriorNode {
 
         independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
 
-        PathAssignments::new(constraints, independent_typevars)
+        PathAssignments::new(constraints.into_iter().flatten(), independent_typevars)
     }
 }
 
@@ -5185,9 +5365,10 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
-    use crate::types::generics::ApplySpecialization;
+    use crate::types::generics::{AliasPolicy, ApplySpecialization, GenericContext};
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+        TypeVarInstance,
     };
     use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
     use ruff_db::files::system_path_to_file;
@@ -5281,7 +5462,7 @@ mod tests {
                 visits: max_visits,
                 ..SolutionBudget::default()
             },
-            ReportDiagnostics::Yes,
+            CandidateSearch::All(ReportDiagnostics::Yes),
         )
     }
 
@@ -5293,6 +5474,37 @@ mod tests {
             solved_typevars,
             validity: SolutionValidity::Valid,
         }
+    }
+
+    #[test]
+    fn shared_promotion_respects_dependent_bounds() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let vars = ["A", "B", "C"].map(|name| create_typevar(db, name));
+        let context = GenericContext::from_typevar_instances(db, &env, vars);
+        let [a, b, c] = vars.map(Type::TypeVar);
+        let literal = Type::string_literal(db, "x");
+        let object = Type::object();
+        let tuple = |types| Type::heterogeneous_tuple(db, &env, types);
+
+        // The left arm permits widening C with B, and the right permits widening C with A.
+        // Widening C alone would violate its upper bound on both arms.
+        let left = tuple([literal, object, b]);
+        let right = tuple([object, literal, a]);
+        let target = UnionType::from_two_elements(db, &env, left, right);
+        let bounds = tuple([a, b, c]).assignable_solutions_for_argument_context(
+            db,
+            &env,
+            target,
+            context.inferable_typevars(db),
+        );
+        let original = context.repeat_specialization(db, literal);
+        let widest = context.repeat_specialization(db, known_instance(db, KnownClass::Str));
+        assert_eq!(
+            bounds.promote_for_argument_context(db, &env, original, widest),
+            original
+        );
     }
 
     #[test]
@@ -5317,7 +5529,11 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let mapped = set.apply_type_mapping_impl(
             db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(u, int)),
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                u,
+                int,
+                AliasPolicy::Expand,
+            )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(&env),
         );
@@ -5490,6 +5706,7 @@ mod tests {
             &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
                 t,
                 KnownClass::Int.to_instance(db, &env),
+                AliasPolicy::Expand,
             )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(&env),
@@ -5514,6 +5731,7 @@ mod tests {
             &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
                 t,
                 KnownClass::Str.to_instance(db, &env),
+                AliasPolicy::Expand,
             )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(&env),

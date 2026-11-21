@@ -253,6 +253,23 @@ fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
     }
 }
 
+/// Both containers in Sentry's JSON type refer forward to the same outer union.
+fn benchmark_recursive_json_union(criterion: &mut Criterion) {
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[recursive_json_union]",
+        r#"
+from typing import Dict, List, Union
+
+JSONScalar = Union[None, bool, int, float, str]
+JSONDict = Dict[str, "JSONish"]
+JSONList = List["JSONish"]
+JSONContainer = Union[JSONDict, JSONList]
+JSONish = Union[JSONScalar, JSONContainer]
+"#,
+    );
+}
+
 /// Dense recursive definitions should not accumulate obsolete cycle-recovery results.
 fn benchmark_dense_recursive_alias_definitions(criterion: &mut Criterion) {
     let aliases = 8;
@@ -1167,6 +1184,39 @@ fn benchmark_inherited_recursive_protocol(criterion: &mut Criterion) {
     }
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4961>.
+///
+/// The inner constructor call matches both arms of `V | Declaration[K, V]`. Even without an
+/// expected type for the outer call, feeding the merged binding back into the inner call can
+/// add another `Declaration` layer on every inference pass.
+fn benchmark_nested_generic_constructor_arguments(criterion: &mut Criterion) {
+    for (suffix, choices) in [
+        ("", "V | Declaration[K, V]"),
+        ("_aliased", "Choice[K, V] | None"),
+    ] {
+        let code = format!(
+            r#"
+            from __future__ import annotations
+
+            type Choice[K, V] = V | Declaration[K, V]
+
+            class Declaration[K, V]:
+                def __init__(self, key: K | None = None, *choices: {choices}): ...
+
+            class Attribute[V](Declaration[str, V]): ...
+            class SubFactory[V](Declaration[str, V]): ...
+
+            Declaration("name", Declaration("name", Attribute(), SubFactory()), None)
+        "#
+        );
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[nested_generic_constructor_arguments{suffix}]"),
+            &code,
+        );
+    }
+}
+
 /// Regression benchmark for ty#4269: inherited receiver binding with nested type variables.
 ///
 /// The nominal relation constrains `T` inside the source's union argument. Ignoring that
@@ -1300,6 +1350,35 @@ fn benchmark_recursive_protocol_materialization_scaling(criterion: &mut Criterio
             &format!("ty_micro[recursive_protocol_materialization_{num_methods}]"),
             &code,
         );
+    }
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/5041>.
+///
+/// Applying `Top` to a nested generic isolates the cost of materialization in overloaded calls.
+/// Covariant layers reuse the top materialization. Contravariant layers alternate between top
+/// and bottom, so computing an unused top materialization can also lead to exponential work.
+fn benchmark_nested_generic_materialization(criterion: &mut Criterion) {
+    for depth in [12, 20] {
+        let nested = format!("{}Any{}", "Row[".repeat(depth), "]".repeat(depth));
+        for variance in ["covariant", "contravariant"] {
+            let code = format!(
+                r#"
+                from typing import Any, Generic, TypeVar
+                from ty_extensions import Top
+
+                T = TypeVar("T", {variance}=True)
+                class Row(Generic[T]): ...
+
+                def f(x: Top[{nested}]): ...
+                "#
+            );
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[nested_{variance}_materialization_{depth}]"),
+                &code,
+            );
+        }
     }
 }
 
@@ -1459,6 +1538,25 @@ fn benchmark_gradual_vararg_call(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[gradual_vararg_call]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4990>.
+fn benchmark_list_of_generic_callable(criterion: &mut Criterion) {
+    let code = "
+        type Box[T] = list[T]
+
+        def f[
+            A: (int, str, bytes, range, slice),
+            B: (int, str, bytes, range, slice),
+            C: (int, str, bytes, range, slice),
+            D: (int, str, bytes, range, slice),
+            E: (int, str, bytes, range, slice),
+        ](a: Box[A], b: Box[B], c: Box[C], d: Box[D], e: Box[E]) -> None: ...
+
+        funcs = [f]
+    ";
+
+    benchmark_micro_case(criterion, "ty_micro[list_of_generic_callable]", code);
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4796>.
 ///
 /// Capturing independently bounded generic overloads must not enumerate every combination of
@@ -1612,6 +1710,44 @@ fn benchmark_union_construction(criterion: &mut Criterion) {
         writeln!(split, "U{i} = U{} | Literal[{i}]", i - 1).ok();
     }
     benchmark_micro_case(criterion, "ty_micro[split_literal_union_1024]", &split);
+}
+
+fn benchmark_literal_union_aliases(criterion: &mut Criterion) {
+    let members = (1..=4000).join(", ");
+
+    // Keeping the single literal alongside Codes should not require negating all of Codes.
+    let codes = format!(
+        "
+        from typing import Literal
+
+        type Codes = Literal[{members}]
+
+        def zero() -> Literal[0] | Codes:
+            return 0
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[literal_union_alias_of_literals_4000]",
+        &codes,
+    );
+
+    // Integer covers every literal in the group. Returning an arbitrary int forces ty to check it.
+    let integer = format!(
+        "
+        from typing import Literal
+
+        type Integer = int
+
+        def identity(value: int) -> Literal[{members}] | Integer:
+            return value
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[literal_union_alias_of_int_4000]",
+        &integer,
+    );
 }
 
 /// Benchmark for narrowing a large union type through multiple match statements.
@@ -2860,6 +2996,7 @@ criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
     benchmark_mutually_recursive_aliases,
+    benchmark_recursive_json_union,
     benchmark_dense_recursive_alias_definitions,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
@@ -2881,20 +3018,24 @@ criterion_group!(
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
+    benchmark_nested_generic_constructor_arguments,
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
+    benchmark_nested_generic_materialization,
     benchmark_recursive_callable_materialization,
     benchmark_recursive_protocol_growing_specialization,
     benchmark_recursive_protocol_specialized_receiver,
     benchmark_async_context_manager_recursive_protocol,
+    benchmark_list_of_generic_callable,
     benchmark_paramspec_bounded_overloads,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
     benchmark_nested_tuple_comparison,
     benchmark_union_construction,
+    benchmark_literal_union_aliases,
     benchmark_large_union_narrowing,
     benchmark_class_or_pattern_captures,
     benchmark_large_isinstance_narrowing,

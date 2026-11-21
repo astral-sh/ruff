@@ -22,9 +22,9 @@ use crate::{
     lint::{LintId, LintMetadata},
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass,
-        MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
-        TypeContext, TypeQualifiers, UnionType,
+        ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, MemberLookupPolicy,
+        Parameter, Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        UnionType,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
@@ -32,7 +32,7 @@ use crate::{
         diagnostic::{
             INCOMPATIBLE_ATTRIBUTE_OVERRIDE, INCOMPATIBLE_METHOD_OVERRIDE,
             INCOMPATIBLE_MUTABLE_OVERRIDE, INCOMPATIBLE_PROPERTY_OVERRIDE, INVALID_ASSIGNMENT,
-            INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE, INVALID_NAMED_TUPLE,
+            INVALID_DATACLASS_POST_INIT, INVALID_EXPLICIT_OVERRIDE, INVALID_NAMED_TUPLE,
             INVALID_NAMED_TUPLE_OVERRIDE, LOST_KEYWORD_FOR_REGULAR_PARAMETER,
             MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
             report_incompatible_base_method, report_incompatible_method_override,
@@ -902,8 +902,14 @@ fn check_class_declaration<'db>(
                 || is_auto
                 || enum_info.value_construction.metaclass_may_transform_values;
 
-            if !skip_type_check && !subclass_instance_member.place.is_undefined() {
-                if let Some(new_function) = enum_info.value_construction.new.function() {
+            if !skip_type_check {
+                // Plain enums have neither a constructor nor a value annotation to check.
+                // Only resolve the member on the subclass when one of these checks applies.
+                let is_defined = || !subclass_instance_member.place.is_undefined();
+
+                if let Some(new_function) = enum_info.value_construction.new.function()
+                    && is_defined()
+                {
                     check_enum_member_against_constructor_method(
                         context,
                         new_function,
@@ -915,7 +921,9 @@ fn check_class_declaration<'db>(
                     );
                 }
 
-                if let Some(init_function) = enum_info.value_construction.init.function() {
+                if let Some(init_function) = enum_info.value_construction.init.function()
+                    && is_defined()
+                {
                     check_enum_member_against_constructor_method(
                         context,
                         init_function,
@@ -929,6 +937,7 @@ fn check_class_declaration<'db>(
                     .value_construction
                     .can_validate_with_value_annotation()
                     && let Some(expected_type) = enum_info.value_annotation_type()
+                    && is_defined()
                 {
                     if !member_value_type.is_assignable_to(db, env, expected_type) {
                         if let Some(builder) = context.report_lint(
@@ -1032,8 +1041,7 @@ fn check_class_declaration<'db>(
                         (
                             None,
                             CodeGeneratorKind::from_class(db, superclass_literal.into())
-                                .map(MethodKind::Synthesized)
-                                .unwrap_or_default(),
+                                .map_or_default(MethodKind::Synthesized),
                         )
                     }
                 } else if matches!(
@@ -1960,7 +1968,7 @@ bitflags! {
         const FINAL_METHOD_OVERRIDDEN = 1 << 3;
         const INVALID_NAMED_TUPLE = 1 << 4;
         const NAMED_TUPLE_FIELD_OVERRIDE = 1 << 5;
-        const INVALID_DATACLASS = 1 << 6;
+        const INVALID_DATACLASS_POST_INIT = 1 << 6;
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 7;
         const INVALID_ENUM_VALUE = 1 << 8;
         const MISSING_OVERRIDE_DECORATOR = 1 << 9;
@@ -2005,8 +2013,8 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         if rule_selection.is_enabled(LintId::of(&INVALID_NAMED_TUPLE_OVERRIDE)) {
             config |= OverrideRulesConfig::NAMED_TUPLE_FIELD_OVERRIDE;
         }
-        if rule_selection.is_enabled(LintId::of(&INVALID_DATACLASS)) {
-            config |= OverrideRulesConfig::INVALID_DATACLASS;
+        if rule_selection.is_enabled(LintId::of(&INVALID_DATACLASS_POST_INIT)) {
+            config |= OverrideRulesConfig::INVALID_DATACLASS_POST_INIT;
         }
         if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_VARIABLE)) {
             config |= OverrideRulesConfig::FINAL_VARIABLE_OVERRIDDEN;
@@ -2060,8 +2068,8 @@ impl OverrideRulesConfig {
         self.contains(OverrideRulesConfig::NAMED_TUPLE_FIELD_OVERRIDE)
     }
 
-    const fn check_invalid_dataclasses(self) -> bool {
-        self.contains(OverrideRulesConfig::INVALID_DATACLASS)
+    const fn check_invalid_dataclass_post_init(self) -> bool {
+        self.contains(OverrideRulesConfig::INVALID_DATACLASS_POST_INIT)
     }
 
     const fn check_final_variable_overridden(self) -> bool {
@@ -2260,7 +2268,7 @@ fn check_post_init_signature<'db>(
 ) {
     let db = context.db();
 
-    if !configuration.check_invalid_dataclasses() {
+    if !configuration.check_invalid_dataclass_post_init() {
         return;
     }
     let Some((static_class, spec)) = class.static_class_literal(db) else {
@@ -2268,10 +2276,10 @@ fn check_post_init_signature<'db>(
     };
     let env = &context.program_environment();
 
-    let init_var_fields = static_class
+    let init_var_parameters = static_class
         .fields(db, spec, policy)
-        .iter()
-        .filter(|(_, field)| {
+        .values()
+        .filter(|field| {
             matches!(
                 field.kind,
                 FieldKind::Dataclass {
@@ -2279,29 +2287,23 @@ fn check_post_init_signature<'db>(
                     ..
                 }
             )
-        });
+        })
+        .map(|field| Parameter::positional_only(None).with_annotated_type(field.declared_ty));
 
-    let first_parameter = Parameter::positional_only(Some(Name::new_static("self")))
-        .with_annotated_type(Type::instance(db, env, class));
-
-    let following_parameters = init_var_fields.map(|(name, field)| {
-        Parameter::positional_only(Some(name.clone())).with_annotated_type(field.declared_ty)
-    });
+    let self_parameter =
+        Parameter::positional_only(None).with_annotated_type(Type::instance(db, env, class));
 
     let parameters =
-        Parameters::standard(std::iter::chain([first_parameter], following_parameters));
+        Parameters::standard(std::iter::once(self_parameter).chain(init_var_parameters));
 
-    let expected_signature = CallableType::single(db, Signature::new(parameters, Type::object()));
+    let expected = Type::single_callable(db, Signature::new(parameters, Type::object()));
 
-    if member
-        .ty
-        .is_assignable_to(db, env, Type::Callable(expected_signature))
-    {
+    if member.ty.is_assignable_to(db, env, expected) {
         return;
     }
 
     let Some(builder) = context.report_lint(
-        &INVALID_DATACLASS,
+        &INVALID_DATACLASS_POST_INIT,
         definition.focus_range(db, context.module()),
     ) else {
         return;
@@ -2311,9 +2313,13 @@ fn check_post_init_signature<'db>(
         "Invalid `__post_init__` signature for dataclass `{}`",
         class.name(db)
     ));
-    diagnostic.info(
-        "`__post_init__` methods must accept all `InitVar` fields \
-            as positional-only parameters",
+    member
+        .ty
+        .assignability_error_context(db, env, expected)
+        .attach_to(db, env, &mut diagnostic);
+    diagnostic.help(
+        "A `__post_init__` method must accept a call where all `InitVar` fields are passed \
+         as positional arguments",
     );
 }
 

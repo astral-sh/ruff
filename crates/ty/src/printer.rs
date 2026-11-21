@@ -26,14 +26,11 @@ impl Printer {
         }
 
         match self.verbosity {
-            VerbosityLevel::Silent => ProgressDrawTarget::hidden(),
-            VerbosityLevel::Quiet => ProgressDrawTarget::hidden(),
-            VerbosityLevel::Default => ProgressDrawTarget::stderr(),
-            // Hide the progress bar when in verbose mode.
-            // Otherwise, it gets interleaved with log messages.
-            VerbosityLevel::Verbose => ProgressDrawTarget::hidden(),
-            VerbosityLevel::ExtraVerbose => ProgressDrawTarget::hidden(),
-            VerbosityLevel::Trace => ProgressDrawTarget::hidden(),
+            VerbosityLevel::Silent | VerbosityLevel::Quiet => ProgressDrawTarget::hidden(),
+            VerbosityLevel::Default
+            | VerbosityLevel::Verbose
+            | VerbosityLevel::ExtraVerbose
+            | VerbosityLevel::Trace => ProgressDrawTarget::stderr(),
         }
     }
 

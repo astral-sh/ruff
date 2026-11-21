@@ -584,7 +584,7 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import TypeAlias
+from typing import TypeAlias, Union
 from typing_extensions import deprecated
 
 @deprecated("Use Replacement")
@@ -608,6 +608,10 @@ ExplicitAlias: TypeAlias = Old  # error: [deprecated] "Use Replacement"
 
 def quoted(value: list["ExplicitAlias"]) -> None:  # error: [deprecated] "Use Replacement"
     pass
+
+Single = Union[Old]  # error: [deprecated] "Use Replacement"
+
+value: list["Single"]  # error: [deprecated] "Use Replacement"
 ```
 
 ## Dunders
@@ -835,6 +839,28 @@ class AlsoDeprecated:
 def deprecated_intersection(value: Deprecated) -> None:
     if isinstance(value, AlsoDeprecated):
         # error: [deprecated] "`Deprecated.__invert__`, `AlsoDeprecated.__invert__`"
+        ~value
+```
+
+If one component defines the operator conditionally, a deprecated branch can still be selected.
+
+```py
+def flag() -> bool:
+    return True
+
+class Conditional:
+    if flag():
+        @deprecated("conditional inversion")
+        def __invert__(self) -> int:
+            return 1
+
+    else:
+        def __invert__(self) -> int:
+            return 2
+
+def conditional_intersection(value: Conditional) -> None:
+    if isinstance(value, AlsoDeprecated):
+        # error: [deprecated] "`Conditional.__invert__`, `AlsoDeprecated.__invert__`"
         ~value
 ```
 

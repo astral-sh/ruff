@@ -327,17 +327,6 @@ help: Import from `re`
 46 |
    |
 
-UP035 `typing.List` is deprecated, use `list` instead
-  --> UP035.py:44:1
-   |
-42 |     )
-43 |
-44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-45 |
-46 | if True: from collections import (
-   |
-
 UP035 `typing.AbstractSet` is deprecated, use `collections.abc.Set` instead
   --> UP035.py:44:1
    |
@@ -350,6 +339,17 @@ UP035 `typing.AbstractSet` is deprecated, use `collections.abc.Set` instead
    |
 
 UP035 `typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead
+  --> UP035.py:44:1
+   |
+42 |     )
+43 |
+44 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 |
+46 | if True: from collections import (
+   |
+
+UP035 `typing.List` is deprecated, use `list` instead
   --> UP035.py:44:1
    |
 42 |     )

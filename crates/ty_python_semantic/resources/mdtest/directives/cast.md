@@ -183,9 +183,9 @@ def make_item() -> Item:
 ```
 
 Type context can also introduce diagnostics in lambda bodies. Here, using the outer context would
-make the lambda parameter an `int` and report `call-non-callable`. We therefore fall back to the
+make the lambda parameter an `int` and report `not-callable`. We therefore fall back to the
 inference attempt that does not use the type context, and emit neither `redundant-cast` nor
-`call-non-callable`:
+`not-callable`:
 
 ```py
 from typing import Callable
@@ -214,7 +214,7 @@ def make_item_with_error(name: str) -> Item:
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.13"
 ```
 
 The parameter type of the value passed to `cast` is declared as `Any`. This declared type is ignored
@@ -229,6 +229,16 @@ def first[T](values: list[T]) -> T:
 
 def _(value: int):
     cast(Any, first([value]))  # ok
+```
+
+Similarly, the declared type does not override any type variable defaults that would otherwise make
+the cast redundant.
+
+```py
+def result[T = str]() -> T:
+    raise NotImplementedError
+
+cast(str, result())  # error: [redundant-cast] "Value is already of type `str`"
 ```
 
 An explicit outer annotation, however, can influence the type of the generic call, leading to the

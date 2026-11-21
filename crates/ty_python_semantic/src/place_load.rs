@@ -196,8 +196,9 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
                 }
                 ImplicitPlaceLoad::Builtin(name) => {
                     let context = self.procedure.context;
-                    if Some(context.index.scope_id(context.scope))
-                        == builtins_module_scope(db, self.env)
+                    if context.scope.is_global()
+                        && Some(context.index.scope_id(context.scope))
+                            == builtins_module_scope(db, self.env)
                     {
                         Place::Undefined.into()
                     } else {
@@ -405,6 +406,14 @@ impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
                     }
                 }
                 PlaceLoadResolutionNode::AskConsumerWhetherToContinueForMember => {
+                    if matches!(self.place_expr, PlaceExprRef::Member(_))
+                        && !self.context.can_resolve_enclosing_member()
+                    {
+                        return Some(PlaceLoadResolutionStep::Exhausted(
+                            PlaceLoadFailure::NotFound,
+                        ));
+                    }
+
                     self.next_node = Some(PlaceLoadResolutionNode::DecideResolutionPath);
 
                     if let Some(prefix_loads) =
@@ -1250,6 +1259,23 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                 source.map(|source| (source, None))
             }
         }
+    }
+
+    /// Could an enclosing scope supply a binding or narrowing constraint for a member?
+    fn can_resolve_enclosing_member(self) -> bool {
+        if self.scope.is_global() {
+            return false;
+        }
+
+        // Eager scopes can capture a snapshot of an outer member. Lazy snapshots and
+        // global lookup only handle symbols, so a lazy scope needs a visible non-module
+        // ancestor to find another source for an attribute or subscript.
+        self.index.scope(self.scope).is_eager()
+            || self
+                .index
+                .visible_ancestor_scopes(self.scope)
+                .nth(1)
+                .is_some_and(|(id, _)| !id.is_global())
     }
 
     /// Describes how to evaluate the tracked prefixes of `place_expr` in this scope.

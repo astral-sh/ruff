@@ -90,7 +90,7 @@ fn generate_markdown() -> String {
 
 fn write_rule(output: &mut String, lint: LintId, aliases: &FxHashMap<LintId, Vec<LintName>>) {
     // Keep links to the old rule heading working after a rename.
-    let names = aliases.get(&lint).map(Vec::as_slice).unwrap_or_default();
+    let names = aliases.get(&lint).map_or_default(Vec::as_slice);
     if !names.is_empty() {
         for name in names {
             let _ = writeln!(output, r#"<a id="{name}"></a>"#);

@@ -851,6 +851,49 @@ unannotated(reveal_type(identity(1)))  # revealed: Literal[1]
 annotated(reveal_type(identity(1)))  # revealed: Unknown
 ```
 
+A generic call in a bare `Final` initializer infers its return type from its argument.
+
+```py
+from typing import Final
+
+ONE: Final = reveal_type(identity(1))  # revealed: Literal[1]
+```
+
+A call through an unannotated parameter supplies no expected type for its arguments. A callable with
+a parameter annotated as `Any` supplies `Any` as context.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def call(sink, typed_sink: Callable[[Any], None]):
+    sink(reveal_type(identity(1)))  # revealed: Literal[1]
+    typed_sink(reveal_type(identity(1)))  # revealed: Any
+```
+
+A generator without a return annotation leaves the operands of `yield` and `yield from` to
+inference. An explicit return annotation supplies its declared element type, including `Any` or
+`Unknown`.
+
+```py
+from collections.abc import Iterator
+
+def singleton[T](x: T) -> list[T]:
+    return [x]
+
+def values():
+    yield reveal_type(identity(1))  # revealed: Literal[1]
+    yield from reveal_type(singleton(1))  # revealed: list[int]
+
+def annotated_values() -> Iterator[Any]:
+    yield reveal_type(identity(1))  # revealed: Any
+    yield from reveal_type(singleton(1))  # revealed: list[Any]
+
+def unknown_values() -> Iterator[Unknown]:
+    yield reveal_type(identity(1))  # revealed: Unknown
+    yield from reveal_type(singleton(1))  # revealed: list[Unknown]
+```
+
 ## Upper-bound type context
 
 The declared upper bound of a type variable provides type context for a nested generic call:
@@ -929,12 +972,30 @@ reveal_type(payload({"value": 1}))  # revealed: Payload
 reveal_type(callback(lambda value: [value]))  # revealed: (value: int) -> list[int]
 ```
 
-As well as propagate through lambda bodies:
+Declared upper bounds are also propagated through lambda bodies, without restricting the range of
+nested gradual types:
 
 ```py
 def _(value: Any):
     f = callback(lambda _: singleton(value))
     reveal_type(f(1))  # revealed: list[Any | int]
+
+    annotated: Callable[[int], list[int]] = lambda _: singleton(value)
+    reveal_type(annotated(1))  # revealed: list[int]
+```
+
+As well as through nested `TypedDict` literals and constructor calls:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+def _(value: Any):
+    payload({"value": reveal_type(identity(value))})  # revealed: Any
+    literal: Payload = {"value": reveal_type(identity(value))}  # revealed: int
+
+    payload(dict(value=reveal_type(identity(value))))  # revealed: Any
+    constructed: Payload = dict(value=reveal_type(identity(value)))  # revealed: int
 ```
 
 ## Upper-bound context without inference evidence
@@ -1094,6 +1155,24 @@ from typing import Any
 # string keys for keyword arguments. We special-case it to match the literal form.
 x1: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 x2: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
+```
+
+## Preserving literal element types in a generic call
+
+`max(..., key=len)` returns one of its input tuples. When the result is annotated as `Colors`, ty
+preserves the literal element types while inferring the list passed to `max`.
+
+```py
+from typing import Literal
+
+Colors = tuple[Literal["red", "blue"], ...]
+left = ("red",)
+right = ("blue", "red")
+
+named: Colors = max([left, right], key=len)  # ok
+extended: Colors = max([(*left, "blue"), (*right, "red")], key=len)  # ok
+# error: [invalid-assignment]
+invalid: Colors = max([(*left, "blue"), (*right, "green")], key=len)
 ```
 
 ## Covariant constructors with outer return contexts
@@ -1879,6 +1958,60 @@ x10: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(
 # fmt: on
 ```
 
+## Type context and explicitly annotated `self`
+
+When `self` is explicitly annotated with a concrete specialization, ty uses it when inferring the
+type of unspecialized constructor calls:
+
+```py
+class Reader[T]:
+    def __init__(self: "Reader[int]") -> None: ...
+    def read(self) -> T:
+        raise NotImplementedError
+
+reveal_type(Reader())  # revealed: Reader[int]
+```
+
+When trying to specialize explicitly, the call will fail:
+
+```py
+Reader[str]()  # error: [invalid-argument-type]
+```
+
+`Reader[int]` is also inferred if it is assignable to the assignment context (`Reader` is covariant
+in `T`):
+
+```py
+# revealed: Reader[int]
+reader: Reader[int] = reveal_type(Reader())
+
+# revealed: Reader[int]
+reader: Reader[int | str] = reveal_type(Reader())
+```
+
+The assignment context can also narrow the inferred type argument from `int` to `bool`. Since
+`Reader` is covariant, `Reader[bool]` is a valid argument for `self: Reader[int]`.
+
+```py
+# TODO: this should not be an error, and Reader[bool] should be inferred (see https://github.com/astral-sh/ty/issues/4993)
+# revealed: Reader[int]
+narrow_reader: Reader[bool] = reveal_type(Reader())  # error: [invalid-assignment]
+```
+
+The same is also true if the receiver is annotated with a union:
+
+```py
+class ReaderUnion[T]:
+    def __init__(self: "ReaderUnion[int | str]") -> None: ...
+
+# revealed: ReaderUnion[int | str]
+reader: ReaderUnion[int | str] = reveal_type(ReaderUnion())
+# revealed: ReaderUnion[int | str]
+reader: ReaderUnion[int | str | None] = reveal_type(ReaderUnion())
+# revealed: ReaderUnion[int]
+narrow_union: ReaderUnion[int] = reveal_type(ReaderUnion())
+```
+
 ## Generic class specialization through recursive callable aliases
 
 A recursive callable context specializes a generic class used as a factory. The returned container
@@ -2207,7 +2340,7 @@ x2: tuple[list[str] | list[int]] = wrap_tuple((
 ))
 ```
 
-## Correlated overload specializations from declared type
+## Correlated overload specializations from an expected type
 
 A declared return type can be satisfied by correlated specializations even when merging the type
 arguments independently would violate the declared constraints:
@@ -2229,6 +2362,19 @@ type Choice = tuple[list[int], list[str]] | tuple[list[str], list[int]]
 
 # revealed: tuple[tuple[list[int], list[str]]] | tuple[tuple[list[str], list[int]]]
 result: tuple[Choice] = reveal_type(f(callback))
+```
+
+The same applies when the expected tuple type is inferred from a previous assignment:
+
+```py
+def initial() -> tuple[Choice]:
+    return (([1], ["s"]),)
+
+class Fields:
+    pair = initial()
+
+# revealed: tuple[tuple[list[int], list[str]]] | tuple[tuple[list[str], list[int]]]
+Fields.pair = reveal_type(f(callback))
 ```
 
 ## Literal union context for generic calls
@@ -2403,6 +2549,54 @@ class Callbacks:
     def __init__(self):
         self.values = [{"x": 0}, {"x": lambda x: 0}]
         self.identities = [{"x": 0}, {"x": lambda x: x}]
+```
+
+An inferred attribute type does not provide a declared type preference to later assignments:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+class Fields:
+    class_value = None
+
+    def __init__(self, value: Any):
+        self.value = None
+        self.value = identity(value)
+        reveal_type(self.value)  # revealed: Any
+
+def _(value: Any):
+    Fields.class_value = reveal_type(identity(value))  # revealed: Any
+    reveal_type(Fields.class_value)  # revealed: Any
+```
+
+The inferred attribute type is, however, used to fill in unsolved type variables:
+
+```py
+class Collections:
+    numbers = [1]
+    items = iter([1])
+
+def _():
+    Collections.numbers = reveal_type(list())  # revealed: list[int]
+    Collections.items = reveal_type(iter(list()))  # revealed: Iterator[int]
+```
+
+An annotated instance attribute provides a declared type preference even if the class body
+conditionally annotated the same field:
+
+```py
+def _(flag: bool, value: Any):
+    class Conditional:
+        if flag:
+            field: int
+
+        def __init__(self):
+            self.field: int = 0
+
+    obj = Conditional()
+    obj.field = identity(value)
+    reveal_type(obj.field)  # revealed: int
 ```
 
 ## Overload evaluation
@@ -3344,7 +3538,7 @@ parameter types do not contribute `Unknown` to the inferred return type:
 python-version = "3.13"
 
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -3563,19 +3757,19 @@ def make_list() -> list[str]:
     result = list()
     result.append(1)
     reveal_type(result)  # revealed: list[int | str]
-    return result  # error: [invalid-return-type]
+    return result  # error: [invalid-explicit-return]
 
 def make_set() -> set[str]:
     result = set()
     result.add(1)
     reveal_type(result)  # revealed: set[int | str]
-    return result  # error: [invalid-return-type]
+    return result  # error: [invalid-explicit-return]
 
 def make_dict() -> dict[str, str]:
     result = dict()
     result["x"] = 1
     reveal_type(result)  # revealed: dict[str, int | str]
-    return result  # error: [invalid-return-type]
+    return result  # error: [invalid-explicit-return]
 
 set_alias = set
 aliased_result = set_alias()
@@ -3653,7 +3847,7 @@ def _() -> list[int | None]:
 
 def _() -> int:
     invalid_x6 = []
-    return invalid_x6  # error: [invalid-return-type]
+    return invalid_x6  # error: [invalid-explicit-return]
 ```
 
 A return annotation can provide a union of fixed-length tuple element types. Inferring an empty list

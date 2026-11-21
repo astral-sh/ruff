@@ -74,12 +74,12 @@ error[invalid-legacy-type-variable]: A `TypeVar` definition must be a simple var
 ```py
 from typing import TypeVar
 
-# snapshot: mismatched-type-name
+# snapshot: mismatched-typevar-name
 T = TypeVar("Q")
 ```
 
 ```snapshot
-warning[mismatched-type-name]: The name passed to `TypeVar` must match the variable it is assigned to
+warning[mismatched-typevar-name]: The name passed to `TypeVar` must match the variable it is assigned to
  --> src/mdtest_snippet.py:4:13
   |
 4 | T = TypeVar("Q")

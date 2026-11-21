@@ -25,6 +25,8 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## Example
 ///
 /// ```python
+/// import re
+///
 /// re.sub("abc", "", s)
 /// ```
 ///

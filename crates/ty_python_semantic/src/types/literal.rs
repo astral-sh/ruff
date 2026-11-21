@@ -92,6 +92,18 @@ pub(crate) enum LiteralValueTypeKind<'db> {
     Bytes(BytesLiteralType<'db>),
 }
 
+impl LiteralValueTypeKind<'_> {
+    pub(super) fn known_class(self) -> Option<KnownClass> {
+        match self {
+            Self::Int(_) => Some(KnownClass::Int),
+            Self::Bool(_) => Some(KnownClass::Bool),
+            Self::String(_) | Self::LiteralString => Some(KnownClass::Str),
+            Self::Bytes(_) => Some(KnownClass::Bytes),
+            Self::Enum(_) => None,
+        }
+    }
+}
+
 impl<'db> LiteralValueType<'db> {
     pub(crate) fn new(
         kind: impl Into<LiteralValueTypeKind<'db>>,
@@ -183,6 +195,21 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeInner::Enum(v, _) => LiteralValueTypeKind::Enum(v),
             LiteralValueTypeInner::Bytes(v, _) => LiteralValueTypeKind::Bytes(v),
             LiteralValueTypeInner::LiteralString(_) => LiteralValueTypeKind::LiteralString,
+        }
+    }
+
+    /// Returns whether these literal types are known to have no value in common.
+    pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self.kind(), other.kind()) {
+            (LiteralValueTypeKind::String(_), LiteralValueTypeKind::LiteralString)
+            | (LiteralValueTypeKind::LiteralString, LiteralValueTypeKind::String(_)) => false,
+            (LiteralValueTypeKind::Enum(left), LiteralValueTypeKind::Enum(right))
+                if left.enum_class_literal(db) == right.enum_class_literal(db)
+                    && !left.enum_class_literal(db).aliases_are_known(db) =>
+            {
+                false
+            }
+            (left, right) => left != right,
         }
     }
 
@@ -533,10 +560,8 @@ impl<'db> WideLiteralComparison<'db> {
 
     fn comparison_class(db: &'db dyn Db, ty: Type<'db>) -> Option<KnownClass> {
         match ty.as_literal_value_kind() {
-            Some(LiteralValueTypeKind::String(_)) => Some(KnownClass::Str),
-            Some(LiteralValueTypeKind::Bytes(_)) => Some(KnownClass::Bytes),
-            Some(LiteralValueTypeKind::Int(_)) => Some(KnownClass::Int),
-            Some(LiteralValueTypeKind::Bool(_)) => Some(KnownClass::Bool),
+            Some(LiteralValueTypeKind::LiteralString) => None,
+            Some(literal) => literal.known_class(),
             // Both boolean literals together simplify to `bool`.
             None if ty.is_bool(db) => Some(KnownClass::Bool),
             None if ty.is_none(db) => Some(KnownClass::NoneType),

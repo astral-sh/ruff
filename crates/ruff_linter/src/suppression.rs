@@ -23,8 +23,8 @@ use crate::preview::{is_human_readable_names_enabled, is_redirected_suppression_
 use crate::rule_redirects::{get_redirect, get_redirect_target};
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
-    RedirectedNOQA, RuleCodesInSuppressionComments, UnmatchedSuppressionComment, UnusedCodes,
-    UnusedNOQA, UnusedNOQAKind, code_is_valid,
+    RenamedRuleInSuppressionComment, RuleCodesInSuppressionComments, UnmatchedSuppressionComment,
+    UnusedCodes, UnusedNOQAKind, UnusedSuppressionComment, code_is_valid,
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
@@ -163,12 +163,13 @@ impl Suppression {
 
     /// Return the [`Rule`] associated with this suppression.
     fn rule(&self, preview: PreviewMode) -> Option<Rule> {
-        if let Ok(rule) = Rule::from_code(get_redirect_target(&self.code).unwrap_or(&self.code)) {
+        let selector = get_redirect_target(&self.code).unwrap_or(&self.code);
+        if let Ok(rule) = Rule::from_code(selector) {
             return Some(rule);
         }
 
         if is_human_readable_names_enabled(preview) {
-            return Rule::from_name(&self.code).ok();
+            return Rule::from_name(selector).ok();
         }
 
         None
@@ -397,10 +398,10 @@ impl Suppressions {
         false
     }
 
-    /// Check for rule codes in valid suppression comments.
+    /// Check for rule codes and redirected names in valid suppression comments.
     pub(crate) fn check_rule_codes(&self, context: &LintContext, locator: &Locator) {
         let check_names = context.is_rule_enabled(Rule::RuleCodesInSuppressionComments);
-        let check_redirects = context.is_rule_enabled(Rule::RedirectedNOQA)
+        let check_redirects = context.is_rule_enabled(Rule::RenamedRuleInSuppressionComment)
             && is_redirected_suppression_code_enabled(context.settings());
         if !check_names && !check_redirects {
             return;
@@ -423,8 +424,10 @@ impl Suppressions {
                 let second_range = second_comment.and_then(|comment| comment.codes.get(index));
 
                 if check_redirects && let Some((original, target)) = redirect {
-                    let mut diagnostic =
-                        context.report_diagnostic(RedirectedNOQA { original, target }, *range);
+                    let mut diagnostic = context.report_diagnostic(
+                        RenamedRuleInSuppressionComment { original, target },
+                        *range,
+                    );
                     let edit = Edit::range_replacement(target.to_string(), *range);
                     // Conservatively mark any fixes involving a `ruff: disable` comment unsafe
                     // because the fix could make the `disable` match a previously unmatched, nested
@@ -511,7 +514,7 @@ impl Suppressions {
                     group.suppression,
                     &codes,
                     false,
-                    UnusedNOQA {
+                    UnusedSuppressionComment {
                         codes: Some(UnusedCodes {
                             disabled: &group.disabled_codes,
                             duplicated: &group.duplicated_codes,
@@ -540,7 +543,8 @@ impl Suppressions {
             let code_str = suppression.code.as_str();
 
             let code_is_valid = code_is_valid(&suppression.code, &context.settings().external);
-            let name_is_known = Rule::from_name(&suppression.code).is_ok();
+            let name_is_known =
+                Rule::from_name(get_redirect_target(code_str).unwrap_or(code_str)).is_ok();
             let name_is_valid = is_human_readable_names_enabled(self.preview) && name_is_known;
 
             if !code_is_valid && !name_is_valid {
@@ -550,7 +554,7 @@ impl Suppressions {
                 group.invalid_codes.push(code_str);
                 group.has_stable_rule_name |= name_is_known;
             } else if !suppression.used.get() {
-                // UnusedNOQA
+                // UnusedSuppressionComment
                 let Some(rule) = suppression.rule(self.preview) else {
                     continue; // "external" lint code, don't treat it as unused
                 };
@@ -793,8 +797,7 @@ impl<'a> SuppressionsBuilder<'a> {
                     };
                     token.kind() == TokenKind::Indent && count < 0
                 })
-                .map(|token| self.source.slice(token))
-                .unwrap_or_default();
+                .map_or_default(|token| self.source.slice(token));
 
             indents.push(last_indent);
 
@@ -1016,7 +1019,7 @@ impl<'a> SuppressionsBuilder<'a> {
             } else {
                 self.invalid.push(InvalidSuppression {
                     kind: InvalidSuppressionKind::Unmatched,
-                    comment: self.pending.remove(comment_index).comment.clone(),
+                    comment: self.pending.remove(comment_index).comment,
                 });
             }
         }

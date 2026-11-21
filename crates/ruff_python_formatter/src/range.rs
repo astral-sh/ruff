@@ -4,12 +4,11 @@ use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
     FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode, format,
 };
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
 use ruff_python_parser::{ParseOptions, parse};
-use ruff_python_trivia::{
-    BackwardsTokenizer, SimpleToken, SimpleTokenKind, TriviaRanges, indentation_at_offset,
-};
+use ruff_python_trivia::{TriviaRanges, indentation_at_offset};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::Comments;
@@ -501,18 +500,25 @@ impl NarrowRange<'_> {
             // 2|    pass
             // ```
             // We don't want to format the body of the function.
-            if let Some(SimpleToken {
-                kind: SimpleTokenKind::Colon,
-                range: colon_range,
-            }) = BackwardsTokenizer::up_to(
-                first_child.start(),
-                self.context.source(),
-                self.context.trivia().comments(),
-            )
-            .skip_trivia()
-            .next()
+            if let Some(token) = self
+                .context
+                .tokens()
+                .before(first_child.start())
+                .iter()
+                .rfind(|token| {
+                    // Logical newlines and indentation can separate the header from its body.
+                    !matches!(
+                        token.kind(),
+                        TokenKind::Comment
+                            | TokenKind::NonLogicalNewline
+                            | TokenKind::Newline
+                            | TokenKind::Indent
+                            | TokenKind::Dedent
+                    )
+                })
+                && token.kind() == TokenKind::Colon
             {
-                self.narrow_offset(colon_range.end());
+                self.narrow_offset(token.end());
             }
 
             // It is necessary to format all statements if the statement or any of its parents don't use the configured indentation.

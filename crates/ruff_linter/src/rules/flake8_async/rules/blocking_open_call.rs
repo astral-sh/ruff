@@ -86,12 +86,7 @@ pub(crate) fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -
     // Path("foo").open()
     // ```
     if let Expr::Call(call) = value.as_ref() {
-        let Some(qualified_name) = semantic.resolve_qualified_name(call.func.as_ref()) else {
-            return false;
-        };
-        if qualified_name.segments() == ["pathlib", "Path"] {
-            return true;
-        }
+        return semantic.matches_qualified_name(&call.func, &["pathlib", "Path"]);
     }
 
     // Second, is this a call to `pathlib.Path.open` via a variable?
@@ -114,7 +109,5 @@ pub(crate) fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -
         return false;
     };
 
-    semantic
-        .resolve_qualified_name(call.func.as_ref())
-        .is_some_and(|qualified_name| qualified_name.segments() == ["pathlib", "Path"])
+    semantic.matches_qualified_name(call.func.as_ref(), &["pathlib", "Path"])
 }

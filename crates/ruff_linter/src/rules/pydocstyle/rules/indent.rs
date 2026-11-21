@@ -111,9 +111,9 @@ impl Violation for DocstringTabIndentation {
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.75", category = Category::Formatting)]
-pub(crate) struct UnderIndentation;
+pub(crate) struct UnderIndentedDocstringLine;
 
-impl AlwaysFixableViolation for UnderIndentation {
+impl AlwaysFixableViolation for UnderIndentedDocstringLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Docstring is under-indented".to_string()
@@ -168,9 +168,9 @@ impl AlwaysFixableViolation for UnderIndentation {
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.75", category = Category::Formatting)]
-pub(crate) struct OverIndentation;
+pub(crate) struct OverIndentedDocstringLine;
 
-impl AlwaysFixableViolation for OverIndentation {
+impl AlwaysFixableViolation for OverIndentedDocstringLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Docstring is over-indented".to_string()
@@ -236,12 +236,12 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
         // yet.
         has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
-        if checker.is_rule_enabled(Rule::UnderIndentation) {
+        if checker.is_rule_enabled(Rule::UnderIndentedDocstringLine) {
             // We report under-indentation on every line. This isn't great, but enables
             // fix.
             if (is_last || !is_blank) && line_indent_size < docstring_indent_size {
-                let mut diagnostic =
-                    checker.report_diagnostic(UnderIndentation, TextRange::empty(line.start()));
+                let mut diagnostic = checker
+                    .report_diagnostic(UnderIndentedDocstringLine, TextRange::empty(line.start()));
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     clean_space(docstring_indentation),
                     TextRange::at(line.start(), line_indent.text_len()),
@@ -286,7 +286,7 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
         }
     }
 
-    if checker.is_rule_enabled(Rule::OverIndentation) {
+    if checker.is_rule_enabled(Rule::OverIndentedDocstringLine) {
         // If every line (except the last) is over-indented...
         if let Some(smallest_over_indent_size) = smallest_over_indent_size {
             for line in over_indented_lines {
@@ -295,8 +295,8 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
 
                 // We report over-indentation on every line. This isn't great, but
                 // enables the fix capability.
-                let mut diagnostic =
-                    checker.report_diagnostic(OverIndentation, TextRange::empty(line.start()));
+                let mut diagnostic = checker
+                    .report_diagnostic(OverIndentedDocstringLine, TextRange::empty(line.start()));
 
                 let edit = if indent.is_empty() {
                     // Delete the entire indent.
@@ -337,8 +337,8 @@ pub(crate) fn indent(checker: &Checker, docstring: &Docstring) {
 
             let is_indent_only = line_indent.len() == last.len();
             if last_line_over_indent > 0 && is_indent_only {
-                let mut diagnostic =
-                    checker.report_diagnostic(OverIndentation, TextRange::empty(last.start()));
+                let mut diagnostic = checker
+                    .report_diagnostic(OverIndentedDocstringLine, TextRange::empty(last.start()));
                 let indent = clean_space(docstring_indentation);
                 let range = TextRange::at(last.start(), line_indent.text_len());
                 let edit = if indent.is_empty() {

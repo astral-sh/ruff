@@ -2859,8 +2859,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 // Write parameter with range tracking
                 let param_name = parameter
                     .display_name()
-                    .map(|name| name.to_string())
-                    .unwrap_or_default();
+                    .map_or_default(|name| name.to_string());
                 parameter
                     .display_with(db, display.env, display.settings.singleline())
                     .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
@@ -3275,6 +3274,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             })
         };
         let mut condensed_types = vec![];
+        let mut seen_literals = FxHashSet::default();
         let mut condensed_element_count = 0usize;
         let mut subclass_of_types = vec![];
         let mut numeric_tower_element_count = 0usize;
@@ -3285,7 +3285,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             } else if let Some(literals) = self.condensable_literals(element) {
                 condensed_element_count += 1;
                 for literal in literals {
-                    if !condensed_types.contains(&literal) {
+                    if seen_literals.insert(literal) {
                         condensed_types.push(literal);
                     }
                 }

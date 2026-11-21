@@ -76,74 +76,72 @@ pub(super) fn class_member_with_symbol<'db>(
     scope: ScopeId<'db>,
     symbol: Option<ScopedSymbolId>,
 ) -> Member<'db> {
-    symbol
-        .map(|symbol_id| {
-            let mut place_and_quals = place_by_id(
-                db,
-                scope,
-                symbol_id.into(),
-                RequiresExplicitReExport::No,
-                ConsideredDefinitions::EndOfScope,
-            );
+    symbol.map_or_default(|symbol_id| {
+        let mut place_and_quals = place_by_id(
+            db,
+            scope,
+            symbol_id.into(),
+            RequiresExplicitReExport::No,
+            ConsideredDefinitions::EndOfScope,
+        );
 
-            if let Place::Defined(ref mut place) = place_and_quals.place
-                && place.origin == TypeOrigin::Inferred
-                && let Some(inherited) = inherited_class_body_declaration(db, scope, symbol_id)
-            {
-                if let Place::Defined(declared) = inherited.member.place {
-                    // The annotation determines the public type, but the value is still supplied
-                    // by this class. Consumers such as Pydantic inspect that value's definition.
-                    *place = DefinedPlace {
-                        ty: declared.ty,
-                        origin: declared.origin,
-                        public_type_policy: declared.public_type_policy,
-                        ..*place
-                    };
-                }
-                place_and_quals.qualifiers = inherited.member.qualifiers;
-            }
-
-            if !place_and_quals.is_undefined() && !place_and_quals.is_init_var() {
-                // Trust the declared type if we see a class-level declaration
-                return Member {
-                    inner: place_and_quals,
+        if let Place::Defined(ref mut place) = place_and_quals.place
+            && place.origin == TypeOrigin::Inferred
+            && let Some(inherited) = inherited_class_body_declaration(db, scope, symbol_id)
+        {
+            if let Place::Defined(declared) = inherited.member.place {
+                // The annotation determines the public type, but the value is still supplied
+                // by this class. Consumers such as Pydantic inspect that value's definition.
+                *place = DefinedPlace {
+                    ty: declared.ty,
+                    origin: declared.origin,
+                    public_type_policy: declared.public_type_policy,
+                    ..*place
                 };
             }
+            place_and_quals.qualifiers = inherited.member.qualifiers;
+        }
 
-            if let PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
+        if !place_and_quals.is_undefined() && !place_and_quals.is_init_var() {
+            // Trust the declared type if we see a class-level declaration
+            return Member {
+                inner: place_and_quals,
+            };
+        }
+
+        if let PlaceAndQualifiers {
+            place:
+                Place::Defined(DefinedPlace {
+                    ty,
+                    provenance: declared_provenance,
+                    ..
+                }),
+            qualifiers,
+        } = place_and_quals
+        {
+            // Otherwise, we need to check if the symbol has bindings
+            let use_def = use_def_map(db, scope);
+            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+            let env = ProgramEnvironment::from_scope(scope);
+            let inferred = place_from_bindings(db, &env, bindings).place;
+
+            // TODO: we should not need to calculate inferred type second time. This is a temporary
+            // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
+            Member {
+                inner: match inferred {
+                    Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
+                    Place::Defined(place) => Place::Defined(DefinedPlace {
                         ty,
-                        provenance: declared_provenance,
-                        ..
-                    }),
-                qualifiers,
-            } = place_and_quals
-            {
-                // Otherwise, we need to check if the symbol has bindings
-                let use_def = use_def_map(db, scope);
-                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let env = ProgramEnvironment::from_scope(scope);
-                let inferred = place_from_bindings(db, &env, bindings).place;
-
-                // TODO: we should not need to calculate inferred type second time. This is a temporary
-                // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
-                Member {
-                    inner: match inferred {
-                        Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
-                        Place::Defined(place) => Place::Defined(DefinedPlace {
-                            ty,
-                            provenance: place.provenance.or(declared_provenance),
-                            ..place
-                        })
-                        .with_qualifiers(qualifiers),
-                    },
-                }
-            } else {
-                Member::unbound()
+                        provenance: place.provenance.or(declared_provenance),
+                        ..place
+                    })
+                    .with_qualifiers(qualifiers),
+                },
             }
-        })
-        .unwrap_or_default()
+        } else {
+            Member::unbound()
+        }
+    })
 }
 
 /// Returns the inherited class-body annotation governing an unannotated class attribute.
@@ -158,8 +156,6 @@ pub(super) fn inherited_class_body_declaration<'db>(
     symbol: ScopedSymbolId,
 ) -> Option<ClassBodyDeclaration<'db>> {
     scope.node(db).as_class()?;
-    let table = place_table(db, scope);
-    let name = table.symbol(symbol).name();
     let use_def = use_def_map(db, scope);
     let env = ProgramEnvironment::from_scope(scope);
     if !place_from_declarations(db, &env, use_def.end_of_scope_symbol_declarations(symbol))
@@ -170,9 +166,19 @@ pub(super) fn inherited_class_body_declaration<'db>(
     }
 
     let class = nearest_enclosing_class(db, semantic_index(db, scope.program_file(db)), scope)?;
+    let table = place_table(db, scope);
+    class_body_declaration_from_bases(db, &env, class, table.symbol(symbol).name())
+}
+
+pub(super) fn class_body_declaration_from_bases<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+    name: &str,
+) -> Option<ClassBodyDeclaration<'db>> {
     let mut inherited = MroLookup::new(
         db,
-        &env,
+        env,
         class.identity_specialization(db).iter_mro(db).skip(1),
     )
     .class_body_declaration(name)?;

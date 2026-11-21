@@ -106,9 +106,9 @@ impl Violation for Print {
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.57", category = Category::Restriction)]
-pub(crate) struct PPrint;
+pub(crate) struct Pprint;
 
-impl Violation for PPrint {
+impl Violation for Pprint {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -140,7 +140,7 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall, qualified_name
             if has_non_default_output_target(semantic, call, "stream") {
                 return;
             }
-            checker.report_diagnostic_if_enabled(PPrint, call.func.range())
+            checker.report_diagnostic_if_enabled(Pprint, call.func.range())
         }
         _ => return,
     };

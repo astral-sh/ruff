@@ -1,8 +1,7 @@
-use ruff_python_trivia::{
-    BackwardsTokenizer, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
-};
+use ruff_python_ast::token::TokenKind;
+use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 
@@ -25,33 +24,42 @@ pub(super) fn comment_strings_in_range<'a>(
         .collect()
 }
 
+/// Returns the start of a preceding semicolon and the start of the token after a following semicolon.
 fn semicolon_before_and_after(
     checker: &Checker,
     statement: TextRange,
-) -> (Option<SimpleToken>, Option<SimpleToken>) {
-    // determine whether there's a semicolon either before or after the binding statement.
-    // Since it's a binding statement, we can just check whether there's a semicolon immediately
-    // after the whitespace in front of or behind it
-    let mut after_tokenizer =
-        SimpleTokenizer::starts_at(statement.end(), checker.locator().contents()).skip_trivia();
+) -> (Option<TextSize>, Option<TextSize>) {
+    // Skip logical newlines and indentation too, so the lookup can cross lines.
+    let is_trivia = |kind: TokenKind| {
+        kind.is_trivia()
+            || matches!(
+                kind,
+                TokenKind::Newline | TokenKind::Indent | TokenKind::Dedent
+            )
+    };
 
-    let after_semicolon = if after_tokenizer
+    let mut after_tokens = checker
+        .tokens()
+        .after(statement.end())
+        .iter()
+        .filter(|token| !is_trivia(token.kind()));
+
+    let after_semicolon = if after_tokens
         .next()
-        .is_some_and(|token| token.kind() == SimpleTokenKind::Semi)
+        .is_some_and(|token| token.kind() == TokenKind::Semi)
     {
-        after_tokenizer.next()
+        after_tokens.next().map(Ranged::start)
     } else {
         None
     };
 
-    let semicolon_before = BackwardsTokenizer::up_to(
-        statement.start(),
-        checker.locator().contents(),
-        checker.comment_ranges(),
-    )
-    .skip_trivia()
-    .next()
-    .filter(|token| token.kind() == SimpleTokenKind::Semi);
+    let semicolon_before = checker
+        .tokens()
+        .before(statement.start())
+        .iter()
+        .rfind(|token| !is_trivia(token.kind()))
+        .filter(|token| token.kind() == TokenKind::Semi)
+        .map(Ranged::start);
 
     (semicolon_before, after_semicolon)
 }
@@ -82,7 +90,7 @@ pub(super) fn statement_deletion_range(
         //      ^^^^^^^^
         // ```
         (Some(semicolon_before), Some(_) | None) => (
-            TextRange::new(semicolon_before.start(), statement_range.end()),
+            TextRange::new(semicolon_before, statement_range.end()),
             true,
         ),
 
@@ -91,7 +99,7 @@ pub(super) fn statement_deletion_range(
         // ^^^^^^^
         // ```
         (None, Some(after_semicolon)) => (
-            TextRange::new(statement_range.start(), after_semicolon.start()),
+            TextRange::new(statement_range.start(), after_semicolon),
             true,
         ),
     }

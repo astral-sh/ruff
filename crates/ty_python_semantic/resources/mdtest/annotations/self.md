@@ -413,7 +413,7 @@ class GenericShape[T]:
     @classmethod
     def baz[U](cls, u: U) -> "GenericShape[U]":
         reveal_type(cls)  # revealed: type[Self@baz]
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         return cls()
 
 class GenericCircle[T](GenericShape[T]): ...
@@ -935,7 +935,7 @@ b: Self
 class Foo:
     def return_concrete_type(self) -> Self:
         # TODO: We could emit a hint that suggests annotating with `Foo` instead of `Self`
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         return Foo()
 
     @staticmethod

@@ -433,17 +433,11 @@ fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a
 }
 
 fn is_fastapi_depends(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Depends"]))
+    semantic.matches_qualified_name(expr, &["fastapi", "Depends"])
 }
 
 fn is_pydantic_base_model(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["pydantic", "BaseModel"])
-        })
+    semantic.matches_qualified_name(expr, &["pydantic", "BaseModel"])
 }
 
 /// Extract the expected in-route name for a given parameter, if it has an alias.
@@ -482,10 +476,7 @@ fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Op
     }
 
     // Verify that the call was a `fastapi.Path`.
-    if !semantic
-        .resolve_qualified_name(&path.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Path"]))
-    {
+    if !semantic.matches_qualified_name(&path.func, &["fastapi", "Path"]) {
         return None;
     }
 

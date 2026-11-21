@@ -8,7 +8,7 @@ use crate::codes::Category;
 
 /// ## What it does
 ///
-/// Checks Ruff configuration files for rule selectors that redirect to another code or prefix.
+/// Checks Ruff configuration files for redirected rule names, codes, and prefixes.
 ///
 /// ## Why is this bad?
 ///
@@ -30,7 +30,7 @@ use crate::codes::Category;
 /// ignore = ["TC002"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
+#[violation_metadata(preview_since = "0.17.5", category = Category::Suspicious)]
 pub(crate) struct RenamedRule {
     original: &'static str,
     target: &'static str,

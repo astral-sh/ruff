@@ -10,6 +10,7 @@ use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 use std::hash::BuildHasherDefault;
 use std::num::NonZeroUsize;
+use std::sync::OnceLock;
 use ty_static::EnvVars;
 
 pub mod cancellation;
@@ -48,7 +49,7 @@ pub use std::time::{Instant, SystemTime, SystemTimeError};
 pub use web_time::{Instant, SystemTime, SystemTimeError};
 
 pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
-static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+static VERSION: OnceLock<String> = OnceLock::new();
 
 /// Returns the version of the executing program if set.
 pub fn program_version() -> Option<&'static str> {
@@ -79,31 +80,35 @@ pub trait Db: salsa::Database {
     fn files(&self) -> &Files;
 }
 
-/// Returns the maximum number of tasks that ty is allowed
-/// to process in parallel.
+static MAX_PARALLELISM: OnceLock<NonZeroUsize> = OnceLock::new();
+
+/// Sets the maximum number of tasks to process in parallel.
 ///
-/// Returns [`std::thread::available_parallelism`], unless the environment
-/// variable `TY_MAX_PARALLELISM` or `RAYON_NUM_THREADS` is set. `TY_MAX_PARALLELISM` takes
-/// precedence over `RAYON_NUM_THREADS`.
+/// Returns the supplied limit if [`max_parallelism`] has already been read or set.
+pub fn set_max_parallelism(limit: NonZeroUsize) -> Result<(), NonZeroUsize> {
+    MAX_PARALLELISM.set(limit)
+}
+
+/// Returns the maximum number of tasks to process in parallel.
 ///
-/// Falls back to `1` if `available_parallelism` is not available.
+/// Unless [`set_max_parallelism`] was called at startup, the first call uses a positive
+/// `RAYON_NUM_THREADS` value or [`std::thread::available_parallelism`].
+/// Falls back to `1` if `available_parallelism` is unavailable.
 ///
-/// Setting `TY_MAX_PARALLELISM` to `2` only restricts the number of threads that ty spawns
-/// to process work in parallel. For example, to index a directory or checking the files of a project.
-/// ty can still spawn more threads for other tasks, e.g. to wait for a Ctrl+C signal or
-/// watching the files for changes.
+/// A limit of `2` restricts how many threads can index a directory or check the files
+/// of a project in parallel. The process can still spawn threads for other tasks,
+/// such as waiting for a Ctrl+C signal or watching files for changes.
 #[expect(
     clippy::disallowed_methods,
     reason = "We don't have access to System here, but this is also only used by the CLI and the server which always run on a real system."
 )]
 pub fn max_parallelism() -> NonZeroUsize {
-    std::env::var(EnvVars::TY_MAX_PARALLELISM)
-        .or_else(|_| std::env::var(EnvVars::RAYON_NUM_THREADS))
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or_else(|| {
-            std::thread::available_parallelism().unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
-        })
+    *MAX_PARALLELISM.get_or_init(|| {
+        std::env::var(EnvVars::RAYON_NUM_THREADS)
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN))
+    })
 }
 
 // Use a reasonably large stack size to avoid running into stack overflows too easily. The

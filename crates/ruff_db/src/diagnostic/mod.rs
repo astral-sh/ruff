@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 use std::{borrow::Cow, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
-use ruff_source_file::{LineColumn, SourceCode, SourceFile};
+use ruff_source_file::{SourceCode, SourceFile};
 
 use annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -13,7 +13,7 @@ pub use self::render::{DummyFileResolver, FileResolver, Input};
 use self::render::{FullRenderer, Renderer};
 pub use self::stylesheet::{DiagnosticStylesheet, fmt_with_hyperlink};
 use crate::cancellation::CancellationToken;
-use crate::{Db, files::File};
+use crate::files::File;
 
 pub mod render;
 mod stylesheet;
@@ -176,12 +176,15 @@ impl Diagnostic {
     }
 
     /// Adds an "info" sub-diagnostic before any existing sub-diagnostics.
-    pub fn prepend_info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
+    pub fn prepend_info<'a>(
+        &mut self,
+        message: impl IntoDiagnosticMessage + 'a,
+    ) -> &mut SubDiagnostic {
         let subs = &mut Arc::make_mut(&mut self.inner).subs;
         if subs.is_empty() {
             subs.reserve_exact(1);
         }
-        subs.insert(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
+        subs.insert_mut(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message))
     }
 
     /// Adds a "help" sub-diagnostic with the given message.
@@ -342,9 +345,6 @@ impl Diagnostic {
 
     /// Returns the "primary" span of this diagnostic, panicking if it does not exist.
     ///
-    /// This should typically only be used when working with diagnostics in Ruff, where diagnostics
-    /// are currently required to have a primary span.
-    ///
     /// See [`Diagnostic::primary_span`] for more details.
     pub fn expect_primary_span(&self) -> Span {
         self.primary_span().expect("Expected a primary span")
@@ -352,9 +352,9 @@ impl Diagnostic {
 
     /// Returns a key that can be used to sort two diagnostics into the canonical order
     /// in which they should appear when rendered.
-    pub fn rendering_sort_key<'a>(&'a self, db: &'a dyn Db) -> impl Ord + 'a {
+    pub fn rendering_sort_key<'a>(&'a self, resolver: &'a dyn FileResolver) -> impl Ord + 'a {
         RenderingSortKey {
-            db,
+            resolver,
             diagnostic: self,
         }
     }
@@ -487,62 +487,9 @@ impl Diagnostic {
             .map(|sub| sub.inner.message.as_str())
     }
 
-    /// Returns the filename for the message.
-    ///
-    /// Panics if the diagnostic has no primary span, or if its file is not a `SourceFile`.
-    pub fn expect_ruff_filename(&self) -> String {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .name()
-            .to_string()
-    }
-
-    /// Computes the start source location for the message.
-    ///
-    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
-    /// or if the span has no range.
-    pub fn ruff_start_location(&self) -> Option<LineColumn> {
-        Some(
-            self.ruff_source_file()?
-                .to_source_code()
-                .line_column(self.range()?.start()),
-        )
-    }
-
-    /// Returns the [`SourceFile`] which the message belongs to.
-    fn ruff_source_file(&self) -> Option<&SourceFile> {
-        self.primary_span_ref()?.as_ruff_file()
-    }
-
-    /// Returns the [`SourceFile`] which the message belongs to.
-    ///
-    /// Panics if the diagnostic has no primary span, or if its file is not a `SourceFile`.
-    fn expect_ruff_source_file(&self) -> &SourceFile {
-        self.ruff_source_file()
-            .expect("Expected a ruff source file")
-    }
-
     /// Returns the [`TextRange`] for the diagnostic.
     pub fn range(&self) -> Option<TextRange> {
         self.primary_span()?.range()
-    }
-
-    /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
-    ///
-    /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
-    pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
-        let a = (
-            self.severity().is_fatal(),
-            self.expect_ruff_source_file(),
-            self.range().map(|r| r.start()),
-        );
-        let b = (
-            other.severity().is_fatal(),
-            other.expect_ruff_source_file(),
-            other.range().map(|r| r.start()),
-        );
-
-        a.cmp(&b)
     }
 
     /// Add an offset for aligning the header sigil with the line number separators in a diff.
@@ -568,7 +515,7 @@ struct DiagnosticInner {
 }
 
 struct RenderingSortKey<'a> {
-    db: &'a dyn Db,
+    resolver: &'a dyn FileResolver,
     diagnostic: &'a Diagnostic,
 }
 
@@ -587,7 +534,9 @@ impl Ord for RenderingSortKey<'_> {
             let left_file = left_span.file();
             let right_file = right_span.file();
             if left_file != right_file {
-                let order = left_file.path(&self.db).cmp(right_file.path(&self.db));
+                let order = left_file
+                    .path(self.resolver)
+                    .cmp(right_file.path(self.resolver));
                 if order.is_ne() {
                     return order;
                 }
@@ -1024,8 +973,8 @@ pub enum DiagnosticId {
     /// A PEP 723 script contains invalid metadata or configuration.
     InvalidScriptMetadata,
 
-    /// Metadata could not be loaded from uv.
-    UvMetadata,
+    /// The project manager could not provide the Python environment or dependency metadata.
+    ProjectManager,
 
     /// An `include` glob without any patterns.
     ///
@@ -1160,7 +1109,7 @@ impl DiagnosticId {
             DiagnosticId::RenamedRule => "renamed-rule",
             DiagnosticId::InvalidGlob => "invalid-glob",
             DiagnosticId::InvalidScriptMetadata => "invalid-script-metadata",
-            DiagnosticId::UvMetadata => "uv-metadata",
+            DiagnosticId::ProjectManager => "project-manager",
             DiagnosticId::EmptyInclude => "empty-include",
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
@@ -1297,14 +1246,6 @@ impl Span {
             UnifiedFile::Ty(file) => file,
             UnifiedFile::Ruff(_) => panic!("Expected a ty `File`, found a ruff `SourceFile`"),
         }
-    }
-
-    /// Returns the [`SourceFile`] attached to this [`Span`].
-    ///
-    /// Panics if the file is a [`UnifiedFile::Ty`] instead of a [`UnifiedFile::Ruff`].
-    fn expect_ruff_file(&self) -> &SourceFile {
-        self.as_ruff_file()
-            .expect("Expected a ruff `SourceFile`, found a ty `File`")
     }
 
     /// Returns the [`SourceFile`] attached to this [`Span`].
@@ -1554,21 +1495,12 @@ impl DisplayDiagnosticConfig {
         }
     }
 
-    pub fn preview_enabled(&self) -> bool {
-        self.preview
-    }
-
     /// Whether to prefer rule codes over human-readable rule names, even in preview mode.
     pub fn prefer_rule_codes(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             prefer_rule_codes: yes,
             ..self
         }
-    }
-
-    /// Whether rule codes are explicitly preferred over human-readable rule names.
-    pub fn is_prefer_rule_codes_enabled(&self) -> bool {
-        self.prefer_rule_codes
     }
 
     /// Whether to hide a diagnostic's severity or not.
@@ -1596,14 +1528,6 @@ impl DisplayDiagnosticConfig {
             fix_applicability: applicability,
             ..self
         }
-    }
-
-    pub fn show_fix_status(&self) -> bool {
-        self.show_fix_status
-    }
-
-    pub fn fix_applicability(&self) -> Applicability {
-        self.fix_applicability
     }
 
     pub fn with_cancellation_token(

@@ -89,12 +89,12 @@ impl UnusedNOQAKind {
 /// [RUF102]: https://docs.astral.sh/ruff/rules/invalid-rule-code/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155", category = Category::Suspicious)]
-pub(crate) struct UnusedNOQA<'a> {
+pub(crate) struct UnusedSuppressionComment<'a> {
     pub codes: Option<UnusedCodes<'a>>,
     pub kind: UnusedNOQAKind,
 }
 
-impl AlwaysFixableViolation for UnusedNOQA<'_> {
+impl AlwaysFixableViolation for UnusedSuppressionComment<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
         match &self.codes {

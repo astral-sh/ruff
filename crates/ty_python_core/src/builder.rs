@@ -68,7 +68,7 @@ use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
     LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
-    UseDefMapBuilder, UseDefMapInterner,
+    StubParameter, UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{
     AncestorsIter, DefinitionsByNode, EvaluationMode, LoopHeader, LoopHeaderId,
@@ -103,12 +103,20 @@ struct NarrowingAlias<'ast> {
     first_definition_after_alias: ScopedDefinitionId,
 }
 
+#[derive(Default)]
+struct NarrowingAliases<'ast> {
+    by_name: FxHashMap<Name, NarrowingAlias<'ast>>,
+    /// Every place narrowed by a live alias in this scope. Places can stay in the set
+    /// after an alias is removed, since we only use it to rule out invalidations.
+    narrowed_places: PossiblyNarrowedPlaces,
+}
+
 struct ScopeInfo<'ast> {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
     /// Saved narrowing aliases from the enclosing scope, restored on `pop_scope`.
-    narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    narrowing_aliases: NarrowingAliases<'ast>,
     /// `global` and `nonlocal` declarations from scopes nested under this one. This is used for:
     ///
     /// 1. Visibility of nested writes. A nested function that binds a variable might affect the
@@ -312,7 +320,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Maps alias variable names to their narrowing expressions (same-scope only).
     /// TODO: cross-scope alias narrowing support
-    narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    narrowing_aliases: NarrowingAliases<'ast>,
 
     /// Alias metadata for predicate leaf names in the current file.
     alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
@@ -371,7 +379,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try_statement: false,
             semantic_syntax_errors: RefCell::default(),
-            narrowing_aliases: FxHashMap::default(),
+            narrowing_aliases: NarrowingAliases::default(),
             alias_predicates: FxHashMap::default(),
         };
 
@@ -623,29 +631,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
             .collect();
 
-        let captures = self
-            .current_scope_info_mut()
+        // A scope contributes each free name once from its symbol table. Each enclosing
+        // scope forwards that capture at most once when it pops.
+        self.current_scope_info_mut()
             .pending_captures
             .entry(capture.name)
-            .or_default();
-
-        if let Some(pending) = captures
-            .iter_mut()
-            .find(|pending| pending.nested_scope == capture.nested_scope)
-        {
-            pending
-                .binding_definition_ids
-                .extend(binding_definition_ids);
-            if capture.laziness.is_lazy() {
-                pending.laziness = ScopeLaziness::Lazy;
-            }
-        } else {
-            captures.push(PendingCapture {
+            .or_default()
+            .push(PendingCapture {
                 nested_scope: capture.nested_scope,
                 laziness: capture.laziness,
                 binding_definition_ids,
             });
-        }
     }
 
     fn record_pending_capture_binding(
@@ -1157,7 +1153,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .is_some_and(|symbol| narrowed_places.contains(&symbol.into()));
 
         if !narrowed_places.is_empty() && !target_is_narrowed {
-            self.narrowing_aliases.insert(
+            self.narrowing_aliases
+                .narrowed_places
+                .extend(&narrowed_places);
+            self.narrowing_aliases.by_name.insert(
                 target_name.clone(),
                 NarrowingAlias {
                     expression: value,
@@ -1171,31 +1170,33 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Invalidate any narrowing aliases affected by a new definition of `place`.
     fn invalidate_narrowing_aliases_for(&mut self, place: ScopedPlaceId) {
+        if self.narrowing_aliases.by_name.is_empty() {
+            return;
+        }
+
         let place_table = &self.place_tables[self.current_scope()];
+        // Rebinding the alias itself invalidates it: `is_none = x is None; is_none = False`.
+        if let Some(symbol) = place.as_symbol() {
+            self.narrowing_aliases
+                .by_name
+                .remove(place_table.symbol(symbol).name());
+        }
+
+        // Rebinding a place also invalidates aliases that narrow it or any of its members,
+        // e.g. `is_none = a.x is None; a = A()`.
         let associated_members = place_table.associated_place_ids(place);
-        let reassigned_alias_name = place
-            .as_symbol()
-            .map(|symbol_id| place_table.symbol(symbol_id).name());
+        let affected = |places: &PossiblyNarrowedPlaces| {
+            places.contains(&place)
+                || associated_members
+                    .iter()
+                    .any(|member| places.contains(&(*member).into()))
+        };
 
-        self.narrowing_aliases.retain(|name, alias| {
-            // Drop aliases that narrow the reassigned place or any of its members.
-            //  e.g. `is_none = x is None and ...; x = 1`
-            if alias.narrowed_places.contains(&place) {
-                return false;
-            }
-
-            //  e.g. `is_none = a.x is None; a = A()`
-            if associated_members
-                .iter()
-                .any(|m| alias.narrowed_places.contains(&(*m).into()))
-            {
-                return false;
-            }
-
-            // Drop the alias whose own variable is the reassigned place.
-            // e.g. `is_none = x is None; is_none = False`
-            reassigned_alias_name != Some(name)
-        });
+        if affected(&self.narrowing_aliases.narrowed_places) {
+            self.narrowing_aliases
+                .by_name
+                .retain(|_, alias| !affected(&alias.narrowed_places));
+        }
     }
 
     fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
@@ -1263,7 +1264,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let Some(name) = leaf.as_name_expr() else {
                 return;
             };
-            let Some(alias) = self.narrowing_aliases.get(&name.id) else {
+            let Some(alias) = self.narrowing_aliases.by_name.get(&name.id) else {
                 return;
             };
             if self
@@ -1777,6 +1778,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .take_while(|e| !e.is_starred_expr())
                 .enumerate()
             {
+                if !matches!(
+                    item,
+                    ast::Expr::Dict(_) | ast::Expr::List(_) | ast::Expr::Tuple(_)
+                ) {
+                    continue;
+                }
+
                 if let Some(target) = MemberExprBuilder::visit_subscript_expr(
                     target,
                     &ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -3200,43 +3208,60 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         filtered_out
     }
 
-    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
-        for parameter in parameters.iter_non_variadic_params() {
-            self.declare_parameter(parameter);
-        }
-        if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
-                ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
+    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, is_stub_body: bool) {
+        let nodes = parameters
+            .iter_non_variadic_params()
+            .map(ParameterDefinitionNodeRef::Parameter)
+            .chain(
+                parameters
+                    .vararg
+                    .as_deref()
+                    .map(ParameterDefinitionNodeRef::VariadicPositionalParameter),
+            )
+            .chain(
+                parameters
+                    .kwarg
+                    .as_deref()
+                    .map(ParameterDefinitionNodeRef::VariadicKeywordParameter),
             );
-        }
-        if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
-                ParameterDefinitionNodeRef::VariadicKeywordParameter(kwarg),
-            );
+        if is_stub_body {
+            let parameters = nodes
+                .map(|node| self.declare_stub_parameter(node))
+                .collect();
+            self.current_use_def_map_mut().stub_parameters = Some(parameters);
+        } else {
+            for node in nodes {
+                let symbol = self.add_symbol(node.parameter().name.id().clone());
+                self.add_definition(symbol.into(), node);
+                self.current_place_table_mut()
+                    .symbol_mut(symbol)
+                    .mark_parameter();
+            }
         }
     }
 
-    fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
-
-        self.add_definition(
-            symbol.into(),
-            ParameterDefinitionNodeRef::Parameter(parameter),
-        );
-
-        self.current_place_table_mut()
-            .symbol_mut(symbol)
-            .mark_parameter();
+    /// Creates the definition now so the semantic index can resolve the parameter's AST node.
+    /// Its binding and optional declaration are recorded when the scope's use-def map is finished.
+    fn declare_stub_parameter(
+        &mut self,
+        node: ParameterDefinitionNodeRef<'ast>,
+    ) -> StubParameter<'db> {
+        let parameter = node.parameter();
+        let (symbol, _) = self
+            .current_place_table_mut()
+            .add_symbol(Symbol::new(parameter.name.id().clone()));
+        let info = self.current_place_table_mut().symbol_mut(symbol);
+        info.mark_bound();
+        info.mark_parameter();
+        let annotated = parameter.annotation.is_some();
+        if annotated {
+            info.mark_declared();
+        }
+        StubParameter {
+            symbol,
+            definition: self.create_definition(symbol.into(), node),
+            annotated,
+        }
     }
 
     fn declare_lambda_parameters(
@@ -3320,11 +3345,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         target: &'ast ast::Expr,
         value: Expression<'db>,
     ) {
-        self.record_exception_checkpoint_if(matches!(
-            target,
-            ast::Expr::List(_) | ast::Expr::Tuple(_)
-        ));
-
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
                 if matches!(unpackable, Unpackable::Comprehension { .. }) {
@@ -3445,7 +3465,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: self
                 .use_def_maps
                 .into_iter()
-                .map(|builder| use_def_map_interner.intern(builder.finish()))
+                .map(|builder| use_def_map_interner.finish(builder))
                 .collect(),
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
@@ -3575,6 +3595,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         *unpack_position = UnpackPosition::Other;
                     }
                 }
+            }
+            ast::Expr::List(ast::ExprList { ctx, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { ctx, .. }) => {
+                // A nested unpack can raise after earlier targets have been assigned.
+                self.record_exception_checkpoint_if(*ctx == ast::ExprContext::Store);
+                walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
                 self.visit_expr(&node.value);
@@ -3927,7 +3953,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
-                        builder.declare_parameters(parameters);
+                        builder.declare_parameters(parameters, ast::helpers::is_stub_body(body));
 
                         let mut first_parameter_name = parameters
                             .iter_non_variadic_params()
@@ -4288,8 +4314,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
                     self.has_future_annotations |= !node.is_lazy
-                        && alias.name.id == "annotations"
-                        && node.module.as_deref() == Some("__future__");
+                        && node.is_future_import(self.python_version())
+                        && alias.name.id == "annotations";
 
                     let symbol = self.add_symbol(symbol_name.clone());
 

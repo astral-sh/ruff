@@ -1085,6 +1085,24 @@ reveal_type(Child().missing)  # revealed: int
 Child().missing = 1
 ```
 
+## Receiver annotations do not create instance storage
+
+Redeclaring an inherited nested class as an instance attribute still requires a slot or an instance
+dictionary.
+
+```py
+class Base:
+    __slots__ = ()
+
+    class Inner: ...
+
+class Child(Base):
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        self.Inner: type[Base.Inner] = Base.Inner  # error: [missing-slot]
+```
+
 ## Class attributes cannot have the same name as a slot
 
 Assigning to a slot name in the class body prevents Python from creating the class.

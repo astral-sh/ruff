@@ -16,8 +16,8 @@ use crate::rules::{
     flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
-    flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_use_pathlib, flynt, numpy,
-    pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
+    flake8_simplify, flake8_tidy_imports, flake8_use_pathlib, flynt, numpy, pandas_vet,
+    pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
 use ruff_python_ast::PythonVersion;
 
@@ -91,7 +91,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.any_rule_enabled(&[
                 Rule::UnnecessaryLiteralUnion,
                 Rule::DuplicateUnionMember,
-                Rule::RedundantLiteralUnion,
+                Rule::LiteralUnionWithSupertype,
                 Rule::UnnecessaryTypeUnion,
                 Rule::NoneNotAtEndOfUnion,
             ]) {
@@ -107,7 +107,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
                     }
-                    if checker.is_rule_enabled(Rule::RedundantLiteralUnion) {
+                    if checker.is_rule_enabled(Rule::LiteralUnionWithSupertype) {
                         flake8_pyi::rules::redundant_literal_union(checker, expr);
                     }
                     if checker.is_rule_enabled(Rule::UnnecessaryTypeUnion) {
@@ -286,11 +286,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         Rule::SuspiciousInsecureCipherUsage,
                         Rule::SuspiciousInsecureCipherModeUsage,
                         Rule::SuspiciousMktempUsage,
-                        Rule::SuspiciousEvalUsage,
+                        Rule::Eval,
                         Rule::SuspiciousMarkSafeUsage,
                         Rule::SuspiciousURLOpenUsage,
                         Rule::SuspiciousNonCryptographicRandomUsage,
-                        Rule::SuspiciousTelnetUsage,
+                        Rule::SuspiciousTelnetlibUsage,
                         Rule::SuspiciousXMLCElementTreeUsage,
                         Rule::SuspiciousXMLElementTreeUsage,
                         Rule::SuspiciousXMLExpatReaderUsage,
@@ -299,7 +299,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         Rule::SuspiciousXMLMiniDOMUsage,
                         Rule::SuspiciousXMLPullDOMUsage,
                         Rule::SuspiciousXMLETreeUsage,
-                        Rule::SuspiciousFTPLibUsage,
+                        Rule::SuspiciousFtplibUsage,
                         Rule::SuspiciousUnverifiedContextUsage,
                     ]) {
                         flake8_bandit::rules::suspicious_function_reference(checker, expr);
@@ -394,7 +394,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::SixPY3) {
                 flake8_2020::rules::name_or_attribute(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::UndocumentedWarn) {
+            if checker.is_rule_enabled(Rule::LoggingWarnConstant) {
                 flake8_logging::rules::undocumented_warn(checker, expr);
             }
         }
@@ -412,11 +412,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     Rule::SuspiciousInsecureCipherUsage,
                     Rule::SuspiciousInsecureCipherModeUsage,
                     Rule::SuspiciousMktempUsage,
-                    Rule::SuspiciousEvalUsage,
+                    Rule::Eval,
                     Rule::SuspiciousMarkSafeUsage,
                     Rule::SuspiciousURLOpenUsage,
                     Rule::SuspiciousNonCryptographicRandomUsage,
-                    Rule::SuspiciousTelnetUsage,
+                    Rule::SuspiciousTelnetlibUsage,
                     Rule::SuspiciousXMLCElementTreeUsage,
                     Rule::SuspiciousXMLElementTreeUsage,
                     Rule::SuspiciousXMLExpatReaderUsage,
@@ -425,7 +425,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     Rule::SuspiciousXMLMiniDOMUsage,
                     Rule::SuspiciousXMLPullDOMUsage,
                     Rule::SuspiciousXMLETreeUsage,
-                    Rule::SuspiciousFTPLibUsage,
+                    Rule::SuspiciousFtplibUsage,
                     Rule::SuspiciousUnverifiedContextUsage,
                 ]) {
                     flake8_bandit::rules::suspicious_function_reference(checker, expr);
@@ -507,13 +507,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::CollectionsNamedTuple) {
                 flake8_pyi::rules::collections_named_tuple(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::UndocumentedWarn) {
+            if checker.is_rule_enabled(Rule::LoggingWarnConstant) {
                 flake8_logging::rules::undocumented_warn(checker, expr);
             }
             if checker.is_rule_enabled(Rule::PandasUseOfDotValues) {
                 pandas_vet::rules::attr(checker, attribute);
             }
-            if checker.is_rule_enabled(Rule::ByteStringUsage) {
+            if checker.is_rule_enabled(Rule::DeprecatedByteStringType) {
                 flake8_pyi::rules::bytestring_attribute(checker, expr);
             }
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
@@ -731,7 +731,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::SuspiciousInsecureCipherUsage,
                 Rule::SuspiciousInsecureCipherModeUsage,
                 Rule::SuspiciousMktempUsage,
-                Rule::SuspiciousEvalUsage,
+                Rule::Eval,
                 Rule::SuspiciousMarkSafeUsage,
                 Rule::SuspiciousURLOpenUsage,
                 Rule::SuspiciousNonCryptographicRandomUsage,
@@ -744,8 +744,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::SuspiciousXMLPullDOMUsage,
                 Rule::SuspiciousXMLETreeUsage,
                 Rule::SuspiciousUnverifiedContextUsage,
-                Rule::SuspiciousTelnetUsage,
-                Rule::SuspiciousFTPLibUsage,
+                Rule::SuspiciousTelnetlibUsage,
+                Rule::SuspiciousFtplibUsage,
             ]) {
                 flake8_bandit::rules::suspicious_function_call(checker, call);
             }
@@ -758,17 +758,17 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_bugbear::rules::strip_with_multi_characters(checker, expr, func, args);
             }
             if keywords.is_empty() {
-                if checker.is_rule_enabled(Rule::GetAttrWithConstant) {
+                if checker.is_rule_enabled(Rule::GetattrWithConstant) {
                     flake8_bugbear::rules::getattr_with_constant(checker, expr, func, args);
                 }
-                if checker.is_rule_enabled(Rule::DelAttrWithConstant) {
+                if checker.is_rule_enabled(Rule::DelattrWithConstant) {
                     flake8_bugbear::rules::delattr_with_constant(checker, expr, func, args);
                 }
-                if checker.is_rule_enabled(Rule::SetAttrWithConstant) {
+                if checker.is_rule_enabled(Rule::SetattrWithConstant) {
                     flake8_bugbear::rules::setattr_with_constant(checker, expr, func, args);
                 }
             }
-            if checker.is_rule_enabled(Rule::StarArgUnpackingAfterKeywordArg) {
+            if checker.is_rule_enabled(Rule::StarArgAfterKeyword) {
                 flake8_bugbear::rules::star_arg_unpacking_after_keyword_arg(
                     checker, args, keywords,
                 );
@@ -792,7 +792,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryRangeStart) {
                 flake8_pie::rules::unnecessary_range_start(checker, call);
             }
-            if checker.is_rule_enabled(Rule::ExecBuiltin) {
+            if checker.is_rule_enabled(Rule::Exec) {
                 flake8_bandit::rules::exec_used(checker, func);
             }
             if checker.is_rule_enabled(Rule::HardcodedPasswordFuncArg) {
@@ -964,21 +964,21 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
             }
             if checker.any_rule_enabled(&[
-                Rule::FStringInGetTextFuncCall,
-                Rule::FormatInGetTextFuncCall,
-                Rule::PrintfInGetTextFuncCall,
+                Rule::FStringInGettextCall,
+                Rule::FormatInGettextCall,
+                Rule::PrintfInGettextCall,
             ]) && flake8_gettext::is_gettext_func_call(
                 checker,
                 func,
                 &checker.settings().flake8_gettext.function_names,
             ) {
-                if checker.is_rule_enabled(Rule::FStringInGetTextFuncCall) {
+                if checker.is_rule_enabled(Rule::FStringInGettextCall) {
                     flake8_gettext::rules::f_string_in_gettext_func_call(checker, func, args);
                 }
-                if checker.is_rule_enabled(Rule::FormatInGetTextFuncCall) {
+                if checker.is_rule_enabled(Rule::FormatInGettextCall) {
                     flake8_gettext::rules::format_in_gettext_func_call(checker, func, args);
                 }
-                if checker.is_rule_enabled(Rule::PrintfInGetTextFuncCall) {
+                if checker.is_rule_enabled(Rule::PrintfInGettextCall) {
                     flake8_gettext::rules::printf_in_gettext_func_call(checker, func, args);
                 }
             }
@@ -1005,7 +1005,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::LoggingFString,
                 Rule::LoggingWarn,
                 Rule::LoggingExtraAttrClash,
-                Rule::LoggingExcInfo,
+                Rule::LoggingErrorWithExcInfo,
                 Rule::LoggingRedundantExcInfo,
             ]) {
                 flake8_logging_format::rules::logging_call(checker, call);
@@ -1031,10 +1031,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::DirectLoggerInstantiation) {
                 flake8_logging::rules::direct_logger_instantiation(checker, call);
             }
-            if checker.is_rule_enabled(Rule::InvalidGetLoggerArgument) {
+            if checker.is_rule_enabled(Rule::FilePathAsLoggerName) {
                 flake8_logging::rules::invalid_get_logger_argument(checker, call);
             }
-            if checker.is_rule_enabled(Rule::ExceptionWithoutExcInfo) {
+            if checker.is_rule_enabled(Rule::LoggingExceptionWithFalsyExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
             if checker.is_rule_enabled(Rule::RootLoggerCall) {
@@ -1127,10 +1127,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::AccessAnnotationsFromClassDict) {
                 ruff::rules::access_annotations_from_class_dict_with_get(checker, call);
             }
-            if checker.is_rule_enabled(Rule::LogExceptionOutsideExceptHandler) {
+            if checker.is_rule_enabled(Rule::LoggingExceptionOutsideExceptHandler) {
                 flake8_logging::rules::log_exception_outside_except_handler(checker, call);
             }
-            if checker.is_rule_enabled(Rule::ExcInfoOutsideExceptHandler) {
+            if checker.is_rule_enabled(Rule::LoggingExcInfoOutsideExceptHandler) {
                 flake8_logging::rules::exc_info_outside_except_handler(checker, call);
             }
             if checker.is_rule_enabled(Rule::FromisoformatReplaceZ) {
@@ -1196,7 +1196,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_literal);
                 }
             }
-            if checker.is_rule_enabled(Rule::MissingFStringSyntax) {
+            if checker.is_rule_enabled(Rule::PossiblyMissingFStringPrefix) {
                 for string_literal in value.literals() {
                     ruff::rules::missing_fstring_syntax(checker, string_literal);
                 }
@@ -1366,14 +1366,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.is_rule_enabled(Rule::UnnecessaryLiteralUnion) {
                     flake8_pyi::rules::unnecessary_literal_union(checker, expr);
                 }
-                if checker.is_rule_enabled(Rule::RedundantLiteralUnion) {
+                if checker.is_rule_enabled(Rule::LiteralUnionWithSupertype) {
                     flake8_pyi::rules::redundant_literal_union(checker, expr);
                 }
                 if checker.is_rule_enabled(Rule::UnnecessaryTypeUnion) {
                     flake8_pyi::rules::unnecessary_type_union(checker, expr);
-                }
-                if checker.is_rule_enabled(Rule::RuntimeStringUnion) {
-                    flake8_type_checking::rules::runtime_string_union(checker, expr);
                 }
                 if checker.is_rule_enabled(Rule::NoneNotAtEndOfUnion) {
                     ruff::rules::none_not_at_end_of_union(checker, expr);
@@ -1489,7 +1486,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
                 }
             }
-            if checker.is_rule_enabled(Rule::MissingFStringSyntax) {
+            if checker.is_rule_enabled(Rule::PossiblyMissingFStringPrefix) {
                 for string_literal in value {
                     ruff::rules::missing_fstring_syntax(checker, string_literal);
                 }
@@ -1518,16 +1515,16 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::IfExprWithFalseTrue) {
                 flake8_simplify::rules::if_expr_with_false_true(checker, expr, test, body, orelse);
             }
-            if checker.is_rule_enabled(Rule::IfExprWithTwistedArms) {
+            if checker.is_rule_enabled(Rule::IfExprWithNegatedElseAsCondition) {
                 flake8_simplify::rules::twisted_arms_in_ifexpr(checker, expr, test, body, orelse);
             }
             if checker.is_rule_enabled(Rule::IfExprMinMax) {
                 refurb::rules::if_expr_min_max(checker, if_exp);
             }
-            if checker.is_rule_enabled(Rule::IfExpInsteadOfOrOperator) {
+            if checker.is_rule_enabled(Rule::IfExprWithBodyAsCondition) {
                 refurb::rules::if_exp_instead_of_or_operator(checker, if_exp);
             }
-            if checker.is_rule_enabled(Rule::UselessIfElse) {
+            if checker.is_rule_enabled(Rule::IfExprWithIdenticalBranches) {
                 ruff::rules::useless_if_else(checker, if_exp);
             }
             if checker.is_rule_enabled(Rule::SliceToRemovePrefixOrSuffix) {
@@ -1696,7 +1693,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryKeyCheck) {
                 ruff::rules::unnecessary_key_check(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::ParenthesizeChainedOperators) {
+            if checker.is_rule_enabled(Rule::UnclearBooleanPrecedence) {
                 ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
             }
         }
@@ -1704,7 +1701,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &lambda.into());
             }
-            if checker.is_rule_enabled(Rule::InvalidArgumentName) {
+            if checker.is_rule_enabled(Rule::NonLowercaseParameterName) {
                 pep8_naming::rules::invalid_argument_name_lambda(checker, lambda);
             }
         }
@@ -1721,7 +1718,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::OSErrorAlias,
         Rule::TimeoutErrorAlias,
         Rule::Print,
-        Rule::PPrint,
+        Rule::Pprint,
         Rule::ReSubPositionalArgs,
         Rule::UselessContextlibSuppress,
         Rule::NoExplicitStacklevel,
@@ -1824,7 +1821,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
             pyupgrade::rules::timeout_error_alias_call(checker, &call.func, &qualified_name);
         }
     }
-    if checker.any_rule_enabled(&[Rule::Print, Rule::PPrint]) {
+    if checker.any_rule_enabled(&[Rule::Print, Rule::Pprint]) {
         flake8_print::rules::print_call(checker, call, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::ReSubPositionalArgs) {

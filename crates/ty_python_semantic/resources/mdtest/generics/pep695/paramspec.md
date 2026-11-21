@@ -510,7 +510,7 @@ as a wrapper around a callback that accepts no arguments.
 
 ```py
 def erase_parameters[**P](job: Job[P]) -> Job[[]]:
-    return job  # error: [invalid-return-type]
+    return job  # error: [invalid-explicit-return]
 ```
 
 The same restriction applies in the other direction when a class consumes callbacks. A consumer of
@@ -521,7 +521,7 @@ class CallbackConsumer[**P]:
     def consume(self, callback: Callable[P, None]) -> None: ...
 
 def broaden_parameters[**P](consumer: CallbackConsumer[[]]) -> CallbackConsumer[P]:
-    return consumer  # error: [invalid-return-type]
+    return consumer  # error: [invalid-explicit-return]
 ```
 
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
@@ -1186,6 +1186,31 @@ accept(wrap(keyword_only), value=1)
 accept(wrap(keyword_only), value="incorrect")  # error: [invalid-argument-type]
 ```
 
+### Inferring lambda parameters through nested calls
+
+When the outer call leaves the callback's parameter list unspecified, the lambda parameter remains
+unknown.
+
+```py
+from typing import Callable, Concatenate
+
+def wrap[**P](callback: Callable[P, object]) -> Callable[P, object]:
+    return callback
+
+def register[**P](callback: Callable[P, object]) -> None: ...
+
+register(wrap(lambda x: chr(reveal_type(x))))  # revealed: Unknown
+```
+
+A fixed prefix still supplies types for the corresponding lambda parameters.
+
+```py
+def register_prefixed[**P](callback: Callable[Concatenate[int, P], object]) -> None: ...
+
+# revealed: tuple[int, Unknown, Unknown]
+register_prefixed(wrap(lambda x, y, z: reveal_type((x, y, z))))
+```
+
 ### Immediate literal forwarding
 
 A literal unpack can supply several arguments to a forwarded `ParamSpec`. The wrapped callable
@@ -1206,6 +1231,50 @@ forward(target, *[1])  # error: [missing-argument]
 forward(target, **{"x": 1, "y": "wrong"})  # error: [invalid-argument-type]
 ```
 
+A positional unpack can supply the callback and some or all of its arguments.
+
+```py
+def write(x: int, y: str) -> None: ...
+
+forward(*(write, 1, "ok"))  # ok
+forward(*(write, 1), "ok")  # ok
+forward(*[write, 1, "ok"])  # ok
+forward(*(write, 1, 2))  # error: 9 [invalid-argument-type] "Expected `str`"
+forward(*(write, 1), 2)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `forward` is incorrect
+  --> src/mdtest_snippet.py:19:22
+   |
+19 | forward(*(write, 1), 2)  # snapshot: invalid-argument-type
+   |                      ^ Expected `str`, found `Literal[2]`
+info: Function defined here
+  --> src/mdtest_snippet.py:13:5
+   |
+13 | def write(x: int, y: str) -> None: ...
+   |     ^^^^^         ------ Parameter declared here
+```
+
+When a variable-length segment follows the callback, we check its element type and any fixed
+arguments after it.
+
+```py
+def check_words(words: tuple[str, ...]):
+    forward(*(write, *words))  # error: [invalid-argument-type] "Expected `int`, found `str`"
+
+def check_parts[*Ts](callback: Callable[[*Ts, str], None], values: tuple[*Ts]):
+    forward(*(callback, *values, "ok"))  # ok
+    forward(*(callback, *values, 2))  # error: [invalid-argument-type] "Expected `str`"
+```
+
+Here `0` is either the callback or an argument to a callback that takes none.
+
+```py
+def check_callbacks(callbacks: tuple[Callable[[], None], ...]):
+    forward(*(*callbacks, 0))  # error: [invalid-argument-type]
+```
+
 A dictionary can supply both a wrapper parameter and arguments to forward. The wrapper checks its
 own parameter and forwards only the remaining keys.
 
@@ -1217,6 +1286,46 @@ reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1, "y": 2}))  # revealed
 reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1}, y=2))  # revealed: int
 forward_prefix(target, **{"prefix": "wrong", "x": 1, "y": 2})  # error: [invalid-argument-type]
 forward_prefix(target, **{"prefix": 0, "x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
+### Forwarding part of an unpacked tuple from a method
+
+The bound method takes the callback and tag from the tuple. The remaining value fills the callback's
+first parameter, so its second parameter provides the type context for the list.
+
+```py
+from typing import Callable
+
+class Runner:
+    def run[**P](self, callback: Callable[P, None], tag: object, /, *args: P.args, **kwargs: P.kwargs) -> None:
+        callback(*args, **kwargs)
+
+def consume(value: int, items: list[object]) -> None: ...
+
+Runner().run(*(consume, None, 1), reveal_type([1]))  # revealed: list[object]
+```
+
+Each tuple must supply arguments that match an overload after the method takes its tag. A trailing
+argument can fill a different parameter for each tuple length.
+
+```py
+from typing import overload
+
+@overload
+def pair(x: int, y: int = 0) -> None: ...
+@overload
+def pair(x: str, y: str) -> None: ...
+def pair(x, y=0) -> None: ...
+def check(
+    matching: tuple[None, int, int] | tuple[None, str, str],
+    mixed: tuple[None, int, int] | tuple[None, str, int],
+    varying: tuple[None] | tuple[None, int],
+):
+    Runner().run(pair, *matching)  # ok
+    Runner().run(pair, *mixed)  # error: 24 [invalid-argument-type]
+    Runner().run(pair, *varying)  # error: [missing-argument]
+    Runner().run(pair, *varying, 1)  # ok
+    Runner().run(pair, *varying, "bad")  # error: 34 [invalid-argument-type]
 ```
 
 ### Preserve an unpacked required suffix
@@ -2754,7 +2863,7 @@ class Container[**P]:
         return f
 
     def try_assign[**Q](self, f: Callable[Q, None]) -> Callable[Q, None]:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `(**Q@try_assign) -> None`, found `(**P@Container) -> None`"
+        # error: [invalid-explicit-return] "Return type does not match returned value: expected `(**Q@try_assign) -> None`, found `(**P@Container) -> None`"
         # error: [invalid-argument-type] "Argument to bound method `Container.method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
         return self.method(f)
 ```

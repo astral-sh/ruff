@@ -434,17 +434,6 @@ impl NodeWithScopeKind {
         self.as_function().expect("expected function")
     }
 
-    fn as_type_alias(&self) -> Option<&AstNodeRef<ast::StmtTypeAlias>> {
-        match self {
-            Self::TypeAlias(type_alias) => Some(type_alias),
-            _ => None,
-        }
-    }
-
-    pub fn expect_type_alias(&self) -> &AstNodeRef<ast::StmtTypeAlias> {
-        self.as_type_alias().expect("expected type alias")
-    }
-
     /// Returns the anchor node index for this scope, or `None` for the module scope.
     ///
     /// This is used to compute relative node indices for expressions within the scope,

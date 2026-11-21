@@ -40,9 +40,9 @@ use crate::codes::Category;
 /// - [Python documentation](https://docs.python.org/3/library/exceptions.html#StopIteration)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.16.0", category = Category::Correctness)]
-pub(crate) struct StopIterationReturn;
+pub(crate) struct RaiseStopIterationInGenerator;
 
-impl Violation for StopIterationReturn {
+impl Violation for RaiseStopIterationInGenerator {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Explicit `raise StopIteration` in generator".to_string()
@@ -65,7 +65,7 @@ pub(crate) fn stop_iteration_return(checker: &Checker, function_def: &ast::StmtF
 
     if analyzer.has_yield {
         for raise_stmt in analyzer.stop_iteration_raises {
-            checker.report_diagnostic(StopIterationReturn, raise_stmt.range());
+            checker.report_diagnostic(RaiseStopIterationInGenerator, raise_stmt.range());
         }
     }
 }

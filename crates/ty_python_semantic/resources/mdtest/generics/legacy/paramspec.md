@@ -64,13 +64,51 @@ from typing import Callable, Generic, ParamSpec
 
 P1 = ParamSpec("P1")
 
-# error: [mismatched-type-name]
+# snapshot: mismatched-paramspec-name
 P2 = ParamSpec("P3")
 
 class Wrapper(Generic[P2]): ...
 
 def decorator(f: Callable[P2, int]) -> Callable[P2, int]:
     return f
+```
+
+```snapshot
+warning[mismatched-paramspec-name]: The name passed to `ParamSpec` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:6:16
+  |
+6 | P2 = ParamSpec("P3")
+  |                ^^^^ Expected "P2", got "P3"
+```
+
+### Name supplied at runtime
+
+When ty cannot verify the name match, it displays the `ParamSpec` using the assignment target.
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec
+
+def runtime_name() -> str:
+    return "P"
+
+P = ParamSpec(runtime_name())  # error: [mismatched-paramspec-name]
+
+def as_unary(callback: Callable[P, int]) -> Callable[[int], int]:
+    # snapshot: invalid-explicit-return
+    return callback
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+  --> src/mdtest_snippet.py:11:12
+   |
+ 9 | def as_unary(callback: Callable[P, int]) -> Callable[[int], int]:
+   |                                             -------------------- Expected `(int, /) -> int` because of return type
+10 |     # snapshot: invalid-explicit-return
+11 |     return callback
+   |            ^^^^^^^^ expected `(int, /) -> int`, found `(**P@as_unary) -> int`
+info: the first parameter has an incompatible type: `int` is not assignable to `P@as_unary.args`
 ```
 
 ### Bounds and constraints
@@ -940,7 +978,7 @@ as a wrapper around a callback that accepts no arguments.
 
 ```py
 def erase_parameters(job: Job[P]) -> Job[[]]:
-    return job  # error: [invalid-return-type]
+    return job  # error: [invalid-explicit-return]
 ```
 
 The same restriction applies in the other direction when a class consumes callbacks. A consumer of
@@ -953,7 +991,7 @@ class CallbackConsumer(Generic[P_co]):
     def consume(self, callback: Callable[P_co, None]) -> None: ...
 
 def broaden_parameters(consumer: CallbackConsumer[[]]) -> CallbackConsumer[P_co]:
-    return consumer  # error: [invalid-return-type]
+    return consumer  # error: [invalid-explicit-return]
 ```
 
 ## Inferring an invariant `ParamSpec` through `Concatenate`
@@ -1293,6 +1331,41 @@ forward(target, *[1])  # error: [missing-argument]
 forward(target, **{"x": 1, "y": "wrong"})  # error: [invalid-argument-type]
 ```
 
+A positional unpack can supply the callback and some or all of its arguments.
+
+```py
+def write(x: int, y: str) -> None: ...
+
+forward(*(write, 1, "ok"))  # ok
+forward(*(write, 1), "ok")  # ok
+forward(*[write, 1, "ok"])  # ok
+forward(*(write, 1, 2))  # error: 9 [invalid-argument-type] "Expected `str`"
+forward(*(write, 1), 2)  # error: 22 [invalid-argument-type] "Expected `str`"
+```
+
+When a variable-length segment follows the callback, we check its element type and any fixed
+arguments after it.
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def check_words(words: tuple[str, ...]):
+    forward(*(write, *words))  # error: [invalid-argument-type] "Expected `int`, found `str`"
+
+def check_parts(callback: Callable[[*Ts, str], None], values: tuple[*Ts]):
+    forward(*(callback, *values, "ok"))  # ok
+    forward(*(callback, *values, 2))  # error: [invalid-argument-type] "Expected `str`"
+```
+
+Here `0` is either the callback or an argument to a callback that takes none.
+
+```py
+def check_callbacks(callbacks: tuple[Callable[[], None], ...]):
+    forward(*(*callbacks, 0))  # error: [invalid-argument-type]
+```
+
 A dictionary can supply both a wrapper parameter and arguments to forward. The wrapper checks its
 own parameter and forwards only the remaining keys.
 
@@ -1304,6 +1377,48 @@ reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1, "y": 2}))  # revealed
 reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1}, y=2))  # revealed: int
 forward_prefix(target, **{"prefix": "wrong", "x": 1, "y": 2})  # error: [invalid-argument-type]
 forward_prefix(target, **{"prefix": 0, "x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
+### Forwarding part of an unpacked tuple from a method
+
+The bound method takes the callback and tag from the tuple. The remaining value fills the callback's
+first parameter, so its second parameter provides the type context for the list.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+class Runner:
+    def run(self, callback: Callable[P, None], tag: object, /, *args: P.args, **kwargs: P.kwargs) -> None:
+        callback(*args, **kwargs)
+
+def consume(value: int, items: list[object]) -> None: ...
+
+Runner().run(*(consume, None, 1), reveal_type([1]))  # revealed: list[object]
+```
+
+Each tuple must supply arguments that match an overload after the method takes its tag. A trailing
+argument can fill a different parameter for each tuple length.
+
+```py
+from typing import overload
+
+@overload
+def pair(x: int, y: int = 0) -> None: ...
+@overload
+def pair(x: str, y: str) -> None: ...
+def pair(x, y=0) -> None: ...
+def check(
+    matching: tuple[None, int, int] | tuple[None, str, str],
+    mixed: tuple[None, int, int] | tuple[None, str, int],
+    varying: tuple[None] | tuple[None, int],
+):
+    Runner().run(pair, *matching)  # ok
+    Runner().run(pair, *mixed)  # error: 24 [invalid-argument-type]
+    Runner().run(pair, *varying)  # error: [missing-argument]
+    Runner().run(pair, *varying, 1)  # ok
+    Runner().run(pair, *varying, "bad")  # error: 34 [invalid-argument-type]
 ```
 
 ### Constructor overrides with receiver-inferred parameters
@@ -1397,6 +1512,47 @@ wrapped(1)
 wrapped(1, label="label", enabled=True)
 wrapped(1, enabled="yes")  # error: [invalid-argument-type]
 wrapped()  # error: [missing-argument]
+```
+
+### Assignability to a callable with a gradual tail
+
+If the target requires an initial `int`, the callback must accept it before `P`. The caller can
+specialize `P` to an empty parameter list.
+
+```py
+from typing import Callable, Concatenate, ParamSpec
+
+P = ParamSpec("P")
+
+def takes_int(callback: Callable[Concatenate[int, ...], None]) -> None: ...
+def check(
+    bare: Callable[P, None],
+    accepts_int: Callable[Concatenate[int, P], None],
+    accepts_str: Callable[Concatenate[str, P], None],
+) -> None:
+    takes_int(bare)  # error: [invalid-argument-type]
+    takes_int(accepts_int)  # ok
+    takes_int(accepts_str)  # error: [invalid-argument-type]
+```
+
+### Matching overloads by prefix length
+
+Only the second overload applies when the callback guarantees one positional parameter.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, overload
+
+P = ParamSpec("P")
+
+@overload
+def pick(f: Callable[Concatenate[str, str, P], None]) -> str: ...
+@overload
+def pick(f: Callable[Concatenate[str, P], None]) -> None: ...
+def pick(f):
+    raise NotImplementedError
+
+def check(callback: Callable[Concatenate[str, P], None]) -> None:
+    reveal_type(pick(callback))  # revealed: None
 ```
 
 ### Parameter lists inferred from consumers
@@ -1974,6 +2130,33 @@ class Factory(Generic[P]):
         raise NotImplementedError
 
 Factory.for_protocol(Protocol)  # ok
+```
+
+### Inferring lambda parameters through nested calls
+
+When the outer call leaves the callback's parameter list unspecified, the lambda parameter remains
+unknown.
+
+```py
+from typing import Callable, Concatenate, ParamSpec
+
+P = ParamSpec("P")
+
+def wrap(callback: Callable[P, object]) -> Callable[P, object]:
+    return callback
+
+def register(callback: Callable[P, object]) -> None: ...
+
+register(wrap(lambda x: chr(reveal_type(x))))  # revealed: Unknown
+```
+
+A fixed prefix still supplies types for the corresponding lambda parameters.
+
+```py
+def register_prefixed(callback: Callable[Concatenate[int, P], object]) -> None: ...
+
+# revealed: tuple[int, Unknown, Unknown]
+register_prefixed(wrap(lambda x, y, z: reveal_type((x, y, z))))
 ```
 
 ### A decorator's unsolved parameter list

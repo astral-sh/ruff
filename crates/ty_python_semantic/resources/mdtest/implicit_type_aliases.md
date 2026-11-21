@@ -1293,7 +1293,9 @@ An unreachable class binding gives the same result whether the argument or the e
 quoted.
 
 ```py
-Alias = list[int]
+from typing import Union
+
+Alias = Union[int, str]
 
 class C:
     if False:
@@ -2727,7 +2729,7 @@ def valid_tree() -> Tree:
     return (((1,),),)
 
 def invalid_tree() -> Tree:
-    return ((("leaf",),),)  # error: [invalid-return-type]
+    return ((("leaf",),),)  # error: [invalid-explicit-return]
 ```
 
 ### Displaying aliases with the same name
@@ -3077,10 +3079,10 @@ def valid_odd() -> Odd:
     return (("leaf",),)
 
 def invalid_even() -> Even:
-    return (("leaf",),)  # error: [invalid-return-type]
+    return (("leaf",),)  # error: [invalid-explicit-return]
 
 def invalid_odd() -> Odd:
-    return ((1,),)  # error: [invalid-return-type]
+    return ((1,),)  # error: [invalid-explicit-return]
 ```
 
 ### Mutually recursive aliases using `typing.Union`
@@ -3094,6 +3096,51 @@ State = Union[int, DictState, ListState]
 
 valid: State = {"children": [1]}
 invalid: State = [b"leaf"]  # error: [invalid-assignment]
+```
+
+The recursive reference can also occur inside another union.
+
+```py
+JsonDict = dict[str, Union[int, "JsonStruct"]]
+JsonList = list[Union[int, "JsonStruct"]]
+JsonStruct = Union[JsonDict, JsonList]
+
+valid_struct: JsonStruct = [{"key": 1}]
+invalid_struct: JsonStruct = {"key": b"leaf"}  # error: [invalid-assignment]
+```
+
+The outer alias can also include `None` via `Optional`.
+
+```py
+from typing import Optional
+
+Obj = dict[str, "Value"]
+Array = list["Value"]
+Value = Optional[Union[Obj, Array]]
+
+valid_optional: Value = [None, {"key": None}]
+invalid_optional: Value = [1]  # error: [invalid-assignment]
+```
+
+### A recursive union used in a generic base class
+
+Both the base class and the sequence refer forward to the same union, as in
+[Eclipse AAS Core Meta](https://github.com/eclipse-aascw/aas-core-meta/blob/feab6a1c7047e4b05f636c1fa16dfe5d3469b661/aas_core_meta/marker.py#L29).
+
+```py
+from typing import Mapping, Sequence, TypeVar, Union
+
+K = TypeVar("K", bound=str)
+
+class JSONObject(Mapping[K, "JSONValue"]): ...
+
+JSONArray = Sequence["JSONValue"]
+JSONValue = Union[None, bool, int, float, str, JSONArray, JSONObject[str]]
+
+def read(obj: JSONObject[str]) -> JSONValue:
+    return obj["key"]
+
+invalid: JSONValue = object()  # error: [invalid-assignment]
 ```
 
 ### Forward references in mutually recursive aliases
@@ -3146,10 +3193,10 @@ def valid() -> Outer:
     return (1, ("inner", (2, None), ("inner", None, None)))
 
 def invalid_outer() -> Outer:
-    return (1, ("inner", ("bad", None), None))  # error: [invalid-return-type]
+    return (1, ("inner", ("bad", None), None))  # error: [invalid-explicit-return]
 
 def invalid_inner() -> Outer:
-    return (1, ("inner", None, (2, None, None)))  # error: [invalid-return-type]
+    return (1, ("inner", None, (2, None, None)))  # error: [invalid-explicit-return]
 ```
 
 ### A recursive union with a self-recursive tuple member
@@ -3203,7 +3250,7 @@ def valid() -> A[int]:
     return [({"leaf": [({"leaf": 1},)]},)]
 
 def invalid() -> A[int]:
-    return [({"leaf": "bad"},)]  # error: [invalid-return-type]
+    return [({"leaf": "bad"},)]  # error: [invalid-explicit-return]
 ```
 
 ### Self-recursion within three mutually recursive generic aliases
@@ -3285,7 +3332,7 @@ def valid() -> Root:
     return (1, None, (None, (((2, None, None), None),)))
 
 def invalid() -> Root:
-    return (1, None, (None, ((("bad", None, None), None),)))  # error: [invalid-return-type]
+    return (1, None, (None, ((("bad", None, None), None),)))  # error: [invalid-explicit-return]
 ```
 
 ### Shared references with changing type arguments
@@ -3326,7 +3373,7 @@ def valid() -> Root[int]:
     return (1, None, (None, ((([2], None, None), None),)))
 
 def invalid() -> Root[int]:
-    return (1, None, (None, (((["bad"], None, None), None),)))  # error: [invalid-return-type]
+    return (1, None, (None, (((["bad"], None, None), None),)))  # error: [invalid-explicit-return]
 ```
 
 ### Generic recursion through different paths
@@ -3366,7 +3413,7 @@ def valid() -> Root[int]:
     return (1, (2, None), (3, ([4], None)))
 
 def invalid() -> Root[int]:
-    return (1, None, (2, ("bad", None)))  # error: [invalid-return-type]
+    return (1, None, (2, ("bad", None)))  # error: [invalid-explicit-return]
 ```
 
 ### Recursive callable parameters
@@ -3428,13 +3475,13 @@ def valid_first() -> First:
     return (((1,),),)
 
 def invalid_first() -> First:
-    return ((("leaf",),),)  # error: [invalid-return-type]
+    return ((("leaf",),),)  # error: [invalid-explicit-return]
 
 def valid_second() -> Second:
     return (((1,),),)
 
 def invalid_second() -> Second:
-    return ((("leaf",),),)  # error: [invalid-return-type]
+    return ((("leaf",),),)  # error: [invalid-explicit-return]
 ```
 
 ### Unguarded recursion through generic aliases
@@ -3497,7 +3544,7 @@ def valid() -> Tree[int]:
     return (((1,),),)
 
 def invalid() -> Tree[int]:
-    return ((("bad",),),)  # error: [invalid-return-type]
+    return ((("bad",),),)  # error: [invalid-explicit-return]
 ```
 
 Type arguments can themselves be recursive aliases; their display preserves each application.
@@ -3680,7 +3727,7 @@ def valid() -> Forwarded[int]:
     return (1, (2, None))
 
 def invalid() -> Forwarded[int]:
-    return (1, ("bad", None))  # error: [invalid-return-type]
+    return (1, ("bad", None))  # error: [invalid-explicit-return]
 ```
 
 ### Generic mutually recursive aliases
@@ -3699,10 +3746,10 @@ def valid() -> Even[int]:
     return [(1,)]
 
 def invalid_even() -> Even[int]:
-    return [("bad",)]  # error: [invalid-return-type]
+    return [("bad",)]  # error: [invalid-explicit-return]
 
 def invalid_odd() -> Odd[int]:
-    return ([("bad",)],)  # error: [invalid-return-type]
+    return ([("bad",)],)  # error: [invalid-explicit-return]
 ```
 
 ### Changing recursive type arguments
@@ -3720,7 +3767,7 @@ def valid() -> Growing[int]:
     return [[1]]
 
 def invalid() -> Growing[int]:
-    return [["bad"]]  # error: [invalid-return-type]
+    return [["bad"]]  # error: [invalid-explicit-return]
 
 def inspect(value: Growing[int]):
     if isinstance(value, list):
@@ -3811,7 +3858,7 @@ def valid() -> Tree[int]:
     return [[1]]
 
 def invalid() -> tree.Tree[int]:
-    return [["bad"]]  # error: [invalid-return-type]
+    return [["bad"]]  # error: [invalid-explicit-return]
 
 def inspect(value: Tree[int]):
     if isinstance(value, list):
@@ -3834,7 +3881,7 @@ def valid() -> Tree[int]:
     return (("T",),)
 
 def invalid() -> Tree[int]:
-    return (("bad",),)  # error: [invalid-return-type]
+    return (("bad",),)  # error: [invalid-explicit-return]
 ```
 
 ### Specialized aliases do not introduce type parameters

@@ -223,6 +223,24 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
     }
 }
 
+/// Whether the unspecialized MRO rules out `target` as a proper base of `source`.
+///
+/// Specialization changes the arguments of a base, not its class identity. If the
+/// MRO is invalid or incomplete, leave the decision to the full relation.
+fn excludes_ancestor<'db>(
+    db: &'db dyn Db,
+    source: super::StaticClassLiteral<'db>,
+    target: super::StaticClassLiteral<'db>,
+) -> bool {
+    source.try_mro_ancestors(db, None).is_ok_and(|bases| {
+        bases.iter().all(|base| match base {
+            ClassBase::Class(class) => class.class_literal(db) != ClassLiteral::Static(target),
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => false,
+            ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => true,
+        })
+    })
+}
+
 impl<'db> NominalInstanceType<'db> {
     fn from_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         Self(NominalInstanceInner::NonTuple(
@@ -249,6 +267,33 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Can neither instance be redundant with the other in a union, regardless of
+    /// their type arguments? Only ordinary instances are decided by class ancestry.
+    ///
+    /// For a pair of ordinary nominal instances, [`TypeRelationChecker::check_class_pair`]
+    /// requires the target class to appear in the source MRO before it compares type
+    /// arguments or tries alternate inheritance paths. This is not an assignability
+    /// check: an unknown base does not make an instance redundant in a union.
+    /// Object and exact tuples have dedicated rules and are excluded here.
+    pub(super) fn has_unrelated_class(self, db: &'db dyn Db, other: Self) -> bool {
+        let (NominalInstanceInner::NonTuple(left), NominalInstanceInner::NonTuple(right)) =
+            (self.0, other.0)
+        else {
+            return false;
+        };
+        let (Some(left), Some(right)) = (
+            left.class(db).class_literal(db).as_static(),
+            right.class(db).class_literal(db).as_static(),
+        ) else {
+            return false;
+        };
+        if left == right {
+            return false;
+        }
+
+        excludes_ancestor(db, left, right) && excludes_ancestor(db, right, left)
+    }
+
     /// Returns the class literal for this instance.
     pub(super) fn class_literal(
         &self,
@@ -267,6 +312,10 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::SysVersionInfo => Some(KnownClass::VersionInfo),
             NominalInstanceInner::Object => Some(KnownClass::Object),
         }
+    }
+
+    pub(super) const fn is_exact_tuple(self) -> bool {
+        matches!(self.0, NominalInstanceInner::ExactTuple(_))
     }
 
     pub(super) const fn is_sys_version_info(self) -> bool {
@@ -1383,6 +1432,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 NominalInstanceInner::ExactTuple(source_tuple),
                 NominalInstanceInner::ExactTuple(target_tuple),
             ) => self.check_tuple_type_pair(db, source_tuple, target_tuple),
+            (NominalInstanceInner::ExactTuple(tuple), NominalInstanceInner::NonTuple(class))
+                if let Some(target) = class.class(db).class_literal(db).as_static()
+                    && let Some(source) = KnownClass::Tuple.try_to_class_literal(
+                        db,
+                        &ProgramEnvironment::from_program(tuple.program(db)),
+                    )
+                    && source != target
+                    && excludes_ancestor(db, source, target) =>
+            {
+                self.never()
+            }
             _ => {
                 let env = self.env;
                 self.check_class_pair(db, source.class(db, env), target.class(db, env))

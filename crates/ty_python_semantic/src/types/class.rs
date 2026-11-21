@@ -25,7 +25,10 @@ use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
-use crate::place::{DefinedPlace, Provenance, TypeOrigin, place_from_declarations};
+use crate::place::{
+    ConsideredDefinitions, DefinedPlace, Provenance, RequiresExplicitReExport, TypeOrigin,
+    place_by_id, place_from_declarations,
+};
 use crate::reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
@@ -48,9 +51,9 @@ use crate::types::tuple::{Tuple, TupleLength, TupleSpec};
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceOrigin;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
-    TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassFlags, DataclassParams,
+    ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext,
+    TypeMapping, TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet,
@@ -212,7 +215,6 @@ impl<'db> CodeGeneratorKind<'db> {
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
         ) -> Option<CodeGeneratorKind<'db>> {
-            let env = ProgramEnvironment::from_scope(class.body_scope(db));
             // If a class is directly decorated as a dataclass, it's a dataclass.
             // If a class' metaclass is a dataclass transformer, it's a dataclass.
             // If a class inherits from a base class that is a dataclass
@@ -228,24 +230,7 @@ impl<'db> CodeGeneratorKind<'db> {
                     class,
                     info.params,
                 ))
-            } else if KnownClass::Type
-                .try_to_class_literal(db, &env)
-                .is_none_or(|type_class| {
-                    !class.is_subclass_of(
-                        db,
-                        None,
-                        ClassType::NonGeneric(ClassLiteral::Static(type_class)),
-                    )
-                })
-                && let Some(transformer_params) =
-                    class.iter_mro(db, None).skip(1).find_map(|base| {
-                        base.into_class().and_then(|class| {
-                            class
-                                .static_class_literal(db)
-                                .and_then(|(lit, _)| lit.dataclass_transformer_params(db))
-                        })
-                    })
-            {
+            } else if let Some(transformer_params) = class.dataclass_transformer_from_bases(db) {
                 Some(CodeGeneratorKind::from_dataclass_transformer(
                     db,
                     class,
@@ -353,6 +338,22 @@ impl<'db> CodeGeneratorKind<'db> {
         matches!(self, Self::Pydantic(_))
     }
 
+    /// Whether the class's frozen setting is enforced for ordinary attribute writes.
+    fn is_frozen(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: StaticClassLiteral<'db>,
+    ) -> bool {
+        match self {
+            Self::Pydantic(metadata) => {
+                metadata.is_frozen(db)
+                    && pydantic::uses_base_model_setattr(db, env, class) == Some(true)
+            }
+            _ => class.has_dataclass_param(db, self, DataclassFlags::FROZEN),
+        }
+    }
+
     /// Return `true` if field declarations should be treated as instance attributes.
     ///
     /// For example, a bare annotation in a dataclass body is seen as evidence for the
@@ -448,12 +449,13 @@ impl<'db> GenericAlias<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.origin(db),
-            self.specialization(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-        ))
+        let original = self.specialization(db);
+        let normalized = original.recursive_type_normalized_impl(db, env, div, nested)?;
+        if normalized == original {
+            Some(self)
+        } else {
+            Some(Self::new(db, self.origin(db), normalized))
+        }
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
@@ -470,7 +472,7 @@ impl<'db> GenericAlias<'db> {
         let tcx = if type_mapping.is_structural() {
             &[]
         } else {
-            tcx.declared_type()
+            tcx.expected_type()
                 .and_then(|ty| ty.specialization_of(db, visitor.env, self.origin(db)))
                 .map(|specialization| specialization.types(db))
                 .unwrap_or(&[])
@@ -561,7 +563,13 @@ impl<'db> GenericAlias<'db> {
     ) -> Result<Box<[ClassBase<'db>]>, Box<StaticMroError<'db>>> {
         let origin = self.origin(db);
         tracing::trace!("GenericAlias::try_mro_ancestors: {}", origin.name(db));
-        Mro::ancestors_of_static_class(db, origin, Some(self.specialization(db))).map_err(Box::new)
+        Mro::ancestors_of_static_class(
+            db,
+            origin,
+            Some(self.specialization(db)),
+            origin.explicit_bases(db),
+        )
+        .map_err(Box::new)
     }
 
     /// Compose each type argument's variance with its formal parameter's variance. Inferred
@@ -1871,11 +1879,7 @@ impl<'db> ClassType<'db> {
         else {
             return true;
         };
-        if types_are_disjoint(self_metaclass_instance, other_metaclass_instance) {
-            return false;
-        }
-
-        true
+        !types_are_disjoint(self_metaclass_instance, other_metaclass_instance)
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
@@ -2411,7 +2415,7 @@ impl<'db> ClassType<'db> {
         }
 
         let dunder_new_callables = lookup_type
-            .lookup_dunder_new(db, env, MemberLookupPolicy::default())
+            .lookup_dunder_new(db, env, MemberLookupPolicy::INHERIT_GENERIC_CONTEXT)
             .and_then(|place_and_quals| {
                 receiver
                     .resolve_dunder_new_callable(db, env, place_and_quals.place)
@@ -2871,7 +2875,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         }
     }
 
-    /// Finds the annotation governing a new class-body default, without inferring existing defaults.
+    /// Finds the type governing a new class-body default. A bare `ClassVar` gets its public type
+    /// from the base class's bindings.
     ///
     /// An unannotated binding retains its owner's inherited declaration. Resolving that owner
     /// before continuing the MRO prevents a later sibling base from supplying a different contract.
@@ -2897,9 +2902,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             };
             let use_def = use_def_map(db, scope);
             let declarations = use_def.end_of_scope_symbol_declarations(symbol);
-            let declared = place_from_declarations(db, &self.env, declarations.clone())
-                .ignore_conflicting_declarations();
-            let declaration = if declared.is_undefined() {
+            let declared = place_from_declarations(db, &self.env, declarations.clone());
+            let qualifier_only = declared.is_qualifier_only();
+            let declared = declared.ignore_conflicting_declarations();
+            let mut declaration = if declared.is_undefined() {
                 let mut bindings = use_def.end_of_scope_symbol_bindings(symbol);
                 let predicates = bindings.predicates();
                 let constraints = bindings.reachability_constraints();
@@ -2911,16 +2917,43 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }) {
                     continue;
                 }
-                inherited_class_body_declaration(db, scope, symbol)
+                inherited_class_body_declaration(db, scope, symbol)?
+            } else if declared.qualifiers.contains(TypeQualifiers::FINAL)
+                || !declarations.contains_only_annotated_assignments(db)
+            {
+                return None;
             } else {
-                (!declared.qualifiers.contains(TypeQualifiers::FINAL)
-                    && declarations.contains_only_annotated_assignments(db))
-                .then_some(ClassBodyDeclaration {
-                    member: declared,
+                ClassBodyDeclaration {
+                    member: if qualifier_only {
+                        Place::Undefined.with_qualifiers(declared.qualifiers)
+                    } else {
+                        declared
+                    },
                     class: base,
-                })
+                }
             };
-            return declaration.map(|declaration| ClassBodyDeclaration {
+            // The first class to bind a bare ClassVar supplies its type to subclasses.
+            // An uninitialized declaration or a stub placeholder supplies only the qualifier.
+            if declaration.member.is_class_var()
+                && !declaration.member.place.is_definitely_bound()
+                && let Place::Defined(binding) = place_by_id(
+                    db,
+                    scope,
+                    symbol.into(),
+                    RequiresExplicitReExport::No,
+                    ConsideredDefinitions::EndOfScope,
+                )
+                .place
+                && (!declaration.member.is_undefined() || !binding.ty.is_unknown())
+            {
+                declaration.member.place = Place::Defined(DefinedPlace {
+                    ty: binding.public_type(db, &self.env),
+                    public_type_policy: PublicTypePolicy::Raw,
+                    ..binding
+                });
+                declaration.class = base;
+            }
+            return Some(ClassBodyDeclaration {
                 member: declaration
                     .member
                     .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
@@ -3131,11 +3164,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     let member = class.own_instance_member(db, &self.env, name);
                     let definitely_declared = matches!(
                         member.inner.place,
-                        Place::Defined(DefinedPlace {
-                            origin: TypeOrigin::Declared,
-                            definedness: Definedness::AlwaysDefined,
-                            ..
-                        })
+                        Place::Defined(place) if place.is_definitely_defined()
+                            && (place.origin.is_declared() || member.qualifiers().contains(TypeQualifiers::FINAL))
                     );
                     if definitely_declared {
                         let overriding_class_default =

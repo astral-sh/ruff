@@ -11,6 +11,8 @@ use crate::registry::Rule;
 
 use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
 
+const PYTEST_WARNS: &[&str] = &["pytest", "warns"];
+
 /// ## What it does
 /// Checks for `pytest.warns` context managers with multiple statements.
 ///
@@ -123,8 +125,9 @@ impl Violation for PytestWarnsTooBroad {
 /// Checks for `pytest.warns` calls without an expected warning.
 ///
 /// ## Why is this bad?
-/// `pytest.warns` expects to receive an expected warning as its first
-/// argument. If omitted, the `pytest.warns` call will fail at runtime.
+/// When called without arguments, `pytest.warns` defaults to `Warning`, accepting any warning type.
+/// Specifying the expected warning type makes the test more precise and prevents unrelated warnings
+/// from causing it to pass unexpectedly.
 ///
 /// ## Example
 /// ```python
@@ -160,7 +163,7 @@ impl Violation for PytestWarnsWithoutWarning {
 }
 
 fn is_pytest_warns(qualified_name: &QualifiedName) -> bool {
-    matches!(qualified_name.segments(), ["pytest", "warns"])
+    qualified_name.segments() == PYTEST_WARNS
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
@@ -199,8 +202,7 @@ pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], 
     let warns_called = items.iter().any(|item| match &item.context_expr {
         Expr::Call(ast::ExprCall { func, .. }) => checker
             .semantic()
-            .resolve_qualified_name(func)
-            .is_some_and(|name| is_pytest_warns(&name)),
+            .matches_qualified_name(func, PYTEST_WARNS),
         _ => false,
     });
 

@@ -203,9 +203,7 @@ impl Serialize for RuleCode<'_> {
 impl<'a> RuleCode<'a> {
     fn from_diagnostic(code: &'a Diagnostic, config: &'a DisplayDiagnosticConfig) -> Self {
         match code.secondary_code() {
-            Some(diagnostic)
-                if !config.preview_enabled() || config.is_prefer_rule_codes_enabled() =>
-            {
+            Some(diagnostic) if !config.preview || config.prefer_rule_codes => {
                 Self::SecondaryCode(diagnostic)
             }
             _ => Self::LintId(code.id().as_str()),
@@ -388,29 +386,25 @@ impl<'a> SarifResult<'a> {
         resolver: &dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
     ) -> Self {
-        let (locations, fixes) = diagnostic
-            .primary_span()
-            .map(|span| {
-                let file = span.file();
-                let uri = Self::uri(file.path(resolver));
-                let source = file.diagnostic_source(resolver);
-                let source_code = source.as_source_code();
-                let region = span
-                    .range()
-                    .map(|range| Self::range_to_sarif_region(&source_code, range))
-                    .unwrap_or_default();
-                let fixes = Self::fix(diagnostic, &uri, &source_code)
-                    .into_iter()
-                    .collect();
-                let locations = vec![SarifLocation {
-                    physical_location: SarifPhysicalLocation {
-                        artifact_location: SarifArtifactLocation { uri },
-                        region,
-                    },
-                }];
-                (locations, fixes)
-            })
-            .unwrap_or_default();
+        let (locations, fixes) = diagnostic.primary_span().map_or_default(|span| {
+            let file = span.file();
+            let uri = Self::uri(file.path(resolver));
+            let source = file.diagnostic_source(resolver);
+            let source_code = source.as_source_code();
+            let region = span
+                .range()
+                .map_or_default(|range| Self::range_to_sarif_region(&source_code, range));
+            let fixes = Self::fix(diagnostic, &uri, &source_code)
+                .into_iter()
+                .collect();
+            let locations = vec![SarifLocation {
+                physical_location: SarifPhysicalLocation {
+                    artifact_location: SarifArtifactLocation { uri },
+                    region,
+                },
+            }];
+            (locations, fixes)
+        });
 
         Self {
             rule_id: RuleCode::from_diagnostic(diagnostic, config),
