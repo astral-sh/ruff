@@ -3067,7 +3067,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let shared_value = self.index.expression(value.as_ref());
+        let Some(shared_value) = self.index.try_expression(value.as_ref()) else {
+            // A literal assigned to a single subscript has no standalone expression.
+            debug_assert!(value.is_literal_expr() && targets.len() == 1);
+            self.infer_target(&targets[0], value, &|builder, tcx| {
+                builder.infer_expression(value, tcx)
+            });
+            return;
+        };
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             // The statement owns every binding created while evaluating its shared value,
@@ -3637,8 +3644,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
                 // of `OptionalList` as the binding context while inferring the RHS (`list[T] | None`), in
                 // order to bind `T` to `OptionalList`.
-                let previous_typevar_binding_context =
-                    self.typevar_binding_context.replace(definition);
+                let previous_typevar_binding_context = self.typevar_binding_context;
+                self.typevar_binding_context = target.is_name_expr().then_some(definition);
 
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
