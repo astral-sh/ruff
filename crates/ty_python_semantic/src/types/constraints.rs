@@ -654,6 +654,30 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             .is_always_satisfied(db, env, &mut storage, inferable, self.source_order)
     }
 
+    /// Checks a relation in a builder that will be discarded after the check.
+    ///
+    /// On an all-negative path, the only rule that can cause a conflict is a tautology.
+    /// Every other sequent needs a positive premise, and only positive bounds contribute
+    /// to candidate solutions. In a shared builder, discovering those sequents can still
+    /// intern constraints whose order matters to later bounded searches.
+    pub(super) fn is_always_satisfied_in_isolation(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        let mut storage = self.builder.storage.borrow_mut();
+        if !self.node.is_terminal()
+            && let Some(atoms) = self.node.all_negative_path_to_false(&storage)
+            && atoms
+                .iter()
+                .all(|&atom| !storage.atomic_constraint_data(atom).is_tautology(db))
+        {
+            return false;
+        }
+        self.node
+            .is_always_satisfied(db, env, &mut storage, TypeVarSet::None, self.source_order)
+    }
+
     /// Like [`Self::is_always_satisfied`], but returns `None` if the default solution budget is
     /// exhausted before the result is known.
     pub(super) fn is_always_satisfied_bounded(
@@ -6332,6 +6356,27 @@ class E: ...
 
         assert!(tautology.is_always_satisfied(db, &env, TypeVarSet::None));
         assert!(!tautology.is_trivially_always_satisfied());
+    }
+
+    #[test]
+    fn a_tautology_rules_out_an_all_negative_counterexample() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let [t, u, v] = ["T", "U", "V"].map(|name| create_typevar(db, name));
+
+        // T ≤ U or T ≤ V can be false, but T ≤ U or T ≤ T always holds.
+        for (right, always) in [(v, false), (t, true)] {
+            let builder = ConstraintSetBuilder::new();
+            let bound = |other| {
+                let range = TypeVarRangeBound::new(db, ConstraintProvenance::INFERRED, t, other);
+                let (node, order) = Constraint::Atomic(AtomicConstraint::TypeVarRange(range))
+                    .new_node(db, &env, &mut builder.storage.borrow_mut());
+                ConstraintSet::from_node(&builder, node, order)
+            };
+            let set = bound(u).or(db, &builder, || bound(right));
+            assert_eq!(set.is_always_satisfied_in_isolation(db, &env), always);
+        }
     }
 
     #[test]

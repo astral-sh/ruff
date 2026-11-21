@@ -583,7 +583,7 @@ impl<'db> Type<'db> {
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         self.when_constraint_set_assignable_to(db, env, target, &constraints)
-            .is_always_satisfied(db, env, TypeVarSet::None)
+            .is_always_satisfied_in_isolation(db, env)
     }
 
     /// Return true if this type is a subtype of `target` for every specialization of the type
@@ -610,7 +610,7 @@ impl<'db> Type<'db> {
                     TypeVarEvaluation::Lazy,
                     ConstraintProvenance::INFERRED,
                 )
-                .is_always_satisfied(db, &env, TypeVarSet::None)
+                .is_always_satisfied_in_isolation(db, &env)
         }
 
         is_constraint_set_subtype_of_impl(db, TypePair::new(db, env.program(db), self, target))
@@ -1124,7 +1124,7 @@ impl<'db> Type<'db> {
         }
 
         self.when_constraint_set_equivalent_to_owned(db, env, other)
-            .query(|_constraints, when| when.is_always_satisfied(db, env, TypeVarSet::None))
+            .query(|_constraints, when| when.is_always_satisfied_in_isolation(db, env))
     }
 
     fn when_equivalent_to_with_materialization_visitor<'c>(
