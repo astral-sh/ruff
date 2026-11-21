@@ -3274,6 +3274,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             })
         };
         let mut condensed_types = vec![];
+        let mut seen_literals = FxHashSet::default();
         let mut condensed_element_count = 0usize;
         let mut subclass_of_types = vec![];
         let mut numeric_tower_element_count = 0usize;
@@ -3284,7 +3285,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             } else if let Some(literals) = self.condensable_literals(element) {
                 condensed_element_count += 1;
                 for literal in literals {
-                    if !condensed_types.contains(&literal) {
+                    if seen_literals.insert(literal) {
                         condensed_types.push(literal);
                     }
                 }
