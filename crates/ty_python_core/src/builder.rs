@@ -5186,10 +5186,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.mark_unreachable();
                     }
 
-                    let pre_except_state = self.flow_snapshot();
-                    let num_handlers = handlers.len();
+                    let pre_except_state = (handlers.len() > 1).then(|| self.flow_snapshot());
 
                     for (i, except_handler) in handlers.iter().enumerate() {
+                        if i > 0
+                            && let Some(state) = &pre_except_state
+                        {
+                            self.flow_restore(state.clone());
+                        }
+
                         let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
                         let ast::ExceptHandlerExceptHandler {
                             name: symbol_name,
@@ -5228,13 +5233,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }
                         // Each `except` block is mutually exclusive with all other `except` blocks.
                         post_except_states.push(self.flow_snapshot());
-
-                        // It's unnecessary to do the `self.flow_restore()` call for the final except handler,
-                        // as we'll immediately call `self.flow_restore()` to a different state
-                        // as soon as this loop over the handlers terminates.
-                        if i < (num_handlers - 1) {
-                            self.flow_restore(pre_except_state.clone());
-                        }
                     }
 
                     // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
@@ -5248,7 +5246,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_merge(post_except_state);
                 }
 
-                let normal_pre_finally_state = self.flow_snapshot();
                 let (
                     terminal_finally_entry_snapshots,
                     has_escaping_exception,
@@ -5267,7 +5264,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // For more details, see:
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
-                if normal_pre_finally_state.is_always_unreachable()
+                if self.current_use_def_map().reachability
+                    == ScopedReachabilityConstraintId::ALWAYS_FALSE
                     && !terminal_finally_entry_snapshots.is_empty()
                 {
                     let mut snapshots = terminal_finally_entry_snapshots.into_iter();
@@ -5277,7 +5275,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.flow_merge(snapshot);
                     }
                     self.visit_body(finalbody);
-                    if !self.flow_snapshot().is_always_unreachable() {
+                    if self.current_use_def_map().reachability
+                        != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                    {
                         if !finalbody.is_empty() && has_escaping_exception {
                             self.record_exception_checkpoint();
                         }
@@ -5290,6 +5290,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if has_deferred_terminal_context_manager_exit
                         && let Some(snapshot) = terminal_snapshots.next()
                     {
+                        let normal_pre_finally_state = self.flow_snapshot();
                         let continuation = self.current_use_def_map().reachability;
                         self.current_reachability_constraints_mut()
                             .mark_used(continuation);
