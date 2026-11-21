@@ -51,7 +51,7 @@ use crate::predicate::{
     CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
     MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
     PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
-    SequencePatternPredicateKind, StarImportPlaceholderPredicate, StatementCall,
+    SequencePatternPredicateKind, StarImportContext, StarImportPlaceholderPredicate, StatementCall,
     SubjectElementPatternPredicate,
 };
 use crate::re_exports::exported_names;
@@ -4246,17 +4246,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // ```
                         //
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
+                        let import = StarImportContext::new(
+                            self.db,
+                            self.current_scope_id(),
+                            referenced_program_file,
+                        );
                         for export in exported_names(self.db, referenced_program_file) {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
-                            let star_import = StarImportPlaceholderPredicate::new(
-                                self.db,
-                                self.file,
-                                symbol_id,
-                                referenced_program_file,
+                            let star_import_predicate = self.add_predicate(
+                                StarImportPlaceholderPredicate { import, symbol_id }.into(),
                             );
-
-                            let star_import_predicate = self.add_predicate(star_import.into());
 
                             let scope = self.current_scope();
                             let associated_member_ids = self.place_tables[scope]
