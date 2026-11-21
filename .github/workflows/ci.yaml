@@ -1712,13 +1712,21 @@ jobs:
           retention-days: 1
 
   benchmarks-walltime-ty-run:
-    name: "benchmarks walltime ty (x86_64)"
+    name: "benchmarks walltime ty (x86_64, ${{ matrix.shard }})"
     runs-on: codspeed-macro-x64-ryzen-9950x-ubuntu-24-04
     needs: benchmarks-walltime-ty-build
     timeout-minutes: 20
     permissions:
       contents: read # required for actions/checkout
       id-token: write # required for OIDC authentication with CodSpeed
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: suite
+            arguments: -- --skip '^ty_walltime::numpy$'
+          - shard: numpy
+            arguments: --bench ty_walltime '^ty_walltime::numpy$'
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1750,7 +1758,7 @@ jobs:
           UV_LOCKED: 0
         with:
           mode: walltime
-          run: uv run --locked --only-dev cargo codspeed run -m walltime
+          run: uv run --locked --only-dev cargo codspeed run -m walltime ${{ matrix.arguments }}
 
   required-checks-passed:
     name: "all required checks passed"
