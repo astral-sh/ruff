@@ -1,7 +1,124 @@
-use anyhow::Result;
-use insta::assert_json_snapshot;
+use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
 
-use crate::TestServerBuilder;
+use anyhow::{Context, Result, bail};
+use insta::assert_json_snapshot;
+use lsp_types::{
+    Code, CodeActionKind, CodeActionResponse, Diagnostic, DocumentDiagnosticReport, Message,
+};
+use test_case::test_case;
+
+use crate::{TestServer, TestServerBuilder};
+
+fn diagnostic_items(server: &mut TestServer, document: &str) -> Result<Vec<Diagnostic>> {
+    let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+        server.document_diagnostic_request(document, None)
+    else {
+        bail!("Expected a full diagnostic report");
+    };
+    Ok(report.full_document_diagnostic_report.items)
+}
+
+#[test_case("app/TEST.py"; "original_uri")]
+#[test_case("app/test.py"; "lowercase_uri")]
+fn module_name_after_case_only_rename(document: &str) -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file("ruff.toml", r#"lint.select = ["N999"]"#)?
+        .with_file("app/__init__.py", "")?
+        .with_file("app/TEST.py", "# ruff: noqa: N999\n")?
+        .build();
+    let uppercase = server.file_path("app/TEST.py");
+    let lowercase = server.file_path("app/test.py");
+    if !lowercase.try_exists()? {
+        // The two spellings must refer to the same file.
+        return Ok(());
+    }
+
+    // The open buffer has no suppression.
+    server.open_text_document(document, "", 1);
+    let items = diagnostic_items(&mut server, document)?;
+    let [diagnostic] = items.as_slice() else {
+        bail!("Expected one N999 diagnostic, got {items:?}");
+    };
+    assert_eq!(diagnostic.code, Some(Code::String("N999".into())));
+    assert_eq!(
+        diagnostic.message,
+        Message::String("Invalid module name: 'TEST'".into())
+    );
+
+    fs::rename(uppercase, lowercase)?;
+    let items = diagnostic_items(&mut server, document)?;
+    assert!(
+        items.is_empty(),
+        "Unexpected diagnostics after rename: {items:?}"
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn module_name_uses_editor_spelling_for_symlink() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file("ruff.toml", r#"lint.select = ["N999"]"#)?
+        .with_file("app/__init__.py", "")?
+        .with_file("app/TEST.py", "")?
+        .build();
+    let alias = server.file_path("app/alias.py");
+    symlink("TEST.py", &alias)?;
+
+    server.open_text_document("app/alias.py", "", 1);
+    assert!(diagnostic_items(&mut server, "app/alias.py")?.is_empty());
+
+    let uppercase = server.file_path("app/ALIAS.py");
+    if uppercase.try_exists()? {
+        fs::rename(alias, uppercase)?;
+        assert!(diagnostic_items(&mut server, "app/alias.py")?.is_empty());
+    }
+    Ok(())
+}
+
+#[test]
+fn per_file_ignore_after_case_only_rename() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file("ruff.toml", r#"lint.per-file-ignores."test.py" = ["F401"]"#)?
+        .with_file("TEST.py", "")?
+        .build();
+    let lowercase = server.file_path("test.py");
+    if !lowercase.try_exists()? {
+        return Ok(());
+    }
+
+    server.open_text_document("TEST.py", "import os\n", 1);
+    let items = diagnostic_items(&mut server, "TEST.py")?;
+    let [diagnostic] = items.as_slice() else {
+        bail!("Expected one F401 diagnostic, got {items:?}");
+    };
+    assert_eq!(diagnostic.code, Some(Code::String("F401".into())));
+
+    fs::rename(server.file_path("TEST.py"), lowercase)?;
+    assert!(diagnostic_items(&mut server, "TEST.py")?.is_empty());
+
+    let actions = server
+        .code_action_request("TEST.py", vec![])
+        .context("Expected code actions")?;
+    let changes = actions
+        .into_iter()
+        .find_map(|action| match action {
+            CodeActionResponse::CodeAction(action)
+                if action.kind == Some(CodeActionKind::from("source.fixAll.ruff")) =>
+            {
+                action.edit?.changes
+            }
+            _ => None,
+        })
+        .context("Expected a fix-all workspace edit")?;
+    assert!(changes.is_empty(), "Unexpected fix-all edits: {changes:?}");
+    Ok(())
+}
 
 #[test]
 fn uses_human_readable_names_in_preview() -> Result<()> {

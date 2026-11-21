@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     DIAGNOSTIC_NAME, PositionEncoding, TextDocument,
     edit::{NotebookDocument, NotebookRange, ToRangeExt},
-    resolve::is_document_excluded_for_linting,
+    resolve::{case_preserved_name, is_document_excluded_for_linting},
     session::DocumentQuery,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic};
@@ -80,7 +80,7 @@ pub(crate) fn check(
     supports_related_information: bool,
 ) -> DiagnosticsMap {
     let settings = query.settings();
-    let document_path = query.virtual_file_path();
+    let mut document_path = query.virtual_file_path();
 
     // If the document is excluded, return an empty list of diagnostics.
     if is_document_excluded_for_linting(
@@ -93,7 +93,16 @@ pub(crate) fn check(
     }
 
     let result = match query.source_type_for_lint() {
-        SourceType::Python(source_type) => check_python(query, source_type),
+        SourceType::Python(source_type) => {
+            let file_path = query.file_path();
+            let package = file_path.as_deref().and_then(Path::parent).and_then(|dir| {
+                detect_package_root(dir, &settings.linter.namespace_packages).map(PackageRoot::root)
+            });
+            if let Some(name) = file_path.as_deref().and_then(case_preserved_name) {
+                document_path.to_mut().set_file_name(name);
+            }
+            check_python(query, &document_path, package, source_type)
+        }
         SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
             let Ok(document) = query.as_single_document() else {
                 return DiagnosticsMap::default();
@@ -166,28 +175,16 @@ pub(crate) fn check(
     diagnostics_map
 }
 
-fn check_python(
-    query: &DocumentQuery,
+fn check_python<'a>(
+    query: &'a DocumentQuery,
+    document_path: &Path,
+    package: Option<PackageRoot<'_>>,
     source_type: ruff_python_ast::PySourceType,
-) -> CheckResult<'_> {
+) -> CheckResult<'a> {
     let settings = query.settings();
-    let document_path = query.virtual_file_path();
     let source_kind = query.make_python_source_kind(source_type);
 
-    let file_path = query.file_path();
-    let package = if let Some(file_path) = &file_path {
-        detect_package_root(
-            file_path
-                .parent()
-                .expect("a path to a document should have a parent path"),
-            &settings.linter.namespace_packages,
-        )
-        .map(PackageRoot::root)
-    } else {
-        None
-    };
-
-    let target_version = settings.linter.resolve_target_version(&document_path);
+    let target_version = settings.linter.resolve_target_version(document_path);
 
     // Parse once.
     let parsed = parse_unchecked_source(&source_kind, source_type, target_version.parser_version());
@@ -214,7 +211,7 @@ fn check_python(
 
     // Generate checks.
     let diagnostics = check_path(
-        &document_path,
+        document_path,
         package,
         &locator,
         &stylist,
@@ -230,7 +227,7 @@ fn check_python(
     );
 
     let suppression_edits = generate_suppression_edits(
-        &document_path,
+        document_path,
         &diagnostics,
         &locator,
         indexer.comment_ranges(),
