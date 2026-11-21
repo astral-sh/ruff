@@ -267,6 +267,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::Sentinel(_)
                 | KnownInstanceType::Range { .. }
+                | KnownInstanceType::Regex(_)
                 | KnownInstanceType::FunctoolsPartial(_)
                 | KnownInstanceType::MethodWrapper(_)
                 | KnownInstanceType::FunctoolsPartialCall(_) => None,

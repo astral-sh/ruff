@@ -148,6 +148,9 @@ pub enum KnownClass {
     Template,
     // pathlib
     Path,
+    // re
+    RePattern,
+    ReMatch,
     // functools
     FunctoolsPartial,
     // unittest
@@ -227,6 +230,8 @@ impl KnownClass {
             | Self::NotImplementedType
             | Self::BuiltinFunctionType
             | Self::EllipsisType
+            | Self::RePattern
+            | Self::ReMatch
             | Self::Deque => true,
 
             Self::Sentinel => python_version >= PythonVersion::PY315,
@@ -355,6 +360,8 @@ impl KnownClass {
             | Self::MethodWrapperType
             | Self::CoroutineType
             | Self::BuiltinFunctionType
+            | Self::RePattern
+            | Self::ReMatch
             | Self::Template => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
@@ -566,6 +573,8 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
+            | KnownClass::RePattern
+            | KnownClass::ReMatch
             | KnownClass::FunctoolsPartial
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
@@ -690,6 +699,8 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
+            | KnownClass::RePattern
+            | KnownClass::ReMatch
             | KnownClass::FunctoolsPartial
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
@@ -813,6 +824,8 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
+            | KnownClass::RePattern
+            | KnownClass::ReMatch
             | KnownClass::FunctoolsPartial
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
@@ -946,6 +959,8 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
+            | Self::RePattern
+            | Self::ReMatch
             | Self::FunctoolsPartial
             | Self::Mapping
             | Self::MutableMapping
@@ -1070,6 +1085,8 @@ impl KnownClass {
             | KnownClass::NamedTupleLike
             | KnownClass::Template
             | KnownClass::Path
+            | KnownClass::RePattern
+            | KnownClass::ReMatch
             | KnownClass::FunctoolsPartial
             | KnownClass::ConstraintSet
             | KnownClass::ConstraintSetSolution
@@ -1210,6 +1227,8 @@ impl KnownClass {
             Self::ExtensionTypedDictFallback => "_TypedDict",
             Self::Template => "Template",
             Self::Path => "Path",
+            Self::RePattern => "Pattern",
+            Self::ReMatch => "Match",
             Self::FunctoolsPartial => "partial",
             Self::ProtocolMeta => "_ProtocolMeta",
             Self::UnittestTestCase => "TestCase",
@@ -1653,6 +1672,7 @@ impl KnownClass {
             | Self::TyExtensionsIterator => KnownModule::TyExtensionsInternal,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
+            Self::RePattern | Self::ReMatch => KnownModule::Re,
             Self::FunctoolsPartial => KnownModule::Functools,
             Self::UnittestTestCase => KnownModule::UnittestCase,
             Self::DjangoModel => KnownModule::DjangoDbModelsBase,
@@ -1780,6 +1800,8 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
+            | Self::RePattern
+            | Self::ReMatch
             | Self::FunctoolsPartial
             | Self::UnittestTestCase
             | Self::DjangoModel
@@ -1904,6 +1926,8 @@ impl KnownClass {
             "TypedDictFallback" => &[Self::TypedDictFallback],
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
+            "Pattern" => &[Self::RePattern],
+            "Match" => &[Self::ReMatch],
             "partial" => &[Self::FunctoolsPartial],
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             "_TypedDict" => &[Self::ExtensionTypedDictFallback],
@@ -2018,6 +2042,8 @@ impl KnownClass {
             | Self::AsyncGenerator
             | Self::Template
             | Self::Path
+            | Self::RePattern
+            | Self::ReMatch
             | Self::FunctoolsPartial
             | Self::UnittestTestCase
             | Self::DjangoModel
