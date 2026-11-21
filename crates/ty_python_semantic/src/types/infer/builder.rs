@@ -6969,6 +6969,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        // A nominal target other than `tuple` supplies no element types to a tuple
+        // literal. Drop it before the cache lookup so overloads expecting, for
+        // example, `list[str]` and `list[bytes]` can share the same inference.
+        let tcx = if expression.is_tuple_expr()
+            && let Some(Type::NominalInstance(expected)) = tcx.expected_type()
+            && !expected.is_exact_tuple()
+        {
+            tcx.with_expected_type(None)
+        } else {
+            tcx
+        };
+
         let Some(expression_cache) = &self.expression_cache else {
             return self.infer_expression_uncached(expression, tcx);
         };
