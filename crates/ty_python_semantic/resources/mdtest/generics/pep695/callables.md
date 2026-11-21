@@ -1286,7 +1286,8 @@ stage: Callable[[list[int]], int] = wrap_sum(sum)  # ok
 
 ## Inference from a bounded callable type variable
 
-The upper bound of a bounded type variable is used to infer the signature of a callable type:
+We use a type variable's upper bound to infer the callable signature, including when the variable is
+one member of a union.
 
 ```py
 from typing import Callable
@@ -1294,8 +1295,9 @@ from typing import Callable
 def apply[T](callback: Callable[[int], T]) -> T:
     return callback(1)
 
-def _[F: Callable[[int], str]](callback: F):
+def _[F: Callable[[int], str]](callback: F, either: F | Callable[[int], int]):
     reveal_type(apply(callback))  # revealed: str
+    reveal_type(apply(either))  # revealed: str | int
 ```
 
 If the upper bound is a class type, the signature of the class's `__call__` method is used:
