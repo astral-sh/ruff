@@ -2,10 +2,11 @@ use lsp_types::SemanticToken;
 use ruff_db::source::{line_index, source_text};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
+use salsa::Database as _;
 use ty_ide::{SemanticTokenModifier, SemanticTokenType, semantic_tokens};
 use ty_project::{ProjectDatabase, SemanticDb as _};
 
-use crate::document::{PositionEncoding, ToRangeExt};
+use crate::document::{PositionEncoding, ToRangeExt, text_range_to_lsp_range};
 
 /// Common logic for generating semantic tokens, either for full document or a specific range.
 /// If no range is provided, the entire file is processed.
@@ -27,12 +28,15 @@ pub(crate) fn generate_semantic_tokens(
     };
 
     for token in &*semantic_token_data {
-        let Some(lsp_range) = token
-            .range()
-            .to_lsp_range(db, file, encoding)
-            .map(|lsp_range| lsp_range.local_range())
-        else {
-            continue;
+        // Only notebooks need to translate file offsets to cell-relative positions.
+        let lsp_range = if source.as_notebook().is_some() {
+            let Some(range) = token.range().to_lsp_range(db, file, encoding) else {
+                continue;
+            };
+            range.local_range()
+        } else {
+            db.unwind_if_revision_cancelled();
+            text_range_to_lsp_range(token.range(), &source, &line_index, encoding)
         };
 
         if lsp_range.start.line == lsp_range.end.line {
