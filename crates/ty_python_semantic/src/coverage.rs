@@ -3,7 +3,7 @@
 //! This follows mypy's line-precision reports (`mypy --html-report`). Every expression, parameter,
 //! and import is classified by its inferred type, and each line takes the least precise
 //! classification of the nodes that start on it. Lines on which no node starts, such as blank lines,
-//! comments, and the continuation lines of a multi-line expression, are [`Empty`].
+//! comments, docstrings, and the continuation lines of a multi-line expression, are [`Empty`].
 //!
 //! [`Empty`]: LineCoverage::Empty
 
@@ -12,6 +12,7 @@ use std::fmt::Write as _;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceText, line_index, source_text};
+use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{self as ast};
 use ruff_source_file::LineIndex;
@@ -138,6 +139,8 @@ fn classify<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) 
 impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         match stmt {
+            // Docstrings carry no type information, so their lines stay empty.
+            stmt if is_docstring_stmt(stmt) => return,
             ast::Stmt::FunctionDef(function) => {
                 self.record(function.inferred_type(&self.model), function.name.range());
             }
@@ -385,7 +388,7 @@ mod tests {
             "#
         ), @r#"
           | 
-        P | """Docstring."""
+          | """Docstring."""
         D | import does_not_exist  # `does_not_exist`: Unknown
         P | from typing import Any
           | 
