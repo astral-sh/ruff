@@ -222,6 +222,31 @@ def _(
     reveal_type(bytes_last)  # revealed: LengthOne | Literal[b"ab"]
 ```
 
+## Unions of class objects and string literals
+
+```py
+from typing import Literal
+
+def _(dtype: type[float] | Literal["float", "double"]):
+    reveal_type(dtype)  # revealed: type[float] | Literal["float", "double"]
+    if isinstance(dtype, str):
+        reveal_type(dtype)  # revealed: Literal["float", "double"]
+```
+
+If the metaclass never returns, there is no class object to include in the union.
+
+```py
+from typing_extensions import Never
+
+def meta(*args: object) -> Never:
+    raise ValueError
+
+class C(metaclass=meta): ...
+
+def _(x: type[C] | Literal["a"]):
+    reveal_type(x)  # revealed: Literal["a"]
+```
+
 ## Do not erase `Unknown`
 
 ```py
