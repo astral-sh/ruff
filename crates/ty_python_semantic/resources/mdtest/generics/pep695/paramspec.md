@@ -684,7 +684,7 @@ reveal_type(with_empty())  # revealed: bytes
 reveal_type(with_empty(1))  # revealed: bytes
 ```
 
-A `ParamSpec` wrapper should preserve the combined callable's supported signatures.
+A `ParamSpec` wrapper preserves the combined callable's supported signatures.
 
 ```py
 def preserve[**P](callback: Callable[P, bytes]) -> Callable[P, bytes]:
@@ -692,11 +692,9 @@ def preserve[**P](callback: Callable[P, bytes]) -> Callable[P, bytes]:
 
 reveal_type(callback)  # revealed: ((int, /) -> bytes) & ((str, /) -> bytes)
 preserved = preserve(callback)
-# TODO: ((int, /) -> bytes) & ((str, /) -> bytes)
-reveal_type(preserved)  # revealed: (int, /) -> bytes
+reveal_type(preserved)  # revealed: ((int, /) -> bytes) & ((str, /) -> bytes)
 preserved(1)
-# TODO: no error
-preserved("text")  # error: [invalid-argument-type]
+preserved("text")
 ```
 
 A `Concatenate` prefix is required for every signature in the result.
