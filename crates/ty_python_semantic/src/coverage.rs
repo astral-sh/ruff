@@ -147,6 +147,12 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
             ast::Stmt::ClassDef(class) => {
                 self.record(class.inferred_type(&self.model), class.name.range());
             }
+            // The value of a `type` statement is a type expression, which we classify through the
+            // alias's name rather than expression by expression (see `visit_annotation`).
+            ast::Stmt::TypeAlias(type_alias) => {
+                self.visit_expr(&type_alias.name);
+                return;
+            }
             _ => {}
         }
 
@@ -156,6 +162,15 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
     fn visit_expr(&mut self, expr: &ast::Expr) {
         self.record(expr.inferred_type(&self.model), expr.range());
         source_order::walk_expr(self, expr);
+    }
+
+    /// Records the type that an annotation declares, without visiting the expressions inside it.
+    ///
+    /// Like mypy, we classify `def f(x: list[Any])` by the declared type `list[Any]`, which is
+    /// imprecise. Visiting the annotation's sub-expressions would classify the `Any` inside it as
+    /// dynamic, even though no value on the line has a dynamic type.
+    fn visit_annotation(&mut self, expr: &ast::Expr) {
+        self.record(expr.inferred_type(&self.model), expr.range());
     }
 
     fn visit_parameter(&mut self, parameter: &ast::Parameter) {
@@ -250,7 +265,7 @@ mod tests {
         P | def chunks() -> Iterable[bytes]:
         P |     return [b""]
           | 
-        D | type Json = dict[str, Any]  # `Json`: TypeAliasType, `dict[str, Any]`: dict[str, Any], `str, Any`: tuple[str, Any], `Any`: Any
+        I | type Json = dict[str, Any]  # `Json`: TypeAliasType
           | 
         I | def parse() -> Json:  # `Json`: Json
         I |     return {}  # `{}`: dict[str, Any]
@@ -283,7 +298,7 @@ mod tests {
         I | from aliases import Json  # `Json`: <class 'dict[str, Any]'>
         D | from does_not_exist import Missing  # `Missing`: Unknown
           | 
-        D | def send(message: dict[str, Any]) -> None:  # `message`: dict[str, Any], `dict[str, Any]`: dict[str, Any], `str, Any`: tuple[str, Any], `Any`: Any
+        I | def send(message: dict[str, Any]) -> None:  # `message`: dict[str, Any], `dict[str, Any]`: dict[str, Any]
           |     pass
           | 
         I | def load(raw: str) -> Json:  # `Json`: dict[str, Any]
@@ -314,7 +329,7 @@ mod tests {
           | 
         P | def request(
         P |     method: str,
-        D |     data: dict[str, Any] | None = None,  # `data`: dict[str, Any] | None, `dict[str, Any] | None`: dict[str, Any] | None, `dict[str, Any]`: dict[str, Any], `str, Any`: tuple[str, Any], `Any`: Any
+        I |     data: dict[str, Any] | None = None,  # `data`: dict[str, Any] | None, `dict[str, Any] | None`: dict[str, Any] | None
         I |     timeout=5.0,  # `timeout`: Unknown | float*
         I |     default=len("x"),  # `default`: Unknown | Literal[1]
         P | ) -> None:
@@ -350,14 +365,14 @@ mod tests {
         D | def handler(event: Any) -> int:  # `event`: Any, `Any`: Any
         P |     return 1
           | 
-        D | config: dict[str, Any] = {  # `config`: dict[str, Any], `dict[str, Any]`: dict[str, Any], `str, Any`: tuple[str, Any], `Any`: Any, `{`: dict[str, Any]
+        I | config: dict[str, Any] = {  # `config`: dict[str, Any], `dict[str, Any]`: dict[str, Any], `{`: dict[str, Any]
         P |     "retries": 3,
           | }
         P | pairs = [(1, 2), (3, 4)]
         P | squares = [n * n for n in range(3)]
         I | handlers = [handler]  # `handlers`: list[(event: Any) -> int], `[handler]`: list[(event: Any) -> int]
         I | bound = functools.partial(handler)  # `bound`: partial[(event: Any) -> int], `functools.partial(handler)`: partial[(event: Any) -> int]
-        D | callback: Callable[[Any], int] = handler  # `Callable[[Any], int]`: (Any, /) -> int, `[Any], int`: (Any, /) -> int, `[Any]`: (Any, /) -> int, `Any`: Any
+        I | callback: Callable[[Any], int] = handler  # `Callable[[Any], int]`: (Any, /) -> int
         P | result = callback(1)
         "#);
     }
@@ -398,7 +413,7 @@ mod tests {
         D | def unannotated(y):  # `y`: Unknown
         D |     return y  # `y`: Unknown
           | 
-        D | def explicit_any(z: Any) -> list[Any]:  # `z`: Any, `Any`: Any, `list[Any]`: list[Any], `Any`: Any
+        D | def explicit_any(z: Any) -> list[Any]:  # `z`: Any, `Any`: Any, `list[Any]`: list[Any]
         D |     return [z]  # `[z]`: list[Any], `z`: Any
           | 
         P | a = annotated(1)
