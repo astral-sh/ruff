@@ -1,5 +1,4 @@
 use crate::ProgramEnvironment;
-use char_str::CharStr;
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::source_text;
 use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, Keyword, name::Name};
@@ -15,7 +14,7 @@ use ty_python_core::{
 use crate::Db;
 use crate::diagnostic::format_enumeration;
 use crate::place::{DefinedPlace, Definedness, Place, Provenance, known_module_symbol};
-use crate::reachability::DeclarationsIteratorExtension;
+use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::call::Bindings;
 use crate::types::class::{CodeGeneratorKind, FieldKind};
 use crate::types::context::InferContext;
@@ -1028,11 +1027,12 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
 pub(in crate::types) fn constructor_parameter_type<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
+    validated_fields: &FxHashSet<Name>,
     field_name: &Name,
     field_type: Type<'db>,
     strict: bool,
 ) -> Type<'db> {
-    if has_before_or_plain_field_validator(db, class, field_name.clone()) {
+    if validated_fields.contains(field_name) || validated_fields.contains("*") {
         return Type::any();
     }
 
@@ -1047,18 +1047,24 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
     lax_input_type(db, &env, field_type)
 }
 
-/// Return whether `field_name` has a Pydantic field validator that receives the raw input.
+/// Return the names targeted by field validators that receive raw input, including `"*"`
+/// if a validator applies to every field.
 ///
 /// A before validator can transform arbitrary values before Pydantic validates them against the
 /// declared field type, while a plain validator bypasses that validation entirely. We therefore
 /// cannot derive a useful input type from the field annotation alone.
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
+///
+/// Keying the query by field names rather than field types lets specializations share the
+/// same scan. Keep only names in the model: an inherited validator can target fields that
+/// are absent from many of its subclasses.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(in crate::types) fn fields_with_raw_input_validators<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
-    field_name: Name,
-) -> bool {
-    let field_name = CharStr::from(field_name);
+    field_names: Box<[Name]>,
+) -> FxHashSet<Name> {
+    let mut remaining: FxHashSet<_> = field_names.into_iter().collect();
+    let mut fields = FxHashSet::default();
 
     // Pydantic inherits validators unless a subclass defines a symbol with the same method name.
     let mut shadowed_symbols = FxHashSet::default();
@@ -1079,71 +1085,86 @@ pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
             if !shadowed_symbols.insert(name) {
                 continue;
             }
-            if declarations.any_reachable(db, |declaration| {
-                declaration.is_defined_and(|definition| {
-                    function_has_before_or_plain_field_validator(
-                        db,
-                        definition,
-                        field_name.as_str(),
-                    )
-                })
-            }) {
-                return true;
+            let predicates = declarations.predicates();
+            let constraints = declarations.reachability_constraints();
+            for declaration in declarations {
+                let Some(definition) = declaration.declaration.definition() else {
+                    continue;
+                };
+                let targets = raw_input_validator_targets(db, definition, &remaining);
+                if !targets.is_empty()
+                    && !constraints
+                        .evaluate(db, predicates, declaration.reachability_constraint)
+                        .is_always_false()
+                {
+                    for target in targets {
+                        if target == "*" {
+                            return FxHashSet::from_iter([Name::new("*")]);
+                        }
+                        if let Some(name) = remaining.take(target) {
+                            fields.insert(name);
+                        }
+                    }
+                    if remaining.is_empty() {
+                        return fields;
+                    }
+                }
             }
         }
     }
 
-    false
+    fields
 }
 
-fn function_has_before_or_plain_field_validator<'db>(
+/// Collect targets of a method's `before` and `plain` validators that can still widen a field.
+fn raw_input_validator_targets<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    field_name: &str,
-) -> bool {
+    remaining: &FxHashSet<Name>,
+) -> Vec<&'db str> {
     let DefinitionKind::Function(function) = definition.kind(db) else {
-        return false;
+        return Vec::new();
     };
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let function_node = function.node(&module);
     if function_node.decorator_list.is_empty() {
-        return false;
+        return Vec::new();
     }
     let decorators = function_known_decorators(db, definition);
 
-    function_node.decorator_list.iter().any(|decorator| {
+    let mut fields = Vec::new();
+    for decorator in &function_node.decorator_list {
         let Some(call) = decorator.expression.as_call_expr() else {
-            return false;
+            continue;
         };
         let Some(Type::FunctionLiteral(function)) = decorators.expression_type(call.func.as_ref())
         else {
-            return false;
+            continue;
         };
         if !function.is_known(db, KnownFunction::PydanticFieldValidator) {
-            return false;
+            continue;
         }
 
         let Some(mode) = call.arguments.find_keyword("mode") else {
-            return false;
+            continue;
         };
         if decorators
             .expression_type(&mode.value)
             .and_then(Type::as_string_literal)
             .is_none_or(|mode| !matches!(mode.value(db), "before" | "plain"))
         {
-            return false;
+            continue;
         }
 
-        call.arguments.args.iter().any(|field| {
-            decorators
-                .expression_type(field)
-                .and_then(Type::as_string_literal)
-                .is_some_and(|field| {
-                    let field = field.value(db);
-                    field == "*" || field == field_name
-                })
-        })
-    })
+        fields.extend(call.arguments.args.iter().filter_map(|field| {
+            let name = decorators
+                .expression_type(field)?
+                .as_string_literal()?
+                .value(db);
+            (name == "*" || remaining.contains(name)).then_some(name)
+        }));
+    }
+    fields
 }
 
 /// Return the documented Python input type accepted by Pydantic for `field_type` in lax mode.

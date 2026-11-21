@@ -1957,7 +1957,18 @@ impl<'db> StaticClassLiteral<'db> {
                 pydantic::extend_settings_constructor_parameters(db, self, &mut parameters);
             }
 
-            for (field_name, field) in self.fields(db, specialization, field_policy) {
+            let fields = self.fields(db, specialization, field_policy);
+            let validated_fields = LazyCell::new(|| {
+                let names = fields
+                    .iter()
+                    .filter(|(_, field)| {
+                        matches!(field.kind, FieldKind::Pydantic { init: true, .. })
+                    })
+                    .map(|(name, _)| name.clone())
+                    .collect();
+                pydantic::fields_with_raw_input_validators(db, self, names)
+            });
+            for (field_name, field) in fields {
                 let (init, mut default_ty, kw_only, alias, converter, strict) = match &field.kind {
                     FieldKind::NamedTuple { default_ty } => (
                         true,
@@ -2069,7 +2080,12 @@ impl<'db> StaticClassLiteral<'db> {
                 {
                     let strict = metadata.field_is_strict(db, strict);
                     field_ty = pydantic::constructor_parameter_type(
-                        db, self, field_name, field_ty, strict,
+                        db,
+                        self,
+                        &validated_fields,
+                        field_name,
+                        field_ty,
+                        strict,
                     );
                 }
 

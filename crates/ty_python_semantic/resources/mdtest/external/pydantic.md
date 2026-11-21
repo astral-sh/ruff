@@ -543,6 +543,23 @@ class InheritedBeforeValidatedParent(BeforeValidatorBase):
 reveal_type(InheritedBeforeValidatedParent.__init__)
 ```
 
+A subclass can override a validator to target different fields. Only the new targets accept
+arbitrary input:
+
+```py
+class RetargetedValidator(InheritedBeforeValidatedParent):
+    left: Child
+    right: Child
+
+    @field_validator("left", "right", mode="before")
+    @classmethod
+    def coerce_child(cls, value: object) -> object:
+        return value
+
+# revealed: (self: RetargetedValidator, *, child: Child | Mapping[str, Any], left: Any, right: Any, **extra: Any) -> None
+reveal_type(RetargetedValidator.__init__)
+```
+
 A wildcard "before" validator applies to every field:
 
 ```py
