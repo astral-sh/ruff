@@ -6972,6 +6972,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_expression_uncached(expression, tcx);
         };
 
+        // Without a literal or type-form context, inferring a small integer only constructs
+        // its literal type. That's cheaper than caching a separate speculative inference.
+        if let ast::Expr::NumberLiteral(number) = expression
+            && let ast::Number::Int(value) = &number.value
+            && value.as_i64().is_some()
+            && matches!(tcx.expected_type(), None | Some(Type::NominalInstance(_)))
+        {
+            return self.infer_expression_uncached(expression, tcx);
+        }
+
         // See if we already have a cached entry for this expression.
         let expression_key = expression.into();
         let cache_entry = expression_cache.borrow().get(expression_key, tcx).cloned();
