@@ -185,6 +185,13 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
             ast::Stmt::ClassDef(class) => {
                 self.record(class.inferred_type(&self.model), class.name.range());
             }
+            // These statements have no expressions, but like mypy we count their lines as precise
+            // rather than empty.
+            ast::Stmt::Pass(_) | ast::Stmt::Break(_) | ast::Stmt::Continue(_) => {
+                if let Some(line) = self.line_mut(stmt.start()) {
+                    line.coverage = line.coverage.max(LineCoverage::Precise);
+                }
+            }
             // The value of a `type` statement is a type expression, which we classify through the
             // alias's name rather than expression by expression (see `visit_annotation`).
             ast::Stmt::TypeAlias(type_alias) => {
@@ -346,7 +353,7 @@ mod tests {
         D | from does_not_exist import Missing  # `Missing`: Unknown
           | 
         I | def send(message: dict[str, Any]) -> None:  # `message`: dict[str, Any], `dict[str, Any]`: dict[str, Any]
-          |     pass
+        P |     pass
           | 
         I | def load(raw: str) -> Json:  # `Json`: dict[str, Any]
         I |     return {}  # `{}`: dict[str, Any]
@@ -380,7 +387,7 @@ mod tests {
         P |     timeout=5.0,
         P |     default=len("x"),
           | ) -> None:
-          |     pass
+        P |     pass
         "#);
     }
 
