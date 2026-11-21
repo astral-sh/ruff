@@ -2561,6 +2561,76 @@ impl<'db> HasIdentity<'db> for InferSpecialization<'db> {
     }
 }
 
+/// Filter incompatible union members without adding constraints to the caller's specialization.
+#[expect(clippy::unnecessary_wraps, reason = "Salsa returns None during cycles")]
+fn filter_inference_unions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    generic_context: GenericContext<'db>,
+    formal: Type<'db>,
+    actual: Type<'db>,
+) -> (Type<'db>, Type<'db>) {
+    #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    fn cached_filter_inference_unions<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        generic_context: GenericContext<'db>,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> Option<(Type<'db>, Type<'db>)> {
+        let env = ProgramEnvironment::from_program(program);
+        Some(filter(db, &env, generic_context, formal, actual))
+    }
+
+    fn filter<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> (Type<'db>, Type<'db>) {
+        let inferable = generic_context.inferable_typevars(db);
+        // Remove the union elements from `actual` that are not related to `formal`, and vice
+        // versa.
+        //
+        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
+        // specialize `T` to `int`, and so ignore the `None`.
+        //
+        // Replace inferable variables with `Unknown` for this filter to avoid solving
+        // specialization constraints separately for each actual union member. Inference below
+        // uses the original formal type to determine the specialization and validate its bounds.
+        //
+        // If no elements survive, keep the original union: inferring from `Never` would discard
+        // its type variables and skip the bound checks that reject the argument.
+        let actual = if actual.resolve_type_alias(db).is_union() {
+            let formal =
+                formal.apply_specialization(db, generic_context.unknown_specialization(db, None));
+            actual
+                .discard_disjoint_union_elements(db, env, formal, inferable)
+                .unless_all_disjoint(actual)
+        } else {
+            actual
+        };
+        // Ignore inferable variables' bounds when deciding which formal members can match.
+        // `list[T]` must survive a comparison with `list[object]` even if `T: str`, so that
+        // inference can report the bound violation. It can still be discarded when the
+        // argument is `str | None`, since no specialization of `list[T]` can match it.
+        let disjoint_constraints = ConstraintSetBuilder::new();
+        let formal = formal.filter_union(db, env, |element| {
+            !element
+                .apply_specialization(db, generic_context.unknown_specialization(db, None))
+                .when_disjoint_from(db, env, actual, &disjoint_constraints, inferable)
+                .is_always_satisfied(db, env, inferable)
+        });
+
+        (formal, actual)
+    }
+
+    // Recompute against the current provisional types while resolving a cycle.
+    cached_filter_inference_unions(db, env.program(db), generic_context, formal, actual)
+        .unwrap_or_else(|| filter(db, env, generic_context, formal, actual))
+}
+
 /// Performs type inference between parameter annotations and argument types, producing a
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db, 'c> {
@@ -4218,7 +4288,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // `Any <= T | None` is unconditional and would lose the mapping `T = Any`.
         // Recursive aliases retain their unfolding path, which collects leaf evidence for
         // variables in types such as `Tree[T] = T | tuple[Tree[T]]`.
-        if formal.resolve_type_alias(db).is_union()
+        let formal_is_union = formal.resolve_type_alias(db).is_union();
+        if formal_is_union
             && !has_variadic
             && !any_over_type_expanding_aliases(db, self.env, formal, |nested| {
                 matches!(nested, Type::Recursive(_))
@@ -4229,38 +4300,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return self.infer_from_constraint_set(when);
         }
 
-        // Remove the union elements from `actual` that are not related to `formal`, and vice
-        // versa.
-        //
-        // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
-        // specialize `T` to `int`, and so ignore the `None`.
-        //
-        // Replace inferable variables with `Unknown` for this filter to avoid solving
-        // specialization constraints separately for each actual union member. Inference below
-        // uses the original formal type to determine the specialization and validate its bounds.
-        //
-        // If no elements survive, keep the original union: inferring from `Never` would discard
-        // its type variables and skip the bound checks that reject the argument.
-        let actual = if actual.resolve_type_alias(db).is_union() {
-            let formal = formal
-                .apply_specialization(db, self.generic_context.unknown_specialization(db, None));
-            actual
-                .discard_disjoint_union_elements(db, self.env, formal, self.inferable)
-                .unless_all_disjoint(actual)
+        let (formal, actual) = if formal_is_union || actual.resolve_type_alias(db).is_union() {
+            filter_inference_unions(db, self.env, self.generic_context, formal, actual)
         } else {
-            actual
+            (formal, actual)
         };
-        // Ignore inferable variables' bounds when deciding which formal members can match.
-        // `list[T]` must survive a comparison with `list[object]` even if `T: str`, so that
-        // inference can report the bound violation. It can still be discarded when the
-        // argument is `str | None`, since no specialization of `list[T]` can match it.
-        let disjoint_constraints = ConstraintSetBuilder::new();
-        let formal = formal.filter_union(db, self.env, |element| {
-            !element
-                .apply_specialization(db, self.generic_context.unknown_specialization(db, None))
-                .when_disjoint_from(db, self.env, actual, &disjoint_constraints, self.inferable)
-                .is_always_satisfied(db, self.env, self.inferable)
-        });
 
         // Parameter-list inference extracts the actual signature's shape, including a
         // Concatenate tail. Argument validation separately checks the enclosing variance.
