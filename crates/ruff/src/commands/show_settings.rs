@@ -4,19 +4,19 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 use itertools::Itertools;
 
-use ruff_workspace::resolver::{ResolvedFile, RootSettings, project_files_in_path};
+use ruff_workspace::resolver::{ResolvedFile, RootProject, project_files_in_path};
 
 use crate::args::ConfigArguments;
 
 /// Print the user-facing configuration settings.
 pub(crate) fn show_settings(
     files: &[PathBuf],
-    root_settings: &RootSettings,
+    root_project: &RootProject,
     config_arguments: &ConfigArguments,
     writer: &mut impl Write,
 ) -> Result<()> {
     // Collect all files in the hierarchy.
-    let (paths, resolver) = project_files_in_path(files, root_settings, config_arguments)?;
+    let (paths, resolver) = project_files_in_path(files, root_project, config_arguments)?;
 
     // Print the list of files.
     let Some(path) = paths

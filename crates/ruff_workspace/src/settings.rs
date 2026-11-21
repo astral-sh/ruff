@@ -46,7 +46,12 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        let project_root = path_dedot::CWD.as_path();
+        Self::new(path_dedot::CWD.as_path())
+    }
+}
+
+impl Settings {
+    pub(crate) fn new(project_root: &Path) -> Self {
         Self {
             preview: PreviewMode::Disabled,
             cache_dir: cache_dir(project_root),

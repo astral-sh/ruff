@@ -778,7 +778,8 @@ impl LinterSettings {
         }
     }
 
-    pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
+    #[cfg(test)]
+    pub(crate) fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: RuleTable::from_iter(rules),
             unresolved_target_version: PythonVersion::latest().into(),
