@@ -51,8 +51,8 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownBoundMethodType,
     KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
-    NegativeIntersectionElements, StringLiteralType, SubclassOfType, Type, TypePair,
-    TypeVarBoundOrConstraints, UnionType,
+    NegativeIntersectionElements, StringLiteralType, SubclassOfInner, SubclassOfType, Type,
+    TypePair, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use itertools::Itertools;
@@ -906,8 +906,20 @@ impl<'db> UnionBuilder<'db> {
                                     if can_compare_with_literals(*existing) =>
                                 {
                                     // Neither a string literal nor its complement is a subtype of
-                                    // `type[C]`. The reverse check still matters when the callable
-                                    // used as C's metaclass returns `Never`.
+                                    // `type[C]`. The reverse check compares C's metaclass instance
+                                    // to the literal. A nominal instance cannot be a subtype of
+                                    // a string literal, but a callable metaclass can return `Never`.
+                                    if let Type::SubclassOf(subclass) = existing
+                                        && matches!(
+                                            subclass.subclass_of(),
+                                            SubclassOfInner::Class(_)
+                                        )
+                                        && subclass
+                                            .try_metaclass_instance(db, &self.env)
+                                            .is_some_and(Type::is_nominal_instance)
+                                    {
+                                        continue;
+                                    }
                                     let is_subclass_of = existing.is_subclass_of();
 
                                     // e.g. `existing` could be `Literal[""] & Any`,
