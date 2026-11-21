@@ -205,7 +205,23 @@ impl SourceOrderVisitor<'_> for CoverageVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: &ast::Expr) {
-        self.record(expr.inferred_type(&self.model), expr.range());
+        // Like mypy, we classify the elements of a container literal or comprehension, but not the
+        // container itself. Its type often comes from the type it's checked against, as in
+        // `x: dict[str, Any] = {"a": 1}`, where the imprecision is already reported on the
+        // declaration, and would otherwise be reported again on the line where the literal starts.
+        if !matches!(
+            expr,
+            ast::Expr::List(_)
+                | ast::Expr::Tuple(_)
+                | ast::Expr::Dict(_)
+                | ast::Expr::Set(_)
+                | ast::Expr::ListComp(_)
+                | ast::Expr::SetComp(_)
+                | ast::Expr::DictComp(_)
+                | ast::Expr::Generator(_)
+        ) {
+            self.record(expr.inferred_type(&self.model), expr.range());
+        }
         source_order::walk_expr(self, expr);
     }
 
@@ -322,7 +338,7 @@ mod tests {
         I | type Json = dict[str, Any]  # `Json`: TypeAliasType
           | 
         I | def parse() -> Json:  # `Json`: Json
-        I |     return {}  # `{}`: dict[str, Any]
+          |     return {}
           | 
         I | data = parse()  # `data`: Json, `parse()`: Json
         "#);
@@ -356,7 +372,7 @@ mod tests {
         P |     pass
           | 
         I | def load(raw: str) -> Json:  # `Json`: dict[str, Any]
-        I |     return {}  # `{}`: dict[str, Any]
+          |     return {}
           | 
         P | def first(values: list[int]) -> list[int]:
         I |     return values[1:]  # `1:`: slice[Literal[1], None, None]
@@ -419,12 +435,12 @@ mod tests {
         D | def handler(event: Any) -> int:  # `event`: Any, `Any`: Any
         P |     return 1
           | 
-        I | config: dict[str, Any] = {  # `config`: dict[str, Any], `dict[str, Any]`: dict[str, Any], `{`: dict[str, Any]
+        I | config: dict[str, Any] = {  # `config`: dict[str, Any], `dict[str, Any]`: dict[str, Any]
         P |     "retries": 3,
           | }
         P | pairs = [(1, 2), (3, 4)]
         P | squares = [n * n for n in range(3)]
-        I | handlers = [handler]  # `handlers`: list[(event: Any) -> int], `[handler]`: list[(event: Any) -> int]
+        I | handlers = [handler]  # `handlers`: list[(event: Any) -> int]
         I | bound = functools.partial(handler)  # `bound`: partial[(event: Any) -> int], `functools.partial(handler)`: partial[(event: Any) -> int]
         I | callback: Callable[[Any], int] = handler  # `Callable[[Any], int]`: (Any, /) -> int
         P | result = callback(1)
@@ -468,7 +484,7 @@ mod tests {
         D |     return y  # `y`: Unknown
           | 
         D | def explicit_any(z: Any) -> list[Any]:  # `z`: Any, `Any`: Any, `list[Any]`: list[Any]
-        D |     return [z]  # `[z]`: list[Any], `z`: Any
+        D |     return [z]  # `z`: Any
           | 
         P | a = annotated(1)
         D | b = unannotated(1)  # `b`: Unknown, `unannotated(1)`: Unknown
