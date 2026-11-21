@@ -18,7 +18,7 @@ use ruff_python_ast::{self as ast};
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::types::visitor::any_over_type_through_aliases;
+use crate::types::visitor::any_over_type_outside_signatures;
 use crate::types::{ProgramEnvironment, Type};
 use crate::{Db, HasType, SemanticModel};
 
@@ -150,7 +150,19 @@ fn classify<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) 
         return LineCoverage::Dynamic;
     }
 
-    if any_over_type_through_aliases(db, env, ty, |ty| ty.is_dynamic()) {
+    // Like mypy, we don't consider a reference to a class imprecise because its constructor's
+    // signature mentions a dynamic type. (The search below skips the signatures of functions and
+    // other callables for the same reason.)
+    if matches!(ty, Type::ClassLiteral(_)) {
+        return LineCoverage::Precise;
+    }
+
+    // Like mypy, we don't consider a callable imprecise because its signature mentions a dynamic
+    // type, wherever the callable appears: in `f(x)`, where `f` is `def f(a, b: int)`, the
+    // imprecision is reported on the line that defines `a`, and on any line that uses the
+    // `Unknown` return type of `f(x)`, but not on every line that mentions `f` or stores it in a
+    // list or a `functools.partial`.
+    if any_over_type_outside_signatures(db, env, ty, |ty| ty.is_dynamic()) {
         LineCoverage::Imprecise
     } else {
         LineCoverage::Precise
@@ -440,9 +452,9 @@ mod tests {
           | }
         P | pairs = [(1, 2), (3, 4)]
         P | squares = [n * n for n in range(3)]
-        I | handlers = [handler]  # `handlers`: list[(event: Any) -> int]
-        I | bound = functools.partial(handler)  # `bound`: partial[(event: Any) -> int], `functools.partial(handler)`: partial[(event: Any) -> int]
-        I | callback: Callable[[Any], int] = handler  # `Callable[[Any], int]`: (Any, /) -> int
+        P | handlers = [handler]
+        P | bound = functools.partial(handler)
+        P | callback: Callable[[Any], int] = handler
         P | result = callback(1)
         "#);
     }
