@@ -1,5 +1,6 @@
 use ruff_python_ast as ast;
 
+use super::function::CheckedFunction;
 use crate::DisplaySettings;
 use crate::types::Type;
 use crate::types::context::InferContext;
@@ -13,9 +14,13 @@ use crate::types::diagnostic::{
 pub(crate) fn check_type_guard_definition<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
+    checked_function: Option<CheckedFunction<'db>>,
     node: &ast::StmtFunctionDef,
 ) {
     let Type::FunctionLiteral(function) = ty else {
+        return;
+    };
+    let Some(returns_expr) = node.returns.as_deref() else {
         return;
     };
 
@@ -23,6 +28,17 @@ pub(crate) fn check_type_guard_definition<'db>(
     let env = context.program_environment();
 
     let overload = function.literal(db).last_definition;
+    // A decorator may have replaced the function, and cycle recovery can replace
+    // an annotated guard with `Unknown` in the cached signature. In either case,
+    // check the definition's signature directly. Wrapping an async return in a
+    // coroutine can hide a type guard, but it cannot produce one.
+    if let Some(checked) = checked_function
+        && checked.overload == overload
+        && !checked.return_ty.is_unknown()
+        && !matches!(checked.return_ty, Type::TypeIs(_) | Type::TypeGuard(_))
+    {
+        return;
+    }
     let signature = overload.signature(db);
     let return_ty = signature.return_ty;
 
@@ -31,11 +47,6 @@ pub(crate) fn check_type_guard_definition<'db>(
         Type::TypeIs(type_is) => ("TypeIs", Some(type_is.return_type(db))),
         Type::TypeGuard(_) => ("TypeGuard", None),
         _ => return,
-    };
-
-    // The return type annotation must exist since we matched `TypeIs`/`TypeGuard`.
-    let Some(returns_expr) = node.returns.as_deref() else {
-        return;
     };
 
     // Check if this is a non-static method (first parameter is implicit `self`/`cls`).
