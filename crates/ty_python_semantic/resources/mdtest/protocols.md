@@ -8436,6 +8436,31 @@ def valid(value: Chain[Iterable[int]]) -> None:
     reveal_type(value.flatten())  # revealed: Chain[int]
 ```
 
+### Generic alias for a protocol method's receiver
+
+Comparing two specializations of `P` requires binding `f`. Inferring the variance of the receiver's
+type parameters leads back to `P`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type Alias[T, U] = P[T, U]
+
+class P[T, U](Protocol):
+    def f(self: Alias[T, U]) -> T | U: ...
+
+def widen(p: Alias[int, str]) -> Alias[object, object]:
+    return p  # ok
+
+def narrow(p: Alias[object, object]) -> Alias[int, str]:
+    return p  # error: [invalid-explicit-return]
+```
+
 ### Structurally equivalent recursive protocol specializations as receivers
 
 Comparing the `child` return types of `Node[str]` and `Node[int]` leads back to the same comparison.
