@@ -4003,7 +4003,17 @@ impl<'db> Type<'db> {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
-            Type::Union(union) if nested => union.normalize_nested_union(db, env.program(db), div),
+            // Repeatedly branching into type arguments can revisit the same union
+            // exponentially often. Avoid retaining a memo for every intermediate
+            // union in a recursive alias such as `tuple[T, "A[T] | None"]`.
+            Type::Union(union)
+                if nested
+                    && union.elements(db).iter().filter(|ty| {
+                        matches!(ty, Type::NominalInstance(instance) if instance.is_definition_generic(db))
+                    }).nth(1).is_some() =>
+            {
+                union.normalize_nested_union(db, env.program(db), div)
+            }
             Type::Union(union) => union.recursive_type_normalized_impl(db, env, div, nested),
             Type::Intersection(intersection) => intersection
                 .recursive_type_normalized_impl(db, env, div, nested)
