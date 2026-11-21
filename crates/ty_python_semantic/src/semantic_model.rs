@@ -21,7 +21,7 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{builtins_module_scope, implicit_builtins_symbol_scope};
 use crate::place_load::{PlaceLoadMode, PlaceLoadResolver};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
-use crate::types::list_members::{all_members, all_reachable_members};
+use crate::types::list_members::{all_members, reachable_members};
 use crate::types::{
     CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
     infer_complete_scope_types, infer_definition_types, inferred_declaration,
@@ -131,11 +131,11 @@ impl<'db> SemanticModel<'db> {
     /// Returns a map from symbol name to that symbol's
     /// type and definition site (if available).
     ///
-    /// The symbols are the symbols in scope at the given
-    /// AST node.
+    /// When `names` is provided, resolve only those names in the visible scopes.
     pub(crate) fn members_in_scope_at(
         &self,
         node: ast::AnyNodeRef<'_>,
+        names: Option<&[&str]>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
         let db = self.db;
         let mut members = FxHashMap::default();
@@ -151,7 +151,7 @@ impl<'db> SemanticModel<'db> {
             .rev()
         {
             for memberdef in
-                all_reachable_members(db, file_scope.to_scope_id(self.db, program_file))
+                reachable_members(db, file_scope.to_scope_id(self.db, program_file), names)
             {
                 members.insert(
                     memberdef.member.name,
@@ -329,7 +329,7 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
-                all_reachable_members(db, file_scope.to_scope_id(self.db, program_file)).map(
+                reachable_members(db, file_scope.to_scope_id(self.db, program_file), None).map(
                     |memberdef| Completion {
                         name: CompactString::new(memberdef.member.name),
                         ty: Some(memberdef.member.ty),
