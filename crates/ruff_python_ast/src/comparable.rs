@@ -196,26 +196,32 @@ fn match_sequence_fields(node: &ast::PatternMatchSequence) -> ComparablePatternS
     ComparableSlice::new(patterns)
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct MatchMappingFields<'a> {
-    keys: ComparableExprSlice<'a>,
-    patterns: ComparablePatternSlice<'a>,
-    rest: Option<&'a str>,
+type ComparableMappingPatternItem<'a> =
+    ast::MappingPatternItem<ComparableExpr<'a>, ComparablePattern<'a>, &'a str>;
+
+impl<'a> From<&'a ast::MappingPatternItem> for ComparableMappingPatternItem<'a> {
+    fn from(item: &'a ast::MappingPatternItem) -> Self {
+        match item {
+            ast::MappingPatternItem::Entry { key, pattern } => ast::MappingPatternItem::Entry {
+                key: key.into(),
+                pattern: pattern.into(),
+            },
+            ast::MappingPatternItem::Rest(identifier) => {
+                ast::MappingPatternItem::Rest(identifier.as_str())
+            }
+        }
+    }
 }
 
-fn match_mapping_fields(node: &ast::PatternMatchMapping) -> MatchMappingFields<'_> {
+fn match_mapping_fields(
+    node: &ast::PatternMatchMapping,
+) -> ComparableSlice<'_, ast::MappingPatternItem, ComparableMappingPatternItem<'_>> {
     let ast::PatternMatchMapping {
-        keys,
-        patterns,
-        rest,
+        items,
         range: _,
         node_index: _,
     } = node;
-    MatchMappingFields {
-        keys: ComparableSlice::new(keys),
-        patterns: ComparableSlice::new(patterns),
-        rest: rest.as_deref(),
-    }
+    ComparableSlice::new(items)
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]

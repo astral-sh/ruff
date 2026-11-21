@@ -2494,18 +2494,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
         // Step 1: Binding
-        if let Pattern::MatchAs(ast::PatternMatchAs {
-            name: Some(name), ..
-        })
-        | Pattern::MatchStar(ast::PatternMatchStar {
-            name: Some(name),
-            range: _,
-            node_index: _,
-        })
-        | Pattern::MatchMapping(ast::PatternMatchMapping {
-            rest: Some(name), ..
-        }) = pattern
-        {
+        let name = pattern.capture_name();
+        if let Some(name) = name {
             self.add_binding(
                 name,
                 name.range(),
@@ -2518,7 +2508,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
         walk_pattern(self, pattern);
 
         // Step 4: Analysis
-        analyze::pattern(pattern, self);
+        if let Some(name) = name {
+            analyze::pattern_name(name, self);
+        }
     }
 
     fn visit_body(&mut self, body: &'a [Stmt]) {

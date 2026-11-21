@@ -591,11 +591,7 @@ fields = [{ name = "patterns", type = "Pattern*" }]
 
 [Pattern.nodes.PatternMatchMapping]
 doc = "See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)"
-fields = [
-  { name = "keys", type = "ThinVec<Expr>" },
-  { name = "patterns", type = "ThinVec<Pattern>" },
-  { name = "rest", type = "Identifier?" },
-]
+fields = [{ name = "items", type = "MappingPatternItems" }]
 custom_source_order = true
 
 [Pattern.nodes.PatternMatchClass]
