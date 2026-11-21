@@ -763,7 +763,7 @@ in the loop, whose base in turn depends on that reachability.
 ```py
 value = 0
 while value:
-    value = type("C", (value,), {})
+    value = type("value", (value,), {})
 ```
 
 ### `types.new_class`
@@ -773,7 +773,7 @@ from types import new_class
 
 value = 0
 while value:
-    value = new_class("C", (value,))
+    value = new_class("value", (value,))
 ```
 
 ## Generic call constraining a list initializer
