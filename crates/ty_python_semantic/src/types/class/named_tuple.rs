@@ -18,7 +18,7 @@ use crate::{
         infer::InferenceFlags,
         member::Member,
         mro::Mro,
-        tuple::{FixedLengthTuple, TupleSpec, TupleType},
+        tuple::{FixedLengthTuple, TupleSpec, TupleSpecBuilder, TupleType},
     },
 };
 use ty_python_core::{definition::Definition, scope::ScopeId};
@@ -144,6 +144,60 @@ pub struct NamedTupleField<'db> {
     pub(crate) default: Option<Type<'db>>,
     /// The field's first declaration for a class based named tuple.
     pub(crate) definition: Option<Definition<'db>>,
+}
+
+/// A field or a variable-length sequence of fields in a functional named tuple.
+#[derive(Debug, get_size2::GetSize, Clone, PartialEq, Eq, Hash, salsa::SalsaValue)]
+pub enum FunctionalNamedTupleField<'db> {
+    Named(NamedTupleField<'db>),
+    /// One position whose name is unknown.
+    Unnamed(Type<'db>),
+    /// Zero or more positions with the given element type.
+    Variadic(Type<'db>),
+}
+
+impl<'db> FunctionalNamedTupleField<'db> {
+    pub(in crate::types) fn required(name: Option<&str>, ty: Type<'db>) -> Self {
+        match name {
+            Some(name) => Self::Named(NamedTupleField {
+                name: Name::new(name),
+                ty,
+                default: None,
+                definition: None,
+            }),
+            None => Self::Unnamed(ty),
+        }
+    }
+
+    fn as_named(&self) -> Option<&NamedTupleField<'db>> {
+        match self {
+            Self::Named(field) => Some(field),
+            Self::Unnamed(_) | Self::Variadic(_) => None,
+        }
+    }
+
+    pub(in crate::types) fn ty(&self) -> Type<'db> {
+        match self {
+            Self::Named(field) => field.ty,
+            Self::Unnamed(ty) | Self::Variadic(ty) => *ty,
+        }
+    }
+}
+
+fn field_tuple<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    fields: &[FunctionalNamedTupleField<'db>],
+) -> TupleType<'db> {
+    let mut tuple = TupleSpecBuilder::with_capacity(fields.len());
+    for field in fields {
+        if let FunctionalNamedTupleField::Variadic(ty) = field {
+            tuple = tuple.concat(db, env, &TupleSpec::homogeneous(*ty));
+        } else {
+            tuple.push(field.ty());
+        }
+    }
+    TupleType::new(db, env, &tuple.build())
 }
 
 /// A namedtuple created via the functional form `namedtuple(name, fields)` or
@@ -287,23 +341,18 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> ClassType<'db> {
-        // If fields are unknown, return `tuple[Unknown, ...]` to avoid false positives
-        // like index-out-of-bounds errors.
-        if !self.has_known_fields(db) {
-            return TupleType::homogeneous(db, env, Type::unknown()).to_class_type(db);
-        }
-
-        let field_types = self.fields(db).iter().map(|field| field.ty);
-        TupleType::heterogeneous(db, env, field_types).to_class_type(db)
+        field_tuple(db, env, self.spec(db).fields(db)).to_class_type(db)
     }
 
     /// Look up an instance member defined directly on this class (not inherited).
     ///
-    /// `NamedTuple` fields are exposed via synthesized descriptors on the class rather than
-    /// instance attributes. If fields are unknown (dynamic), return `Any` for any attribute.
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, _name: &str) -> Member<'db> {
-        if !self.has_known_fields(db) {
-            return Member::definitely_declared(Type::any());
+    /// Return an unbound member for a known field so lookup can use its synthesized class
+    /// descriptor. For an unrecognized name, use the fallback if the name could belong to a field.
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        if let Some(ty) = self.spec(db).attribute_fallback(db)
+            && self.field(db, name).is_none()
+        {
+            return Member::definitely_declared(ty);
         }
 
         Member::unbound()
@@ -346,10 +395,10 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             .class_literal(db)
             .class_member(db, env, name, policy);
 
-        // If fields are unknown (dynamic) and the attribute wasn't found,
-        // return `Any` instead of failing.
-        if !self.has_known_fields(db) && result.place.is_undefined() {
-            return Place::bound(Type::any()).into();
+        if result.place.is_undefined()
+            && let Some(ty) = self.spec(db).attribute_fallback(db)
+        {
+            return Place::bound(ty).into();
         }
 
         result
@@ -367,10 +416,8 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         }
 
         // Check if it's a field name (returns a property descriptor).
-        for field in self.fields(db) {
-            if field.name == name {
-                return Member::definitely_declared(create_field_property(db, field.ty));
-            }
+        if let Some(field) = self.field(db, name) {
+            return Member::definitely_declared(create_field_property(db, field.ty));
         }
 
         Member::default()
@@ -422,7 +469,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             env,
             name,
             ClassType::NonGeneric(self.into()),
-            self.fields(db).iter().cloned(),
+            self.spec(db).named_fields(db).cloned(),
             None,
         );
         // For fallback members from NamedTupleFallback, apply type mapping to handle
@@ -451,7 +498,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|db, _, _| NamedTupleSpec::unknown(db),
+            cycle_initial=|db, _, _| NamedTupleSpec::unknown(db, Type::unknown()),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
@@ -465,8 +512,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                 .expect("Expected `NamedTuple` definition r.h.s. to be a call expression");
             match definition_expression_type(db, definition, &node.arguments.args[1]) {
                 Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)) => spec,
-                ty => NamedTupleSpec::from_fields_type(db, definition.scope(db), ty)
-                    .unwrap_or_else(|_| NamedTupleSpec::unknown(db)),
+                ty => NamedTupleSpec::from_fields_type(db, definition.scope(db), ty, |_| {}),
             }
         }
 
@@ -477,17 +523,15 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         }
     }
 
-    fn fields(self, db: &'db dyn Db) -> &'db [NamedTupleField<'db>] {
-        self.spec(db).fields(db)
-    }
-
     /// Returns the field declared directly on this dynamic named tuple, if any.
-    pub(crate) fn field(self, db: &'db dyn Db, name: &Name) -> Option<&'db NamedTupleField<'db>> {
-        self.fields(db).iter().find(|field| field.name == *name)
+    pub(crate) fn field(self, db: &'db dyn Db, name: &str) -> Option<&'db NamedTupleField<'db>> {
+        self.spec(db)
+            .named_fields(db)
+            .find(|field| field.name == name)
     }
 
     pub(super) fn has_known_fields(self, db: &'db dyn Db) -> bool {
-        self.spec(db).has_known_fields(db)
+        self.spec(db).attribute_fallback(db).is_none()
     }
 }
 
@@ -580,71 +624,138 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamedTupleSpec<'db> {
     #[returns(deref)]
-    pub(crate) fields: Box<[NamedTupleField<'db>]>,
-
+    pub(crate) fields: Box<[FunctionalNamedTupleField<'db>]>,
+    /// Type of an unrecognized attribute that might be a field. `None` if all names are known.
     #[returns(copy)]
-    pub(crate) has_known_fields: bool,
+    attribute_fallback: Option<Type<'db>>,
 }
 
 impl<'db> NamedTupleSpec<'db> {
-    /// Recover the field declarations from the value type of an indirect `fields` argument.
+    pub(in crate::types) fn named_fields(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = &'db NamedTupleField<'db>> {
+        self.fields(db)
+            .iter()
+            .filter_map(FunctionalNamedTupleField::as_named)
+    }
+
+    /// Infer the fields of an indirect `fields` argument and report the first problem.
     pub(in crate::types) fn from_fields_type(
         db: &'db dyn Db,
         scope: ScopeId<'db>,
         ty: Type<'db>,
-    ) -> Result<Self, Cow<'static, str>> {
+        report: impl FnOnce(Cow<'static, str>),
+    ) -> Self {
         let env = ProgramEnvironment::from_scope(scope);
-        let tuple = ty.resolve_type_alias(db).tuple_instance_spec(db, &env);
-        let Some(TupleSpec::Fixed(pairs)) = tuple.as_deref() else {
-            return Err(Cow::Borrowed(
-                "`fields` must be a list literal or a fixed-length tuple",
-            ));
-        };
-
-        let mut fields = Vec::with_capacity(pairs.all_elements().len());
-        for pair in pairs.all_elements() {
-            let pair = pair.resolve_type_alias(db).tuple_instance_spec(db, &env);
-            let elements = pair.as_deref().and_then(TupleSpec::as_fixed_length);
-            let Some([name, value]) = elements.map(FixedLengthTuple::all_elements) else {
-                return Err(Cow::Borrowed(
-                    "Expected a `(name, type)` pair for each field",
-                ));
-            };
-            let name = name
-                .resolve_type_alias(db)
-                .as_string_literal()
-                .ok_or("Expected a string literal for each field name")?
-                .value(db);
-
-            let ty = value
-                .default_specialize(db, &env)
-                .in_type_expression(db, scope, None, InferenceFlags::empty())
-                .map_err(|_| {
-                    format!(
-                        "Cannot determine the type of field `{name}` from `{}`",
-                        value.display(db, &env)
-                    )
-                })?;
-
-            fields.push(NamedTupleField {
-                name: Name::new(name),
-                ty,
-                default: None,
-                definition: None,
-            });
+        let expected = "`fields` must be a list literal or a fixed-length tuple";
+        let mut problem = None;
+        let pairs = Self::field_sequence(db, &env, ty, expected, &mut problem);
+        let mut fields = Vec::new();
+        Self::extend_fields(db, scope, &pairs, &mut fields, &mut problem);
+        if let Some(reason) = problem {
+            report(reason);
         }
-
-        Ok(Self::known(db, fields.into_boxed_slice()))
+        Self::from_fields(db, fields.into_boxed_slice())
     }
 
-    /// Create a [`NamedTupleSpec`] with the given fields.
-    pub(crate) fn known(db: &'db dyn Db, fields: Box<[NamedTupleField<'db>]>) -> Self {
-        Self::new(db, fields, true)
+    /// Append fields from a sequence of `(name, annotation)` pairs. For a variable-length
+    /// sequence, retain its fixed prefix and suffix for lookup by name and index.
+    fn extend_fields(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        pairs: &TupleSpec<'db>,
+        fields: &mut Vec<FunctionalNamedTupleField<'db>>,
+        problem: &mut Option<Cow<'static, str>>,
+    ) {
+        if matches!(pairs, TupleSpec::Variable(_)) {
+            problem.get_or_insert("Cannot determine the number of fields".into());
+        }
+        let mut field = |pair| Self::field_from_type(db, scope, pair, problem);
+        match pairs {
+            TupleSpec::Fixed(pairs) => fields.extend(pairs.iter_all_elements().map(field)),
+            TupleSpec::Variable(pairs) => {
+                fields.extend(pairs.iter_prefix_elements().map(&mut field));
+                let variable = field(pairs.variable().element_type(db));
+                fields.push(FunctionalNamedTupleField::Variadic(variable.ty()));
+                fields.extend(pairs.iter_suffix_elements().map(field));
+            }
+        }
     }
 
-    /// Create a [`NamedTupleSpec`] that indicates a namedtuple class has unknown fields.
-    pub(crate) fn unknown(db: &'db dyn Db) -> Self {
-        Self::new(db, Box::default(), false)
+    /// For an indirect field list or pair, expect a tuple. If given another iterable,
+    /// record the problem and use its element types for recovery.
+    fn field_sequence(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        expected: &'static str,
+        problem: &mut Option<Cow<'static, str>>,
+    ) -> Cow<'db, TupleSpec<'db>> {
+        ty.resolve_type_alias(db)
+            .tuple_instance_spec(db, env)
+            .unwrap_or_else(|| {
+                problem.get_or_insert(expected.into());
+                ty.iterate(db, env)
+            })
+    }
+
+    /// Recover the name and declared type of a computed field pair independently, recording
+    /// the first inference problem in `problem`.
+    fn field_from_type(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        pair: Type<'db>,
+        problem: &mut Option<Cow<'static, str>>,
+    ) -> FunctionalNamedTupleField<'db> {
+        let env = ProgramEnvironment::from_scope(scope);
+        let expected = "Expected a `(name, type)` pair for each field";
+        let pair = Self::field_sequence(db, &env, pair, expected, problem);
+        let elements = pair.as_fixed_length();
+        let Some([name, value]) = elements.map(FixedLengthTuple::all_elements) else {
+            problem.get_or_insert(expected.into());
+            return FunctionalNamedTupleField::Unnamed(Type::unknown());
+        };
+        let name = name
+            .resolve_type_alias(db)
+            .as_string_literal()
+            .map(|s| s.value(db));
+        if name.is_none() {
+            problem.get_or_insert("Expected a string literal for each field name".into());
+        }
+        let ty = value
+            .default_specialize(db, &env)
+            .in_type_expression(db, scope, None, InferenceFlags::empty())
+            .unwrap_or_else(|_| {
+                if let Some(name) = name {
+                    problem.get_or_insert_with(|| {
+                        format!(
+                            "Cannot determine the type of field `{name}` from `{}`",
+                            value.display(db, &env)
+                        )
+                        .into()
+                    });
+                }
+                Type::unknown()
+            });
+        FunctionalNamedTupleField::required(name, ty)
+    }
+
+    pub(in crate::types) fn from_fields(
+        db: &'db dyn Db,
+        fields: Box<[FunctionalNamedTupleField<'db>]>,
+    ) -> Self {
+        let fallback = fields
+            .iter()
+            .any(|field| field.as_named().is_none())
+            .then(Type::unknown);
+        Self::new(db, fields, fallback)
+    }
+
+    /// Create a spec for a named tuple whose fields are entirely unknown.
+    pub(crate) fn unknown(db: &'db dyn Db, attribute_fallback: Type<'db>) -> Self {
+        let fields = Box::from([FunctionalNamedTupleField::Variadic(Type::unknown())]);
+        Self::new(db, fields, Some(attribute_fallback))
     }
 
     pub(crate) fn recursive_type_normalized_impl(
@@ -654,34 +765,39 @@ impl<'db> NamedTupleSpec<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let normalize = |ty: Type<'db>| {
+            let normalized = ty.recursive_type_normalized_impl(db, env, div, true);
+            if nested {
+                normalized
+            } else {
+                Some(normalized.unwrap_or(div))
+            }
+        };
         let fields = self
             .fields(db)
             .iter()
-            .map(|f| {
-                let ty = f.ty.recursive_type_normalized_impl(db, env, div, true);
-                let ty = if nested { ty? } else { ty.unwrap_or(div) };
-                let default = match f.default {
-                    Some(default) => {
-                        let default = default.recursive_type_normalized_impl(db, env, div, true);
-                        Some(if nested {
-                            default?
-                        } else {
-                            default.unwrap_or(div)
+            .map(|field| {
+                let ty = normalize(field.ty())?;
+                Some(match field {
+                    FunctionalNamedTupleField::Named(field) => {
+                        let default = match field.default {
+                            Some(default) => Some(normalize(default)?),
+                            None => None,
+                        };
+                        FunctionalNamedTupleField::Named(NamedTupleField {
+                            ty,
+                            default,
+                            ..field.clone()
                         })
                     }
-                    None => None,
-                };
-
-                Some(NamedTupleField {
-                    name: f.name.clone(),
-                    ty,
-                    default,
-                    definition: f.definition,
+                    FunctionalNamedTupleField::Unnamed(_) => FunctionalNamedTupleField::Unnamed(ty),
+                    FunctionalNamedTupleField::Variadic(_) => {
+                        FunctionalNamedTupleField::Variadic(ty)
+                    }
                 })
             })
             .collect::<Option<Box<_>>>()?;
-
-        Some(Self::new(db, fields, self.has_known_fields(db)))
+        Some(Self::new(db, fields, self.attribute_fallback(db)))
     }
 }
 

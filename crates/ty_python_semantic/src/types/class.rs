@@ -9,7 +9,8 @@ use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
-    DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
+    DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FunctionalNamedTupleField, NamedTupleField,
+    NamedTupleSpec,
 };
 pub use self::slots::SlotDescriptorType;
 pub(crate) use self::static_literal::{
