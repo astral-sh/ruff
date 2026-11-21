@@ -2683,6 +2683,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return None;
         }
         let capture = self.paramspec_capture(db, overloads, other);
+        let mut contexts = SmallVec::<[GenericContext<'db>; 1]>::new();
         let freshen = |signature: &Signature<'db>| {
             let Some(mut context) = local_context(signature) else {
                 return signature.clone();
@@ -2701,6 +2702,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 context = locals;
             }
             let freshening = capture.or_else(|| {
+                // Check for collisions with earlier overloads before interning the combined scope.
+                let preceding = contexts.iter().flat_map(|context| context.variables(db));
                 let types = signature
                     .types_for_freshening(db)
                     .chain(
@@ -2708,17 +2711,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             .iter()
                             .flat_map(|signature| signature.types_for_freshening(db)),
                     )
-                    .chain(inferable.iter(db).map(Type::TypeVar));
+                    .chain(inferable.iter(db).chain(preceding).map(Type::TypeVar));
                 freshening_delta(db, types, context).map(TypeVarFreshening::Offset)
             });
             let signature = freshening.map_or_else(
                 || signature.clone(),
                 |freshening| signature.freshen_context(db, self.env, context, freshening),
             );
-            *inferable = inferable.merge(db, signature.inferable_typevars(db));
+            contexts.extend(signature.generic_context);
             signature
         };
-        Some(overloads.iter().map(freshen).collect())
+        let signatures = overloads.iter().map(freshen).collect();
+        *inferable = inferable.merge(db, TypeVarSet::from_contexts(db, &contexts));
+        Some(signatures)
     }
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable

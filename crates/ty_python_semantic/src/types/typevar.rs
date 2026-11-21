@@ -2123,6 +2123,19 @@ pub(crate) enum TypeVarSet<'db> {
 }
 
 impl<'db> TypeVarSet<'db> {
+    /// Collects the binders of all the signatures in order. Interning each successive
+    /// prefix would retain a quadratic number of entries for generic overloads.
+    pub(super) fn from_contexts(db: &'db dyn Db, contexts: &[GenericContext<'db>]) -> Self {
+        match contexts {
+            [] => Self::None,
+            [context] => context.inferable_typevars(db),
+            _ => Self::from_typevars(
+                db,
+                contexts.iter().flat_map(|context| context.variables(db)),
+            ),
+        }
+    }
+
     pub(crate) fn from_typevars(
         db: &'db dyn Db,
         typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,

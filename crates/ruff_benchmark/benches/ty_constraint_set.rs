@@ -965,6 +965,43 @@ fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     });
 }
 
+/// Each overload brings its own `T` into the scope of `P`. Interning the growing set of
+/// binders after each overload retains a quadratic number of entries. Passing `first` keeps
+/// the final argument check from comparing the whole overload set against itself.
+fn benchmark_paramspec_capture_many_overloads(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from("from typing import Callable, Literal, overload\n\n");
+    for tag in 0..256 {
+        writeln!(
+            &mut code,
+            "@overload\ndef select[T](tag: Literal[{tag}], value: T) -> T: ..."
+        )
+        .ok();
+    }
+    code.push_str(
+        "\
+def select(tag: int, value: object) -> object:
+    return value
+
+def register[**P](f: Callable[P, object], g: Callable[P, object]) -> None: ...
+
+def first(tag: Literal[0], value: int) -> int:
+    return value
+
+register(first, select)
+",
+    );
+
+    criterion.bench_function("ty_micro[paramspec_capture_many_overloads]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// An overloaded `__call__` can refer to the protocol itself in each receiver annotation. Checking
 /// the receiver can therefore encounter the same overloads again.
 fn benchmark_overloaded_protocol_receivers(criterion: &mut Criterion) {
@@ -1085,6 +1122,7 @@ criterion_group!(
     benchmark_many_invariant_typevars,
     benchmark_mixed_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
+    benchmark_paramspec_capture_many_overloads,
     benchmark_overloaded_protocol_receivers,
     benchmark_recursive_alias_product,
     benchmark_shared_source_order_compaction,

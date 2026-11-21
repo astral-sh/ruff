@@ -108,7 +108,7 @@ use ty_static::EnvVars;
 
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::generics::Specialization;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::relation::TypeVarEvaluation;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarSet};
 use crate::types::visitor::{
@@ -146,26 +146,36 @@ impl<'db> TypeVarSet<'db> {
         storage: &ConstraintSetStorage<'db>,
         constraints: impl Fn() -> I,
     ) -> Self {
-        let mut binders = Self::None;
+        let mut contexts = SmallVec::<[GenericContext<'db>; 1]>::new();
+        let mut seen_paramspecs = FxHashSet::default();
         let mut owners = self.explicit_typevars();
         while owners.iter(db).any(|typevar| typevar.is_paramspec(db)) {
-            let mut locals = Self::None;
+            let start = contexts.len();
             for id in constraints() {
                 if let Some((parameter, Type::Callable(captured))) =
                     storage.atomic_constraint_data(id).as_concrete()
                     && parameter.is_paramspec(db)
                     && parameter.is_inferable(db, owners)
                 {
-                    for signature in captured.signatures(db) {
-                        locals = locals.merge(db, signature.inferable_typevars(db));
-                    }
+                    contexts.extend(
+                        captured
+                            .signatures(db)
+                            .iter()
+                            .filter_map(|signature| signature.generic_context),
+                    );
                 }
             }
             // A captured signature can bind a ParamSpec that captures another generic signature.
-            owners = locals.difference(db, binders);
-            binders = binders.merge(db, owners);
+            // Only newly discovered ParamSpecs need another pass over the constraints.
+            owners = Self::from_typevars(
+                db,
+                contexts[start..]
+                    .iter()
+                    .flat_map(|context| context.variables(db))
+                    .filter(|var| var.is_paramspec(db) && seen_paramspecs.insert(var.identity(db))),
+            );
         }
-        binders
+        Self::from_contexts(db, &contexts)
     }
 
     /// Returns the variables in this finite set that are absent from `other`.
