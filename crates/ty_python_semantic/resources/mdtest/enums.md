@@ -1183,6 +1183,25 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+An enum member can itself be a descriptor. In that case, assigning it in another enum's body doesn't
+create a member of the second enum.
+
+```py
+class Label(Enum):
+    SHORT = "short"
+    LONG = "long"
+
+    def __get__(self, instance: object, owner: type) -> str:
+        return self.value
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+    label = Label.SHORT
+
+reveal_type(enum_members(Color))  # revealed: tuple[Literal["RED"], Literal["BLUE"]]
+```
+
 ### `enum.property`
 
 Enum attributes that are defined using `enum.property` are not considered members:

@@ -902,8 +902,14 @@ fn check_class_declaration<'db>(
                 || is_auto
                 || enum_info.value_construction.metaclass_may_transform_values;
 
-            if !skip_type_check && !subclass_instance_member.place.is_undefined() {
-                if let Some(new_function) = enum_info.value_construction.new.function() {
+            if !skip_type_check {
+                // Plain enums have neither a constructor nor a value annotation to check.
+                // Only resolve the member on the subclass when one of these checks applies.
+                let is_defined = || !subclass_instance_member.place.is_undefined();
+
+                if let Some(new_function) = enum_info.value_construction.new.function()
+                    && is_defined()
+                {
                     check_enum_member_against_constructor_method(
                         context,
                         new_function,
@@ -915,7 +921,9 @@ fn check_class_declaration<'db>(
                     );
                 }
 
-                if let Some(init_function) = enum_info.value_construction.init.function() {
+                if let Some(init_function) = enum_info.value_construction.init.function()
+                    && is_defined()
+                {
                     check_enum_member_against_constructor_method(
                         context,
                         init_function,
@@ -929,6 +937,7 @@ fn check_class_declaration<'db>(
                     .value_construction
                     .can_validate_with_value_annotation()
                     && let Some(expected_type) = enum_info.value_annotation_type()
+                    && is_defined()
                 {
                     if !member_value_type.is_assignable_to(db, env, expected_type) {
                         if let Some(builder) = context.report_lint(
