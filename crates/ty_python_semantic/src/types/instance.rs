@@ -274,8 +274,17 @@ impl<'db> NominalInstanceType<'db> {
     /// requires the target class to appear in the source MRO before it compares type
     /// arguments or tries alternate inheritance paths. This is not an assignability
     /// check: an unknown base does not make an instance redundant in a union.
-    /// Object and exact tuples have dedicated rules and are excluded here.
-    pub(super) fn has_unrelated_class(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_incomparable_for_union(self, db: &'db dyn Db, other: Self) -> bool {
+        // Two fixed-length tuples can only subsume one another if their lengths match.
+        if let (NominalInstanceInner::ExactTuple(left), NominalInstanceInner::ExactTuple(right)) =
+            (self.0, other.0)
+        {
+            return matches!(
+                (left.tuple(db), right.tuple(db)),
+                (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) if left.len() != right.len()
+            );
+        }
+
         let (NominalInstanceInner::NonTuple(left), NominalInstanceInner::NonTuple(right)) =
             (self.0, other.0)
         else {
