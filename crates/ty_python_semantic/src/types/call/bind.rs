@@ -320,6 +320,48 @@ fn typevar_identity_for_inference<'db>(
     })
 }
 
+/// Transforms each callable while preserving the surrounding unions and intersections.
+/// Negated types cannot be transformed this way, so intersections containing them are rejected.
+fn try_map_partial_callable<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    map: &mut impl FnMut(CallableType<'db>) -> Option<Type<'db>>,
+) -> Option<Type<'db>> {
+    match ty {
+        Type::Callable(callable) => map(callable),
+        Type::Union(union) => union.try_map(db, env, |element| {
+            try_map_partial_callable(db, env, *element, map)
+        }),
+        Type::Intersection(intersection) if intersection.negative(db).is_empty() => {
+            let elements = intersection
+                .positive(db)
+                .iter()
+                .map(|element| try_map_partial_callable(db, env, *element, map))
+                .collect::<Option<Vec<_>>>()?;
+            Some(IntersectionType::from_elements(db, env, elements))
+        }
+        _ => None,
+    }
+}
+
+/// Combines the reduced types of the original callable's applicable overloads.
+fn combine_partial_overloads<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    callables: SmallVec<[Type<'db>; 1]>,
+) -> Option<Type<'db>> {
+    if callables.iter().all(Type::is_callable_type) {
+        let signatures = callables
+            .into_iter()
+            .filter_map(Type::as_callable)
+            .flat_map(|callable| callable.signatures(db).iter().cloned());
+        CallableType::from_partial_overloads(db, signatures).map(Type::Callable)
+    } else {
+        Some(IntersectionType::from_elements(db, env, callables))
+    }
+}
+
 /// A single callable item within the union/intersection structure.
 /// Either a regular callable, or a constructor callable.
 #[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
@@ -467,7 +509,7 @@ impl<'db> CallableItem<'db> {
         env: &ProgramEnvironment<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<SmallVec<[CallableType<'db>; 1]>> {
+    ) -> Option<SmallVec<[Type<'db>; 1]>> {
         match self {
             CallableItem::Regular(binding) => {
                 binding.partially_applied_callables(db, env, partial_overload, bound_call_arguments)
@@ -1284,6 +1326,9 @@ impl<'db> Bindings<'db> {
         let mut reduce = |item: &CallableItem<'db>| {
             item.functools_partial_callables(db, env, partial_overload, bound_call_arguments)
         };
+        let wrap = &mut |callable: CallableType<'db>| {
+            Some(callable.into_precise_functools_partial_instance(db, wrapped_callable_ty))
+        };
         if wrapped_callable_ty.is_union()
             || wrapped_callable_ty.is_intersection()
             || self
@@ -1294,14 +1339,15 @@ impl<'db> Bindings<'db> {
                 Some(UnionType::from_elements(
                     db,
                     env,
-                    reduce(item)?.into_iter().map(|callable| {
-                        callable.into_precise_functools_partial_instance(db, wrapped_callable_ty)
-                    }),
+                    reduce(item)?
+                        .into_iter()
+                        .map(|callable| try_map_partial_callable(db, env, callable, wrap))
+                        .collect::<Option<SmallVec<[_; 1]>>>()?,
                 ))
             });
         }
 
-        let partial_callables: SmallVec<[CallableType<'db>; 1]> = self
+        let partial_callables: SmallVec<[Type<'db>; 1]> = self
             .iter_callable_items()
             .filter_map(reduce)
             .flatten()
@@ -1309,9 +1355,19 @@ impl<'db> Bindings<'db> {
 
         if partial_callables.is_empty() {
             Type::Never
+        } else if partial_callables.iter().all(Type::is_callable_type) {
+            CallableTypes::from_elements(
+                partial_callables.into_iter().filter_map(Type::as_callable),
+            )
+            .into_precise_functools_partial_instance(db, wrapped_callable_ty)
         } else {
-            CallableTypes::from_elements(partial_callables)
-                .into_precise_functools_partial_instance(db, wrapped_callable_ty)
+            try_map_partial_callable(
+                db,
+                env,
+                IntersectionType::from_elements(db, env, partial_callables),
+                wrap,
+            )
+            .unwrap_or_else(Type::unknown)
         }
     }
 
@@ -3928,7 +3984,7 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<SmallVec<[CallableType<'db>; 1]>> {
+    ) -> Option<SmallVec<[Type<'db>; 1]>> {
         if self.overloads().is_empty() {
             return None;
         }
@@ -3967,39 +4023,29 @@ impl<'db> CallableBinding<'db> {
         }
 
         let signature_arguments = bound_call_arguments.with_self(self.bound_type);
-        let signatures: SmallVec<[(usize, Signature<'db>); 1]> = selected_overload_indexes
+        let callables: SmallVec<[(usize, Type<'db>); 1]> = selected_overload_indexes
             .into_iter()
             .map(|index| {
                 let overload = &self.overloads()[index];
-                // TODO: Preserve intersected parameter lists when synthesizing partial signatures.
-                if let Some((_, paramspec)) =
-                    overload.signature.parameters().as_paramspec_with_prefix()
-                    && let Some(value) = overload
-                        .merged_specialization(db)
-                        .and_then(|specialization| specialization.get(db, paramspec))
-                    && matches!(
-                        value.as_paramspec_value(db),
-                        Some(ParamSpecValue::Intersection(_))
-                    )
-                {
-                    return None;
-                }
-                Some((
-                    index,
-                    overload.partially_applied_signature(db, env, signature_arguments.as_ref()),
-                ))
+                overload
+                    .partially_apply(db, env, signature_arguments.as_ref())
+                    .map(|callable| (index, callable))
             })
             .collect::<Option<_>>()?;
         if let Some(cases) = self.partial_keyword_cases() {
             return cases
                 .iter()
-                .map(|case| case.partial_callable(db, &signatures, bound_call_arguments))
+                .map(|case| case.partial_callable(db, env, &callables, bound_call_arguments))
                 .collect();
         }
 
-        CallableType::from_partial_overloads(
+        combine_partial_overloads(
             db,
-            signatures.into_iter().map(|(_, signature)| signature),
+            env,
+            callables
+                .into_iter()
+                .map(|(_, callable)| callable)
+                .collect(),
         )
         .map(|callable| smallvec_inline![callable])
     }
@@ -5141,28 +5187,35 @@ impl<'db> ExpandedCallEvaluation<'db> {
     fn partial_callable(
         &self,
         db: &'db dyn Db,
-        signatures: &[(usize, Signature<'db>)],
+        env: &ProgramEnvironment<'db>,
+        callables: &[(usize, Type<'db>)],
         arguments: &CallArguments<'_, 'db>,
-    ) -> Option<CallableType<'db>> {
+    ) -> Option<Type<'db>> {
         let snapshots = &self.snapshot.matching_overloads;
-        CallableType::from_partial_overloads(
-            db,
-            signatures.iter().filter_map(|(index, signature)| {
+        let callables = callables
+            .iter()
+            .filter_map(|(index, callable)| {
                 let position = snapshots
                     .binary_search_by_key(index, |(index, _)| *index)
                     .ok()?;
                 let (_, snapshot) = &snapshots[position];
-                snapshot
-                    .errors
-                    .iter()
-                    .filter(|error| error.is_relevant_for_partial_application())
-                    .try_fold(signature.clone(), |reduced, error| {
-                        let (name, expected) =
-                            error.partial_keyword_override(db, arguments, signature)?;
-                        reduced.requiring_keyword(name, expected)
-                    })
-            }),
-        )
+                try_map_partial_callable(db, env, *callable, &mut |callable| {
+                    let signatures = callable.signatures(db).iter().filter_map(|signature| {
+                        snapshot
+                            .errors
+                            .iter()
+                            .filter(|error| error.is_relevant_for_partial_application())
+                            .try_fold(signature.clone(), |reduced, error| {
+                                let (name, expected) =
+                                    error.partial_keyword_override(db, arguments, signature)?;
+                                reduced.requiring_keyword(name, expected)
+                            })
+                    });
+                    CallableType::from_partial_overloads(db, signatures).map(Type::Callable)
+                })
+            })
+            .collect();
+        combine_partial_overloads(db, env, callables)
     }
 }
 
@@ -9786,15 +9839,15 @@ impl<'db> Binding<'db> {
         partial_application
     }
 
-    /// Synthesizes this overload's reduced partial signature.
-    fn partially_applied_signature(
+    /// Specializes and reduces this overload, retaining any combined parameter lists.
+    fn partially_apply(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
-    ) -> Signature<'db> {
+    ) -> Option<Type<'db>> {
         let partial_application = self.partial_application(arguments);
-        let signature = self.signature.specialize_for_partial_application(
+        let callable = self.signature.specialize_for_partial_application(
             db,
             env,
             &partial_application,
@@ -9802,17 +9855,21 @@ impl<'db> Binding<'db> {
             self.unspecialized_return_type(db),
         );
 
-        if signature.parameters() == self.signature.parameters() {
-            return signature.partially_apply(db, &partial_application);
-        }
+        try_map_partial_callable(db, env, callable, &mut |callable| {
+            let signatures = callable.signatures(db).iter().map(|signature| {
+                if signature.parameters() == self.signature.parameters() {
+                    return signature.clone().partially_apply(db, &partial_application);
+                }
 
-        // Specializing `*args: *Ts` can replace one parameter with several positional parameters.
-        // Rematch before reducing so bound arguments consume those positions and keyword bindings
-        // still refer to the correct parameters after the expansion.
-        let mut binding = Self::single(self.signature_type, signature);
-        binding.match_parameters(db, env, arguments);
-        let partial_application = binding.partial_application(arguments);
-        binding.signature.partially_apply(db, &partial_application)
+                // Specialization can expand variadic parameters. Rematch so bound arguments
+                // consume the right positions and keywords in each expanded signature.
+                let mut binding = Self::single(self.signature_type, signature.clone());
+                binding.match_parameters(db, env, arguments);
+                let partial_application = binding.partial_application(arguments);
+                binding.signature.partially_apply(db, &partial_application)
+            });
+            CallableType::from_partial_overloads(db, signatures).map(Type::Callable)
+        })
     }
 
     /// Returns the bound type for the specified parameter, or `None` if no argument was matched to
