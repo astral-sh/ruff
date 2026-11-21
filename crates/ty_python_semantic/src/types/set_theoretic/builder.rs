@@ -894,16 +894,25 @@ impl<'db> UnionBuilder<'db> {
                                 UnionElement::Type(existing)
                                     if can_compare_with_literals(*existing) =>
                                 {
+                                    // Neither a string literal nor its complement is a subtype of
+                                    // `type[C]`. The reverse check still matters when the callable
+                                    // used as C's metaclass returns `Never`.
+                                    let is_subclass_of = existing.is_subclass_of();
+
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
-                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                    if !is_subclass_of
+                                        && ty.is_redundant_with(db, &self.env, *existing)
+                                    {
                                         return;
                                     }
                                     if existing.is_redundant_with(db, &self.env, ty) {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(db, &self.env, *existing) {
+                                    if !is_subclass_of
+                                        && ty_negated().is_subtype_of(db, &self.env, *existing)
+                                    {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
