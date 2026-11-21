@@ -40,30 +40,6 @@ impl<'db> OperatorResult<'db> {
     }
 }
 
-/// Returns the special method used to implement a unary operator.
-pub(super) const fn unary_dunder_method(op: ast::UnaryOp) -> &'static str {
-    match op {
-        ast::UnaryOp::Invert => "__invert__",
-        ast::UnaryOp::UAdd => "__pos__",
-        ast::UnaryOp::USub => "__neg__",
-        ast::UnaryOp::Not => "__bool__",
-    }
-}
-
-/// Reuse successful unary operator resolutions without retaining the full call bindings.
-#[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn unary_operator_result<'db>(
-    db: &'db dyn Db,
-    program: Program<'db>,
-    operand: Type<'db>,
-    op: ast::UnaryOp,
-) -> Option<OperatorResult<'db>> {
-    let env = &ProgramEnvironment::from_program(program);
-    operand
-        .try_call_unary_dunder(db, env, unary_dunder_method(op), None)
-        .ok()
-}
-
 /// Whether the right operand's reflected method has priority based on the possible runtime
 /// classes of both operands.
 ///

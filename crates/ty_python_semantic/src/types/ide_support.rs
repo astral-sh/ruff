@@ -5,7 +5,7 @@ use crate::FxIndexSet;
 use crate::place::implicit_builtins_symbol_scope;
 use crate::reachability::is_range_reachable;
 use crate::types::call::bind::CheckTypesMode;
-use crate::types::call::{CallArguments, CallError, MatchedArgument, unary_dunder_method};
+use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::infer::infer_definition_types;
@@ -1452,7 +1452,12 @@ pub fn definitions_for_unary_op<'db>(
     let db = model.db();
     let operand_ty = unary_op.operand.inferred_type(model)?;
 
-    let unary_dunder_method = unary_dunder_method(unary_op.op);
+    let unary_dunder_method = match unary_op.op {
+        ast::UnaryOp::Invert => "__invert__",
+        ast::UnaryOp::UAdd => "__pos__",
+        ast::UnaryOp::USub => "__neg__",
+        ast::UnaryOp::Not => "__bool__",
+    };
 
     let env = &model.program_environment();
     let bindings = match operand_ty.try_call_dunder(
