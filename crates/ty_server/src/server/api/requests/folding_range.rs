@@ -5,7 +5,7 @@ use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Uri};
 use ty_ide::folding_ranges;
 use ty_project::{ProjectDatabase, SemanticDb as _};
 
-use crate::document::{ToRangeExt, cell_range};
+use crate::document::{LocalRanges, cell_range};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -53,12 +53,16 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
             None
         };
 
-        let results: Vec<_> = folding_ranges(db, db.program_file(file).python_file(db), cell_range)
+        let folds = folding_ranges(db, db.program_file(file).python_file(db), cell_range);
+        if folds.is_empty() {
+            return Ok(None);
+        }
+
+        let ranges = LocalRanges::new(db, file, snapshot.encoding());
+        let results: Vec<_> = folds
             .into_iter()
             .filter_map(|folding_range| {
-                let lsp_range = folding_range
-                    .range
-                    .to_lsp_range(db, file, snapshot.encoding())?;
+                let lsp_range = ranges.convert(folding_range.range)?;
 
                 let kind = folding_range.kind.map(|k| match k {
                     ty_ide::FoldingRangeKind::Comment => FoldingRangeKind::Comment,
@@ -67,10 +71,10 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
                 });
 
                 Some(FoldingRange {
-                    start_line: lsp_range.local_range().start.line,
-                    start_character: Some(lsp_range.local_range().start.character),
-                    end_line: lsp_range.local_range().end.line,
-                    end_character: Some(lsp_range.local_range().end.character),
+                    start_line: lsp_range.start.line,
+                    start_character: Some(lsp_range.start.character),
+                    end_line: lsp_range.end.line,
+                    end_character: Some(lsp_range.end.character),
                     kind,
                     collapsed_text: None,
                 })
