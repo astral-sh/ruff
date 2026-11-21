@@ -334,21 +334,13 @@ impl<'db> LocalRanges<'db> {
             );
         }
 
+        self.db.unwind_if_revision_cancelled();
         Some(text_range_to_lsp_range(
             range,
             &self.source,
             &self.index,
             self.encoding,
         ))
-    }
-
-    /// Length of a zero-based source line in the client's position encoding.
-    pub(crate) fn line_len(&self, line: u32) -> usize {
-        self.index.line_len(
-            OneIndexed::from_zero_indexed(line as usize),
-            &self.source,
-            self.encoding.into(),
-        )
     }
 }
 

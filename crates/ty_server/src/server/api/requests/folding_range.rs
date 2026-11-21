@@ -53,8 +53,13 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
             None
         };
 
+        let folds = folding_ranges(db, db.program_file(file).python_file(db), cell_range);
+        if folds.is_empty() {
+            return Ok(None);
+        }
+
         let ranges = LocalRanges::new(db, file, snapshot.encoding());
-        let results: Vec<_> = folding_ranges(db, db.program_file(file).python_file(db), cell_range)
+        let results: Vec<_> = folds
             .into_iter()
             .filter_map(|folding_range| {
                 let lsp_range = ranges.convert(folding_range.range)?;
