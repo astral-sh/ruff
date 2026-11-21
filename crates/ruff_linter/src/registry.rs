@@ -16,12 +16,8 @@ mod rule_set;
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
-        linter
-            .all_rules()
-            .find(|rule| {
-                rule.noqa_code()
-                    .is_some_and(|rule_code| rule_code.suffix() == code)
-            })
+        codes::RuleCodePrefix::parse(&linter, code)?
+            .as_rule()
             .ok_or(FromCodeError::Unknown)
     }
 }
