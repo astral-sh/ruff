@@ -7478,8 +7478,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_bytes_literal_expression(&mut self, literal: &ast::ExprBytesLiteral) -> Type<'db> {
-        // TODO: ignoring r/R prefixes for now, should normalize bytes values
-        let bytes: Vec<u8> = literal.value.bytes().collect();
+        let bytes: Cow<'_, [u8]> = (&literal.value).into();
         Type::bytes_literal(self.db(), &bytes)
     }
 
