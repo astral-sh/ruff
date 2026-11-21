@@ -1808,8 +1808,25 @@ impl<'db> IntersectionBuilder<'db> {
                 for pos in other.positive(db) {
                     self.add_positive_impl::<L>(*pos, seen_aliases)?;
                 }
-                for neg in other.negative(db) {
-                    self.add_negative_impl::<L>(*neg, seen_aliases)?;
+                let negatives = other.negative(db);
+                if negatives.len() > 1
+                    && let [inner] = &mut self.intersections[..]
+                    && let Some(Type::LiteralValue(first)) = negatives.iter().next()
+                    && inner.negative.iter().chain(negatives).all(|ty| {
+                        ty.as_literal_value().is_some_and(|literal| {
+                            literal.is_concrete_builtin() && literal.has_same_flags(*first)
+                        })
+                    })
+                {
+                    // Distinct built-in literal exclusions never simplify each other. With
+                    // matching flags, set membership also detects equal literal values.
+                    for neg in negatives {
+                        inner.add_negative_impl(db, &self.env, *neg, true);
+                    }
+                } else {
+                    for neg in negatives {
+                        self.add_negative_impl::<L>(*neg, seen_aliases)?;
+                    }
                 }
             }
             Type::EnumComplement(complement) => {
@@ -1989,20 +2006,8 @@ fn simplify_intersection_pair<'db>(
     // Built-in literal values have no inference dependencies, so these simplifications cannot
     // participate in a cycle and do not need an interned pair or a tracked relation query.
     if let (Type::LiteralValue(first), Type::LiteralValue(second)) = (first, second)
-        && matches!(
-            first.kind(),
-            LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::Bool(_)
-                | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-        )
-        && matches!(
-            second.kind(),
-            LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::Bool(_)
-                | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-        )
+        && first.is_concrete_builtin()
+        && second.is_concrete_builtin()
     {
         return match (polarity, first.kind() == second.kind()) {
             (IntersectionPolarity::Positive, true) => {
@@ -2466,6 +2471,16 @@ impl<'db> InnerIntersectionBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         new_negative: Type<'db>,
     ) {
+        self.add_negative_impl(db, env, new_negative, false);
+    }
+
+    fn add_negative_impl(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        new_negative: Type<'db>,
+        literal_exclusions: bool,
+    ) {
         // `Never & ~T` -> `Never`.
         if self.positive.contains(&Type::Never) {
             return;
@@ -2541,7 +2556,15 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let new_negative_enum = new_negative.resolve_type_alias(db).as_enum_literal();
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
-                for (index, existing_negative) in self.negative.iter().enumerate() {
+                let negatives = if literal_exclusions {
+                    if self.negative.contains(&new_negative) {
+                        return;
+                    }
+                    &NegativeIntersectionElements::Empty
+                } else {
+                    &self.negative
+                };
+                for (index, existing_negative) in negatives.iter().enumerate() {
                     if let Some(new_enum) = new_negative_enum
                         && existing_negative
                             .resolve_type_alias(db)
@@ -3161,6 +3184,45 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn merge_literal_exclusions() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let one = Type::int_literal(1);
+        let two = Type::int_literal(2);
+        let exclusions = IntersectionBuilder::new(db, &env)
+            .add_negative(one)
+            .add_negative(two)
+            .build();
+
+        // Keep the first exclusion even if the duplicate has different literal flags.
+        for first in [
+            one,
+            Type::LiteralValue(LiteralValueType::unpromotable(1)),
+            Type::LiteralValue(
+                LiteralValueType::promotable(1).with_recursively_defined(RecursivelyDefined::Yes),
+            ),
+        ] {
+            let merged = IntersectionBuilder::new(db, &env)
+                .add_negative(first)
+                .add_positive(exclusions)
+                .build();
+            assert!(
+                matches!(merged, Type::Intersection(i) if i.iter_negative(db).eq([first, two]))
+            );
+        }
+
+        // An exclusion still needs to be compared to the positive side of the intersection.
+        assert_eq!(
+            IntersectionBuilder::new(db, &env)
+                .add_positive(two)
+                .add_positive(exclusions)
+                .build(),
+            Type::Never
+        );
     }
 
     #[test]
