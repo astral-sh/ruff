@@ -1,0 +1,34 @@
+def redundant():
+    (yield a, b)
+    ((yield a, b))
+    (yield a, b)  # comment
+    (yield a, b,)
+    (yield a, *b)
+    x = (yield a, b)
+    x = y = (yield a, b)
+    x += (yield a, b)
+
+
+def too_long():
+    (yield abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_, abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_abcdefg_)
+    (yield get_first.asynq(first_argument), get_second.asynq(second_argument_name_that_is_long))
+    first, second = (yield get_first.asynq(first_argument), get_second.asynq(second_argument))
+    yield (
+        already_formatted_first_element,
+        already_formatted_second_element,
+    )
+
+
+def kept():
+    (
+        # comment
+        yield a, b
+    )
+    print((yield a, b))
+    x = (yield a, b), c
+    x: int = (yield a, b)
+    return (yield a, b)
+
+
+async def kept_async():
+    await (yield a, b)

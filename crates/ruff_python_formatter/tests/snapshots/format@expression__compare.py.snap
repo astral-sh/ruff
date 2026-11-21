@@ -129,6 +129,19 @@ c = (
     # 6
 )
 
+# Normalize operands before choosing line breaks, including nested comparisons.
+assert (
+    (call_with_a_long_name(first_argument, second_argument, third_argument))
+    == (expected_result_with_a_long_name)
+    and (other.attribute) != (None)
+)
+assert ((a + b)) == ((c - d))
+assert (not a) == b
+assert (a < b) == (c < d)
+assert (value := compute()) == (expected)
+assert ("first part of a long implicitly concatenated string "
+        "second part of a long implicitly concatenated string") == (expected)
+
 # Implicit strings and comments
 
 assert (
@@ -358,6 +371,19 @@ c = (
     # 6
 )
 
+# Normalize operands before choosing line breaks, including nested comparisons.
+assert (call_with_a_long_name(first_argument, second_argument, third_argument)) == (
+    expected_result_with_a_long_name
+) and (other.attribute) != (None)
+assert (a + b) == (c - d)
+assert (not a) == b
+assert (a < b) == (c < d)
+assert (value := compute()) == (expected)
+assert (
+    "first part of a long implicitly concatenated string "
+    "second part of a long implicitly concatenated string"
+) == (expected)
+
 # Implicit strings and comments
 
 assert (
@@ -417,4 +443,130 @@ c = (
     "a"
     "b" > b
 )
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -70,26 +70,23 @@
+     othr_schedule,
+ )
+ (
+-    (
+-        name,
+-        description,
+-        self_default,
+-        self_selected,
+-        self_auto_generated,
+-        self_parameters,
+-        self_meta_data,
+-        self_schedule,
+-    )
+-    == (
+-        name,
+-        description,
+-        other_default,
+-        othr_selected,
+-        othr_auto_generated,
+-        othr_parameters,
+-        othr_meta_data,
+-        othr_schedule,
+-    )
++    name,
++    description,
++    self_default,
++    self_selected,
++    self_auto_generated,
++    self_parameters,
++    self_meta_data,
++    self_schedule,
++) == (
++    name,
++    description,
++    other_default,
++    othr_selected,
++    othr_auto_generated,
++    othr_parameters,
++    othr_meta_data,
++    othr_schedule,
+ )
+ 
+ [
+@@ -120,9 +117,9 @@
+     obj=rel_obj, using=instance._state.db
+ ).id
+ 
+-ct_match = (aaaaaaaaaaaaaaaa) == self.get_content_type(
+-    obj=rel_obj, using=instance._state.db
+-).id
++ct_match = (
++    aaaaaaaaaaaaaaaa == self.get_content_type(obj=rel_obj, using=instance._state.db).id
++)
+ 
+ ct_match = aaaaaaaaaaact_id == self.get_content_type(
+     obj=rel_obj, using=instance._state.db
+@@ -138,24 +135,27 @@
+     obj=rel_obj, using=instance._state.db
+ )[id]
+ 
+-ct_match = (aaaaaaaaaaaaaaaa) == self.get_content_type(
+-    obj=rel_obj, using=instance._state.db
+-)[id]
++ct_match = (
++    aaaaaaaaaaaaaaaa == self.get_content_type(obj=rel_obj, using=instance._state.db)[id]
++)
+ 
+ # Subscripts expressions with trailing attributes.
+ 
+ ct_match = (
+-    aaaaaaaaaaact_id
+-    == self.get_content_type[obj, rel_obj, using, instance._state.db].id
++    aaaaaaaaaaact_id == self.get_content_type[
++        obj, rel_obj, using, instance._state.db
++    ].id
+ )
+ 
+ ct_match = {aaaaaaaaaaaaaaaa} == self.get_content_type[
+     obj, rel_obj, using, instance._state.db
+ ].id
+ 
+-ct_match = (aaaaaaaaaaaaaaaa) == self.get_content_type[
+-    obj, rel_obj, using, instance._state.db
+-].id
++ct_match = (
++    aaaaaaaaaaaaaaaa == self.get_content_type[
++        obj, rel_obj, using, instance._state.db
++    ].id
++)
+ 
+ # comments
+ 
+@@ -169,17 +169,19 @@
+ )
+ 
+ # Normalize operands before choosing line breaks, including nested comparisons.
+-assert (call_with_a_long_name(first_argument, second_argument, third_argument)) == (
+-    expected_result_with_a_long_name
+-) and (other.attribute) != (None)
++assert (
++    call_with_a_long_name(first_argument, second_argument, third_argument)
++    == expected_result_with_a_long_name
++    and other.attribute != None
++)
+ assert (a + b) == (c - d)
+ assert (not a) == b
+ assert (a < b) == (c < d)
+-assert (value := compute()) == (expected)
++assert (value := compute()) == expected
+ assert (
+     "first part of a long implicitly concatenated string "
+-    "second part of a long implicitly concatenated string"
+-) == (expected)
++    "second part of a long implicitly concatenated string" == expected
++)
+ 
+ # Implicit strings and comments
+ 
 ```

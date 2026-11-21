@@ -3,7 +3,7 @@ use std::ops::{Deref, Index};
 
 use smallvec::SmallVec;
 
-use ruff_formatter::write;
+use ruff_formatter::{FormatContext, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprUnaryOp, StringLike, UnaryOp,
 };
@@ -11,14 +11,188 @@ use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer, TriviaRa
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{Comments, SourceComment, leading_comments, trailing_comments};
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::OperatorPrecedence;
 use crate::expression::parentheses::{
     Parentheses, in_parentheses_only_group, in_parentheses_only_if_group_breaks,
     in_parentheses_only_soft_line_break, in_parentheses_only_soft_line_break_or_space,
-    write_in_parentheses_only_group_end_tag, write_in_parentheses_only_group_start_tag,
+    optional_parentheses, write_in_parentheses_only_group_end_tag,
+    write_in_parentheses_only_group_start_tag,
 };
 use crate::prelude::*;
+use crate::preview::{
+    is_hug_comparator_enabled, is_keep_dict_keys_with_operators_enabled,
+    is_remove_redundant_comparison_parentheses_enabled, is_simplify_power_operator_hugging_enabled,
+    is_symmetric_collection_operations_enabled,
+};
 use crate::string::implicit::FormatImplicitConcatenatedString;
+
+/// Tries a split between two collection displays before expanding either display.
+pub(super) struct SymmetricCollectionOperation<'a> {
+    left: &'a Expr,
+    operator: OperatorSymbol,
+    right: &'a Expr,
+}
+
+impl<'a> SymmetricCollectionOperation<'a> {
+    pub(super) fn new(expression: &'a Expr, context: &PyFormatContext) -> Option<Self> {
+        if !is_symmetric_collection_operations_enabled(context)
+            || context.comments().has(expression)
+        {
+            return None;
+        }
+
+        let (left, operator, right) = match expression {
+            Expr::BinOp(binary) => (
+                binary.left.as_ref(),
+                OperatorSymbol::Binary(binary.op),
+                binary.right.as_ref(),
+            ),
+            Expr::Compare(compare) => {
+                let [operator] = compare.ops.as_ref() else {
+                    return None;
+                };
+                if matches!(
+                    operator,
+                    ruff_python_ast::CmpOp::In
+                        | ruff_python_ast::CmpOp::NotIn
+                        | ruff_python_ast::CmpOp::Is
+                        | ruff_python_ast::CmpOp::IsNot
+                ) {
+                    return None;
+                }
+                (
+                    compare.first_operand(),
+                    OperatorSymbol::Comparator(*operator),
+                    compare.second_operand(),
+                )
+            }
+            _ => return None,
+        };
+
+        let is_collection = |operand: &Expr| {
+            matches!(
+                operand,
+                Expr::List(_)
+                    | Expr::Tuple(_)
+                    | Expr::Set(_)
+                    | Expr::Dict(_)
+                    | Expr::ListComp(_)
+                    | Expr::SetComp(_)
+                    | Expr::DictComp(_)
+            )
+        };
+        (is_collection(left)
+            && is_collection(right)
+            && !context.comments().contains_comments(left.into())
+            && !context.comments().contains_comments(right.into())
+            && !(context.options().magic_trailing_comma().is_respect()
+                && [left, right]
+                    .iter()
+                    .any(|operand| matches!(operand, Expr::Tuple(tuple) if tuple.elts.len() == 1))))
+        .then_some(Self {
+            left,
+            operator,
+            right,
+        })
+    }
+}
+
+impl Format<PyFormatContext<'_>> for SymmetricCollectionOperation<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        // Inspect inside `fits_expanded` as well: unlike `will_break`, this must
+        // detect forced breaks inside either collection's brackets.
+        fn has_forced_break(elements: &[FormatElement]) -> bool {
+            elements.iter().any(|element| match element {
+                FormatElement::Interned(interned) => has_forced_break(interned),
+                element => element.will_break(),
+            })
+        }
+
+        let parens_id = f.group_id("symmetric_collection_operation");
+        let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(parens_id)), f);
+        let parentheses = if matches!(self.operator, OperatorSymbol::Comparator(_))
+            && is_remove_redundant_comparison_parentheses_enabled(f.context())
+        {
+            Parentheses::Never
+        } else {
+            Parentheses::Preserve
+        };
+        let left = self.left.format().with_options(parentheses).memoized();
+        let right = self.right.format().with_options(parentheses).memoized();
+
+        let flat_left = format_with(|f| {
+            let mut buffer = RemoveSoftLinesBuffer::new(f);
+            write!(buffer, [left])
+        })
+        .memoized();
+        let flat_right = format_with(|f| {
+            let mut buffer = RemoveSoftLinesBuffer::new(f);
+            write!(buffer, [right])
+        })
+        .memoized();
+
+        let regular = format_with(|f| {
+            let prefix = format_with(|f| {
+                write!(
+                    f,
+                    [
+                        left,
+                        in_parentheses_only_soft_line_break_or_space(),
+                        self.operator
+                    ]
+                )
+            });
+            let content = format_with(|f| {
+                if is_keep_dict_keys_with_operators_enabled(f.context())
+                    && matches!(self.operator, OperatorSymbol::Binary(_))
+                    && matches!(self.right, Expr::Dict(_) | Expr::DictComp(_))
+                {
+                    in_parentheses_only_group(&prefix).fmt(f)?;
+                } else {
+                    prefix.fmt(f)?;
+                }
+                write!(f, [space(), right])
+            });
+            optional_parentheses(&in_parentheses_only_group(&content))
+                .with_group_id(parens_id)
+                .fmt(f)
+        });
+
+        if has_forced_break(flat_left.inspect(f)?) || has_forced_break(flat_right.inspect(f)?) {
+            return regular.fmt(f);
+        }
+
+        let single_line =
+            format_with(|f| write!(f, [flat_left, space(), self.operator, space(), flat_right]));
+        let symmetric = format_with(|f| {
+            write!(
+                f,
+                [
+                    token("("),
+                    block_indent(&format_args![
+                        flat_left,
+                        hard_line_break(),
+                        self.operator,
+                        space(),
+                        flat_right
+                    ]),
+                    token(")")
+                ]
+            )
+        });
+
+        best_fitting![
+            group(&single_line).with_id(Some(parens_id)),
+            group(&symmetric)
+                .with_id(Some(parens_id))
+                .should_expand(true),
+            regular
+        ]
+        .with_mode(BestFittingMode::AllLines)
+        .fmt(f)
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {
@@ -50,6 +224,7 @@ impl<'a> BinaryLike<'a> {
                 Operand::Left {
                     expression: compare.first_operand(),
                     leading_comments,
+                    is_comparison: true,
                 },
                 comments,
                 trivia,
@@ -70,7 +245,15 @@ impl<'a> BinaryLike<'a> {
                         trailing_comments: &[],
                     }));
 
-                    rec(Operand::Middle { expression }, comments, trivia, parts);
+                    rec(
+                        Operand::Middle {
+                            expression,
+                            is_comparison: true,
+                        },
+                        comments,
+                        trivia,
+                        parts,
+                    );
                 }
 
                 parts.push(OperandOrOperator::Operator(Operator {
@@ -82,6 +265,7 @@ impl<'a> BinaryLike<'a> {
                     Operand::Right {
                         expression: last_expression,
                         trailing_comments,
+                        is_comparison: true,
                     },
                     comments,
                     trivia,
@@ -105,6 +289,7 @@ impl<'a> BinaryLike<'a> {
                     Operand::Left {
                         expression: left,
                         leading_comments,
+                        is_comparison: false,
                     },
                     comments,
                     trivia,
@@ -118,7 +303,15 @@ impl<'a> BinaryLike<'a> {
 
                 if let Some((right, middle)) = rest.split_last() {
                     for expression in middle {
-                        rec(Operand::Middle { expression }, comments, trivia, parts);
+                        rec(
+                            Operand::Middle {
+                                expression,
+                                is_comparison: false,
+                            },
+                            comments,
+                            trivia,
+                            parts,
+                        );
                         parts.push(OperandOrOperator::Operator(Operator {
                             symbol: OperatorSymbol::Bool(bool_expression.op),
                             trailing_comments: &[],
@@ -129,6 +322,7 @@ impl<'a> BinaryLike<'a> {
                         Operand::Right {
                             expression: right,
                             trailing_comments,
+                            is_comparison: false,
                         },
                         comments,
                         trivia,
@@ -150,6 +344,7 @@ impl<'a> BinaryLike<'a> {
                 Operand::Left {
                     leading_comments,
                     expression: &binary.left,
+                    is_comparison: false,
                 },
                 comments,
                 trivia,
@@ -165,6 +360,7 @@ impl<'a> BinaryLike<'a> {
                 Operand::Right {
                     expression: binary.right.as_ref(),
                     trailing_comments,
+                    is_comparison: false,
                 },
                 comments,
                 trivia,
@@ -273,6 +469,8 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
             return in_parentheses_only_group(&&*flat_binary).fmt(f);
         }
 
+        let remove_comparison_parentheses =
+            is_remove_redundant_comparison_parentheses_enabled(f.context());
         let mut string_operands = flat_binary
             .operands()
             .filter_map(|(index, operand)| {
@@ -280,7 +478,10 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                     .ok()
                     .filter(|string| {
                         string.is_implicit_concatenated()
-                            && !trivia.parenthesized().contains(string.range())
+                            && (!trivia.parenthesized().contains(string.range())
+                                || (remove_comparison_parentheses
+                                    && operand.is_comparison()
+                                    && !comments.contains_comments(operand.expression().into())))
                     })
                     .map(|string| (index, string, operand))
             })
@@ -646,6 +847,18 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
         let mut last_operator: Option<OperatorIndex> = None;
 
         let lowest_precedence = self.lowest_precedence();
+        let single_operator = (is_hug_comparator_enabled(f.context())
+            || is_keep_dict_keys_with_operators_enabled(f.context()))
+            && self
+                .operators()
+                .filter(|(_, operator)| operator.precedence() == lowest_precedence)
+                .count()
+                == 1;
+        let hug_lone_comparator = single_operator
+            && is_hug_comparator_enabled(f.context())
+            && lowest_precedence == OperatorPrecedence::Comparator;
+        let hug_dictionary =
+            single_operator && is_keep_dict_keys_with_operators_enabled(f.context());
 
         for (index, operator_part) in self.operators() {
             if operator_part.precedence() == lowest_precedence {
@@ -659,26 +872,39 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                         f.context(),
                     );
 
-                if let Some(leading) = left.first_operand().leading_binary_comments() {
-                    leading_comments(leading).fmt(f)?;
-                }
+                let hug_comparator = hug_lone_comparator
+                    && left.operands().all(|(_, operand)| {
+                        is_unbracketed_comparison_operand(operand.expression(), f.context())
+                    })
+                    && matches!(&right.0, [OperandOrOperator::Operand(operand)] if matches!(operand.expression(), Expr::Call(_) | Expr::Subscript(_) | Expr::Attribute(_) | Expr::List(_) | Expr::Set(_) | Expr::Dict(_) | Expr::Tuple(_) | Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_)));
+                let hug_operator = hug_comparator
+                    || (hug_dictionary
+                        && matches!(operator_part.symbol, OperatorSymbol::Binary(_))
+                        && matches!(&right.0, [OperandOrOperator::Operand(operand)] if matches!(operand.expression(), Expr::Dict(_) | Expr::DictComp(_))));
 
-                match &left.0 {
-                    [OperandOrOperator::Operand(operand)] => operand.fmt(f)?,
-                    _ => in_parentheses_only_group(&left).fmt(f)?,
-                }
-
-                if let Some(trailing) = left.last_operand().trailing_binary_comments() {
-                    trailing_comments(trailing).fmt(f)?;
-                }
-
-                if is_pow {
-                    in_parentheses_only_soft_line_break().fmt(f)?;
+                let left_with_operator = format_with(|f| {
+                    if let Some(leading) = left.first_operand().leading_binary_comments() {
+                        leading_comments(leading).fmt(f)?;
+                    }
+                    match &left.0 {
+                        [OperandOrOperator::Operand(operand)] => operand.fmt(f)?,
+                        _ => in_parentheses_only_group(&left).fmt(f)?,
+                    }
+                    if let Some(trailing) = left.last_operand().trailing_binary_comments() {
+                        trailing_comments(trailing).fmt(f)?;
+                    }
+                    if is_pow {
+                        in_parentheses_only_soft_line_break().fmt(f)?;
+                    } else {
+                        in_parentheses_only_soft_line_break_or_space().fmt(f)?;
+                    }
+                    operator_part.fmt(f)
+                });
+                if hug_operator {
+                    in_parentheses_only_group(&left_with_operator).fmt(f)?;
                 } else {
-                    in_parentheses_only_soft_line_break_or_space().fmt(f)?;
+                    left_with_operator.fmt(f)?;
                 }
-
-                operator_part.fmt(f)?;
 
                 // Format the operator on its own line if the right side has any leading comments.
                 if operator_part.has_trailing_comments()
@@ -688,7 +914,9 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                 {
                     hard_line_break().fmt(f)?;
                 } else if is_pow {
-                    in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
+                    if !is_simplify_power_operator_hugging_enabled(f.context()) {
+                        in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
+                    }
                 } else {
                     space().fmt(f)?;
                 }
@@ -712,6 +940,35 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
             [OperandOrOperator::Operand(operand)] => operand.fmt(f),
             _ => in_parentheses_only_group(&right).fmt(f),
         }
+    }
+}
+
+fn is_unbracketed_comparison_operand(expression: &Expr, context: &PyFormatContext) -> bool {
+    if context.comments().contains_comments(expression.into())
+        || (context.is_expression_parenthesized(expression.into())
+            && !can_omit_comparison_operand_parentheses(expression, context))
+    {
+        return false;
+    }
+    match expression {
+        Expr::Name(_)
+        | Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::FString(_)
+        | Expr::TString(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_) => true,
+        Expr::Attribute(attribute) => {
+            !context.is_expression_parenthesized(attribute.value.as_ref().into())
+                && is_unbracketed_comparison_operand(&attribute.value, context)
+        }
+        Expr::UnaryOp(unary) => {
+            !context.is_expression_parenthesized(unary.operand.as_ref().into())
+                && is_unbracketed_comparison_operand(&unary.operand, context)
+        }
+        _ => false,
     }
 }
 
@@ -753,6 +1010,7 @@ enum Operand<'a> {
     /// ```
     Left {
         expression: &'a Expr,
+        is_comparison: bool,
         /// Leading comments of the outer most binary expression that starts at this node.
         leading_comments: &'a [SourceComment],
     },
@@ -766,7 +1024,10 @@ enum Operand<'a> {
     /// ```
     ///
     /// Middle have no leading or trailing comments from the enclosing binary like expression.
-    Middle { expression: &'a Expr },
+    Middle {
+        expression: &'a Expr,
+        is_comparison: bool,
+    },
 
     /// Operand that is on the right side of a binary operation.
     ///
@@ -777,17 +1038,29 @@ enum Operand<'a> {
     /// ```
     Right {
         expression: &'a Expr,
+        is_comparison: bool,
         /// Trailing comments of the outer most binary expression that ends at this operand.
         trailing_comments: &'a [SourceComment],
     },
 }
 
 impl<'a> Operand<'a> {
+    const fn is_comparison(&self) -> bool {
+        let (Operand::Left { is_comparison, .. }
+        | Operand::Middle { is_comparison, .. }
+        | Operand::Right { is_comparison, .. }) = self;
+        *is_comparison
+    }
+
+    fn omit_parentheses(&self, context: &PyFormatContext) -> bool {
+        self.is_comparison() && can_omit_comparison_operand_parentheses(self.expression(), context)
+    }
+
     fn expression(&self) -> &'a Expr {
         match self {
             Operand::Left { expression, .. } => expression,
             Operand::Right { expression, .. } => expression,
-            Operand::Middle { expression } => expression,
+            Operand::Middle { expression, .. } => expression,
         }
     }
 
@@ -799,7 +1072,7 @@ impl<'a> Operand<'a> {
             Operand::Left {
                 leading_comments, ..
             } => !leading_comments.is_empty(),
-            Operand::Middle { expression } | Operand::Right { expression, .. } => {
+            Operand::Middle { expression, .. } | Operand::Right { expression, .. } => {
                 let leading = comments.leading(*expression);
                 if context.is_expression_parenthesized((*expression).into()) {
                     leading.iter().any(|comment| {
@@ -847,6 +1120,10 @@ impl<'a> Operand<'a> {
 impl Format<PyFormatContext<'_>> for Operand<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let expression = self.expression();
+
+        if self.omit_parentheses(f.context()) {
+            return expression.format().with_options(Parentheses::Never).fmt(f);
+        }
 
         if f.context().is_expression_parenthesized(expression.into()) {
             let comments = f.context().comments().clone();
@@ -982,6 +1259,42 @@ impl Format<PyFormatContext<'_>> for Operand<'_> {
             expression.format().with_options(Parentheses::Never).fmt(f)
         }
     }
+}
+
+pub(super) fn can_omit_comparison_operand_parentheses(
+    expression: &Expr,
+    context: &PyFormatContext,
+) -> bool {
+    is_remove_redundant_comparison_parentheses_enabled(context)
+        && !context.comments().contains_comments(expression.into())
+        && matches!(
+            expression,
+            Expr::Name(_)
+                | Expr::Attribute(_)
+                | Expr::Call(_)
+                | Expr::Subscript(_)
+                | Expr::Await(_)
+                | Expr::List(_)
+                | Expr::ListComp(_)
+                | Expr::Set(_)
+                | Expr::SetComp(_)
+                | Expr::Dict(_)
+                | Expr::DictComp(_)
+                | Expr::Tuple(_)
+                | Expr::Generator(_)
+                | Expr::StringLiteral(_)
+                | Expr::BytesLiteral(_)
+                | Expr::FString(_)
+                | Expr::TString(_)
+                | Expr::NumberLiteral(_)
+                | Expr::BooleanLiteral(_)
+                | Expr::NoneLiteral(_)
+                | Expr::EllipsisLiteral(_)
+                | Expr::UnaryOp(ExprUnaryOp {
+                    op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
+                    ..
+                })
+        )
 }
 
 #[derive(Debug)]

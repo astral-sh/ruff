@@ -1544,3 +1544,16 @@ print(
 # Regression tests for https://github.com/astral-sh/ruff/issues/15536
 print(t"{ {}, 1 }")
 ```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,4 @@
+-(t"{one}{two}")
++t"{one}{two}"
+ 
+ 
+ rt"Not-so-tricky \"quote"
+```

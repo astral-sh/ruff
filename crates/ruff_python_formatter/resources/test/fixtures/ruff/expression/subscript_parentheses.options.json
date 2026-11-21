@@ -1,0 +1,5 @@
+[
+  { "target_version": "3.9" },
+  { "target_version": "3.11" },
+  { "target_version": "3.14" }
+]

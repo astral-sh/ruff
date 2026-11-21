@@ -1,15 +1,28 @@
-use ruff_formatter::{format_args, write};
+use ruff_formatter::{FormatRuleWithOptions, format_args, write};
 use ruff_python_ast::{AnyNodeRef, ElifElseClause, StmtIf};
 use ruff_text_size::Ranged;
 
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
+use crate::preview::is_pyi_overload_group_blank_lines_enabled;
 use crate::statement::clause::{ClauseHeader, clause};
+use crate::statement::stub;
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
-pub struct FormatStmtIf;
+pub struct FormatStmtIf {
+    stub_overload_groups: Vec<bool>,
+}
+
+impl FormatRuleWithOptions<StmtIf, PyFormatContext<'_>> for FormatStmtIf {
+    type Options = Vec<bool>;
+
+    fn with_options(mut self, stub_overload_groups: Vec<bool>) -> Self {
+        self.stub_overload_groups = stub_overload_groups;
+        self
+    }
+}
 
 impl FormatNodeRule<StmtIf> for FormatStmtIf {
     fn fmt_fields(&self, item: &StmtIf, f: &mut PyFormatter) -> FormatResult<()> {
@@ -23,6 +36,19 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
 
         let comments = f.context().comments().clone();
         let trailing_colon_comment = comments.dangling(item);
+        let default_groups;
+        let groups = if f.options().source_type().is_stub()
+            && is_pyi_overload_group_blank_lines_enabled(f.context())
+        {
+            if self.stub_overload_groups.is_empty() {
+                default_groups = stub::conditional_groups(item, None, None, f.context());
+                default_groups.as_slice()
+            } else {
+                &self.stub_overload_groups
+            }
+        } else {
+            &[]
+        };
 
         write!(
             f,
@@ -35,17 +61,24 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                 ],
                 trailing_colon_comment,
                 body,
-                SuiteKind::other(elif_else_clauses.is_empty()),
+                SuiteKind::other(elif_else_clauses.is_empty()).with_stub_overload_groups(
+                    groups.first().copied().unwrap_or(false),
+                    groups.get(1).copied().unwrap_or(false),
+                ),
             )]
         )?;
 
         let mut last_node = body.last().unwrap().into();
-        for clause in elif_else_clauses {
+        for (index, clause) in elif_else_clauses.iter().enumerate() {
             format_elif_else_clause(
                 clause,
                 f,
-                Some(last_node),
-                SuiteKind::other(clause == elif_else_clauses.last().unwrap()),
+                (!groups.get(index + 1).copied().unwrap_or(false)).then_some(last_node),
+                SuiteKind::other(clause == elif_else_clauses.last().unwrap())
+                    .with_stub_overload_groups(
+                        groups.get(index + 1).copied().unwrap_or(false),
+                        groups.get(index + 2).copied().unwrap_or(false),
+                    ),
             )?;
             last_node = clause.body.last().unwrap().into();
         }

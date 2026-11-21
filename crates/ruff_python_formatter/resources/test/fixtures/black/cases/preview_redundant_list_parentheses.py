@@ -1,0 +1,81 @@
+# Simple list literals
+([])
+([1])
+([1, 2])
+([1, 2, 3])
+
+# Nested parentheses
+(([]))
+((([1, 2])))
+
+# List comprehensions
+([x for x in items])
+(([x for x in items]))
+
+# Function call arguments
+foo(([1, 2]))
+foo(([]))
+foo(*([1, 2]))
+
+# Keyword arguments
+foo(items=([1, 2]))
+foo(items=(([])))
+
+# Assignments
+items = ([1, 2])
+items = (([]))
+
+# Operators
+([1, 2]) + ([3, 4])
+not ([1, 2])
+1 in ([1, 2])
+
+# Subscript and attribute access
+([1, 2])[0]
+([1, 2]).append(3)
+([1, 2]).copy()
+
+# Statements
+if ([1, 2]):
+    pass
+
+while ([1, 2]):
+    pass
+
+for item in ([1, 2]):
+    pass
+
+with ([1, 2]):
+    pass
+
+
+def f():
+    return ([1, 2])
+
+
+def g():
+    yield ([1, 2])
+
+
+f = lambda: ([1, 2])
+
+# Containers
+[([1, 2])]
+{"key": ([1, 2])}
+
+# Multiline list
+([
+    1,
+    2,
+])
+
+# Comments
+# leading comment
+([1, 2])
+([1, 2])  # trailing comment
+
+# Parentheses required for tuples containing lists
+([1, 2],)
+([1, 2], 3)
+(([1, 2],))
+foo(([1, 2],))

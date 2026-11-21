@@ -4,8 +4,8 @@ use ruff_text_size::Ranged;
 
 use crate::builders::{PyFormatterExtensions, parenthesize_if_expands};
 use crate::comments::dangling_node_comments;
-use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
+use crate::expression::{FormatUnpackingTarget, maybe_parenthesize_expression};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -50,7 +50,11 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
             targets => {
                 let item = format_with(|f| {
                     f.join_comma_separated(item.end())
-                        .nodes(targets.iter())
+                        .entries(
+                            targets
+                                .iter()
+                                .map(|target| (target, FormatUnpackingTarget(target))),
+                        )
                         .finish()
                 });
                 parenthesize_if_expands(&item).fmt(f)

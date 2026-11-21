@@ -1,0 +1,240 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/comprehension_in.py
+---
+## Input
+```python
+result = [
+    very_very_very_very_very_long_item
+    for very_very_very_very_very_long_item in some_very_very_very_very_very_very_long_function_name
+]
+result = {
+    very_very_very_very_very_long_item
+    for very_very_very_very_very_long_item in source.collection.items()
+}
+result = {
+    very_very_very_very_very_long_key: value
+    for very_very_very_very_very_long_key, value in source.collection.items()
+}
+result = consume(
+    very_very_very_very_very_long_item
+    for very_very_very_very_very_long_item in source.collection.items()
+)
+
+# Avoid wrapping an iterable that still cannot fit on its own line.
+result = [item for item in very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_long_name]
+
+# Keep required grammar and user grouping in compound iterables.
+result = [item for item in (lambda: source) if item]
+result = [item for item in (left if condition else right)]
+result = [item for item in (left or right)]
+result = [item for item in left or right]
+
+# An iterable that expands also expands its comprehension.
+result = [item for item in call(first, second,)]
+result = [item for item in call(["long long long long line", "long long long long line"])]
+
+async def collect():
+    return [item async for item in source.collection.items() if item]
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+result = [
+    very_very_very_very_very_long_item
+    for very_very_very_very_very_long_item in some_very_very_very_very_very_very_long_function_name
+]
+result = {
+    very_very_very_very_very_long_item
+    for very_very_very_very_very_long_item in source.collection.items()
+}
+result = {
+    very_very_very_very_very_long_key: value
+    for very_very_very_very_very_long_key, value in source.collection.items()
+}
+result = consume(
+    very_very_very_very_very_long_item
+    for very_very_very_very_very_long_item in source.collection.items()
+)
+
+# Avoid wrapping an iterable that still cannot fit on its own line.
+result = [
+    item
+    for item in very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_long_name
+]
+
+# Keep required grammar and user grouping in compound iterables.
+result = [item for item in (lambda: source) if item]
+result = [item for item in (left if condition else right)]
+result = [item for item in (left or right)]
+result = [item for item in left or right]
+
+# An iterable that expands also expands its comprehension.
+result = [
+    item
+    for item in call(
+        first,
+        second,
+    )
+]
+result = [
+    item for item in call(["long long long long line", "long long long long line"])
+]
+
+
+async def collect():
+    return [item async for item in source.collection.items() if item]
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,6 +1,8 @@
+ result = [
+     very_very_very_very_very_long_item
+-    for very_very_very_very_very_long_item in some_very_very_very_very_very_very_long_function_name
++    for very_very_very_very_very_long_item in (
++        some_very_very_very_very_very_very_long_function_name
++    )
+ ]
+ result = {
+     very_very_very_very_very_long_item
+```
+
+
+### Output 2
+```
+indent-style               = space
+line-width                 = 40
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.11
+source_type                = Python
+nested-string-quote-style  = alternating
+```
+
+```python
+result = [
+    very_very_very_very_very_long_item
+    for very_very_very_very_very_long_item in some_very_very_very_very_very_very_long_function_name
+]
+result = {
+    very_very_very_very_very_long_item
+    for very_very_very_very_very_long_item in source.collection.items()
+}
+result = {
+    very_very_very_very_very_long_key: value
+    for very_very_very_very_very_long_key, value in source.collection.items()
+}
+result = consume(
+    very_very_very_very_very_long_item
+    for very_very_very_very_very_long_item in source.collection.items()
+)
+
+# Avoid wrapping an iterable that still cannot fit on its own line.
+result = [
+    item
+    for item in very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_long_name
+]
+
+# Keep required grammar and user grouping in compound iterables.
+result = [
+    item
+    for item in (lambda: source)
+    if item
+]
+result = [
+    item
+    for item in (
+        left if condition else right
+    )
+]
+result = [
+    item for item in (left or right)
+]
+result = [
+    item for item in left or right
+]
+
+# An iterable that expands also expands its comprehension.
+result = [
+    item
+    for item in call(
+        first,
+        second,
+    )
+]
+result = [
+    item
+    for item in call(
+        [
+            "long long long long line",
+            "long long long long line",
+        ]
+    )
+]
+
+
+async def collect():
+    return [
+        item
+        async for item in source.collection.items()
+        if item
+    ]
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -50,18 +50,18 @@
+ ]
+ result = [
+     item
+-    for item in call(
+-        [
+-            "long long long long line",
+-            "long long long long line",
+-        ]
+-    )
++    for item in call([
++        "long long long long line",
++        "long long long long line",
++    ])
+ ]
+ 
+ 
+ async def collect():
+     return [
+         item
+-        async for item in source.collection.items()
++        async for item in (
++            source.collection.items()
++        )
+         if item
+     ]
+```

@@ -8,6 +8,7 @@ use crate::expression::is_expression_huggable;
 use crate::expression::parentheses::{Parentheses, empty_parenthesized, parenthesized};
 use crate::other::commas;
 use crate::prelude::*;
+use crate::preview::is_remove_redundant_generator_parentheses_enabled;
 use crate::string::StringLikeExtensions;
 
 #[derive(Default)]
@@ -36,15 +37,27 @@ impl FormatNodeRule<Arguments> for FormatArguments {
 
         let all_arguments = format_with(|f: &mut PyFormatter| {
             let source = f.context().source();
+            let generator_parentheses =
+                if is_remove_redundant_generator_parentheses_enabled(f.context())
+                    && let [Expr::Generator(generator)] = args.as_ref()
+                    && keywords.is_empty()
+                    && !f.context().comments().contains_comments(generator.into())
+                    && !commas::has_magic_trailing_comma(
+                        TextRange::new(generator.end(), range.end()),
+                        f.context(),
+                    )
+                {
+                    GeneratorExpParentheses::Never
+                } else {
+                    GeneratorExpParentheses::Preserve
+                };
             let mut joiner = f.join_comma_separated(range.end());
             match args.as_ref() {
                 [arg] if keywords.is_empty() => {
                     match arg {
                         Expr::Generator(generator_exp) => joiner.entry(
                             generator_exp,
-                            &generator_exp
-                                .format()
-                                .with_options(GeneratorExpParentheses::Preserve),
+                            &generator_exp.format().with_options(generator_parentheses),
                         ),
                         other => {
                             let parentheses =

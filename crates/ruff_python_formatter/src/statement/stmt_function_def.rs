@@ -4,14 +4,28 @@ use crate::comments::format::{
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::prelude::*;
+use crate::preview::is_pyi_blank_line_after_function_docstring_enabled;
 use crate::statement::clause::{ClauseHeader, clause};
 use crate::statement::stmt_class_def::FormatDecorators;
-use crate::statement::suite::SuiteKind;
-use ruff_formatter::write;
+use crate::statement::suite::{SuiteKind, function_has_only_docstring};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::{NodeKind, StmtFunctionDef};
+use ruff_python_trivia::lines_before;
+use ruff_text_size::Ranged;
 
 #[derive(Default)]
-pub struct FormatStmtFunctionDef;
+pub struct FormatStmtFunctionDef {
+    continues_stub_group: bool,
+}
+
+impl FormatRuleWithOptions<StmtFunctionDef, PyFormatContext<'_>> for FormatStmtFunctionDef {
+    type Options = bool;
+
+    fn with_options(mut self, continues_stub_group: bool) -> Self {
+        self.continues_stub_group = continues_stub_group;
+        self
+    }
+}
 
 impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
     fn fmt_fields(&self, item: &StmtFunctionDef, f: &mut PyFormatter) -> FormatResult<()> {
@@ -86,8 +100,24 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
         //
         // # comment
         // ```
-        empty_lines_before_trailing_comments(comments.trailing(item), NodeKind::StmtFunctionDef)
-            .fmt(f)
+        if self.continues_stub_group {
+            Ok(())
+        } else if f.options().source_type().is_stub()
+            && is_pyi_blank_line_after_function_docstring_enabled(f.context())
+            && function_has_only_docstring(item, f.context())
+            && let Some(comment) = comments
+                .trailing(item)
+                .iter()
+                .find(|comment| comment.line_position().is_own_line())
+        {
+            if lines_before(comment.start(), f.context().source()) < 2 {
+                empty_line().fmt(f)?;
+            }
+            Ok(())
+        } else {
+            empty_lines_before_trailing_comments(comments.trailing(item), NodeKind::StmtFunctionDef)
+                .fmt(f)
+        }
     }
 }
 
