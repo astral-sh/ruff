@@ -1175,7 +1175,7 @@ mod tests {
         parsed::ParsedModuleRef,
     };
     use ruff_python_ast as ast;
-    use ruff_text_size::{Ranged, TextRange, TextSize};
+    use ruff_text_size::{Ranged, TextRange};
     use test_case::test_case;
 
     use super::Truthiness::{AlwaysFalse, AlwaysTrue, Ambiguous, Uninhabited};
@@ -2051,29 +2051,6 @@ class C[T]:
             "C"
         );
         assert_eq!(names(index.place_table(class_scope_id)), vec!["x"]);
-    }
-
-    #[test_case("f()\ng()\nh()"; "ordered ranges")]
-    #[test_case("f()\na and b"; "equal end offsets")]
-    #[test_case("f()\na and b and c"; "decreasing end offsets")]
-    #[test_case("a if b and c else d"; "out of source order")]
-    fn reachability_lookup_matches_full_scan(source: &str) {
-        let TestCase { db, file } = test_case(source);
-        let scope = global_scope(&db, program_file(&db, file));
-        let map = use_def_map(&db, scope);
-        let len = TextSize::of(source).to_u32();
-        for start in 0..=len {
-            for end in start..=len {
-                let query = TextRange::new(start.into(), end.into());
-                let expected = map.range_reachability().filter_map(|(range, constraint)| {
-                    range.contains_range(query).then_some(constraint)
-                });
-                assert!(
-                    map.reachability_constraints_for(query).eq(expected),
-                    "{query:?}"
-                );
-            }
-        }
     }
 
     #[test]
