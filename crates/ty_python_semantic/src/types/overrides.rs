@@ -541,7 +541,7 @@ fn inherited_conflict_mro<'db>(
 
 /// Source declarations, receiver attributes, and slots in their lookup order. Only a source
 /// declaration can supply the definition for an inherited method diagnostic.
-#[salsa::tracked(returns(ref), cycle_initial=|_, _, _| FxIndexMap::default(), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _| FxIndexMap::default(), heap_size=ruff_memory_usage::heap_size)]
 fn inherited_member_candidates<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -567,7 +567,7 @@ fn inherited_member_candidates<'db>(
 /// A declaration, receiver use, or slot on both bases is enough to retain a name; the normal
 /// check resolves its type for the subclass. When only one base lists the name, use member
 /// lookup on the other because synthesis can introduce an override target or shadow a method.
-#[salsa::tracked(returns(deref), cycle_initial=|_, _, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(deref), cycle_initial=|_, _, _, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
 fn shared_inherited_names<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
@@ -599,6 +599,7 @@ fn visit_shared_inherited_names<'db>(
         return;
     };
     let listed = inherited_member_candidates(db, literal);
+    let code_generator = LazyCell::new(|| CodeGeneratorKind::from_class(db, literal.into()));
     let table = place_table(db, literal.body_scope(db));
     let specialization = specialization.map(|s| s.tuple_runtime_element_specialization(db));
     candidates
@@ -608,11 +609,20 @@ fn visit_shared_inherited_names<'db>(
             if listed.contains_key(*name) {
                 return true;
             }
+            // Checking for a shared name doesn't require building a constructor signature.
+            if *name == "__init__"
+                && table.symbol_id(name).is_none()
+                && code_generator.is_some_and(|kind| {
+                    kind.synthesizes_constructor_signature_from_fields(db, literal)
+                })
+            {
+                return true;
+            }
             // The inventory includes every slot and receiver attribute. If the class body
             // has no symbol either, a non-dunder can only come from member synthesis.
             if !is_dunder(name) && table.symbol_id(name).is_none() {
                 return literal
-                    .own_synthesized_member(db, env, specialization, None, name)
+                    .own_generated_member(db, env, specialization, None, name, || *code_generator)
                     .is_some();
             }
             !other.own_class_member(db, env, None, name).is_undefined()

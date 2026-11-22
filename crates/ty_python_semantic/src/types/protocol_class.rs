@@ -3611,7 +3611,7 @@ fn non_object_protocol_member_count<'db>(
 /// fixed-point computation starting from bivariance.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, _, _| true,
+    cycle_initial=|_, _, _, _| true,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn supports_protocol_variance_inference<'db>(
@@ -3663,7 +3663,7 @@ fn supports_protocol_variance_inference<'db>(
 /// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=protocol_interface_cycle_initial,
+    cycle_initial=|db, id, _, input| protocol_interface_cycle_initial(db, id, input),
     cycle_fn=proto_interface_cycle_recover,
     heap_size=ruff_memory_usage::heap_size,
 )]
@@ -3789,7 +3789,7 @@ fn protocol_bind_self<'db>(
 /// Cache receiver and `Self` binding only for protocol-member compatibility checks.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|db, _, _, _, _, _| CallableType::bottom(db),
+    cycle_initial=|db, _, _, _, _, _, _| CallableType::bottom(db),
     heap_size=ruff_memory_usage::heap_size
 )]
 fn protocol_apply_self_with_receiver<'db>(

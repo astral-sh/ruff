@@ -173,6 +173,83 @@ def _(flag: bool):
     reveal_type(f)  # revealed: str | Literal[54]
 ```
 
+## Bit flags
+
+```py
+def flags(first: bool, second: bool):
+    value = 0
+    value |= 1 if first else 0
+    value |= 2 if second else 0
+    reveal_type(value)  # revealed: Literal[3, 1, 2, 0]
+```
+
+## A reflected operator that accepts only one literal
+
+```py
+from typing import Literal
+
+class Operand:
+    def __ror__(self, other: Literal[0]) -> str:
+        return ""
+
+def update(flag: bool):
+    value = 1 if flag else 0
+    value |= Operand()  # error: [unsupported-operator]
+    reveal_type(value)  # revealed: Unknown | str
+```
+
+## Integer literals and a custom in-place operator
+
+The integer literals fall back to `__or__` while the other union member uses `__ior__`.
+
+```py
+from typing import Literal
+
+class Flags:
+    def __ior__(self, other: int) -> str:
+        return ""
+
+def update(initial: Literal[0, 1] | Flags):
+    value = initial
+    value |= 2
+    reveal_type(value)  # revealed: Literal[2, 3] | str
+```
+
+## An in-place operator on a builtin class
+
+If the stubs define an in-place method, `Self` refers to each literal in turn.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+Self: object
+
+def reveal_type(obj, /): ...
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+from typing_extensions import Self
+
+class object: ...
+
+class int:
+    def __ior__(self, other: int) -> Self: ...
+```
+
+```py
+def update(flag):
+    value = 0 if flag else 1
+    value |= 2
+    reveal_type(value)  # revealed: Literal[0, 1]
+```
+
 ## Partially bound target union with `__add__`
 
 ```py

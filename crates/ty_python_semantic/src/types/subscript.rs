@@ -92,7 +92,7 @@ impl DunderMethod {
             },
         }
 
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn call_subscript_method<'db>(
             db: &'db dyn Db,
             program: Program<'db>,

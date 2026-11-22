@@ -594,7 +594,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| false, heap_size=ruff_memory_usage::heap_size)]
         fn is_constraint_set_subtype_of_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
             let env = ProgramEnvironment::from_program(types.program(db));
             let constraints = ConstraintSetBuilder::new();
@@ -660,7 +660,7 @@ impl<'db> Type<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _| OwnedConstraintSet::always(),
+            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_assignable_to_owned_impl<'db>(
@@ -672,7 +672,7 @@ impl<'db> Type<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
+            cycle_initial=|_, _, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_assignable_to_owned_with_inferable_impl<'db>(
@@ -706,7 +706,7 @@ impl<'db> Type<'db> {
 
     /// Returns `true` if assignability is known to be unconditionally satisfied before
     /// constructing the relation checker.
-    fn is_trivially_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub(super) fn is_trivially_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         if self.materialized_divergent_fallback().is_none() && self == target {
             return true;
         }
@@ -781,7 +781,7 @@ impl<'db> Type<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _| OwnedConstraintSet::always(),
+            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_constraint_set_assignable_to_owned_impl<'db>(
@@ -799,7 +799,7 @@ impl<'db> Type<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
+            cycle_initial=|_, _, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_constraint_set_assignable_to_owned_with_provenance_impl<'db>(
@@ -870,7 +870,7 @@ impl<'db> Type<'db> {
         // comparison alternate between true and false. Keeping an extra alternative is safe.
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| true,
+            cycle_initial=|_, _, _, _| true,
             cycle_fn=|_, _, previous: &bool, current: bool, _| *previous && current,
             heap_size=ruff_memory_usage::heap_size,
         )]
@@ -1080,7 +1080,7 @@ impl<'db> Type<'db> {
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _| OwnedConstraintSet::always(),
+            cycle_initial=|_, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_constraint_set_equivalent_to_impl<'db>(

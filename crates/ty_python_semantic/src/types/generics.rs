@@ -2561,35 +2561,58 @@ impl<'db> HasIdentity<'db> for InferSpecialization<'db> {
     }
 }
 
-/// Filter incompatible union members without adding constraints to the caller's specialization.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum UnionInference<'db> {
+    Whole,
+    Filtered(Type<'db>, Type<'db>),
+}
+
+/// Decide how to infer from these types without adding constraints to the caller's specialization.
+/// Overloads can share this decision even when they accumulate different constraints.
 #[expect(clippy::unnecessary_wraps, reason = "Salsa returns None during cycles")]
-fn filter_inference_unions<'db>(
+fn union_inference<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     generic_context: GenericContext<'db>,
     formal: Type<'db>,
     actual: Type<'db>,
-) -> (Type<'db>, Type<'db>) {
+) -> UnionInference<'db> {
     #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-    fn cached_filter_inference_unions<'db>(
+    fn cached_union_inference<'db>(
         db: &'db dyn Db,
         program: Program<'db>,
         generic_context: GenericContext<'db>,
         formal: Type<'db>,
         actual: Type<'db>,
-    ) -> Option<(Type<'db>, Type<'db>)> {
+    ) -> Option<UnionInference<'db>> {
         let env = ProgramEnvironment::from_program(program);
-        Some(filter(db, &env, generic_context, formal, actual))
+        Some(compute(db, &env, generic_context, formal, actual))
     }
 
-    fn filter<'db>(
+    fn compute<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         generic_context: GenericContext<'db>,
         formal: Type<'db>,
         actual: Type<'db>,
-    ) -> (Type<'db>, Type<'db>) {
+    ) -> UnionInference<'db> {
         let inferable = generic_context.inferable_typevars(db);
+        // Keep alternative matches in one constraint set until all arguments have contributed
+        // their evidence. Filtering either union first can discard an obligation or apply a
+        // variable's bound to an argument member that matches a different formal member.
+        // Variadic unions retain their existing inference path, as does direct gradual evidence:
+        // `Any <= T | None` is unconditional and would lose the mapping `T = Any`.
+        // Recursive aliases retain their unfolding path, which collects leaf evidence for
+        // variables in types such as `Tree[T] = T | tuple[Tree[T]]`.
+        if formal.resolve_type_alias(db).is_union()
+            && !inferable
+                .iter(db)
+                .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db))
+            && !SpecializationBuilder::requires_memberwise_union_inference(db, env, formal, actual)
+        {
+            return UnionInference::Whole;
+        }
+
         // Remove the union elements from `actual` that are not related to `formal`, and vice
         // versa.
         //
@@ -2623,12 +2646,12 @@ fn filter_inference_unions<'db>(
                 .is_always_satisfied(db, env, inferable)
         });
 
-        (formal, actual)
+        UnionInference::Filtered(formal, actual)
     }
 
     // Recompute against the current provisional types while resolving a cycle.
-    cached_filter_inference_unions(db, env.program(db), generic_context, formal, actual)
-        .unwrap_or_else(|| filter(db, env, generic_context, formal, actual))
+    cached_union_inference(db, env.program(db), generic_context, formal, actual)
+        .unwrap_or_else(|| compute(db, env, generic_context, formal, actual))
 }
 
 /// Performs type inference between parameter annotations and argument types, producing a
@@ -2690,7 +2713,7 @@ impl<'db> TypeVarInference<'db> {
     pub(crate) fn merged_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|db, _, inference: TypeVarInference<'db>| {
+            cycle_initial=|db, _, _, inference: TypeVarInference<'db>| {
                 inference.generic_context(db).unknown_specialization(db, None)
             },
             cycle_fn=|db, cycle: &salsa::Cycle, previous: &Specialization<'db>, current: Specialization<'db>, inference: TypeVarInference<'db>| {
@@ -4112,8 +4135,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ///
     /// The formal type limits which gradual types we look for in the actual type; we do not
     /// match corresponding positions to determine whether that evidence reaches a type variable.
-    fn requires_memberwise_union_inference(&self, formal: Type<'db>, actual: Type<'db>) -> bool {
-        let db = self.db;
+    fn requires_memberwise_union_inference(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> bool {
         let union = formal.resolve_type_alias(db);
         let has_nested_union = Cell::new(false);
         let instances = RefCell::new(FxOrderSet::default());
@@ -4122,7 +4149,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // evidence. Collect instances while checking for recursion, but look up their
         // classes only if we encounter a generic base of the argument. For example,
         // looking up the class of a tuple requires specializing it with its element types.
-        let recursive = any_over_type_expanding_aliases(db, self.env, formal, |ty| {
+        let recursive = any_over_type_expanding_aliases(db, env, formal, |ty| {
             match ty {
                 Type::Recursive(_) => return true,
                 Type::Union(_) if ty != union => has_nested_union.set(true),
@@ -4142,7 +4169,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // `Box[T] | int` can infer `Any` directly, and a concrete `dict[str, Any]` arm must not
         // prevent inference from other members of an argument union.
         if has_nested_union.get()
-            && self.has_nested_gradual_evidence(
+            && Self::has_nested_gradual_evidence(
+                db,
+                env,
                 &instances.into_inner(),
                 actual,
                 &RefCell::default(),
@@ -4173,13 +4202,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     if !seen_recursive_types.insert(actual.to_type_identity(db)) {
                         return true;
                     }
-                    pending.push(recursive.unfold(db, self.env).into_type());
+                    pending.push(recursive.unfold(db, env).into_type());
                 }
                 Type::Union(union) => pending.extend(union.elements(db).iter().copied()),
                 Type::Intersection(intersection) => pending.extend(intersection.iter_positive(db)),
                 Type::NominalInstance(instance)
                     if instance
-                        .class(db, self.env)
+                        .class(db, env)
                         .iter_mro(db)
                         .any(|base| matches!(base, ClassBase::Any | ClassBase::Dynamic(_))) =>
                 {
@@ -4192,23 +4221,23 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     fn has_nested_gradual_evidence(
-        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         instances: &FxOrderSet<Type<'db>>,
         actual: Type<'db>,
         seen_classes: &RefCell<FxHashSet<ClassType<'db>>>,
         active_classes: &ActiveRecursionDetector<ClassLiteral<'db>>,
     ) -> bool {
-        let db = self.db;
         let in_formal = |origin| {
             instances.iter().any(|ty| {
-                ty.nominal_class(db, self.env)
+                ty.nominal_class(db, env)
                     .is_some_and(|class| class.class_literal(db) == origin)
             })
         };
-        any_over_type_expanding_aliases(db, self.env, actual, |nested| match nested {
+        any_over_type_expanding_aliases(db, env, actual, |nested| match nested {
             Type::Dynamic(_) => true,
             Type::NominalInstance(instance) => {
-                let class = instance.class(db, self.env);
+                let class = instance.class(db, env);
                 // Exact recursion adds no evidence, as when `str` inherits `Sequence[str]`.
                 if !seen_classes.borrow_mut().insert(class) {
                     return false;
@@ -4229,7 +4258,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 // Only bases present in the formal type can supply this evidence:
                                 // `str` inheriting `Container[Any]` does not make it gradual here.
                                 base.specialization(db).types(db).iter().any(|&ty| {
-                                    self.has_nested_gradual_evidence(
+                                    Self::has_nested_gradual_evidence(
+                                        db,
+                                        env,
                                         instances,
                                         ty,
                                         seen_classes,
@@ -4286,29 +4317,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // possible when adding any new heuristics here. See the `Callable` clause below for an
         // example.
 
-        let has_variadic = self
-            .inferable
-            .iter(db)
-            .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
-
-        // Keep alternative matches in one constraint set until all arguments have contributed
-        // their evidence. Filtering either union first can discard an obligation or apply a
-        // variable's bound to an argument member that matches a different formal member.
-        // Variadic unions retain their existing inference path, as does direct gradual evidence:
-        // `Any <= T | None` is unconditional and would lose the mapping `T = Any`.
-        // Recursive aliases retain their unfolding path, which collects leaf evidence for
-        // variables in types such as `Tree[T] = T | tuple[Tree[T]]`.
-        let formal_is_union = formal.resolve_type_alias(db).is_union();
-        if formal_is_union
-            && !has_variadic
-            && !self.requires_memberwise_union_inference(formal, actual)
+        let (formal, actual) = if formal.resolve_type_alias(db).is_union()
+            || actual.resolve_type_alias(db).is_union()
         {
-            let when = self.constraint_for_relation(formal, actual, polarity);
-            return self.infer_from_constraint_set(when);
-        }
-
-        let (formal, actual) = if formal_is_union || actual.resolve_type_alias(db).is_union() {
-            filter_inference_unions(db, self.env, self.generic_context, formal, actual)
+            match union_inference(db, self.env, self.generic_context, formal, actual) {
+                UnionInference::Whole => {
+                    let when = self.constraint_for_relation(formal, actual, polarity);
+                    return self.infer_from_constraint_set(when);
+                }
+                UnionInference::Filtered(formal, actual) => (formal, actual),
+            }
         } else {
             (formal, actual)
         };

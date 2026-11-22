@@ -8,6 +8,7 @@ use std::collections::hash_map::Entry;
 use std::ops::ControlFlow;
 
 use rustc_hash::FxHashMap;
+use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::{AnalysisSettings, Db, Program, ProgramEnvironment, place::PlaceAndQualifiers};
@@ -1454,8 +1455,7 @@ fn evaluate_intersection_left<'db>(
     let mut any_true = false;
     let mut any_false = false;
     let mut any_ambiguous = false;
-    let mut any_narrowing = false;
-    let mut builder = IntersectionBuilder::new(db, &evaluator.env).add_positive(original);
+    let mut narrowed_types = SmallVec::<[_; 1]>::new();
 
     for element in positive {
         match evaluator.evaluate(*element, other, branch, operator) {
@@ -1474,14 +1474,13 @@ fn evaluate_intersection_left<'db>(
                     return ComparisonResult::Ambiguous;
                 }
 
-                any_narrowing = true;
-                builder.add_positive_in_place(narrowed);
+                narrowed_types.push(narrowed);
             }
             ComparisonResult::Ambiguous => any_ambiguous = true,
         }
     }
 
-    if any_ambiguous || (any_narrowing && (any_true || any_false)) {
+    if any_ambiguous || (!narrowed_types.is_empty() && (any_true || any_false)) {
         return ComparisonResult::Ambiguous;
     }
 
@@ -1489,7 +1488,12 @@ fn evaluate_intersection_left<'db>(
         (true, false) => ComparisonResult::AlwaysTrue,
         (false, true) => ComparisonResult::AlwaysFalse,
         (true, true) => ComparisonResult::Ambiguous,
-        (false, false) => ComparisonResult::CanNarrow(builder.build()),
+        (false, false) => ComparisonResult::CanNarrow(
+            IntersectionBuilder::new(db, &evaluator.env)
+                .add_positive(original)
+                .positive_elements(narrowed_types)
+                .build(),
+        ),
     }
 }
 
@@ -2036,7 +2040,7 @@ impl KnownComparisonSemantics {
 }
 
 /// Classify the implementation once per class so every enum member can reuse it.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 fn class_comparison_semantics<'db>(
     db: &'db dyn Db,
     program: Program<'db>,

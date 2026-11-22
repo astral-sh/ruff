@@ -252,7 +252,7 @@ impl<'db> ClassType<'db> {
     /// The value of the map is a struct containing information about the abstract method.
     // Inferring class members can call constructors that query abstractness again.
     // Start with no abstract methods while resolving these cycles.
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=|_, _, _| FxIndexMap::default())]
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=|_, _, _, _| FxIndexMap::default())]
     pub(in crate::types) fn abstract_methods(
         self,
         db: &'db dyn Db,
@@ -381,7 +381,7 @@ impl<'db> ClassType<'db> {
 /// Keep the definition dependency in this query so unrelated edits to a superclass's module do
 /// not invalidate abstract-method discovery for all of its subclasses. Use cached decorator
 /// metadata to avoid reloading ASTs that were discarded after checking their files.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true)]
 fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
     let DefinitionKind::Function(function) = definition.kind(db) else {
         return true;

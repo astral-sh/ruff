@@ -109,7 +109,7 @@ pub(super) struct CyclicTypeAliasError<'db> {
 /// which recursive references remain in the recovered type.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+    cycle_initial=|db, id, _, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
         LegacyTypeAliasInference {
             ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
             context: InferContextResult::default(),
@@ -167,7 +167,7 @@ pub(super) struct LegacyTypeAliasInference<'db> {
 /// separately so unchecked dependencies and local suppressions do not hide the explanation.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| TypeCheckDiagnostics::default(),
+    cycle_initial=|_, _, _, _| TypeCheckDiagnostics::default(),
     heap_size=ruff_memory_usage::heap_size
 )]
 pub(super) fn non_alias_type_expression_diagnostics<'db>(
@@ -256,7 +256,7 @@ fn normalize_collection_use_constraints<'db>(
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, definition: Definition<'db>| {
+    cycle_initial=|db, id, _, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
@@ -312,7 +312,7 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
 /// `@staticmethod`).
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| FunctionDecoratorInference {
+    cycle_initial=|_, _, _, _| FunctionDecoratorInference {
         may_produce_abstract_method: true,
         ..FunctionDecoratorInference::default()
     },
@@ -413,7 +413,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 /// Function parameter defaults are inferred separately by [`infer_function_default_types`].
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, definition: Definition<'db>| {
+    cycle_initial=|db, id, _, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
@@ -459,7 +459,7 @@ pub(crate) fn infer_deferred_types<'db>(
 /// Keeping the results separate also avoids caching annotation expressions twice.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, definition: Definition<'db>| {
+    cycle_initial=|db, id, _, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
@@ -533,7 +533,7 @@ pub(crate) fn infer_scope_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
+    cycle_initial=|_, id, _, _| ScopeInference::cycle_initial(Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(scope);
@@ -602,7 +602,7 @@ pub(crate) fn infer_predicate_truthiness<'db>(
 /// Reachability walks can revisit the same predicate for many different bindings.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    cycle_initial = |_, _, _, _| Truthiness::Ambiguous,
     cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, current: Truthiness, _| {
         // A predicate can guard one of its own inputs. Keep both outcomes when iterations
         // disagree, but give the initial ambiguous result a chance to resolve first.
@@ -638,7 +638,7 @@ fn evaluate_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'d
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=expression_cycle_initial,
+    cycle_initial=|db, id, _, input| expression_cycle_initial(db, id, input),
     cycle_fn=|db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
@@ -720,7 +720,7 @@ pub(crate) fn infer_expression_type<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|_, id, _, _| Type::divergent(id),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
@@ -760,7 +760,7 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, statement: StatementInner<'db>| {
+    cycle_initial=|db, id, _, statement: StatementInner<'db>| {
         StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
@@ -884,7 +884,7 @@ impl<'db> InferScope<'db> {
 /// during this unpacking.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
+    cycle_initial=|_, id, _, _| UnpackResult::cycle_initial(Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
         result.cycle_normalized(db, &env, previous, cycle)
@@ -998,6 +998,12 @@ pub(crate) enum InferenceRegion<'db> {
 }
 
 impl<'db> InferenceRegion<'db> {
+    /// Whether to collect binding types from nested inference regions.
+    /// Scope inference leaves these types to the individual definition queries.
+    fn collects_bindings(self) -> bool {
+        !matches!(self, Self::Scope(..))
+    }
+
     fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
             InferenceRegion::Statement(statement) => statement.scope(db),

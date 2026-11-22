@@ -79,7 +79,7 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_fn=implicit_attribute_cycle_recover,
-        cycle_initial=|_, id, _| ImplicitAttribute {
+        cycle_initial=|_, id, _, _| ImplicitAttribute {
             member: Member {
                 inner: Place::bound(Type::divergent(id)).into(),
             },
@@ -98,7 +98,7 @@ impl<'db> StaticClassLiteral<'db> {
         result
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
     fn has_implicit_attribute_inner(
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,

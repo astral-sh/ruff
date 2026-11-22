@@ -1,5 +1,4 @@
-use crate::Db;
-use crate::ProgramEnvironment;
+use crate::{Db, Program, ProgramEnvironment};
 use compact_str::CompactString;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
@@ -47,6 +46,29 @@ fn is_union_type_operand(ty: Type<'_>) -> bool {
                     | KnownInstanceType::Sentinel(_)
             )
     )
+}
+
+/// Whether `class` might define or inherit the in-place method for `op`.
+///
+/// Literals of the same class share this lookup. If the method exists, we still bind
+/// it to each literal separately.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+pub(super) fn has_in_place_operator<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    class: KnownClass,
+    op: ast::Operator,
+) -> bool {
+    let env = &ProgramEnvironment::from_program(program);
+    class
+        .to_class_literal(db, env)
+        .find_name_in_mro_with_policy(
+            db,
+            env,
+            op.in_place_dunder(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
+        .is_none_or(|member| !member.is_undefined())
 }
 
 /// Repeated conditional concatenation can double the number of tuple alternatives at each step.

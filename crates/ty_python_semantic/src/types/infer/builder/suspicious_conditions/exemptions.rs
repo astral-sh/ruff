@@ -561,7 +561,7 @@ fn definition_reachability<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| ConditionDefinitionInfo::default(),
+    cycle_initial = |_, _, _, _| ConditionDefinitionInfo::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
 fn resolved_condition_definition_info<'db>(
@@ -590,7 +590,7 @@ fn resolved_condition_definition_info<'db>(
 /// traversal and boundness analysis so repeated conditions do not rescan all those bindings.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| (ConditionDefinitionInfo::default(), false),
+    cycle_initial = |_, _, _, _, _| (ConditionDefinitionInfo::default(), false),
     heap_size = ruff_memory_usage::heap_size
 )]
 fn owning_scope_condition_definition_info<'db>(
@@ -623,7 +623,7 @@ fn owning_scope_condition_definition_info<'db>(
 /// can be quadratic in the number of assignments, even when the per-definition traversal is cached.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| ConditionDefinitionInfo::default(),
+    cycle_initial = |_, _, _, _, _| ConditionDefinitionInfo::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
 // Salsa copies this attribute to both the query wrapper and its inner function. The wrapper
@@ -647,7 +647,7 @@ fn name_condition_definition_info<'db>(
 /// to. Taking that type from the caller avoids re-entering inference of the use-site scope.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _, _| ConditionDefinitionInfo::default(),
+    cycle_initial = |_, _, _, _, _, _| ConditionDefinitionInfo::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
 // Salsa copies this attribute to both the query wrapper and its inner function. The wrapper
@@ -683,7 +683,7 @@ fn attribute_condition_definition_info<'db>(
 /// callers do not depend directly on another file's syntax tree. Cyclic aliases recover as `false`.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| false,
+    cycle_initial = |_, _, _, _| false,
     heap_size = ruff_memory_usage::heap_size
 )]
 fn definition_contains_special_cased_condition<'db>(
@@ -825,7 +825,7 @@ fn definition_contains_special_cased_condition<'db>(
 /// All three branches contribute, regardless of the configured environment's truthiness.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| false,
+    cycle_initial = |_, _, _, _, _| false,
     heap_size = ruff_memory_usage::heap_size
 )]
 fn reachability_contains_special_cased_condition<'db>(
@@ -859,7 +859,7 @@ fn reachability_contains_special_cased_condition<'db>(
 /// definitions can share the same guard, and recover as `false` if the guard refers to the definition.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| false,
+    cycle_initial = |_, _, _, _, _| false,
     heap_size = ruff_memory_usage::heap_size
 )]
 fn predicate_contains_special_cased_condition<'db>(

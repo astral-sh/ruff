@@ -300,6 +300,23 @@ def _(
     reveal_type(i2)  # revealed: P & Q
 ```
 
+Excluding the same class from unrelated alternatives keeps both. In `Q & Child`, `Child` satisfies
+the `P` bound in `P & Q` even though it comes second.
+
+```py
+class R: ...
+class Child(P): ...
+
+def _(
+    distinct: Intersection[P, Not[R]] | Intersection[Q, Not[R]],
+    narrower_last: Intersection[P, Q] | Intersection[Q, Child],
+    narrower_first: Intersection[Q, Child] | Intersection[P, Q],
+):
+    reveal_type(distinct)  # revealed: (P & ~R) | (Q & ~R)
+    reveal_type(narrower_last)  # revealed: P & Q
+    reveal_type(narrower_first)  # revealed: P & Q
+```
+
 Recombining the truthy and falsy parts of `int` also subsumes the earlier `bool` operand.
 
 ```py
@@ -309,6 +326,28 @@ from ty_extensions import AlwaysFalsy, AlwaysTruthy
 TruthyInt = Intersection[int, Not[AlwaysFalsy]]
 FalsyInt = Intersection[int, Not[AlwaysTruthy]]
 reveal_type(Union[bool, TruthyInt, FalsyInt])  # revealed: <types.UnionType special-form 'int'>
+```
+
+## Unions of gradual literals
+
+When we intersect literals with `Any`, distinct values still give distinct alternatives.
+`LiteralString` can subsume a particular string.
+
+```py
+from typing import Any, Literal
+from typing_extensions import LiteralString
+from ty_extensions import Intersection
+
+def _(
+    distinct: Intersection[Any, Literal["a"]] | Intersection[Literal["b"], Any],
+    same: Intersection[Literal["a"], Any] | Intersection[Any, Literal["a"]],
+    broader: Intersection[Literal["a"], Any] | Intersection[Any, LiteralString],
+    mixed: Intersection[Any, LiteralString] | Intersection[Any, Literal[1]],
+):
+    reveal_type(distinct)  # revealed: (Any & Literal["a"]) | (Literal["b"] & Any)
+    reveal_type(same)  # revealed: Literal["a"] & Any
+    reveal_type(broader)  # revealed: Any & LiteralString
+    reveal_type(mixed)  # revealed: (Any & LiteralString) | (Any & Literal[1])
 ```
 
 ## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`

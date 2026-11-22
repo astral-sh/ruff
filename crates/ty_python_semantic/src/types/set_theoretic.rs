@@ -1,5 +1,5 @@
 use crate::ProgramEnvironment;
-use itertools::Either;
+use itertools::{Either, Itertools};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
@@ -11,8 +11,8 @@ use crate::place::{
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{
-    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
-    TypeMapping, TypePair, TypeQualifiers,
+    ApplyTypeMappingVisitor, InstanceProjection, LiteralValueType, PromotionKind, PromotionMode,
+    Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
@@ -145,7 +145,7 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },
@@ -190,9 +190,15 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        let elements = elements.into_iter();
-        if elements.size_hint().0 >= WIDE_UNION {
-            let elements = elements.map(Into::into).collect::<Box<[_]>>();
+        let mut elements = elements.into_iter().map(Into::into).peekable();
+        let (min, max) = elements.size_hint();
+        // Iterating a homogeneous tuple can supply one element that is itself a wide union.
+        // Normalizing it still compares the members of that union against each other.
+        if min >= WIDE_UNION
+            || (max == Some(1)
+                && matches!(elements.peek(), Some(Type::Union(union)) if union.elements(db).len() >= WIDE_UNION))
+        {
+            let elements = elements.collect::<Box<[_]>>();
             return OrderedUnionInput::new(
                 db,
                 env.program(db),
@@ -204,7 +210,7 @@ impl<'db> UnionType<'db> {
         }
         let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
         for element in elements {
-            builder.add_in_place(element.into());
+            builder.add_in_place(element);
         }
         builder.build()
     }
@@ -246,7 +252,7 @@ impl<'db> UnionType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|_, id, _, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, program| {
             result.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
         },
@@ -1061,6 +1067,20 @@ impl<'db> IntersectionType<'db> {
         builder.build()
     }
 
+    /// Return the literal if this intersection consists of a dynamic type and a literal,
+    /// as in `Any & Literal["a"]`.
+    fn gradual_literal(self, db: &'db dyn Db) -> Option<LiteralValueType<'db>> {
+        match self.iter_positive(db).collect_tuple()? {
+            (Type::Dynamic(_), Type::LiteralValue(literal))
+            | (Type::LiteralValue(literal), Type::Dynamic(_))
+                if self.negative(db).is_empty() =>
+            {
+                Some(literal)
+            }
+            _ => None,
+        }
+    }
+
     /// Return the compact enum-complement view of this intersection, if it has one.
     pub(crate) fn enum_complement(
         self,
@@ -1165,7 +1185,7 @@ impl<'db> IntersectionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },
@@ -1191,7 +1211,7 @@ impl<'db> IntersectionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },

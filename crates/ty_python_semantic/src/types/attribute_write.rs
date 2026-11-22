@@ -1294,7 +1294,7 @@ fn descriptor_setter<'db>(
 /// value. The receiver's type can require the same writable protocol member that this descriptor
 /// implements. Treat a recursive check of the same descriptor and receiver as provisionally
 /// successful; the outer protocol check still validates the member's read and write types.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
 fn descriptor_setter_accepts_receiver<'db>(
     db: &'db dyn Db,
     program: Program<'db>,

@@ -6454,7 +6454,7 @@ impl<'db> ParameterDefault<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|_, id, _, _| Type::divergent(id),
     cycle_fn=|db, cycle, previous: &Type<'db>, ty: Type<'db>, parameter: Definition<'db>| {
         ty.cycle_normalized(db, &ProgramEnvironment::from_definition(parameter), *previous, cycle)
     },

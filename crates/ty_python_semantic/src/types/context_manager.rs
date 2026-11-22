@@ -67,7 +67,7 @@ impl<'db> Type<'db> {
     ) -> bool {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial = |_, _, _, _, _| false,
+            cycle_initial = |_, _, _, _, _, _| false,
             heap_size = ruff_memory_usage::heap_size
         )]
         fn can_suppress_exceptions_impl<'db>(

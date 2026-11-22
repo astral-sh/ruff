@@ -373,7 +373,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| None,
+        cycle_initial=|_, _, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
@@ -421,7 +421,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| None,
+        cycle_initial=|_, _, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn pep695_generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
@@ -479,7 +479,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Option<GenericContext<'db>> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| None,
+            cycle_initial=|_, _, _, _| None,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn inherited_legacy_generic_context_inner<'db>(
@@ -706,7 +706,12 @@ impl<'db> StaticClassLiteral<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
-        #[salsa::tracked(returns(deref), cycle_initial=explicit_bases_cycle_initial, cycle_fn=explicit_bases_cycle_fn, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(
+            returns(deref),
+            cycle_initial=|db, id, _, input| explicit_bases_cycle_initial(db, id, input),
+            cycle_fn=explicit_bases_cycle_fn,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
         fn explicit_bases_inner<'db>(
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
@@ -819,7 +824,7 @@ impl<'db> StaticClassLiteral<'db> {
         self.decorators_inner(db)
     }
 
-    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     fn decorators_inner(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("StaticClassLiteral::decorators: {}", self.name(db));
 
@@ -921,7 +926,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         #[salsa::tracked(
             returns(as_ref),
-            cycle_initial=mro_ancestors_cycle_initial,
+            cycle_initial=|db, id, _, input| mro_ancestors_cycle_initial(db, id, input),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn named_tuple_ancestors<'db>(
@@ -968,7 +973,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     #[salsa::tracked(
         returns(as_ref),
-        cycle_initial=mro_ancestors_cycle_initial,
+        cycle_initial=|db, id, _, input| mro_ancestors_cycle_initial(db, id, input),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn try_mro_ancestors_unspecialized(
@@ -1056,7 +1061,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| ClassInstanceFlags::empty(),
+            cycle_initial=|_, _, _, _| ClassInstanceFlags::empty(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn instance_flags_inner<'db>(
@@ -1107,7 +1112,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Return the module defining the `TypedDict` base of this class.
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypingModule> {
         self.iter_mro(db, None)
             .find_map(ClassBase::typed_dict_module)
@@ -1316,7 +1321,7 @@ impl<'db> StaticClassLiteral<'db> {
     {
         #[salsa::tracked(
             returns(clone),
-            cycle_initial=|_, _, _| Err(MetaclassError {
+            cycle_initial=|_, _, _, _| Err(MetaclassError {
                 kind: MetaclassErrorKind::Cycle,
             }),
             heap_size=ruff_memory_usage::heap_size,
@@ -1865,7 +1870,7 @@ impl<'db> StaticClassLiteral<'db> {
         })
     }
 
-    fn own_generated_member(
+    pub(in crate::types) fn own_generated_member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -2189,12 +2194,6 @@ impl<'db> StaticClassLiteral<'db> {
             (field_policy, "__init__")
                 if field_policy.synthesizes_constructor_signature_from_fields(db, self) =>
             {
-                if field_policy.is_dataclass_like()
-                    && !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT)
-                {
-                    return None;
-                }
-
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                     // TODO: could be `Self`.
                     .with_annotated_type(*instance_ty);
@@ -2635,7 +2634,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
+        cycle_initial=|_, _, _, _, _, _| FxIndexMap::default(),
         heap_size=get_size2::GetSize::get_heap_size
     )]
     fn fields_inner(
@@ -2835,7 +2834,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// Keeping both together avoids reinterpreting declarations while merging inherited fields.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _, _, _| OwnClassFields::default(),
+        cycle_initial=|_, _, _, _, _, _| OwnClassFields::default(),
         heap_size=get_size2::GetSize::get_heap_size
     )]
     fn own_fields_inner(
@@ -3434,7 +3433,7 @@ impl<'db> StaticClassLiteral<'db> {
             return None;
         }
 
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn inheritance_cycle_inner<'db>(
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
@@ -3650,7 +3649,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// Build a definition-site equation before substituting type arguments. Supported protocols
     /// use their structural interface; `TypedDict` classes use their fields. Other classes retain the
     /// ordinary attribute and base-class variance rules.
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| VarianceTerm::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
     pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,

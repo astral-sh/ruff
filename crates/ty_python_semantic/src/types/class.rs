@@ -208,7 +208,7 @@ impl<'db> CodeGeneratorKind<'db> {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| None,
+            cycle_initial=|_, _, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_static_class<'db>(
@@ -270,7 +270,7 @@ impl<'db> CodeGeneratorKind<'db> {
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| None,
+            cycle_initial=|_, _, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_dynamic_class<'db>(
@@ -383,13 +383,13 @@ impl<'db> CodeGeneratorKind<'db> {
     ///
     /// C(value=42)
     /// ```
-    fn synthesizes_constructor_signature_from_fields(
+    pub(super) fn synthesizes_constructor_signature_from_fields(
         self,
         db: &'db dyn Db,
         class: StaticClassLiteral<'db>,
     ) -> bool {
         match self {
-            Self::DataclassLike(_) => true,
+            Self::DataclassLike(_) => class.has_dataclass_param(db, self, DataclassFlags::INIT),
             Self::Pydantic(_) => pydantic::synthesizes_constructor_signature_from_fields(db, class),
             Self::NamedTuple | Self::TypedDict => false,
         }
@@ -546,7 +546,7 @@ impl<'db> GenericAlias<'db> {
     /// Resolve this alias's ancestors in MRO order with its type arguments applied.
     #[salsa::tracked(
         returns(as_ref),
-        cycle_initial=|db, _, alias: GenericAlias<'db>| {
+        cycle_initial=|db, _, _, alias: GenericAlias<'db>| {
             let origin = alias.origin(db);
             let env = ProgramEnvironment::from_scope(origin.body_scope(db));
             Err(Box::new(StaticMroError::cycle(
@@ -577,7 +577,7 @@ impl<'db> GenericAlias<'db> {
     /// `P[list[T]]` finite without expanding specialized class bodies.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        cycle_initial=|_, _, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(in crate::types) fn variance_equation(
@@ -1646,7 +1646,7 @@ impl<'db> ClassType<'db> {
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| None,
+        cycle_initial=|_, _, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn nearest_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
@@ -2357,7 +2357,7 @@ impl<'db> ClassType<'db> {
     /// instance-returning constructors and constructors that explicitly return another type.
     #[salsa::tracked(
         returns(clone),
-        cycle_initial=|db, _, _, _| CallableTypes::one(CallableType::bottom(db)),
+        cycle_initial=|db, _, _, _, _| CallableTypes::one(CallableType::bottom(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn into_callable_with_receiver(
