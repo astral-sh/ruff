@@ -623,6 +623,27 @@ class Child(Parent):
 reveal_type(Child.A.value)  # revealed: int
 ```
 
+### Inherited `_value_` annotation referring to a subclass member
+
+Regression test for a `too many cycle iterations` panic. ty used to include the inherited `_value_`
+type in the identity of every `Node` member. Looking up `Node.ROOT` therefore required identifying
+`Node.LEAF`, whose identity in turn depended on that same type.
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Base(Enum):
+    _value_: "list[Literal[Node.LEAF]] | None"
+
+class Node(Base):
+    LEAF = None
+    ROOT = []
+
+reveal_type(Node.ROOT)  # revealed: Literal[Node.ROOT]
+reveal_type(Node.ROOT.value)  # revealed: list[Literal[Node.LEAF]] | None
+```
+
 ### Inherited `__init__`
 
 A custom `__init__` on a parent enum is inherited by subclasses. Member values are validated against

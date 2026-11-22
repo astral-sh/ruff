@@ -1,15 +1,11 @@
-use std::hash::BuildHasherDefault;
-
-use crate::ProgramEnvironment;
 use compact_str::ToCompactString;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
-use crate::FxOrderSet;
 use crate::{
-    Db, FxIndexMap, FxOrderMap,
+    Db, FxIndexMap, FxOrderSet, ProgramEnvironment,
     place::{
         DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
     },
@@ -297,16 +293,20 @@ pub(super) fn class_defines_property<'db>(
     false
 }
 
-/// An enum class literal with its canonical members, value types, and aliases.
+/// An enum class literal with its canonical member names and aliases.
 ///
-/// This keeps the enum-specific information used by enum literals and enum complements alongside
-/// the underlying class literal.
+/// Enum literals and complements carry the member names so that normalizing unions and
+/// intersections doesn't require querying enum metadata again. We look up value types on demand
+/// because they can refer back to this enum. For example, in the `_value_` annotation
+/// `list[Literal[Node.LEAF]] | None`, the literal `Node.LEAF` carries `Node`'s `EnumClassLiteral`.
+/// Storing the value type here would give each iteration of the cycle a new `EnumClassLiteral`
+/// containing the previous one, preventing Salsa from reaching a fixed point.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumClassLiteral<'db> {
     #[returns(copy)]
     pub(crate) class_literal: ClassLiteral<'db>,
     #[returns(ref)]
-    pub(crate) members: FxOrderMap<Name, Type<'db>>,
+    pub(crate) member_names: FxOrderSet<Name>,
     #[returns(ref)]
     pub(crate) aliases: Box<[(Name, Name)]>,
     /// Whether the canonical member and alias sets are known exactly.
@@ -336,11 +336,7 @@ fn enum_class_literal<'db>(
 ) -> Option<EnumClassLiteral<'db>> {
     let env = ProgramEnvironment::from_file(class.program_file(db));
     let metadata = enum_metadata(db, class)?;
-    let mut members =
-        FxOrderMap::with_capacity_and_hasher(metadata.members.len(), BuildHasherDefault::default());
-    for name in metadata.members.keys() {
-        members.insert(name.clone(), metadata.value_type(db, &env, name)?);
-    }
+    let member_names: FxOrderSet<Name> = metadata.members.keys().cloned().collect();
     let mut aliases: Vec<_> = metadata
         .aliases
         .iter()
@@ -357,7 +353,7 @@ fn enum_class_literal<'db>(
     Some(EnumClassLiteral::new(
         db,
         class,
-        members,
+        member_names,
         aliases.into_boxed_slice(),
         metadata.aliases_are_known,
         members_are_exhaustive,
@@ -366,20 +362,11 @@ fn enum_class_literal<'db>(
 
 impl<'db> EnumClassLiteral<'db> {
     pub(crate) fn member_count(self, db: &'db dyn Db) -> usize {
-        self.members(db).len()
+        self.member_names(db).len()
     }
 
-    pub(crate) fn member_names(self, db: &'db dyn Db) -> impl Iterator<Item = &'db Name> {
-        self.members(db).keys()
-    }
-
-    fn resolve_member_entry(
-        self,
-        db: &'db dyn Db,
-        name: &Name,
-    ) -> Option<(&'db Name, &'db Type<'db>)> {
-        let members = self.members(db);
-        if let Some(member) = members.get_key_value(name) {
+    pub(crate) fn resolve_member(self, db: &'db dyn Db, name: &Name) -> Option<&'db Name> {
+        if let Some(member) = self.member_names(db).get(name) {
             return Some(member);
         }
 
@@ -387,13 +374,7 @@ impl<'db> EnumClassLiteral<'db> {
         let alias_index = aliases
             .binary_search_by(|(alias, _)| alias.cmp(name))
             .ok()?;
-        let canonical_name = &aliases[alias_index].1;
-        members.get_key_value(canonical_name)
-    }
-
-    pub(crate) fn resolve_member(self, db: &'db dyn Db, name: &Name) -> Option<&'db Name> {
-        self.resolve_member_entry(db, name)
-            .map(|(member, _)| member)
+        Some(&aliases[alias_index].1)
     }
 
     /// Returns the type of `.name`/`._name_` for a given enum member.
@@ -407,8 +388,10 @@ impl<'db> EnumClassLiteral<'db> {
     }
 
     pub(crate) fn value_type(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
-        self.resolve_member_entry(db, name)
-            .map(|(_, value_type)| *value_type)
+        let name = self.resolve_member(db, name)?;
+        let class = self.class_literal(db);
+        let env = ProgramEnvironment::from_file(class.program_file(db));
+        enum_metadata(db, class)?.value_type(db, &env, name)
     }
 }
 
@@ -751,6 +734,7 @@ impl<'db> EnumComplementType<'db> {
         (!excluded_names.is_empty()).then(|| {
             let excluded_names: FxOrderSet<Name> = enum_class_literal
                 .member_names(db)
+                .iter()
                 .filter(|name| excluded_names.contains(*name))
                 .cloned()
                 .collect();
@@ -766,6 +750,7 @@ impl<'db> EnumComplementType<'db> {
     fn remaining_member_names(self, db: &'db dyn Db) -> impl Iterator<Item = &'db Name> {
         self.enum_class_literal(db)
             .member_names(db)
+            .iter()
             .filter(move |name| !self.excluded_names(db).contains(*name))
     }
 
@@ -866,29 +851,64 @@ impl<'db> EnumComplementType<'db> {
         env: &ProgramEnvironment<'db>,
         member_name: &str,
     ) -> Option<Type<'db>> {
-        let enum_class_literal = self.enum_class_literal(db);
-        let is_enum_subclass = Type::ClassLiteral(self.enum_class(db)).is_subtype_of(
-            db,
-            env,
-            KnownClass::Enum.to_subclass_of(db, env),
-        );
-        let mut builder = UnionBuilder::new(db, env);
-        let mut found_member = false;
-
-        for name in self.remaining_member_names(db) {
-            let member_ty = (match member_name {
-                "name" if is_enum_subclass => enum_class_literal.name_type(db, name),
-                "_name_" => enum_class_literal.name_type(db, name),
-                "value" if is_enum_subclass => enum_class_literal.value_type(db, name),
-                "_value_" => enum_class_literal.value_type(db, name),
-                _ => None,
-            })?;
-
-            builder = builder.add(member_ty);
-            found_member = true;
+        /// Returns the type of `.value`/`._value_` for each canonical member in
+        /// [`EnumClassLiteral::member_names`] order.
+        ///
+        /// Salsa caches the slice per enum class so complements can each skip their excluded
+        /// members and build a union of the remaining value types. A single enum literal uses
+        /// [`EnumClassLiteral::value_type`] to avoid computing the other members' value types.
+        #[salsa::tracked(returns(as_deref), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn value_types<'db>(
+            db: &'db dyn Db,
+            enum_class: EnumClassLiteral<'db>,
+        ) -> Option<Box<[Type<'db>]>> {
+            let class = enum_class.class_literal(db);
+            let metadata = enum_metadata(db, class)?;
+            let env = ProgramEnvironment::from_file(class.program_file(db));
+            enum_class
+                .member_names(db)
+                .iter()
+                .map(|name| metadata.value_type(db, &env, name))
+                .collect()
         }
 
-        found_member.then(|| builder.build())
+        if self.remaining_member_count(db) == 0 {
+            return None;
+        }
+        if matches!(member_name, "name" | "value")
+            && !Type::ClassLiteral(self.enum_class(db)).is_subtype_of(
+                db,
+                env,
+                KnownClass::Enum.to_subclass_of(db, env),
+            )
+        {
+            return None;
+        }
+
+        match member_name {
+            "name" | "_name_" => {
+                let names = self
+                    .remaining_member_names(db)
+                    .map(|name| Type::string_literal(db, name));
+                Some(UnionType::from_elements(db, env, names))
+            }
+            "value" | "_value_" => {
+                let class = self.enum_class_literal(db);
+                let all_values = value_types(db, class)?;
+                let all_names = class.member_names(db);
+                debug_assert_eq!(all_names.len(), all_values.len());
+                let excluded = self.excluded_names(db);
+
+                let values = all_names
+                    .iter()
+                    .zip(all_values)
+                    .filter(|(name, _)| !excluded.contains(*name))
+                    .map(|(_, value)| value);
+
+                Some(UnionType::from_elements(db, env, values))
+            }
+            _ => None,
+        }
     }
 
     /// Return `true` if users can spell an equivalent type for this complement.
@@ -1643,6 +1663,7 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
     Some(
         enum_class_literal
             .member_names(db)
+            .iter()
             .filter(move |name| Some(*name) != exclude_member)
             .map(move |name| {
                 Type::enum_literal(EnumLiteralType::new(db, enum_class_literal, name))
