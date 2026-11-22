@@ -108,6 +108,23 @@ static COLOUR_SCIENCE: Benchmark = Benchmark::new(RealWorldProject {
     python_version: SupportedPythonVersion::Py311,
 });
 
+static FASTAPI: Benchmark = Benchmark::new(RealWorldProject {
+    name: "fastapi",
+    repository: "https://github.com/fastapi/fastapi",
+    commit: "7a0a3f0b286c6c865cf4398ea0e957a87b8bffa4",
+    paths: &["fastapi"],
+    dependencies: &[
+        "annotated-doc",
+        "opentelemetry-api",
+        "pydantic",
+        "starlette",
+        "typing-extensions",
+        "typing-inspection",
+    ],
+    max_dep_date: TY_ECOSYSTEM_PIN,
+    python_version: SupportedPythonVersion::Py311,
+});
+
 static FREQTRADE: Benchmark = Benchmark::new(RealWorldProject {
     name: "freqtrade",
     repository: "https://github.com/freqtrade/freqtrade",
@@ -152,6 +169,16 @@ static PANDAS: Benchmark = Benchmark::new(RealWorldProject {
         "types-setuptools",
         "pytest",
     ],
+    max_dep_date: TY_ECOSYSTEM_PIN,
+    python_version: SupportedPythonVersion::Py311,
+});
+
+static PANDAS_STUBS: Benchmark = Benchmark::new(RealWorldProject {
+    name: "pandas-stubs",
+    repository: "https://github.com/pandas-dev/pandas-stubs",
+    commit: "8dd6d91b1c05b26e30f7ddbe3dc3d4042a92bdd6",
+    paths: &["pandas-stubs"],
+    dependencies: &["numpy"],
     max_dep_date: TY_ECOSYSTEM_PIN,
     python_version: SupportedPythonVersion::Py311,
 });
@@ -228,6 +255,11 @@ fn altair(bencher: Bencher) {
 }
 
 #[bench(sample_size = 2, sample_count = 3)]
+fn fastapi(bencher: Bencher) {
+    run_single_threaded(bencher, &FASTAPI);
+}
+
+#[bench(sample_size = 2, sample_count = 3)]
 fn freqtrade(bencher: Bencher) {
     run_single_threaded(bencher, &FREQTRADE);
 }
@@ -261,6 +293,11 @@ fn numpy(bencher: Bencher) {
 #[bench(sample_size = 1, sample_count = 2)]
 fn pandas(bencher: Bencher) {
     run_single_threaded(bencher, &PANDAS);
+}
+
+#[bench(sample_size = 2, sample_count = 3)]
+fn pandas_stubs(bencher: Bencher) {
+    run_single_threaded(bencher, &PANDAS_STUBS);
 }
 
 #[bench(sample_size = 1, sample_count = 2)]
