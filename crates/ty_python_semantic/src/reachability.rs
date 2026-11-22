@@ -2128,7 +2128,7 @@ pub(crate) fn is_range_reachable<'db>(
     index.ancestor_scopes(scope_id).all(|(scope_id, _)| {
         let use_def = index.use_def_map(scope_id);
         use_def
-            .reachability_for_range(range)
+            .reachability_constraints_for(range)
             .all(|constraint| is_reachable(db, use_def, constraint))
     })
 }

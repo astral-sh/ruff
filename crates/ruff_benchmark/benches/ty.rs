@@ -2721,6 +2721,25 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
     }
 }
 
+/// Each call adds a reachability constraint for the next statement. Passing an extra argument
+/// forces a diagnostic at every call, so scanning all ranges for each diagnostic is quadratic.
+fn benchmark_diagnostic_range_reachability(criterion: &mut Criterion) {
+    const CALLS: usize = 4_000;
+    let code = format!(
+        "def f(value: str) -> None:\n{}",
+        "    value.upper(0)\n".repeat(CALLS)
+    );
+
+    setup_rayon();
+    criterion.bench_function("ty_micro[diagnostic_range_reachability]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| assert_eq!(case.db.check().len(), CALLS),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Exercises repeated control-flow gates with and without interleaved statement-call predicates.
 ///
 /// Each suppressing context manager merges the old binding with a reassigned binding. Repeating
@@ -3037,6 +3056,7 @@ criterion_group!(
     benchmark_nested_mapping_pattern_exhaustiveness,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
+    benchmark_diagnostic_range_reachability,
     benchmark_repeated_suppressing_context_managers,
     benchmark_repeated_narrowed_assignments,
 );
