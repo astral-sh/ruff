@@ -8528,7 +8528,12 @@ impl<'db> ArgumentContextSpecialization<'db> {
                     let ty = other
                         .expected_type
                         .unwrap_or_else(|| parameters[other.index].annotated_type());
-                    ty == parameter_type || (union.contains_member(db, ty) && contains_variable(ty))
+                    if ty == parameter_type {
+                        // A nullable operand may be absent even when supplied explicitly.
+                        !union.elements(db).iter().any(|ty| ty.is_none(db))
+                    } else {
+                        union.contains_member(db, ty) && contains_variable(ty)
+                    }
                 });
             if has_other_operand {
                 hints.to_mut()[index] = Type::Dynamic(DynamicType::UnspecializedTypeVar);

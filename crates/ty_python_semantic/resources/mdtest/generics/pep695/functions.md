@@ -3941,8 +3941,9 @@ explicit: Box[int] = unwrap(find(copy(copy(lambda x: x.missing)), None))
 
 ## A repeated bound in the context for a type variable with a default
 
-Both arguments can constrain `T`, but only the iterable arm passes the expected type down to
-`empty`. The expected element type `int` should still take precedence over the default `str`.
+Both parameters are required and accept the same sources of `T`. If the second argument is `None`,
+only the first argument can constrain `T`. Its expected element type `int` should still take
+precedence over the default `str`.
 
 ```toml
 [environment]
@@ -3950,17 +3951,22 @@ python-version = "3.13"
 ```
 
 ```py
-from collections.abc import Iterable, Sized
+from collections.abc import Callable, Iterable, Sized
 from typing import overload
 
+type Source[T] = Iterable[T] | Callable[[], T] | None
+
 @overload
-def head[T: Sized](values: Iterable[T] | None, other: Iterable[T] | None) -> T: ...
+def head[T: Sized](values: Source[T], other: Source[T]) -> T: ...
 @overload
 def head[N: int](values: N, other: None) -> N: ...
 def head(values, other):
     if isinstance(values, int):
         return values
-    return next(iter(values or other or ()))
+    source = values if values is not None else other
+    if callable(source):
+        return source()
+    return next(iter(source or ()))
 
 def empty[T = str]() -> list[list[list[T]]]:
     return [[[]]]
