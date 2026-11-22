@@ -1544,7 +1544,8 @@ class SingleMember(Enum):
 reveal_type(SingleMember.SINGLE.value)  # revealed: Literal[1]
 ```
 
-For integer values on Python 3.11 and later, `auto()` adds one to the highest value so far.
+For integer values, `auto()` adds one to the highest value so far, on Python 3.11.4 and later.
+Python 3.11.0 through 3.11.3 had a different behavior, but for 3.11+ we assume the 3.11.4+ behavior.
 
 ```py
 class Mixed(Enum):

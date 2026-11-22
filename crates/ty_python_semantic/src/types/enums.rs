@@ -969,8 +969,9 @@ fn try_register_alias<'db>(
     Some(false)
 }
 
-/// The integer input to the next standard `_generate_next_value_` call. Python 3.10
-/// uses the last integer, and newer versions use the highest for integer-valued enums.
+/// The integer input to the next standard `_generate_next_value_` call. For integer-valued
+/// enums, ty tracks the last value for targets through Python 3.10 and the highest value for
+/// targets from Python 3.11 onward.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub(super) enum EnumAutoHistory {
     #[default]
