@@ -3122,6 +3122,49 @@ valid_optional: Value = [None, {"key": None}]
 invalid_optional: Value = [1]  # error: [invalid-assignment]
 ```
 
+### Copying a recursive union of tuples
+
+`tuple()` preserves the length and element types of each alternative.
+
+```py
+from typing import Union
+from typing_extensions import assert_type
+
+Children = list["Tree"]
+Tree = Union[tuple[str], tuple[str, Children]]
+
+def copy(tree: Tree):
+    assert_type(tuple(tree), Tree)
+
+def copy_extended(tree: Tree | tuple[int]):
+    assert_type(tuple(tree), Tree | tuple[int])
+```
+
+### Deleting a key from a recursive union
+
+Each union member must allow deletion of the key.
+
+```py
+from typing import Union
+from typing_extensions import TypedDict
+
+class Leaf(TypedDict, extra_items=int):
+    required: int
+
+Children = dict[str, "Tree"]
+Tree = Union[Leaf, Children]
+
+def remove(tree: Tree):
+    del tree["extra"]  # ok
+    del tree["required"]  # error: [invalid-argument-type] "Cannot delete required key"
+
+Nodes = dict[str, "Node"]
+Node = Union[str, Nodes]
+
+def remove_node(node: Node):
+    del node["key"]  # error: [not-subscriptable]
+```
+
 ### A recursive union used in a generic base class
 
 Both the base class and the sequence refer forward to the same union, as in

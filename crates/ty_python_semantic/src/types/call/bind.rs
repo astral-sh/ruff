@@ -3413,6 +3413,8 @@ impl<'db> Bindings<'db> {
                             // `tuple(range(42))` => `tuple[int, ...]`
                             // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
                             if let [Some(argument)] = overload.parameter_types() {
+                                // Preserve each tuple shape when the union is behind an alias.
+                                let argument = argument.expand_top_level_aliases(db, env);
                                 // We deliberately use `.iterate()` here (falling back to `Unknown` if it isn't iterable)
                                 // rather than `.try_iterate().expect()`. Even though we know at this point that the input
                                 // type is assignable to `Iterable`, that doesn't mean that the input type is *actually*
