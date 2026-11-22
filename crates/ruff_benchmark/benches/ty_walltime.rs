@@ -196,16 +196,6 @@ static PYDANTIC: Benchmark = Benchmark::new(RealWorldProject {
     python_version: SupportedPythonVersion::Py311,
 });
 
-static SCIKIT_LEARN: Benchmark = Benchmark::new(RealWorldProject {
-    name: "scikit-learn",
-    repository: "https://github.com/scikit-learn/scikit-learn",
-    commit: "ee56c8b5d809dc7b970a140ed501269b63c69cf8",
-    paths: &["sklearn"],
-    dependencies: &["joblib", "narwhals", "numpy", "scipy", "threadpoolctl"],
-    max_dep_date: TY_ECOSYSTEM_PIN,
-    python_version: SupportedPythonVersion::Py312,
-});
-
 static SYMPY: Benchmark = Benchmark::new(RealWorldProject {
     name: "sympy",
     repository: "https://github.com/sympy/sympy",
@@ -311,11 +301,6 @@ fn pandas(bencher: Bencher) {
 #[bench(sample_size = 2, sample_count = 3)]
 fn pandas_stubs(bencher: Bencher) {
     run_single_threaded(bencher, &PANDAS_STUBS);
-}
-
-#[bench(sample_size = 1, sample_count = 2)]
-fn scikit_learn(bencher: Bencher) {
-    run_single_threaded(bencher, &SCIKIT_LEARN);
 }
 
 #[bench(sample_size = 1, sample_count = 2)]
