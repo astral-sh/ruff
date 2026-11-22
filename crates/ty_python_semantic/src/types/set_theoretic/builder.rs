@@ -1821,7 +1821,12 @@ impl<'db> IntersectionBuilder<'db> {
                     // Distinct built-in literal exclusions never simplify each other. With
                     // matching flags, set membership also detects equal literal values.
                     for neg in negatives {
-                        inner.add_negative_impl(db, &self.env, *neg, true);
+                        inner.add_negative_impl(
+                            db,
+                            &self.env,
+                            *neg,
+                            ExclusionComparison::SetMembership,
+                        );
                     }
                 } else {
                     for neg in negatives {
@@ -1977,6 +1982,14 @@ impl<'db> IntersectionBuilder<'db> {
                 .map(|inner| inner.build(db, &self.env)),
         )
     }
+}
+
+/// How to compare an incoming exclusion with the existing exclusions.
+#[derive(Copy, Clone)]
+enum ExclusionComparison {
+    Pairwise,
+    /// Exact duplicates are redundant, and distinct exclusions cannot simplify each other.
+    SetMembership,
 }
 
 /// The signs of a pair of intersection elements. For `Mixed`, the first is positive.
@@ -2471,7 +2484,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         new_negative: Type<'db>,
     ) {
-        self.add_negative_impl(db, env, new_negative, false);
+        self.add_negative_impl(db, env, new_negative, ExclusionComparison::Pairwise);
     }
 
     fn add_negative_impl(
@@ -2479,7 +2492,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         new_negative: Type<'db>,
-        literal_exclusions: bool,
+        comparison: ExclusionComparison,
     ) {
         // `Never & ~T` -> `Never`.
         if self.positive.contains(&Type::Never) {
@@ -2556,13 +2569,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let new_negative_enum = new_negative.resolve_type_alias(db).as_enum_literal();
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
-                let negatives = if literal_exclusions {
-                    if self.negative.contains(&new_negative) {
-                        return;
+                let negatives = match comparison {
+                    ExclusionComparison::Pairwise => &self.negative,
+                    ExclusionComparison::SetMembership => {
+                        if self.negative.contains(&new_negative) {
+                            return;
+                        }
+                        &NegativeIntersectionElements::Empty
                     }
-                    &NegativeIntersectionElements::Empty
-                } else {
-                    &self.negative
                 };
                 for (index, existing_negative) in negatives.iter().enumerate() {
                     if let Some(new_enum) = new_negative_enum
