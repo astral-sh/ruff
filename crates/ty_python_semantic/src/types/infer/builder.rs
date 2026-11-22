@@ -7680,6 +7680,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if expected.len() != tuple.elts.len() {
                 return None;
             }
+            let mut all_trivial_literals = true;
             let mut elements = Vec::with_capacity(expected.len());
             for (index, (elt, expected_ty)) in tuple
                 .elts
@@ -7688,13 +7689,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .enumerate()
             {
                 let ty = self.infer_expression(elt, tcx.with_expected_type(Some(expected_ty)));
+                elements.push(ty);
+                if all_trivial_literals
+                    && matches!(ty, Type::LiteralValue(_))
+                    && ty.is_trivially_assignable_to(db, expected_ty)
+                {
+                    continue;
+                }
+                all_trivial_literals = false;
                 // The whole-tuple check below already checks the last element.
                 if index + 1 < expected.len() && !ty.is_assignable_to(db, env, expected_ty) {
                     return None;
                 }
-                elements.push(ty);
             }
-            Type::heterogeneous_tuple(db, env, elements)
+            let inferred = Type::heterogeneous_tuple(db, env, elements);
+            // Tables of literals would otherwise create a query per distinct row.
+            // Keep the whole-tuple check for other types because relations can share
+            // recursion state across positions and treat nested types differently.
+            if all_trivial_literals {
+                return Some(inferred);
+            }
+            inferred
         } else {
             self.infer_tuple_expression_impl(tuple, tcx.with_expected_type(Some(candidate)))
         };
