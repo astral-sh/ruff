@@ -1833,11 +1833,11 @@ impl<'src> Parser<'src> {
                 self.storage.range(value.expr).end(),
                 self.current_token_range().start(),
             );
-            Some(ast::DebugText::new(
-                self.src_text(leading_range),
-                self.src_text(self.storage.range(value.expr)),
-                self.src_text(trailing_range),
-            ))
+            Some(build::DebugText {
+                leading: self.src_text(leading_range),
+                expression: self.src_text(self.storage.range(value.expr)),
+                trailing: self.src_text(trailing_range),
+            })
         } else {
             None
         };

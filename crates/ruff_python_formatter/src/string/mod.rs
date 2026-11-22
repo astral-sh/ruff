@@ -110,7 +110,7 @@ impl StringLikeExtensions for ast::StringLike<'_> {
                         || expression.format_spec().is_some_and(|spec| {
                             contains_line_break_or_comments(spec.elements(), context, triple_quotes)
                         })
-                        || expression.debug_text().as_ref().is_some_and(|debug_text| {
+                        || expression.debug_text().is_some_and(|debug_text| {
                             memchr2(b'\n', b'\r', debug_text.leading().as_bytes()).is_some()
                                 || memchr2(b'\n', b'\r', debug_text.trailing().as_bytes()).is_some()
                         })

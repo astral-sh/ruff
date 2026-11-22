@@ -340,10 +340,10 @@ def field_codec(field: Field, nodes: set[str]) -> WireField:
         assert field.optional
         return codec(
             4,
-            "Option<&'a crate::DebugText>",
-            f"{value}.map_or(u64::from(ABSENT), |text| {{ let slot = offset(builder.ast.debug_text.len()); builder.ast.debug_text.push(text); u64::from(slot) }})",
-            "(split_words(word)[0] != ABSENT).then(|| &self.syntax_node().ast.debug_text[split_words(word)[0] as usize])",
-            build_type="Option<crate::DebugText>",
+            "Option<crate::DebugText<'a>>",
+            f"u64::from({value}.map_or(ABSENT, |parts| builder.store_debug_text(parts)))",
+            "(split_words(word)[0] != ABSENT).then(|| crate::DebugText::new(self.syntax_node().ast, split_words(word)[0]))",
+            build_type="Option<DebugText<'a>>",
         )
     raise ValueError(f"Missing flat field codec for {field.name}: {field.ty}")
 
@@ -715,7 +715,7 @@ def copy_field(field: Field, nodes: set[str]) -> str:
     if inner == "Number":
         return f"{value}.clone()"
     if inner == "DebugText":
-        return f"{value}.cloned()"
+        return f"{value}.map(crate::DebugText::parts)"
     if inner == "str":
         return f"{value}.into()"
     return value
@@ -952,7 +952,13 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         "use crate::NodeKind;",
     ]
     initializers = [
-        "pub mod build { use super::{BuildId, AstNodeId, Builder, ABSENT, Word, offset}; use super::super::Emit;"
+        "pub mod build { use super::{BuildId, AstNodeId, Builder, ABSENT, Word, offset}; use super::super::Emit;",
+        """#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub struct DebugText<'a> {
+            pub leading: &'a str,
+            pub expression: &'a str,
+            pub trailing: &'a str,
+        }""",
     ]
     for group in ast.groups:
         name = group.name
@@ -1054,9 +1060,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         }}""")
         method = f"push_{to_snake_case(n.name)}"
         parameters = ", ".join(f.name for f in fields)
-        borrows_literal = any(
-            field.ty in {"LiteralText", "LiteralBytes"} for field in n.fields
-        )
+        borrows_literal = any("'a" in field.build_type for field in fields)
         out.append(
             f"impl Builder {{ #[inline] fn {method}(&mut self, range: ruff_text_size::TextRange, [{parameters}]: [u64; {len(fields)}]) -> BuildId<crate::kind::{n.name}> {{"
         )

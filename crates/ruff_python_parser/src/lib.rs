@@ -868,6 +868,29 @@ mod tests {
     }
 
     #[test]
+    fn copying_nested_debug_expressions_preserves_text_boundaries() -> Result<(), ParseError> {
+        let source = parse_module(r#"f"π {f'λ{ café = }'=}""#)?;
+        let mut builder = Builder::default();
+        // Give the copy different offsets in the destination's text and extra buffers.
+        builder.copy_node(parse_expression("'prefix'")?.expr());
+        let copy = builder.copy_node(source.root());
+        let tree = builder.finish_tree(copy);
+        assert_eq!(
+            ComparableMod::from(source.root()),
+            ComparableMod::from(tree.root())
+        );
+        for root in [source.root(), tree.root()] {
+            let parts = root
+                .descendants()
+                .filter_map(AstNode::cast::<ruff_python_ast::InterpolatedElement>)
+                .filter_map(ruff_python_ast::InterpolatedElement::debug_text)
+                .map(|text| (text.leading(), text.expression(), text.trailing()));
+            assert!(parts.eq([("", "f'λ{ café = }'", "="), (" ", "café", " = ")]));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn rewrite_expressions_and_strings_in_copied_syntax() -> Result<(), ParseError> {
         struct ReplaceTokens;
 

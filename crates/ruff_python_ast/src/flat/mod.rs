@@ -16,8 +16,7 @@ use rustc_hash::FxBuildHasher;
 
 use crate::kind::Any;
 use crate::{
-    DebugText, MAX_REAL_INDEX, NodeIndex, NodeIndexError, NodeKind, Number, sub_ast_level,
-    sub_indices,
+    MAX_REAL_INDEX, NodeIndex, NodeIndexError, NodeKind, Number, sub_ast_level, sub_indices,
 };
 
 mod children;
@@ -46,8 +45,8 @@ pub use list::{
     ParameterItems, ParameterItemsId, PatternArgumentId,
 };
 pub use nodes::{
-    AnyParameter, ArgOrKeyword, ArgumentsSourceOrder, BytesValue, FStringValue, LiteralExpression,
-    StringValue, TStringValue,
+    AnyParameter, ArgOrKeyword, ArgumentsSourceOrder, BytesValue, DebugText, FStringValue,
+    LiteralExpression, StringValue, TStringValue,
 };
 pub use rewrite::Rewriter;
 
@@ -548,7 +547,6 @@ pub struct Ast {
     names: Vec<Name>,
     bytes: Vec<u8>,
     numbers: Vec<Number>,
-    debug_text: Vec<DebugText>,
     keys: RowKeys,
 }
 
@@ -567,7 +565,6 @@ impl Ast {
             names: Vec::new(),
             bytes: Vec::new(),
             numbers: Vec::new(),
-            debug_text: Vec::new(),
             keys: RowKeys::Unindexed,
         }
     }
@@ -672,7 +669,6 @@ pub struct Checkpoint {
     names: usize,
     bytes: usize,
     numbers: usize,
-    debug_text: usize,
 }
 
 impl Default for Builder {
@@ -763,7 +759,6 @@ impl Builder {
             names: self.ast.names.len(),
             bytes: self.ast.bytes.len(),
             numbers: self.ast.numbers.len(),
-            debug_text: self.ast.debug_text.len(),
         }
     }
 
@@ -787,7 +782,6 @@ impl Builder {
         }
         self.ast.bytes.truncate(checkpoint.bytes);
         self.ast.numbers.truncate(checkpoint.numbers);
-        self.ast.debug_text.truncate(checkpoint.debug_text);
     }
 
     fn node_count(&self) -> usize {
@@ -1031,6 +1025,24 @@ impl Builder {
         &self.ast.names[id.0 as usize]
     }
 
+    fn store_debug_text(&mut self, parts: build::DebugText<'_>) -> u32 {
+        let text = &mut self.ast.text;
+        text.reserve(parts.leading.len() + parts.expression.len() + parts.trailing.len());
+        let start = offset(text.len());
+        text.push_str(parts.leading);
+        let expression_start = offset(text.len());
+        text.push_str(parts.expression);
+        let expression_end = offset(text.len());
+        text.push_str(parts.trailing);
+        let end = offset(text.len());
+
+        let slot = offset(self.ast.extra.len());
+        self.ast
+            .extra
+            .extend([start, expression_start, expression_end, end]);
+        slot
+    }
+
     fn store_string(&mut self, text: &str) -> u64 {
         let range = Interval::new(self.ast.text.len(), text.len());
         self.ast.text.push_str(text);
@@ -1097,7 +1109,6 @@ impl<T> Tree<T> {
         self.ast.names.shrink_to_fit();
         self.ast.bytes.shrink_to_fit();
         self.ast.numbers.shrink_to_fit();
-        self.ast.debug_text.shrink_to_fit();
     }
 
     fn required_node_indices(&self) -> usize {

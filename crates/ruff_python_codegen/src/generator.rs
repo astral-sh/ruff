@@ -1445,7 +1445,7 @@ impl<'a> Generator<'a> {
     fn unparse_interpolated_element(
         &mut self,
         val: Expr<'_>,
-        debug_text: Option<&DebugText>,
+        debug_text: Option<DebugText<'_>>,
         conversion: ConversionFlag,
         spec: Option<InterpolatedStringFormatSpec<'_>>,
         flags: AnyStringFlags,

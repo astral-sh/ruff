@@ -4,8 +4,8 @@ use std::path::Path;
 pub use flat::fields::*;
 pub use flat::{
     AnyNode, AnyParameter, ArgOrKeyword, ArgumentId, ArgumentsSourceOrder, Ast, AstNode, AstNodeId,
-    BuildId, Builder, BytesValue, Checkpoint, Children, Descendants, Emit, ExceptHandlerKind,
-    ExprKind, FStringPartId, FStringPartView, FStringValue, FilteredNodes,
+    BuildId, Builder, BytesValue, Checkpoint, Children, DebugText, Descendants, Emit,
+    ExceptHandlerKind, ExprKind, FStringPartId, FStringPartView, FStringValue, FilteredNodes,
     InterpolatedStringElementKind, InterpolatedStringElements, List, ListId, ListItem, ListIter,
     LiteralExpression, MappingPatternItemId, MappingPatternItems, MappingPatternItemsId, ModKind,
     NameId, NodeList, NodeType, ParameterItemId, ParameterItems, ParameterItemsId,

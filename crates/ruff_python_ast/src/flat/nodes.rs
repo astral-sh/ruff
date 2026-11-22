@@ -1,9 +1,10 @@
 use crate::StringFlags;
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-use super::{AstNode, AstNodeId, ExprKind, List};
+use super::{Ast, AstNode, AstNodeId, ExprKind, List, build};
 use crate::{
     CmpOp, Expr, ExprCompare, Identifier, NodeKind, Parameter, ParameterWithDefault, Pattern,
 };
@@ -187,6 +188,78 @@ impl<'a> ParameterWithDefault<'a> {
 
     pub fn annotation(self) -> Option<Expr<'a>> {
         self.parameter().annotation()
+    }
+}
+
+/// The original spelling of a self-documenting interpolation such as `f"{ x = }"`.
+///
+/// Its four boundaries in the shared text buffer delimit the leading text, the expression
+/// and the trailing text. Parentheses and comments can occur around the expression, so
+/// trimming whitespace from the full text would lose the split.
+#[derive(Clone, Copy)]
+pub struct DebugText<'a> {
+    ast: &'a Ast,
+    slot: u32,
+}
+
+impl<'a> DebugText<'a> {
+    // Defer reading the boundaries and text until needed. Rules that only test whether
+    // the interpolation has debug text can answer that from the row alone.
+    pub(super) fn new(ast: &'a Ast, slot: u32) -> Self {
+        Self { ast, slot }
+    }
+
+    fn slice(self, start: usize, end: usize) -> &'a str {
+        let bounds = &self.ast.extra[self.slot as usize..];
+        &self.ast.text[bounds[start] as usize..bounds[end] as usize]
+    }
+
+    /// The full text between the opening brace and the conversion, format spec or closing brace.
+    pub fn as_str(self) -> &'a str {
+        self.slice(0, 3)
+    }
+
+    /// The text between the opening brace and the expression.
+    pub fn leading(self) -> &'a str {
+        self.slice(0, 1)
+    }
+
+    /// The expression as written, e.g. `0x0` in `f"{0x0=}"`.
+    pub fn expression(self) -> &'a str {
+        self.slice(1, 2)
+    }
+
+    /// The text following the expression, including the equals sign.
+    pub fn trailing(self) -> &'a str {
+        self.slice(2, 3)
+    }
+
+    pub(super) fn parts(self) -> build::DebugText<'a> {
+        build::DebugText {
+            leading: self.leading(),
+            expression: self.expression(),
+            trailing: self.trailing(),
+        }
+    }
+}
+
+impl fmt::Debug for DebugText<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.parts(), f)
+    }
+}
+
+impl PartialEq for DebugText<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.parts() == other.parts()
+    }
+}
+
+impl Eq for DebugText<'_> {}
+
+impl Hash for DebugText<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.parts().hash(state);
     }
 }
 

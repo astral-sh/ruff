@@ -874,7 +874,7 @@ impl Hash for ComparableStringElement<'_> {
 /// the runtime value. If `x` is 1, `f"{x =}"` produces `"x =1"` and `f"{x=}"`
 /// produces `"x=1"`. Python normalizes CR and CRLF to LF at compile time, so
 /// these newline spellings produce identical text.
-fn comparable_debug_text(text: &ast::DebugText) -> Cow<'_, str> {
+fn comparable_debug_text(text: ast::DebugText<'_>) -> Cow<'_, str> {
     normalize_newlines(text.as_str())
 }
 

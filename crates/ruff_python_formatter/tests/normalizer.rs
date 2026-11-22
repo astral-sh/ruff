@@ -143,7 +143,11 @@ impl Rewriter for Normalizer {
                     expression,
                     conversion: interpolation.conversion(),
                     format_spec,
-                    debug_text: Some(ast::DebugText::new(&leading, debug.expression(), &trailing)),
+                    debug_text: Some(build::DebugText {
+                        leading: &leading,
+                        expression: debug.expression(),
+                        trailing: &trailing,
+                    }),
                 })
                 .into(),
         )

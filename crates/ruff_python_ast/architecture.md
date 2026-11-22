@@ -97,8 +97,8 @@ A dictionary display stores a list of `DictItem` IDs. Each item holds its option
 value. In `{**mapping}` the entry starts at `**` and its only child is `mapping`. Every AST list
 element occupies one four-byte word. Side-table offsets have their own encoding and can start at
 zero. UTF-8 text and arbitrary byte strings have separate buffers, so a bytes literal can contain
-any byte without affecting text decoding. Number
-values and interpolation debug text have their own side tables. Identifiers with the same spelling
+any byte without affecting text decoding. Number values have their own side table.
+Identifiers with the same spelling
 share a four-byte index into the parse's name table. Each distinct spelling is a `Name` backed
 by `CharStr`, which stores short names inline. The parser emits unescaped literals from the source and
 decodes escaped literals before emitting them into the text or bytes buffer.
@@ -106,6 +106,13 @@ A string literal expression stores both its list of tokens and the range of its 
 The text offset and a two-byte length fit beside the list in the row. Lengths of 65,535 bytes
 or more use a full range in the extra-data column. A semantic
 check can borrow the decoded text directly, including for implicitly concatenated literals.
+
+Self-documenting interpolations store their original spelling alongside decoded literals in
+`Ast::text`. For `f"{ x = }"` the text is `" x = "`. The interpolation row points to four byte
+offsets in `Ast::extra` delimiting the three contiguous slices `" "`, `"x"` and `" = "`.
+The split preserves spacing, parentheses and comments when rewriting the expression.
+An ordinary interpolation such as `f"{x}"` marks this field absent in the row and needs no
+debug text or offsets in the shared buffers.
 
 Strings, bytes, f-strings, and t-strings all store their parts as lists of row IDs at the same
 offset. The generator checks this layout and emits one accessor for the four expression kinds.

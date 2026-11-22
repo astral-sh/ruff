@@ -3499,10 +3499,10 @@ impl<'a> crate::InterpolatedElement<'a> {
         self.syntax_node().ast.child(word)
     }
     #[inline]
-    pub fn debug_text(self) -> Option<&'a crate::DebugText> {
+    pub fn debug_text(self) -> Option<crate::DebugText<'a>> {
         let word = u64::from(self.syntax_node().row.interpolated_element_debug_text());
         (split_words(word)[0] != ABSENT)
-            .then(|| &self.syntax_node().ast.debug_text[split_words(word)[0] as usize])
+            .then(|| crate::DebugText::new(self.syntax_node().ast, split_words(word)[0]))
     }
     #[inline]
     pub fn conversion(self) -> crate::ConversionFlag {
@@ -5437,7 +5437,7 @@ impl Builder {
             AnyNode::InterpolatedElement(node) => build::InterpolatedElement {
                 range: node.range(),
                 expression: self.copy_with(node.expression(), rewriter),
-                debug_text: node.debug_text().cloned(),
+                debug_text: node.debug_text().map(crate::DebugText::parts),
                 conversion: node.conversion(),
                 format_spec: node
                     .format_spec()
@@ -6980,6 +6980,12 @@ impl<'a> TypeParamKind<'a> {
 pub mod build {
     use super::super::Emit;
     use super::{ABSENT, AstNodeId, BuildId, Builder, Word, offset};
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct DebugText<'a> {
+        pub leading: &'a str,
+        pub expression: &'a str,
+        pub trailing: &'a str,
+    }
     impl From<AstNodeId<crate::kind::ModModule>> for AstNodeId<crate::kind::Mod> {
         fn from(value: AstNodeId<crate::kind::ModModule>) -> Self {
             value.cast()
@@ -8674,23 +8680,22 @@ pub mod build {
         }
     }
     #[derive(Debug)]
-    pub struct InterpolatedElement {
+    pub struct InterpolatedElement<'a> {
         pub range: ruff_text_size::TextRange,
         pub expression: BuildId<crate::kind::Expr>,
-        pub debug_text: Option<crate::DebugText>,
+        pub debug_text: Option<DebugText<'a>>,
         pub conversion: crate::ConversionFlag,
         pub format_spec: Option<BuildId<crate::kind::InterpolatedStringFormatSpec>>,
     }
-    impl Emit for InterpolatedElement {
+    impl Emit for InterpolatedElement<'_> {
         type Output = crate::kind::InterpolatedElement;
         #[inline]
         fn emit(self, builder: &mut Builder) -> BuildId<Self::Output> {
             let expression = u64::from(self.expression.slot);
-            let debug_text = self.debug_text.map_or(u64::from(ABSENT), |text| {
-                let slot = offset(builder.ast.debug_text.len());
-                builder.ast.debug_text.push(text);
-                u64::from(slot)
-            });
+            let debug_text = u64::from(
+                self.debug_text
+                    .map_or(ABSENT, |parts| builder.store_debug_text(parts)),
+            );
             let conversion = self.conversion.encode();
             let format_spec = self.format_spec.map_or(0, |id| u64::from(id.slot));
             builder.push_interpolated_element(
@@ -10524,7 +10529,7 @@ pub(crate) mod fields {
     pub struct InterpolatedElementFields<'a> {
         pub node: crate::InterpolatedElement<'a>,
         pub expression: crate::Expr<'a>,
-        pub debug_text: Option<&'a crate::DebugText>,
+        pub debug_text: Option<crate::DebugText<'a>>,
         pub conversion: crate::ConversionFlag,
         pub format_spec: Option<crate::InterpolatedStringFormatSpec<'a>>,
     }

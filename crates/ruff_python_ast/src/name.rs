@@ -25,9 +25,8 @@ use crate::Expr;
 /// built incrementally, mutated, or commonly falls in that 17-to-24-byte range.
 ///
 /// `Name` uses `CharStr` because names appear throughout the AST and repeated heap-backed parser
-/// names share an allocation. By contrast, [`crate::DebugText`] uses `CompactString` because it
-/// builds a uniquely owned buffer incrementally, and `ty_module_resolver::ModuleName` uses
-/// `CompactString` because module names can be extended in place.
+/// names share an allocation. `ty_module_resolver::ModuleName` uses `CompactString` because
+/// module names can be extended in place.
 ///
 /// Converting a borrowed `&str` into `CharStr` creates a new value and does not preserve structural
 /// sharing. When an API retains text already held in a `CharStr` (including a `Name`), pass or clone
